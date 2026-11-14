@@ -46,6 +46,9 @@ import {
   STORE_NAME,
   THUMBNAILS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
+  VIDEO_ANIMATION_PACKAGES_STORE,
+  VIDEO_VISUAL_PREFERENCES_STORE,
+  VIDEO_GL_TRANSITION_PRESETS_STORE,
   VIDEO_PROJECTS_STORE,
   VIDEO_PROJECT_REVISIONS_STORE,
   WEB_SNAPSHOTS_STORE,
@@ -111,7 +114,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 36,
+    schemaVersion: 39,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
@@ -134,7 +137,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'videoProjects',
-    schemaVersion: 11,
+    schemaVersion: 13,
     stores: [
       { storeName: VIDEO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_PROJECT_REVISIONS_STORE, dataClass: 'durable-authority' },
@@ -171,8 +174,13 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'effects',
-    schemaVersion: 1,
-    stores: [{ storeName: VIDEO_EFFECT_BUNDLES_STORE, dataClass: 'durable-authority' }],
+    schemaVersion: 4,
+    stores: [
+      { storeName: VIDEO_EFFECT_BUNDLES_STORE, dataClass: 'durable-authority' },
+      { storeName: VIDEO_ANIMATION_PACKAGES_STORE, dataClass: 'durable-authority' },
+      { storeName: VIDEO_VISUAL_PREFERENCES_STORE, dataClass: 'durable-authority' },
+      { storeName: VIDEO_GL_TRANSITION_PRESETS_STORE, dataClass: 'durable-authority' },
+    ],
   },
   {
     domainId: 'editorAssets',

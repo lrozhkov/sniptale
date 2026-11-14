@@ -1,3 +1,4 @@
+import { createSourceImageFilter } from '../../image-filters/contract';
 import { createQuickEditWatermark } from '../project/scene/watermark';
 import { updateQuickEditBackground } from './advanced/background';
 import { expect, it } from 'vitest';
@@ -347,3 +348,51 @@ it('keeps a distinct passive layout without replacing the active layout blur or 
     });
   }
 });
+
+it.each(['basic', 'advanced'] as const)(
+  'preserves source filters through cuts rates conversion and Native reopen in %s mode',
+  (mode) => {
+    const input = fixture();
+    input.ui.mode = mode;
+    input.document.edits.push({
+      id: 'rate',
+      kind: 'speed',
+      start: 1,
+      end: 2,
+      requestedStart: 1,
+      requestedEnd: 2,
+      rate: 2,
+      audio: 'speed',
+    });
+    const stack = {
+      version: 1 as const,
+      filters: [
+        createSourceImageFilter('bloom', 'bloom'),
+        ...(['monochrome', 'sepia', 'sharpen', 'pixelate', 'vignette', 'grain'] as const).map(
+          (kind) => createSourceImageFilter(kind, kind)
+        ),
+        { ...createSourceImageFilter('blur', 'blur'), enabled: false },
+        createSourceImageFilter('color', 'color'),
+      ],
+    };
+    input.document.advancedContent.sourceFilters = stack;
+    const before = structuredClone(input);
+    const result = planReviewProjectConversion(input);
+    if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+    expect(result.project.version).toBe(52);
+    const restored = hydrateVideoProject(JSON.parse(JSON.stringify(result.project)));
+    expect(isExportReadyVideoProject(restored)).toBe(true);
+    const videos = restored.clips.filter((clip) => clip.type === 'VIDEO');
+    expect(videos.length).toBeGreaterThan(1);
+    for (const clip of videos) {
+      expect(clip.sourceFilters).toEqual(stack);
+      expect(clip.sourceFilters).not.toBe(stack);
+    }
+    expect(
+      restored.clips
+        .filter((clip) => clip.type !== 'VIDEO')
+        .every((clip) => !('sourceFilters' in clip))
+    ).toBe(true);
+    expect(input).toEqual(before);
+  }
+);

@@ -55,6 +55,8 @@ export function createZoomPreviewPaintOwner(args: {
   } | null = null;
   const authoringKey = (input: ZoomPreviewGpuInput) =>
     JSON.stringify([
+      input.sourceFilters,
+      input.sourceSize,
       input.output,
       input.background,
       input.layout.videoRect,
@@ -209,6 +211,8 @@ export function createZoomPreviewPaintOwner(args: {
     if (disposed) return;
     const next = authoringKey(input);
     const identity = JSON.stringify([
+      input.sourceFilters,
+      input.sourceSize,
       input.output,
       input.view,
       !!input.live,

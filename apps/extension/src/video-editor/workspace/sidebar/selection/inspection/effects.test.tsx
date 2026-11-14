@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createGlTransitionSelection } from '../../../../../features/video/project/transition/gl-catalog';
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -88,16 +89,15 @@ function createProps() {
     },
     selectedClip: null,
     selectedTransition: {
-      direction: 'RIGHT',
       duration: 0.8,
       easing: 'EASE_IN_OUT',
-      highlightColor: '#f97316',
+
       id: 'transition-1',
-      intensity: 'BOLD',
-      kind: 'LIGHT_SWEEP',
+
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       leadingClipId: 'clip-a',
-      renderKind: 'CSS_LIKE',
-      templateKind: 'LIGHT_SWEEP',
+
       trailingClipId: 'clip-b',
     },
     selectedCursorSample: null,
@@ -138,8 +138,8 @@ describe('workspace-sidebar/selection/inspect-effects', () => {
       'videoEditor.sidebar.inspectorGroupTransition',
       'videoEditor.sidebar.inspectorGroupInfo',
     ]);
-    expect(container?.textContent).toContain('videoEditor.effectsLibrary.fallbackTransition');
-    expect(container?.textContent).toContain('videoEditor.effectsLibrary.chooseTransition');
+    expect(container?.textContent).toContain('Fade');
+    expect(container?.querySelector('button[aria-haspopup="listbox"]')).not.toBeNull();
     expect(container?.textContent).toContain('videoEditor.sidebar.transitionEasingLabel');
     clickGroup('videoEditor.sidebar.inspectorGroupInfo');
     expect(container?.textContent).toContain('videoEditor.sidebar.transitionLeadingClipLabel');

@@ -345,8 +345,9 @@ function sequencePlacements(sequence: PresentationSequencePlan) {
       ...(join
         ? {
             transition: {
-              type: join.type,
-              color: join.color,
+              ...(join.type === 'gl'
+                ? { type: join.type, selection: join.selection, easing: join.easing }
+                : { type: join.type, color: join.color }),
               before: join.beforeUs / 1_000_000,
               after: join.afterUs / 1_000_000,
             },

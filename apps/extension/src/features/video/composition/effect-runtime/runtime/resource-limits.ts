@@ -276,7 +276,7 @@ export function createEffectRuntimeGpuFrameLedger(
           const frameLimit = EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterBytes;
           if (frameBytes + cost > frameLimit || bytes + cost > frameLimit * maximumInFlight)
             throw new EffectRuntimeResourceError();
-          const reservation = reserveBytes?.(cost);
+          const reservation = cost > 0 ? reserveBytes?.(cost) : undefined;
           frameBytes += cost;
           bytes += cost;
           let released = false;

@@ -62,7 +62,7 @@ function fixture() {
   return { project, video, audio };
 }
 
-it('does not expose sound controls on video or an extra mute toggle on audio', () => {
+it('keeps legacy volume and duration fields on audio and exposes DSP for linked video', () => {
   const { project, video, audio } = fixture();
   const props = {
     project,
@@ -71,10 +71,14 @@ it('does not expose sound controls on video or an extra mute toggle on audio', (
     onUpdateClipAudioEnvelope: vi.fn(),
     onDetachClipGroup: vi.fn(),
   };
-  expect(renderAudioFields({ ...props, selectedClip: video })).toBeNull();
+  act(() => root.render(renderAudioFields({ ...props, selectedClip: video })));
+  expect(container.querySelector('[data-ui="audio.processing-fields"]')).not.toBeNull();
+  expect(container.textContent).not.toContain('videoEditor.sidebar.volumeLabel');
+  expect(container.textContent).not.toContain('videoEditor.sidebar.audioDurationContent');
   act(() => root.render(renderAudioFields({ ...props, selectedClip: audio })));
   expect(container.textContent).toContain('videoEditor.sidebar.volumeLabel');
-  expect(container.querySelector('[role="switch"]')).toBeNull();
+  for (const toggle of container.querySelectorAll('[role="switch"]'))
+    expect(toggle.getAttribute('aria-label')).toMatch(/^audioProcessing\./u);
   expect(container.textContent).toContain('videoEditor.sidebar.audioDurationContent');
 });
 
@@ -237,4 +241,42 @@ it('shows zero volume for a retained muted audio clip', () => {
   );
   expect(input).not.toBeNull();
   expect(Number(input!.value)).toBe(0);
+});
+
+it('commits selected-video DSP to linked audio through the real Undo and Redo owner', () => {
+  const { project, audio, video } = fixture();
+  useVideoEditorStore.getState().setProject(project);
+  function Harness() {
+    const current = useVideoEditorStore((state) => state.project)!;
+    return renderAudioFields({
+      project: current,
+      selectedClip: current.clips.find((clip) => clip.id === video.id)!,
+      onUpdateClipMuted: vi.fn(),
+      onUpdateClipVolume: vi.fn(),
+      onUpdateClipAudioEnvelope: vi.fn(),
+      onDetachClipGroup: vi.fn(),
+    });
+  }
+  act(() => root.render(<Harness />));
+  const before = useVideoEditorStore.getState().projectHistory.past.length;
+  act(() =>
+    container.querySelector<HTMLButtonElement>('[aria-label="audioProcessing.denoise"]')!.click()
+  );
+  const state = useVideoEditorStore.getState();
+  expect(state.projectHistory.past).toHaveLength(before + 1);
+  expect(state.project!.clips.find((clip) => clip.id === audio.id)).toHaveProperty(
+    'audioProcessing.denoise.enabled',
+    true
+  );
+  expect(state.project!.clips.find((clip) => clip.id === video.id)).not.toHaveProperty(
+    'audioProcessing'
+  );
+  act(() => useVideoEditorStore.getState().undoProject());
+  expect(
+    useVideoEditorStore.getState().project!.clips.find((clip) => clip.id === audio.id)
+  ).not.toHaveProperty('audioProcessing');
+  act(() => useVideoEditorStore.getState().redoProject());
+  expect(
+    useVideoEditorStore.getState().project!.clips.find((clip) => clip.id === audio.id)
+  ).toHaveProperty('audioProcessing.denoise.enabled', true);
 });

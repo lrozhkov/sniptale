@@ -1,12 +1,13 @@
 import * as sandboxRuntime from '../video/effect-runtime-sandbox';
 import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import {
-  mapEffectV1ObjectPoint,
-  resolveEffectV1ObjectRenderBounds,
-  resolveEffectV1ControlDefault,
-  sha256EffectV1Bytes,
-} from '@sniptale/runtime-contracts/effect-v1';
+  mapAnimationObjectPoint,
+  resolveAnimationObjectRenderBounds,
+} from '@sniptale/runtime-contracts/animation-template';
+import { animationRuntimeDuration } from '../../contracts/effect-runtime/animation';
+import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
 import type {
   EffectRuntimeFrameResult,
   EffectRuntimeGpuPlanResult,
@@ -33,38 +34,45 @@ const density = { content: { width: 0.5, height: 0.5 }, viewport: { width: 0.5, 
 async function fixture(names = ['title']) {
   const plane = { width: 1920, height: 1080 };
   const snapshots: ReviewAnnotationEffectSnapshot[] = [];
+  const documents = new Map<
+    string,
+    NonNullable<ReturnType<typeof readReviewAnnotationEffectDocument>>
+  >();
   const instances: ReviewAnnotationScene['lane']['instances'] = [];
   for (const name of names) {
     const source = readFileSync(
-      `apps/extension/public/video-effects/effects/annotations/sniptale-${name}/effect.sniptale-effect.json`,
+      name === 'callout'
+        ? 'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
+        : `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
       'utf8'
     );
     const document = readReviewAnnotationEffectDocument(source)!;
-    const hash = await sha256EffectV1Bytes(new TextEncoder().encode(source));
+    const hash = createHash('sha256').update(source).digest('hex');
     const snapshot: ReviewAnnotationEffectSnapshot = {
       id: `effect:${hash}`,
       sha256: hash,
       source,
       documentId: document.id,
-      schemaVersion: 'sniptale.effect.v1',
+      schemaVersion: 'sniptale.animation.v1',
       kind: 'standalone',
       retainedByteLength: new TextEncoder().encode(source).byteLength,
       assets: [],
     };
     snapshots.push(snapshot);
-    const layout = document.objectLayout!;
+    documents.set(snapshot.id, document);
+    const layout = document.objectLayout;
     const transform = {
       x: 0.2,
       y: 0.3,
-      width: layout.width / plane.width,
-      height: layout.height / plane.height,
+      width: document.animation.w / plane.width,
+      height: document.animation.h / plane.height,
       rotation: 0.2,
     };
     const controls = Object.fromEntries(
-      document.controls.map((control) => [control.id, resolveEffectV1ControlDefault(control, 'en')])
+      document.controls.map((control) => [control.id, resolveEffectControlDefault(control, 'en')])
     );
     const anchors = initializeReviewAnnotationEffectAnchors(document, transform, controls, plane);
-    for (const handle of layout.handles ?? []) {
+    for (const handle of layout?.handles ?? []) {
       delete controls[handle.xControl];
       delete controls[handle.yControl];
     }
@@ -141,7 +149,7 @@ async function fixture(names = ['title']) {
     signal: new AbortController().signal,
     createExecutor: vi.fn(() => executor),
   };
-  return { scene, deps, executor, success, bitmaps, managed: () => managed };
+  return { scene, deps, executor, success, bitmaps, documents, managed: () => managed };
 }
 
 it('renders six real definitions in order through the standalone driver and closes outputs', async () => {
@@ -168,15 +176,18 @@ it('renders six real definitions in order through the standalone driver and clos
     'viewport',
   ]);
   for (const [request] of f.executor.renderFrame.mock.calls) {
+    const snapshot = f.scene.snapshots.find((item) => item.id === request.snapshotId)!;
+    const document = f.documents.get(snapshot.id)!;
+    const duration = animationRuntimeDuration(document);
     expect(request).toMatchObject({
-      duration: 4,
+      duration,
       progress: 0.5,
-      time: 2,
-      frameIndex: 60,
+      time: duration / 2,
+      frameIndex: duration * 15,
       inputFrames: {},
     });
     expect((await request.materializeImmutablePayloads()).documentSource).toContain(
-      'sniptale.effect.v1'
+      'sniptale-animation'
     );
   }
   expect(renderer.counters().liveRasterResources).toBe(6);
@@ -209,13 +220,16 @@ it('keeps the full main animation clock after cuts/speed and does not restart at
   ]);
   const renderer = await createReviewAnnotationRenderer(f.scene, f.deps);
   const frame = await renderer.render(5.5, density, 30, f.deps.signal);
-  expect(f.executor.renderFrame.mock.calls[0]![0].time).toBeCloseTo(28 / 9);
+  const duration = animationRuntimeDuration(
+    readReviewAnnotationEffectDocument(f.scene.snapshots[0]!.source)!
+  );
+  expect(f.executor.renderFrame.mock.calls[0]![0].time).toBeCloseTo((duration * 7) / 9);
   expect(f.executor.renderFrame.mock.calls[0]![0].progress).toBeCloseTo(7 / 9);
   frame.release();
   renderer.dispose();
 });
 
-it('grows callout raster bounds past the body, and reflow dimensions use the authored body', async () => {
+it('grows external callout bounds and separates source coordinates from physical body dimensions', async () => {
   const f = await fixture(['callout', 'frame']);
   const callout = f.scene.lane.instances[0]!;
   const document = readReviewAnnotationEffectDocument(f.scene.snapshots[0]!.source)!;
@@ -227,12 +241,12 @@ it('grows callout raster bounds past the body, and reflow dimensions use the aut
   const plans = renderer.describe(6, density, 30);
   expect(plans[0]!.bitmapBounds.x).toBeLessThan(0);
   expect(plans[0]!.bitmapBounds.width).toBeGreaterThan(1);
-  expect(plans[1]!.plan.dimensions).toEqual({ width: 1152, height: 324 });
+  expect(plans[1]!.plan.dimensions).toEqual({ width: 640, height: 360 });
   expect(plans[1]!.plan.renderDimensions).toEqual({ width: 576, height: 162 });
   renderer.dispose();
 });
 
-it('scale-body aspect and fixed handles agree with public SDK raster bounds', async () => {
+it('scale-body aspect and fixed handles agree with shared animation source bounds', async () => {
   const f = await fixture(['callout']);
   const instance = f.scene.lane.instances[0]!;
   instance.transform = { x: 0.1, y: 0.2, width: 0.5, height: 0.1, rotation: 0 };
@@ -249,18 +263,18 @@ it('scale-body aspect and fixed handles agree with public SDK raster bounds', as
     time: 6,
     fps: 30,
   })!;
-  const bounds = resolveEffectV1ObjectRenderBounds(layout, planned.plan.controls);
+  const bounds = resolveAnimationObjectRenderBounds(document, planned.plan.controls);
   expect(planned.plan.dimensions).toEqual({ width: bounds.width, height: bounds.height });
   const { box, bitmapBounds, plan } = planned;
   for (const point of [
     { x: 0, y: 0 },
-    { x: layout.width, y: layout.height },
+    { x: document.animation.w, y: document.animation.h },
     ...layout.handles!.map((handle) => ({
       x: Number(plan.controls[handle.xControl]),
       y: Number(plan.controls[handle.yControl]),
     })),
   ]) {
-    const mapped = mapEffectV1ObjectPoint(layout, box, point);
+    const mapped = mapAnimationObjectPoint(document, box, point);
     const painted = {
       x:
         box.x +
@@ -458,7 +472,7 @@ it('keeps Gallery annotation phase and anchors in ordinary Native cut and rate i
     project.effectSnapshots = [{ ...snapshot, assets: [] }];
     project.effectInstances = [];
     project.clips = [];
-    const playbackRate = document.duration / projection.duration;
+    const playbackRate = animationRuntimeDuration(document) / projection.duration;
     for (const [index, slice] of projection.slices.entries()) {
       const id = `${instance.id}:${index}`;
       const duration = slice.end - slice.start;
@@ -895,4 +909,94 @@ it('contains advisory factory failure and attempts that event only once', async 
   renderer.warmUpcomingGpu({ ...args, inputs: [{}] });
   expect(createWarmExecutor).toHaveBeenCalledTimes(2);
   renderer.dispose();
+});
+
+it('prepares four startup bitmap frames and releases outputs before async compilation', async () => {
+  const f = await fixture(['title', 'callout', 'lower-third', 'frame', 'corners', 'chapters']);
+  f.scene.lane.instances[5]!.start = 1;
+  f.scene.lane.instances.push(
+    { ...f.scene.lane.instances[0]!, id: 'later', start: 3, order: 6 },
+    { ...f.scene.lane.instances[0]!, id: 'disabled', enabled: false, order: 7 }
+  );
+  let finish!: () => void;
+  const compilation = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const warm: EffectRuntimeSandboxExecutor = {
+    maximumWarmFrames: 4,
+    dispose: vi.fn(),
+    renderFrame: vi.fn(),
+    prepareGpuFrame: vi.fn(async (request) => f.success(request)),
+  };
+  const renderer = await createReviewAnnotationRenderer(f.scene, {
+    ...f.deps,
+    createWarmExecutor: () => warm,
+  });
+  const held = f.managed();
+  const prepare = vi.fn(
+    (_entry: { instance: ReviewAnnotationScene['lane']['instances'][number] }) => compilation
+  );
+  renderer.warmUpcomingGpu({
+    time: 1.5,
+    fps: 30,
+    context: {},
+    signal: f.deps.signal,
+    densityAt: () => density,
+    prepare,
+  });
+  await vi.waitFor(() => expect(prepare).toHaveBeenCalledTimes(4));
+  expect(prepare.mock.calls.map(([entry]) => entry.instance.id)).toEqual([
+    'instance-title',
+    'instance-callout',
+    'instance-lower-third',
+    'instance-frame',
+  ]);
+  expect(f.bitmaps).toHaveLength(4);
+  for (const bitmap of f.bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+  expect(f.managed()).toBe(held);
+  finish();
+  renderer.dispose();
+});
+
+it('reuses owned unchanged GPU contents across clock ticks and retires them after the last batch borrow', async () => {
+  const f = await fixture();
+  class Bitmap {
+    static [Symbol.hasInstance](value: unknown) {
+      return f.bitmaps.some((bitmap) => bitmap === value);
+    }
+  }
+  vi.stubGlobal('ImageBitmap', Bitmap);
+  const executor = {
+    ...f.executor,
+    gpuFrameReuseContext: {},
+    maximumGpuFramesInFlight: 2 as const,
+    prepareGpuFrame: vi.fn(async (request: EffectRuntimeRenderCommand) => f.success(request)),
+  };
+  const renderer = await createReviewAnnotationRenderer(f.scene, {
+    ...f.deps,
+    createExecutor: () => executor,
+  });
+  try {
+    const first = await renderer.prepareGpu(6, density, 30, f.deps.signal);
+    const next = await renderer.prepareGpu(6.001, density, 30, f.deps.signal);
+    expect(executor.prepareGpuFrame).toHaveBeenCalledOnce();
+    const a = first.entries[0],
+      b = next.entries[0];
+    if (!a || !b || !('rasterCache' in a) || !('rasterCache' in b))
+      throw new Error('Expected owned GPU metadata.');
+    expect(b.source).toBe(a.source);
+    expect(b.rasterCache).toEqual(a.rasterCache);
+    const borrowed = next.retain();
+    first.release();
+    next.release();
+    expect(f.bitmaps[0]!.close).not.toHaveBeenCalled();
+    renderer.dispose();
+    expect(f.bitmaps[0]!.close).not.toHaveBeenCalled();
+    borrowed.release();
+    expect(f.bitmaps[0]!.close).toHaveBeenCalledOnce();
+    expect(f.managed()).toBe(0);
+  } finally {
+    renderer.dispose();
+    vi.unstubAllGlobals();
+  }
 });

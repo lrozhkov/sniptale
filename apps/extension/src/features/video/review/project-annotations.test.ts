@@ -12,10 +12,8 @@ import { isExportReadyVideoProject, parseHydratableVideoProject } from '../proje
 import { calculateProjectDuration, syncProjectDuration } from '../project/timeline/basics';
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import {
-  sha256EffectV1Bytes,
-  validateEffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
+import { sha256 as hashSha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import { readReviewAnnotationEffectDocument } from './annotation-effects/validation';
 import { planReviewProjectConversion } from './project-conversion';
 import { fixture } from './project-conversion.test-support';
@@ -30,17 +28,17 @@ import { hydrateVideoProject } from '../project/hydration';
 async function annotationsFixture() {
   const input = fixture();
   const source = readFileSync(
-    'apps/extension/public/video-effects/effects/annotations/sniptale-title/effect.sniptale-effect.json',
+    'apps/extension/public/video-effects/animations/title.sniptale-animation.json',
     'utf8'
   );
   const document = readReviewAnnotationEffectDocument(source)!;
-  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(source));
+  const sha256 = bytesToHex(hashSha256(new TextEncoder().encode(source)));
   const snapshot = {
     id: `effect:${sha256}`,
     sha256,
     source,
     documentId: document.id,
-    schemaVersion: 'sniptale.effect.v1' as const,
+    schemaVersion: 'sniptale.animation.v1' as const,
     kind: 'standalone' as const,
     retainedByteLength: new TextEncoder().encode(source).byteLength,
     assets: [],
@@ -84,12 +82,17 @@ it('converts both annotation planes with Gallery phase through cuts speed and re
   expect(hosts.filter((clip) => clip.attachment?.kind === 'viewport')).toHaveLength(1);
   expect(project.effectSnapshots).toHaveLength(1);
   const annotation = input.document.advancedContent.annotationEffects!.instances[0]!;
+  const document = readReviewAnnotationEffectDocument(input.annotationSnapshots[0]!.source)!;
   const projection = projectReviewAnnotationEffect(
     annotation,
     buildReviewTimeMap(input.source.duration, input.document.edits)
   );
   for (const time of [1.019, 2.9, 3.25, 4.01, 4.9]) {
-    const expected = sampleReviewAnnotationEffect(projection, 4, time)!;
+    const expected = sampleReviewAnnotationEffect(
+      projection,
+      (document.animation.op - document.animation.ip) / document.animation.fr,
+      time
+    )!;
     const plans = resolveEffectRuntimeFramePlans(project, time);
     expect(plans).toHaveLength(2);
     for (const plan of plans) {
@@ -166,46 +169,38 @@ it('retains wholly cut annotations without extending the montage after reopen', 
     });
   }
   expect(reopened.effectSnapshots).toHaveLength(1);
-  const targetSource = readFileSync(
-    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-target-effect.sniptale-effect.json',
-    'utf8'
-  );
-  const targetDocument = validateEffectV1Document(JSON.parse(targetSource)).document!;
-  const targetHash = await sha256EffectV1Bytes(new TextEncoder().encode(targetSource));
   const firstHost = reopened.clips.find((clip) => clip.type === 'EFFECT')!;
   expect(
     resolveEffectOwner(reopened, { kind: 'track', trackId: firstHost.trackId })!.duration
   ).toBe(0);
-  reopened.effectSnapshots!.push({
-    id: `effect:${targetHash}`,
-    sha256: targetHash,
-    source: targetSource,
-    documentId: targetDocument.id,
-    schemaVersion: 'sniptale.effect.v1',
-    kind: 'targetEffect',
-    assets: [],
-    retainedByteLength: new TextEncoder().encode(targetSource).byteLength,
-  });
-  reopened.effectInstances!.push(
-    ...[
-      { kind: 'clip' as const, clipId: firstHost.id },
-      { kind: 'track' as const, trackId: firstHost.trackId },
-    ].map((target, index) => ({
-      id: `dormant-fx-${index}`,
-      snapshotId: `effect:${targetHash}`,
-      kind: 'targetEffect' as const,
-      target,
-      controls: {},
-      enabled: true,
-      startTime: 1,
-      duration: 1,
-      playbackRate: 1,
-    }))
-  );
   expect(isExportReadyVideoProject(reopened)).toBe(true);
   expect(reopened.effectInstances!.every((instance) => instance.enabled)).toBe(true);
   for (const time of [0, 0.5, 1, 1.9])
     expect(resolveEffectRuntimeFramePlans(reopened, time)).toEqual([]);
+  const legacySource = readFileSync(
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/title.sniptale-effect.json',
+    'utf8'
+  );
+  const legacyHash = bytesToHex(hashSha256(new TextEncoder().encode(legacySource)));
+  const unsupported = {
+    ...reopened,
+    effectSnapshots: [
+      ...reopened.effectSnapshots!,
+      {
+        id: `effect:${legacyHash}`,
+        sha256: legacyHash,
+        source: legacySource,
+        documentId: 'sniptale-title',
+        schemaVersion: 'sniptale.effect.v1',
+        kind: 'standalone',
+        assets: [],
+        retainedByteLength: new TextEncoder().encode(legacySource).byteLength,
+      },
+    ],
+  };
+  const retainedUnsupported = structuredClone(unsupported);
+  expect(parseHydratableVideoProject(unsupported)).toBeNull();
+  expect(unsupported).toEqual(retainedUnsupported);
   expect(input).toEqual(before);
 });
 
@@ -375,7 +370,7 @@ it('retains dormant source annotations through bookend transfer and reopen', asy
 });
 
 it.each([3.87, 3.86])(
-  'retains both full-length EffectV1 clocks after main fitting and reopen with cut end %s',
+  'retains both full-length Lottie clocks after main fitting and reopen with cut end %s',
   async (cutEnd) => {
     const input = await annotationsFixture();
     input.document.edits[0]!.end = cutEnd;

@@ -14,7 +14,7 @@ import {
 } from '../../../../apps/extension/src/features/video/project/types';
 import { drawProjectFrame } from '../../../../apps/extension/src/offscreen/project-export/renderer/frame';
 import { resolveVideoCompositionRenderPasses } from '../../../../apps/extension/src/features/video/composition/timeline/render';
-import { drawPreviewVisualPasses } from '../../../../apps/extension/src/video-editor/preview/stage/scene/render-visual';
+import { drawPreviewVisualPasses } from '../../../../apps/extension/src/workflows/video/native-composition/render-visual';
 
 /** Pixel proof uses real painters: an opaque red layer must occlude the blue layer beneath it. */
 export async function fullEditorOcclusion() {

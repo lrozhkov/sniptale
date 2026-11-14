@@ -20,7 +20,7 @@ export type { QuickEditVoiceoverAnchor } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 28;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 34;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -28,6 +28,9 @@ export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
 export type QuickEditTrack =
   | 'source'
   | 'actions'
+  | 'keyboard'
+  | 'mouse'
+  | 'cursorMotion'
   | 'zoom'
   | 'text'
   | 'annotationEffects'
@@ -37,10 +40,13 @@ export type QuickEditTrack =
   | 'music';
 
 export interface QuickEditTrackVisibility {
+  cursorMotion?: boolean;
   text?: boolean;
   originalAudio?: boolean;
   voiceover?: boolean;
   music?: boolean;
+  keyboard?: boolean;
+  mouse?: boolean;
   actions: boolean;
   webcam?: boolean;
   annotationEffects?: boolean;
@@ -97,6 +103,20 @@ export interface QuickEditCameraTransform {
  * matching the shared ReviewTimeMap coordinate domain.
  */
 export interface QuickEditZoomRegion {
+  /** Independent spatial effect; it never occupies or moves the zoom camera. */
+  effect?: '3d';
+  /** Derived source clock for a cut/rate slice; storage admission drops this field. */
+  spatialClock?: { offset: number; rate: number; duration: number };
+  /** Derived phase clock for inserted time; storage admission drops this field. */
+  phaseClock?: {
+    offset: number;
+    rate: number;
+    duration: number;
+    enter: QuickEditZoomTransition;
+    exit: QuickEditZoomTransition;
+  };
+  spatialMotion?: import('../../project/motion/spatial').CameraSpatialMotion;
+
   cameraFollow?: import('../../project/camera/cursor-policy').CameraFollowSettings;
   /** Explicit local camera policy; absence inherits the scene cursor-focus mode. */
   followCursor?: boolean;
@@ -136,6 +156,8 @@ export interface QuickEditZoomRegion {
   linkTo?: string;
   /** Link easing; absent on legacy payloads applies the smooth default. */
   linkEasing?: QuickEditZoomLinkEasing;
+  /** Camera copies yield to existing intervals and remain editable during a conflict. */
+  overlapPolicy?: 'suppress';
   /** Kept but not applied: its interval could not be proven in result time. */
   dormant?: boolean;
 }
@@ -189,6 +211,7 @@ export type QuickEditBackgroundSettings = {
 /** One voiceover or music clip; timeline coordinates are seconds like the video domain. */
 
 export interface QuickEditAudioClip {
+  audioProcessing?: import('@sniptale/runtime-contracts/audio-effects').AudioProcessing;
   /** Immutable text association; deleting or editing text does not delete this audio. */
   textSnapshot?: import('../text-types').ReviewVoiceTextSnapshot;
   /** Optional native-asset transcript and immutable accepted speech replacements. */
@@ -221,6 +244,7 @@ export type QuickEditOriginalAudioMute =
   | (QuickEditOriginalAudioRange & { kind: 'range' });
 
 export interface QuickEditOriginalAudio {
+  audioProcessing?: import('@sniptale/runtime-contracts/audio-effects').AudioProcessing;
   /** Source seconds, independent of result-time edits. */
   ranges?: QuickEditOriginalAudioRange[];
   /** Independent overlays preserve the authored manual gain envelope underneath. */
@@ -266,6 +290,10 @@ export interface QuickEditAdvancedState extends QuickEditAdvancedContent {
  * zoom/background/audio changes join the same undo timeline as cuts.
  */
 export interface QuickEditAdvancedContent {
+  /** Source color processing is independent of presentation mode and overlay visibility. */
+  sourceFilters?: import('../../../image-filters/contract').SourceImageFilterStack;
+  cursorMotionEnabled?: boolean;
+  cursorMotions?: import('../../project/cursor-motion').CursorMotion[];
   cameraFollowDefaults?: import('../../project/camera/cursor-policy').CameraFollowSettings;
   cursorFocusPath?: import('../../project/cursor-focus-path/types').CursorFocusPath;
   text?: import('../text-types').ReviewTextDocument;
@@ -273,6 +301,7 @@ export interface QuickEditAdvancedContent {
   annotationEffects?: import('../annotation-effects/types').ReviewAnnotationEffects;
   /** Missing on older projects means enabled. */
   actionsEnabled?: boolean;
+  interactionTimeline?: import('../interaction-types').ReviewInteractionTimeline;
   keyAnimations?: import('../../project/action-feedback/key-animation').ReviewKeyAnimation[];
   clickAnimations?: import('../../project/action-feedback/types').ReviewClickAnimation[];
   actionAudio?: import('../../project/action-feedback/types').ReviewActionAudioSetting[];

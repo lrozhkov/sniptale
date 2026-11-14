@@ -1,3 +1,5 @@
+import { SourceInteractionFeedbackFields } from '../source-interaction-feedback-fields';
+import { projectSourceInteractionOwner } from '../../../../../../features/video/project/source-interaction-authoring';
 import { KeyFeedbackFields } from '../key-feedback-fields';
 import {
   getVideoProjectClickStyle,
@@ -79,92 +81,94 @@ export function InspectActionPanel(props: ActionProps) {
       ) : null}
       <InspectorGroupedPanel
         groups={
-          keyStyle && source
-            ? sourceKeyGroups(props, resolved, disabled, keyStyle.enabled)
-            : [
-                {
-                  id: 'info',
-                  semantic: 'info' as const,
-                  label: translate('videoEditor.sidebar.inspectorGroupInfo'),
-                  content: (
-                    <ActionOverview
-                      resolved={resolved}
-                      gesture={gesture}
-                      feedbackOverridden={Boolean(authoredGesture)}
-                    />
-                  ),
-                },
-                {
-                  id: 'appearance',
-                  semantic: event.kind === 'KEY' ? ('content' as const) : ('effects' as const),
-                  label: translate(
-                    event.kind === 'KEY'
-                      ? 'videoEditor.sidebar.historyKeyboard'
-                      : 'videoEditor.sidebar.historyClickEffects'
-                  ),
-                  defaultActive: true,
-                  content: (
-                    <ActionAppearanceFields
-                      props={props}
-                      resolved={resolved}
-                      disabled={disabled}
-                      update={update}
-                      gesture={gesture}
-                      click={click}
-                    />
-                  ),
-                },
-                ...actionVisualGroups({
-                  props,
-                  resolved,
-                  disabled,
-                  update,
-                  gesture,
-                  click,
-                  appearanceVisible: gestureStyle.effect !== 'off',
-                }),
-                ...(event.anchor.kind === 'recording-source' &&
-                (event.kind === 'CLICK' || event.kind === 'KEY')
-                  ? [
-                      {
-                        id: 'action-sound',
-                        semantic: 'audio' as const,
-                        label: translate('gallery.videoReview.actionAudio'),
-                        content: (
-                          <ActionFeedbackFields
-                            recordedAction={resolved.event}
-                            project={props.project}
-                            recordingId={event.anchor.recordingId}
-                            sourceInstanceId={event.anchor.sourceInstanceId}
-                            target={{
-                              ref: { kind: 'action', id: event.anchor.sourceEventId },
-                              family: event.kind === 'KEY' ? 'keyboard' : 'mouse',
-                            }}
-                            disabled={disabled}
-                            part="sound"
-                          />
-                        ),
-                      },
-                    ]
-                  : []),
-                ...(event.kind === 'KEY' || gesture || click
-                  ? []
-                  : [
-                      {
-                        id: 'placement',
-                        semantic: 'placement' as const,
-                        label: translate('videoEditor.sidebar.inspectorGroupPlacement'),
-                        content: (
-                          <ActionPlacementFields
-                            props={props}
-                            resolved={resolved}
-                            disabled={disabled}
-                            update={update}
-                          />
-                        ),
-                      },
-                    ]),
-              ]
+          projectSourceInteractionOwner(props.project, event.id)
+            ? transferredInputGroups(props, resolved, disabled)
+            : keyStyle && source
+              ? sourceKeyGroups(props, resolved, disabled, keyStyle.enabled)
+              : [
+                  {
+                    id: 'info',
+                    semantic: 'info' as const,
+                    label: translate('videoEditor.sidebar.inspectorGroupInfo'),
+                    content: (
+                      <ActionOverview
+                        resolved={resolved}
+                        gesture={gesture}
+                        feedbackOverridden={Boolean(authoredGesture)}
+                      />
+                    ),
+                  },
+                  {
+                    id: 'appearance',
+                    semantic: event.kind === 'KEY' ? ('content' as const) : ('effects' as const),
+                    label: translate(
+                      event.kind === 'KEY'
+                        ? 'videoEditor.sidebar.historyKeyboard'
+                        : 'videoEditor.sidebar.historyClickEffects'
+                    ),
+                    defaultActive: true,
+                    content: (
+                      <ActionAppearanceFields
+                        props={props}
+                        resolved={resolved}
+                        disabled={disabled}
+                        update={update}
+                        gesture={gesture}
+                        click={click}
+                      />
+                    ),
+                  },
+                  ...actionVisualGroups({
+                    props,
+                    resolved,
+                    disabled,
+                    update,
+                    gesture,
+                    click,
+                    appearanceVisible: gestureStyle.effect !== 'off',
+                  }),
+                  ...(event.anchor.kind === 'recording-source' &&
+                  (event.kind === 'CLICK' || event.kind === 'KEY')
+                    ? [
+                        {
+                          id: 'action-sound',
+                          semantic: 'audio' as const,
+                          label: translate('gallery.videoReview.actionAudio'),
+                          content: (
+                            <ActionFeedbackFields
+                              recordedAction={resolved.event}
+                              project={props.project}
+                              recordingId={event.anchor.recordingId}
+                              sourceInstanceId={event.anchor.sourceInstanceId}
+                              target={{
+                                ref: { kind: 'action', id: event.anchor.sourceEventId },
+                                family: event.kind === 'KEY' ? 'keyboard' : 'mouse',
+                              }}
+                              disabled={disabled}
+                              part="sound"
+                            />
+                          ),
+                        },
+                      ]
+                    : []),
+                  ...(event.kind === 'KEY' || gesture || click
+                    ? []
+                    : [
+                        {
+                          id: 'placement',
+                          semantic: 'placement' as const,
+                          label: translate('videoEditor.sidebar.inspectorGroupPlacement'),
+                          content: (
+                            <ActionPlacementFields
+                              props={props}
+                              resolved={resolved}
+                              disabled={disabled}
+                              update={update}
+                            />
+                          ),
+                        },
+                      ]),
+                ]
         }
       />
     </section>
@@ -648,4 +652,60 @@ function ActionAppearanceFields({
       ) : null}
     </>
   );
+}
+
+function transferredInputGroups(
+  props: ActionProps,
+  resolved: ActionPresentation,
+  disabled: boolean
+): InspectorGroupDefinition<string>[] {
+  return [
+    {
+      id: 'info',
+      semantic: 'info',
+      label: translate('videoEditor.sidebar.inspectorGroupInfo'),
+      content: (
+        <ActionOverview
+          resolved={resolved}
+          gesture={false}
+          feedbackOverridden={resolved.overridden}
+        />
+      ),
+    },
+    ...(['display', 'appearance', 'timing', 'position', 'sound'] as const).map((part) => ({
+      id: 'source-input-' + part,
+      semantic:
+        part === 'display'
+          ? ('animation' as const)
+          : part === 'timing'
+            ? ('animation' as const)
+            : part === 'position'
+              ? ('placement' as const)
+              : part === 'sound'
+                ? ('audio' as const)
+                : ('appearance' as const),
+      label: translate(
+        part === 'display'
+          ? resolved.event.kind === 'KEY'
+            ? 'gallery.videoReview.keyDisplay'
+            : 'gallery.videoReview.clickAnimation'
+          : part === 'appearance'
+            ? 'gallery.videoReview.clickAppearance'
+            : part === 'timing'
+              ? 'gallery.videoReview.clickTiming'
+              : part === 'position'
+                ? 'gallery.videoReview.clickPosition'
+                : 'gallery.videoReview.actionAudio'
+      ),
+      ...(part === 'display' ? { defaultActive: true } : {}),
+      content: (
+        <SourceInteractionFeedbackFields
+          project={props.project}
+          event={resolved.event}
+          part={part}
+          disabled={disabled}
+        />
+      ),
+    })),
+  ];
 }

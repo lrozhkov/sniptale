@@ -149,9 +149,21 @@ export const SETTINGS_TRANSFER_REGISTRY = [
     field('styles.surfaces', 'items', { kind: 'collection', dynamicItems: true }),
     field('styles.surfaces', 'defaults'),
   ]),
+  ...domain('styles.audio-effects', [
+    field('styles.audio-effects', 'items', { kind: 'collection', dynamicItems: true }),
+    field('styles.audio-effects', 'preferences'),
+  ]),
   ...domain('styles.video-effects', [
-    field('styles.video-effects', 'items', { kind: 'collection', dynamicItems: true }),
-    field('styles.video-effects', 'preferences'),
+    {
+      ...field('styles.video-effects', 'items', { kind: 'collection', dynamicItems: true }),
+      labelKey: 'settings.settingsTransfer.fields.animationItems',
+    },
+    {
+      ...field('styles.video-effects', 'preferences'),
+      labelKey: 'settings.settingsTransfer.fields.animationPreferences',
+    },
+    field('styles.video-effects', 'transitionItems', { kind: 'collection', dynamicItems: true }),
+    field('styles.video-effects', 'transitionPreferences'),
   ]),
   ...domain('styles.gradients', [
     field('styles.gradients', 'items', { kind: 'collection', dynamicItems: true }),

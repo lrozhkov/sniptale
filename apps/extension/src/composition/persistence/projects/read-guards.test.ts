@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import { validateEffectV1Document } from '@sniptale/runtime-contracts/effect-v1';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { createVideoProjectEntry } from './index.test-support';
 import {
   parseVideoProjectEntry,
@@ -11,15 +11,11 @@ import type { VideoProjectMetadataEntry } from './contracts';
 
 function metadataEntry(): VideoProjectMetadataEntry {
   const source = readFileSync(
-    new URL(
-      '../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/valid/' +
-        'neutral-standalone.sniptale-effect.json',
-      import.meta.url
-    ),
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
-  const validated = validateEffectV1Document(JSON.parse(source));
-  if (!validated.document) throw new Error('Expected valid effect fixture');
+  const validated = parseAnimationTemplateSource(source);
+  if (!validated.template) throw Error('Invalid animation fixture');
   const sha256 = 'a'.repeat(64);
   return {
     ...createVideoProjectEntry(),
@@ -29,14 +25,12 @@ function metadataEntry(): VideoProjectMetadataEntry {
       ...createVideoProjectEntry().project,
       effectSnapshots: [
         {
-          assets: [
-            { id: 'retained-image', kind: 'image', mimeType: 'image/png', byteLength: 3, sha256 },
-          ],
-          documentId: validated.document.id,
+          assets: [],
+          documentId: validated.template.id,
           id: `effect:${sha256}`,
-          kind: validated.document.kind,
-          retainedByteLength: new TextEncoder().encode(source).byteLength + 3,
-          schemaVersion: 'sniptale.effect.v1',
+          kind: 'standalone',
+          retainedByteLength: new TextEncoder().encode(source).byteLength,
+          schemaVersion: 'sniptale.animation.v1',
           sha256,
           source,
         },
@@ -51,8 +45,8 @@ it('admits an exact project metadata entry without fabricating effect Blobs', ()
   const parsed = parseVideoProjectMetadataEntry(entry);
   expect(parsed).toEqual(entry);
   expect(JSON.stringify(entry)).toBe(before);
-  expect(Object.hasOwn(parsed!.project.effectSnapshots![0]!.assets[0]!, 'blob')).toBe(false);
-  expect(parseVideoProjectEntry(entry)).toBeNull();
+  expect(parsed!.project.effectSnapshots![0]!.assets).toEqual([]);
+  expect(parseVideoProjectEntry(entry)).not.toBeNull();
 });
 
 it.each([

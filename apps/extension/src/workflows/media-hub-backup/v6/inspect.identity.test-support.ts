@@ -1,3 +1,5 @@
+import { createValidGlPresetSourceEntry } from '../../../composition/persistence/effect-bundles/fixture.test-support';
+import { encodeEffectBundleMetadata } from './root-codecs/effect-bundle';
 import { createArchiveWriter } from '../../../composition/archive-transfer';
 import { createArchiveMemorySink } from '../../../composition/archive-transfer/test-support';
 
@@ -60,25 +62,11 @@ function createMetadata(profile: IdentityRootProfile, metadataId: string) {
       originalObjectId: OBJECT.objectId,
     };
   }
-  if (profile === 'effect-bundle') {
-    return {
-      entry: {
-        assets: [
-          {
-            byteLength: OBJECT.size,
-            kind: 'image',
-            mimeType: 'image/png',
-            objectId: OBJECT.objectId,
-            sha256: 'a'.repeat(64),
-          },
-        ],
-        documents: [{}],
-        packId: metadataId,
-        retainedByteLength: OBJECT.size,
-        version: '1',
-      },
-    };
-  }
+  if (profile === 'effect-bundle')
+    return encodeEffectBundleMetadata({
+      entry: createValidGlPresetSourceEntry(metadataId),
+      objectIds: [OBJECT.objectId],
+    });
   if (profile === 'video-project') {
     return {
       entry: { id: metadataId, project: {} },

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { GpuPreviewTargetFactory } from '../../../features/video/composition/canvas/preview-presentation';
-import * as nativeGpu from '../stage/scene/gpu-preview';
-import { createVideoEditorEffectPreparationExecutor } from '../../runtime/effect-runtime';
+import * as nativeGpu from '../../../workflows/video/native-composition/gpu-preview';
+
 import type { PreviewScenePresentation } from '../stage/scene/types';
 import type { GpuPreviewRenderer } from '../../../features/video/composition/canvas/gpu-preview';
 import { resolveVideoCompositionFrame } from '../../../features/video/composition/timeline/frame';
@@ -45,11 +45,11 @@ vi.mock('../../../features/video/composition/canvas/spatial-renderer', () => ({
   createReviewSpatialRenderer: spatial.create,
 }));
 
-vi.mock('../stage/scene/render-preview', async () => {
+vi.mock('../../../workflows/video/native-composition/render-scene', async () => {
   const { resolveVideoCompositionFrame } =
     await import('../../../features/video/composition/timeline/frame');
   return {
-    renderPreviewScene: async (
+    renderNativeCompositionScene: async (
       input: Parameters<typeof import('../stage/scene/render-preview').renderPreviewScene>[0]
     ) => {
       const result = await renderPreviewScene(input);
@@ -1341,7 +1341,7 @@ it('forwards the admitted original project to its own GPU provider across derive
     expect(createGpu).toHaveBeenCalledWith(undefined, {
       maximumPresentationSurfaces: 5,
       maximumPresentationBytes: 256 * 1024 * 1024,
-      createPreparationExecutor: createVideoEditorEffectPreparationExecutor,
+      createPreparationExecutor: expect.any(Function),
     });
     expect(renderPreviewScene).toHaveBeenLastCalledWith(
       expect.objectContaining({ gpuPreview: gpu, effectPreparation: preparation })

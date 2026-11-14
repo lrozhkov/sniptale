@@ -118,6 +118,7 @@ it.each([
         fill: vi.fn(),
         fillRect: vi.fn(),
         save: vi.fn(),
+        resetTransform: vi.fn(),
         translate: vi.fn(),
         restore: vi.fn(),
         clip: vi.fn(),
@@ -156,6 +157,7 @@ it('expands the animated clip without rasterizing unused single-mask protection'
       getContext: () => ({
         clearRect: vi.fn(),
         save: vi.fn(),
+        resetTransform: vi.fn(),
         translate: vi.fn(),
         restore: vi.fn(),
         beginPath: vi.fn(),
@@ -242,12 +244,14 @@ function managedMasks(failRole?: string) {
       let read = 0;
       const context = {
         save: vi.fn(),
+        resetTransform: vi.fn(),
         restore: vi.fn(),
         clearRect: vi.fn(),
         beginPath: vi.fn(),
         roundRect: vi.fn(),
         clip: vi.fn(),
         fill,
+        fillRect: vi.fn(),
         drawImage: vi.fn(),
         getImageData: (x: number, y: number, width: number, height: number) => {
           readbacks.push({ x, y, width, height });

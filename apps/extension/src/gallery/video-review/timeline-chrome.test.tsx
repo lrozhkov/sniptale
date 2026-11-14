@@ -215,8 +215,9 @@ it('keeps ruler and lane markers aligned across source-time bounds without captu
       );
       const cap = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.rulerPlayhead"]')!;
       const lane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.playhead"]')!;
-      expect(cap.style.left).toBe(`${left}px`);
-      expect(lane.style.left).toBe(cap.style.left);
+      expect(cap.style.transform).toBe(`translateX(${left}px)`);
+      expect(cap.style.left).toBe('0px');
+      expect(lane.style.transform).toBe(cap.style.transform);
       expect(cap.classList.contains('bottom-0')).toBe(true);
       expect(lane.classList.contains('bottom-2')).toBe(true);
       for (const marker of [cap, lane]) {
@@ -226,6 +227,114 @@ it('keeps ruler and lane markers aligned across source-time bounds without captu
     }
   } finally {
     act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('moves the playhead on published frames without a React render and preserves paused navigation', async () => {
+  const { createReviewPlaybackPresentationClock, ReviewPlaybackPresentationClockContext } =
+    await import('./playback-presentation-clock');
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  let playing = true,
+    renders = 0;
+  const clock = createReviewPlaybackPresentationClock(() => playing);
+  const host = document.createElement('div'),
+    root = createRoot(host);
+  const render = (time: number) =>
+    act(() =>
+      root.render(
+        <ReviewPlaybackPresentationClockContext.Provider value={clock}>
+          <Counter time={time} />
+        </ReviewPlaybackPresentationClockContext.Provider>
+      )
+    );
+  function Counter({ time }: { time: number }) {
+    renders++;
+    return <ReviewPlayhead time={time} duration={10} gutter={100} width={1000} />;
+  }
+  try {
+    render(0);
+    const playhead = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.playhead"]')!;
+    const count = renders;
+    clock.publish(2);
+    expect(playhead.style.transform).toBe('translateX(295px)');
+    expect(renders).toBe(count);
+    clock.publish(3);
+    render(1);
+    expect(playhead.style.transform).toBe('translateX(395px)');
+    playing = false;
+    render(6);
+    expect(playhead.style.transform).toBe('translateX(695px)');
+    clock.publish(7);
+    expect(playhead.style.transform).toBe('translateX(695px)');
+    act(() => root.unmount());
+    expect(() => clock.publish(8)).not.toThrow();
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('updates the clock from presented frames without a root render and rejects stale React time', async () => {
+  const { createReviewPlaybackPresentationClock, ReviewPlaybackPresentationClockContext } =
+    await import('./playback-presentation-clock');
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
+  let playing = true;
+  const clock = createReviewPlaybackPresentationClock(() => playing);
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  let renders = 0;
+  function View({ time, duration = 10 }: { time: number; duration?: number }) {
+    renders++;
+    return (
+      <ReviewToolbar
+        time={time}
+        duration={duration}
+        playing={playing}
+        onPlay={vi.fn()}
+        onNavigate={vi.fn()}
+        onZoom={vi.fn()}
+        zoom={1}
+        navigation={{ start: 0, end: duration }}
+      />
+    );
+  }
+  const render = (time: number, duration = 10) =>
+    act(() =>
+      root.render(
+        <ReviewPlaybackPresentationClockContext.Provider value={clock}>
+          <View time={time} duration={duration} />
+        </ReviewPlaybackPresentationClockContext.Provider>
+      )
+    );
+  try {
+    render(0);
+    const readout = host.querySelector('.review-playback-clock-value')!;
+    const count = renders;
+    clock.publish(2.34);
+    expect(readout.textContent).toBe('0:02.34 / 0:10.00');
+    expect(renders).toBe(count);
+    clock.publish(3.45);
+    render(1);
+    expect(readout.textContent).toBe('0:03.45 / 0:10.00');
+    render(1, 20);
+    expect(readout.textContent).toBe('0:03.45 / 0:20.00');
+    playing = false;
+    render(6);
+    clock.publish(7);
+    expect(readout.textContent).toBe('0:06.00 / 0:10.00');
+  } finally {
+    act(() => root.unmount());
+    expect(() => clock.publish(8)).not.toThrow();
+    host.remove();
     vi.unstubAllGlobals();
   }
 });

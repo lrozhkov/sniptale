@@ -57,13 +57,19 @@ export function anchorReviewVoiceover(
   const tempo = clip.tempo ?? 1;
   const anchors: QuickEditVoiceoverAnchor[] = [];
   for (const segment of map) {
-    if (segment.kind === 'cut') continue;
+    if (segment.kind === 'cut' || segment.kind === 'freeze') continue;
     const start = Math.max(clip.timelineStart, segment.resultStart);
     const end = Math.min(clip.timelineStart + clip.duration / tempo, segment.resultEnd);
     if (end <= start) continue;
     anchors.push({
-      start: segment.sourceStart + (start - segment.resultStart) * segment.rate,
-      end: segment.sourceStart + (end - segment.resultStart) * segment.rate,
+      start:
+        start === segment.resultStart
+          ? segment.sourceStart
+          : segment.sourceStart + (start - segment.resultStart) * segment.rate,
+      end:
+        end === segment.resultEnd
+          ? segment.sourceEnd
+          : segment.sourceStart + (end - segment.resultStart) * segment.rate,
       offset: (start - clip.timelineStart) * tempo,
       duration: (end - start) * tempo,
     });
@@ -167,7 +173,7 @@ export function projectReviewVoiceoverAnchors(
   const { sourceAnchor: _anchor, ...recording } = clip;
   const slices = anchors.flatMap((anchor, anchorIndex) =>
     map.flatMap((part) => {
-      if (part.kind === 'cut') return [];
+      if (part.kind === 'cut' || part.kind === 'freeze') return [];
       const start = Math.max(anchor.start, part.sourceStart);
       const end = Math.min(anchor.end, part.sourceEnd);
       if (end <= start) return [];
@@ -422,6 +428,7 @@ export function areReviewVoiceoverSlicesContinuous(
   slice: QuickEditAudioClip
 ): boolean {
   return (
+    JSON.stringify(previous.audioProcessing) === JSON.stringify(slice.audioProcessing) &&
     Math.abs(previous.playbackRate! - slice.playbackRate!) < REVIEW_VOICEOVER_CONTINUITY_EPSILON &&
     Math.abs(previous.timelineStart + previous.duration - slice.timelineStart) <
       REVIEW_VOICEOVER_CONTINUITY_EPSILON &&

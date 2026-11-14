@@ -3,18 +3,19 @@ import { expect, it } from 'vitest';
 import { buildEffectThumbnailPlans } from './effect-thumbnail-plans';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { createEffectHostClip } from '../../../features/video/project/factories/overlay-clip';
-import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 
 function project() {
   const p = createEmptyVideoProject('thumbnail');
   const source = readFileSync(
-    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
-  const d = parseEffectV1Source(source).document!;
+  const d = parseAnimationTemplateSource(source).template!;
+  const duration = (d.animation.op - d.animation.ip) / d.animation.fr;
   p.clips = [
     createEffectHostClip({
-      duration: d.duration,
+      duration: duration,
       effectInstanceId: 'instance',
       name: 'Annotation',
       projectHeight: p.height,
@@ -27,8 +28,8 @@ function project() {
     {
       id: 'snapshot',
       documentId: d.id,
-      kind: d.kind,
-      schemaVersion: d.schemaVersion,
+      kind: 'standalone',
+      schemaVersion: 'sniptale.animation.v1',
       sha256: 'a'.repeat(64),
       retainedByteLength: source.length,
       source,
@@ -42,9 +43,10 @@ function project() {
       kind: 'standalone',
       target: { kind: 'scene' },
       startTime: 0,
-      duration: d.duration,
+      duration: duration,
       playbackRate: 1,
       controls: {},
+      sceneAnchors: { tip: { x: 0.5, y: 0.5 } },
       enabled: true,
     },
   ];

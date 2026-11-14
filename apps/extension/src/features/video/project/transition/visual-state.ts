@@ -1,73 +1,27 @@
 import { buildProjectTransitionSegments } from './project';
 import { getTransitionProgress } from './runtime';
-import { resolveTransitionVisualStateForRole } from './visual-resolvers';
-import {
-  IDENTITY_TRANSITION_VISUAL_STATE,
-  type ResolvedTransitionVisualState,
-} from './presentation.types.ts';
-import {
-  type VideoProject,
-  type VideoProjectClip,
-  type VideoProjectTransitionSegment,
-} from '../types/index';
+import type { VideoProject, VideoProjectClip } from '../types';
 
-function findClipTransitionSegment(
-  project: VideoProject,
-  clip: VideoProjectClip,
-  currentTime: number
-): { role: 'leading' | 'trailing'; segment: VideoProjectTransitionSegment } | null {
-  for (const segment of buildProjectTransitionSegments(project)) {
-    if (currentTime < segment.start || currentTime >= segment.end) {
-      continue;
-    }
-    if (segment.leadingClipId === clip.id) {
-      return { role: 'leading', segment };
-    }
-    if (segment.trailingClipId === clip.id) {
-      return { role: 'trailing', segment };
-    }
-  }
-
-  return null;
-}
-
-export function resolveClipTransitionVisualState(
-  project: VideoProject,
-  clip: VideoProjectClip,
-  currentTime: number
-): ResolvedTransitionVisualState {
-  const activeTransition = findClipTransitionSegment(project, clip, currentTime);
-  if (!activeTransition) {
-    return IDENTITY_TRANSITION_VISUAL_STATE;
-  }
-
-  const progress = getTransitionProgress(activeTransition.segment, currentTime);
-  if (progress === null) {
-    return IDENTITY_TRANSITION_VISUAL_STATE;
-  }
-
-  return resolveTransitionVisualStateForRole(
-    clip,
-    activeTransition.role,
-    activeTransition.segment,
-    progress
-  );
-}
-
+/** Audio follows the same directed junction fold; GL controls do not execute in the audio path. */
 export function resolveClipTransitionAudioMultiplier(
   project: VideoProject,
   clip: VideoProjectClip,
   currentTime: number
 ): number {
-  const activeTransition = findClipTransitionSegment(project, clip, currentTime);
-  if (!activeTransition) {
-    return 1;
+  const active = buildProjectTransitionSegments(project).flatMap((segment) => {
+    const progress = getTransitionProgress(segment, currentTime);
+    return progress === null ? [] : [{ segment, progress }];
+  });
+  const incoming = active.find((edge) => edge.segment.trailingClipId === clip.id);
+  let multiplier = incoming?.progress ?? 1;
+  let id = clip.id;
+  const visited = new Set<string>();
+  while (true) {
+    if (visited.has(id)) throw new Error('Cyclic project transition chain.');
+    visited.add(id);
+    const outgoing = active.find((edge) => edge.segment.leadingClipId === id);
+    if (!outgoing) return multiplier;
+    multiplier *= 1 - outgoing.progress;
+    id = outgoing.segment.trailingClipId;
   }
-
-  const progress = getTransitionProgress(activeTransition.segment, currentTime);
-  if (progress === null) {
-    return 1;
-  }
-
-  return activeTransition.role === 'leading' ? 1 - progress : progress;
 }

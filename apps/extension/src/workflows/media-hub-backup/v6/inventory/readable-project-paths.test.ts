@@ -1,3 +1,4 @@
+import { readValidAnimationSnapshot } from '../../../../composition/persistence/effect-bundles/fixture.test-support';
 import { parsePortableVideoProjectMetadata } from '../root-codecs/projects';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -45,27 +46,7 @@ describe('readable project archive paths', () => {
     'backs up project video reviews with explicit MIME=%s',
     async (explicitMime) => {
       const project = createVideoProjectEntryWithMediaClip({ name: 'Demo/Project' });
-      project.project.effectSnapshots = [
-        {
-          id: 'snapshot-1',
-          assets: [
-            {
-              blob: new Blob(['effect'], { type: 'image/png' }),
-              byteLength: 6,
-              id: 'effect-asset',
-              kind: 'image',
-              mimeType: 'image/png',
-              sha256: 'a'.repeat(64),
-            },
-          ],
-          documentId: 'document-1',
-          kind: 'standalone',
-          retainedByteLength: 8,
-          schemaVersion: 'sniptale.effect.v1',
-          sha256: 'b'.repeat(64),
-          source: '{}',
-        },
-      ];
+      project.project.effectSnapshots = [await readValidAnimationSnapshot()];
       const asset = createProjectAssetEntry({
         assetId: 'project-asset-object',
         id: 'project-asset-1',
@@ -164,7 +145,6 @@ describe('readable project archive paths', () => {
       expect(payload.objects.map((object) => object.ref.filename)).toEqual([
         'Camera clip.webm',
         'Final?.webm',
-        'snapshot-1-effect-asset',
         `${project.id}-thumbnail`,
         `${project.id}-preview`,
         `${project.id}-presentation-thumbnail`,

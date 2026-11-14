@@ -1,5 +1,5 @@
 import type { ArchiveRootDescriptor } from '../../../../composition/archive-transfer';
-import { parseEffectBundleMetadata } from './effect-bundle';
+import { parseEffectBundleMetadata, visualCatalogMetadataRootId } from './effect-bundle';
 import { parsePortableMediaMetadata } from './media';
 import {
   parsePortableScenarioProjectMetadata,
@@ -15,7 +15,7 @@ function parseDomainRootId(descriptor: ArchiveRootDescriptor, metadata: unknown)
   }
   if (descriptor.rootKind === 'media') {
     return descriptor.mediaSubtype === 'effect-bundle'
-      ? parseEffectBundleMetadata(metadata).entry.packId
+      ? visualCatalogMetadataRootId(parseEffectBundleMetadata(metadata))
       : parsePortableMediaMetadata(metadata).entry.id;
   }
   throw new Error('Media backup root descriptor kind is unsupported.');

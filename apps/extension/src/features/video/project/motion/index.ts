@@ -96,6 +96,8 @@ function hasSameMotionConnectionTarget(
   source: VideoProjectMotionRegion,
   destination: VideoProjectMotionRegion
 ): boolean {
+  if (source.effect === '3d' || destination.effect === '3d')
+    return source.effect === destination.effect;
   if (source.spotlight && destination.spotlight) {
     return (
       source.spotlightTarget === destination.spotlightTarget &&
@@ -124,9 +126,11 @@ export function resolveMotionConnectionEdges(
 ) {
   const group = region.sourceBinding?.animationGroupId;
   const sameKind = (item: VideoProjectMotionRegion) =>
-    region.spotlight
-      ? item.spotlight !== undefined && item.spotlightTarget === region.spotlightTarget
-      : isCameraMotionRegion(item);
+    region.effect === '3d'
+      ? item.effect === '3d'
+      : region.spotlight
+        ? item.spotlight !== undefined && item.spotlightTarget === region.spotlightTarget
+        : isCameraMotionRegion(item);
   const parts = group
     ? (project.motionRegions ?? [])
         .filter(sameKind)
@@ -215,6 +219,7 @@ function motionWindowConnectionClips(
 
 function isConnectableMotionState(region: VideoProjectMotionRegion): boolean {
   return (
+    region.effect === '3d' ||
     Boolean(region.spotlight) ||
     (isCameraMotionRegion(region) &&
       (region.focusMode === VideoMotionFocusMode.MANUAL ||
@@ -376,6 +381,10 @@ export function normalizeVideoProjectMotionRegion(
     retainedPhases || exit.type === 'none' ? region.zoomOutDuration : exit.duration;
 
   return projectMotionSourceBinding(project, {
+    ...(region.effect === '3d' ? { effect: '3d' as const } : {}),
+    ...(region.effect === '3d' && region.spatialMotion
+      ? { spatialMotion: region.spatialMotion }
+      : {}),
     ...(border && (borderTarget === 'viewport' || (borderTarget === 'window' && sourceBinding))
       ? { border, borderTarget }
       : {}),
@@ -424,4 +433,26 @@ export function normalizeVideoProjectMotionRegion(
         : animationDuration
     ),
   });
+}
+
+/** Whole later intervals stay editable but cannot replace an already accepted spatial effect. */
+export function resolveActiveSpatialMotionRegions(
+  project: Pick<VideoProject, 'motionRegions' | 'clips'>
+) {
+  const accepted: VideoProjectMotionRegion[] = [];
+  for (const region of project.motionRegions ?? []) {
+    if (region.effect !== '3d' || region.duration <= 0 || region.sourceBinding?.dormant) continue;
+    if (
+      accepted.some((other) => {
+        const destination = project.motionRegions?.find(
+          (r) => r.effect === '3d' && resolveMotionConnectionSource(project, r)?.id === other.id
+        );
+        const end = destination?.startTime ?? other.startTime + other.duration;
+        return region.startTime < end && region.startTime + region.duration > other.startTime;
+      })
+    )
+      continue;
+    accepted.push(region);
+  }
+  return accepted;
 }

@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../../project/transition/gl-catalog';
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../../project/factories/creation';
 import { createVideoProjectFromRecording } from '../../project/factories/creation';
@@ -26,11 +27,9 @@ it('lands on the action geometry at the destination time during a media transiti
       leadingClipId: 'a',
       trailingClipId: 'b',
       duration: 2,
-      kind: 'SLIDE',
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       easing: 'LINEAR',
-      renderKind: 'CSS_LIKE',
-      templateKind: 'SLIDE',
-      direction: 'LEFT',
     },
   ];
   project.actionEvents = [
@@ -67,10 +66,10 @@ it('lands on the action geometry at the destination time during a media transiti
   const at = (currentTime: number) =>
     resolveVideoCompositionCamera({ project, currentTime, actions: [], cursorSample: null });
   const incoming = at(3).focusPoint;
-  expect(incoming.x).not.toBe(960);
+  expect(incoming).toMatchObject({ x: 960, y: 360 });
   expect(at(2).focusPoint.x).toBeCloseTo((200 + incoming.x) / 2);
   expect(at(2.999999).focusPoint.x).toBeCloseTo(incoming.x, 2);
-  expect(at(3.1).focusPoint.x).not.toBe(incoming.x);
+  expect(at(3.1).focusPoint.x).toBeCloseTo(incoming.x);
 });
 
 it('keeps a centred frame stationary throughout zoom-in and zoom-out animations', () => {

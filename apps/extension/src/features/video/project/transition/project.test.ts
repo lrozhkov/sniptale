@@ -2,12 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { buildProjectTransitionSegments } from './project';
 import { createEmptyVideoProject, createVideoProjectAsset } from '../factories/creation';
 import { createAnnotationClip } from '../factories/overlay-clip';
-import { normalizeVideoProjectTransition } from './template';
+import { parseVideoProjectTransition } from './contract';
+import { createGlTransitionSelection } from './gl-catalog';
+import { resolveClipTransitionAudioMultiplier } from './visual-state';
 import { createVideoClipFromAsset } from '../factories/clip';
 import { getProjectTransitionById, syncProjectTransitions } from './project';
 import { createVideoProjectClipLogicalLaneId } from '../timeline/logical-lanes';
 import type { VideoProjectClip, VideoProjectTransition } from '../types/index';
-import { VideoProjectAssetType, VideoTransitionEasing, VideoTransitionKind } from '../types/index';
+import { VideoProjectAssetType, VideoTransitionEasing } from '../types/index';
 
 function createImageAsset(id: string) {
   return createVideoProjectAsset(
@@ -45,7 +47,8 @@ function createTransitionProject() {
       duration: 1,
       easing: VideoTransitionEasing.EASE_IN_OUT,
       id: 'transition-1',
-      kind: VideoTransitionKind.CROSSFADE,
+      kind: 'gl',
+      selection: createGlTransitionSelection('Fade')!,
       leadingClipId: 'clip-a',
       trailingClipId: 'clip-b',
     },
@@ -65,8 +68,8 @@ describe('shared video project transitions', () => {
     verifyOverlapSync
   );
   it(
-    'creates transition entities from legacy clip flags when a junction overlaps',
-    verifyLegacyClipFlags
+    'creates explicit transition entities for overlapping montage clips regardless of old flags',
+    verifyMontageOverlapCreation
   );
   it('treats missing clip logical lane ids as the default transition lane', () => {
     const project = createTransitionProject();
@@ -113,11 +116,12 @@ function registerTransitionBoundaryGuardTests() {
     annotationClip.timelineLaneId = project.clips[0]!.timelineLaneId ?? null;
     (project as { clips: VideoProjectClip[] }).clips = [project.clips[0]!, annotationClip];
     project.transitions = [
-      normalizeVideoProjectTransition({
+      admitTransition({
         duration: 1,
         easing: VideoTransitionEasing.LINEAR,
         id: 'transition-annotation',
-        kind: VideoTransitionKind.CROSSFADE,
+        kind: 'gl',
+        selection: createGlTransitionSelection('Fade')!,
         leadingClipId: 'clip-a',
         trailingClipId: 'annotation-1',
       }),
@@ -131,16 +135,12 @@ function registerTransitionBoundaryGuardTests() {
 function createLightSweepTransitionProject() {
   const project = createTransitionProject();
   project.transitions = [
-    normalizeVideoProjectTransition({
-      direction: 'RIGHT',
+    admitTransition({
       duration: 1,
       easing: VideoTransitionEasing.LINEAR,
-      highlightColor: '#22ccff',
       id: 'transition-1',
-      intensity: 'BOLD',
-      kind: VideoTransitionKind.LIGHT_SWEEP,
-      renderKind: 'CSS_LIKE',
-      templateKind: 'LIGHT_SWEEP',
+      kind: 'gl',
+      selection: createGlTransitionSelection('CrossZoom')!,
       leadingClipId: 'clip-a',
       trailingClipId: 'clip-b',
     }),
@@ -157,8 +157,6 @@ function verifyOverlapSync() {
     expect.objectContaining({
       easing: VideoTransitionEasing.EASE_IN_OUT,
       leadingClipId: 'clip-a',
-      renderKind: 'COMPOSITE',
-      templateKind: 'CROSSFADE',
       trailingClipId: 'clip-b',
     })
   );
@@ -171,7 +169,7 @@ function verifyOverlapSync() {
   expect(getProjectTransitionById(separated, 'transition-1')).toBeNull();
 }
 
-function verifyLegacyClipFlags() {
+function verifyMontageOverlapCreation() {
   const project = createTransitionProject();
   project.transitions = [];
   project.clips = project.clips.map((clip) =>
@@ -187,9 +185,8 @@ function verifyLegacyClipFlags() {
     expect.arrayContaining([
       expect.objectContaining({
         id: '00000000-0000-4000-8000-000000000001',
-        kind: VideoTransitionKind.CROSSFADE,
-        renderKind: 'COMPOSITE',
-        templateKind: 'CROSSFADE',
+        kind: 'gl',
+        selection: createGlTransitionSelection('Fade')!,
       }),
     ])
   );
@@ -201,11 +198,7 @@ function verifyLightSweepSegments() {
       leadingClipId: 'clip-a',
       trailingClipId: 'clip-b',
       transition: expect.objectContaining({
-        direction: 'RIGHT',
-        highlightColor: '#22ccff',
-        intensity: 'BOLD',
-        renderKind: 'CSS_LIKE',
-        templateKind: 'LIGHT_SWEEP',
+        selection: expect.objectContaining({ name: 'CrossZoom' }),
       }),
     }),
   ]);
@@ -239,7 +232,6 @@ it('updates changed flags and transition controls after preserving a normalized 
     transitions: project.transitions!.map((transition) => ({
       ...transition,
       duration: 99,
-      highlightColor: '#123456',
     })),
   };
   const next = syncProjectTransitions(edited);
@@ -248,4 +240,84 @@ it('updates changed flags and transition controls after preserving a normalized 
   expect(next.clips).toEqual(project.clips);
   expect(next.transitions).toEqual(project.transitions);
   expect(project).toEqual(original);
+});
+
+it.each([undefined, []])(
+  'does not render implicit transitions from old clip flags with explicit inventory %j',
+  (transitions) => {
+    const { transitions: _stored, ...project } = createTransitionProject();
+    const flagged = {
+      ...project,
+      ...(transitions ? { transitions } : {}),
+      clips: project.clips.map((clip) =>
+        clip.id === 'clip-a'
+          ? { ...clip, transitionOut: 'CROSSFADE' as const }
+          : { ...clip, transitionIn: 'CROSSFADE' as const }
+      ),
+    };
+    expect(buildProjectTransitionSegments(flagged)).toEqual([]);
+  }
+);
+
+it('does not synthesize a second rendering transition for a flagged pair outside the explicit inventory', () => {
+  const project = createTransitionProject();
+  const third = {
+    ...project.clips[1]!,
+    id: 'clip-c',
+    startTime: 8,
+    transitionIn: 'CROSSFADE' as const,
+  };
+  const flagged = {
+    ...project,
+    clips: [
+      ...project.clips.map((clip) => ({ ...clip, transitionOut: 'CROSSFADE' as const })),
+      third,
+    ],
+  };
+  const before = structuredClone(flagged);
+  const segments = buildProjectTransitionSegments(flagged);
+  expect(segments.map((segment) => segment.id)).toEqual(['transition-1']);
+  expect(flagged).toEqual(before);
+});
+
+function admitTransition(value: unknown): VideoProjectTransition {
+  const accepted = parseVideoProjectTransition(value);
+  if (!accepted) throw new Error('Expected valid explicit GL transition.');
+  return accepted;
+}
+
+it('uses the directed visual fold for audio weights across an active A/B/C chain', () => {
+  const project = createTransitionProject();
+  const [a, b] = project.clips;
+  if (!a || !b) throw new Error('Expected clips.');
+  const c = { ...b, id: 'clip-c', startTime: 6, duration: 10 };
+  project.clips = [{ ...a, duration: 10 }, { ...b, duration: 10 }, c];
+  project.transitions = [
+    admitTransition({
+      id: 'AB',
+      leadingClipId: a.id,
+      trailingClipId: b.id,
+      duration: 6,
+      easing: 'LINEAR',
+      kind: 'audio',
+    }),
+    admitTransition({
+      id: 'BC',
+      leadingClipId: b.id,
+      trailingClipId: c.id,
+      duration: 8,
+      easing: 'LINEAR',
+      kind: 'audio',
+    }),
+  ];
+  const time = 8,
+    ab = (time - 4) / 6,
+    bc = (time - 6) / 8;
+  expect(resolveClipTransitionAudioMultiplier(project, project.clips[0]!, time)).toBeCloseTo(
+    (1 - ab) * (1 - bc)
+  );
+  expect(resolveClipTransitionAudioMultiplier(project, project.clips[1]!, time)).toBeCloseTo(
+    ab * (1 - bc)
+  );
+  expect(resolveClipTransitionAudioMultiplier(project, c, time)).toBeCloseTo(bc);
 });

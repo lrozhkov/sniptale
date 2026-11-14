@@ -9,20 +9,25 @@ import type { ReviewEdit } from '../../features/video/review/types';
 export function useReviewTimeMap(
   source: { duration: number },
   edits: readonly ReviewEdit[],
-  time: number
+  time: number,
+  heldTime: number | null = null,
+  readHeldTime?: () => number | null
 ) {
   const timeMap = useMemo(
     () => createReviewTimeMap(source.duration, edits),
     [source.duration, edits]
   );
-  const outputTime = useMemo(
+  const mappedOutputTime = useMemo(
     () => sourceToReviewResult(time, timeMap.getSegments()),
     [time, timeMap]
   );
+  const outputTime = heldTime ?? mappedOutputTime;
   const lastOutputTime = useRef(0);
   if (outputTime !== null) lastOutputTime.current = outputTime;
   return {
     timeMap,
+    readOutputTime: (source: number) =>
+      readHeldTime?.() ?? sourceToReviewResult(source, timeMap.getSegments()),
     outputTime,
     sceneOutputTime: outputTime ?? lastOutputTime.current,
     resultDuration: timeMap.getDuration(),

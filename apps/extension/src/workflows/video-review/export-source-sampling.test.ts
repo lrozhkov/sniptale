@@ -1,4 +1,24 @@
+import { createPreparedSourceBudget } from '../../features/video/composition/export-enhancement/prepared-source';
 // @vitest-environment jsdom
+import type { CanvasCommentExport } from '../../features/video/review/comments';
+import { isCanvasCommentVisibleAt } from '../../features/video/review/comments';
+import type {
+  QuickEditAdvancedState,
+  QuickEditZoomRegion,
+} from '../../features/video/review/advanced/types';
+import {
+  computeQuickEditSceneLayout,
+  evaluateQuickEditCameraAtTime,
+} from '../../features/video/review/advanced/scene';
+import { quickEditMotionBlurCameras } from '../../features/video/review/advanced/motion-blur';
+import {
+  evaluateReviewClicks,
+  type ReviewClickCue,
+} from '../../features/video/review/click-animation';
+import { drawReviewSceneFrame, drawReviewExportSharpStage } from './scene-frame';
+import { drawReviewSceneOverlays } from './render-scene-overlays';
+import { reviewWindowRasterBacking } from './window-header';
+import type { ReviewTransitionSample } from './cut-transition-frames';
 import { planReviewExportSource } from './export-source-plan';
 import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
 import { expect, it, vi } from 'vitest';
@@ -6,10 +26,10 @@ import {
   prepareReviewExportSourceSampling,
   drawReviewPreparedSource,
   reviewExportSamplingAllocation,
+  type ReviewExportSamplingFrame,
 } from './export-source-sampling';
 import { planEnhancedRegion } from '../../features/video/composition/export-enhancement/region-plan';
 import type { ExportEnhancer } from '../../features/video/composition/export-enhancement/enhancer';
-import { paintReviewExportScene } from './render-export-scene';
 import { createQuickEditSpotlight } from '../../features/video/project/scene/focus-appearance';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { DEFAULT_CAMERA_PERSPECTIVE } from '../../features/video/project/motion/spatial';
@@ -164,7 +184,7 @@ it('composes a dense original-source body below the unchanged joined header', as
   });
   expect(frame).not.toBeNull();
   try {
-    paintReviewExportScene({
+    paintLegacyExportReference({
       scene: value,
       context: canvas.getContext('2d')!,
       canvas,
@@ -247,7 +267,7 @@ it('paints a lens from its own denser original-source demand rather than magnify
   expect(frame!.plan.lenses).toHaveLength(1);
   expect(model.withEnhancedRegion).toHaveBeenCalledTimes(2);
   try {
-    paintReviewExportScene({
+    paintLegacyExportReference({
       scene: value,
       context: canvas.getContext('2d')!,
       canvas,
@@ -336,7 +356,7 @@ it('keeps logical 3D source rectangles separate from dense body and sharp-lens r
     draw,
   } as unknown as ReviewSpatialRenderer;
   try {
-    paintReviewExportScene({
+    paintLegacyExportReference({
       scene: value,
       context: canvas.getContext('2d')!,
       canvas,
@@ -437,7 +457,7 @@ it('declares density-scaled expanded click overlay dimensions used by spatial pa
   });
   try {
     expect(prepared).not.toBeNull();
-    paintReviewExportScene({
+    paintLegacyExportReference({
       scene: value,
       context: output.getContext('2d')!,
       canvas: output,
@@ -462,4 +482,164 @@ it('declares density-scaled expanded click overlay dimensions used by spatial pa
   } finally {
     prepared?.dispose();
   }
+});
+
+// Frozen historical painter: sampling pixel proof only; production uses render-preview.
+interface ReviewRenderScene {
+  sourceSize: { width: number; height: number };
+  baseCanvas?: { width: number; height: number };
+  windowHeader?: QuickEditAdvancedState['windowHeader'];
+  background: QuickEditAdvancedState['background'];
+  comments: readonly CanvasCommentExport[];
+  clickCues?: readonly ReviewClickCue[] | undefined;
+  zoomRegions: readonly QuickEditZoomRegion[];
+  sceneScale?: number;
+  headerImage?: CanvasImageSource | null;
+  image: ImageBitmap | null;
+}
+
+function paintLegacyExportReference({
+  scene,
+  context,
+  canvas,
+  sample,
+  resultTime,
+  sourceTime,
+  spatialRenderer,
+  scratch,
+  blurEnabled,
+  exportSampling,
+}: {
+  scene: Readonly<ReviewRenderScene>;
+  context: CanvasRenderingContext2D;
+  canvas: HTMLCanvasElement;
+  sample: Pick<ReviewTransitionSample, 'draw'>;
+  resultTime: number;
+  sourceTime: number;
+  spatialRenderer: ReviewSpatialRenderer | undefined;
+  scratch: HTMLCanvasElement | null;
+  blurEnabled: boolean;
+  exportSampling?: ReviewExportSamplingFrame;
+}) {
+  const camera =
+    exportSampling?.plan.camera ??
+    evaluateQuickEditCameraAtTime(scene.zoomRegions, resultTime, {
+      source: scene.sourceSize,
+      canvas: scene.baseCanvas ?? canvas,
+      background: scene.background,
+      windowHeader: scene.windowHeader,
+      output: canvas,
+    });
+  const layout =
+    exportSampling?.plan.layout ??
+    computeQuickEditSceneLayout({
+      output: canvas,
+      source: scene.sourceSize,
+      canvas: scene.baseCanvas ?? canvas,
+      windowHeader: scene.windowHeader,
+      background: scene.background,
+      camera,
+    });
+  const burned = scene.comments.filter(
+    (comment) => comment.renderToVideo && isCanvasCommentVisibleAt(comment, sourceTime)
+  );
+  const magnify = evaluateReviewClicks(scene.clickCues ?? [], resultTime).some(
+    (click) => (click.lens?.scale ?? 1) > 1
+  );
+  const frameArgs: Parameters<typeof drawReviewSceneFrame>[1] = {
+    spatialRenderer,
+    canvas,
+    layout,
+    background: scene.background,
+    image: scene.image,
+    headerImage: scene.headerImage,
+    sample: sample,
+    deferComments: true,
+    comments: burned,
+    sourceTime: sourceTime,
+    currentTime: resultTime,
+    cameraScale: camera.scale,
+    ...(exportSampling ? { exportSampling: { frame: exportSampling } } : {}),
+    motionBlur: exportSampling
+      ? exportSampling.plan.exposures
+      : blurEnabled
+        ? quickEditMotionBlurCameras(scene.zoomRegions, resultTime, {
+            source: scene.sourceSize,
+            canvas: scene.baseCanvas ?? canvas,
+            background: scene.background,
+            windowHeader: scene.windowHeader,
+            output: canvas,
+          })
+        : undefined,
+    sceneScale: scene.sceneScale ?? 1,
+    windowRasterBacking: magnify
+      ? reviewWindowRasterBacking({
+          windowRect: layout.windowRect,
+          sourceWidth: scene.sourceSize.width * (layout.sourceCrop?.width ?? 1),
+          magnify,
+        })
+      : undefined,
+    drawOverlays: (windowRaster) =>
+      drawReviewSceneOverlays({
+        scene: {
+          canvas,
+          layout,
+          background: scene.background,
+          image: scene.image,
+          sample: sample,
+          comments: burned,
+          sourceTime: sourceTime,
+          sceneScale: scene.sceneScale ?? 1,
+        },
+        renderer: spatialRenderer,
+        context,
+        canvas,
+        spotlightScratch: scratch,
+        regions: scene.zoomRegions,
+        globalResultTime: resultTime,
+        cameraScale: camera.scale,
+        sourceWidth: scene.sourceSize.width,
+        clicks: scene.clickCues,
+        windowRaster,
+        ...(exportSampling
+          ? {
+              exportSampling,
+              sharpPaint: (
+                target: CanvasRenderingContext2D,
+                lens: ReviewExportSamplingFrame['plan']['lenses'][number]
+              ) => drawReviewExportSharpStage(target, frameArgs, exportSampling, lens),
+            }
+          : {}),
+      }),
+  };
+  drawReviewSceneFrame(context, frameArgs);
+}
+
+it('accounts simultaneous transition endpoint sources in one retained budget', async () => {
+  const budget = createPreparedSourceBudget();
+  const model = enhancer();
+  const sample = { timestamp: 1, draw: vi.fn() };
+  const args = {
+    enhancer: model,
+    budget,
+    scene,
+    output: { width: 64, height: 36 },
+    sample,
+    sourceTime: 1,
+    resultTime: 1,
+    signal: new AbortController().signal,
+  };
+  const first = await prepareReviewExportSourceSampling(args);
+  const one = budget.snapshot();
+  const second = await prepareReviewExportSourceSampling({
+    ...args,
+    sample: { ...sample, timestamp: 2 },
+  });
+  expect(budget.snapshot()).toEqual({ bytes: one.bytes * 2, entries: one.entries * 2 });
+  expect(one.bytes).toBeGreaterThan(0);
+  first!.dispose();
+  expect(budget.snapshot()).toEqual(one);
+  expect(second!.sampling.sourceTime).toBe(2);
+  second!.dispose();
+  expect(budget.snapshot()).toEqual({ bytes: 0, entries: 0 });
 });

@@ -1,4 +1,4 @@
-import { collectPreviewImageResourceDemand } from '../scene/image-resources';
+import { collectPreviewImageResourceDemand } from '../../../../workflows/video/native-composition/image-resources';
 import type { PreviewImageResourceDemand } from '../scene/types';
 import type { VideoCompositionFrame } from '../../../../features/video/composition/types';
 import {

@@ -248,39 +248,6 @@ it('keeps source anchors on the original tail when inserting the same recording 
   }
 });
 
-it('keeps clip effects on both split halves with continuous document time across the insert', () => {
-  const { store, asset } = setup();
-  store.getState().appendMaterial(asset.id);
-  const project = store.getState().project!;
-  const sourceClipId = project.clips[0]!.id;
-  store.setState({
-    project: {
-      ...project,
-      effectInstances: [
-        {
-          id: 'effect',
-          kind: 'targetEffect',
-          snapshotId: 'snapshot',
-          enabled: true,
-          controls: { color: 'red' },
-          target: { kind: 'clip', clipId: sourceClipId },
-          startTime: 0,
-          duration: 6,
-          playbackRate: 2,
-        },
-      ],
-    },
-  });
-  store.getState().insertMaterial(asset.id);
-  const effects = store.getState().project!.effectInstances!;
-  expect(effects).toHaveLength(2);
-  expect(effects[0]!.target).toEqual({ kind: 'clip', clipId: sourceClipId });
-  expect(effects[1]!.target).not.toEqual(effects[0]!.target);
-  expect(resolveEffectInstanceTime(effects[0]!, 12, 2)).toMatchObject({ effectTime: 4 });
-  expect(resolveEffectInstanceTime(effects[1]!, 12, 9)).toMatchObject({ effectTime: 6 });
-  expect(effects[1]!.snapshotId).toBe(effects[0]!.snapshotId);
-});
-
 it('moves a later camera with the original trailing group and restores the montage with undo', () => {
   const { store, asset } = setup(true);
   store.getState().appendMaterial(asset.id);

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createGlTransitionSelection } from '../../../features/video/project/transition/gl-catalog';
 
 import { act } from 'react';
 import { readFileSync } from 'node:fs';
@@ -12,11 +13,7 @@ import {
   createVideoProjectTrack,
 } from '../../../features/video/project/factories/creation';
 import { createTextClip } from '../../../features/video/project/factories/overlay-clip';
-import {
-  VideoTrackKind,
-  VideoTransitionEasing,
-  VideoTransitionKind,
-} from '../../../features/video/project/types';
+import { VideoTrackKind, VideoTransitionEasing } from '../../../features/video/project/types';
 import { EffectImportControl } from './header';
 import { VideoEditorEffectsLibraryDock } from './index';
 import { useEffectLibraryOperations, type EffectLibraryOperations } from './operations';
@@ -91,12 +88,12 @@ it('uses the compact tokenized dock and user-facing EffectV1 target labels', () 
   expect(documentRows).toHaveLength(3);
   expect(documentRows?.[0]?.className).toContain('var(--sniptale-color-surface-panel)');
   expect(findDocumentButton('target').title).toBe(
-    translate('videoEditor.effectsLibrary.selectClipTarget')
+    translate('videoEditor.effectsLibrary.applyToScene')
   );
   expect(container?.textContent).not.toContain('targetEffect');
 });
 
-it('exposes only targets that are available for each EffectV1 kind', async () => {
+it('applies all supported annotation documents to the scene independently of source selection', async () => {
   const onApplyEffect = vi.fn(async () => 'instance-1');
   renderDock({ onApplyEffect, selectedClipId: null, selectedTransitionId: null });
 
@@ -104,15 +101,15 @@ it('exposes only targets that are available for each EffectV1 kind', async () =>
   const target = findDocumentButton('target');
   const transition = findDocumentButton('transition');
   expect(standalone.disabled).toBe(false);
-  expect(target.disabled).toBe(true);
-  expect(transition.disabled).toBe(true);
+  expect(target.disabled).toBe(false);
+  expect(transition.disabled).toBe(false);
   expect(standalone.getAttribute('aria-label')).toBe(
     translate('videoEditor.effectsLibrary.applyToScene')
   );
   expect(target.getAttribute('aria-label')).toBe(
-    translate('videoEditor.effectsLibrary.selectClipTarget')
+    translate('videoEditor.effectsLibrary.applyToScene')
   );
-  expect(target.title).toBe(translate('videoEditor.effectsLibrary.selectClipTarget'));
+  expect(target.title).toBe(translate('videoEditor.effectsLibrary.applyToScene'));
 
   await click(standalone);
   expect(onApplyEffect).toHaveBeenCalledWith(
@@ -148,7 +145,7 @@ it('keeps catalog management out of the editor for invalid bundles', () => {
   expect(container?.textContent).toContain(translate('videoEditor.effectsLibrary.noSearchResults'));
 });
 
-it('allows replacing the imported template of an existing transition', () => {
+it('resolves an existing GL join independently from annotation instances', () => {
   const project = createEmptyVideoProject('occupied transition');
   project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const track = project.tracks.find(({ name }) => name === 'Annotations')!;
@@ -162,25 +159,13 @@ it('allows replacing the imported template of an existing transition', () => {
       duration: 1,
       easing: VideoTransitionEasing.LINEAR,
       id: 'transition-1',
-      kind: VideoTransitionKind.CROSSFADE,
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       leadingClipId: 'leading',
       trailingClipId: 'trailing',
     },
   ];
   project.clips = [leading, trailing];
-  project.effectInstances = [
-    {
-      controls: {},
-      duration: 1,
-      enabled: true,
-      id: 'effect-1',
-      kind: 'transition',
-      playbackRate: 3,
-      snapshotId: 'snapshot-1',
-      startTime: 1,
-      target: { kind: 'transition', transitionId: 'transition-1' },
-    },
-  ];
 
   expect(resolveEffectTransitionTargetId(project, 1.5, 'transition-1')).toBe('transition-1');
 });
@@ -304,8 +289,8 @@ function createCatalog(): EffectBundleCatalogEntry {
     description: { en: 'Description', ru: 'Описание' },
     documents: [
       createDocument('standalone', 'standalone'),
-      createDocument('target', 'targetEffect'),
-      createDocument('transition', 'transition'),
+      createDocument('target', 'standalone'),
+      createDocument('transition', 'standalone'),
     ],
     enabled: true,
     label: { en: 'Effect bundle', ru: 'Набор эффектов' },
@@ -326,7 +311,7 @@ function createDocument(
     assets: [],
     id,
     kind,
-    schemaVersion: 'sniptale.effect.v1',
+    schemaVersion: 'sniptale.animation.v1',
     sha256: `${id}-sha`,
     source: '{}',
   };
@@ -336,12 +321,9 @@ function findDocumentButton(id: string): HTMLButtonElement {
   const row = [...(container?.querySelectorAll('[data-effect-document]') ?? [])].find(
     (element) => element.getAttribute('data-effect-document') === id
   );
-  const button =
-    id === 'standalone'
-      ? [...(row?.querySelectorAll('button') ?? [])].find(
-          (item) => item.title === translate('videoEditor.effectsLibrary.applyToScene')
-        )
-      : row?.querySelector('button');
+  const button = [...(row?.querySelectorAll('button') ?? [])].find(
+    (item) => item.title === translate('videoEditor.effectsLibrary.applyToScene')
+  );
   if (!(button instanceof HTMLButtonElement)) throw new Error(`Missing button for ${id}`);
   return button;
 }
@@ -374,11 +356,15 @@ it('opens the picker, ignores its cancellation and resets it after a selected pa
 it('presents the imported document label instead of its internal identifier', () => {
   const catalog = createCatalog();
   catalog.documents[1]!.source = readFileSync(
-    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-target-effect.sniptale-effect.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
+  const document = JSON.parse(catalog.documents[1]!.source!);
+  delete document.controlPresets;
+  delete document.defaultControlPresetId;
+  catalog.documents[1]!.source = JSON.stringify(document);
   renderDock({ catalogs: [{ catalog, status: 'ready' }] });
-  expect(container?.textContent).toContain('Neutral Target Effect');
+  expect(container?.textContent).toContain('Выноска');
   expect(container?.textContent).not.toContain('effect-pack');
   expect(container?.textContent).not.toContain('EffectV1');
 });
@@ -386,9 +372,13 @@ it('presents the imported document label instead of its internal identifier', ()
 it('filters document names and restores the catalog after an empty search', () => {
   const catalog = createCatalog();
   catalog.documents[1]!.source = readFileSync(
-    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-target-effect.sniptale-effect.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
+  const document = JSON.parse(catalog.documents[1]!.source!);
+  delete document.controlPresets;
+  delete document.defaultControlPresetId;
+  catalog.documents[1]!.source = JSON.stringify(document);
   renderDock({ catalogs: [{ catalog, status: 'ready' }] });
   act(() =>
     container!
@@ -404,9 +394,9 @@ it('filters document names and restores the catalog after an empty search', () =
       setValue.call(input, value);
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
-  search('Neutral');
+  search('Выноска');
   expect(container?.querySelectorAll('[data-effect-document]')).toHaveLength(1);
-  expect(container?.textContent).toContain('Neutral Target Effect');
+  expect(container?.textContent).toContain('Выноска');
   search('not-in-this-catalog');
   expect(container?.querySelectorAll('[data-effect-document]')).toHaveLength(0);
   expect(container?.querySelector('[role="status"]')?.textContent).toBe(
@@ -456,18 +446,3 @@ it.each(['targetEffect', 'transition'] as const)(
     expect(document.activeElement).toBe(search);
   }
 );
-
-it('uses a plain Apply to field while keeping its target selection operable', async () => {
-  renderDock({ kind: 'targetEffect', selectedTrackId: 'track' });
-  const select = container!.querySelector<HTMLButtonElement>(
-    `button[aria-label="${translate('videoEditor.effectsLibrary.applyTo')}"]`
-  )!;
-  expect(select.className).toContain('border-transparent bg-transparent');
-  act(() => select.click());
-  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((node) =>
-    node.textContent?.includes(translate('videoEditor.effectsLibrary.wholeVideo'))
-  )!;
-  expect(option).toBeDefined();
-  await act(async () => option.click());
-  expect(select.textContent).toContain(translate('videoEditor.effectsLibrary.wholeVideo'));
-});

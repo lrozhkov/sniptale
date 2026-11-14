@@ -1,38 +1,35 @@
+import { importAnimationArtifactBytes } from '../../lottie-profile';
+import { parseAnimationImportWorkerRequest, createAnimationImportWorkerResponse } from './protocol';
 import { createEffectBundleFailure } from '../../diagnostics';
-import { importEffectArtifactInCurrentThread } from '../artifact';
-import {
-  collectEffectImportResultTransferables,
-  createEffectImportWorkerResponse,
-  parseEffectImportWorkerRequest,
-} from './protocol';
-
 let consumed = false;
 
 self.onmessage = (event: MessageEvent<unknown>) => {
   if (event.origin !== '' || consumed || event.ports.length !== 0) {
+    for (const port of event.ports) port.close();
     self.close();
     return;
   }
   consumed = true;
-  const request = parseEffectImportWorkerRequest(event.data);
-  if (!request) {
-    self.close();
+  const animation = parseAnimationImportWorkerRequest(event.data);
+  if (animation) {
+    void executeAnimationImport(animation);
     return;
   }
-  void executeImport(request);
+  self.close();
 };
 
-async function executeImport(
-  request: NonNullable<ReturnType<typeof parseEffectImportWorkerRequest>>
+async function executeAnimationImport(
+  request: NonNullable<ReturnType<typeof parseAnimationImportWorkerRequest>>
 ): Promise<void> {
   let result;
   try {
-    result = await importEffectArtifactInCurrentThread(request.kind, request.bytes);
+    result = await importAnimationArtifactBytes(request.bytes);
   } catch {
     result = createEffectBundleFailure('BUNDLE_IMPORT_WORKER_FAILURE', '$worker');
   }
-  const response = createEffectImportWorkerResponse(request.requestId, result);
-  const transferables = collectEffectImportResultTransferables(result);
-  self.postMessage(response, { transfer: transferables });
-  self.close();
+  try {
+    self.postMessage(createAnimationImportWorkerResponse(request.requestId, result));
+  } finally {
+    self.close();
+  }
 }

@@ -1,3 +1,4 @@
+import { createSourceImageFilter } from '../../features/image-filters/contract';
 // @vitest-environment jsdom
 import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 import { createNeutralPresentationSettings } from '../../features/video/review/advanced/presentation';
@@ -705,4 +706,51 @@ it('discards a failed control on Reload and permits flush without replaying it',
   await act(async () => advanced.retry());
   expect(advanced.advanced.ui.tracks.actions).toBe(true);
   expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledOnce();
+});
+
+it('persists source filters and retries a failed capture without losing the stack', async () => {
+  const { session, deps, build } = setup();
+  const stack = {
+    version: 1 as const,
+    filters: [
+      createSourceImageFilter('bloom', 'bloom'),
+      { ...createSourceImageFilter('blur', 'blur'), enabled: false },
+    ],
+  };
+  deps.commitVideoWorkspace.mockRejectedValueOnce(new Error('Storage unavailable'));
+  act(() => advanced.setSourceFilters(stack));
+  expect(advanced.advanced.sourceFilters).toEqual(stack);
+  await act(async () => {
+    await expect(advanced.flush()).rejects.toThrow('Storage unavailable');
+  });
+  expect(advanced.advanced.sourceFilters).toEqual(stack);
+  await act(async () => advanced.retry());
+  expect(session.getSnapshot().document.advancedContent.sourceFilters).toEqual(stack);
+  expect(
+    createVideoReviewSession(build(), deps).getSnapshot().document.advancedContent.sourceFilters
+  ).toEqual(stack);
+  act(() => advanced.setSourceFilters(undefined));
+  await act(async () => advanced.flush());
+  expect(session.getSnapshot().document.advancedContent.sourceFilters).toBeUndefined();
+  expect(advanced.advanced.sourceFilters).toBeUndefined();
+});
+it('does not resurrect removed source filters from the persisted baseline', async () => {
+  const initial = createQuickEditAdvancedState();
+  initial.sourceFilters = { version: 1, filters: [createSourceImageFilter('blur', 'blur')] };
+  const { session } = setup(initial),
+    before = session.getSnapshot().document.advancedContent;
+  const { sourceFilters: _removed, ...after } = before;
+  await act(async () => {
+    await session.commitDurable({
+      id: 'remove-source-filters',
+      at: 2,
+      target: 'advancedContent',
+      before,
+      after,
+    });
+  });
+  expect(advanced.advanced.sourceFilters).toBeUndefined();
+  act(() => advanced.setCanvas({ width: 640, height: 360 }));
+  await act(async () => advanced.flush());
+  expect(session.getSnapshot().document.advancedContent.sourceFilters).toBeUndefined();
 });

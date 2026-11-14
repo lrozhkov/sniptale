@@ -223,3 +223,39 @@ it('keeps the authored zoom link across a partially removed gap and restores it 
   expect(touching[0]).toMatchObject({ linkTo: 'right', end: 2 });
   expect(touching[1]).toMatchObject({ start: 2 });
 });
+
+it('holds camera phase without slowing the enter animation before an inserted frame', () => {
+  const original = {
+    ...focus('held-enter', 2, 8),
+    sourceAnchor: { start: 2, end: 8 },
+    enter: { type: 'linear' as const, duration: 2 },
+    exit: { type: 'linear' as const, duration: 2 },
+  };
+  const map = buildReviewTimeMap(12, [
+    {
+      id: 'hold',
+      kind: 'freeze',
+      start: 3,
+      end: 3,
+      requestedStart: 3,
+      requestedEnd: 3,
+      duration: 2,
+      frameTime: 2.98,
+      frameDuration: 0.04,
+    },
+  ]);
+  const projected = projectReviewFocus([original], map);
+  for (const [result, source] of [
+    [2.5, 2.5],
+    [3, 3],
+    [4, 3],
+    [4.99, 3],
+    [5.5, 3.5],
+    [8.5, 6.5],
+  ]) {
+    expect(evaluateQuickEditCameraAtTime(projected, result!).scale).toBeCloseTo(
+      evaluateQuickEditCameraAtTime([original], source!).scale,
+      8
+    );
+  }
+});

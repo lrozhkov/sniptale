@@ -1,0 +1,1 @@
+import("stdfaust.lib"); ceiling=hslider("ceiling[unit:dB]",-1,-24,0,0.1); release=hslider("release[unit:s]",0.2,0.01,2,0.01); process=co.limiter_lad_N(2,0.01,ba.db2linear(ceiling),0.001,0.01,release);

@@ -68,6 +68,48 @@ export interface CameraPerspective {
   strength: number;
 }
 
+/** Bounded motion between the authored opening pose and a second pose. */
+export interface CameraSpatialMotion {
+  enabled: boolean;
+  end: CameraPerspective;
+  easing: 'linear' | 'ease-in-out';
+}
+
+/** Shared admission for both editor documents and history. */
+export function parseCameraSpatialMotion(value: unknown): CameraSpatialMotion | undefined | null {
+  if (value === undefined) return undefined;
+  if (
+    !isRecord(value) ||
+    typeof value['enabled'] !== 'boolean' ||
+    (value['easing'] !== 'linear' && value['easing'] !== 'ease-in-out')
+  )
+    return null;
+  const end = parseCameraPerspective(value['end']);
+  return end ? { enabled: value['enabled'], end, easing: value['easing'] } : null;
+}
+
+/** Both editors use the same pose clock and keep entry/exit envelopes separate. */
+export function cameraSpatialMotionPose<
+  T extends CameraSpatialSettings & { spatialMotion?: CameraSpatialMotion },
+>(settings: T, progress: number): T {
+  if (!settings.spatialMotion?.enabled) return settings;
+  const t = Math.max(0, Math.min(1, progress));
+  const weight = settings.spatialMotion.easing === 'linear' ? t : t * t * (3 - 2 * t);
+  const a = settings.perspective ?? DEFAULT_CAMERA_PERSPECTIVE;
+  const b = settings.spatialMotion.end;
+  const mix = (x: number, y: number) => x + (y - x) * weight;
+  return {
+    ...settings,
+    perspective: {
+      enabled: a.enabled || b.enabled,
+      rotateX: mix(a.rotateX, b.rotateX),
+      rotateY: mix(a.rotateY, b.rotateY),
+      rotateZ: mix(a.rotateZ, b.rotateZ),
+      strength: mix(a.strength, b.strength),
+    },
+  };
+}
+
 export interface CameraDepthOfField {
   enabled: boolean;
   mode: 'area' | 'depth';
@@ -98,6 +140,7 @@ export interface CameraSpatialRect {
 
 /** Authored settings only; clocks and scene coordinates belong to each editor. */
 export interface CameraSpatialSettings {
+  spatialMotion?: CameraSpatialMotion;
   cursorComposition?: CursorCompositionSettings;
   perspective?: CameraPerspective;
   depthOfField?: CameraDepthOfField;
@@ -304,15 +347,18 @@ export function normalizeMotionSpatialSettings(
   const perspective = parseCameraPerspective(settings.perspective);
   const depthOfField = parseCameraDepth(settings.depthOfField);
   const spatialReference = parseMotionSpatialReference(settings.spatialReference);
+  const spatialMotion = parseCameraSpatialMotion(settings.spatialMotion);
   return {
     ...(cursorComposition ? { cursorComposition } : {}),
     ...(perspective ? { perspective } : {}),
     ...(depthOfField ? { depthOfField } : {}),
     ...(spatialReference ? { spatialReference } : {}),
+    ...(spatialMotion ? { spatialMotion } : {}),
   };
 }
 
 export type MotionSpatialEdit =
+  | ({ kind: 'motion' } & CameraSpatialMotion)
   | ({ kind: 'cursor-composition' } & Partial<CursorCompositionSettings>)
   | ({ kind: 'perspective' } & Partial<CameraPerspective>)
   | ({ kind: 'depth' } & Partial<CameraDepthOfField>)
@@ -343,6 +389,11 @@ export function editMotionSpatialSettings(
 ): MotionSpatialSettings | null {
   if (!isRecord(edit)) return null;
   const { kind, reset, ...fields } = edit;
+  if (kind === 'motion') {
+    if (!('effect' in settings) || settings.effect !== '3d') return null;
+    const next = parseCameraSpatialMotion(fields);
+    return next ? { ...settings, spatialMotion: next } : null;
+  }
   if (kind === 'cursor-composition') {
     if (reset !== undefined) return null;
     const next = parseCursorCompositionSettings({

@@ -100,13 +100,11 @@ export const EDITOR_OWNER_MAPPINGS = [
   },
   {
     owner: 'video-preview-canvas-region-gestures',
-    productionFile: 'apps/extension/src/video-editor/preview/stage/canvas/editor-region/gesture.ts',
+    productionFile: 'apps/extension/src/video-editor/preview/stage/canvas/effect-handles.tsx',
     reason:
-      'Region and anchor consumers retain shared arrow decoding, pointer preview, single commit \
-and cancellation behavior.',
+      'Lottie object anchors retain arrow decoding, pointer preview, single commit and cancellation behavior.',
     testFiles: [
-      'apps/extension/src/video-editor/preview/stage/canvas/editor-region/model.test.ts',
-      'apps/extension/src/video-editor/preview/stage/canvas/editor-region/index.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/canvas/root.test.tsx',
       'apps/extension/src/video-editor/preview/stage/canvas/index.test.tsx',
     ],
   },
@@ -180,6 +178,7 @@ and cancellation behavior.',
     allowCrossOwner: true,
     reason: 'Video isolation owns source fit, decorations, sharp feedback and failure cleanup.',
     testFiles: [
+      'apps/extension/src/workflows/video-review/source-filters-render.test.ts',
       'apps/extension/src/features/video/composition/draw/video.test.ts',
       'apps/extension/src/features/video/composition/draw/visual.test.ts',
       'apps/extension/src/features/video/composition/draw/visual.media-source.test.ts',
@@ -629,8 +628,14 @@ action-feedback-click-fields.test.tsx',
   {
     owner: 'gallery-review-opening-and-feedback',
     productionFile: 'apps/extension/src/gallery/video-review/index.tsx',
-    reason: 'The modal integration suite exercises opening, retry, feedback and editor navigation.',
-    testFiles: ['apps/extension/src/gallery/video-review/review.test.tsx'],
+    reason:
+      'Mounted shell and selection suites cover opening, navigation, tools and transient preview controls.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/review.test.tsx',
+      'apps/extension/src/gallery/video-review/index.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+    ],
   },
   {
     owner: 'gallery-review-opening-and-feedback',
@@ -668,6 +673,10 @@ action-feedback-click-fields.test.tsx',
     reason: `Mounted preview hooks exercise the session acquisition, source callbacks, stale
       results, publication, cancellation, failure diagnostics and retry lifecycle.`,
     testFiles: [
+      'apps/extension/src/gallery/video-review/preview-presentation-session.test.ts',
+      'apps/extension/src/gallery/video-review/preview-presentation-session.sources.test.ts',
+      'apps/extension/src/gallery/video-review/use-preview-presentation-camera.test.tsx',
+      'apps/extension/src/gallery/video-review/use-preview-presentation-performance.test.tsx',
       'apps/extension/src/gallery/video-review/use-preview-presentation.test.tsx',
       'apps/extension/src/gallery/video-review/use-preview-presentation-captions.test.tsx',
     ],
@@ -717,17 +726,7 @@ action-feedback-click-fields.test.tsx',
       'apps/extension/src/gallery/video-review/stage-geometry.test.tsx',
     ],
   },
-  {
-    owner: 'video-review-export-scene',
-    productionFile: 'apps/extension/src/workflows/video-review/render-export-scene.ts',
-    reason: `Export frame and overlay consumer suites execute the extracted scene composition,
-      borrowed raster lifetime and decorated lens sampling.`,
-    testFiles: [
-      'apps/extension/src/workflows/video-review/render-export.test.ts',
-      'apps/extension/src/workflows/video-review/scene-frame.test.ts',
-      'apps/extension/src/workflows/video-review/render-scene-overlays.test.ts',
-    ],
-  },
+
   {
     owner: 'gallery-review-annotation-numeric',
     productionFile: 'apps/extension/src/gallery/video-review/annotation-effects-numeric.tsx',

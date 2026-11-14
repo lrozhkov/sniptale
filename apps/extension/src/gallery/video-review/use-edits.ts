@@ -82,7 +82,7 @@ export function useReviewEdits(props: {
     requestedKind?: 'cut' | 'speed'
   ) => {
     const kind = before?.kind ?? requestedKind ?? mode;
-    if (!kind || pending.current) return false;
+    if (!kind || kind === 'freeze' || pending.current) return false;
     const planned = candidate(kind, selection, before);
     const after = planned && {
       ...planned,
@@ -110,6 +110,13 @@ export function useReviewEdits(props: {
     }
   };
 
+  const changeFreezeDuration = (edit: ReviewEdit, duration: number) => {
+    if (edit.kind !== 'freeze' || !Number.isFinite(duration) || duration < 0.04 || duration > 600)
+      return;
+    props.pause();
+    return props.commit(edit, { ...edit, duration });
+  };
+
   return {
     mode,
     cutting: mode !== null,
@@ -124,6 +131,9 @@ export function useReviewEdits(props: {
         ? props.commit(selected, { ...selected, audio: value })
         : undefined,
     selected,
+    changeFreezeDuration,
+    changeSelectedFreezeDuration: (duration: number) =>
+      selected ? changeFreezeDuration(selected, duration) : undefined,
     changeSelectedTransition: (transition: CompositionJoinSettings | null) => {
       if (selected?.kind !== 'cut') return undefined;
       props.pause();
@@ -140,7 +150,11 @@ export function useReviewEdits(props: {
     select: (edit: ReviewEdit) => {
       props.pause();
       setSelectedEditId(edit.id);
-      props.setSelection({ kind: 'range', start: edit.start, end: edit.end });
+      props.setSelection(
+        edit.kind === 'freeze'
+          ? { kind: 'point', time: edit.start }
+          : { kind: 'range', start: edit.start, end: edit.end }
+      );
       props.seek(edit.start);
     },
     toggle,

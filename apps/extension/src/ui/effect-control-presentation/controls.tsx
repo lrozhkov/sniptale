@@ -2,8 +2,8 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import {
   resolveEffectLocaleText,
   type ControlDefinition,
-  type EffectV1ControlUnit,
-} from '@sniptale/runtime-contracts/effect-v1';
+  type EffectControlUnit,
+} from '@sniptale/runtime-contracts/effect-controls';
 import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { SelectField, SegmentedRow, TextareaField } from '../compact-inspector-controls';
 import { InspectorParameterRow } from '../compact-inspector-controls/layout';
@@ -14,7 +14,7 @@ import {
 } from '../compact-inspector-controls/shared';
 
 /** Units decorate values only; graph controls always retain their raw authored scale. */
-export function effectControlUnit(unit: EffectV1ControlUnit | undefined): CompactInspectorUnit {
+export function effectControlUnit(unit: EffectControlUnit | undefined): CompactInspectorUnit {
   return unit === 'percent' ? '%' : (unit ?? '');
 }
 

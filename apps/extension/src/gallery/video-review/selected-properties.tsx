@@ -1,3 +1,13 @@
+import { useGlTransitionCatalog } from '../../composition/gl-transition-presets/catalog';
+import {
+  glTransitionChoices,
+  glTransitionChoiceValue,
+  resolveGlTransitionChoice,
+} from '../../ui/gl-transition-choices';
+import { GlTransitionPresetActions } from '../../composition/gl-transition-presets/actions';
+
+import { GlTransitionFields } from '../../ui/gl-transition-fields';
+import { withCursorMotionPath } from '../../features/video/project/cursor-motion';
 import { createRecordingCursorAvailabilityReader } from '../../workflows/video-review/cursor-trajectory';
 import {
   sameCursorAvailabilitySource,
@@ -69,6 +79,7 @@ type SelectedPropertiesProps = {
   editing: ReturnType<typeof useReviewEdits> & { exporter: ReturnType<typeof useReviewExport> };
   zoom: ReturnType<typeof useReviewZoomEditor>;
   busy: boolean;
+  interactionEditor?: import('./interaction-editor').ReviewInteractionEditor | undefined;
   markers: readonly ReviewTelemetryMarker[];
   onOpenHistory?(): void;
   onActionAudio?: Parameters<typeof ReviewActionProperties>[0]['onActionAudio'];
@@ -141,13 +152,26 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
   const cursorPath = useMemo(
     () =>
       cameraSelected
-        ? resolveReviewCursorFocusPath(
-            selectedHistory.telemetry ?? null,
-            resource.source,
-            advanced.cursorFocusPath
+        ? withCursorMotionPath(
+            resolveReviewCursorFocusPath(
+              selectedHistory.telemetry ?? null,
+              resource.source,
+              advanced.cursorFocusPath
+            ),
+            advanced.cursorMotionEnabled !== false && advanced.ui.tracks.cursorMotion !== false
+              ? advanced.cursorMotions
+              : undefined
           )
         : undefined,
-    [cameraSelected, selectedHistory.telemetry, resource.source, advanced.cursorFocusPath]
+    [
+      cameraSelected,
+      selectedHistory.telemetry,
+      resource.source,
+      advanced.cursorFocusPath,
+      advanced.cursorMotions,
+      advanced.ui.tracks.cursorMotion,
+      advanced.cursorMotionEnabled,
+    ]
   );
   const edits = resource.session.getSnapshot().document.edits;
   const regionId = selectedRegion?.id,
@@ -180,7 +204,12 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
   const cursor = useSelectedCursorAvailability(
     resource.historyProject,
     sourceInterval,
-    inlineCursorPath,
+    withCursorMotionPath(
+      inlineCursorPath,
+      advanced.cursorMotionEnabled !== false && advanced.ui.tracks.cursorMotion !== false
+        ? advanced.cursorMotions
+        : undefined
+    ),
     regionId
   );
   return (
@@ -203,6 +232,7 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
           />
         ) : selection.kind === 'telemetry' ? (
           <ReviewActionProperties
+            interactionEditor={props.interactionEditor}
             marker={marker}
             actionAudio={advanced.actionAudio}
             onActionAudio={props.onActionAudio}
@@ -287,6 +317,7 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
                     : (region.start + region.end) / 2,
                 }}
                 background={advanced.background}
+                sourceFilters={advanced.sourceFilters}
                 source={resource.source}
                 canvas={advanced.canvas}
                 windowHeader={advanced.windowHeader}
@@ -374,6 +405,33 @@ function SelectedEdit(
 ) {
   const { editing, advanced, resource, busy } = props;
   const selected = editing.selected!;
+  if (selected.kind === 'freeze')
+    return (
+      <div className="space-y-3">
+        <ReviewFreezeDuration
+          duration={selected.duration}
+          disabled={busy}
+          onChange={(value) => {
+            void editing.changeSelectedFreezeDuration(value);
+          }}
+        />
+        <ReviewInspectorSections
+          sections={[
+            reviewInspectorActions(
+              <ReviewButton
+                label={translate('gallery.videoReview.deleteSelected')}
+                className={reviewDeleteButtonClassName}
+                disabled={busy}
+                onClick={() => void editing.remove()}
+              >
+                <Trash2 size={15} aria-hidden />
+                <span>{translate('gallery.videoReview.deleteSelected')}</span>
+              </ReviewButton>
+            ),
+          ]}
+        />
+      </div>
+    );
   return (
     <div className="space-y-3">
       <ReviewInterval start={selected.start} end={selected.end} />
@@ -448,6 +506,7 @@ function CutTransitionFields(props: {
   onChange(value: CompositionJoinSettings | null): Promise<boolean> | undefined;
 }) {
   const locale = useAppLocale();
+  const glCatalog = useGlTransitionCatalog();
   const [draft, setDraft] = useState(props.edit.transition ?? null);
   const [saving, setSaving] = useState(false);
   const pending = useRef(false);
@@ -493,21 +552,60 @@ function CutTransitionFields(props: {
         className="min-w-0 sniptale-parameter-stack"
         data-ui="gallery.videoReview.cutTransition"
       >
-        <SelectField<CompositionJoinSettings['type'] | 'none'>
+        <SelectField<string>
           className={reviewSelectFieldClassName}
           label={translate('gallery.videoReview.zoomTransitionType')}
-          value={draft?.type ?? 'none'}
+          value={
+            draft?.type === 'gl'
+              ? glTransitionChoiceValue(glCatalog, draft.selection)
+              : (draft?.type ?? 'none')
+          }
           options={[
             { value: 'none', label: translate('gallery.videoReview.transitionNone') },
             { value: 'dissolve', label: translate('gallery.videoReview.cutDissolve') },
             { value: 'fade-black', label: translate('gallery.videoReview.cutFadeColor') },
+            ...glTransitionChoices(glCatalog, draft?.type === 'gl' ? draft.selection : undefined),
           ]}
-          onChange={(type) =>
-            void commit(type === 'none' ? null : { before: 0.25, after: 0.25, ...draft, type })
-          }
+          onChange={(type) => {
+            if (type === 'none') {
+              void commit(null);
+              return;
+            }
+            const timing = { before: draft?.before ?? 0.25, after: draft?.after ?? 0.25 };
+            if (type === 'dissolve' || type === 'fade-black') {
+              void commit({ ...timing, type, ...(draft?.color ? { color: draft.color } : {}) });
+              return;
+            }
+            const selection = resolveGlTransitionChoice(glCatalog, type);
+            if (selection)
+              void commit({
+                ...timing,
+                type: 'gl',
+                selection,
+                easing: draft?.type === 'gl' ? draft.easing : 'LINEAR',
+              });
+          }}
         />
         {draft ? (
           <>
+            {draft.type === 'gl' && (
+              <GlTransitionFields
+                presetActions={
+                  <GlTransitionPresetActions
+                    ownerKey={props.edit.id}
+                    ownerRevision={props.edit}
+                    selection={draft.selection}
+                    disabled={saving}
+                    onApply={(selection) => commit({ ...draft, selection })}
+                  />
+                }
+                selection={draft.selection}
+                easing={draft.easing}
+                disabled={saving}
+                onChangeSelection={(selection) => void commit({ ...draft, selection })}
+                onChangeEasing={(easing) => void commit({ ...draft, easing })}
+              />
+            )}
             {draft.type === 'fade-black' ? (
               <ColorField
                 className={reviewSelectFieldClassName}
@@ -565,6 +663,7 @@ export function reviewSelectionLabel(
   state: Pick<SelectedPropertiesProps, 'selection' | 'markers' | 'advanced' | 'editing'>
 ): string | undefined {
   const selection = state.selection;
+  if (selection.kind === 'cursor-motion') return translate('gallery.videoReview.cursorMotionTrack');
   if (selection.kind === 'cursor-focus')
     return translate('videoEditor.sidebar.cursorFocusPathTitle');
   if (selection.kind === 'annotation-effect')
@@ -585,11 +684,13 @@ export function reviewSelectionLabel(
   if (selection.kind === 'zoom') {
     const region = state.advanced.zoom.regions.find((item) => item.id === selection.id);
     return translate(
-      region?.border
-        ? 'gallery.videoReview.focusBorder'
-        : region?.spotlight
-          ? 'gallery.videoReview.focusSpotlight'
-          : 'gallery.videoReview.zoomRegionLabel'
+      region?.effect === '3d'
+        ? 'gallery.videoReview.focus3d'
+        : region?.border
+          ? 'gallery.videoReview.focusBorder'
+          : region?.spotlight
+            ? 'gallery.videoReview.focusSpotlight'
+            : 'gallery.videoReview.zoomRegionLabel'
     );
   }
   if (selection.kind === 'zoom-link') return translate('gallery.videoReview.zoomLinkSettings');
@@ -604,9 +705,11 @@ export function reviewSelectionLabel(
     );
   if (selection.kind === 'edit' && state.editing.selected)
     return translate(
-      state.editing.selected.kind === 'cut'
-        ? 'gallery.videoReview.cutLabel'
-        : 'gallery.videoReview.speedMode'
+      state.editing.selected.kind === 'freeze'
+        ? 'gallery.videoReview.freezeFrame'
+        : state.editing.selected.kind === 'cut'
+          ? 'gallery.videoReview.cutLabel'
+          : 'gallery.videoReview.speedMode'
     );
   return undefined;
 }
@@ -679,6 +782,20 @@ export function ReviewSelectedTextProperties(props: {
           )
         }
       />
+      <ReviewInspectorSections
+        sections={[
+          reviewInspectorActions(
+            <ReviewButton
+              label={translate('gallery.videoReview.textFragmentDelete')}
+              className={`${reviewDeleteButtonClassName} !w-full justify-start`}
+              onClick={() => props.editor.remove([fragment.id])}
+            >
+              <Trash2 size={15} aria-hidden="true" />
+              <span>{translate('gallery.videoReview.textFragmentDelete')}</span>
+            </ReviewButton>
+          ),
+        ]}
+      />
     </fieldset>
   );
 }
@@ -741,4 +858,28 @@ function useSelectedCursorAvailability(
     available: inline || (ready && completed.available),
     pending: !inline && !!project && !!interval && !ready,
   };
+}
+
+function ReviewFreezeDuration(props: {
+  duration: number;
+  disabled: boolean;
+  onChange(value: number): void;
+}) {
+  const [value, setValue] = useState(props.duration);
+  useEffect(() => setValue(props.duration), [props.duration]);
+  return (
+    <NumericRow
+      label={translate('gallery.videoReview.freezeDuration')}
+      unit="s"
+      value={value}
+      min={0.04}
+      max={600}
+      step={0.01}
+      precision={3}
+      scrub={{ min: 0.5, max: 30, step: 0.5 }}
+      disabled={props.disabled}
+      onPreviewValue={setValue}
+      onCommitValue={props.onChange}
+    />
+  );
 }

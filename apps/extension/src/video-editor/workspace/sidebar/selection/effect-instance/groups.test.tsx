@@ -2,18 +2,8 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import {
-  createEmptyVideoProject,
-  createVideoProjectAsset,
-} from '../../../../../features/video/project/factories/creation';
-import { translate } from '../../../../../platform/i18n';
-import { createEffectInstanceGroup, createEffectInstanceGroups } from './groups';
-import { createVideoClipFromAsset } from '../../../../../features/video/project/factories/clip';
-import { VideoProjectAssetType } from '../../../../../features/video/project/types';
-import {
-  createSelectionPanelProps,
-  WorkspaceSidebarSelectionPanel,
-} from '../../panel-content/selection-panel';
+import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
+import { createEffectInstanceGroups } from './groups';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -29,164 +19,26 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderStack(disabled = false, composed = false) {
-  const project = createEmptyVideoProject('Effect stack');
-  project.duration = 10;
-  project.effectInstances = ['first', 'last'].map((id) => ({
-    id,
-    kind: 'targetEffect',
-    snapshotId: 'unavailable-source',
-    enabled: true,
-    controls: {},
-    duration: 2,
-    playbackRate: 1,
-    startTime: 0,
-    target: { kind: 'clip', clipId: 'clip' },
-  }));
-  const actions = {
-    onDeleteEffectInstance: vi.fn(),
-    onDuplicateEffectInstance: vi.fn(() => 'copy'),
-    onMoveEffectInstance: vi.fn(),
-    onUpdateEffectInstance: vi.fn(),
-  };
-  if (composed) {
-    const asset = createVideoProjectAsset(
-      'Video',
-      VideoProjectAssetType.VIDEO,
-      { kind: 'project-asset', projectAssetId: 'video' },
-      {
-        audioPeaks: null,
-        duration: 5,
-        hasAudio: false,
-        height: 1080,
-        mimeType: 'video/mp4',
-        size: 100,
-        width: 1920,
-      }
-    );
-    const clip = {
-      ...createVideoClipFromAsset(project.tracks[0]!.id, asset, project.width, project.height, 0),
-      id: 'clip',
-    };
-    project.assets.push(asset);
-    project.clips.push(clip);
-    const props = createSelectionPanelProps({
-      project,
-      selectedClip: clip,
-      selectedTrack: project.tracks[0]!,
-      selection: { kind: 'clip', clipId: clip.id },
-      onAddActionEvent: vi.fn(),
-      onDetachClipGroup: vi.fn(),
-      onEnableCursorTrack: vi.fn(),
-      onResizeProject: vi.fn(),
-      onSetCursorCaptureMode: vi.fn(),
-      onImportImage: vi.fn(),
-      onSetSceneBackground: vi.fn(),
-      onUpdateClipAudioEnvelope: vi.fn(),
-      onUpdateClipFades: vi.fn(),
-      onUpdateClipMuted: vi.fn(),
-      onUpdateClipTransform: vi.fn(),
-      onUpdateClipVolume: vi.fn(),
-      onUpdateCursorSkin: vi.fn(),
-      onUpdateMediaClipFitMode: vi.fn(),
-      onUpdateShapeStyle: vi.fn(),
-      onUpdateTextContent: vi.fn(),
-      onUpdateTextStyle: vi.fn(),
-      ...actions,
-    });
-    act(() => root.render(<WorkspaceSidebarSelectionPanel {...props} />));
-    const effects = [...container.querySelectorAll<HTMLButtonElement>('nav button')].find(
-      (button) =>
-        button.getAttribute('aria-label') === translate('videoEditor.effectsLibrary.effectV1Label')
-    )!;
-    act(() => effects.click());
-  } else {
-    act(() =>
-      root.render(
-        createEffectInstanceGroup({
-          project,
-          disabled,
-          target: { kind: 'clip', clipId: 'clip' },
-          ...actions,
-        }).content
-      )
-    );
-  }
-  return actions;
-}
-function action(
-  card: Element,
-  key: 'moveUp' | 'moveDown' | 'deleteInstance' | 'duplicateInstance'
-) {
-  const label = translate(`videoEditor.effectsLibrary.${key}`);
-  const button = [...card.querySelectorAll('button')].find(
-    (node) => node.getAttribute('aria-label') === label || node.textContent === label
-  );
-  if (!button) throw new Error(`Missing ${key}`);
-  return button;
-}
-it('disables impossible edge moves while routing available order, duplicate and delete actions', () => {
-  const handlers = renderStack();
-  const cards = container.querySelectorAll('section');
-  expect(cards).toHaveLength(2);
-  expect(action(cards[0]!, 'moveUp').disabled).toBe(true);
-  expect(action(cards[1]!, 'moveDown').disabled).toBe(true);
-  act(() => {
-    action(cards[0]!, 'moveUp').click();
-    action(cards[0]!, 'moveDown').click();
-    action(cards[1]!, 'duplicateInstance').click();
-    action(cards[1]!, 'deleteInstance').click();
-  });
-  expect(handlers.onMoveEffectInstance).toHaveBeenCalledExactlyOnceWith('first', 'down');
-  expect(handlers.onDuplicateEffectInstance).toHaveBeenCalledExactlyOnceWith('last');
-  expect(handlers.onDeleteEffectInstance).toHaveBeenCalledExactlyOnceWith('last');
-  expect(container.textContent).not.toContain('unavailable-source');
-});
-it('keeps all instance actions unavailable when its target is locked', () => {
-  const handlers = renderStack(true);
-  for (const card of container.querySelectorAll('section')) {
-    for (const key of ['moveUp', 'moveDown', 'duplicateInstance', 'deleteInstance'] as const) {
-      const button = action(card, key);
-      expect(button.disabled).toBe(true);
-      act(() => button.click());
-    }
-  }
-  expect(handlers.onMoveEffectInstance).not.toHaveBeenCalled();
-  expect(handlers.onDuplicateEffectInstance).not.toHaveBeenCalled();
-  expect(handlers.onDeleteEffectInstance).not.toHaveBeenCalled();
-});
-
-it('routes duplicate and order through the composed selection panel into the effect inspector', () => {
-  const handlers = renderStack(false, true);
-  const cards = container.querySelectorAll('[data-effect-instance]');
-  expect(cards).toHaveLength(2);
-  act(() => {
-    action(cards[0]!, 'duplicateInstance').click();
-    action(cards[0]!, 'moveDown').click();
-  });
-  expect(handlers.onDuplicateEffectInstance).toHaveBeenCalledExactlyOnceWith('first');
-  expect(handlers.onMoveEffectInstance).toHaveBeenCalledExactlyOnceWith('first', 'down');
-});
-
 it('preserves an off-scene handle coordinate when committing its existing value', async () => {
   const { readFileSync } = await import('node:fs');
-  const { parseEffectV1Source } = await import('@sniptale/runtime-contracts/effect-v1');
+  const { parseAnimationTemplateSource } =
+    await import('@sniptale/runtime-contracts/animation-template');
   const source = readFileSync(
-    'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-callout.sniptale-effect.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
-  const parsed = parseEffectV1Source(source);
-  if (!parsed.document) throw new Error('Expected callout fixture');
-  const handle = parsed.document.objectLayout!.handles![0]!;
+  const parsed = parseAnimationTemplateSource(source);
+  if (!parsed.template) throw new Error('Expected callout fixture');
+  const handle = parsed.template.objectLayout!.handles![0]!;
   const project = createEmptyVideoProject('Handle');
   project.effectSnapshots = [
     {
       id: 'snapshot',
-      documentId: parsed.document.id,
+      documentId: parsed.template.id,
       kind: 'standalone',
       assets: [],
       retainedByteLength: new TextEncoder().encode(source).length,
-      schemaVersion: 'sniptale.effect.v1',
+      schemaVersion: 'sniptale.animation.v1',
       sha256: '0'.repeat(64),
       source,
     },
@@ -227,7 +79,7 @@ it('preserves an off-scene handle coordinate when committing its existing value'
     [...container.querySelectorAll('[data-semantic]')].map((node) =>
       node.getAttribute('data-semantic')
     )
-  ).toEqual(['effects', 'content', 'typography', 'appearance', 'geometry', 'animation']);
+  ).toEqual(['effects', 'content', 'typography', 'appearance', 'geometry']);
   const input = [...container.querySelectorAll<HTMLInputElement>('input')].find((node) =>
     node.getAttribute('aria-label')?.endsWith('· X')
   )!;
@@ -250,26 +102,27 @@ it('preserves an off-scene handle coordinate when committing its existing value'
 
 it('renders promoted advanced controls without a duplicate disclosure', async () => {
   const { readFileSync } = await import('node:fs');
-  const { parseEffectV1Source } = await import('@sniptale/runtime-contracts/effect-v1');
+  const { parseAnimationTemplateSource } =
+    await import('@sniptale/runtime-contracts/animation-template');
   const fixtureSource = readFileSync(
-    'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-callout.sniptale-effect.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
   const document = JSON.parse(fixtureSource);
-  document.controls.at(-1).group = 'advanced';
+  document.controls.find((control: { id: string }) => control.id === 'opacity').group = 'advanced';
   const source = JSON.stringify(document);
-  const parsed = parseEffectV1Source(source);
-  if (!parsed.document) throw new Error('Expected callout fixture');
-  const handle = parsed.document.objectLayout!.handles![0]!;
+  const parsed = parseAnimationTemplateSource(source);
+  if (!parsed.template) throw new Error('Expected callout fixture');
+  const handle = parsed.template.objectLayout!.handles![0]!;
   const project = createEmptyVideoProject('Handle');
   project.effectSnapshots = [
     {
       id: 'snapshot',
-      documentId: parsed.document.id,
+      documentId: parsed.template.id,
       kind: 'standalone',
       assets: [],
       retainedByteLength: new TextEncoder().encode(source).length,
-      schemaVersion: 'sniptale.effect.v1',
+      schemaVersion: 'sniptale.animation.v1',
       sha256: '0'.repeat(64),
       source,
     },
@@ -312,7 +165,7 @@ it('renders promoted advanced controls without a duplicate disclosure', async ()
   expect(advanced.querySelector('input,button')).not.toBeNull();
 });
 
-it('keeps target-effect parameters out of global navigation and disclosures independent', async () => {
+it('keeps standalone annotation disclosures independent', async () => {
   const { InspectorDisclosurePreferences } =
     await import('../../../../../composition/inspector-disclosures/state');
   const { createInspectorDisclosureStore } =
@@ -320,35 +173,35 @@ it('keeps target-effect parameters out of global navigation and disclosures inde
   const project = createEmptyVideoProject('Nested effects');
   const { readFileSync } = await import('node:fs');
   const source = readFileSync(
-    'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-video-blur.sniptale-effect.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
   project.effectSnapshots = [
     {
       id: 'blur',
-      documentId: 'sniptale-video-blur',
-      kind: 'targetEffect',
+      documentId: 'sniptale-callout',
+      kind: 'standalone',
       assets: [],
       retainedByteLength: new TextEncoder().encode(source).length,
-      schemaVersion: 'sniptale.effect.v1',
+      schemaVersion: 'sniptale.animation.v1',
       sha256: '0'.repeat(64),
       source,
     },
   ];
   project.effectInstances = ['first', 'second'].map((id) => ({
     id,
-    kind: 'targetEffect',
+    kind: 'standalone',
     snapshotId: 'blur',
     enabled: true,
     controls: {},
     duration: 2,
     playbackRate: 1,
     startTime: 0,
-    target: { kind: 'track', trackId: project.tracks[0]!.id },
+    target: { kind: 'scene' },
   }));
   const groups = createEffectInstanceGroups({
     project,
-    target: { kind: 'track', trackId: project.tracks[0]!.id },
+    target: { kind: 'scene' },
     onDeleteEffectInstance: vi.fn(),
     onDuplicateEffectInstance: vi.fn(() => null),
     onMoveEffectInstance: vi.fn(),
@@ -373,33 +226,38 @@ it('keeps target-effect parameters out of global navigation and disclosures inde
   expect(disclosures[0]!.open).toBe(false);
   expect(disclosures[1]!.open).toBe(true);
   expect(disclosures[1]!.querySelector('input')).not.toBeNull();
-  expect(disclosures[1]!.textContent).toContain('Радиус размытия');
+  expect(disclosures[1]!.textContent).toContain('Текст');
 });
 
 it.each(['move', 'sparkles'] as const)(
   'keeps nested %s from repeating the surrounding host groups',
   async (icon) => {
     const { readFileSync } = await import('node:fs');
-    const { parseEffectV1Source } = await import('@sniptale/runtime-contracts/effect-v1');
-    const parsed = parseEffectV1Source(
+    const { parseAnimationTemplateSource } =
+      await import('@sniptale/runtime-contracts/animation-template');
+    const value = JSON.parse(
       readFileSync(
-        'apps/extension/public/video-effects/effects/annotations/sniptale-callout/effect.sniptale-effect.json',
+        'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
         'utf8'
       )
     );
-    if (!parsed.document) throw new Error('Missing callout');
-    parsed.document.controlGroups![0]!.icon = icon;
-    const source = JSON.stringify(parsed.document);
-    expect(parseEffectV1Source(source).ok).toBe(true);
+    value.controlGroups = [
+      { id: 'tracing', label: { en: 'Tracing' }, parentId: 'appearance', icon },
+    ];
+    value.controls.find((control: { id: string }) => control.id === 'opacity').group = 'tracing';
+    const source = JSON.stringify(value),
+      parsed = parseAnimationTemplateSource(source);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.template) throw Error('Missing callout');
     const project = createEmptyVideoProject();
     project.effectSnapshots = [
       {
         id: 'snapshot',
-        documentId: parsed.document.id,
+        documentId: parsed.template.id,
         kind: 'standalone',
         assets: [],
         retainedByteLength: new TextEncoder().encode(source).byteLength,
-        schemaVersion: 'sniptale.effect.v1',
+        schemaVersion: 'sniptale.animation.v1',
         sha256: '0'.repeat(64),
         source,
       },

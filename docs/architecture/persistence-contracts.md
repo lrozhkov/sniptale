@@ -1195,3 +1195,12 @@ Advanced schema27 admits optional `sourceAnchor` on result-domain text fragments
 The text document owns these anchors. Descriptive provenance owns no timing authority or audio lease. Malformed anchors reject the operation without partial publication. Preview, captions, and subtitle export use the same projection. Gallery-to-Montage conversion retains current slices as ordinary Native text and retains fully excluded text with a zero result limit.
 
 Physical database47 and mediaLibrary32 admit this contract through a metadata-only46→47 migration. The migration preserves existing workspaces, history, recovery, and immutable objects. Earlier applications refuse the newer database before writing. Reading older supported projects does not create anchors or write a migration.
+
+
+## Audio processing admission
+
+Physical database version 57 admits Gallery advanced schema 31 and Native project schema 53. The mediaLibrary contract uses version 35. The videoProjects contract uses version 12.
+
+The additive 56→57 migration changes contracts only. It preserves project heads, history, recovery drafts, source references and immutable media bytes. Older writers refuse the newer database before they can discard audio settings.
+
+DSP settings contain fixed processor identities and parameters. They contain no executable code. Reads of older supported projects do not add processing settings or write project migrations. User audio presets retain their separate browser storage authority.

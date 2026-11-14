@@ -34,7 +34,7 @@ export function getTrackJunctions(project: VideoProject): TrackJunction[] {
 function dedupeTrackJunctions(junctions: TrackJunction[]): TrackJunction[] {
   const seenJunctions = new Set<string>();
   return junctions.filter((junction) => {
-    const key = `${junction.leadingClip.id}:${junction.trailingClip.id}`;
+    const key = JSON.stringify([junction.leadingClip.id, junction.trailingClip.id]);
     if (seenJunctions.has(key)) {
       return false;
     }

@@ -144,13 +144,15 @@ export function getSelectionMeta(
       return createStaticSelectionMeta(Search, 'videoEditor.timeline.motionLane');
     case VideoEditorSelectionKind.MOTION_REGION: {
       const region = project?.motionRegions?.find((item) => item.id === selection.motionRegionId);
-      return region?.border
-        ? createStaticSelectionMeta(Frame, 'gallery.videoReview.focusBorder')
-        : region?.spotlight?.effect === 'magnify'
-          ? createStaticSelectionMeta(Focus, 'gallery.videoReview.focusLens')
-          : region?.spotlight
-            ? createStaticSelectionMeta(Focus, 'gallery.videoReview.focusSpotlight')
-            : createStaticSelectionMeta(Search, 'videoEditor.timeline.motionLane');
+      return region?.effect === '3d'
+        ? createStaticSelectionMeta(Focus, 'gallery.videoReview.focus3d')
+        : region?.border
+          ? createStaticSelectionMeta(Frame, 'gallery.videoReview.focusBorder')
+          : region?.spotlight?.effect === 'magnify'
+            ? createStaticSelectionMeta(Focus, 'gallery.videoReview.focusLens')
+            : region?.spotlight
+              ? createStaticSelectionMeta(Focus, 'gallery.videoReview.focusSpotlight')
+              : createStaticSelectionMeta(Search, 'videoEditor.timeline.motionLane');
     }
     case VideoEditorSelectionKind.MOTION_CONNECTION: {
       const region = project?.motionRegions?.find((item) => item.id === selection.motionRegionId);

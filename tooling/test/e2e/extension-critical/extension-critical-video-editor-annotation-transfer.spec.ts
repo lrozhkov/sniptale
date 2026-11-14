@@ -1,3 +1,5 @@
+import { buildProjectTransitionSegments } from '../../../../apps/extension/src/features/video/project/transition/project';
+import type { GlTrackNode } from '../../../../apps/extension/src/features/video/project/transition/gl-track-plan';
 import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
 import {
   syntheticSpeechWav,
@@ -30,9 +32,8 @@ import { mapCompositionPointThroughCamera } from '../../../../apps/extension/src
 import { resolveEffectSourceProjection } from '../../../../apps/extension/src/features/video/composition/motion/source-window';
 import { projectQuickEditPoint } from '../../../../apps/extension/src/features/video/composition/motion/spatial-geometry';
 import {
-  EFFECT_V1_TARGET_FIXTURE,
-  EFFECT_V1_TRANSITION_FIXTURE,
-  importEffectFile,
+  chooseGlTransition,
+  overlapTimelineClips,
 } from './extension-critical-video-effects.helpers';
 import { isBoundedVideoProjectExportSettings } from '../../../../apps/extension/src/features/video/project/export/settings-validation';
 import { resolveVideoCompositionFrame } from '../../../../apps/extension/src/features/video/composition/timeline/frame';
@@ -40,7 +41,7 @@ import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { expect, test, type Page, type Locator } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { isProjectExportInputReference } from '../../../../apps/extension/src/contracts/video/types/project-export-input';
 import { startHostServer } from '../support/host-server';
@@ -78,93 +79,139 @@ async function drawAnnotation(page: Page, start: number, end: number) {
   await page.mouse.up();
 }
 
-async function resourceAnnotationSource(title: string, clocked = false, spatialDetails = false) {
-  const base = parseEffectV1Source(
-    await readFile(
-      'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
-      'utf8'
-    )
-  );
-  if (!base.document) throw new Error('Missing EffectV1 fixture');
-  const svgText =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#e020b0"/>' +
-    (spatialDetails ? '<rect x="4" y="4" width="4" height="4" fill="#22d3ee"/>' : '') +
-    '</svg>';
+async function resourceAnnotationSource(
+  title: string,
+  clocked = false,
+  spatialDetails = false,
+  nativeAccent = false
+) {
+  // The former SVG mark is authored as a self-contained PNG in the supported Lottie format.
+  const base64 = spatialDetails
+    ? 'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAPUlEQVR4nO3OMQ0AIAwAsEkh+D/wggEU' +
+      'YAFuDDASevRvjNJWphB4LlD7PAj8F7hNQEBAQEBAQEBAQCA9sAE/L7/HkImmLQAAAABJRU5ErkJggg=='
+    : 'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAMElEQVR4nO3OIQEAAAgDMKLQXxGJJhDj' +
+      'ZmJ+tT2XVAICAgICAgICAgICAgICAunAAwiBvJfkt9HyAAAAAElFTkSuQmCC';
+  const bytes = Buffer.from(base64, 'base64');
   const source = JSON.stringify({
-    ...base.document,
-    id: 'transfer-svg',
+    format: 'sniptale-animation',
+    version: 1,
+    id: 'transfer-mark',
     label: { en: title, ru: title },
-    objectLayout: { width: 160, height: 90, resize: 'scale' },
     controls: [
       {
         id: 'reveal',
         kind: 'number',
-        min: 0.2,
-        max: 1,
-        step: 0.1,
-        defaultValue: 1,
+        min: 20,
+        max: 100,
+        step: 10,
+        defaultValue: 100,
+        unit: 'percent',
         label: { en: 'Reveal', ru: 'Появление' },
         group: 'appearance',
       },
+      ...(nativeAccent
+        ? [
+            {
+              id: 'accent',
+              kind: 'color',
+              defaultValue: '#20b060',
+              label: { en: 'Accent', ru: 'Акцент' },
+              group: 'appearance',
+            },
+          ]
+        : []),
     ],
-    assets: [
+    resources: [
       {
-        id: 'mark',
-        kind: 'svg',
-        mimeType: 'image/svg+xml',
-        width: 32,
-        height: 32,
-        svgText,
-        byteLength: Buffer.byteLength(svgText),
-        sha256: createHash('sha256').update(svgText).digest('hex'),
+        path: 'images/mark.png',
+        mimeType: 'image/png',
+        byteLength: bytes.length,
+        sha256: createHash('sha256').update(bytes).digest('hex'),
+        base64,
       },
     ],
-    layers: [
-      {
-        id: 'mark',
-        name: 'Mark',
-        type: 'svgAsset',
-        visible: true,
-        assetId: 'mark',
-        width: 32,
-        height: 32,
-        x: 0,
-        y: 0,
-      },
+    bindings: [
+      { kind: 'scalar', slot: 'reveal', control: 'reveal' },
+      ...(nativeAccent ? [{ kind: 'color', slot: 'accent', control: 'accent' }] : []),
     ],
-    clips: [{ layerId: 'mark', sceneId: 'main', start: 0, duration: 3 }],
-    timeline: { phases: [], tracks: [] },
-    program: {
-      kind: 'graph',
-      version: 1,
-      commands: [
+    animation: {
+      v: '5.12.2',
+      w: 160,
+      h: 90,
+      fr: 30,
+      ip: 0,
+      op: 90,
+      ddd: 0,
+      assets: [{ id: 'mark', w: 32, h: 32, u: 'images/', p: 'mark.png', e: 0 }],
+      slots: {
+        reveal: { p: { a: 0, k: 100 } },
+        ...(nativeAccent ? { accent: { p: { a: 0, k: [32 / 255, 176 / 255, 96 / 255, 1] } } } : {}),
+      },
+      layers: [
+        ...(nativeAccent
+          ? [
+              {
+                ty: 4,
+                ind: 2,
+                ddd: 0,
+                sr: 1,
+                ip: 0,
+                op: 90,
+                st: 0,
+                ks: {
+                  p: { a: 0, k: [0, 0, 0] },
+                  a: { a: 0, k: [0, 0, 0] },
+                  s: { a: 0, k: [100, 100, 100] },
+                  r: { a: 0, k: 0 },
+                  o: { a: 0, k: 100 },
+                },
+                shapes: [
+                  {
+                    ty: 'rc',
+                    p: { a: 0, k: [112, 58.5] },
+                    s: { a: 0, k: [16, 9] },
+                    r: { a: 0, k: 0 },
+                  },
+                  {
+                    ty: 'fl',
+                    c: { a: 0, k: [32 / 255, 176 / 255, 96 / 255, 1], sid: 'accent' },
+                    o: { a: 0, k: 100 },
+                    r: 1,
+                  },
+                ],
+              },
+            ]
+          : []),
         {
-          op: 'svgParts',
-          layerId: 'mark',
-          assetId: 'mark',
-          x: clocked
-            ? {
-                op: 'mul',
-                args: [{ op: 'read', path: 'progress' }, { op: 'read', path: 'width' }, 0.4],
-              }
-            : 0,
-          y: 0,
-          width: { op: 'read', path: 'width' },
-          height: { op: 'read', path: 'height' },
-          part: {
-            kind: 'preset',
-            mode: 'assemble',
-            order: 'center',
-            reveal: { op: 'read', path: 'controls.reveal' },
-            spread: 0,
-            scaleFrom: 1,
-            stagger: 0,
-            rotate: 0,
+          ty: 2,
+          ind: 1,
+          refId: 'mark',
+          ddd: 0,
+          sr: 1,
+          ip: 0,
+          op: 90,
+          st: 0,
+          ks: {
+            a: { a: 0, k: [0, 0, 0] },
+            s: { a: 0, k: [500, 281.25, 100] },
+            r: { a: 0, k: 0 },
+            o: { a: 0, k: 100, sid: 'reveal' },
+            p: clocked
+              ? {
+                  a: 1,
+                  k: [
+                    { t: 0, s: [0, 0, 0], e: [64, 0, 0], i: { x: 1, y: 1 }, o: { x: 0, y: 0 } },
+                    { t: 90, s: [64, 0, 0] },
+                  ],
+                }
+              : { a: 0, k: [0, 0, 0] },
           },
         },
       ],
     },
   });
+  const parsed = parseAnimationTemplateSource(source);
+  if (!parsed.template) throw new Error('Invalid transfer animation fixture.');
   return source;
 }
 
@@ -466,6 +513,22 @@ async function checkTransferredResultVoiceEditing(
   });
 }
 
+function checkedAnimationResources(
+  snapshot: NonNullable<NativeProject['effectSnapshots']>[number]
+) {
+  expect(snapshot.assets).toHaveLength(0);
+  expect(createHash('sha256').update(snapshot.source).digest('hex')).toBe(snapshot.sha256);
+  const parsed = parseAnimationTemplateSource(snapshot.source);
+  expect(parsed.ok, JSON.stringify(parsed.diagnostics)).toBe(true);
+  if (!parsed.template) throw new Error('Missing accepted animation template');
+  for (const resource of parsed.template.resources) {
+    const bytes = Buffer.from(resource.base64, 'base64');
+    expect(bytes.length).toBe(resource.byteLength);
+    expect(createHash('sha256').update(bytes).digest('hex')).toBe(resource.sha256);
+  }
+  return parsed.template.resources;
+}
+
 async function createGallerySpeechForTransfer(
   page: Page,
   dialog: Locator,
@@ -479,9 +542,7 @@ async function createGallerySpeechForTransfer(
   const original = dialog
     .locator('[data-ui="gallery.videoReview.trackHeader"]')
     .filter({ hasText: label('gallery.videoReview.audioOriginal') });
-  await original
-    .getByRole('button', { name: label('gallery.videoReview.speechTitle'), exact: true })
-    .click();
+  await original.locator('[data-review-track-select]').click();
   const speech = dialog.locator('[data-ui="gallery.videoReview.speechPanel"]');
   const volume = speech.getByRole('textbox', {
     name: label('gallery.videoReview.volume'),
@@ -510,7 +571,7 @@ async function createGallerySpeechForTransfer(
   await expect
     .poll(async () => (await persistedReviewContent(page))?.text?.fragments.length)
     .toBe(1);
-  await command('gallery.videoReview.textTrackOpen').click();
+  await dialog.locator('[data-review-header-track="text"] [data-review-track-select]').click();
   const document = dialog.locator('[data-ui="gallery.videoReview.textDocument"]');
   await document
     .getByRole('group', { name: label('gallery.videoReview.textView'), exact: true })
@@ -903,6 +964,13 @@ async function checkTransferredRotatedArea(args: {
       async () => (await accepted()).clips.find((clip) => clip.id === video.id)?.transform.rotation
     )
     .toBe(30);
+  await page
+    .getByRole('slider', { name: label('videoEditor.timeline.zoom'), exact: true })
+    .press('End');
+  const timelineScroll = page.locator('[data-ui="video-editor.timeline.canvas-scroll"]');
+  await timelineScroll.hover();
+  await page.mouse.wheel(-100000, 0);
+  await expect.poll(() => timelineScroll.evaluate((node) => node.scrollLeft)).toBe(0);
   await page.locator(`[data-timeline-effect-segment="${args.regionId}"] button[title]`).click();
   await page
     .locator('[data-ui="video-editor.inspector.categories"] > nav')
@@ -912,7 +980,7 @@ async function checkTransferredRotatedArea(args: {
   await chooseInspectorValue(
     page,
     inspector,
-    label('videoEditor.sidebar.motionFocusLabel'),
+    label('editor.scene.cameraManualPlacement'),
     label('videoEditor.sidebar.motionFocusManualArea')
   );
   await expect.poll(async () => (await region()).focusArea).toBeTruthy();
@@ -1043,13 +1111,7 @@ async function checkTransferredRotatedArea(args: {
       .filter((clip) => clip.id !== video.id)
       .map((clip) => ({ ...clip, timelineLaneId: clip.timelineLaneId ?? null }))
   );
-  for (const asset of restored.effectSnapshots?.flatMap((snapshot) => snapshot.assets) ?? []) {
-    expect(
-      createHash('sha256')
-        .update(new Uint8Array(await asset.blob.arrayBuffer()))
-        .digest('hex')
-    ).toBe(asset.sha256);
-  }
+  for (const snapshot of restored.effectSnapshots ?? []) checkedAnimationResources(snapshot);
   const host = restored.clips.find(
     (clip) =>
       clip.type === 'EFFECT' && clip.attachment?.kind === 'source' && !clip.sourceRange?.dormant
@@ -1075,9 +1137,7 @@ async function checkTransferredRotatedArea(args: {
   if (
     restored.effectInstances?.some(
       (instance) =>
-        instance.kind === 'targetEffect' &&
-        instance.target.kind === 'clip' &&
-        instance.target.clipId === host.id
+        instance.id === host.effectInstanceId && instance.controls['accent'] === '#20b060'
     )
   ) {
     const green = point(2, 0.7, 0.65);
@@ -1213,17 +1273,9 @@ async function restorePortableNative(args: {
       restored.assets.some((asset) => asset.id === voice.take.assetId && asset.type === 'AUDIO')
     ).toBe(true);
   }
-  const hashes = async (value: NativeProject) =>
-    Promise.all(
-      (value.effectSnapshots ?? [])
-        .flatMap((snapshot) => snapshot.assets)
-        .map(async (asset) => {
-          const hash = createHash('sha256')
-            .update(new Uint8Array(await asset.blob.arrayBuffer()))
-            .digest('hex');
-          expect(hash).toBe(asset.sha256);
-          return hash;
-        })
+  const hashes = (value: NativeProject) =>
+    (value.effectSnapshots ?? []).flatMap((snapshot) =>
+      checkedAnimationResources(snapshot).map((resource) => resource.sha256)
     );
   expect((await hashes(restored)).sort()).toEqual((await hashes(project)).sort());
   expect(await readNativeVideoProject(page, project.id)).toEqual(project);
@@ -1678,6 +1730,7 @@ for (const {
             ? {
                 runtimeResponses: {
                   AI_SETTINGS_QUERY: textModelResponse,
+                  AI_SETTINGS_MUTATION: { success: true },
                   REQUEST_LLM_SESSION: { success: true, token: 'fixture-review-text-token' },
                 },
               }
@@ -1690,8 +1743,13 @@ for (const {
           height: 90,
           duration: 12,
         });
-        const source = await resourceAnnotationSource(title, heldExposure, spatialDetails);
-        const admitted = parseEffectV1Source(source);
+        const source = await resourceAnnotationSource(
+          title,
+          heldExposure,
+          spatialDetails,
+          nativeFx && !groupFx
+        );
+        const admitted = parseAnimationTemplateSource(source);
         expect(admitted.diagnostics).toEqual([]);
         expect(admitted.ok).toBe(true);
         await page.goto(
@@ -1708,7 +1766,7 @@ for (const {
         await (
           await chooser
         ).setFiles({
-          name: 'transfer-svg.sniptale-effect.json',
+          name: 'transfer-mark.sniptale-animation.json',
           mimeType: 'application/json',
           buffer: Buffer.from(source),
         });
@@ -1746,8 +1804,14 @@ for (const {
                 .getAttribute('aria-valuemax')
             );
             await page.mouse.click(box.x + (box.width * start) / duration + 0.1, box.y + 10);
-            await addReviewFocus(page);
-            await button('gallery.videoReview.focusSpotlight').click();
+            await addReviewFocus(page, locale);
+            await dialog
+              .getByRole('complementary')
+              .getByRole('button', {
+                name: label('gallery.videoReview.focusSpotlight'),
+                exact: true,
+              })
+              .click();
             await chooseInspectorValue(
               page,
               dialog,
@@ -1787,7 +1851,7 @@ for (const {
           await ruler.scrollIntoViewIfNeeded();
           const box = (await ruler.boundingBox())!;
           await page.mouse.click(box.x + 0.1, box.y + 10);
-          await addReviewFocus(page);
+          await addReviewFocus(page, locale);
           await dialog
             .locator('[data-ui="gallery.videoReview.spatialTools"]')
             .getByRole('button', {
@@ -2240,7 +2304,7 @@ for (const {
                 async () =>
                   (await readNativeVideoProject(page))?.effectSnapshots?.[0]?.assets.length
               )
-              .toBe(1);
+              .toBe(0);
             const project = (await readNativeVideoProject(page))!;
             await page.reload();
             await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
@@ -2302,9 +2366,10 @@ for (const {
           const project = await transfer();
           const nativeUrl = page.url();
           expect(project.id).not.toBe(reference.id);
-          const resource = project.effectSnapshots![0]!.assets[0]!;
-          expect(resource.blob.type).toBe('image/svg+xml');
-          expect(resource.blob.size).toBeGreaterThan(0);
+          const resources = checkedAnimationResources(project.effectSnapshots![0]!);
+          expect(resources).toHaveLength(1);
+          expect(resources[0]!.mimeType).toBe('image/png');
+          expect(resources[0]!.byteLength).toBeGreaterThan(0);
           expect(project.effectSnapshots![0]!.sha256).toBe(reference.effectSnapshots![0]!.sha256);
           const current = resolveVideoCompositionRenderPasses(project, last);
           if (emptyMedia)
@@ -2681,7 +2746,7 @@ for (const {
             expect(hosts).toHaveLength(3);
             expect(hosts.every((clip) => clip.sourceRange?.dormant)).toBe(true);
             expect(project.effectSnapshots).toHaveLength(1);
-            expect(project.effectSnapshots![0]!.assets).toHaveLength(1);
+            expect(checkedAnimationResources(project.effectSnapshots![0]!)).toHaveLength(1);
             await isolated.reload();
             await expect(
               isolated.locator('[data-ui="video-editor.timeline.surface"]')
@@ -3135,7 +3200,7 @@ for (const {
           expect(source?.type === 'VIDEO' && source.sourceCrop?.width).toBeCloseTo(0.8, 6);
           expect(source?.type === 'VIDEO' && source.windowHeader).toBeTruthy();
         }
-        expect(native.effectSnapshots?.[0]?.assets).toHaveLength(1);
+        expect(checkedAnimationResources(native.effectSnapshots![0]!)).toHaveLength(1);
         if (spotlight) {
           const region = native.motionRegions!.find(
             (item) => item.spotlight && item.duration > 0.1
@@ -3339,7 +3404,7 @@ for (const {
           name: locale === 'en' ? 'Reveal' : 'Появление',
           exact: true,
         });
-        await reveal.fill('0.8');
+        await reveal.fill('80');
         await reveal.press('Enter');
         await expect
           .poll(
@@ -3348,8 +3413,8 @@ for (const {
                 (item) => item.id === (content.type === 'EFFECT' ? content.effectInstanceId : '')
               )?.controls['reveal']
           )
-          .toBe(0.8);
-        await reveal.fill('1');
+          .toBe(80);
+        await reveal.fill('100');
         await reveal.press('Enter');
         await checkInspectorPaintedFont(page, reveal, 'transferred-annotation-control');
         await page
@@ -3407,6 +3472,7 @@ for (const {
           await playhead.press('Home');
           for (let n = 0; n < 18; n++) await playhead.press('ArrowRight');
           await page.locator('[data-ui="video.preview.stage.root"]').focus();
+          await expect(selection).toBeVisible();
           const before = (await readNativeVideoProject(page))!;
           const beforeHost = before.clips.find((clip) => clip.id === content.id)!;
           const projectedCenter = (project: typeof before) => {
@@ -3600,88 +3666,6 @@ for (const {
         }
         if (nativeFx) {
           await page.locator(`[data-project-timeline-clip="${content.id}"]`).click();
-          const targetBase = parseEffectV1Source(await readFile(EFFECT_V1_TARGET_FIXTURE, 'utf8'));
-          if (!targetBase.document) throw new Error('Missing target effect fixture');
-          const targetSource = JSON.stringify({
-            ...targetBase.document,
-            id: 'native-annotation-accent',
-            label: { en: 'Native annotation accent', ru: 'Native annotation accent' },
-            controls: groupFx
-              ? []
-              : [
-                  {
-                    id: 'accent',
-                    kind: 'color',
-                    label: { en: 'Accent', ru: 'Акцент' },
-                    defaultValue: '#20b060',
-                  },
-                ],
-            program: {
-              kind: 'graph',
-              version: 1,
-              commands: [
-                { op: 'clear' },
-                {
-                  op: 'image',
-                  input: 'source',
-                  fit: 'cover',
-                  x: 0,
-                  y: 0,
-                  width: { op: 'read', path: 'width' },
-                  height: { op: 'read', path: 'height' },
-                },
-                {
-                  op: 'shape',
-                  shape: 'rect',
-                  fill: { op: 'read', path: 'controls.accent' },
-                  x: { op: 'mul', args: [{ op: 'read', path: 'width' }, 0.65] },
-                  y: { op: 'mul', args: [{ op: 'read', path: 'height' }, 0.6] },
-                  width: { op: 'mul', args: [{ op: 'read', path: 'width' }, 0.1] },
-                  height: { op: 'mul', args: [{ op: 'read', path: 'height' }, 0.1] },
-                },
-              ].filter((command) => !groupFx || command.op !== 'shape'),
-            },
-          });
-          expect(parseEffectV1Source(targetSource).diagnostics).toEqual([]);
-          const targetPath = info.outputPath('native-annotation-accent.sniptale-effect.json');
-          await writeFile(targetPath, targetSource);
-          await importEffectFile(page, {
-            documentId: 'native-annotation-accent',
-            fixturePath: targetPath,
-            locale,
-          });
-          if (groupFx)
-            await chooseInspectorValue(
-              page,
-              page.locator('[data-ui="video-editor.effects-library.dock"]'),
-              label('videoEditor.effectsLibrary.applyTo'),
-              label('videoEditor.effectsLibrary.wholeVideo')
-            );
-          const targetCard = page.locator('[data-effect-document="native-annotation-accent"]');
-          await targetCard.hover();
-          await targetCard
-            .getByRole('button', {
-              name: label(
-                groupFx
-                  ? 'videoEditor.effectsLibrary.wholeVideo'
-                  : 'videoEditor.effectsLibrary.applyToClip'
-              ),
-              exact: true,
-            })
-            .click();
-          await expect
-            .poll(
-              async () =>
-                (await readNativeVideoProject(page))?.effectInstances?.filter(
-                  (item) => item.kind === 'targetEffect'
-                ).length
-            )
-            .toBe(1);
-          await importEffectFile(page, {
-            documentId: 'neutral-transition',
-            fixturePath: EFFECT_V1_TRANSITION_FIXTURE,
-            locale,
-          });
           await page.locator('[data-ui="video-editor.timeline.toolbar.fit-project"]').click();
           const sourceTrack = (await readNativeVideoProject(page))!.clips.find(
             (clip) => clip.id === appended.id
@@ -3709,83 +3693,55 @@ for (const {
                 )!.startTime
             )
             .toBeCloseTo(leadingBeforeClose.startTime + leadingBeforeClose.duration, 5);
-          const junction = page
-            .locator(`[data-track-lane-id="${sourceTrack}"]`)
-            .locator('[data-ui="timeline.transition-cut-drop"]')
-            .last();
-          await junction.scrollIntoViewIfNeeded();
-          const cardLabel = page.locator('[data-effect-document="neutral-transition"] p').first();
-          await cardLabel.scrollIntoViewIfNeeded();
-          const card = (await cardLabel.boundingBox())!;
-          expect(
-            await page.evaluate(
-              ({ x, y }) =>
-                document
-                  .elementFromPoint(x, y)
-                  ?.closest('[data-effect-document]')
-                  ?.getAttribute('data-effect-document'),
-              { x: card.x + card.width / 2, y: card.y + card.height / 2 }
-            )
-          ).toBe('neutral-transition');
-          const drop = (await junction.boundingBox())!;
-          await page.mouse.move(card.x + card.width / 2, card.y + card.height / 2);
-          await page.mouse.down();
-          await page.mouse.move(drop.x + drop.width / 2, drop.y + drop.height / 2, { steps: 20 });
-          await page.mouse.up();
+          const adjacent = (await readNativeVideoProject(page))!;
+          await overlapTimelineClips(page, {
+            leading: adjacent.clips.find((clip) => clip.id === leadingBeforeClose.id)!,
+            trailing: adjacent.clips.find((clip) => clip.id === trailingBeforeClose.id)!,
+            duration: 0.4,
+          });
           await expect
-            .poll(
-              async () =>
-                (await readNativeVideoProject(page))?.effectInstances?.filter(
-                  (item) => item.kind === 'transition'
-                ).length
+            .poll(async () =>
+              (await readNativeVideoProject(page))?.transitions?.some(
+                (item) =>
+                  item.kind === 'gl' &&
+                  item.leadingClipId === leadingBeforeClose.id &&
+                  item.trailingClipId === trailingBeforeClose.id &&
+                  item.duration > 0
+              )
             )
-            .toBe(1);
+            .toBe(true);
+          const joined = page
+            .locator(`[data-track-lane-id="${sourceTrack}"]`)
+            .locator('[data-ui="timeline.track-transition-zone"]')
+            .last();
+          await joined.scrollIntoViewIfNeeded();
+          await joined.click();
+          await chooseGlTransition(page, 'Fade');
           if (sourceTransitionPair) {
+            const current = (await readNativeVideoProject(page))!;
+            await overlapTimelineClips(page, {
+              leading: current.clips.find((clip) => clip.id === sourceTransitionPair!.leading)!,
+              trailing: current.clips.find((clip) => clip.id === sourceTransitionPair!.trailing)!,
+              duration: 0.4,
+            });
             const sourceJunction = page
               .locator(`[data-track-lane-id="${sourceTransitionPair.trackId}"]`)
-              .locator('[data-ui="timeline.transition-cut-drop"]')
+              .locator('[data-ui="timeline.track-transition-zone"]')
               .nth(1);
             await sourceJunction.scrollIntoViewIfNeeded();
-            await cardLabel.scrollIntoViewIfNeeded();
-            const origin = (await cardLabel.boundingBox())!;
-            const destination = (await sourceJunction.boundingBox())!;
-            expect(
-              await page.evaluate(
-                ({ x, y }) =>
-                  document
-                    .elementFromPoint(x, y)
-                    ?.closest('[data-effect-document]')
-                    ?.getAttribute('data-effect-document'),
-                { x: origin.x + origin.width / 2, y: origin.y + origin.height / 2 }
-              )
-            ).toBe('neutral-transition');
-            await page.mouse.move(origin.x + origin.width / 2, origin.y + origin.height / 2);
-            await page.mouse.down();
-            await page.mouse.move(
-              destination.x + destination.width / 2,
-              destination.y + destination.height / 2,
-              { steps: 20 }
-            );
-            await page.mouse.up();
-            await expect
-              .poll(
-                async () =>
-                  (await readNativeVideoProject(page))!.effectInstances?.filter(
-                    (item) => item.kind === 'transition'
-                  ).length
-              )
-              .toBe(2);
+            await sourceJunction.click();
+            await chooseGlTransition(page, 'Fade');
             const transitioned = (await readNativeVideoProject(page))!;
             const junction = transitioned.transitions!.find(
               (item) =>
                 item.leadingClipId === sourceTransitionPair!.leading &&
                 item.trailingClipId === sourceTransitionPair!.trailing
             )!;
-            const runtimeTransition = transitioned.effectInstances!.find(
-              (item) =>
-                item.target.kind === 'transition' && item.target.transitionId === junction.id
+            const runtimeTransition = buildProjectTransitionSegments(transitioned).find(
+              (item) => item.id === junction.id
             )!;
-            sourceTransitionTime = runtimeTransition.startTime + runtimeTransition.duration / 2;
+            expect(runtimeTransition).toBeDefined();
+            sourceTransitionTime = (runtimeTransition.start + runtimeTransition.end) / 2;
             const sourceFrame = resolveVideoCompositionFrame(transitioned, sourceTransitionTime);
             await writeFile(
               info.outputPath('source-transition-state.json'),
@@ -3801,14 +3757,7 @@ for (const {
                 2
               )
             );
-            expect(
-              sourceFrame.effectRuntimePlans.some(
-                (plan) =>
-                  plan.target.kind === 'transition' &&
-                  plan.target.leadingClipId === sourceTransitionPair!.leading &&
-                  plan.target.trailingClipId === sourceTransitionPair!.trailing
-              )
-            ).toBe(true);
+            expect(hasGlTrackTransition(sourceFrame, junction.id)).toBe(true);
             expect(
               sourceFrame.sceneSpotlights?.some(
                 (mask) =>
@@ -3819,7 +3768,6 @@ for (const {
               )
             ).toBe(true);
           }
-          await page.locator('[data-ui="video-editor.materials.close"]').click();
         }
         const checksBackdrop = groupFx && spotlightEffect === 'blur';
         if (checksBackdrop) {
@@ -4110,16 +4058,21 @@ for (const {
           expect(spatialFrame.visualLayers.some((layer) => layer.clipId === content.id)).toBe(true);
         }
         if (nativeFx) {
-          const appliedFx = final.effectInstances!.find((item) => item.kind === 'targetEffect')!;
-          expect(appliedFx.target).toEqual(
-            groupFx ? { kind: 'video-group' } : { kind: 'clip', clipId: content.id }
-          );
-          const transition = final.effectInstances!.find((item) => item.kind === 'transition')!;
+          const applied = final.effectInstances!.find(
+            (item) => item.id === (content.type === 'EFFECT' ? content.effectInstanceId : '')
+          )!;
+          expect(applied.kind).toBe('standalone');
+          expect(applied.target).toEqual({ kind: 'scene' });
+          if (!groupFx) expect(applied.controls['accent']).toBe('#20b060');
+          const transition = buildProjectTransitionSegments(final).find(
+            (item) => item.end > item.start
+          )!;
+          expect(transition).toBeDefined();
           expect(
-            resolveVideoCompositionFrame(
-              final,
-              transition.startTime + transition.duration / 2
-            ).effectRuntimePlans.some((plan) => plan.effectInstanceId === transition.id)
+            hasGlTrackTransition(
+              resolveVideoCompositionFrame(final, (transition.start + transition.end) / 2),
+              transition.id
+            )
           ).toBe(true);
         }
         await page.reload();
@@ -4996,4 +4949,11 @@ for (const {
       }
     }
   );
+}
+
+function hasGlTrackTransition(frame: ReturnType<typeof resolveVideoCompositionFrame>, id: string) {
+  const contains = (node: GlTrackNode): boolean =>
+    node.kind === 'gl' &&
+    (node.junction.id === id || contains(node.before) || contains(node.after));
+  return [...(frame.glTrackPlans?.values() ?? [])].some(contains);
 }

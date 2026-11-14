@@ -1,10 +1,10 @@
+import { createGlTransitionSelection } from '../transition/gl-catalog';
 import { readFileSync } from 'node:fs';
 
 import { expect, it } from 'vitest';
 
-import { createEffectCatalogEntry } from '../../../../composition/persistence/effect-bundles/catalog-builder';
 import type { EffectBundleCatalogEntry } from '../effect-bundle/catalog';
-import { importRawEffectDocument } from '../effect-bundle/import/zip';
+import { importAnimationArtifactBytes } from '../effect-bundle/lottie-profile';
 import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
 import {
   createRecordingAudioClip,
@@ -12,48 +12,39 @@ import {
   createRecordingProjectAsset,
 } from '../factories/recording';
 import { createEffectHostClip } from '../factories/overlay-clip';
-import {
-  VideoTrackKind,
-  VideoTransitionEasing,
-  VideoTransitionKind,
-  type VideoProject,
-} from '../types';
+import { VideoTrackKind, VideoTransitionEasing, type VideoProject } from '../types';
 import { applyEffectCatalogDocument } from './apply';
 
-it('applies target effects only to an existing clip', async () => {
-  const catalog = await createRawCatalog('neutral-target-effect.sniptale-effect.json');
-  const project = createProjectWithTransition();
-  const clipId = project.clips[0]!.id;
-
-  const applied = await applyEffectCatalogDocument({
-    ...createApplyArgs(catalog, catalog.documents[0]!.id, project),
-    startTime: 2,
-    target: { clipId, kind: 'clip' },
-  });
-
-  expect(applied.effectInstances![0]).toEqual(
-    expect.objectContaining({ duration: 5, playbackRate: 0.6, startTime: 0, rangeMode: 'owner' })
-  );
+it('refuses source clip annotation targets without changing the source or GL transition', async () => {
+  const catalog = await createRawCatalog(readFixture());
+  const project = createProjectWithTransition(),
+    before = structuredClone(project);
+  await expect(
+    applyEffectCatalogDocument({
+      ...createApplyArgs(catalog, catalog.documents[0]!.id, project),
+      startTime: 2,
+      target: { clipId: project.clips[0]!.id, kind: 'clip' },
+    })
+  ).rejects.toMatchObject({ code: 'effectKindTargetMismatch' });
+  expect(project).toEqual(before);
 });
 
-it('maps a transition document onto the exact overlap segment', async () => {
-  const catalog = await createRawCatalog('neutral-transition.sniptale-effect.json');
-  const project = createProjectWithTransition();
-  const transitionId = project.transitions![0]!.id;
-
-  const applied = await applyEffectCatalogDocument({
-    ...createApplyArgs(catalog, catalog.documents[0]!.id, project),
-    startTime: 99,
-    target: { kind: 'transition', transitionId },
-  });
-
-  expect(applied.effectInstances![0]).toEqual(
-    expect.objectContaining({ duration: 1, playbackRate: 3, startTime: 4 })
-  );
+it('refuses a retired EffectV1 transition without changing the accepted GL boundary', async () => {
+  const catalog = await createRawCatalog(readFixture());
+  const project = createProjectWithTransition(),
+    original = structuredClone(project);
+  await expect(
+    applyEffectCatalogDocument({
+      ...createApplyArgs(catalog, catalog.documents[0]!.id, project),
+      startTime: 99,
+      target: { kind: 'transition', transitionId: project.transitions![0]!.id },
+    })
+  ).rejects.toMatchObject({ code: 'effectKindTargetMismatch' });
+  expect(project).toEqual(original);
 });
 
-it('fails when a declared transition has no renderable overlap segment', async () => {
-  const catalog = await createRawCatalog('neutral-transition.sniptale-effect.json');
+it('refuses a retired transition target independently of its invalid overlap', async () => {
+  const catalog = await createRawCatalog(readFixture());
   const project = createProjectWithTransition();
   project.clips[1]!.startTime = 5;
 
@@ -62,11 +53,11 @@ it('fails when a declared transition has no renderable overlap segment', async (
       ...createApplyArgs(catalog, catalog.documents[0]!.id, project),
       target: { kind: 'transition', transitionId: project.transitions![0]!.id },
     })
-  ).rejects.toEqual(expect.objectContaining({ code: 'effectTargetMissing' }));
+  ).rejects.toEqual(expect.objectContaining({ code: 'effectKindTargetMismatch' }));
 });
 
-it('rejects audio and accepts generated annotation clips as target-effect inputs', async () => {
-  const catalog = await createRawCatalog('neutral-target-effect.sniptale-effect.json');
+it('rejects audio and generated annotation clips as annotation targets', async () => {
+  const catalog = await createRawCatalog(readFixture());
   const project = createProjectWithTransition();
   const audioTrack = createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO);
   const overlayTrack = createVideoProjectTrack('Effects', 0, VideoTrackKind.PRIMARY);
@@ -83,7 +74,7 @@ it('rejects audio and accepts generated annotation clips as target-effect inputs
   });
   project.clips.push(audio, host);
 
-  for (const clipId of [audio.id]) {
+  for (const clipId of [audio.id, host.id]) {
     await expect(
       applyEffectCatalogDocument({
         ...createApplyArgs(catalog, catalog.documents[0]!.id, project),
@@ -93,53 +84,42 @@ it('rejects audio and accepts generated annotation clips as target-effect inputs
   }
 });
 
-it('applies track and video-group effects with owner duration and refuses camera/audio tracks', async () => {
-  const catalog = await createRawCatalog('neutral-target-effect.sniptale-effect.json');
-  const project = createProjectWithTransition();
+it('refuses track and video-group annotation targets without changing ordinary clips', async () => {
+  const catalog = await createRawCatalog(readFixture());
+  const project = createProjectWithTransition(),
+    before = structuredClone(project);
   for (const target of [
     { kind: 'track' as const, trackId: project.tracks[0]!.id },
     { kind: 'video-group' as const },
   ]) {
-    const next = await applyEffectCatalogDocument({
-      ...createApplyArgs(catalog, catalog.documents[0]!.id, project),
-      target,
-    });
-    expect(next.effectInstances![0]).toMatchObject({
-      target,
-      startTime: 0,
-      duration: 9,
-      rangeMode: 'owner',
-    });
+    await expect(
+      applyEffectCatalogDocument({
+        ...createApplyArgs(catalog, catalog.documents[0]!.id, project),
+        target,
+      })
+    ).rejects.toMatchObject({ code: 'effectKindTargetMismatch' });
   }
-  project.tracks[0]!.role = 'CAMERA';
-  await expect(
-    applyEffectCatalogDocument({
-      ...createApplyArgs(catalog, catalog.documents[0]!.id, project),
-      target: { kind: 'track', trackId: project.tracks[0]!.id },
-    })
-  ).rejects.toMatchObject({ code: 'effectKindTargetMismatch' });
+  expect(project).toEqual(before);
 });
 
-it('replaces a junction template instead of stacking transition graphs', async () => {
-  const catalog = await createRawCatalog('neutral-transition.sniptale-effect.json');
-  const project = createProjectWithTransition();
-  const target = { kind: 'transition' as const, transitionId: project.transitions![0]!.id };
-  const first = await applyEffectCatalogDocument({
-    ...createApplyArgs(catalog, catalog.documents[0]!.id, project),
-    target,
-  });
-  const second = await applyEffectCatalogDocument({
-    ...createApplyArgs(catalog, catalog.documents[0]!.id, first),
-    instanceId: 'replacement',
-    target,
-  });
-  expect(second.effectInstances).toHaveLength(1);
-  expect(second.effectInstances![0]).toMatchObject({ id: 'replacement', target });
-  expect(first.effectInstances![0]!.id).toBe('effect-instance');
+it('refuses repeated retired transition application without stacking graphs or rewriting GL data', async () => {
+  const catalog = await createRawCatalog(readFixture());
+  const project = createProjectWithTransition(),
+    original = structuredClone(project);
+  for (const instanceId of ['first', 'replacement']) {
+    await expect(
+      applyEffectCatalogDocument({
+        ...createApplyArgs(catalog, catalog.documents[0]!.id, project),
+        instanceId,
+        target: { kind: 'transition', transitionId: project.transitions![0]!.id },
+      })
+    ).rejects.toMatchObject({ code: 'effectKindTargetMismatch' });
+  }
+  expect(project).toEqual(original);
 });
 
 it('refuses imported transitions on a locked track', async () => {
-  const catalog = await createRawCatalog('neutral-transition.sniptale-effect.json');
+  const catalog = await createRawCatalog(readFixture());
   const project = createProjectWithTransition();
   project.tracks[0]!.locked = true;
   await expect(
@@ -165,10 +145,40 @@ function createApplyArgs(
   };
 }
 
-async function createRawCatalog(filename: string): Promise<EffectBundleCatalogEntry> {
-  const imported = await importRawEffectDocument(readFixture(filename));
-  if (!imported.ok) throw new Error('Expected valid raw EffectV1 fixture');
-  return createEffectCatalogEntry({ document: imported.artifact, kind: 'raw-json' }, 1);
+async function createRawCatalog(source: string): Promise<EffectBundleCatalogEntry> {
+  const imported = await importAnimationArtifactBytes(new TextEncoder().encode(source));
+  if (!imported.ok) throw new Error('Expected valid animation fixture.');
+  const entry = imported.documents[0]!,
+    document = entry.template;
+  return {
+    assets: [],
+    createdAt: 1,
+    updatedAt: 1,
+    enabled: true,
+    description: { en: '', ru: '' },
+    label: { en: document.label.en, ru: document.label.ru ?? document.label.en },
+    documents: [
+      {
+        assets: [],
+        id: document.id,
+        kind: 'standalone',
+        schemaVersion: 'sniptale.animation.v1',
+        sha256: entry.sha256,
+        source: entry.source,
+      },
+    ],
+    packId: `animation.${document.id}`,
+    retainedByteLength: new TextEncoder().encode(entry.source).byteLength,
+    source: 'raw-json',
+    sourceSha256: imported.archiveSha256,
+    version: '1',
+  };
+}
+function readFixture(): string {
+  return readFileSync(
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
+    'utf8'
+  );
 }
 
 function createProjectWithTransition(): VideoProject {
@@ -206,7 +216,8 @@ function createProjectWithTransition(): VideoProject {
         duration: 1,
         easing: VideoTransitionEasing.LINEAR,
         id: 'transition',
-        kind: VideoTransitionKind.CROSSFADE,
+        kind: 'gl' as const,
+        selection: createGlTransitionSelection('Fade')!,
         leadingClipId: leading.id,
         trailingClipId: trailing.id,
       },
@@ -214,19 +225,8 @@ function createProjectWithTransition(): VideoProject {
   };
 }
 
-function readFixture(filename: string): Uint8Array {
-  return new Uint8Array(
-    readFileSync(
-      new URL(
-        `../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/valid/${filename}`,
-        import.meta.url
-      )
-    )
-  );
-}
-
 it('inserts standalone annotations only into a free requested video track', async () => {
-  const catalog = await createRawCatalog('neutral-standalone.sniptale-effect.json');
+  const catalog = await createRawCatalog(readFixture());
   const project = createProjectWithTransition();
   const trackId = project.tracks[0]!.id;
   const args = {
@@ -249,7 +249,7 @@ it('inserts standalone annotations only into a free requested video track', asyn
 });
 
 it('rejects a logical lane without its owning track', async () => {
-  const catalog = await createRawCatalog('neutral-standalone.sniptale-effect.json');
+  const catalog = await createRawCatalog(readFixture());
   await expect(
     applyEffectCatalogDocument({
       ...createApplyArgs(catalog, catalog.documents[0]!.id, createEmptyVideoProject('lane')),

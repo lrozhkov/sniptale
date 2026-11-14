@@ -203,7 +203,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
             duration: 12,
           });
           const source = await readFile(
-            'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conformance.sniptale-effect.json',
+            'tooling/test/e2e/fixtures/lottie/neutral.sniptale-animation.json',
             'utf8'
           );
           const bundle = await build({
@@ -471,7 +471,7 @@ test('bounded policy comparison uses native Gallery commits and keeps the latest
     await page.locator('[data-ui="gallery.page.root"]').waitFor();
     await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
     const source = await readFile(
-      'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conformance.sniptale-effect.json',
+      'tooling/test/e2e/fixtures/lottie/neutral.sniptale-animation.json',
       'utf8'
     );
     const bundle = await build({

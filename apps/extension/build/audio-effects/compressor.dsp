@@ -1,0 +1,1 @@
+import("stdfaust.lib"); ratio=hslider("ratio",4,1,20,0.1); threshold=hslider("threshold[unit:dB]",-18,-60,0,0.1); attack=hslider("attack[unit:s]",0.01,0.001,0.1,0.001); release=hslider("release[unit:s]",0.2,0.01,2,0.01); process=co.compressor_stereo(ratio,threshold,attack,release);

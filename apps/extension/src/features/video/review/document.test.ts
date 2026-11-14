@@ -101,7 +101,7 @@ it('preserves authored cursor keys and handles in the accepted baseline and ever
 });
 
 it.each(['advancedContent', 'annotation', 'canvasComment', 'edit'] as const)(
-  'traverses the before-value once while applying a %s operation',
+  'does not repeatedly serialize the before-value while applying a %s operation',
   (target) => {
     const document = replayReviewHistory([], 0, source);
     let operation: ReviewOperation;
@@ -141,8 +141,13 @@ it.each(['advancedContent', 'annotation', 'canvasComment', 'edit'] as const)(
     const stringify = vi.spyOn(JSON, 'stringify');
     try {
       applyReviewOperation(document, operation, source);
-      expect(stringify.mock.calls.filter(([value]) => value === operation.before)).toHaveLength(1);
-      expect(stringify).toHaveBeenCalledTimes(3);
+      if (target === 'advancedContent') expect(stringify).not.toHaveBeenCalled();
+      else {
+        expect(stringify.mock.calls.filter(([value]) => value === operation.before)).toHaveLength(
+          1
+        );
+        expect(stringify).toHaveBeenCalledTimes(3);
+      }
     } finally {
       stringify.mockRestore();
     }
@@ -571,4 +576,118 @@ it('keeps unrelated text on the voiceover source positions after a video Cut', a
   expect(
     projectReviewTextFragment(fragment, buildReviewTimeMap(source.duration, result.edits)).ranges
   ).toEqual([{ start: 6, end: 8 }]);
+});
+
+it('retains authored interaction timing in a replay baseline and through Undo and Redo', () => {
+  const baseline = createQuickEditAdvancedContent();
+  baseline.interactionTimeline = {
+    presses: [
+      {
+        id: 'authored',
+        family: 'keyboard',
+        start: 1,
+        end: 2,
+        label: 'Cmd+K',
+        keys: ['Cmd', 'K'],
+        button: 0,
+        x: 0.5,
+        y: 0.5,
+      },
+    ],
+    overrides: [
+      {
+        ref: { kind: 'signal', id: 'typing' },
+        start: 5,
+        end: 6,
+        enabled: true,
+        sourceRange: { start: 1, end: 2 },
+      },
+    ],
+  };
+  const retained = reviewAdvancedContentBaseline(baseline);
+  expect(retained.interactionTimeline).toEqual(baseline.interactionTimeline);
+  const after = { ...retained, interactionTimeline: { presses: [], overrides: [] } };
+  const history: ReviewOperation[] = [
+    { id: 'clear', at: 1, target: 'advancedContent', before: retained, after },
+  ];
+  expect(
+    replayReviewHistory(history, 0, source, retained).advancedContent.interactionTimeline
+  ).toEqual(baseline.interactionTimeline);
+  expect(
+    replayReviewHistory(history, 1, source, retained).advancedContent.interactionTimeline
+  ).toEqual(after.interactionTimeline);
+});
+
+it('replays freeze duration, deletion and Undo without rewriting cursor keys or losing audio samples', () => {
+  const baseline = createQuickEditAdvancedContent();
+  baseline.audio.voiceover = [
+    {
+      id: 'voice',
+      assetId: 'asset',
+      timelineStart: 3,
+      sourceOffset: 2,
+      duration: 4,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ];
+  baseline.cursorFocusPath = {
+    version: 1,
+    mode: 'follow',
+    gapPolicy: 'hold',
+    smoothing: 0.5,
+    sensitivity: 0.5,
+    segments: [
+      {
+        id: 'cursor',
+        binding: { kind: 'project' },
+        start: 1,
+        end: 8,
+        keys: [{ id: 'key', time: 4, x: 0.2, y: 0.3, anchor: 'manual', interpolation: 'smooth' }],
+      },
+    ],
+  };
+  const freeze = {
+    id: 'freeze',
+    kind: 'freeze' as const,
+    start: 4,
+    end: 4,
+    requestedStart: 4,
+    requestedEnd: 4,
+    duration: 2,
+    frameTime: 3.98,
+    frameDuration: 0.04,
+  };
+  const changed = { ...freeze, duration: 3 };
+  const operation = {
+    target: 'edit' as const,
+    preserveVoiceoverAnchors: true as const,
+    preserveFocusAnchors: true as const,
+    preserveUnderCuts: true as const,
+    preserveTextAnchors: true as const,
+  };
+  const history: ReviewOperation[] = [
+    { ...operation, id: 'insert', at: 1, before: null, after: freeze },
+    { ...operation, id: 'duration', at: 2, before: freeze, after: changed },
+    { ...operation, id: 'remove', at: 3, before: changed, after: null },
+  ];
+  const before = structuredClone(baseline);
+  for (const cursor of [1, 2, 3, 2, 1, 0, 3]) {
+    const document = replayReviewHistory(
+      JSON.parse(JSON.stringify(history)),
+      cursor,
+      source,
+      baseline
+    );
+    const map = buildReviewTimeMap(source.duration, document.edits);
+    expect(document.advancedContent.cursorFocusPath).toEqual(baseline.cursorFocusPath);
+    const slices = projectReviewVoiceover(document.advancedContent.audio.voiceover, map);
+    const inserted = cursor === 1 ? 2 : cursor === 2 ? 3 : 0;
+    expect(map.at(-1)!.resultEnd).toBe(12 + inserted);
+    expect(slices.reduce((total, slice) => total + slice.duration, 0)).toBe(4);
+    expect(slices.at(-1)!.timelineStart + slices.at(-1)!.duration).toBe(7 + inserted);
+  }
+  expect(baseline).toEqual(before);
 });

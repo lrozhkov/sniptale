@@ -344,51 +344,60 @@ it.each(['no-adapter', 'device-failure'] as const)(
   }
 );
 
-it('admits export frames without an unrelated WebGPU allocation allowance', async () => {
-  vi.stubGlobal('navigator', { gpu: {} });
-  const { resolvePreviewRenderAllocation, calculatePreviewRenderAllocation } =
-    await import('./preview-render-allocation');
-  const { resources } = setup();
-  const sourceScene = scene();
-  const graph = resolvePreviewRenderAllocation({
-    scene: sourceScene,
-    dimensions,
-    resultTime: 0,
-    sourceTime: 0,
-    sourceAllocationBytes: null,
-    sourceBacking: size,
-    camera: { retainedBytes: null, activeBytes: null },
-    transitionBytes: null,
-    previousFront: null,
-    assets: {
-      headerBitmap: null,
-      backgroundBitmap: null,
-      watermark: null,
-      previousWatermarkCache: null,
-    },
-  });
-  const replaceLimits = vi.fn();
-  const enhancement = {
-    mode: 'bicubic-sharpen' as const,
-    withEnhancedRegion: vi.fn(),
-    dispose: vi.fn(),
-  };
-  const owner = createReviewPreviewRenderer({
-    resources,
-    exportEnhancer: enhancement,
-    allocation: { describe: () => graph, replaceLimits },
-  });
-  const prepared = await owner.prepare(sourceScene, dimensions, new AbortController().signal);
-  owner.admit(prepared, { ...frame(), exportEnhancer: enhancement });
-  const expected = calculatePreviewRenderAllocation(graph);
-  expect(replaceLimits.mock.calls.at(-1)![0]).toEqual({
-    maximumManagedBytes: expected.maximumManagedBytes,
-    maximumCanvases: expected.maximumCanvases,
-  });
-  expect(io.gpu).not.toHaveBeenCalled();
-  prepared.release();
-  owner.dispose();
-});
+it.each(['gpu', 'legacy'] as const)(
+  'admits enhanced export frames with the %s backend allocation',
+  async (backend) => {
+    vi.stubGlobal('navigator', { gpu: {} });
+    const { resolvePreviewRenderAllocation, calculatePreviewRenderAllocation } =
+      await import('./preview-render-allocation');
+    const { resources } = setup();
+    const sourceScene = scene();
+    const graph = resolvePreviewRenderAllocation({
+      scene: sourceScene,
+      dimensions,
+      resultTime: 0,
+      sourceTime: 0,
+      sourceAllocationBytes: null,
+      sourceBacking: size,
+      camera: { retainedBytes: null, activeBytes: null },
+      transitionBytes: null,
+      previousFront: null,
+      assets: {
+        headerBitmap: null,
+        backgroundBitmap: null,
+        watermark: null,
+        previousWatermarkCache: null,
+      },
+    });
+    const replaceLimits = vi.fn();
+    const enhancement = {
+      mode: 'bicubic-sharpen' as const,
+      withEnhancedRegion: vi.fn(),
+      dispose: vi.fn(),
+    };
+    const owner = createReviewPreviewRenderer({
+      resources,
+      renderer: backend,
+      exportEnhancer: enhancement,
+      allocation: { describe: () => graph, replaceLimits },
+    });
+    const prepared = await owner.prepare(sourceScene, dimensions, new AbortController().signal);
+    owner.admit(prepared, { ...frame(), exportEnhancer: enhancement });
+    const expected = calculatePreviewRenderAllocation(graph);
+    const { reviewGpuPreviewAllocation } = await import('./gpu-preview-geometry');
+    const gpu =
+      backend === 'gpu'
+        ? reviewGpuPreviewAllocation(sourceScene, dimensions)
+        : { maximumManagedBytes: 0, maximumCanvases: 0 };
+    expect(replaceLimits.mock.calls.at(-1)![0]).toEqual({
+      maximumManagedBytes: expected.maximumManagedBytes + gpu.maximumManagedBytes,
+      maximumCanvases: expected.maximumCanvases + gpu.maximumCanvases,
+    });
+    expect(io.gpu).not.toHaveBeenCalled();
+    prepared.release();
+    owner.dispose();
+  }
+);
 
 it('honors Standard without acquiring the available GPU backend', async () => {
   vi.stubGlobal('navigator', { gpu: {} });

@@ -6,6 +6,8 @@ import { ReviewInspector as Inspector } from './inspector';
 import { useReviewInspectorNavigation } from './inspector-navigation';
 import type { ReviewSelection } from '../../features/video/review/types';
 
+let currentNavigation: ReturnType<typeof useReviewInspectorNavigation>;
+
 function ReviewInspector(
   props: Omit<Parameters<typeof Inspector>[0], 'navigation'> & {
     contextKey?: string;
@@ -13,7 +15,12 @@ function ReviewInspector(
     exportRequest?: number;
   }
 ) {
-  const navigation = useReviewInspectorNavigation({ ...props, exportAvailable: !!props.actions });
+  const navigation = useReviewInspectorNavigation({
+    ...props,
+    exportAvailable: !!props.actions,
+    recordingAvailable: !!props.recording,
+  });
+  currentNavigation = navigation;
   return <Inspector {...props} navigation={navigation} />;
 }
 
@@ -62,9 +69,9 @@ it('hover highlights without seeking; comment selection and edit are distinct ex
         </ReviewInspector>
       )
     );
-    expect(host.querySelector('header h2')?.textContent).toBe('clip.webm');
-    expect(host.querySelector('header h2')?.getAttribute('title')).toBe('clip.webm');
-    expect(host.querySelectorAll('[title="clip.webm"]')).toHaveLength(1);
+    expect(host.querySelector('header h2')?.textContent).toBe('gallery.videoReview.comments');
+    expect(host.querySelector('header h2')?.getAttribute('title')).toBeNull();
+    expect(host.querySelectorAll('[title="clip.webm"]')).toHaveLength(0);
     act(() =>
       host.querySelector('li')!.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     );
@@ -232,24 +239,16 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
     expect(host.textContent).not.toContain('gallery.videoReview.commentsEmpty');
     expect(host.querySelector('[aria-label="gallery.app.selectionBackup"]')).toBeNull();
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
-    const basicTabs = () =>
-      Array.from(
-        host.querySelectorAll<HTMLButtonElement>(
-          '[aria-label="gallery.videoReview.inspector"] button'
-        )
-      );
-    expect(basicTabs().map((button) => button.textContent)).toEqual([
-      'gallery.videoReview.comments',
-      'Cut',
-    ]);
-    await act(async () => basicTabs()[0]!.click());
+    expect(host.querySelector('[data-ui="gallery.videoReview.inspectorNavigation"]')).toBeNull();
+    await act(async () => currentNavigation.setSection('comments'));
     expect(host.textContent).not.toContain('Selected controls');
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).not.toBeNull();
-    await act(async () => basicTabs()[1]!.click());
+    await act(async () => currentNavigation.setSection('selected'));
     expect(host.textContent).toContain('Selected controls');
     await act(async () => render(false, 'comments'));
     expect(host.querySelector('[aria-label="gallery.videoReview.inspector"]')).toBeNull();
     await act(async () => render(true, 'settings:none:'));
+    await act(async () => currentNavigation.setSection('scene'));
     expect(host.querySelector('[data-ui="gallery.videoReview.exportFooter"]')).toBeNull();
     expect(host.textContent).toContain('Scene controls');
     expect(host.querySelector('[aria-label="gallery.app.selectionBackup"]')).toBeNull();
@@ -272,26 +271,11 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
     expect(host.textContent).toContain('Selected controls');
     expect(host.querySelector('[aria-label="gallery.app.selectionBackup"]')).toBeNull();
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
-    const tabs = () =>
-      Array.from(
-        host.querySelectorAll<HTMLButtonElement>(
-          '[aria-label="gallery.videoReview.inspector"] button'
-        )
-      );
-    await act(async () =>
-      tabs()
-        .find((button) => button.textContent === 'gallery.videoReview.scene')!
-        .click()
-    );
+    await act(async () => currentNavigation.setSection('scene'));
     expect(host.textContent).toContain('Scene controls');
     expect(host.querySelector('[aria-label="gallery.app.selectionBackup"]')).toBeNull();
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
-    expect(tabs().some((button) => button.textContent === 'Zoom')).toBe(true);
-    await act(async () =>
-      tabs()
-        .find((button) => button.textContent === 'Zoom')!
-        .click()
-    );
+    await act(async () => currentNavigation.setSection('selected'));
     expect(host.textContent).toContain('Selected controls');
     expect(host.querySelector('[aria-label="gallery.app.selectionBackup"]')).toBeNull();
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
@@ -344,24 +328,12 @@ it('consumes export requests once and returns to the same selected edit', async 
   try {
     await act(async () => render(0));
     expect(host.textContent).toContain('Cut controls');
-    expect(
-      Array.from(
-        host.querySelectorAll('[data-ui="gallery.videoReview.inspectorNavigation"] button')
-      ).map((node) => node.textContent)
-    ).toEqual(['gallery.videoReview.comments', 'gallery.videoReview.scene', 'Cut']);
+    expect(host.querySelector('[data-ui="gallery.videoReview.inspectorNavigation"]')).toBeNull();
     await act(async () => render(1));
     const exporting = () => host.querySelector('[data-ui="gallery.videoReview.exportSection"]');
     expect(exporting()).not.toBeNull();
     expect(exporting()!.querySelector('[aria-label="gallery.app.selectionBackup"]')).toBeNull();
-    expect(
-      Array.from(
-        host.querySelectorAll('[data-ui="gallery.videoReview.inspectorNavigation"] button')
-      ).map((node) => node.textContent)
-    ).toEqual([
-      'gallery.videoReview.comments',
-      'gallery.videoReview.scene',
-      'gallery.videoReview.exportSection',
-    ]);
+    expect(host.querySelector('[data-ui="gallery.videoReview.inspectorNavigation"]')).toBeNull();
     expect(exporting()?.querySelector('h3')).toBeNull();
     expect(host.querySelector('[data-ui="gallery.videoReview.exportFooter"]')).toBeNull();
     expect(host.querySelector('.review-inspector-scroll')?.contains(exporting())).toBe(true);
@@ -373,20 +345,11 @@ it('consumes export requests once and returns to the same selected edit', async 
     expect(host.textContent).toContain('Cut controls');
     await act(async () => render(2));
     expect(exporting()).not.toBeNull();
-    const scene = host.querySelector<HTMLButtonElement>(
-      '[aria-label="gallery.videoReview.inspector"] button[title="gallery.videoReview.scene"]'
-    )!;
-    await act(async () => scene.click());
+    await act(async () => currentNavigation.setSection('scene'));
     expect(host.textContent).toContain('Scene controls');
     await act(async () => render(2, true));
     expect(exporting()).toBeNull();
-    const tab = Array.from(
-      host.querySelectorAll<HTMLButtonElement>(
-        '[aria-label="gallery.videoReview.inspector"] button'
-      )
-    ).find((button) => button.textContent === 'gallery.videoReview.exportSection')!;
-    expect(tab.disabled).toBe(false);
-    await act(async () => tab.click());
+    await act(async () => currentNavigation.setSection('export'));
     expect(exporting()).not.toBeNull();
   } finally {
     await act(async () => root.unmount());
@@ -476,7 +439,7 @@ it.each(['scene', 'selected', 'history', 'export'] as const)(
       const close = host.querySelector<HTMLButtonElement>(
         'header [aria-label="common.actions.close"]'
       )!;
-      expect(host.querySelector('header .lucide-arrow-left')).toBeNull();
+      expect(host.querySelector('header .lucide-arrow-left')).not.toBeNull();
       act(() => close.click());
       expect(leave).toHaveBeenCalledOnce();
     } finally {
@@ -533,15 +496,10 @@ it.each([true, false])(
       act(() => root.render(<Harness />));
       act(() => navigation.setSection('speech'));
       expect(host.querySelector('output')?.textContent).toBe('speech');
-      expect(
-        Array.from(
-          host.querySelectorAll('[data-ui="gallery.videoReview.inspectorNavigation"] button')
-        ).map((node) => node.textContent)
-      ).toEqual([
-        'gallery.videoReview.comments',
-        ...(advanced ? ['gallery.videoReview.scene'] : []),
-        'gallery.videoReview.speechTitle',
-      ]);
+      expect(host.querySelector('[data-ui="gallery.videoReview.inspectorNavigation"]')).toBeNull();
+      expect(host.querySelector('header h2')?.textContent).toBe(
+        'gallery.videoReview.audioOriginal'
+      );
       const presentation = host.querySelector<HTMLButtonElement>(
         '[data-ui="gallery.videoReview.inspectorPresentation"]'
       );
@@ -556,7 +514,7 @@ it.each([true, false])(
       act(() => navigation.setSection('speech'));
       settingsAvailable = !advanced;
       act(() => root.render(<Harness />));
-      expect(host.querySelector('output')?.textContent).toBe(advanced ? 'comments' : 'scene');
+      expect(host.querySelector('output')?.textContent).toBe(advanced ? 'project' : 'track');
     } finally {
       act(() => root.unmount());
       vi.unstubAllGlobals();
@@ -577,6 +535,7 @@ it('opens the track document in the third context and closes it on selection or 
       settingsAvailable: true,
       exportAvailable: false,
     });
+    currentNavigation = navigation;
     return (
       <>
         <button
@@ -627,16 +586,13 @@ it('opens the track document in the third context and closes it on selection or 
     await act(async () => host.querySelector<HTMLButtonElement>('[data-open-track]')!.click());
     expect(host.querySelector('[data-track-document]')).not.toBeNull();
     expect(host.querySelector('[data-selected-fragment]')).toBeNull();
-    expect(
-      host.querySelectorAll('[data-ui="gallery.videoReview.inspectorNavigation"] button')
-    ).toHaveLength(3);
+    expect(host.querySelector('[data-ui="gallery.videoReview.inspectorNavigation"]')).toBeNull();
+    expect(host.querySelector('header h2')?.textContent).toBe('gallery.videoReview.textTrack');
     await act(async () => host.querySelector<HTMLButtonElement>('[data-select-text]')!.click());
     expect(host.querySelector('[data-track-document]')).toBeNull();
     expect(host.querySelector('[data-selected-fragment]')).not.toBeNull();
     await act(async () => host.querySelector<HTMLButtonElement>('[data-open-track]')!.click());
-    await act(async () =>
-      host.querySelector<HTMLButtonElement>('[title="gallery.videoReview.scene"]')!.click()
-    );
+    await act(async () => currentNavigation.setSection('scene'));
     expect(host.textContent).toContain('Scene controls');
     expect(host.querySelector('[title="gallery.videoReview.textTrackDocument"]')).toBeNull();
   } finally {
@@ -645,9 +601,10 @@ it('opens the track document in the third context and closes it on selection or 
   }
 });
 
-it('keeps the recorder mounted in a temporary third tab below the filename', () => {
+it('uses a plain recording heading and an enabled Back while retaining the take during navigation', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
+  document.body.append(host);
   const root = createRoot(host);
   try {
     act(() =>
@@ -673,25 +630,29 @@ it('keeps the recorder mounted in a temporary third tab below the filename', () 
         </ReviewInspector>
       )
     );
-    const tabs = host.querySelector('[data-ui="gallery.videoReview.inspectorNavigation"]')!;
-    expect(tabs.textContent).toContain('gallery.videoReview.recordVoiceover');
-    expect(host.querySelector('header h2')?.textContent).toBe('clip.webm');
+    expect(host.querySelector('[data-ui="gallery.videoReview.inspectorNavigation"]')).toBeNull();
+    expect(host.querySelector('[data-ui="gallery.videoReview.recordingNavigation"]')).toBeNull();
+    expect(host.querySelector('header h2')?.textContent).toBe(
+      'gallery.videoReview.recordVoiceover'
+    );
     const take = host.querySelector<HTMLInputElement>('[aria-label="retained take"]')!;
-    act(() =>
-      Array.from(tabs.querySelectorAll('button'))
-        .find((b) => b.textContent === 'gallery.videoReview.scene')!
-        .click()
-    );
+    take.value = 'retained edited take';
+    const back = host.querySelector<HTMLButtonElement>('header button')!;
+    expect(back.disabled).toBe(false);
+    act(() => currentNavigation.setSection('scene'));
     expect(take.closest('[hidden]')).not.toBeNull();
-    act(() =>
-      Array.from(tabs.querySelectorAll('button'))
-        .find((b) => b.textContent === 'gallery.videoReview.recordVoiceover')!
-        .click()
-    );
-    expect(host.querySelector('[aria-label="retained take"]')).toBe(take);
+    act(() => currentNavigation.openRecording());
     expect(take.closest('[hidden]')).toBeNull();
+    expect(host.querySelector('[aria-label="retained take"]')).toBe(take);
+    expect(take.value).toBe('retained edited take');
+
+    expect(host.querySelector('[data-ui="gallery.videoReview.recordingTab"]')?.contains(take)).toBe(
+      true
+    );
   } finally {
     act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
   }
 });
 
@@ -744,6 +705,35 @@ it('offers full editor transfer with the existing export actions and disables it
       host.querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.openVideoEditor"]')!
         .disabled
     ).toBe(true);
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('does not let a repeated track-root command hide the next selected item', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const root = createRoot(document.createElement('div'));
+  let selection: ReviewSelection = { kind: 'none' };
+  function Harness() {
+    const nav = useReviewInspectorNavigation({
+      contextKey: selection.kind,
+      contextSelection: selection,
+      selectionLabel: selection.kind === 'none' ? undefined : 'Selected effect',
+      settingsAvailable: true,
+      exportAvailable: true,
+    });
+    currentNavigation = nav;
+    return null;
+  }
+  try {
+    act(() => root.render(<Harness />));
+    act(() => currentNavigation.setSection('track'));
+    expect(currentNavigation.shown).toBe('track');
+    act(() => currentNavigation.setSection('track'));
+    selection = { kind: 'zoom', id: 'created' };
+    act(() => root.render(<Harness />));
+    expect(currentNavigation.shown).toBe('selected');
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

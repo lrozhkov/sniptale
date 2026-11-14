@@ -1,3 +1,5 @@
+import { hasSourceImageFilters } from '../../features/image-filters/contract';
+import { compileSourceImageFilters } from '../../features/image-filters/plan';
 import { reviewSpatialOverlayBounds } from './spatial-overlay-bounds';
 import { calculateSpatialRenderAllocations } from './spatial-render-allocation';
 import { hasSceneBackgroundMotion } from '../../features/video/project/scene/background-motion';
@@ -72,6 +74,7 @@ export interface PreviewRenderAllocationInput {
     denseGradient: boolean;
   };
   scene: {
+    sourceFilter?: { raster: Size; scratchCount: number; preparedRaster?: Size };
     transitionRaster: Size | null;
     splitRaster?: Size | null;
     windowRaster: Size | null;
@@ -324,7 +327,20 @@ export function calculatePreviewRenderAllocation(input: PreviewRenderAllocationI
     ) ?? []),
   ];
   const cached = optionalCanvas('background-cache', input.background?.cache ?? null);
-  const normal = [...retained, ...cached];
+  const sourceFilter = input.scene.sourceFilter;
+  const filtered = sourceFilter
+    ? [
+        sourceFilter.raster,
+        ...(sourceFilter.preparedRaster ? [sourceFilter.preparedRaster] : []),
+      ].flatMap((raster, index) => [
+        canvas(`source-image-filter-${index}`, raster),
+        bytes(
+          `source-image-filter-working-${index}`,
+          pixels(raster) * 4 * (4 * (integer(sourceFilter.scratchCount, true) + 1) + 2)
+        ),
+      ])
+    : [];
+  const normal = [...retained, ...cached, ...filtered];
   const window = [
     ...optionalCanvas('decorated-window', input.scene.windowRaster),
     ...optionalCanvas('export-decorated-window', input.scene.exportWindowRaster ?? null),
@@ -368,6 +384,7 @@ export function calculatePreviewRenderAllocation(input: PreviewRenderAllocationI
     const background = input.background;
     const rebuilding = [
       ...retained,
+      ...filtered,
       ...window,
       ...motion,
       ...optionalCanvas('previous-background-cache', background.previousCache),
@@ -679,6 +696,15 @@ export function resolvePreviewRenderAllocation(
     assets: input.assets,
     background: background.cache,
     scene: {
+      ...(scene.sourceFilters && hasSourceImageFilters(scene.sourceFilters)
+        ? {
+            sourceFilter: {
+              raster: scene.source,
+              scratchCount: compileSourceImageFilters(scene.sourceFilters, scene.source)
+                .scratchCount,
+            },
+          }
+        : {}),
       transitionRaster: transition ? input.sourceBacking : null,
       windowRaster:
         input.assets.headerBitmap || layout.sourceCrop

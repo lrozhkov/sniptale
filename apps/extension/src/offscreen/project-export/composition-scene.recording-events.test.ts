@@ -1,3 +1,4 @@
+import type { ProjectCompositionSceneInput } from './types';
 import '../../composition/persistence/infrastructure/indexed-db/fake-indexed-db.test-support';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { openDB, deleteDB, type IDBPDatabase } from 'idb';
@@ -16,10 +17,7 @@ import { DB_VERSION } from '../../composition/persistence/infrastructure/indexed
 import { createRecordingEventsStore } from '../../composition/persistence/recordings/recording-events/store';
 import { createRecordingEventsRenderer } from '../../workflows/video-review/recording-events';
 import type { VideoProject } from '../../features/video/project/types';
-import {
-  renderProjectCompositionScene,
-  type ProjectCompositionSceneInput,
-} from './composition-scene';
+import { renderProjectCompositionScene } from './composition-scene';
 
 const owners = vi.hoisted(() => ({ effects: vi.fn(), draw: vi.fn() }));
 vi.mock('../../workflows/video-review/project-captions', () => ({

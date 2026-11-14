@@ -10,7 +10,8 @@ export const EFFECT_V1_INTEGRATION_OWNER_MAPPINGS = [
     exclusive: true,
     owner: 'effect-v1-backup-v6-inventory',
     productionFile: 'apps/extension/src/workflows/media-hub-backup/v6/inventory/effect-bundles.ts',
-    reason: 'EffectV1 bundle archive inventory has direct metadata and object-file proof.',
+    reason:
+      'Source-only visual archive inventory has exact source, preference and atomic snapshot proof.',
     testFiles: [
       'apps/extension/src/workflows/media-hub-backup/v6/inventory/effect-bundles.test.ts',
     ],
@@ -29,7 +30,8 @@ export const EFFECT_V1_INTEGRATION_OWNER_MAPPINGS = [
     owner: 'effect-v1-backup-v6-publication',
     productionFile:
       'apps/extension/src/workflows/media-hub-backup/v6/root-publication/effect-bundle.ts',
-    reason: 'EffectV1 restore publication and session checkpoint share one transaction.',
+    reason:
+      'Source-only resources, separate preferences and publication receipt share one native transaction.',
     testFiles: [
       'apps/extension/src/workflows/media-hub-backup/v6/root-publication/effect-bundle.test.ts',
     ],
@@ -117,6 +119,7 @@ export const EFFECT_V1_INTEGRATION_OWNER_MAPPINGS = [
   },
   {
     exclusive: true,
+    allowCrossOwner: true,
     owner: 'effect-v1-preview-scene',
     productionPrefix: 'apps/extension/src/video-editor/preview/stage/scene/',
     reason:
@@ -128,10 +131,50 @@ export const EFFECT_V1_INTEGRATION_OWNER_MAPPINGS = [
       'apps/extension/src/video-editor/preview/stage/scene/locked-overlays.test.tsx',
       'apps/extension/src/video-editor/preview/stage/scene/overlay-scale.test.tsx',
       'apps/extension/src/video-editor/preview/stage/scene/render.test.tsx',
-      'apps/extension/src/video-editor/preview/stage/scene/render-visual.test.tsx',
+      'apps/extension/src/workflows/video/native-composition/render-visual.test.tsx',
       'apps/extension/src/video-editor/preview/stage/scene/render-preview.test.ts',
       'apps/extension/src/video-editor/preview/stage/scene/render-scheduler.test.ts',
       'apps/extension/src/video-editor/preview/stage/scene/locked-overlays-motion-blur.test.tsx',
+    ],
+  },
+
+  {
+    exclusive: true,
+    allowCrossOwner: true,
+    owner: 'effect-v1-native-composition',
+    productionPrefix: 'apps/extension/src/workflows/video/native-composition/',
+    reason:
+      'EffectV1 scene scheduling, geometry, locked layers, scaling, visual passes, and ' +
+      'failure propagation have direct proof.',
+    testFiles: [
+      'apps/extension/src/offscreen/project-export/shared-composition.test.ts',
+      'apps/extension/src/video-editor/export/estimate-size.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer-gpu-joins.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer-gpu.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer-source.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer.images.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer.videos.test.ts',
+      'apps/extension/src/video-editor/preview/stage/scene/geometry.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/scene/index.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/scene/locked-overlays-motion-blur.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/scene/locked-overlays.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/scene/overlay-scale.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/scene/render-preview.test.ts',
+      'apps/extension/src/video-editor/preview/stage/scene/render-scheduler.test.ts',
+      'apps/extension/src/video-editor/preview/stage/scene/render.test.tsx',
+      'apps/extension/src/workflows/video/native-composition/canvas.test.tsx',
+      'apps/extension/src/workflows/video/native-composition/effect-preparation.test.ts',
+      'apps/extension/src/workflows/video/native-composition/frame-plan.sources.test.ts',
+      'apps/extension/src/workflows/video/native-composition/frame-plan.test.ts',
+      'apps/extension/src/workflows/video/native-composition/gpu-preview-layers.test.ts',
+      'apps/extension/src/workflows/video/native-composition/gpu-preview-materials.test.ts',
+      'apps/extension/src/workflows/video/native-composition/gpu-preview.sources.test.ts',
+      'apps/extension/src/workflows/video/native-composition/gpu-preview.test.ts',
+      'apps/extension/src/workflows/video/native-composition/image-resources.test.ts',
+      'apps/extension/src/workflows/video/native-composition/materializer-gpu-outputs.test.ts',
+      'apps/extension/src/workflows/video/native-composition/render-visual.test.tsx',
+      'apps/extension/src/workflows/video/native-composition/source-frames.test.ts',
     ],
   },
   {

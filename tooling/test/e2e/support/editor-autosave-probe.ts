@@ -1,6 +1,6 @@
 import { openDB } from 'idb';
-import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import { createHistoryRetentionWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/history-retention.test-support';
 import { inspectVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import { createAutosaveCoordinator } from '@sniptale/platform/data/autosave';
@@ -23,17 +23,7 @@ export async function seedGallery(source: string, fragments = 112) {
   const recording = await getRecording('beta-v1-recording');
   if (!recording) throw new Error('Missing real source');
   const metadata = await inspectReviewVideo(recording.file, new AbortController().signal);
-  const svg = new TextEncoder().encode(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240"><circle cx="120" cy="120" r="80" fill="#123456"/></svg>'
-  );
-  const raw: unknown = JSON.parse(source);
-  if (!isRecord(raw) || !Array.isArray(raw['assets'])) throw new Error('Invalid effect fixture');
-  const hash = await sha256EffectV1Bytes(svg);
-  raw['assets'] = raw['assets'].map((asset: unknown) => {
-    if (!isRecord(asset)) throw new Error('Invalid effect asset');
-    return { ...asset, byteLength: svg.byteLength, sha256: hash };
-  });
-  const effectSnapshot = await historyRetentionEffectSnapshot(JSON.stringify(raw));
+  const effectSnapshot = await historyRetentionEffectSnapshot(source);
   const whole = createHistoryRetentionWorkspace({ effectSnapshot, fragments });
   const workspace = { ...whole, source: metadata.source };
   const admitted = inspectVideoWorkspace(workspace);
@@ -83,7 +73,6 @@ export async function seedGallery(source: string, fragments = 112) {
   header.setUint16(34, 16, true);
   header.setUint32(40, audio.length - 44, true);
   for (const [projectAssetId, bytes, mimeType] of [
-    ['retained-effect', svg, 'image/svg+xml'],
     ['retained-voice', audio, 'audio/wav'],
     ['retained-music', audio, 'audio/wav'],
   ] as const) {
@@ -93,7 +82,7 @@ export async function seedGallery(source: string, fragments = 112) {
     ).createWritable();
     await writable.write(bytes);
     await writable.close();
-    const digest = await sha256EffectV1Bytes(bytes);
+    const digest = await bytesToHex(sha256(bytes));
     const tx = db.transaction(['project_assets', 'asset_refs', 'asset_owners'], 'readwrite');
     await tx
       .objectStore('project_assets')

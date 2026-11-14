@@ -1,3 +1,9 @@
+import { parseCameraSpatialMotion } from '../../project/motion/spatial';
+import { parseReviewInteractionTimeline } from '../interaction-timeline';
+
+import { parseAudioProcessing } from '@sniptale/runtime-contracts/audio-effects';
+import { parseSourceImageFilterStack } from '../../../image-filters/contract';
+import { parseCursorMotions } from '../../project/cursor-motion';
 import { parseReviewAudioClip } from '../audio-clip-validation';
 import { parseSceneBackgroundMotion } from '../../project/scene/background-motion';
 import {
@@ -109,7 +115,7 @@ function parseTrackVisibility(value: unknown): QuickEditTrackVisibility | null {
     typeof value['actions'] !== 'boolean' ||
     typeof value['zoom'] !== 'boolean' ||
     typeof value['audio'] !== 'boolean' ||
-    ['text', 'originalAudio', 'voiceover', 'music'].some(
+    ['text', 'originalAudio', 'voiceover', 'music', 'cursorMotion', 'keyboard', 'mouse'].some(
       (key) => value[key] !== undefined && typeof value[key] !== 'boolean'
     ) ||
     (value['webcam'] !== undefined && typeof value['webcam'] !== 'boolean') ||
@@ -123,6 +129,9 @@ function parseTrackVisibility(value: unknown): QuickEditTrackVisibility | null {
       : {}),
     ...(typeof value['voiceover'] === 'boolean' ? { voiceover: value['voiceover'] } : {}),
     ...(typeof value['music'] === 'boolean' ? { music: value['music'] } : {}),
+    ...(typeof value['cursorMotion'] === 'boolean' ? { cursorMotion: value['cursorMotion'] } : {}),
+    ...(typeof value['keyboard'] === 'boolean' ? { keyboard: value['keyboard'] } : {}),
+    ...(typeof value['mouse'] === 'boolean' ? { mouse: value['mouse'] } : {}),
     actions: value['actions'],
     zoom: value['zoom'],
     audio: value['audio'],
@@ -235,6 +244,14 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   if (cameraFollow === null) return null;
   const cursorComposition = parseCursorCompositionSettings(value['cursorComposition']);
   if (cursorComposition === null) return null;
+  if (value['effect'] !== undefined && value['effect'] !== '3d') return null;
+  if (
+    value['effect'] === '3d' &&
+    (value['border'] !== undefined || value['spotlight'] !== undefined)
+  )
+    return null;
+  const spatialMotion = parseCameraSpatialMotion(value['spatialMotion']);
+  if (spatialMotion === null || (spatialMotion && value['effect'] !== '3d')) return null;
   const perspective = parseQuickEditPerspective(value['perspective']);
   const depthOfField = parseQuickEditDepth(value['depthOfField']);
   if (perspective === null || depthOfField === null) return null;
@@ -270,10 +287,13 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
     value['linkEasing'] !== 'ease-in-out'
   )
     return null;
+  if (value['overlapPolicy'] !== undefined && value['overlapPolicy'] !== 'suppress') return null;
   return {
     ...(cameraFollow ? { cameraFollow } : {}),
     ...(typeof value['followCursor'] === 'boolean' ? { followCursor: value['followCursor'] } : {}),
     ...(cursorComposition ? { cursorComposition } : {}),
+    ...(value['effect'] === '3d' ? { effect: '3d' as const } : {}),
+    ...(spatialMotion ? { spatialMotion } : {}),
     ...(perspective ? { perspective } : {}),
     ...(depthOfField ? { depthOfField } : {}),
     ...(motionBlur ? { motionBlur } : {}),
@@ -294,6 +314,7 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
     ...(value['linkEasing'] === 'linear' || value['linkEasing'] === 'ease-in-out'
       ? { linkEasing: value['linkEasing'] }
       : {}),
+    ...(value['overlapPolicy'] === 'suppress' ? { overlapPolicy: 'suppress' as const } : {}),
     ...(typeof value['dormant'] === 'boolean' ? { dormant: value['dormant'] } : {}),
   };
 }
@@ -433,6 +454,11 @@ function parseOriginalAudio(value: unknown): QuickEditOriginalAudio | null {
     !isBoundedNumber(value['volume'], 0, MAX_QUICK_EDIT_CLIP_VOLUME)
   )
     return null;
+  const audioProcessing =
+    value['audioProcessing'] === undefined
+      ? undefined
+      : parseAudioProcessing(value['audioProcessing']);
+  if (audioProcessing === null) return null;
   const ranges =
     value['ranges'] === undefined ? undefined : parseSourceAudioGainRanges(value['ranges']);
   const mutes = value['mutes'] === undefined ? undefined : parseOriginalAudioMutes(value['mutes']);
@@ -440,6 +466,7 @@ function parseOriginalAudio(value: unknown): QuickEditOriginalAudio | null {
   return {
     muted: value['muted'],
     volume: value['volume'],
+    ...(audioProcessing ? { audioProcessing } : {}),
     ...(ranges ? { ranges } : {}),
     ...(mutes ? { mutes } : {}),
   };
@@ -464,7 +491,8 @@ function parseAudioState(value: unknown, allowOriginalSpeech: boolean): QuickEdi
   if (
     segments === null ||
     (voiceover.some((clip) => clip.sourceAnchor) && !segments) ||
-    music.some((clip) => clip.sourceAnchor || clip.tempo !== undefined)
+    (music.some((clip) => clip.sourceAnchor) && !segments) ||
+    music.some((clip) => clip.tempo !== undefined)
   )
     return null;
   const timing = {
@@ -503,6 +531,24 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
 }
 
 function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdvancedContent | null {
+  if (
+    isRecord(raw['audio']) &&
+    Array.isArray(raw['audio']['music']) &&
+    raw['audio']['music'].some(
+      (clip: unknown) => isRecord(clip) && clip['sourceAnchor'] !== undefined
+    ) &&
+    !supportsAdvancedSchema(raw['schemaVersion'], 34)
+  )
+    return null;
+  const sourceFilters =
+    raw['sourceFilters'] === undefined
+      ? undefined
+      : parseSourceImageFilterStack(raw['sourceFilters']);
+  if (
+    sourceFilters === null ||
+    (sourceFilters && !supportsAdvancedSchema(raw['schemaVersion'], 30))
+  )
+    return null;
   const cameraFollowDefaults =
     raw['cameraFollowDefaults'] === undefined
       ? undefined
@@ -510,6 +556,19 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
   if (
     cameraFollowDefaults === null ||
     (cameraFollowDefaults && !supportsAdvancedSchema(raw['schemaVersion'], 20))
+  )
+    return null;
+  const cursorMotionEnabled = raw['cursorMotionEnabled'];
+  if (
+    cursorMotionEnabled !== undefined &&
+    (typeof cursorMotionEnabled !== 'boolean' || !supportsAdvancedSchema(raw['schemaVersion'], 29))
+  )
+    return null;
+  const cursorMotions =
+    raw['cursorMotions'] === undefined ? undefined : parseCursorMotions(raw['cursorMotions']);
+  if (
+    cursorMotions === null ||
+    (cursorMotions && !supportsAdvancedSchema(raw['schemaVersion'], 29))
   )
     return null;
   const cursorFocusPath =
@@ -544,6 +603,11 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
   if (raw['webcam'] !== undefined && !supportsAdvancedSchema(raw['schemaVersion'], 3)) return null;
   const zoom = parseZoomState(raw['zoom'], supportsAdvancedSchema(raw['schemaVersion'], 3));
   if (
+    zoom?.regions.some((r) => r.effect === '3d') &&
+    !supportsAdvancedSchema(raw['schemaVersion'], 33)
+  )
+    return null;
+  if (
     zoom?.regions.some((region) => requiresExtendedBorderSchema(region.border)) &&
     !supportsAdvancedSchema(raw['schemaVersion'], 26)
   )
@@ -567,6 +631,19 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
   )
     return null;
   const audio = parseAudioState(raw['audio'], supportsAdvancedSchema(raw['schemaVersion'], 7));
+  if (
+    audio &&
+    !supportsAdvancedSchema(raw['schemaVersion'], 31) &&
+    (audio.original.audioProcessing !== undefined ||
+      [...audio.voiceover, ...audio.music].some((clip) => clip.audioProcessing !== undefined))
+  )
+    return null;
+  const interactionTimeline = parseReviewInteractionTimeline(raw['interactionTimeline']);
+  if (
+    interactionTimeline === null ||
+    (interactionTimeline && !supportsAdvancedSchema(raw['schemaVersion'], 32))
+  )
+    return null;
   const actionsEnabled = raw['actionsEnabled'];
   if (actionsEnabled !== undefined && typeof actionsEnabled !== 'boolean') return null;
   const keyAnimations = parseReviewKeyAnimations(raw['keyAnimations']);
@@ -618,13 +695,17 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
     schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
     ...(cameraFollowDefaults ? { cameraFollowDefaults } : {}),
     ...(cursorFocusPath ? { cursorFocusPath } : {}),
+    ...(cursorMotions ? { cursorMotions } : {}),
+    ...(cursorMotionEnabled === undefined ? {} : { cursorMotionEnabled }),
     zoom,
     background,
     audio,
+    ...(sourceFilters ? { sourceFilters } : {}),
     ...(text ? { text } : {}),
     ...(captions ? { captions } : {}),
     ...(annotationEffects ? { annotationEffects } : {}),
     ...(actionsEnabled === undefined ? {} : { actionsEnabled }),
+    ...(interactionTimeline ? { interactionTimeline } : {}),
     ...(keyAnimations ? { keyAnimations } : {}),
     ...(clickAnimations ? { clickAnimations } : {}),
     ...(actionAudio ? { actionAudio } : {}),
@@ -694,7 +775,7 @@ function supportsAdvancedSchema(version: unknown, firstHistorical: number): bool
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
     [
       2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
-      27,
+      27, 28, 29, 30, 31, 32, 33,
     ].some((known) => known >= firstHistorical && version === known)
   );
 }

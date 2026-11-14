@@ -51,7 +51,7 @@ it('shares disposable tool navigation between the preview and exact fields', () 
   act(() =>
     root.render(
       <ReviewZoomInspector
-        region={region}
+        region={{ ...region, effect: '3d' }}
         onChange={onChange}
         onReset={vi.fn()}
         onDelete={vi.fn()}
@@ -59,7 +59,7 @@ it('shares disposable tool navigation between the preview and exact fields', () 
       />
     )
   );
-  expect(field('gallery.videoReview.zoomScale')).not.toBeNull();
+  expect(field('gallery.videoReview.perspectiveX')).not.toBeNull();
   act(() =>
     [...host.querySelectorAll('button')]
       .find((button) => button.textContent === 'Rotate preview')!
@@ -218,31 +218,6 @@ it('edits link easing, shows the derived gap duration, and removes explicitly', 
   expect(remove).toHaveBeenCalledOnce();
 });
 
-it('keeps spotlight settings when the active type is selected again', async () => {
-  const { createQuickEditSpotlight } =
-    await import('../../features/video/project/scene/focus-appearance');
-  const change = vi.fn();
-  await act(async () =>
-    root.render(
-      <ReviewZoomInspector
-        region={{ ...region, spotlight: { ...createQuickEditSpotlight(), strength: 0.4 } }}
-        onChange={change}
-        onReset={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    )
-  );
-  const group = host.querySelector('[data-ui="gallery.videoReview.focusType"]')!;
-  expect(group.querySelector('[aria-label="gallery.videoReview.focusType"]')).not.toBeNull();
-  expect(group.querySelectorAll('button')).toHaveLength(4);
-  const active = group.querySelector<HTMLButtonElement>(
-    '[title="gallery.videoReview.focusSpotlight"]'
-  )!;
-  expect(active.getAttribute('aria-pressed')).toBe('true');
-  await act(async () => active.click());
-  expect(change).not.toHaveBeenCalled();
-});
-
 it('edits spotlight strength, area, reveal, rounding and blur through shared controls', async () => {
   const { createQuickEditSpotlight } =
     await import('../../features/video/project/scene/focus-appearance');
@@ -333,40 +308,6 @@ it('distinguishes compact nested position from collapsible top-level sections', 
   expect([...parents].every((node) => node.hasAttribute('open'))).toBe(true);
 });
 
-it('switches directly between Zoom and Spotlight without resetting the camera', async () => {
-  const change = vi.fn();
-  const render = async (value: QuickEditZoomRegion) =>
-    act(async () =>
-      root.render(
-        <ReviewZoomInspector
-          region={value}
-          onChange={change}
-          onReset={vi.fn()}
-          onDelete={vi.fn()}
-        />
-      )
-    );
-  await render(region);
-  const choose = async (title: string) =>
-    act(async () =>
-      host
-        .querySelector<HTMLButtonElement>(
-          `[data-ui="gallery.videoReview.focusType"] [title="${title}"]`
-        )!
-        .click()
-    );
-  await choose('gallery.videoReview.focusSpotlight');
-  expect(change).toHaveBeenCalledOnce();
-  const patch: QuickEditZoomRegionPatch = change.mock.calls[0]![0];
-  expect(patch.spotlight).toMatchObject({ area: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 } });
-  expect(patch).not.toHaveProperty('scale');
-  expect(patch).not.toHaveProperty('centerX');
-  expect(host.querySelector('[role="listbox"]')).toBeNull();
-  await render({ ...region, spotlight: patch.spotlight! });
-  await choose('gallery.videoReview.zoomRegionLabel');
-  expect(change).toHaveBeenLastCalledWith({ spotlight: null, border: null });
-});
-
 it('offers five source seconds on the slider and retains valid longer typed phases', async () => {
   const change = vi.fn();
   const long = { ...region, start: 0, end: 10, sourceAnchor: { start: 0, end: 20 } };
@@ -453,47 +394,6 @@ it('updates the opposite fractional budget live and keeps fitted values unchange
   expect(change).not.toHaveBeenCalled();
 });
 
-it('preserves the source area when switching Spotlight to Border and blocks conflicting Zoom', async () => {
-  const { createQuickEditSpotlight } =
-    await import('../../features/video/project/scene/focus-appearance');
-  const spotlight = {
-    ...createQuickEditSpotlight(),
-    roundness: 0.21,
-    area: { x: 0.1, y: 0.2, width: 0.5, height: 0.4 },
-  };
-  const onChange = vi.fn();
-  act(() =>
-    root.render(
-      <ReviewZoomInspector
-        region={{ ...region, spotlight }}
-        zoomConversionBlocked
-        onChange={onChange}
-        onReset={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    )
-  );
-  const group = host.querySelector('[data-ui="gallery.videoReview.focusType"]')!;
-  const zoom = group.querySelector<HTMLButtonElement>(
-    '[title="gallery.videoReview.zoomRegionLabel"]'
-  )!;
-  expect(zoom.disabled).toBe(true);
-  act(() => zoom.click());
-  expect(onChange).not.toHaveBeenCalled();
-  expect(host.textContent).toContain('gallery.videoReview.focusZoomConflict');
-  act(() =>
-    group.querySelector<HTMLButtonElement>('[title="gallery.videoReview.focusBorder"]')!.click()
-  );
-  expect(onChange).toHaveBeenLastCalledWith(
-    expect.objectContaining({
-      spotlight: null,
-      border: expect.objectContaining({ area: spotlight.area, roundness: spotlight.roundness }),
-      enter: { type: 'ease-in-out', duration: 1 },
-      exit: region.exit,
-    })
-  );
-});
-
 it('previews Border width without history writes, commits once, and cancels with Escape', async () => {
   const { BorderAppearanceFields } = await import('../../ui/focus-appearance/border');
   const { ReviewDetails } = await import('./controls');
@@ -530,7 +430,7 @@ it('previews Border width without history writes, commits once, and cancels with
   expect(onPreview).toHaveBeenLastCalledWith(null);
 });
 
-it('explains why cameras and unresolved placements cannot be copied', () => {
+it('allows camera copies and explains why unresolved placements cannot be copied', () => {
   const duplicate = vi.fn();
   for (const dormant of [false, true]) {
     act(() =>
@@ -547,15 +447,13 @@ it('explains why cameras and unresolved placements cannot be copied', () => {
     const button = host.querySelector<HTMLButtonElement>(
       '[aria-label="gallery.videoReview.focusDuplicate"]'
     )!;
-    expect(button.disabled).toBe(true);
+    expect(button.disabled).toBe(dormant);
     expect(button.title).toBe(
-      dormant
-        ? 'gallery.videoReview.focusDuplicateDormant'
-        : 'gallery.videoReview.focusDuplicateZoom'
+      dormant ? 'gallery.videoReview.focusDuplicateDormant' : 'gallery.videoReview.focusDuplicate'
     );
     act(() => button.click());
   }
-  expect(duplicate).not.toHaveBeenCalled();
+  expect(duplicate).toHaveBeenCalledTimes(1);
 });
 
 it('configures entrance and exit blur separately, starts disabled and retains the other phase', async () => {
@@ -698,7 +596,7 @@ it.each([
   }
 );
 
-it('selects Cursor before framing, enables orbit by default and retains manual settings', async () => {
+it('selects cursor framing without spatial controls and retains manual settings', async () => {
   const change = vi.fn();
   const props = {
     region: {
@@ -743,7 +641,7 @@ it('selects Cursor before framing, enables orbit by default and retains manual s
   await act(async () => choice('editor.scene.cameraFollowCursor').click());
   expect(change).toHaveBeenCalledExactlyOnceWith({
     followCursor: true,
-    cursorComposition: { mode: 'orbit', amount: 0.5, smoothness: 0.6 },
+    cursorComposition: { mode: 'off', amount: 0.5, smoothness: 0.6 },
   });
   expect(props.region.perspective.rotateY).toBe(15);
   await act(async () =>
@@ -751,7 +649,7 @@ it('selects Cursor before framing, enables orbit by default and retains manual s
   );
   expect(field('gallery.videoReview.zoomFocusX')).toBeNull();
   expect(field('gallery.videoReview.zoomScale').disabled).toBe(false);
-  expect(host.querySelector('[data-ui="camera.composition"]')).not.toBeNull();
+  expect(host.querySelector('[data-ui="camera.composition"]')).toBeNull();
   await act(async () => choice('editor.scene.cameraFollowManual').click());
   expect(change).toHaveBeenLastCalledWith({ followCursor: false });
   await act(async () =>
@@ -794,4 +692,45 @@ it('keeps authored follow while explicit archive availability changes without in
   expect(cursor().disabled).toBe(true);
   expect(cursor().getAttribute('aria-pressed')).toBe('true');
   expect(change).not.toHaveBeenCalled();
+});
+
+it('offers cursor rotation only on 3D and has no focus-type chooser', async () => {
+  const change = vi.fn();
+  const spatial = {
+    ...region,
+    effect: '3d' as const,
+    cursorComposition: { mode: 'off' as const, amount: 0.5, smoothness: 0.6 },
+  };
+  await act(async () =>
+    root.render(
+      <ReviewZoomInspector
+        region={spatial}
+        onChange={change}
+        onReset={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+  );
+  expect(host.querySelector('[data-ui="gallery.videoReview.focusType"]')).toBeNull();
+  const orbit = host.querySelector<HTMLButtonElement>(
+    '[title="editor.scene.cameraCompositionOrbit"]'
+  )!;
+  expect(orbit).not.toBeNull();
+  await act(async () => orbit.click());
+  expect(change).toHaveBeenLastCalledWith({
+    cursorComposition: { mode: 'orbit', amount: 0.5, smoothness: 0.6 },
+  });
+  await act(async () =>
+    root.render(
+      <ReviewZoomInspector
+        region={{ ...spatial, cursorComposition: { ...spatial.cursorComposition, mode: 'orbit' } }}
+        onChange={change}
+        onReset={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+  );
+  expect(field('gallery.videoReview.perspectiveX')).toBeNull();
+  expect(field('gallery.videoReview.zoomScale')).toBeNull();
+  expect(host.querySelector('[data-ui="focus.spatialMotion"]')).toBeNull();
 });

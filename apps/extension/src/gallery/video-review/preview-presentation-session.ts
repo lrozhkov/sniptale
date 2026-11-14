@@ -1,3 +1,5 @@
+import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
+import { canCoalescePresentationInteraction } from './preview-presentation-state';
 import type { VideoPreviewRenderer } from '../../features/video/preview/preferences';
 import { prepareReviewCameraPlans } from '../../features/video/review/advanced/camera-plan-preparation';
 import { createEffectRuntimeSandboxExecutor } from '../../workflows/video/effect-runtime-sandbox';
@@ -72,11 +74,15 @@ export function createManualPresentationOwner(
 
 /** One mounted lifetime owns renderer, publication, camera and scheduler teardown. */
 class ManualPresentationSession {
+  private requestGeneration = 0;
+  private movementBase: Description | null = null;
+  private movementInstance: ReviewAnnotationEffect | null = null;
   private diagnostics = createReviewExportDiagnostics({ destination: 'preview', route: 'render' });
   private diagnosed = false;
   private disposed = false;
   private waiting = false;
   private playing = false;
+  private interacting = false;
   private sequence = 0;
   private current: Description | null = null;
   private cameraDescription: Description | null = null;
@@ -124,6 +130,7 @@ class ManualPresentationSession {
     this.scheduler = createReviewPreviewPresentation({
       ...createReviewPresentationPaintClock(),
       allowPreparedPlayingFrames: true,
+      canCoalesceInteraction: canCoalescePresentationInteraction,
       maximumInFlight: (description) =>
         description.renderer === 'legacy' ? 1 : this.renderer.maximumInFlight(description.scene),
       now: () => performance.now(),
@@ -182,9 +189,10 @@ class ManualPresentationSession {
         ),
       ...(this.rendererPreference === 'gpu'
         ? {
-            annotationWarmExecutor: () =>
+            annotationWarmExecutor: (primary, canAdopt) =>
               this.playing
-                ? createEffectRuntimeSandboxExecutor({ compositionBackend: 'gpu-scene-plan' })
+                ? (primary?.createWarmExecutor?.(canAdopt) ??
+                  createEffectRuntimeSandboxExecutor({ compositionBackend: 'gpu-scene-plan' }))
                 : undefined,
           }
         : {}),
@@ -210,7 +218,10 @@ class ManualPresentationSession {
     return time;
   };
 
-  private prepare = async (request: { scene: Description; time: number }, signal: AbortSignal) => {
+  private prepare = async (
+    request: { scene: Description; generation: string; time: number },
+    signal: AbortSignal
+  ) => {
     if (this.contextLost) throw new Error('Preview context lost');
     if (this.latest().input.backgroundPending) throw new PendingPresentation();
     const rendererPreference = request.scene.renderer ?? 'gpu';
@@ -230,6 +241,8 @@ class ManualPresentationSession {
       this.cameraDescription = request.scene;
     }
     this.current = request.scene;
+    // This session emits decimal generation values; capture keeps the admitted job's sequence.
+    this.sequence = Number(request.generation);
     this.resultTime =
       this.latest().input.playing && this.video
         ? (this.latest().input.sourceToResult(this.video.currentTime) ?? request.time)
@@ -246,20 +259,41 @@ class ManualPresentationSession {
     if (transition?.failed) throw new Error('Transition preview unavailable');
     if (transition && (!transition.frames || !transition.lease?.active))
       throw new PendingPresentation();
-    const current = this.current;
-    const prepared = await reviewExportPhase(signal, 'prepare', () =>
-      this.renderer.prepare(
-        current.scene.captions && current.scene.webcam
-          ? {
-              ...current.scene,
-              webcamDuration:
-                this.cameraState.phase === 'ready' ? this.cameraState.duration : undefined,
-            }
-          : current.scene,
+    const current = request.scene;
+    const moved = request.scene.annotationMove;
+    let retained =
+      moved &&
+      this.renderer.prepareAnnotationMove(
+        moved.baseline,
+        moved.instance,
         current.dimensions,
         signal
-      )
-    );
+      );
+    if (moved && !retained && this.rendererPreference === 'gpu') {
+      const baseline = await this.renderer.prepare(moved.baseline, current.dimensions, signal);
+      baseline.release();
+      retained = this.renderer.prepareAnnotationMove(
+        moved.baseline,
+        moved.instance,
+        current.dimensions,
+        signal
+      );
+    }
+    const prepared =
+      retained ??
+      (await reviewExportPhase(signal, 'prepare', () =>
+        this.renderer.prepare(
+          current.scene.captions && current.scene.webcam
+            ? {
+                ...current.scene,
+                webcamDuration:
+                  this.cameraState.phase === 'ready' ? this.cameraState.duration : undefined,
+              }
+            : current.scene,
+          current.dimensions,
+          signal
+        )
+      ));
     this.admission.replaceAssets(prepared.allocationAssets);
     return { value: prepared, release: () => prepared.release() };
   };
@@ -622,7 +656,88 @@ class ManualPresentationSession {
     return this.admission.retainEndpoints(bytes);
   }
 
+  moveAnnotation(instance: ReviewAnnotationEffect): boolean {
+    const input = this.latest().input;
+    const baseline = this.movementBase ?? this.current;
+    if (
+      this.disposed ||
+      this.playing ||
+      input.playing ||
+      this.rendererPreference !== 'gpu' ||
+      !input.annotationGesture ||
+      input.annotationGesture.id !== instance.id ||
+      !baseline?.interactionKey ||
+      this.contextLost
+    )
+      return false;
+    const annotations = baseline.scene.annotationEffects;
+    if (!annotations?.lane.instances.some((entry) => entry.id === instance.id)) return false;
+    this.movementBase = baseline;
+    this.movementInstance = instance;
+    const scene = {
+      ...baseline.scene,
+      annotationEffects: {
+        ...annotations,
+        lane: {
+          ...annotations.lane,
+          instances: annotations.lane.instances.map((entry) =>
+            entry.id === instance.id ? instance : entry
+          ),
+        },
+      },
+    };
+    this.update(
+      { ...baseline, scene, annotationMove: { baseline: baseline.scene, instance } },
+      this.requestGeneration + 1,
+      true
+    );
+    return true;
+  }
+
+  endAnnotationMovement() {
+    if (!this.movementBase) return;
+    this.movementBase = null;
+    this.movementInstance = null;
+    this.scheduler.invalidate();
+  }
+
   update(description: Description, generation: number, interacting: boolean, active = true) {
+    generation = this.requestGeneration = Math.max(this.requestGeneration + 1, generation);
+    interacting = interacting || !!this.latest().input.annotationGesture;
+    if (!description.annotationMove) {
+      const baseline = this.movementBase,
+        instance = this.movementInstance;
+      const input = this.latest().input;
+      if (
+        active &&
+        baseline &&
+        instance &&
+        input.annotationGesture?.id === instance.id &&
+        canCoalescePresentationInteraction(baseline, description) &&
+        description.scene.annotationEffects
+      ) {
+        const annotations = description.scene.annotationEffects;
+        description = {
+          ...description,
+          scene: {
+            ...description.scene,
+            annotationEffects: {
+              ...annotations,
+              lane: {
+                ...annotations.lane,
+                instances: annotations.lane.instances.map((entry) =>
+                  entry.id === instance.id ? instance : entry
+                ),
+              },
+            },
+          },
+          annotationMove: { baseline: baseline.scene, instance },
+        };
+      } else {
+        this.movementBase = null;
+        this.movementInstance = null;
+      }
+    }
     if (
       this.current !== description ||
       this.sequence !== generation ||
@@ -630,9 +745,19 @@ class ManualPresentationSession {
       !this.latest().input.playing
     )
       this.renderer.cancelWarmAnnotations?.();
-    this.current = description;
-    this.sequence = generation;
     const input = this.latest().input;
+    const coalescing =
+      active &&
+      !input.playing &&
+      interacting &&
+      this.interacting &&
+      this.current &&
+      canCoalescePresentationInteraction(this.current, description);
+    if (!coalescing) {
+      this.current = description;
+      this.sequence = generation;
+    }
+    this.interacting = interacting;
     const deferFrames = !input.playing && !!input.deferFrames;
     if (this.playing !== input.playing || !active) this.publications.length = 0;
     this.playing = active && input.playing;

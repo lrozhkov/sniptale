@@ -29,7 +29,11 @@ export function createReviewFragment(args: {
   const { start, end } = snapReviewRange(selection, boundaries, args.snapToKeyframes);
   if (start < 0 || end > duration || start >= end) return null;
   const edits = args.edits
-    .filter((edit) => edit.start < end && edit.end > start)
+    .filter((edit) =>
+      edit.kind === 'freeze'
+        ? edit.start >= start && (edit.start < end || (end === duration && edit.start === end))
+        : edit.start < end && edit.end > start
+    )
     .map((edit) => ({ ...edit, start: Math.max(start, edit.start), end: Math.min(end, edit.end) }));
   const ids = new Set(args.edits.map((edit) => edit.id));
   const exclude = (from: number, to: number) => {

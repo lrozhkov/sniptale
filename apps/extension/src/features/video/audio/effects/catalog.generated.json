@@ -1,0 +1,1160 @@
+{
+  "version": 1,
+  "sampleRate": 48000,
+  "quantum": 128,
+  "modules": [
+    {
+      "kind": "eq",
+      "processor": {
+        "engine": "faust",
+        "version": "faustwasm-0.20.2.faust-2.90.19",
+        "sha256": "6d844db0106176aefaaac99d7a8f8a456c660bbdbebe9d9ea7915e10c921d330"
+      },
+      "latencyFrames": 0,
+      "metadata": {
+        "inputs": 2,
+        "outputs": 2,
+        "size": 64,
+        "ui": [
+          {
+            "type": "vgroup",
+            "label": "sniptale_eq",
+            "items": [
+              {
+                "type": "hslider",
+                "label": "frequency",
+                "varname": "fHslider0",
+                "shortname": "frequency",
+                "address": "/sniptale_eq/frequency",
+                "index": 12,
+                "meta": [
+                  {
+                    "unit": "Hz"
+                  }
+                ],
+                "init": 1000,
+                "min": 20,
+                "max": 20000,
+                "step": 1
+              },
+              {
+                "type": "hslider",
+                "label": "gain",
+                "varname": "fHslider1",
+                "shortname": "gain",
+                "address": "/sniptale_eq/gain",
+                "index": 20,
+                "meta": [
+                  {
+                    "unit": "dB"
+                  }
+                ],
+                "init": 0,
+                "min": -24,
+                "max": 24,
+                "step": 0.1
+              },
+              {
+                "type": "hslider",
+                "label": "q",
+                "varname": "fHslider2",
+                "shortname": "q",
+                "address": "/sniptale_eq/q",
+                "index": 28,
+                "init": 1,
+                "min": 0.1,
+                "max": 12,
+                "step": 0.1
+              }
+            ]
+          }
+        ],
+        "meta": [
+          {
+            "basics.lib/name": "Faust Basic Element Library"
+          },
+          {
+            "basics.lib/version": "1.23.6"
+          },
+          {
+            "compile_options": "-lang wasm-i -fpga-mem-th 4 -ct 1 -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 2"
+          },
+          {
+            "filename": "sniptale_eq"
+          },
+          {
+            "filters.lib/_tanhalf:author": "Julius O. Smith III"
+          },
+          {
+            "filters.lib/_tanhalf:license": "MIT"
+          },
+          {
+            "filters.lib/name": "Faust Filters Library"
+          },
+          {
+            "filters.lib/peak_eq:author": "Julius O. Smith III"
+          },
+          {
+            "filters.lib/peak_eq:copyright": "Copyright (C) 2003-2019 by Julius O. Smith III <jos@ccrma.stanford.edu>"
+          },
+          {
+            "filters.lib/peak_eq:license": "LicenseRef-STK-4.3"
+          },
+          {
+            "filters.lib/peak_eq_cq:author": "Julius O. Smith III"
+          },
+          {
+            "filters.lib/peak_eq_cq:copyright": "Copyright (C) 2003-2019 by Julius O. Smith III <jos@ccrma.stanford.edu>"
+          },
+          {
+            "filters.lib/peak_eq_cq:license": "LicenseRef-STK-4.3"
+          },
+          {
+            "filters.lib/tf2s:author": "Julius O. Smith III"
+          },
+          {
+            "filters.lib/tf2s:copyright": "Copyright (C) 2003-2019 by Julius O. Smith III <jos@ccrma.stanford.edu>"
+          },
+          {
+            "filters.lib/tf2s:license": "LicenseRef-STK-4.3"
+          },
+          {
+            "filters.lib/version": "1.13.4"
+          },
+          {
+            "maths.lib/author": "GRAME"
+          },
+          {
+            "maths.lib/copyright": "GRAME"
+          },
+          {
+            "maths.lib/license": "LicenseRef-LGPL-2.1-or-later-with-Faust-exception"
+          },
+          {
+            "maths.lib/name": "Faust Math Library"
+          },
+          {
+            "maths.lib/version": "2.9.3"
+          },
+          {
+            "name": "sniptale_eq"
+          },
+          {
+            "platform.lib/name": "Generic Platform Library"
+          },
+          {
+            "platform.lib/version": "1.3.1"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "highpass",
+      "processor": {
+        "engine": "faust",
+        "version": "faustwasm-0.20.2.faust-2.90.19",
+        "sha256": "9448e20e70a67c054b210c697d5a44bd383f16ae42e94700be41ab7c79d38543"
+      },
+      "latencyFrames": 0,
+      "metadata": {
+        "inputs": 2,
+        "outputs": 2,
+        "size": 44,
+        "ui": [
+          {
+            "type": "vgroup",
+            "label": "sniptale_highpass",
+            "items": [
+              {
+                "type": "hslider",
+                "label": "frequency",
+                "varname": "fHslider0",
+                "shortname": "frequency",
+                "address": "/sniptale_highpass/frequency",
+                "index": 8,
+                "meta": [
+                  {
+                    "unit": "Hz"
+                  }
+                ],
+                "init": 80,
+                "min": 20,
+                "max": 20000,
+                "step": 1
+              }
+            ]
+          }
+        ],
+        "meta": [
+          {
+            "compile_options": "-lang wasm-i -fpga-mem-th 4 -ct 1 -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 2"
+          },
+          {
+            "filename": "sniptale_highpass"
+          },
+          {
+            "filters.lib/highpass:author": "Julius O. Smith III"
+          },
+          {
+            "filters.lib/highpass:copyright": "Copyright (C) 2003-2019 by Julius O. Smith III <jos@ccrma.stanford.edu>"
+          },
+          {
+            "filters.lib/highpass:license": "LicenseRef-STK-4.3"
+          },
+          {
+            "filters.lib/lowpass0_highpass1:author": "Julius O. Smith III"
+          },
+          {
+            "filters.lib/lowpass0_highpass1:copyright": "Copyright (C) 2003-2019 by Julius O. Smith III <jos@ccrma.stanford.edu>"
+          },
+          {
+            "filters.lib/lowpass0_highpass1:license": "LicenseRef-STK-4.3"
+          },
+          {
+            "filters.lib/name": "Faust Filters Library"
+          },
+          {
+            "filters.lib/svf:author": "Oleg Nesterov"
+          },
+          {
+            "filters.lib/svf:copyright": "Copyright (C) 2020 Oleg Nesterov <oleg@redhat.com>"
+          },
+          {
+            "filters.lib/svf:license": "LicenseRef-STK-4.3"
+          },
+          {
+            "filters.lib/version": "1.13.4"
+          },
+          {
+            "maths.lib/author": "GRAME"
+          },
+          {
+            "maths.lib/copyright": "GRAME"
+          },
+          {
+            "maths.lib/license": "LicenseRef-LGPL-2.1-or-later-with-Faust-exception"
+          },
+          {
+            "maths.lib/name": "Faust Math Library"
+          },
+          {
+            "maths.lib/version": "2.9.3"
+          },
+          {
+            "name": "sniptale_highpass"
+          },
+          {
+            "platform.lib/name": "Generic Platform Library"
+          },
+          {
+            "platform.lib/version": "1.3.1"
+          },
+          {
+            "routes.lib/name": "Faust Signal Routing Library"
+          },
+          {
+            "routes.lib/version": "1.4.1"
+          },
+          {
+            "signals.lib/name": "Faust Routing Library"
+          },
+          {
+            "signals.lib/version": "1.8.0"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "lowpass",
+      "processor": {
+        "engine": "faust",
+        "version": "faustwasm-0.20.2.faust-2.90.19",
+        "sha256": "af3b6ebb0ad9cb8e0ebcecb1abbc12737e2e22386eca2de05f592dd213774789"
+      },
+      "latencyFrames": 0,
+      "metadata": {
+        "inputs": 2,
+        "outputs": 2,
+        "size": 44,
+        "ui": [
+          {
+            "type": "vgroup",
+            "label": "sniptale_lowpass",
+            "items": [
+              {
+                "type": "hslider",
+                "label": "frequency",
+                "varname": "fHslider0",
+                "shortname": "frequency",
+                "address": "/sniptale_lowpass/frequency",
+                "index": 8,
+                "meta": [
+                  {
+                    "unit": "Hz"
+                  }
+                ],
+                "init": 16000,
+                "min": 20,
+                "max": 20000,
+                "step": 1
+              }
+            ]
+          }
+        ],
+        "meta": [
+          {
+            "compile_options": "-lang wasm-i -fpga-mem-th 4 -ct 1 -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 2"
+          },
+          {
+            "filename": "sniptale_lowpass"
+          },
+          {
+            "filters.lib/lowpass0_highpass1:author": "Julius O. Smith III"
+          },
+          {
+            "filters.lib/lowpass0_highpass1:copyright": "Copyright (C) 2003-2019 by Julius O. Smith III <jos@ccrma.stanford.edu>"
+          },
+          {
+            "filters.lib/lowpass0_highpass1:license": "LicenseRef-STK-4.3"
+          },
+          {
+            "filters.lib/lowpass:author": "Julius O. Smith III"
+          },
+          {
+            "filters.lib/lowpass:copyright": "Copyright (C) 2003-2019 by Julius O. Smith III <jos@ccrma.stanford.edu>"
+          },
+          {
+            "filters.lib/lowpass:license": "LicenseRef-STK-4.3"
+          },
+          {
+            "filters.lib/name": "Faust Filters Library"
+          },
+          {
+            "filters.lib/svf:author": "Oleg Nesterov"
+          },
+          {
+            "filters.lib/svf:copyright": "Copyright (C) 2020 Oleg Nesterov <oleg@redhat.com>"
+          },
+          {
+            "filters.lib/svf:license": "LicenseRef-STK-4.3"
+          },
+          {
+            "filters.lib/version": "1.13.4"
+          },
+          {
+            "maths.lib/author": "GRAME"
+          },
+          {
+            "maths.lib/copyright": "GRAME"
+          },
+          {
+            "maths.lib/license": "LicenseRef-LGPL-2.1-or-later-with-Faust-exception"
+          },
+          {
+            "maths.lib/name": "Faust Math Library"
+          },
+          {
+            "maths.lib/version": "2.9.3"
+          },
+          {
+            "name": "sniptale_lowpass"
+          },
+          {
+            "platform.lib/name": "Generic Platform Library"
+          },
+          {
+            "platform.lib/version": "1.3.1"
+          },
+          {
+            "routes.lib/name": "Faust Signal Routing Library"
+          },
+          {
+            "routes.lib/version": "1.4.1"
+          },
+          {
+            "signals.lib/name": "Faust Routing Library"
+          },
+          {
+            "signals.lib/version": "1.8.0"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "compressor",
+      "processor": {
+        "engine": "faust",
+        "version": "faustwasm-0.20.2.faust-2.90.19",
+        "sha256": "f83bafd4b7fa478b6209d84fa26d82682dcd2e8a1747586b50bd46aeddef83dd"
+      },
+      "latencyFrames": 0,
+      "metadata": {
+        "inputs": 2,
+        "outputs": 2,
+        "size": 40,
+        "ui": [
+          {
+            "type": "vgroup",
+            "label": "sniptale_compressor",
+            "items": [
+              {
+                "type": "hslider",
+                "label": "attack",
+                "varname": "fHslider0",
+                "shortname": "attack",
+                "address": "/sniptale_compressor/attack",
+                "index": 8,
+                "meta": [
+                  {
+                    "unit": "s"
+                  }
+                ],
+                "init": 0.01,
+                "min": 0.001,
+                "max": 0.1,
+                "step": 0.001
+              },
+              {
+                "type": "hslider",
+                "label": "ratio",
+                "varname": "fHslider1",
+                "shortname": "ratio",
+                "address": "/sniptale_compressor/ratio",
+                "index": 12,
+                "init": 4,
+                "min": 1,
+                "max": 20,
+                "step": 0.1
+              },
+              {
+                "type": "hslider",
+                "label": "release",
+                "varname": "fHslider2",
+                "shortname": "release",
+                "address": "/sniptale_compressor/release",
+                "index": 16,
+                "meta": [
+                  {
+                    "unit": "s"
+                  }
+                ],
+                "init": 0.2,
+                "min": 0.01,
+                "max": 2,
+                "step": 0.01
+              },
+              {
+                "type": "hslider",
+                "label": "threshold",
+                "varname": "fHslider3",
+                "shortname": "threshold",
+                "address": "/sniptale_compressor/threshold",
+                "index": 28,
+                "meta": [
+                  {
+                    "unit": "dB"
+                  }
+                ],
+                "init": -18,
+                "min": -60,
+                "max": 0,
+                "step": 0.1
+              }
+            ]
+          }
+        ],
+        "meta": [
+          {
+            "analyzers.lib/amp_follower_ar:author": "Jonatan Liljedahl, revised by Romain Michon"
+          },
+          {
+            "analyzers.lib/name": "Faust Analyzer Library"
+          },
+          {
+            "analyzers.lib/version": "1.6.0"
+          },
+          {
+            "basics.lib/name": "Faust Basic Element Library"
+          },
+          {
+            "basics.lib/version": "1.23.6"
+          },
+          {
+            "compile_options": "-lang wasm-i -fpga-mem-th 4 -ct 1 -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 2"
+          },
+          {
+            "compressors.lib/compression_gain_mono:author": "Julius O. Smith III"
+          },
+          {
+            "compressors.lib/compression_gain_mono:copyright": "Copyright (C) 2014-2020 by Julius O. Smith III <jos@ccrma.stanford.edu>"
+          },
+          {
+            "compressors.lib/compression_gain_mono:license": "LicenseRef-STK-4.3"
+          },
+          {
+            "compressors.lib/compressor_stereo:author": "Julius O. Smith III"
+          },
+          {
+            "compressors.lib/compressor_stereo:copyright": "Copyright (C) 2014-2020 by Julius O. Smith III <jos@ccrma.stanford.edu>"
+          },
+          {
+            "compressors.lib/compressor_stereo:license": "LicenseRef-STK-4.3"
+          },
+          {
+            "compressors.lib/name": "Faust Compressor Effect Library"
+          },
+          {
+            "compressors.lib/version": "1.7.1"
+          },
+          {
+            "filename": "sniptale_compressor"
+          },
+          {
+            "maths.lib/author": "GRAME"
+          },
+          {
+            "maths.lib/copyright": "GRAME"
+          },
+          {
+            "maths.lib/license": "LicenseRef-LGPL-2.1-or-later-with-Faust-exception"
+          },
+          {
+            "maths.lib/name": "Faust Math Library"
+          },
+          {
+            "maths.lib/version": "2.9.3"
+          },
+          {
+            "name": "sniptale_compressor"
+          },
+          {
+            "platform.lib/name": "Generic Platform Library"
+          },
+          {
+            "platform.lib/version": "1.3.1"
+          },
+          {
+            "signals.lib/name": "Faust Routing Library"
+          },
+          {
+            "signals.lib/onePoleSwitching:author": "Jonatan Liljedahl, revised by Dario Sanfilippo"
+          },
+          {
+            "signals.lib/onePoleSwitching:licence": "LicenseRef-STK-4.3"
+          },
+          {
+            "signals.lib/version": "1.8.0"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "limiter",
+      "processor": {
+        "engine": "faust",
+        "version": "faustwasm-0.20.2.faust-2.90.19",
+        "sha256": "0c096c95222aa63ffd4d8d054ab03f585668b4e4786129ac2bd406b21f9bdc5e"
+      },
+      "latencyFrames": 480,
+      "metadata": {
+        "inputs": 2,
+        "outputs": 2,
+        "size": 16456,
+        "ui": [
+          {
+            "type": "vgroup",
+            "label": "sniptale_limiter",
+            "items": [
+              {
+                "type": "hslider",
+                "label": "ceiling",
+                "varname": "fHslider0",
+                "shortname": "ceiling",
+                "address": "/sniptale_limiter/ceiling",
+                "index": 8212,
+                "meta": [
+                  {
+                    "unit": "dB"
+                  }
+                ],
+                "init": -1,
+                "min": -24,
+                "max": 0,
+                "step": 0.1
+              },
+              {
+                "type": "hslider",
+                "label": "release",
+                "varname": "fHslider1",
+                "shortname": "release",
+                "address": "/sniptale_limiter/release",
+                "index": 16444,
+                "meta": [
+                  {
+                    "unit": "s"
+                  }
+                ],
+                "init": 0.2,
+                "min": 0.01,
+                "max": 2,
+                "step": 0.01
+              }
+            ]
+          }
+        ],
+        "meta": [
+          {
+            "analyzers.lib/name": "Faust Analyzer Library"
+          },
+          {
+            "analyzers.lib/version": "1.6.0"
+          },
+          {
+            "basics.lib/name": "Faust Basic Element Library"
+          },
+          {
+            "basics.lib/peakholder:author": "Dario Sanfilippo"
+          },
+          {
+            "basics.lib/peakholder:copyright": "Copyright (C) 2022 Dario Sanfilippo <sanfilippo.dario@gmail.com>"
+          },
+          {
+            "basics.lib/peakholder:license": "LicenseRef-STK-4.3"
+          },
+          {
+            "basics.lib/version": "1.23.6"
+          },
+          {
+            "compile_options": "-lang wasm-i -fpga-mem-th 4 -ct 1 -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 2"
+          },
+          {
+            "compressors.lib/limiter_lad_N:author": "Dario Sanfilippo"
+          },
+          {
+            "compressors.lib/limiter_lad_N:copyright": "Copyright (C) 2020 Dario Sanfilippo       <sanfilippo.dario@gmail.com>"
+          },
+          {
+            "compressors.lib/limiter_lad_N:license": "GPL-3.0-only"
+          },
+          {
+            "compressors.lib/name": "Faust Compressor Effect Library"
+          },
+          {
+            "compressors.lib/version": "1.7.1"
+          },
+          {
+            "filename": "sniptale_limiter"
+          },
+          {
+            "maths.lib/author": "GRAME"
+          },
+          {
+            "maths.lib/copyright": "GRAME"
+          },
+          {
+            "maths.lib/license": "LicenseRef-LGPL-2.1-or-later-with-Faust-exception"
+          },
+          {
+            "maths.lib/name": "Faust Math Library"
+          },
+          {
+            "maths.lib/version": "2.9.3"
+          },
+          {
+            "name": "sniptale_limiter"
+          },
+          {
+            "platform.lib/name": "Generic Platform Library"
+          },
+          {
+            "platform.lib/version": "1.3.1"
+          },
+          {
+            "routes.lib/name": "Faust Signal Routing Library"
+          },
+          {
+            "routes.lib/version": "1.4.1"
+          },
+          {
+            "signals.lib/name": "Faust Routing Library"
+          },
+          {
+            "signals.lib/version": "1.8.0"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "delay",
+      "processor": {
+        "engine": "faust",
+        "version": "faustwasm-0.20.2.faust-2.90.19",
+        "sha256": "40adbb69ab0fc228b33d2d83cc490c651471170446a19b532ade7af9ead14f78"
+      },
+      "latencyFrames": 0,
+      "metadata": {
+        "inputs": 2,
+        "outputs": 2,
+        "size": 2097172,
+        "ui": [
+          {
+            "type": "vgroup",
+            "label": "sniptale_delay",
+            "items": [
+              {
+                "type": "hslider",
+                "label": "duration",
+                "varname": "fHslider1",
+                "shortname": "duration",
+                "address": "/sniptale_delay/duration",
+                "index": 16,
+                "meta": [
+                  {
+                    "unit": "s"
+                  }
+                ],
+                "init": 0.25,
+                "min": 0.01,
+                "max": 1,
+                "step": 0.001
+              },
+              {
+                "type": "hslider",
+                "label": "feedback",
+                "varname": "fHslider0",
+                "shortname": "feedback",
+                "address": "/sniptale_delay/feedback",
+                "index": 0,
+                "init": 0.3,
+                "min": 0,
+                "max": 0.85,
+                "step": 0.01
+              }
+            ]
+          }
+        ],
+        "meta": [
+          {
+            "compile_options": "-lang wasm-i -fpga-mem-th 4 -ct 1 -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 2"
+          },
+          {
+            "delays.lib/name": "Faust Delay Library"
+          },
+          {
+            "delays.lib/version": "1.3.3"
+          },
+          {
+            "filename": "sniptale_delay"
+          },
+          {
+            "maths.lib/author": "GRAME"
+          },
+          {
+            "maths.lib/copyright": "GRAME"
+          },
+          {
+            "maths.lib/license": "LicenseRef-LGPL-2.1-or-later-with-Faust-exception"
+          },
+          {
+            "maths.lib/name": "Faust Math Library"
+          },
+          {
+            "maths.lib/version": "2.9.3"
+          },
+          {
+            "misceffects.lib/echo:author": "Romain Michon"
+          },
+          {
+            "misceffects.lib/name": "Misc Effects Library"
+          },
+          {
+            "misceffects.lib/version": "2.7.2"
+          },
+          {
+            "name": "sniptale_delay"
+          },
+          {
+            "platform.lib/name": "Generic Platform Library"
+          },
+          {
+            "platform.lib/version": "1.3.1"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "reverb",
+      "processor": {
+        "engine": "faust",
+        "version": "faustwasm-0.20.2.faust-2.90.19",
+        "sha256": "3ac2ca385a5f0cc0e5025c39aa62fb4745c92716ecad5138bcd6365f8bc656c4"
+      },
+      "latencyFrames": 0,
+      "metadata": {
+        "inputs": 2,
+        "outputs": 2,
+        "size": 598548,
+        "ui": [
+          {
+            "type": "vgroup",
+            "label": "sniptale_reverb",
+            "items": [
+              {
+                "type": "hslider",
+                "label": "damping",
+                "varname": "fHslider0",
+                "shortname": "damping",
+                "address": "/sniptale_reverb/damping",
+                "index": 0,
+                "init": 0.3,
+                "min": 0,
+                "max": 1,
+                "step": 0.01
+              },
+              {
+                "type": "hslider",
+                "label": "feedback",
+                "varname": "fHslider1",
+                "shortname": "feedback",
+                "address": "/sniptale_reverb/feedback",
+                "index": 12,
+                "init": 0.7,
+                "min": 0,
+                "max": 0.95,
+                "step": 0.01
+              }
+            ]
+          }
+        ],
+        "meta": [
+          {
+            "compile_options": "-lang wasm-i -fpga-mem-th 4 -ct 1 -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 2"
+          },
+          {
+            "delays.lib/name": "Faust Delay Library"
+          },
+          {
+            "delays.lib/version": "1.3.3"
+          },
+          {
+            "filename": "sniptale_reverb"
+          },
+          {
+            "filters.lib/allpass_comb:author": "Julius O. Smith III"
+          },
+          {
+            "filters.lib/allpass_comb:copyright": "Copyright (C) 2003-2019 by Julius O. Smith III <jos@ccrma.stanford.edu>"
+          },
+          {
+            "filters.lib/allpass_comb:license": "LicenseRef-STK-4.3"
+          },
+          {
+            "filters.lib/name": "Faust Filters Library"
+          },
+          {
+            "filters.lib/version": "1.13.4"
+          },
+          {
+            "maths.lib/author": "GRAME"
+          },
+          {
+            "maths.lib/copyright": "GRAME"
+          },
+          {
+            "maths.lib/license": "LicenseRef-LGPL-2.1-or-later-with-Faust-exception"
+          },
+          {
+            "maths.lib/name": "Faust Math Library"
+          },
+          {
+            "maths.lib/version": "2.9.3"
+          },
+          {
+            "name": "sniptale_reverb"
+          },
+          {
+            "platform.lib/name": "Generic Platform Library"
+          },
+          {
+            "platform.lib/version": "1.3.1"
+          },
+          {
+            "reverbs.lib/mono_freeverb:author": "Romain Michon"
+          },
+          {
+            "reverbs.lib/name": "Faust Reverb Library"
+          },
+          {
+            "reverbs.lib/stereo_freeverb:author": "Romain Michon"
+          },
+          {
+            "reverbs.lib/version": "1.6.0"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "saturation",
+      "processor": {
+        "engine": "faust",
+        "version": "faustwasm-0.20.2.faust-2.90.19",
+        "sha256": "b221e3ac3da5b045433370db5fbaafe1290beaeb8019fb804f5de445df412e72"
+      },
+      "latencyFrames": 0,
+      "metadata": {
+        "inputs": 2,
+        "outputs": 2,
+        "size": 8,
+        "ui": [
+          {
+            "type": "vgroup",
+            "label": "sniptale_saturation",
+            "items": [
+              {
+                "type": "hslider",
+                "label": "drive",
+                "varname": "fHslider0",
+                "shortname": "drive",
+                "address": "/sniptale_saturation/drive",
+                "index": 0,
+                "init": 0.2,
+                "min": 0,
+                "max": 1,
+                "step": 0.01
+              }
+            ]
+          }
+        ],
+        "meta": [
+          {
+            "compile_options": "-lang wasm-i -fpga-mem-th 4 -ct 1 -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 2"
+          },
+          {
+            "filename": "sniptale_saturation"
+          },
+          {
+            "misceffects.lib/cubicnl:author": "Julius O. Smith III"
+          },
+          {
+            "misceffects.lib/cubicnl:license": "LicenseRef-STK-4.3"
+          },
+          {
+            "misceffects.lib/name": "Misc Effects Library"
+          },
+          {
+            "misceffects.lib/version": "2.7.2"
+          },
+          {
+            "name": "sniptale_saturation"
+          }
+        ]
+      }
+    }
+  ],
+  "denoise": {
+    "processor": {
+      "engine": "rnnoise",
+      "version": "rnnoise-wasm-0.2.1.sync",
+      "sha256": "4f513a50613de74378331237886138eab52fa2650e8b1a41eb587d932d9b8850"
+    },
+    "frameSize": 480,
+    "latencyFrames": 960,
+    "coreCommit": "372f7b4b76cde4ca1ec4605353dd17898a99de38"
+  },
+  "pitch": {
+    "processor": {
+      "engine": "signalsmith",
+      "version": "signalsmith-stretch-1.3.2",
+      "sha256": "83869197b3c5ebf9fc8c517a1586aef1ecf77404842218d62b9c0e82882d8ca3"
+    },
+    "inputLatencyFrames": 2880,
+    "outputLatencyFrames": 2880
+  },
+  "assets": [
+    {
+      "path": "audio-effects/LICENSES/RNNoise-BSD-3-Clause.txt",
+      "byteLength": 1612,
+      "sha256": "45d37ca1cdb278c088e1aa85e0e65ca3a534ed86a28dcc96ca16810248a61d35"
+    },
+    {
+      "path": "audio-effects/LICENSES/STK.txt",
+      "byteLength": 2061,
+      "sha256": "e9477339bf6da3441a16cdbe196d6796e5b72542cb00fbcf074f10d203104482"
+    },
+    {
+      "path": "audio-effects/LICENSES/Signalsmith-MIT.txt",
+      "byteLength": 1094,
+      "sha256": "7154ecf162d91232235c9ba4619d95b30c7f1f904a39e0f22eaf914e208cb69b"
+    },
+    {
+      "path": "audio-effects/LICENSES/GPL-3.0.txt",
+      "byteLength": 35149,
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+    },
+    {
+      "path": "audio-effects/faust-runtime.mjs",
+      "byteLength": 29703,
+      "sha256": "114badf195e706f4215896af4b1af00ed1cf292e2081eeccd4def7c17a8ca82b"
+    },
+    {
+      "path": "audio-effects/SOURCES/faust-runtime.json",
+      "byteLength": 159360,
+      "sha256": "df82edc9fbfe2915eeedb43156b71a229b53b8302a8f9eb4c014aaca8f03c71b"
+    },
+    {
+      "path": "audio-effects/SOURCES/compressor.dsp",
+      "byteLength": 283,
+      "sha256": "965e8ac143221e7cc4103996a6555f6a0d7b95bc412415de6498b05de2935b75"
+    },
+    {
+      "path": "audio-effects/SOURCES/delay.dsp",
+      "byteLength": 173,
+      "sha256": "ac58dab25a032faed99c4768723a6b0195b2a30e647c65e8fe3ab38646450bdb"
+    },
+    {
+      "path": "audio-effects/SOURCES/eq.dsp",
+      "byteLength": 204,
+      "sha256": "2cb464712b827e3a9a4aeb80dce05af1600dfb0c52f808a79a5350b1ba1ac66f"
+    },
+    {
+      "path": "audio-effects/SOURCES/highpass.dsp",
+      "byteLength": 122,
+      "sha256": "b2064cf72fd9a0b4069e8a8ec1f862ceded51143b3fde74ded14298b251dbcee"
+    },
+    {
+      "path": "audio-effects/SOURCES/limiter.dsp",
+      "byteLength": 201,
+      "sha256": "ff61605cc9a60b81e6e7d78e619c4213136e291b6b4f4006763a150effab8819"
+    },
+    {
+      "path": "audio-effects/SOURCES/lowpass.dsp",
+      "byteLength": 124,
+      "sha256": "051056f920da8df191b6dcfab7fe01a2dd9d353af7419e8ee217106db8b7bf9b"
+    },
+    {
+      "path": "audio-effects/SOURCES/reverb.dsp",
+      "byteLength": 164,
+      "sha256": "bf76af9e301706b72cd8393a303358ed282ba26a257b767327cd794da8c22ee2"
+    },
+    {
+      "path": "audio-effects/SOURCES/saturation.dsp",
+      "byteLength": 99,
+      "sha256": "f5237ac553bb387b49bcc393636baa75529c405634e669f23ab9f75f4417727e"
+    },
+    {
+      "path": "audio-effects/SOURCES/REBUILD.txt",
+      "byteLength": 1770,
+      "sha256": "2d77ae65e9efeafe2dd21d77d8f4f60e4bf056341e82fef0d211d24a07844f59"
+    },
+    {
+      "path": "audio-effects/LICENSES/Faust-LGPL-2.1.txt",
+      "byteLength": 27491,
+      "sha256": "5af8efd745a8c91bf99443662e85708866807dc2e01b08045f338d63e2839916"
+    },
+    {
+      "path": "audio-effects/rnnoise.wasm",
+      "byteLength": 1440118,
+      "sha256": "4f513a50613de74378331237886138eab52fa2650e8b1a41eb587d932d9b8850"
+    },
+    {
+      "path": "audio-effects/rnnoise.mjs",
+      "byteLength": 12917,
+      "sha256": "dc4a3f445009981bf6fad4c2917dbb1bfee5ffc847fd22d941536bff5e78f9a9"
+    },
+    {
+      "path": "audio-effects/LICENSES/Jitsi-Apache-2.0.txt",
+      "byteLength": 12588,
+      "sha256": "4646d0ab74a05730f8b3b12b6376ddccb7f0905ee5b69265b3d873b97ace3e94"
+    },
+    {
+      "path": "audio-effects/signalsmith-runtime.mjs",
+      "byteLength": 98517,
+      "sha256": "91fc43206ba3d9bab261b0487f7472c64aa8241d8bbfc09e5ecebbf71205af50"
+    },
+    {
+      "path": "audio-effects/faust/eq.wasm",
+      "byteLength": 4287,
+      "sha256": "6d844db0106176aefaaac99d7a8f8a456c660bbdbebe9d9ea7915e10c921d330"
+    },
+    {
+      "path": "audio-effects/faust/eq.json",
+      "byteLength": 2523,
+      "sha256": "37b83d3a1362910bcf0380bf15892e17b0d644dce195757b26293302e065df6e"
+    },
+    {
+      "path": "audio-effects/faust/highpass.wasm",
+      "byteLength": 3639,
+      "sha256": "9448e20e70a67c054b210c697d5a44bd383f16ae42e94700be41ab7c79d38543"
+    },
+    {
+      "path": "audio-effects/faust/highpass.json",
+      "byteLength": 2220,
+      "sha256": "ee3c90143bb7c1980b55f562d782a452cf27204617453604bc679e6e42882080"
+    },
+    {
+      "path": "audio-effects/faust/lowpass.wasm",
+      "byteLength": 3587,
+      "sha256": "af3b6ebb0ad9cb8e0ebcecb1abbc12737e2e22386eca2de05f592dd213774789"
+    },
+    {
+      "path": "audio-effects/faust/lowpass.json",
+      "byteLength": 2214,
+      "sha256": "746ccaeceb80690c451104e1bfaf995bec7a711506715c5027168050ad4cfa9b"
+    },
+    {
+      "path": "audio-effects/faust/compressor.wasm",
+      "byteLength": 4449,
+      "sha256": "f83bafd4b7fa478b6209d84fa26d82682dcd2e8a1747586b50bd46aeddef83dd"
+    },
+    {
+      "path": "audio-effects/faust/compressor.json",
+      "byteLength": 3095,
+      "sha256": "2c1ff42058abd6b3e9e86d37379215c7a5f02f2a7bebdc41dd596e2901f2a622"
+    },
+    {
+      "path": "audio-effects/faust/limiter.wasm",
+      "byteLength": 4219,
+      "sha256": "0c096c95222aa63ffd4d8d054ab03f585668b4e4786129ac2bd406b21f9bdc5e"
+    },
+    {
+      "path": "audio-effects/faust/limiter.json",
+      "byteLength": 2480,
+      "sha256": "d73e7cea4f0c0230f553581fc0cf10bc183b061e8de67db97fd42c4e1944d5ab"
+    },
+    {
+      "path": "audio-effects/faust/delay.wasm",
+      "byteLength": 2746,
+      "sha256": "40adbb69ab0fc228b33d2d83cc490c651471170446a19b532ade7af9ead14f78"
+    },
+    {
+      "path": "audio-effects/faust/delay.json",
+      "byteLength": 1662,
+      "sha256": "03036da230973dd5c328f08efbbf207fcc89a0da3df5818465933361451300a6"
+    },
+    {
+      "path": "audio-effects/faust/reverb.wasm",
+      "byteLength": 11537,
+      "sha256": "3ac2ca385a5f0cc0e5025c39aa62fb4745c92716ecad5138bcd6365f8bc656c4"
+    },
+    {
+      "path": "audio-effects/faust/reverb.json",
+      "byteLength": 2038,
+      "sha256": "04a42349924b4dc2e52391c306e1f9e20de2e3c3b5fa539a96bed1edca3b3af6"
+    },
+    {
+      "path": "audio-effects/faust/saturation.wasm",
+      "byteLength": 1862,
+      "sha256": "b221e3ac3da5b045433370db5fbaafe1290beaeb8019fb804f5de445df412e72"
+    },
+    {
+      "path": "audio-effects/faust/saturation.json",
+      "byteLength": 1054,
+      "sha256": "0ff1461d6af633232b473264fd792550e3115377bf2d0ab44cde40266717acb1"
+    },
+    {
+      "path": "audio-effects/LICENSES/Faust-library-notices.txt",
+      "byteLength": 14198,
+      "sha256": "371280762189383438278ada6427c8945ba8948ed14afb591fb0d22bc80eb749"
+    }
+  ]
+}

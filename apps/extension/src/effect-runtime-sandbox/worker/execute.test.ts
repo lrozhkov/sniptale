@@ -1,284 +1,405 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-
+import { parseRuntimeAnimationDocument } from '../../contracts/effect-runtime/animation';
+import {
+  EFFECT_RUNTIME_PROTOCOL_VERSION,
+  EFFECT_RUNTIME_WORKER_REQUEST,
+} from '../../contracts/effect-runtime/types';
 import {
   createEffectRuntimeWorkerExecutionState,
   executeEffectRuntimeWorkerRequest,
 } from './execute';
-import { createPassContext } from './interpreter/support.test-support';
-import {
-  createEffectRuntimeSvgWorkerTestRequest,
-  createEffectRuntimeWorkerTestRequest,
-  FakeImageBitmap,
-  FakeOffscreenCanvas,
-} from './execute.test-support';
+import { LottieResourceIdentityError } from './lottie';
 
-beforeEach(() => {
-  vi.stubGlobal('ImageBitmap', FakeImageBitmap);
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
-
-it('runs only the validated declarative graph and transfers an exact-size bitmap', async () => {
-  const result = await executeEffectRuntimeWorkerRequest(createEffectRuntimeWorkerTestRequest(), {
-    createCanvas: (width, height) => new FakeOffscreenCanvas(width, height),
+class Bitmap {
+  close = vi.fn();
+  constructor(
+    public width: number,
+    public height: number
+  ) {}
+}
+beforeEach(() => vi.stubGlobal('ImageBitmap', Bitmap));
+afterEach(() => vi.unstubAllGlobals());
+function request() {
+  const document = parseRuntimeAnimationDocument({
+    format: 'sniptale-animation',
+    version: 1,
+    id: 'proof',
+    label: { en: 'Proof' },
+    controls: [],
+    bindings: [],
+    resources: [],
+    animation: { v: '5.12.2', w: 320, h: 180, fr: 30, ip: 30, op: 90, layers: [], assets: [] },
   });
-
-  expect(result).toMatchObject({
+  if (!document) throw new Error('Invalid fixture.');
+  return {
+    type: EFFECT_RUNTIME_WORKER_REQUEST,
+    protocolVersion: EFFECT_RUNTIME_PROTOCOL_VERSION,
+    documentRef: { id: 'c'.repeat(64), document },
+    assetSelectionRef: { id: 'd'.repeat(64), assets: {} },
     effectInstanceId: 'instance-1',
-    height: 720,
-    kind: 'frame',
     requestId: 'request-1',
     sequenceId: 1,
     snapshotId: `effect:${'c'.repeat(64)}`,
-    width: 1280,
-  });
-});
-
-it('renders a smaller physical preview bitmap in the unchanged logical coordinate system', async () => {
-  const request = createEffectRuntimeWorkerTestRequest();
-  request.renderHeight = 360;
-  request.renderWidth = 640;
-  const canvases: FakeOffscreenCanvas[] = [];
-
-  const result = await executeEffectRuntimeWorkerRequest(request, {
-    createCanvas: (width, height) => {
-      const canvas = new FakeOffscreenCanvas(width, height);
-      canvases.push(canvas);
-      return canvas;
-    },
-  });
-
-  expect(result).toMatchObject({ height: 360, kind: 'frame', width: 640 });
-  expect(canvases[0]).toMatchObject({ height: 0, width: 0 });
-  expect(canvases[0]!.context.setTransform).toHaveBeenCalledWith(0.5, 0, 0, 0.5, 0, 0);
-});
-
-it('renders a bounded supersampled bitmap in the unchanged logical coordinate system', async () => {
-  const request = createEffectRuntimeWorkerTestRequest();
-  request.renderHeight = 1440;
-  request.renderWidth = 2560;
-  const canvases: FakeOffscreenCanvas[] = [];
-
-  const result = await executeEffectRuntimeWorkerRequest(request, {
-    createCanvas: (width, height) => {
-      const canvas = new FakeOffscreenCanvas(width, height);
-      canvases.push(canvas);
-      return canvas;
-    },
-  });
-
-  expect(result).toMatchObject({ height: 1440, kind: 'frame', width: 2560 });
-  expect(canvases[0]).toMatchObject({ height: 0, width: 0 });
-  expect(canvases[0]!.context.setTransform).toHaveBeenCalledWith(2, 0, 0, 2, 0, 0);
-});
-
-it('reuses acknowledged immutable refs and a keyed canvas in one persistent worker', async () => {
-  const createCanvas = vi.fn(
-    (width: number, height: number) => new FakeOffscreenCanvas(width, height)
+    controls: {},
+    width: 320,
+    height: 180,
+    renderWidth: 160,
+    renderHeight: 90,
+    inputFrames: {},
+    duration: 2,
+    time: 0.5,
+    progress: 0.25,
+    frameIndex: 30,
+    fps: 60,
+  };
+}
+function dependencies() {
+  const dispose = vi.fn();
+  const render = vi.fn(
+    async ({ width, height }: { width: number; height: number }) => new Bitmap(width, height)
   );
-  const state = createEffectRuntimeWorkerExecutionState({ createCanvas });
-  const first = createEffectRuntimeWorkerTestRequest();
-
-  await expect(state.execute(first)).resolves.toMatchObject({ kind: 'frame' });
-  await expect(
-    state.execute({
-      ...first,
-      assetSelectionRef: { id: first.assetSelectionRef.id },
-      documentRef: { id: first.documentRef.id },
-      requestId: 'request-2',
-    })
-  ).resolves.toMatchObject({ kind: 'frame' });
-
-  expect(createCanvas).toHaveBeenCalledOnce();
-  expect(state.snapshot()).toEqual({
-    assets: { bytes: 0, entries: 0, selections: 1 },
-    canvases: { entries: 1, leases: 0 },
-    models: { entries: 1 },
-  });
-  state.dispose();
-  expect(state.snapshot()).toEqual({
-    assets: { bytes: 0, entries: 0, selections: 0 },
-    canvases: { entries: 0, leases: 0 },
-    models: { entries: 0 },
-  });
-});
-
-it('reports which immutable worker ref is absent without retaining transient inputs', async () => {
-  const state = createEffectRuntimeWorkerExecutionState({
-    createCanvas: (width, height) => new FakeOffscreenCanvas(width, height),
-  });
-  const request = createEffectRuntimeWorkerTestRequest();
-  await expect(
-    state.execute({
-      ...request,
-      assetSelectionRef: { id: request.assetSelectionRef.id },
-      documentRef: { id: request.documentRef.id },
-    })
-  ).resolves.toMatchObject({ code: 'cacheMiss', missingRef: 'document' });
-  await expect(
-    state.execute({
-      ...request,
-      assetSelectionRef: { id: request.assetSelectionRef.id },
-    })
-  ).resolves.toMatchObject({ code: 'cacheMiss', missingRef: 'assetSelection' });
-  state.dispose();
-});
-
-it('closes successful input frames per request instead of retaining them in worker caches', async () => {
-  const state = createEffectRuntimeWorkerExecutionState({
-    createCanvas: (width, height) => new FakeOffscreenCanvas(width, height),
-  });
-  const request = createEffectRuntimeWorkerTestRequest();
-  request.documentRef.document!.kind = 'targetEffect';
-  request.documentRef.document!.program.commands = [
-    { height: 720, input: 'source', op: 'image', width: 1280, x: 0, y: 0 },
-  ];
-  const firstInput = new FakeImageBitmap(1280, 720);
-  request.inputFrames = {
-    source: { bitmap: firstInput, height: 720, width: 1280 },
-  };
-  await expect(state.execute(request)).resolves.toMatchObject({ kind: 'frame' });
-  expect(firstInput.close).toHaveBeenCalledOnce();
-
-  const secondInput = new FakeImageBitmap(1280, 720);
-  await expect(
-    state.execute({
-      ...request,
-      assetSelectionRef: { id: request.assetSelectionRef.id },
-      documentRef: { id: request.documentRef.id },
-      inputFrames: {
-        source: { bitmap: secondInput, height: 720, width: 1280 },
+  const createRenderer = vi.fn(async () => ({ render, dispose }));
+  return { createRenderer, render, dispose };
+}
+it.each([
+  [160, 90],
+  [640, 360],
+])(
+  'returns requested physical raster %i × %i with the original local clock',
+  async (width, height) => {
+    const deps = dependencies(),
+      input = { ...request(), renderWidth: width, renderHeight: height };
+    const before = structuredClone(input);
+    const result = await executeEffectRuntimeWorkerRequest(input, deps);
+    expect(result).toMatchObject({
+      kind: 'frame',
+      width,
+      height,
+      requestId: 'request-1',
+      sequenceId: 1,
+      acknowledged: {
+        documentId: input.documentRef.id,
+        assetSelectionId: input.assetSelectionRef.id,
       },
+    });
+    expect(deps.render).toHaveBeenCalledWith(
+      expect.objectContaining({ time: 0.5, width, height, values: {} })
+    );
+    expect(input).toEqual(before);
+    expect(deps.dispose).toHaveBeenCalledOnce();
+  }
+);
+it('reuses a retained player through acknowledged references and destroys it once on disposal', async () => {
+  const deps = dependencies(),
+    state = createEffectRuntimeWorkerExecutionState(deps),
+    input = request();
+  expect(await state.execute(input)).toMatchObject({ kind: 'frame' });
+  expect(
+    await state.execute({
+      ...input,
       requestId: 'request-2',
+      documentRef: { id: input.documentRef.id },
+      assetSelectionRef: { id: input.assetSelectionRef.id },
     })
-  ).resolves.toMatchObject({ kind: 'frame' });
-  expect(secondInput.close).toHaveBeenCalledOnce();
-  expect(state.snapshot()).toMatchObject({
-    assets: { entries: 0, selections: 1 },
-    models: { entries: 1 },
-  });
+  ).toMatchObject({ kind: 'frame', requestId: 'request-2' });
+  expect(deps.createRenderer).toHaveBeenCalledOnce();
   state.dispose();
+  state.dispose();
+  expect(deps.dispose).toHaveBeenCalledOnce();
+  expect(state.snapshot().models).toEqual({ entries: 0, weight: 0 });
 });
-
-it('fails closed and closes input bitmaps when the worker envelope is malformed', async () => {
-  const bitmap = new FakeImageBitmap(1280, 720);
-  const malformed = { ...createEffectRuntimeWorkerTestRequest(), extra: { bitmap } };
-
-  await expect(
-    executeEffectRuntimeWorkerRequest(malformed, {
-      createCanvas: (width, height) => new FakeOffscreenCanvas(width, height),
-    })
-  ).resolves.toMatchObject({ code: 'malformed', kind: 'error' });
+it.each(['document', 'assetSelection'] as const)(
+  'returns the missing %s reference without creating a player',
+  async (missing) => {
+    const input = request(),
+      deps = dependencies();
+    const value =
+      missing === 'document'
+        ? { ...input, documentRef: { id: input.documentRef.id } }
+        : { ...input, assetSelectionRef: { id: input.assetSelectionRef.id } };
+    expect(await executeEffectRuntimeWorkerRequest(value, deps)).toMatchObject({
+      kind: 'error',
+      code: 'cacheMiss',
+      missingRef: missing,
+    });
+    expect(deps.createRenderer).not.toHaveBeenCalled();
+  }
+);
+it('rejects and closes foreign source frames before cache-miss retry', async () => {
+  const bitmap = new Bitmap(320, 180),
+    deps = dependencies(),
+    input = request();
+  expect(
+    await executeEffectRuntimeWorkerRequest(
+      {
+        ...input,
+        documentRef: { id: input.documentRef.id },
+        inputFrames: { source: { bitmap, width: 320, height: 180 } },
+      },
+      deps
+    )
+  ).toMatchObject({ code: 'malformed' });
   expect(bitmap.close).toHaveBeenCalledOnce();
+  expect(deps.createRenderer).not.toHaveBeenCalled();
 });
-
-it('enforces live and aggregate canvas limits inside the worker', async () => {
-  const request = createEffectRuntimeWorkerTestRequest();
-  request.documentRef.document!.program.commands = [
-    ...Array.from({ length: 8 }, (_value, index) => ({
-      commands: [{ op: 'clear' as const }],
-      height: 720,
-      id: `pass-${index}`,
-      op: 'renderPass' as const,
-      width: 1280,
-    })),
-    ...Array.from({ length: 8 }, (_value, index) => ({
-      op: 'compositePass' as const,
-      passId: `pass-${index}`,
-    })),
-  ];
-
-  await expect(
-    executeEffectRuntimeWorkerRequest(request, {
-      createCanvas: (width, height) => new FakeOffscreenCanvas(width, height),
-    })
-  ).resolves.toMatchObject({ code: 'resourceLimit', kind: 'error' });
-});
-
-it('rejects unavailable SVG paths and malformed physical/output canvases', async () => {
-  const svgRequest = createEffectRuntimeWorkerTestRequest();
-  svgRequest.documentRef.document!.assets = [
-    {
-      byteLength: 1,
-      id: 'logo',
-      kind: 'svg',
-      mimeType: 'image/svg+xml',
-      path: 'runtime-assets/logo',
-      sha256: 'a'.repeat(64),
-    },
-  ];
-  svgRequest.documentRef.document!.program.commands = [
-    { assetId: 'logo', height: 1, op: 'svgParts', width: 1, x: 0, y: 0 },
-  ];
-  svgRequest.assetSelectionRef.assets = {
-    logo: {
-      cacheKey: 'a'.repeat(64),
-      height: 1,
-      id: 'logo',
-      kind: 'svg',
-      mimeType: 'image/svg+xml',
-      svgVector: { height: 1, parts: [], width: 1 },
-      width: 1,
-    },
-  };
-  await expect(
-    executeEffectRuntimeWorkerRequest(svgRequest, {
-      createCanvas: (width, height) => new FakeOffscreenCanvas(width, height),
-    })
-  ).resolves.toMatchObject({ code: 'outputRejected' });
-
-  const request = createEffectRuntimeWorkerTestRequest();
-  await expect(
-    executeEffectRuntimeWorkerRequest(request, {
-      createCanvas: () => new FakeOffscreenCanvas(1, 1),
-    })
-  ).resolves.toMatchObject({ code: 'outputRejected' });
-  await expect(
-    executeEffectRuntimeWorkerRequest(request, {
-      createCanvas: (width, height) => ({
-        getContext: () => createPassContext(),
-        height,
-        width,
-      }),
-    })
-  ).resolves.toMatchObject({ code: 'outputRejected' });
-});
-
-it('clears hydrated SVG paths after every request in the persistent worker', async () => {
-  const hydratedPaths: string[] = [];
-  class FakePath2D {
-    constructor(source: string) {
-      hydratedPaths.push(source);
-    }
-  }
-  vi.stubGlobal('Path2D', FakePath2D);
-  const request = createEffectRuntimeSvgWorkerTestRequest();
-  const dependencies = {
-    createCanvas: (width: number, height: number) => new FakeOffscreenCanvas(width, height),
-  };
-
-  await expect(executeEffectRuntimeWorkerRequest(request, dependencies)).resolves.toMatchObject({
-    kind: 'frame',
+it.each([
+  { protocolVersion: 6 },
+  { renderWidth: 0 },
+  { duration: 3 },
+  { renderTarget: 'gpu-plan' },
+  { documentRef: { id: 'c'.repeat(64), document: { kind: 'annotation', version: 1 } } },
+])('rejects retired or inconsistent envelopes %j', async (patch) => {
+  const deps = dependencies();
+  expect(await executeEffectRuntimeWorkerRequest({ ...request(), ...patch }, deps)).toMatchObject({
+    kind: 'error',
+    code: 'malformed',
   });
-  await expect(
-    executeEffectRuntimeWorkerRequest({ ...request, requestId: 'request-2' }, dependencies)
-  ).resolves.toMatchObject({ kind: 'frame' });
-  expect(hydratedPaths).toEqual(['M0 0L10 10', 'M0 0L10 10']);
+  expect(deps.createRenderer).not.toHaveBeenCalled();
 });
-
-it('uses the default canvas factory and closes a rejected output bitmap', async () => {
-  class WrongBitmapCanvas extends FakeOffscreenCanvas {
-    override transferToImageBitmap(): ImageBitmap {
-      return new FakeImageBitmap(1, 1);
-    }
-  }
-  vi.stubGlobal('OffscreenCanvas', WrongBitmapCanvas);
-
-  await expect(
-    executeEffectRuntimeWorkerRequest(createEffectRuntimeWorkerTestRequest())
-  ).resolves.toMatchObject({
+it('serializes player mutation and drops a late bitmap after disposal', async () => {
+  const deps = dependencies(),
+    started = Promise.withResolvers<void>(),
+    pending = Promise.withResolvers<Bitmap>();
+  deps.render.mockImplementationOnce(() => {
+    started.resolve();
+    return pending.promise;
+  });
+  const state = createEffectRuntimeWorkerExecutionState(deps),
+    input = request();
+  const first = state.execute(input);
+  await started.promise;
+  const second = state.execute({ ...input, requestId: 'request-2' });
+  expect(deps.render).toHaveBeenCalledOnce();
+  state.dispose();
+  const bitmap = new Bitmap(160, 90);
+  pending.resolve(bitmap);
+  expect(await first).toMatchObject({ code: 'stale' });
+  expect(await second).toMatchObject({ code: 'stale' });
+  expect(bitmap.close).toHaveBeenCalledOnce();
+  expect(deps.render).toHaveBeenCalledOnce();
+});
+it('closes a malformed raster and classifies resource identity refusal', async () => {
+  const deps = dependencies(),
+    bitmap = new Bitmap(1, 1);
+  deps.render.mockResolvedValueOnce(bitmap);
+  expect(await executeEffectRuntimeWorkerRequest(request(), deps)).toMatchObject({
     code: 'outputRejected',
   });
+  expect(bitmap.close).toHaveBeenCalledOnce();
+  deps.createRenderer.mockRejectedValueOnce(new LottieResourceIdentityError());
+  expect(await executeEffectRuntimeWorkerRequest(request(), deps)).toMatchObject({
+    code: 'inputRejected',
+  });
 });
+
+it('retains distinct mutable players when instances alternate the same document', async () => {
+  const first = dependencies(),
+    second = dependencies(),
+    createRenderer = vi
+      .fn()
+      .mockResolvedValueOnce({ render: first.render, dispose: first.dispose })
+      .mockResolvedValueOnce({ render: second.render, dispose: second.dispose });
+  const state = createEffectRuntimeWorkerExecutionState({ createRenderer }),
+    input = request();
+  const document = parseRuntimeAnimationDocument({
+    ...input.documentRef.document,
+    controls: [{ id: 'opacity', kind: 'number', defaultValue: 100, min: 0, max: 100 }],
+  });
+  if (!document) throw new Error('Invalid controlled animation.');
+  try {
+    for (let index = 0; index < 4; index++) {
+      const result = await state.execute({
+        ...input,
+        requestId: `request-${index}`,
+        effectInstanceId: index % 2 ? 'instance-b' : 'instance-a',
+        documentRef: {
+          id: input.documentRef.id,
+          ...(index === 0 ? { document } : {}),
+        },
+        assetSelectionRef: {
+          id: input.assetSelectionRef.id,
+          ...(index === 0 ? { assets: {} } : {}),
+        },
+        controls: { opacity: index % 2 ? 80 : 20 },
+        time: index / 60,
+        progress: index / 120,
+        frameIndex: index,
+      });
+      expect(result).toMatchObject({ kind: 'frame', requestId: `request-${index}` });
+    }
+    expect(createRenderer).toHaveBeenCalledTimes(2);
+    expect(first.render).toHaveBeenCalledTimes(2);
+    expect(second.render).toHaveBeenCalledTimes(2);
+    expect(first.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({ values: { opacity: 20 } })
+    );
+    expect(second.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({ values: { opacity: 80 } })
+    );
+  } finally {
+    state.dispose();
+  }
+  expect(first.dispose).toHaveBeenCalledOnce();
+  expect(second.dispose).toHaveBeenCalledOnce();
+});
+
+it('keeps eight instance players and preserves their shared immutable document reference', async () => {
+  const deps = dependencies(),
+    state = createEffectRuntimeWorkerExecutionState(deps),
+    input = request();
+  for (let index = 0; index < 9; index++) {
+    expect(
+      await state.execute({
+        ...input,
+        requestId: `request-${index}`,
+        effectInstanceId: `instance-${index}`,
+        documentRef: index ? { id: input.documentRef.id } : input.documentRef,
+        assetSelectionRef: index ? { id: input.assetSelectionRef.id } : input.assetSelectionRef,
+      })
+    ).toMatchObject({ kind: 'frame' });
+  }
+  expect(deps.createRenderer).toHaveBeenCalledTimes(9);
+  expect(deps.dispose).toHaveBeenCalledOnce();
+  expect(state.snapshot().canvases.entries).toBe(8);
+  state.dispose();
+  expect(deps.dispose).toHaveBeenCalledTimes(9);
+});
+
+it('applies the existing raster byte budget across instances of one document', async () => {
+  const deps = dependencies(),
+    state = createEffectRuntimeWorkerExecutionState(deps),
+    input = request();
+  for (let index = 0; index < 5; index++) {
+    expect(
+      await state.execute({
+        ...input,
+        requestId: `request-${index}`,
+        effectInstanceId: `instance-${index}`,
+        documentRef: index ? { id: input.documentRef.id } : input.documentRef,
+        assetSelectionRef: index ? { id: input.assetSelectionRef.id } : input.assetSelectionRef,
+        renderWidth: 3840,
+        renderHeight: 2160,
+      })
+    ).toMatchObject({ kind: 'frame' });
+  }
+  expect(state.snapshot().models.entries).toBe(4);
+  expect(state.snapshot().models.weight).toBeLessThanOrEqual(128 * 1024 * 1024);
+  expect(deps.dispose).toHaveBeenCalledOnce();
+  state.dispose();
+  expect(deps.dispose).toHaveBeenCalledTimes(5);
+});
+
+it('retires every instance on a changed full document replacement and recovers reference-only requests', async () => {
+  const deps = dependencies(),
+    state = createEffectRuntimeWorkerExecutionState(deps),
+    input = request();
+  expect(await state.execute(input)).toMatchObject({ kind: 'frame' });
+  const second = {
+    ...input,
+    effectInstanceId: 'instance-2',
+    documentRef: { id: input.documentRef.id },
+    assetSelectionRef: { id: input.assetSelectionRef.id },
+  };
+  expect(await state.execute(second)).toMatchObject({ kind: 'frame' });
+  expect(deps.createRenderer).toHaveBeenCalledTimes(2);
+  const replacement = structuredClone(input);
+  replacement.documentRef.document.label = { en: 'Replacement' };
+  expect(await state.execute({ ...replacement, requestId: 'replacement' })).toMatchObject({
+    kind: 'frame',
+  });
+  expect(deps.dispose).toHaveBeenCalledTimes(2);
+  expect(state.snapshot().models.entries).toBe(1);
+  expect(await state.execute(second)).toMatchObject({ kind: 'frame' });
+  expect(deps.createRenderer).toHaveBeenCalledTimes(4);
+  state.dispose();
+  expect(deps.dispose).toHaveBeenCalledTimes(4);
+});
+
+it('keeps healthy instance players across concurrent identical full-document delivery', async () => {
+  const deps = dependencies(),
+    state = createEffectRuntimeWorkerExecutionState(deps),
+    input = request();
+  try {
+    const results = await Promise.all([
+      state.execute(input),
+      state.execute({ ...structuredClone(input), requestId: 'concurrent-full' }),
+    ]);
+    expect(results.map((result) => result.kind)).toEqual(['frame', 'frame']);
+    expect(deps.createRenderer).toHaveBeenCalledOnce();
+    expect(
+      await state.execute({
+        ...structuredClone(input),
+        effectInstanceId: 'instance-2',
+        requestId: 'second-instance',
+      })
+    ).toMatchObject({ kind: 'frame' });
+    expect(
+      await state.execute({
+        ...input,
+        requestId: 'first-reference',
+        documentRef: { id: input.documentRef.id },
+      })
+    ).toMatchObject({ kind: 'frame' });
+    expect(deps.createRenderer).toHaveBeenCalledTimes(2);
+    expect(deps.dispose).not.toHaveBeenCalled();
+    expect(state.snapshot().models.entries).toBe(2);
+  } finally {
+    state.dispose();
+  }
+  expect(deps.dispose).toHaveBeenCalledTimes(2);
+});
+
+it('recovers every instance after a failed render using an identical full document', async () => {
+  const deps = dependencies(),
+    state = createEffectRuntimeWorkerExecutionState(deps),
+    input = request();
+  const reference = { ...input, documentRef: { id: input.documentRef.id } };
+  try {
+    expect(await state.execute(input)).toMatchObject({ kind: 'frame' });
+    expect(
+      await state.execute({ ...reference, effectInstanceId: 'instance-2', requestId: 'second' })
+    ).toMatchObject({ kind: 'frame' });
+    deps.render.mockRejectedValueOnce(new Error('render failed'));
+    expect(await state.execute({ ...reference, requestId: 'failed' })).toMatchObject({
+      kind: 'error',
+      code: 'outputRejected',
+    });
+    expect(
+      await state.execute({ ...structuredClone(input), requestId: 'recover-full' })
+    ).toMatchObject({ kind: 'frame' });
+    expect(deps.dispose).toHaveBeenCalledTimes(2);
+    expect(
+      await state.execute({
+        ...reference,
+        effectInstanceId: 'instance-2',
+        requestId: 'recover-reference',
+      })
+    ).toMatchObject({ kind: 'frame' });
+    expect(deps.createRenderer).toHaveBeenCalledTimes(4);
+  } finally {
+    state.dispose();
+  }
+  expect(deps.dispose).toHaveBeenCalledTimes(4);
+});
+
+it.each(['load', 'dimensions'] as const)(
+  'retries an identical full document after %s failure',
+  async (failure) => {
+    const deps = dependencies(),
+      state = createEffectRuntimeWorkerExecutionState(deps),
+      input = request();
+    const rejected = new Bitmap(1, 1);
+    if (failure === 'load') deps.createRenderer.mockRejectedValueOnce(new Error('load failed'));
+    else deps.render.mockResolvedValueOnce(rejected);
+    try {
+      expect(await state.execute(input)).toMatchObject({ kind: 'error', code: 'outputRejected' });
+      if (failure === 'dimensions') expect(rejected.close).toHaveBeenCalledOnce();
+      expect(
+        await state.execute({ ...structuredClone(input), requestId: 'recover' })
+      ).toMatchObject({ kind: 'frame' });
+      expect(deps.createRenderer).toHaveBeenCalledTimes(2);
+    } finally {
+      state.dispose();
+    }
+  }
+);

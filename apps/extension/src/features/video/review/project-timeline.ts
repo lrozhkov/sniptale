@@ -71,14 +71,27 @@ export function planReviewProjectTimeline(args: {
   for (const segment of segments) {
     if (segment.kind === 'cut') continue;
     const index = slices.length;
-    const groupId = args.audio ? `${args.operationId}:group:${index}` : null;
+    const groupId =
+      args.audio && segment.kind !== 'freeze' ? `${args.operationId}:group:${index}` : null;
     const timing = {
       sourceInstanceId,
-      sourceStart: segment.sourceStart,
-      sourceDuration: segment.sourceEnd - segment.sourceStart,
+      sourceStart: segment.kind === 'freeze' ? segment.frameTime! : segment.sourceStart,
+      sourceDuration:
+        segment.kind === 'freeze'
+          ? Math.min(segment.frameDuration!, args.source.duration - segment.frameTime!)
+          : segment.sourceEnd - segment.sourceStart,
       startTime: segment.resultStart,
       duration: segment.resultEnd - segment.resultStart,
-      playbackRate: segment.rate,
+      playbackRate: segment.kind === 'freeze' ? 1 : segment.rate,
+      ...(segment.kind === 'freeze'
+        ? {
+            playbackWindow: {
+              offset: 0,
+              extent: segment.resultEnd - segment.resultStart,
+              holdAt: 0,
+            },
+          }
+        : {}),
       groupId,
       linkMode: groupId ? ('LINKED' as const) : ('DETACHED' as const),
     };
@@ -91,17 +104,18 @@ export function planReviewProjectTimeline(args: {
       ...structuredClone(args.video),
       ...timing,
       id: `${args.operationId}:video:${index}`,
-      muted: Boolean(args.audio) || args.video.muted || muteSpeed,
+      muted: segment.kind === 'freeze' || Boolean(args.audio) || args.video.muted || muteSpeed,
     };
-    const audio = args.audio
-      ? {
-          ...structuredClone(args.audio),
-          ...timing,
-          sourceInstanceId: audioSourceInstanceId,
-          id: `${args.operationId}:audio:${index}`,
-          muted: args.audio.muted || muteSpeed,
-        }
-      : undefined;
+    const audio =
+      args.audio && segment.kind !== 'freeze'
+        ? {
+            ...structuredClone(args.audio),
+            ...timing,
+            sourceInstanceId: audioSourceInstanceId,
+            id: `${args.operationId}:audio:${index}`,
+            muted: args.audio.muted || muteSpeed,
+          }
+        : undefined;
     videoClips.push(video);
     if (audio) audioClips.push(audio);
     slices.push({

@@ -745,3 +745,36 @@ it.each([
   expect(converted.project.sceneEdges?.intro.duration).toBe(0.8);
   expect(converted.project.sceneEdges?.outro.duration).toBe(1.2);
 });
+
+it('transfers independent original and external audio processing without applying the source chain twice', () => {
+  const input = externalAudioFixture();
+  const original = { version: 1 as const, bypassed: false, effects: [] };
+  const external = { version: 1 as const, bypassed: true, effects: [] };
+  input.document.advancedContent.audio.original.audioProcessing = original;
+  for (const clip of [
+    ...input.document.advancedContent.audio.music,
+    ...input.document.advancedContent.audio.voiceover,
+  ])
+    clip.audioProcessing = external;
+  const before = structuredClone(input);
+  const result = planReviewProjectConversion(input);
+  if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+  expect(result.project.version).toBe(53);
+  expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(result.project)))).toEqual(
+    result.project
+  );
+  const sourceAsset = input.seed.clips.find((clip) => clip.type === 'VIDEO');
+  if (!sourceAsset || sourceAsset.type !== 'VIDEO') throw new Error('Missing source');
+  const sourceClips = result.project.clips.filter(
+    (clip) => clip.type === 'AUDIO' && clip.assetId === sourceAsset.assetId
+  );
+  expect(sourceClips.length).toBeGreaterThan(0);
+  for (const clip of result.project.clips) {
+    if (clip.type === 'VIDEO') expect(clip.audioProcessing).toBeUndefined();
+    if (clip.type === 'AUDIO')
+      expect(clip.audioProcessing).toEqual(
+        clip.assetId === sourceAsset.assetId ? original : external
+      );
+  }
+  expect(input).toEqual(before);
+});

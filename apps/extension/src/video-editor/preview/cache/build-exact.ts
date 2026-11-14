@@ -1,4 +1,4 @@
-import { createMaterializerGpuOutputs } from './materializer-gpu-outputs';
+import { createMaterializerGpuOutputs } from '../../../workflows/video/native-composition/materializer-gpu-outputs';
 import {
   cacheExactVideoPreviewFrame,
   hasExactVideoPreviewFrame,

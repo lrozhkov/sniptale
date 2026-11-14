@@ -13,6 +13,7 @@ type Size = { width: number; height: number };
 
 export type PreviewSceneDimensions = { canonical: Size; backing: Size };
 export type PreviewScene = {
+  cursorMotions?: QuickEditAdvancedState['cursorMotions'];
   annotationEffects?: Omit<ReviewAnnotationScene, 'planes'> | undefined;
   captions?:
     | {
@@ -25,6 +26,7 @@ export type PreviewScene = {
   source: Size;
   canvas?: Size;
   background: QuickEditAdvancedState['background'];
+  sourceFilters?: QuickEditAdvancedState['sourceFilters'];
   windowHeader?: QuickEditAdvancedState['windowHeader'];
   watermark?: QuickEditAdvancedState['watermark'];
   webcam?: QuickEditAdvancedState['webcam'];
@@ -115,7 +117,12 @@ function orderedSceneValue(_key: string, value: unknown): unknown {
 }
 
 /** Camera projection emits immutable region arrays; replacement invalidates their retained key. */
-export type PreviewSceneKey = { content: string; camera: CameraKey; context: string };
+export type PreviewSceneKey = {
+  content: string;
+  camera: CameraKey;
+  context: string;
+  annotationSources: readonly string[];
+};
 
 export function reviewPreviewSceneKey(scene: PreviewScene, context?: unknown): PreviewSceneKey {
   let cameraKey = cameraKeys.get(scene.zoomRegions);
@@ -143,8 +150,27 @@ export function reviewPreviewSceneKey(scene: PreviewScene, context?: unknown): P
     };
     cameraKeys.set(scene.zoomRegions, cameraKey);
   }
+  const annotations = scene.annotationEffects;
   return {
-    content: JSON.stringify({ ...scene, zoomRegions: undefined }, orderedSceneValue),
+    content: JSON.stringify(
+      {
+        ...scene,
+        zoomRegions: undefined,
+        ...(annotations
+          ? {
+              annotationEffects: {
+                ...annotations,
+                snapshots: annotations.snapshots.map(
+                  ({ source: _source, ...metadata }) => metadata
+                ),
+              },
+            }
+          : {}),
+      },
+      orderedSceneValue
+    ),
+    // Source strings already contain the complete resources; compare them without JSON escaping.
+    annotationSources: annotations?.snapshots.map((snapshot) => snapshot.source) ?? [],
     camera: cameraKey,
     context: JSON.stringify(context, orderedSceneValue) ?? '',
   };
@@ -155,7 +181,9 @@ export function sameReviewPreviewSceneKey(left: PreviewSceneKey, right: PreviewS
   return (
     sameCameraKey(left.camera, right.camera) &&
     left.content === right.content &&
-    left.context === right.context
+    left.context === right.context &&
+    left.annotationSources.length === right.annotationSources.length &&
+    left.annotationSources.every((source, index) => source === right.annotationSources[index])
   );
 }
 
@@ -196,6 +224,9 @@ export function reviewPreviewPreparationKey(
           ? {
               annotationEffects: {
                 ...annotationEffects,
+                snapshots: annotationEffects.snapshots.map(
+                  ({ source: _source, ...metadata }) => metadata
+                ),
                 lane: {
                   ...annotationEffects.lane,
                   instances: annotationEffects.lane.instances.map(

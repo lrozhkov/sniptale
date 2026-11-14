@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../../project/transition/gl-catalog';
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject, createVideoProjectAsset } from '../../project/factories/creation';
 import { createVideoClipFromAsset } from '../../project/factories/clip';
@@ -68,6 +69,18 @@ function createCompositionProject(): VideoProject {
   return {
     ...project,
     duration: 9,
+    version: 52,
+    transitions: [
+      {
+        id: 'crossfade',
+        kind: 'gl',
+        selection: createGlTransitionSelection('Fade')!,
+        leadingClipId: firstClip.id,
+        trailingClipId: secondClip.id,
+        duration: 1,
+        easing: 'LINEAR',
+      },
+    ],
     assets: [firstAsset, secondAsset],
     clips: [firstClip, secondClip],
     cursorTrack: {
@@ -95,8 +108,20 @@ function expectCrossfadeFrame(frame: ReturnType<typeof resolveVideoCompositionFr
   const layersById = new Map(frame.visualLayers.map((layer) => [layer.clipId, layer]));
 
   expect(frame.visualLayers).toHaveLength(2);
-  expect(layersById.get('clip-a')?.opacity).toBeCloseTo(0.5, 5);
-  expect(layersById.get('clip-b')?.opacity).toBeCloseTo(0.5, 5);
+  const transition = frame.glTrackPlans?.values().next().value;
+  expect(transition?.kind).toBe('gl');
+  if (transition?.kind !== 'gl') throw new Error('Expected the current GL Fade plan');
+  expect(transition.junction.selection.name).toBe('Fade');
+  expect(layersById.get('clip-a')?.opacity).toBe(1);
+  expect(layersById.get('clip-b')?.opacity).toBe(1);
+  expect((layersById.get('clip-a')?.opacity ?? 0) * (1 - transition.junction.progress)).toBeCloseTo(
+    0.5,
+    5
+  );
+  expect((layersById.get('clip-b')?.opacity ?? 0) * transition.junction.progress).toBeCloseTo(
+    0.5,
+    5
+  );
   expect(frame.cursor).toEqual(
     expect.objectContaining({
       animationPreset: 'NONE',

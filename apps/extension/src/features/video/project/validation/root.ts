@@ -1,3 +1,11 @@
+import {
+  parseVideoProjectSourceInteractionDocuments,
+  hasValidVideoProjectSourceInteractionReferences,
+} from '../source-interaction-documents';
+import {
+  parseVideoProjectTransition,
+  hasValidVideoProjectTransitionReferences,
+} from '../transition/contract';
 import { requiresExtendedBorderSchema } from '../scene/focus-appearance';
 import { mapProjectTimeToSourcePoint } from '../timeline/source-time';
 import { hasValidVideoProjectCursorSourceObservations } from '../cursor-source-observations';
@@ -42,8 +50,6 @@ import {
   VideoProjectSourceKind,
   VideoSceneBackgroundKind,
   VideoTimelinePlacementMode,
-  VideoTransitionEasing,
-  VideoTransitionKind,
 } from '../types/index';
 import { isVideoProjectAsset } from './assets';
 import { isVideoProjectClip } from './clips';
@@ -122,20 +128,14 @@ function isActionEventCollection(value: unknown, feedback: unknown): boolean {
 }
 
 function isTransition(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    isString(value['id']) &&
-    isString(value['leadingClipId']) &&
-    isString(value['trailingClipId']) &&
-    isEnumValue(value['kind'], VideoTransitionKind) &&
-    isBoundedNumber(value['duration'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
-    isEnumValue(value['easing'], VideoTransitionEasing)
-  );
+  return parseVideoProjectTransition(value) !== null;
 }
 
 /** Minimum schema for present clip fields, independent of later shape admission. */
 function minimumClipSchemaVersion(value: unknown): number {
   if (!isRecord(value)) return 2;
+  if (value['audioProcessing'] !== undefined) return 53;
+  if (value['sourceFilters'] !== undefined) return 52;
   if (value['transcript'] !== undefined) return 44;
   if (value['playbackWindow'] !== undefined) return 43;
   if (value['attachment'] !== undefined || value['sourceRange'] !== undefined) return 38;
@@ -171,6 +171,7 @@ function minimumClipSchemaVersion(value: unknown): number {
 /** Minimum schema for motion fields. Shape admission remains with the motion parser. */
 function minimumMotionSchemaVersion(value: unknown): number {
   if (!isRecord(value)) return 2;
+  if (value['effect'] !== undefined || value['spatialMotion'] !== undefined) return 55;
   if (value['cursorComposition'] !== undefined) return 51;
   if (requiresExtendedBorderSchema(value['border'])) return 48;
   if (value['spotlightTarget'] === 'source-scene') return 39;
@@ -202,8 +203,32 @@ function minimumMotionSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 51) &&
+    isBoundedNumber(version, 2, 55) &&
     Number.isInteger(version) &&
+    (version >= 54 || value['sourceInteractionDocuments'] === undefined) &&
+    (version >= 54 ||
+      !Array.isArray(value['actionEvents']) ||
+      value['actionEvents'].every(
+        (event: unknown) =>
+          !isRecord(event) || !isRecord(event['anchor']) || event['anchor']['kind'] !== 'source'
+      )) &&
+    (version >= 54 ||
+      !isRecord(value['cursorFocusPath']) ||
+      !Array.isArray(value['cursorFocusPath']['segments']) ||
+      value['cursorFocusPath']['segments'].every(
+        (segment: unknown) =>
+          !isRecord(segment) ||
+          !isRecord(segment['binding']) ||
+          segment['binding']['kind'] !== 'source'
+      )) &&
+    (version >= 53 ||
+      !Array.isArray(value['sourceVoiceoverDocuments']) ||
+      value['sourceVoiceoverDocuments'].every(
+        (document: unknown) =>
+          !isRecord(document) ||
+          !isRecord(document['take']) ||
+          document['take']['audioProcessing'] === undefined
+      )) &&
     (version >= 51 ||
       !isRecord(value['sceneBackground']) ||
       value['sceneBackground']['motion'] === undefined) &&
@@ -324,6 +349,7 @@ function isHydratableProjectShape(value: unknown, effectMode: 'native' | 'metada
       parseVideoProjectSourceAudioDocuments(value['sourceAudioDocuments']) !== null) &&
     (value['sourceVoiceoverDocuments'] === undefined ||
       parseVideoProjectSourceVoiceoverDocuments(value['sourceVoiceoverDocuments']) !== null) &&
+    parseVideoProjectSourceInteractionDocuments(value['sourceInteractionDocuments']) !== null &&
     isString(value['name']) &&
     isProjectSource(value['source']) &&
     isNullable(value['baseRecordingId'], isString) &&
@@ -383,7 +409,6 @@ function isHydratableProjectShape(value: unknown, effectMode: 'native' | 'metada
 function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
   const assetIds = new Set(project.assets.map((asset) => asset.id));
   const trackIds = new Set(project.tracks.map((track) => track.id));
-  const clipIds = new Set(project.clips.map((clip) => clip.id));
   const occurrences = resolveVideoProjectActionOccurrences(project);
 
   return (
@@ -392,10 +417,7 @@ function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
     (!project.watermark?.image || getVideoProjectWatermarkAsset(project) !== undefined) &&
     hasValidVideoProjectBookendReferences(project) &&
     hasValidVideoProjectCompositionJoinReferences(project) &&
-    (project.transitions ?? []).every(
-      (transition) =>
-        clipIds.has(transition.leadingClipId) && clipIds.has(transition.trailingClipId)
-    ) &&
+    hasValidVideoProjectTransitionReferences(project) &&
     (project.motionRegions ?? []).every(
       (region) =>
         ((region.borderTarget !== 'window' &&
@@ -413,6 +435,19 @@ function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
               occurrence.clipId === region.targetAction.clipId
           ))
     ) &&
+    (project.cursorFocusPath?.segments ?? []).every((segment) => {
+      const binding = segment.binding;
+      return (
+        binding.kind !== 'source' ||
+        (project.assets.some((asset) => asset.id === binding.assetId) &&
+          project.clips.every(
+            (clip) =>
+              clip.type !== 'VIDEO' ||
+              clip.sourceInstanceId !== binding.sourceInstanceId ||
+              clip.assetId === binding.assetId
+          ))
+      );
+    }) &&
     hasValidInteractionAnchorReferences(project) &&
     hasValidVideoProjectCursorSourceObservations(project)
   );
@@ -445,7 +480,12 @@ function hasValidInteractionAnchorReferences(project: VideoProject): boolean {
   for (const event of project.actionEvents) {
     const anchor = event.anchor;
     if (anchor.kind === 'project') continue;
-    const key = JSON.stringify([anchor.recordingId, anchor.sourceInstanceId, anchor.sourceEventId]);
+    const key = JSON.stringify([
+      anchor.kind,
+      anchor.kind === 'source' ? anchor.assetId : anchor.recordingId,
+      anchor.sourceInstanceId,
+      anchor.sourceEventId,
+    ]);
     if (factKeys.has(key)) return false;
     factKeys.add(key);
     if (
@@ -453,6 +493,7 @@ function hasValidInteractionAnchorReferences(project: VideoProject): boolean {
         if (clip.type !== 'VIDEO' || clip.sourceInstanceId !== anchor.sourceInstanceId)
           return false;
         const asset = project.assets.find((item) => item.id === clip.assetId);
+        if (anchor.kind === 'source') return clip.assetId === anchor.assetId;
         return asset?.source.kind === 'recording'
           ? asset.source.recordingId === anchor.recordingId
           : asset?.source.kind === 'project-asset' &&
@@ -518,6 +559,7 @@ function hasValidReferences(project: VideoProject): boolean {
     hasValidEffectProjectReferences(project) &&
     hasValidVideoProjectSourceAudioReferences(project) &&
     hasValidVideoProjectSourceVoiceoverReferences(project) &&
+    hasValidVideoProjectSourceInteractionReferences(project) &&
     hasValidVideoProjectTextReferences(project) &&
     hasValidVideoProjectCommentReferences(project)
   );

@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { animationRuntimeDuration } from '../../../../contracts/effect-runtime/animation';
+import { createGlTransitionSelection } from '../../project/transition/gl-catalog';
 import { readFileSync } from 'node:fs';
 import { parseEffectRuntimeSnapshotDocument } from '../effect-runtime/runtime/snapshot-document';
 import { createEffectHostClip } from '../../project/factories/overlay-clip';
@@ -111,15 +114,21 @@ it('forwards subtitle visibility options into the resolved render passes', () =>
   ).toBe(1);
 });
 
-it('attaches transition overlays to resolved visual passes', verifyTransitionOverlays);
+it(
+  'attaches the canonical GL plan to resolved visual passes without a legacy overlay',
+  verifyTransitionOverlays
+);
 
 function verifyTransitionOverlays() {
   const project = createTransitionOverlayProject();
   const result = resolveVideoCompositionRenderPasses(project, 3.5);
 
-  expect(result.visualPasses[0]?.transitionOverlays).toEqual([
-    expect.objectContaining({ color: '#f97316', kind: 'sweep' }),
-  ]);
+  expect(result.visualPasses[0]?.transitionOverlays).toEqual([]);
+  const plan = result.visualPasses[0]?.frame.glTrackPlans?.get(project.clips[0]!.trackId);
+  expect(plan).toMatchObject({
+    kind: 'gl',
+    junction: { progress: 0.5, selection: createGlTransitionSelection('Fade')! },
+  });
 }
 
 function createTransitionOverlayProject() {
@@ -132,16 +141,15 @@ function createTransitionOverlayProject() {
   ] as never;
   project.transitions = [
     {
-      direction: 'RIGHT',
       duration: 1,
       easing: 'LINEAR',
-      highlightColor: '#f97316',
+
       id: 'transition-1',
-      intensity: 'BOLD',
-      kind: 'LIGHT_SWEEP',
+
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       leadingClipId: 'clip-a',
-      renderKind: 'CSS_LIKE',
-      templateKind: 'LIGHT_SWEEP',
+
       trailingClipId: 'clip-b',
     },
   ];
@@ -319,17 +327,18 @@ it.each(
       ),
     ];
     const source = readFileSync(
-      'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
+      'apps/extension/public/video-effects/animations/title.sniptale-animation.json',
       'utf8'
     );
     const document = parseEffectRuntimeSnapshotDocument({ source });
+    const hash = createHash('sha256').update(source).digest('hex');
     const snapshot = {
-      id: `effect:${'7'.repeat(64)}`,
+      id: `effect:${hash}`,
       documentId: document.id,
       source,
-      sha256: '7'.repeat(64),
+      sha256: hash,
       kind: 'standalone' as const,
-      schemaVersion: 'sniptale.effect.v1' as const,
+      schemaVersion: 'sniptale.animation.v1' as const,
       assets: [],
       retainedByteLength: new TextEncoder().encode(source).byteLength,
     };
@@ -343,7 +352,7 @@ it.each(
         enabled: true,
         startTime: 0,
         duration: 1.5,
-        playbackRate: document.duration / 1.5,
+        playbackRate: animationRuntimeDuration(document) / 1.5,
         sourceStart: 0,
         controls: Object.fromEntries(
           document.controls.map((control) => [control.id, control.defaultValue])

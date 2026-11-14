@@ -118,12 +118,16 @@ it('exports the actual inspector document on the final video clock without chang
         )!
         .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     );
-    expect(fixture.host.querySelector('[data-ui="gallery.videoReview.textDocument"]')).toBeNull();
+    expect(
+      fixture.host
+        .querySelector('[data-ui="gallery.videoReview.textDocument"]')
+        ?.closest('[hidden]')
+    ).not.toBeNull();
     expect(fixture.host.querySelector('textarea')?.value).toBe('Hidden authored phrase');
     await act(async () =>
       fixture.host
         .querySelector<HTMLButtonElement>(
-          '[data-review-header-track="actions"] [data-review-track-select]'
+          '[data-review-header-track="mouse"] [data-review-track-select]'
         )!
         .click()
     );
@@ -187,14 +191,9 @@ it('shares caption visibility between the text eye and scene without disabling t
     ).toBe(false);
     await act(async () => eye().click());
     expect(eye().getAttribute('aria-pressed')).toBe('true');
-    await act(async () => {
-      const navigation = fixture.host.querySelector(
-        '[data-ui="gallery.videoReview.inspectorNavigation"]'
-      )!;
-      Array.from(navigation.querySelectorAll('button'))
-        .find((button) => button.textContent === 'gallery.videoReview.scene')!
-        .click();
-    });
+    await act(async () =>
+      fixture.host.querySelector<HTMLButtonElement>('[data-lane-tab="settings"]')!.click()
+    );
     const toggle = fixture.host.querySelector<HTMLButtonElement>(
       '[data-ui="gallery.videoReview.captionScene"] [role="switch"]'
     )!;

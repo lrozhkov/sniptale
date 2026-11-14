@@ -1,3 +1,4 @@
+import { parseCameraSpatialMotion } from '../motion/spatial';
 import { isMotionFocusArea } from '../motion/focus-area';
 import { isCursorTrajectoryDescriptor } from '../cursor-trajectory/records';
 import { parseQuickEditBorder, parseQuickEditSpotlight } from '../scene/focus-appearance';
@@ -189,8 +190,12 @@ function isActionAnchor(value: unknown): boolean {
   if (value['kind'] === 'project')
     return isBoundedNumber(value['time'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS);
   return (
-    value['kind'] === 'recording-source' &&
-    isActionIdentity(value['recordingId']) &&
+    ((value['kind'] === 'recording-source' && isActionIdentity(value['recordingId'])) ||
+      (value['kind'] === 'source' &&
+        isActionIdentity(value['assetId']) &&
+        Object.keys(value).every((key) =>
+          ['kind', 'assetId', 'sourceInstanceId', 'sourceEventId', 'sourceTime'].includes(key)
+        ))) &&
     isActionIdentity(value['sourceInstanceId']) &&
     isActionIdentity(value['sourceEventId']) &&
     isBoundedNumber(value['sourceTime'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS)
@@ -228,7 +233,7 @@ export function isActionEvent(value: unknown): boolean {
     (value['presentation'] === undefined ||
       isVideoProjectActionPresentationOverride(value['presentation'])) &&
     (!isRecord(value['anchor']) ||
-      value['anchor']['kind'] !== 'recording-source' ||
+      value['anchor']['kind'] === 'project' ||
       ((value['point'] === null || isNormalizedActionPoint(value['point'])) &&
         (!isRecord(value['presentation']) ||
           value['presentation']['point'] === undefined ||
@@ -292,6 +297,12 @@ export function isMotionRegion(value: unknown): boolean {
   const phaseTransitions = parseMotionPhaseTransitions(value['phaseTransitions']);
   return (
     phaseTransitions !== null &&
+    (value['effect'] === undefined ||
+      (value['effect'] === '3d' &&
+        value['border'] === undefined &&
+        value['spotlight'] === undefined)) &&
+    parseCameraSpatialMotion(value['spatialMotion']) !== null &&
+    (value['spatialMotion'] === undefined || value['effect'] === '3d') &&
     (!isRecord(value['sourceBinding']) ||
       value['sourceBinding']['dormant'] !== true ||
       value['duration'] === 0) &&

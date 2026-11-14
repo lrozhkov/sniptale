@@ -1,3 +1,7 @@
+import type { AudioProcessing } from '@sniptale/runtime-contracts/audio-effects';
+import { createReviewProcessedClip } from './audio-clip-processing';
+import type { AudioProcessingRenderer } from '../../features/video/audio/effects/prepare';
+import { CANONICAL_AUDIO_RATE } from '../../features/video/audio/effects/source';
 import type { RecordingProjectActionAudioSource } from './recording-action-audio';
 import type { ReviewAudioClipInput } from './audio-clip-source';
 import type { QuickEditOriginalAudioRange } from '../../features/video/review/advanced/types';
@@ -34,6 +38,7 @@ export interface ReviewExportClipPlan {
   buffers: ReadonlyMap<string, ReviewAudioClipInput>;
   /** Releases job-owned decoder inputs; supplied AudioBuffer plans have no resources. */
   dispose?(): void;
+  originalProcessing?: { configuration: AudioProcessing; segments: readonly Segment[] };
   originalVolume: number;
   originalRanges?: readonly QuickEditOriginalAudioRange[];
   originalMuted: boolean;
@@ -69,40 +74,100 @@ export async function* renderReviewAudio(
   muted: boolean,
   signal: AbortSignal,
   exportAudio?: ReviewExportClipPlan,
-  clipRenderer: ReviewAudioClipRenderer = createReviewAudioClipRenderer()
+  clipRenderer?: ReviewAudioClipRenderer
 ): AsyncGenerator<AudioSample, void, unknown> {
-  const sink = track ? new AudioSampleSink(track) : null;
-  const sourceRate = track ? await track.getSampleRate() : outputRate;
-  const channels = track ? await track.getNumberOfChannels() : 2;
-  const tempo =
-    segment.rate !== 1 ? createReviewTempo(sourceRate, channels, segment.rate) : undefined;
-  let frame = Math.round(segment.resultStart * outputRate);
-  const end = Math.round(segment.resultEnd * outputRate);
-  while (frame < end) {
-    signal.throwIfAborted();
-    const count = Math.min(outputRate, Math.floor((4 * outputRate) / segment.rate), end - frame);
-    const buffer = await renderWindow({
-      sink,
-      track,
-      sourceRate,
-      channels,
-      ...(tempo ? { tempo } : {}),
-      segment,
-      frame,
-      count,
-      muted,
-      signal,
-      clipRenderer,
-      ...(exportAudio ? { exportAudio } : {}),
-    });
-    for (const sample of AudioSample.fromAudioBuffer(buffer, frame / outputRate)) {
-      try {
-        yield sample;
-      } finally {
-        sample.close();
-      }
+  const renderer = clipRenderer ?? createReviewAudioClipRenderer();
+  let original: { renderer: AudioProcessingRenderer; start: number } | undefined;
+  try {
+    const held = segment.kind === 'freeze';
+    const sink = track && !held ? new AudioSampleSink(track) : null;
+    const sourceRate = track ? await track.getSampleRate() : outputRate;
+    const channels = track ? await track.getNumberOfChannels() : 2;
+    if (track && sink && exportAudio?.originalProcessing) {
+      const origin = exportAudio.originalProcessing.segments.find(
+        (part) =>
+          part.kind !== 'cut' &&
+          part.rate === segment.rate &&
+          segment.sourceStart >= part.sourceStart - 1e-7 &&
+          segment.sourceEnd <= part.sourceEnd + 1e-7
+      );
+      if (!origin) throw new Error('Processed original audio has no matching source interval.');
+      const source: ReviewAudioClipInput = {
+        sampleRate: sourceRate,
+        numberOfChannels: channels,
+        length: Math.ceil(origin.sourceEnd * sourceRate),
+        dispose() {},
+        async read(first, last, requestSignal) {
+          const pcm = new AudioBuffer({
+            numberOfChannels: channels,
+            length: last - first,
+            sampleRate: sourceRate,
+          });
+          await fillWindow(track, sink, pcm, {
+            windowStart: first / sourceRate,
+            start: first / sourceRate,
+            end: last / sourceRate,
+            signal: requestSignal,
+          });
+          return {
+            start: first,
+            planes: Array.from({ length: channels }, (_, channel) => pcm.getChannelData(channel)),
+          };
+        },
+      };
+      original = {
+        start: origin.sourceStart,
+        renderer: await createReviewProcessedClip(
+          {
+            audioProcessing: exportAudio.originalProcessing.configuration,
+            sourceOffset: origin.sourceStart,
+            duration: (origin.sourceEnd - origin.sourceStart) / origin.rate,
+            playbackRate: origin.rate,
+          },
+          source,
+          signal
+        ),
+      };
     }
-    frame += count;
+    const tempo =
+      !original && !held && segment.rate !== 1
+        ? createReviewTempo(sourceRate, channels, segment.rate)
+        : undefined;
+    let frame = Math.round(segment.resultStart * outputRate);
+    const end = Math.round(segment.resultEnd * outputRate);
+    while (frame < end) {
+      signal.throwIfAborted();
+      const count = Math.min(outputRate, Math.floor((4 * outputRate) / segment.rate), end - frame);
+      const buffer = await renderWindow({
+        sink,
+        track,
+        sourceRate,
+        channels,
+        ...(tempo ? { tempo } : {}),
+        segment,
+        frame,
+        count,
+        muted: muted || held,
+        signal,
+        clipRenderer: renderer,
+        ...(original ? { original } : {}),
+        ...(exportAudio ? { exportAudio } : {}),
+      });
+      for (const sample of AudioSample.fromAudioBuffer(buffer, frame / outputRate)) {
+        try {
+          yield sample;
+        } finally {
+          sample.close();
+        }
+      }
+      frame += count;
+    }
+  } finally {
+    try {
+      original?.renderer.dispose();
+    } finally {
+      if (!clipRenderer) renderer.dispose?.();
+    }
   }
 }
 
@@ -118,6 +183,7 @@ interface AudioRenderWindow {
   signal: AbortSignal;
   clipRenderer: ReviewAudioClipRenderer;
   exportAudio?: ReviewExportClipPlan;
+  original?: { renderer: AudioProcessingRenderer; start: number };
   tempo?: ReturnType<typeof createReviewTempo>;
 }
 
@@ -129,7 +195,23 @@ async function renderWindow(args: AudioRenderWindow) {
   const offline = new OfflineAudioContext(channels, paddingFrames + count, outputRate);
   if (!args.muted && args.sink && args.track) {
     const node = offline.createBufferSource();
-    if (args.tempo) {
+    if (args.original) {
+      const from = Math.round(
+        ((start - args.original.start) / segment.rate) * CANONICAL_AUDIO_RATE
+      );
+      const planes = await args.original.renderer.render(
+        from - paddingFrames,
+        from + count + paddingFrames
+      );
+      const pcm = new AudioBuffer({
+        numberOfChannels: channels,
+        length: count + 2 * paddingFrames,
+        sampleRate: CANONICAL_AUDIO_RATE,
+      });
+      for (let channel = 0; channel < channels; channel++)
+        pcm.getChannelData(channel).set(planes[channel]!);
+      node.buffer = pcm;
+    } else if (args.tempo) {
       node.buffer = await renderTempoWindow(offline, args, args.tempo);
     } else {
       const pcm = offline.createBuffer(

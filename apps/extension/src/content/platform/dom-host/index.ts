@@ -1,3 +1,4 @@
+export { mountContentUiHost } from './ui-roots';
 export { applyIsolatedContentRootStyle } from './isolated';
 export { installContentUiScaleCompensation } from './ui-scale';
 export {

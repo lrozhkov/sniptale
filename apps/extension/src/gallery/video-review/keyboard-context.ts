@@ -1,10 +1,14 @@
+import { getComposedEventTargetElement } from '@sniptale/ui/dom-events';
+
 const editorSelector = '[data-ui="gallery.videoReview.dialog"]';
 const layers = '[role="dialog"],[role="alertdialog"],[role="menu"],[role="listbox"],dialog[open]';
 const hidden = '[hidden],[aria-hidden="true"],[inert]';
 
 /** Resolve only this editor's focused surface; nested layers retain their own commands. */
-export function reviewKeyboardTarget(event: Pick<KeyboardEvent, 'target'>): HTMLElement | null {
-  const target = event.target instanceof HTMLElement ? event.target : document.activeElement;
+export function reviewKeyboardTarget(
+  event: Pick<KeyboardEvent, 'target'> & { composedPath?: () => EventTarget[] }
+): HTMLElement | null {
+  const target = getComposedEventTargetElement(event) ?? document.activeElement;
   if (!(target instanceof HTMLElement) || target.closest(hidden)) return null;
   const editor = target.closest(editorSelector);
   if (!editor) return null;

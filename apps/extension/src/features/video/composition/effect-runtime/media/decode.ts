@@ -1,5 +1,3 @@
-import { assertEffectV1AssetSignature } from '@sniptale/runtime-contracts/effect-v1';
-
 import {
   assertEffectDecodedAudio,
   assertEffectDecodedRaster,
@@ -14,7 +12,7 @@ import { inspectEffectAudioContainer } from './audio-container';
 
 type EffectMediaDecodeErrorCode = 'mediaDecodeFailed' | 'mediaDecodeTimeout';
 
-export class EffectMediaDecodeError extends Error {
+class EffectMediaDecodeError extends Error {
   readonly code: EffectMediaDecodeErrorCode;
 
   constructor(code: EffectMediaDecodeErrorCode) {
@@ -75,7 +73,6 @@ export async function decodeEffectAudio<TBuffer extends EffectDecodedAudioShape>
     throw new EffectMediaDecodeError('mediaDecodeFailed');
   }
   try {
-    assertEffectV1AssetSignature(new Uint8Array(bytes), mimeType, 'effect-audio');
     inspectEffectAudioContainer(new Uint8Array(bytes), mimeType);
   } catch {
     throw new EffectMediaDecodeError('mediaDecodeFailed');

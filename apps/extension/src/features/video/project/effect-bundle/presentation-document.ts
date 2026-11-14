@@ -1,6 +1,14 @@
-import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
+import {
+  parseAnimationTemplateSource,
+  type AnimationTemplate,
+  type AnimationDiagnostic,
+} from '@sniptale/runtime-contracts/animation-template';
 
-type ParsedPresentationDocument = ReturnType<typeof parseEffectV1Source>;
+type ParsedPresentationDocument = {
+  ok: boolean;
+  document: AnimationTemplate | null;
+  diagnostics: AnimationDiagnostic[];
+};
 const MAX_DOCUMENTS = 32;
 const MAX_SOURCE_BYTES = 4 * 1024 * 1024;
 // Disposable presentation data only; import/apply integrity checks remain independent.
@@ -15,7 +23,12 @@ export function readEffectPresentationDocument(source: string): ParsedPresentati
     documents.set(source, cached);
     return cached;
   }
-  const parsed = parseEffectV1Source(source, { presentationPolicy: 'retained' });
+  const validation = parseAnimationTemplateSource(source);
+  const parsed: ParsedPresentationDocument = {
+    ok: validation.ok,
+    document: validation.template,
+    diagnostics: validation.diagnostics,
+  };
   freezePresentationValue(parsed);
   const bytes = source.length * 2;
   if (bytes > MAX_SOURCE_BYTES) return parsed;

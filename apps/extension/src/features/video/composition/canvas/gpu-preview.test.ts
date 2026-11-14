@@ -1,3 +1,4 @@
+import { createSourceImageFilter } from '../../../image-filters/contract';
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import {
@@ -2621,3 +2622,176 @@ it('keeps advisory compilation owned when starting validation settlement throws'
   await result;
   expect(g.device.destroy).toHaveBeenCalledOnce();
 });
+
+function paintSource(fill = '#ff0000'): GpuPreviewLayer['source'] {
+  return {
+    kind: 'paint',
+    width: 32,
+    height: 18,
+    paint: {
+      path: [],
+      draw: { op: 'fillRect', args: [0, 0, 32, 18] },
+      transform: [1, 0, 0, 1, 0, 0],
+      style: {
+        fill,
+        stroke: '#000000',
+        font: '10px sans-serif',
+        lineWidth: 1,
+        lineCap: 'butt',
+        lineJoin: 'miter',
+        miterLimit: 10,
+        textAlign: 'start',
+        textBaseline: 'alphabetic',
+        direction: 'inherit',
+      },
+    },
+  };
+}
+
+it('retains primitive pixels across fresh operand packets and placement changes', async () => {
+  const g = graphics();
+  const paint = { setTransform: vi.fn(), beginPath: vi.fn(), fillRect: vi.fn() };
+  const original = OffscreenCanvas.prototype.getContext;
+  vi.spyOn(OffscreenCanvas.prototype, 'getContext').mockImplementation(function (
+    this: OffscreenCanvas,
+    type: string
+  ) {
+    return type === '2d'
+      ? (paint as unknown as OffscreenCanvasRenderingContext2D)
+      : original.call(this, type as 'webgpu');
+  } as typeof original);
+  const renderer = await owner();
+  await renderer.render(request([layer(paintSource())]));
+  expect(paint.fillRect).toHaveBeenCalledTimes(1);
+  expect(g.queue.copyExternalImageToTexture).toHaveBeenCalledTimes(1);
+  await renderer.render(
+    request([
+      { ...layer(paintSource()), opacity: 0.4, rect: { x: 8, y: 5, width: 32, height: 18 } },
+    ])
+  );
+  expect(paint.fillRect).toHaveBeenCalledTimes(1);
+  expect(g.queue.copyExternalImageToTexture).toHaveBeenCalledTimes(1);
+  await renderer.render(request([layer(paintSource('#00ff00'))]));
+  expect(paint.fillRect).toHaveBeenCalledTimes(2);
+  expect(g.queue.copyExternalImageToTexture).toHaveBeenCalledTimes(2);
+});
+
+it('rejects malformed primitive operands before changing texture ownership', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const allocations = g.device.createTexture.mock.calls.length;
+  const source = paintSource();
+  if (!('kind' in source) || source.kind !== 'paint') throw new Error('Missing paint');
+  source.paint.draw = { op: 'fillRect', args: [0, 0, Number.NaN, 18] };
+  await expect(renderer.render(request([layer(source)]))).rejects.toThrow('paint operands');
+  expect(g.device.createTexture).toHaveBeenCalledTimes(allocations);
+  expect(g.queue.copyExternalImageToTexture).not.toHaveBeenCalled();
+});
+
+it('keeps materialized paint alive through aborted GPU completion', async () => {
+  const g = graphics(),
+    fence = deferred<void>();
+  const paint = { setTransform: vi.fn(), beginPath: vi.fn(), fillRect: vi.fn() };
+  const original = OffscreenCanvas.prototype.getContext;
+  vi.spyOn(OffscreenCanvas.prototype, 'getContext').mockImplementation(function (
+    this: OffscreenCanvas,
+    type: string
+  ) {
+    return type === '2d'
+      ? (paint as unknown as OffscreenCanvasRenderingContext2D)
+      : original.call(this, type as 'webgpu');
+  } as typeof original);
+  const renderer = await owner();
+  g.queue.onSubmittedWorkDone.mockReturnValue(fence.promise);
+  const controller = new AbortController();
+  const pending = renderer.render(request([layer(paintSource())], controller.signal));
+  const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  await vi.waitFor(() => expect(g.queue.submit).toHaveBeenCalledOnce());
+  const uploaded = g.queue.copyExternalImageToTexture.mock.calls[0]![0].source as OffscreenCanvas;
+  controller.abort();
+  expect([uploaded.width, uploaded.height]).toEqual([32, 18]);
+  fence.resolve();
+  await rejected;
+  expect([uploaded.width, uploaded.height]).toEqual([0, 0]);
+});
+
+it('reuses completed static-group mips while preserving group drawing and invalidating edits', async () => {
+  const g = graphics(),
+    renderer = await owner();
+  const child = { ...layer(), cache: { key: 'static', revision: {} } };
+  const input = { ...layer(group([child])), blur: 1 };
+  (await renderer.render(request([input]))).close();
+  expect(g.pass.draw).toHaveBeenCalledTimes(9);
+  (await renderer.render(request([input]))).close();
+  expect(g.pass.draw).toHaveBeenCalledTimes(11);
+  child.opacity = 0.5;
+  (await renderer.render(request([input]))).close();
+  expect(g.pass.draw).toHaveBeenCalledTimes(20);
+  (await renderer.render(request([input]))).close();
+  expect(g.pass.draw).toHaveBeenCalledTimes(22);
+});
+
+it.each(['encode', 'validation', 'cancel'] as const)(
+  'does not accept changed mip contents after %s failure',
+  async (failure) => {
+    const g = graphics(),
+      renderer = await owner();
+    const child = { ...layer(), cache: { key: 'static', revision: {} } };
+    const input = { ...layer(group([child])), blur: 1 };
+    (await renderer.render(request([input]))).close();
+    child.opacity = 0.5;
+    const controller = new AbortController();
+    const fence = deferred<void>();
+    if (failure === 'encode') {
+      let draws = 0;
+      g.pass.draw.mockImplementation(() => {
+        if (++draws === 2) throw new Error('partial mip encode');
+      });
+    } else if (failure === 'validation')
+      g.device.popErrorScope.mockResolvedValueOnce({ message: 'invalid mip output' });
+    else g.queue.onSubmittedWorkDone.mockReturnValueOnce(fence.promise);
+    const pending = renderer.render(request([input], controller.signal));
+    const rejected = expect(pending).rejects.toThrow(
+      failure === 'cancel'
+        ? /abort/i
+        : failure === 'encode'
+          ? 'partial mip encode'
+          : 'invalid mip output'
+    );
+    if (failure === 'cancel') {
+      await vi.waitFor(() => expect(g.queue.submit).toHaveBeenCalledTimes(2));
+      controller.abort();
+      fence.resolve();
+    }
+    await rejected;
+    g.pass.draw.mockImplementation(() => {});
+    const before = g.pass.draw.mock.calls.length;
+    (await renderer.render(request([input]))).close();
+    expect(g.pass.draw.mock.calls.length - before).toBe(9);
+  }
+);
+
+it.each(['css', 'image'] as const)(
+  'regenerates mips after changing an outer %s filter on a static group',
+  async (kind) => {
+    const g = graphics(),
+      renderer = await owner();
+    const child = { ...layer(), cache: { key: 'static', revision: {} } };
+    const input: GpuPreviewLayer = { ...layer(group([child])), blur: 1 };
+    const color = createSourceImageFilter('color', 'outer');
+    if (color.kind !== 'color') throw new Error('Expected color filter.');
+    color.parameters.brightness = 0.75;
+    if (kind === 'css') input.cssFilter = { brightness: 0.75 };
+    else
+      input.imageFilters = {
+        stack: { version: 1, filters: [color] },
+        logical: { width: 64, height: 36 },
+      };
+    (await renderer.render(request([input]))).close();
+    const first = g.pass.draw.mock.calls.length;
+    if (kind === 'css') input.cssFilter = { brightness: 0.5 };
+    else color.parameters.brightness = 0.5;
+    (await renderer.render(request([input]))).close();
+    expect(g.pass.draw.mock.calls.length - first).toBe(first);
+  }
+);

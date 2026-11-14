@@ -191,3 +191,14 @@ it.each([true, false])(
 it('includes the common journal and recovery key store in verified local-data erasure', () => {
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('secret_protection');
 });
+
+it('preserves audio presets only when the user keeps preferences', () => {
+  expect(
+    buildBrowserStorageErasurePlan({ includeAiProviderSecrets: false, preservePreferences: true })
+      .local
+  ).not.toContain('sniptale_audio_presets');
+  expect(
+    buildBrowserStorageErasurePlan({ includeAiProviderSecrets: false, preservePreferences: false })
+      .local
+  ).toContain('sniptale_audio_presets');
+});

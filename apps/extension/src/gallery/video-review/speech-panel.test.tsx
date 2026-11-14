@@ -1,3 +1,4 @@
+import * as recognitionHooks from './use-recognition';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -89,7 +90,7 @@ vi.mock('../../features/ai/model-selector', () => ({
     </select>
   ),
 }));
-import { ReviewSpeechPanel } from './speech-panel';
+import { ReviewSpeechPanel, ReviewOriginalSpeechPanel } from './speech-panel';
 async function chooseField(
   key: Parameters<typeof translate>[0],
   optionKey: Parameters<typeof translate>[0]
@@ -575,3 +576,43 @@ it.each([
     expect(mocks.apply).not.toHaveBeenCalled();
   }
 );
+
+it('shows gain and processing in Basic without starting recognition or model requests', async () => {
+  const { session } = await mount();
+  mocks.remember.mockClear();
+  mocks.prepare.mockClear();
+  const change = vi.fn();
+  const processing = vi.fn();
+  const recognitionHook = vi.spyOn(recognitionHooks, 'useReviewRecognition');
+  await act(async () =>
+    root!.render(
+      <ReviewOriginalSpeechPanel
+        session={session}
+        original={{ file: new Blob(['source']), sourceAssetId: 'source' }}
+        masterAudio={{ volume: 1, muted: false }}
+        masterDisabled={false}
+        onMasterVolumeChange={change}
+        onProcessingChange={processing}
+        recognitionEnabled={false}
+        beforeAction={(action) => action()}
+        flushAdvanced={async () => undefined}
+        registerSpeechFlush={() => () => {}}
+      />
+    )
+  );
+  expect(host.textContent).toContain(translate('gallery.videoReview.volume'));
+  expect(host.textContent).not.toContain(translate('gallery.videoReview.recognitionTitle'));
+  expect(host.querySelector('[data-ui="gallery.videoReview.speechRecognition"]')).toBeNull();
+  expect(host.querySelector('[data-ui="audio.processing-fields"]')).not.toBeNull();
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>(`[aria-label="${translate('audioProcessing.denoise')}"]`)!
+      .click()
+  );
+  expect(processing).toHaveBeenCalledOnce();
+  expect(processing.mock.calls[0]![0]).toMatchObject({ denoise: { enabled: true } });
+  expect(mocks.prepare).not.toHaveBeenCalled();
+  expect(mocks.remember).not.toHaveBeenCalled();
+  expect(recognitionHook).not.toHaveBeenCalled();
+  recognitionHook.mockRestore();
+});

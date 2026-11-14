@@ -1,8 +1,3 @@
-import {
-  createNativeUpgradeFixture,
-  createNativeUpgradeTransaction,
-  expectedVectorLibraryCreation,
-} from './schema-contracts.test-support';
 import { SUPPORTED_BETA_DATABASE_FIXTURES } from './fixtures';
 import { openDB } from 'idb';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -35,6 +30,42 @@ vi.mock('idb', () => ({
     close: vi.fn(),
   })),
 }));
+
+function createNativeUpgradeTransaction(put = vi.fn(), createIndex = vi.fn()) {
+  return {
+    abort: vi.fn(),
+    objectStore: vi.fn((_name: string) => ({
+      createIndex,
+      openCursor: async () => null,
+      index: () => ({ getAll: async () => [] }),
+      put,
+      clear: vi.fn(),
+      delete: vi.fn(),
+      getAll: vi.fn(),
+    })),
+  };
+}
+
+function createNativeUpgradeFixture(stores: readonly string[]) {
+  const names = new Set<string>(stores);
+  const put = vi.fn();
+  const createIndex = vi.fn();
+  const db = {
+    objectStoreNames: { contains: (name: string) => names.has(name) },
+    createObjectStore: vi.fn((name: string) => {
+      names.add(name);
+      return { createIndex, put };
+    }),
+    deleteObjectStore: vi.fn(),
+  };
+  return {
+    names,
+    put,
+    createIndex,
+    db,
+    transaction: createNativeUpgradeTransaction(put, createIndex),
+  };
+}
 
 describe('beta persistence domain registry', () => {
   it('assigns every product store to exactly one owner and keeps metadata infrastructure-owned', () => {
@@ -123,7 +154,10 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
     ['recording_cursor_trajectories', { keyPath: ['recordingId', 'trajectoryId'] }],
     ['recording_cursor_blocks', { keyPath: ['recordingId', 'trajectoryId', 'sequence'] }],
     ['recording_events', { keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'] }],
-    expectedVectorLibraryCreation,
+    ['video_animation_packages', { keyPath: 'packId' }],
+    ['video_visual_preferences', { keyPath: ['kind', 'packId'] }],
+    ['video_gl_transition_presets', { keyPath: 'id' }],
+    ['editor_vector_library', { keyPath: 'key' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   const olderContracts = Object.entries(betaV14Fixture.domainVersions).map(
@@ -189,7 +223,10 @@ it('admits speech without rewriting workspace history or the durable asset graph
     ['recording_cursor_trajectories', { keyPath: ['recordingId', 'trajectoryId'] }],
     ['recording_cursor_blocks', { keyPath: ['recordingId', 'trajectoryId', 'sequence'] }],
     ['recording_events', { keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'] }],
-    expectedVectorLibraryCreation,
+    ['video_animation_packages', { keyPath: 'packId' }],
+    ['video_visual_preferences', { keyPath: ['kind', 'packId'] }],
+    ['video_gl_transition_presets', { keyPath: 'id' }],
+    ['editor_vector_library', { keyPath: 'key' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(transaction.objectStore.mock.calls).toEqual(
@@ -275,10 +312,22 @@ it('upgrades each retained source contract only after all required stores valida
       expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('recording_events', {
         keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'],
       });
-    else if (migration.fromDatabaseVersion === 54)
-      expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith(
-        ...expectedVectorLibraryCreation
-      );
+    else if (migration.toDatabaseVersion === 54)
+      expect(db.createObjectStore.mock.calls).toEqual([
+        ['video_animation_packages', { keyPath: 'packId' }],
+      ]);
+    else if (migration.toDatabaseVersion === 55)
+      expect(db.createObjectStore.mock.calls).toEqual([
+        ['video_visual_preferences', { keyPath: ['kind', 'packId'] }],
+      ]);
+    else if (migration.toDatabaseVersion === 56)
+      expect(db.createObjectStore.mock.calls).toEqual([
+        ['video_gl_transition_presets', { keyPath: 'id' }],
+      ]);
+    else if (migration.toDatabaseVersion === 61)
+      expect(db.createObjectStore.mock.calls).toEqual([
+        ['editor_vector_library', { keyPath: 'key' }],
+      ]);
     else expect(db.createObjectStore).not.toHaveBeenCalled();
     names.clear();
     expect(() => migration.validate(db, transaction)).toThrow();
@@ -315,7 +364,10 @@ it('admits compact source gain without workspace migration and refuses incompati
     ['recording_cursor_trajectories', { keyPath: ['recordingId', 'trajectoryId'] }],
     ['recording_cursor_blocks', { keyPath: ['recordingId', 'trajectoryId', 'sequence'] }],
     ['recording_events', { keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'] }],
-    expectedVectorLibraryCreation,
+    ['video_animation_packages', { keyPath: 'packId' }],
+    ['video_visual_preferences', { keyPath: ['kind', 'packId'] }],
+    ['video_gl_transition_presets', { keyPath: 'id' }],
+    ['editor_vector_library', { keyPath: 'key' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(
@@ -358,7 +410,10 @@ it('annotation admission preserves rows and aborts before publishing contracts o
     ['recording_cursor_trajectories', { keyPath: ['recordingId', 'trajectoryId'] }],
     ['recording_cursor_blocks', { keyPath: ['recordingId', 'trajectoryId', 'sequence'] }],
     ['recording_events', { keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'] }],
-    expectedVectorLibraryCreation,
+    ['video_animation_packages', { keyPath: 'packId' }],
+    ['video_visual_preferences', { keyPath: ['kind', 'packId'] }],
+    ['video_gl_transition_presets', { keyPath: 'id' }],
+    ['editor_vector_library', { keyPath: 'key' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.objectStore.mock.calls).toEqual(
@@ -559,7 +614,7 @@ it('creates the complete fresh schema with empty unindexed connection authority'
   const tx = { abort: vi.fn(), objectStore: vi.fn() };
   handleDatabaseUpgrade(db, 0, DB_VERSION, tx);
   expect([...names].sort()).toEqual([...EXPECTED_STORES].sort());
-  expect(names).toHaveLength(47);
+  expect(names).toHaveLength(50);
   expect(db.createObjectStore).toHaveBeenCalledWith('sync_connection', { keyPath: 'key' });
   expect(db.createObjectStore).toHaveBeenCalledWith('secret_protection', { keyPath: 'key' });
   expect(connectionIndex).not.toHaveBeenCalled();
@@ -758,44 +813,3 @@ it('creates the same exact nonunique due index for a fresh database', () => {
 });
 
 afterEach(() => vi.unstubAllGlobals());
-
-it('admits raster metadata and refuses publication when a required store is absent', () => {
-  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
-    (fixture) => fixture.databaseVersion === 53
-  )!;
-  const plan = buildDatabaseMigrationPlan(53, 54);
-  expect(plan).toHaveLength(1);
-  expect(plan?.[0]).toMatchObject({
-    fromDatabaseVersion: 53,
-    toDatabaseVersion: 54,
-    risk: 'additive',
-    backupCoverage: 'none',
-    stores: ['image_workspaces', 'scenario_step_editor_documents'],
-    domainVersions: [
-      { domainId: 'mediaLibrary', from: 34, to: 35 },
-      { domainId: 'scenarioProjects', from: 10, to: 11 },
-    ],
-  });
-  const { names, put, createIndex, db, transaction } = createNativeUpgradeFixture(source.stores);
-  handleDatabaseUpgrade(db, 53, 54, transaction);
-  expect(transaction.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
-  expect(put.mock.calls.map(([row]) => row)).toEqual(CURRENT_SCHEMA_CONTRACTS);
-  expect(db.createObjectStore).not.toHaveBeenCalled();
-  expect(db.deleteObjectStore).not.toHaveBeenCalled();
-  expect(createIndex).not.toHaveBeenCalled();
-  expect(
-    parseStoredSchemaContracts(
-      Object.entries(source.domainVersions).map(([domainId, schemaVersion]) => ({
-        domainId,
-        schemaVersion,
-      }))
-    )
-  ).toBeNull();
-  put.mockClear();
-  names.delete('scenario_step_editor_documents');
-  expect(() => handleDatabaseUpgrade(db, 53, 54, transaction)).toThrow(
-    'Retained raster document stores are unavailable.'
-  );
-  expect(transaction.abort).toHaveBeenCalledOnce();
-  expect(put).not.toHaveBeenCalled();
-});

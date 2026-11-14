@@ -6,6 +6,7 @@ export function reviewGpuAnnotationLayer(
   entry: {
     instance: Pick<ReviewAnnotationEffect, 'transform'>;
     bitmap?: ImageBitmap;
+    rasterCache?: GpuPreviewLayer['cache'];
     bitmapBounds: { x: number; y: number; width: number; height: number };
   },
   target: { x: number; y: number; width: number; height: number },
@@ -22,6 +23,7 @@ export function reviewGpuAnnotationLayer(
     sine = Math.sin(transform.rotation);
   return {
     source: raster,
+    ...(entry.rasterCache ? { cache: entry.rasterCache } : {}),
     rect: {
       x: (entry.bitmapBounds.x - 0.5) * width,
       y: (entry.bitmapBounds.y - 0.5) * height,

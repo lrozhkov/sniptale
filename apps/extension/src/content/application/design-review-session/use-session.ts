@@ -36,13 +36,24 @@ export function useCreateReviewSessionRuntime(
     let source: ContentPrivilegedActionIntentSource | null = null;
     let captureTimer: ReturnType<typeof setTimeout> | undefined;
     let previousRevision = 0;
+    const editingReviewChrome = () => {
+      const focused = resolveContentShadowRoot()?.activeElement;
+      return !!focused?.closest(
+        '.sniptale-design-review-chrome,[data-ui^="content.design-review."]'
+      );
+    };
     const changed = () => {
       review.changed();
+      if (editingReviewChrome()) {
+        clearTimeout(captureTimer);
+        previousRevision = review.getSnapshot().revision;
+        return;
+      }
       if (source && review.getSnapshot().revision !== previousRevision) {
         clearTimeout(captureTimer);
         const intent = source;
         captureTimer = setTimeout(() => {
-          void review.captureCurrent(intent);
+          if (!disposed && !editingReviewChrome()) void review.captureCurrent(intent);
         }, 600);
       }
       previousRevision = review.getSnapshot().revision;

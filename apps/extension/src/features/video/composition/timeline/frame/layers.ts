@@ -14,7 +14,7 @@ import {
   isSubtitleClip,
   isVisualClip,
 } from '../../../project/timeline';
-import { resolveClipTransitionVisualState } from '../../../project/transition/presentation';
+import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../../project/transition/presentation.types';
 import {
   resolveSubtitleTrackTransform,
   resolveSubtitleClipStyle,
@@ -32,7 +32,6 @@ import {
 function createBaseVisualLayer(
   clip: Extract<VideoProjectClip, { transform: VideoProjectClip['transform'] }>,
   project: VideoProjectRenderScope,
-  currentTime: number,
   opacity: number,
   zIndex: number
 ) {
@@ -45,7 +44,7 @@ function createBaseVisualLayer(
     clipId: clip.id,
     height: transform.height,
     opacity,
-    renderState: resolveClipTransitionVisualState(project, clip, currentTime),
+    renderState: IDENTITY_TRANSITION_VISUAL_STATE,
     rotation: transform.rotation,
     width: transform.width,
     x: transform.x,
@@ -82,7 +81,7 @@ function createVisualLayer(
     return null;
   }
 
-  const resolvedBaseLayer = createBaseVisualLayer(clip, project, currentTime, opacity, zIndex);
+  const resolvedBaseLayer = createBaseVisualLayer(clip, project, opacity, zIndex);
 
   switch (clip.type) {
     case 'VIDEO': {
@@ -106,6 +105,7 @@ function createVisualLayer(
         ...resolvedBaseLayer,
         clip,
         kind: 'video',
+        compositionTime: currentTime,
         ...(options.windowBorders.get(clip.id)?.length
           ? { borders: options.windowBorders.get(clip.id)! }
           : {}),

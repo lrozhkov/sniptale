@@ -1,3 +1,5 @@
+import { parseAudioProcessing } from '@sniptale/runtime-contracts/audio-effects';
+import { parseSourceImageFilterStack } from '../../../image-filters/contract';
 import { isCameraShadowDirection } from '../camera/shadow-direction';
 import { parseReviewSpeechTranscript } from '../../review/speech-validation';
 import { parseMediaSourceCrop } from '../media-crop';
@@ -192,6 +194,9 @@ function isPlaybackWindow(value: unknown, duration: number): boolean {
 
 function hasBaseClipFields(value: Record<string, unknown>): boolean {
   return (
+    (value['sourceFilters'] === undefined ||
+      (value['type'] === VideoProjectClipType.VIDEO &&
+        parseSourceImageFilterStack(value['sourceFilters']) !== null)) &&
     (value['sourceRange'] === undefined ||
       (value['type'] === VideoProjectClipType.EFFECT &&
         value['attachment'] !== undefined &&
@@ -380,6 +385,14 @@ export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
   if (!isRecord(value) || !hasBaseClipFields(value) || !hasOriginalAudioMute(value)) {
     return false;
   }
+
+  if (
+    value['audioProcessing'] !== undefined &&
+    ((value['type'] !== VideoProjectClipType.VIDEO &&
+      value['type'] !== VideoProjectClipType.AUDIO) ||
+      parseAudioProcessing(value['audioProcessing']) === null)
+  )
+    return false;
 
   const timing = value['cameraTiming'];
   if (

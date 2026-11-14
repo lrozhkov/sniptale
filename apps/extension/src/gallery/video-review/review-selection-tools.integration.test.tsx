@@ -127,7 +127,10 @@ async function dragRange(
     );
 }
 
-async function selectTrack(host: HTMLElement, track: 'source' | 'zoom' | 'originalAudio') {
+async function selectTrack(
+  host: HTMLElement,
+  track: 'source' | 'zoom' | 'originalAudio' | 'mouse'
+) {
   await act(async () =>
     host
       .querySelector<HTMLButtonElement>(
@@ -305,10 +308,8 @@ it('keeps Volume unavailable without source audio and drops the tool on leaving 
       audible.root.render(<VideoReview aggregateId="recording:r" onBack={audible.back} />)
     );
     await audible.click('advancedEditing');
-    const marker = audible.host.querySelector<HTMLButtonElement>(
-      '[aria-label^="gallery.videoReview.telemetry ·"]'
-    )!;
-    await act(async () => marker.click());
+    expect(audible.host.querySelector('[data-history-family="cursor"]')).toBeNull();
+    await selectTrack(audible.host, 'mouse');
     await selectTrack(audible.host, 'originalAudio');
     await audible.click('originalAudioRange');
     expect(audible.button('originalAudioRange').getAttribute('aria-pressed')).toBe('true');
@@ -359,24 +360,24 @@ it('draws focus in source coordinates, selects it and keeps drawing tools mutual
     // First entry saves zoom enablement independently of the later focus gesture.
     await waitForContentCommit(fixture, 2);
     await selectTrack(fixture.host, 'zoom');
-    await fixture.click('focusRangeTool');
-    expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('true');
+    await fixture.click('zoomRegionLabel');
+    expect(fixture.button('zoomRegionLabel').getAttribute('aria-pressed')).toBe('true');
     expect(fixture.button('pointerTool').getAttribute('aria-pressed')).toBe('false');
     await act(async () =>
       fixture.key(new KeyboardEvent('keydown', { key: 'м', code: 'KeyV', bubbles: true }))
     );
-    expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('false');
+    expect(fixture.button('zoomRegionLabel').getAttribute('aria-pressed')).toBe('false');
     expect(fixture.button('pointerTool').getAttribute('aria-pressed')).toBe('true');
     await selectTrack(fixture.host, 'zoom');
-    await fixture.click('focusRangeTool');
+    await fixture.click('zoomRegionLabel');
     await selectTrack(fixture.host, 'originalAudio');
     await fixture.click('originalAudioRange');
     expect(
-      fixture.host.querySelector('[aria-label="gallery.videoReview.focusRangeTool"]')
+      fixture.host.querySelector('[aria-label="gallery.videoReview.zoomRegionLabel"]')
     ).toBeNull();
     expect(fixture.button('originalAudioRange').getAttribute('aria-pressed')).toBe('true');
     await selectTrack(fixture.host, 'zoom');
-    await fixture.click('focusRangeTool');
+    await fixture.click('zoomRegionLabel');
     expect(
       fixture.host.querySelector('[aria-label="gallery.videoReview.originalAudioRange"]')
     ).toBeNull();
@@ -408,19 +409,21 @@ it('draws focus in source coordinates, selects it and keeps drawing tools mutual
           fixture.host.querySelector('[data-ui="gallery.videoReview.focusRangePreview"]')
         ).not.toBeNull();
     }
-    expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('false');
+    expect(fixture.button('zoomRegionLabel').getAttribute('aria-pressed')).toBe('false');
     expect(fixture.button('pointerTool').getAttribute('aria-pressed')).toBe('true');
     const inspector = fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]');
     expect(inspector).not.toBeNull();
     expect(
-      inspector?.querySelector('[data-ui="gallery.videoReview.interval"]')?.textContent
+      fixture.host
+        .querySelector('[data-ui="gallery.videoReview.inspector"] header h2')
+        ?.getAttribute('title')
     ).toContain('1.0 – 2.0');
     await waitForContentCommit(fixture, 3);
     expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
       target: 'advancedContent',
       after: { zoom: { regions: [expect.objectContaining({ start: 0.5, end: 1.5 })] } },
     });
-    expect(fixture.button('focusRangeTool').disabled).toBe(false);
+    expect(fixture.button('zoomRegionLabel').disabled).toBe(false);
   } finally {
     await fixture.cleanup();
   }
@@ -451,22 +454,24 @@ it('rejects focus over a cut and applies the focus tool immediately to an availa
     );
     await fixture.click('advancedEditing');
     await selectTrack(fixture.host, 'zoom');
-    await fixture.click('focusRangeTool');
+    await fixture.click('zoomRegionLabel');
     await dragRange(fixture.host, { lane: 'zoomLane' });
     expect(fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')).toBeNull();
-    expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('true');
+    expect(fixture.button('zoomRegionLabel').getAttribute('aria-pressed')).toBe('true');
     await act(async () => fixture.key(new KeyboardEvent('keydown', { key: 'Escape' })));
-    expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('false');
+    expect(fixture.button('zoomRegionLabel').getAttribute('aria-pressed')).toBe('false');
     await dragRange(fixture.host);
-    expect(fixture.button('focusRangeTool').disabled).toBe(true);
+    expect(fixture.button('zoomRegionLabel').disabled).toBe(true);
     await dragRange(fixture.host, { start: 25, end: 75 });
-    expect(fixture.button('focusRangeTool').disabled).toBe(false);
+    expect(fixture.button('zoomRegionLabel').disabled).toBe(false);
     await selectTrack(fixture.host, 'zoom');
-    await fixture.click('focusRangeTool');
+    await fixture.click('zoomRegionLabel');
     const inspector = fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]');
     expect(inspector).not.toBeNull();
     expect(
-      inspector?.querySelector('[data-ui="gallery.videoReview.interval"]')?.textContent
+      fixture.host
+        .querySelector('[data-ui="gallery.videoReview.inspector"] header h2')
+        ?.getAttribute('title')
     ).toContain('0.3 – 0.8');
   } finally {
     await fixture.cleanup();
@@ -521,6 +526,10 @@ it('dismisses and repeats gain feedback without changing source selection', asyn
     expect(
       fixture.host.querySelector('[data-ui="gallery.videoReview.feedback"]')?.textContent
     ).not.toContain('gallery.videoReview.originalAudioOverlap');
+    await fixture.click('play');
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.feedback"]')?.textContent
+    ).not.toContain('gallery.videoReview.playbackFailed');
   } finally {
     await fixture.cleanup();
   }
@@ -549,7 +558,7 @@ it('isolates editing controls while the voiceover tab is open and restores them 
     expect(modal!.textContent).toContain('gallery.videoReview.recordVoiceover');
     expect(host.querySelector('[data-ui="gallery.videoReview.voiceoverStrip"]')).toBeNull();
     expect(
-      host.querySelector('[data-ui="gallery.videoReview.inspectorNavigation"]')?.textContent
+      host.querySelector('[data-ui="gallery.videoReview.inspector"] header h2')?.textContent
     ).toContain('gallery.videoReview.recordVoiceover');
     expect(host.querySelector('[inert]')).not.toBeNull();
     await act(async () =>

@@ -1,11 +1,17 @@
 // @vitest-environment jsdom
+import { drawReviewWebcam } from './render-webcam';
+import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
 import { VideoSample } from 'mediabunny';
 import { afterEach, expect, it, vi } from 'vitest';
 import { drawSceneSpotlights } from '../../features/video/composition/draw/spotlight';
-import { renderRenderWindowFrames } from './render-export';
+import { renderRenderWindowFrames } from './render-export-composition.test-support';
 
 vi.mock('../../features/video/composition/draw/spotlight', () => ({
   drawSceneSpotlights: vi.fn(),
+}));
+vi.mock('./render-webcam', async (original) => ({
+  ...(await original<typeof import('./render-webcam')>()),
+  drawReviewWebcam: vi.fn(),
 }));
 vi.mock('mediabunny', async (original) => ({
   ...(await original<typeof import('mediabunny')>()),
@@ -24,6 +30,14 @@ it.each([false, true])(
   'composes camera above Focus with global source time and releases its iterator (encoder failure=%s)',
   async (fail) => {
     const order: string[] = [];
+    vi.mocked(drawReviewWebcam).mockImplementation(() => {
+      order.push('webcam');
+    });
+    const webcamSettings = createQuickEditWebcam(
+      'camera',
+      { width: 320, height: 180 },
+      { width: 320, height: 180 }
+    );
     vi.mocked(drawSceneSpotlights).mockImplementation(() => {
       order.push('focus');
     });
@@ -55,17 +69,20 @@ it.each([false, true])(
     const webcam = {
       duration: 1,
       dispose: vi.fn(),
-      async *sourceFrames() {
+      async *frames() {
         yield null;
       },
-      async *frames(times: readonly number[]) {
+      async *sourceFrames(times: readonly number[]) {
         cameraTimes.push(...times);
         try {
           for (const _time of times)
             yield {
-              draw: () => {
-                order.push('webcam');
-              },
+              allocationBytes: () => 320 * 180 * 4,
+              release: vi.fn(),
+              representedMediaTime: _time,
+              source: { width: 320, height: 180 },
+              placement: webcamSettings.placement,
+              drawable: { draw: vi.fn() },
             };
         } finally {
           released();
@@ -93,6 +110,7 @@ it.each([false, true])(
       fps: 2,
       fragmentOffset: 1,
       webcam,
+      webcamSettings,
       zoomRegions: [
         {
           id: 'z',

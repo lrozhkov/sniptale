@@ -1,3 +1,6 @@
+import type { ReactNode } from 'react';
+import type { AudioProcessing } from '@sniptale/runtime-contracts/audio-effects';
+import { AudioProcessingFields } from './processing-fields';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
 import { getAudioFadeLimitSeconds } from '../../features/video/audio/fades';
 import { translate } from '../../platform/i18n';
@@ -6,6 +9,8 @@ import { DraftNumericRow } from '../compact-inspector-controls/numeric-preview';
 interface TakeFieldProps {
   clip: QuickEditAudioClip;
   disabled: boolean;
+  presetControls?: ReactNode;
+  createDefaultProcessing?(): AudioProcessing | null | undefined;
   onPatch(patch: Partial<Omit<QuickEditAudioClip, 'id' | 'assetId'>>): void;
 }
 
@@ -35,6 +40,18 @@ export function AudioTakeLevelFields(props: TakeFieldProps & { showTempo?: boole
         value={props.clip.volume * 100}
         disabled={props.disabled}
         onChange={(value) => props.onPatch({ volume: value / 100 })}
+      />
+      {props.presetControls}
+      <AudioProcessingFields
+        key={props.clip.id}
+        value={props.clip.audioProcessing}
+        createDefaultProcessing={props.createDefaultProcessing}
+        disabled={props.disabled}
+        onChange={(audioProcessing) =>
+          props.onPatch({
+            audioProcessing: audioProcessing ?? { version: 1, bypassed: true, effects: [] },
+          })
+        }
       />
     </>
   );

@@ -49,7 +49,15 @@ vi.mock('../infrastructure/browser-storage', async (importOriginal) => ({
 }));
 vi.mock('../effect-bundles', async (original) => ({
   ...(await original<typeof import('../effect-bundles')>()),
-  listImportedEffectBundles: async () => [],
+  listAnimationCatalogEntries: async () => [],
+}));
+vi.mock('../effect-bundles/gl-presets', async (original) => ({
+  ...(await original<typeof import('../effect-bundles/gl-presets')>()),
+  listGlPresetCatalogEntries: async () => [],
+}));
+vi.mock('../effect-bundles/preferences', async (original) => ({
+  ...(await original<typeof import('../effect-bundles/preferences')>()),
+  readVisualCatalogPreferences: async () => [],
 }));
 vi.mock('../capture-settings', async (original) => ({
   ...(await original<typeof import('../capture-settings')>()),

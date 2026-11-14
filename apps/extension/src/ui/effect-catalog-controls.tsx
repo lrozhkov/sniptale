@@ -1,6 +1,6 @@
 import './effect-catalog.css';
 import { useRef, useState } from 'react';
-import { Search, X, Sparkles, WandSparkles, ArrowRightLeft, LayoutGrid } from 'lucide-react';
+import { Search, X, Sparkles, LayoutGrid } from 'lucide-react';
 import { EditorIconButton } from '@sniptale/ui/editor-chrome';
 import { ProductGlassInput } from '@sniptale/ui/product-glass-controls';
 import { CompactSelect } from './compact-inspector-controls/primitives';
@@ -32,16 +32,6 @@ export function EffectCatalogControls({
       value: 'standalone',
       Icon: Sparkles,
       label: translate('videoEditor.effectsLibrary.annotations'),
-    },
-    {
-      value: 'targetEffect',
-      Icon: WandSparkles,
-      label: translate('videoEditor.effectsLibrary.videoEffects'),
-    },
-    {
-      value: 'transition',
-      Icon: ArrowRightLeft,
-      label: translate('videoEditor.effectsLibrary.transitions'),
     },
   ] as const;
   const themeSelect =

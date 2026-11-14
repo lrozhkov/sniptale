@@ -1,3 +1,9 @@
+import {
+  hasSourceImageFilters,
+  SourceImageFilterError,
+  type SourceImageFilterStack,
+} from '../../../image-filters/contract';
+import type { GpuPreviewLayer } from '../canvas/gpu-preview-types';
 import type { ExportEnhancer } from './enhancer';
 import { planEnhancedRegion } from './region-plan';
 import { samplingRasterSize } from './projection-density';
@@ -116,6 +122,8 @@ export async function prepareSourceSampling(args: {
   identity: SourceSamplingIdentity;
   source: CanvasImageSource;
   demands: readonly SourceSamplingDemand[];
+  /** Materialize a contiguous source plane at the original requested density for spatial filters. */
+  fullSourceSupport?: boolean;
   signal?: AbortSignal;
   document?: Pick<Document, 'createElement'>;
 }): Promise<{ sampling: PreparedSourceSampling; dispose(): void }> {
@@ -154,7 +162,7 @@ export async function prepareSourceSampling(args: {
   for (const input of args.demands) {
     if (!matchingIdentity(input, identity) || !input.id || demands.has(input.id))
       throw new TypeError('Prepared source demand identity does not match its pass.');
-    const demand: SourceSamplingDemand = {
+    let demand: SourceSamplingDemand = {
       ...input,
       originalPixelROI: { ...input.originalPixelROI },
       targetRasterSize: { ...input.targetRasterSize },
@@ -162,9 +170,24 @@ export async function prepareSourceSampling(args: {
     };
     // Validate every demand, including inactive ones, before allocating or starting a backend.
     hasMagnificationDemand([demand]);
+    const magnified = growth(demand);
+    if (args.fullSourceSupport && magnified) {
+      const density = Math.max(
+        demand.targetRasterSize.width / demand.originalPixelROI.width,
+        demand.targetRasterSize.height / demand.originalPixelROI.height
+      );
+      demand = {
+        ...demand,
+        originalPixelROI: { x: 0, y: 0, ...identity.sourceSize },
+        targetRasterSize: {
+          width: Math.ceil(identity.sourceSize.width * density),
+          height: Math.ceil(identity.sourceSize.height * density),
+        },
+      };
+    }
     demands.set(demand.id, {
       demand,
-      magnified: growth(demand),
+      magnified,
       tiles: [],
       applied: false,
       planned: [],
@@ -331,5 +354,121 @@ export async function prepareSourceSampling(args: {
   } catch (error) {
     dispose();
     throw error;
+  }
+}
+
+/** Borrow retained source tiles through GPU completion; placement remains in source geometry. */
+export function preparedSourceGpuLayers(
+  sampling: PreparedSourceSampling,
+  demandId: string,
+  destination: SourceSamplingRect,
+  filters?: SourceImageFilterStack,
+  projectTime = 0
+): { layers: GpuPreviewLayer[]; density: number } | null {
+  if (!validRect(destination)) throw new RangeError('Prepared source GPU bounds are invalid.');
+  if (filters && hasSourceImageFilters(filters)) {
+    const logical = sampling.sourceSize;
+    const raw = preparedSourceGpuLayers(sampling, demandId, { x: 0, y: 0, ...logical });
+    if (!raw) return null;
+    assertPreparedSourceFilterCoverage(raw.layers, logical);
+    const output = {
+      width: Math.ceil(logical.width * raw.density),
+      height: Math.ceil(logical.height * raw.density),
+    };
+    return {
+      density: Math.max(output.width / destination.width, output.height / destination.height),
+      layers: [
+        {
+          source: { kind: 'group', logical, output, layers: raw.layers },
+          rect: destination,
+          inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+          imageFilters: { stack: filters, logical, projectTime },
+          clampSourceEdges: ['left', 'top', 'right', 'bottom'],
+        },
+      ],
+    };
+  }
+  const layers: GpuPreviewLayer[] = [];
+  let density = 0;
+  const applied = sampling.visitPreparedTiles(demandId, (tile) => {
+    const crop = tile.physicalSourceRect;
+    const roi = tile.originalPixelROI;
+    const rect = {
+      x: destination.x + (roi.x * destination.width) / sampling.sourceSize.width,
+      y: destination.y + (roi.y * destination.height) / sampling.sourceSize.height,
+      width: (roi.width * destination.width) / sampling.sourceSize.width,
+      height: (roi.height * destination.height) / sampling.sourceSize.height,
+    };
+    density = Math.max(density, crop.width / rect.width, crop.height / rect.height);
+    const identity = [1, 0, 0, 0, 1, 0, 0, 0, 1] as const;
+    const source: GpuPreviewLayer['source'] =
+      crop.x === 0 &&
+      crop.y === 0 &&
+      crop.width === tile.image.width &&
+      crop.height === tile.image.height
+        ? tile.image
+        : {
+            kind: 'group',
+            logical: { width: crop.width, height: crop.height },
+            output: { width: Math.ceil(crop.width), height: Math.ceil(crop.height) },
+            layers: [
+              {
+                source: tile.image,
+                rect: {
+                  x: -crop.x,
+                  y: -crop.y,
+                  width: tile.image.width,
+                  height: tile.image.height,
+                },
+                inverse: identity,
+              },
+            ],
+          };
+    layers.push({
+      source,
+      rect,
+      inverse: identity,
+      clampSourceEdges: ['left', 'top', 'right', 'bottom'],
+    });
+  });
+  return applied ? { layers, density } : null;
+}
+
+/** Validate complete, unambiguous support in source pixels before any spatial filtering. */
+function assertPreparedSourceFilterCoverage(
+  layers: readonly GpuPreviewLayer[],
+  size: { width: number; height: number }
+) {
+  const epsilon = 1e-6;
+  const rectangles = layers.map((layer) => layer.rect);
+  if (
+    !rectangles.length ||
+    rectangles.some(
+      (rect) =>
+        !validRect(rect) ||
+        rect.x < -epsilon ||
+        rect.y < -epsilon ||
+        rect.x + rect.width > size.width + epsilon ||
+        rect.y + rect.height > size.height + epsilon
+    )
+  )
+    throw new SourceImageFilterError();
+  const edges = [
+    ...new Set([0, size.height, ...rectangles.flatMap((rect) => [rect.y, rect.y + rect.height])]),
+  ].sort((a, b) => a - b);
+  for (let index = 1; index < edges.length; index++) {
+    const top = edges[index - 1]!,
+      bottom = edges[index]!;
+    if (bottom - top <= epsilon) continue;
+    const middle = (top + bottom) / 2;
+    const row = rectangles
+      .filter((rect) => rect.y <= middle && rect.y + rect.height >= middle)
+      .sort((a, b) => a.x - b.x);
+    let covered = 0;
+    for (const rect of row) {
+      if (Math.abs(rect.x - covered) > epsilon) throw new SourceImageFilterError();
+      covered = rect.x + rect.width;
+    }
+    if (Math.abs(covered - size.width) > epsilon) throw new SourceImageFilterError();
   }
 }

@@ -9,7 +9,7 @@ it('creates the body at its natural aspect instead of scene aspect', () => {
     projectWidth: 1920,
     startTime: 0,
     trackId: 'video',
-    objectLayout: { width: 640, height: 280, resize: 'reflow' as const },
+    dimensions: { width: 640, height: 280 },
   };
   expect(createEffectHostClip(args).transform).toMatchObject({
     width: 640,
@@ -20,8 +20,10 @@ it('creates the body at its natural aspect instead of scene aspect', () => {
 });
 
 import { readFileSync } from 'node:fs';
-import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
+import { createHash } from 'node:crypto';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { createEmptyVideoProject } from '../factories/creation';
+import type { VideoProjectEffectInstance } from './types';
 import {
   getEffectClipObjectLayout,
   initializeEffectSceneAnchors,
@@ -30,14 +32,14 @@ import {
 } from './layout';
 function fixture() {
   const source = readFileSync(
-    new URL(
-      '../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/' +
-        'sniptale-callout.sniptale-effect.json',
-      import.meta.url
-    ),
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
-  const document = parseEffectV1Source(source).document!;
+  const accepted = parseAnimationTemplateSource(source);
+  if (!accepted.ok) throw new Error(JSON.stringify(accepted.diagnostics));
+  const document = accepted.template;
+  const hash = createHash('sha256').update(source).digest('hex');
+  const snapshotId = `effect:${hash}`;
   const project = createEmptyVideoProject('Layout');
   const clip = createEffectHostClip({
     effectInstanceId: 'effect',
@@ -47,31 +49,38 @@ function fixture() {
     projectHeight: 1080,
     startTime: 0,
     trackId: project.tracks[0]!.id,
-    objectLayout: document.objectLayout!,
+    dimensions: { width: document.animation.w, height: document.animation.h },
   });
-  const instance = {
+  const instance: VideoProjectEffectInstance = {
     id: 'effect',
-    snapshotId: 'snapshot',
+    snapshotId,
     kind: 'standalone' as const,
     target: { kind: 'scene' as const },
-    controls: { sequence: 2 },
+    controls: {
+      ...Object.fromEntries(document.controls.map((control) => [control.id, control.defaultValue])),
+      opacity: 42,
+    },
     startTime: 0,
     duration: 4,
     enabled: true,
     playbackRate: 1,
   };
+  for (const handle of document.objectLayout?.handles ?? []) {
+    delete instance.controls[handle.xControl];
+    delete instance.controls[handle.yControl];
+  }
   project.clips = [clip];
   project.effectInstances = [instance];
   project.effectSnapshots = [
     {
-      id: 'snapshot',
+      id: snapshotId,
       source,
       assets: [],
       documentId: document.id,
       kind: 'standalone',
-      schemaVersion: document.schemaVersion,
-      retainedByteLength: source.length,
-      sha256: '0'.repeat(64),
+      schemaVersion: 'sniptale.animation.v1',
+      retainedByteLength: Buffer.byteLength(source),
+      sha256: hash,
     },
   ];
   return { project, clip, document, instance };
@@ -81,15 +90,15 @@ it('derives the paired numeric dimension and bounds scale uniformly', () => {
   const limits = { min: 40, max: 7680 };
   expect(resolveEffectClipTransformPatch(project, clip, { width: 760 }, limits)).toEqual({
     width: 760,
-    height: 240,
+    height: 427.5,
   });
-  expect(resolveEffectClipTransformPatch(project, clip, { height: 240 }, limits)).toEqual({
+  expect(resolveEffectClipTransformPatch(project, clip, { height: 427.5 }, limits)).toEqual({
     width: 760,
-    height: 240,
+    height: 427.5,
   });
   expect(resolveEffectClipTransformPatch(project, clip, { height: 7680 }, limits)).toEqual({
     width: 7680,
-    height: (7680 * 120) / 380,
+    height: (7680 * 180) / 320,
   });
   expect(resolveEffectClipTransformPatch(project, clip, { x: 15, rotation: 45 }, limits)).toEqual({
     x: 15,
@@ -103,10 +112,7 @@ it('derives the paired numeric dimension and bounds scale uniformly', () => {
 });
 it('initializes scene points and derives controls after body motion without mutating anchor state', () => {
   const { document, clip, instance } = fixture();
-  const anchors = initializeEffectSceneAnchors(document, clip.transform, {
-    width: 1920,
-    height: 1080,
-  })!;
+  const anchors = initializeEffectSceneAnchors(document, clip.transform)!;
   const placed = { ...instance, sceneAnchors: anchors };
   const before = structuredClone(anchors);
   const controls = resolveEffectObjectControls(document, placed, {
@@ -114,15 +120,13 @@ it('initializes scene points and derives controls after body motion without muta
     x: 1600,
     rotation: 90,
   });
-  expect(controls['sequence']).toBe(2);
-  expect(controls['anchorX']).toEqual(expect.any(Number));
+  expect(controls['opacity']).toBe(42);
+  expect(controls['tipX']).toEqual(expect.any(Number));
   expect(placed.sceneAnchors).toEqual(before);
   expect(() => resolveEffectObjectControls(document, instance, clip.transform)).toThrow(
     'Missing effect scene anchor'
   );
   delete document.objectLayout;
-  expect(
-    initializeEffectSceneAnchors(document, clip.transform, { width: 1920, height: 1080 })
-  ).toBeUndefined();
-  expect(resolveEffectObjectControls(document, instance, clip.transform)['sequence']).toBe(2);
+  expect(initializeEffectSceneAnchors(document, clip.transform)).toBeUndefined();
+  expect(resolveEffectObjectControls(document, instance, clip.transform)['opacity']).toBe(42);
 });

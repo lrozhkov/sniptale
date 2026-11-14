@@ -14,13 +14,11 @@ export function createEffectPreviewSession({
   queue,
   key,
   readDocument,
-  readSource,
 }: {
   target: HTMLCanvasElement;
   queue: PreviewQueue;
   key: string;
   readDocument(): { catalog: EffectBundleCatalogEntry; entry: EffectBundleCatalogDocumentEntry };
-  readSource(): HTMLCanvasElement | null;
 }) {
   let active = true;
   let revision = 0;
@@ -50,7 +48,6 @@ export function createEffectPreviewSession({
       const captured = revision;
       const coverRequest = poster;
       const frameProgress = desired;
-      const inputSource = coverRequest ? null : readSource();
       let bitmap: ImageBitmap | null = null;
       try {
         if (coverRequest) bitmap = await restoreCover();
@@ -73,7 +70,6 @@ export function createEffectPreviewSession({
                     entry,
                     frameProgress,
                     captured,
-                    inputSource,
                     getCurrentLocale()
                   )
                 );
@@ -94,7 +90,7 @@ export function createEffectPreviewSession({
             }
           }
         }
-        if (active && coverRequest === poster && (coverRequest || inputSource === readSource())) {
+        if (active && captured === revision && coverRequest === poster) {
           if (target.width !== bitmap.width) target.width = bitmap.width;
           if (target.height !== bitmap.height) target.height = bitmap.height;
           const context = target.getContext('2d');
@@ -117,6 +113,11 @@ export function createEffectPreviewSession({
   };
   return {
     render,
+    renderAutoplay(progress: number) {
+      // Hover ticks are optional. They must not obsolete the frame that can make
+      // a cold preview visible. Explicit scrubs still use render's supersession.
+      if (active && !pending) render(progress);
+    },
     dispose() {
       active = false;
     },

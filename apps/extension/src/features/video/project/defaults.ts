@@ -36,8 +36,6 @@ import {
   VideoOverlayTemplateKind,
   VideoTemplateDirection,
   VideoTemplateIntensity,
-  VideoTransitionRenderKind,
-  VideoTransitionTemplateKind,
 } from './types/index';
 import { getDefaultCursorHidden } from './cursor';
 
@@ -138,11 +136,6 @@ export const DEFAULT_VIDEO_ANNOTATION_CALLOUT_DECOR = {
 } satisfies VideoProjectAnnotationClip['calloutDecor'];
 export const DEFAULT_VIDEO_ANNOTATION_INTRO_MS = 420;
 export const DEFAULT_VIDEO_ANNOTATION_OUTRO_MS = 360;
-export const DEFAULT_VIDEO_TRANSITION_TEMPLATE = VideoTransitionTemplateKind.CROSSFADE;
-export const DEFAULT_VIDEO_TRANSITION_RENDER_KIND = VideoTransitionRenderKind.COMPOSITE;
-export const DEFAULT_VIDEO_TRANSITION_DIRECTION = VideoTemplateDirection.LEFT;
-export const DEFAULT_VIDEO_TRANSITION_INTENSITY = VideoTemplateIntensity.BALANCED;
-export const DEFAULT_VIDEO_TRANSITION_HIGHLIGHT_COLOR = DEFAULT_COLOR_ACCENT;
 
 export function createVideoProjectSource(recordingId: string | null): VideoProjectSource {
   return recordingId

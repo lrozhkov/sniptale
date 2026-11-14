@@ -1,3 +1,5 @@
+import { createValidGlPresetSourceEntry } from '../../../../composition/persistence/effect-bundles/fixture.test-support';
+import { encodeEffectBundleMetadata } from './effect-bundle';
 import { expect, it, vi } from 'vitest';
 import type { ArchiveReader } from '../../../../composition/archive-transfer';
 import type { JsonValue, MediaHubBackupRootEnvelope } from '../contracts';
@@ -287,29 +289,22 @@ it.each(['missing', 'unused', 'size', 'mime'] as const)(
   }
 );
 
-it('admits effect roles and rejects conflicting shared digests', async () => {
-  const digest = 'a'.repeat(64);
-  const root = media();
+it('admits checked visual source roles and rejects conflicting shared digests', async () => {
+  const entry = createValidGlPresetSourceEntry(),
+    root = media(),
+    metadata = encodeEffectBundleMetadata({ entry, objectIds: ['body'] });
+  assertMetadataJson(metadata);
   root.descriptor = { ...root.descriptor, rootKind: 'media', mediaSubtype: 'effect-bundle' };
-  root.metadata = {
-    entry: {
-      packId: 'root',
-      version: '1',
-      documents: [{}],
-      retainedByteLength: 3,
-      assets: [
-        { objectId: 'body', mimeType: 'image/png', byteLength: 3, kind: 'image', sha256: digest },
-      ],
-    },
-  };
+  root.metadata = metadata;
+  root.objects = [{ ...object, mimeType: 'application/json', size: entry.retainedByteLength }];
   await assertArchiveRootObjectInventory(root, reader, []);
   await expect(
     assertArchiveRootObjectInventory(root, reader, [
       {
         id: 'shared',
         path: object.path,
-        mimeType: object.mimeType,
-        size: object.size,
+        mimeType: 'application/json',
+        size: entry.retainedByteLength,
         sha256: 'b'.repeat(64),
       },
     ])

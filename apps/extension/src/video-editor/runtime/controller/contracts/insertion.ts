@@ -5,7 +5,7 @@ import type { VideoProjectActionPreset } from '../../../../features/video/projec
 export interface VideoEditorInsertionActions {
   onAddAnnotationOverlay: VideoEditorProjectActions['addAnnotationOverlay'];
   onAddActionEvent: (preset: VideoProjectActionPreset) => void;
-  onAddMotionRegion: (startTime?: number) => void;
+  onAddMotionRegion: (startTime?: number, effect?: '3d') => void;
   onAddShapeOverlay: VideoEditorProjectActions['addShapeOverlay'];
   onAddSubtitleOverlay?: () => void;
   onAddTextOverlay: () => string | null;

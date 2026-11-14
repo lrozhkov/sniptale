@@ -3,10 +3,10 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import {
-  EFFECT_V1_CONTROL_ICONS,
-  EFFECT_V1_CONTROL_GROUPS,
-  EFFECT_V1_CONTROL_ROOT_ICONS,
-} from '@sniptale/runtime-contracts/effect-v1';
+  EFFECT_CONTROL_ICONS,
+  EFFECT_CONTROL_GROUPS,
+  EFFECT_CONTROL_ROOT_ICONS,
+} from '@sniptale/runtime-contracts/effect-controls';
 import { effectControlIcons, effectControlRootIcon } from './icons';
 
 it('renders all 57 semantic icons with distinct glyphs and contract-owned root reservations', () => {
@@ -17,7 +17,7 @@ it('renders all 57 semantic icons with distinct glyphs and contract-owned root r
     act(() =>
       root.render(
         <>
-          {EFFECT_V1_CONTROL_ICONS.map((id) => {
+          {EFFECT_CONTROL_ICONS.map((id) => {
             const Icon = effectControlIcons[id];
             return <Icon key={id} size={16} />;
           })}
@@ -27,9 +27,9 @@ it('renders all 57 semantic icons with distinct glyphs and contract-owned root r
     const glyphs = [...host.querySelectorAll('svg')].map((node) => node.innerHTML);
     expect(glyphs).toHaveLength(57);
     expect(new Set(glyphs).size).toBe(57);
-    for (const group of EFFECT_V1_CONTROL_GROUPS)
+    for (const group of EFFECT_CONTROL_GROUPS)
       expect(effectControlRootIcon(group)).toBe(
-        effectControlIcons[EFFECT_V1_CONTROL_ROOT_ICONS[group]]
+        effectControlIcons[EFFECT_CONTROL_ROOT_ICONS[group]]
       );
   } finally {
     act(() => root.unmount());

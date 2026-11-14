@@ -60,6 +60,7 @@ export type PreviewStageRootSurfaceProps = Pick<
   | 'previewRasterSize'
   | 'project'
   | 'effectPreparationProject'
+  | 'transformInteraction'
   | 'renderGenerationRef'
   | 'selectedActionOccurrence'
   | 'selectedClipId'

@@ -1,3 +1,4 @@
+import type { ReviewTimelineSnap } from './timeline-magnets';
 import type { ReviewEdit } from '../../features/video/review/types';
 import { placeReviewEditMove } from '../../features/video/review/cuts';
 import {
@@ -19,7 +20,9 @@ export function snapReviewEditDrag(args: {
   playhead: number;
   current: ReviewEdit;
   keyframeMove: boolean;
+  snap?: ReviewTimelineSnap;
 }): { start: number; end: number; guide: number | null } {
+  const snap = args.snap ?? snapTimelineTime;
   const free = freeReviewEditDragRange(args);
   if (args.edge === 'move' && args.keyframeMove) {
     const placed = placeReviewEditMove({
@@ -44,16 +47,16 @@ export function snapReviewEditDrag(args: {
   let guide: number | null = null;
   let { start, end } = free;
   if (args.edge === 'move')
-    return snapReviewEditMove(start, end, args.duration, candidates, threshold);
+    return snapReviewEditMove(start, end, args.duration, candidates, threshold, snap);
   if (args.edge !== 'end') {
-    const snap = snapTimelineTime(start, candidates, threshold);
-    start = snap.time;
-    guide = snap.candidate;
+    const snapped = snap(start, candidates, threshold);
+    start = snapped.time;
+    guide = snapped.candidate;
   }
   if (args.edge !== 'start') {
-    const snap = snapTimelineTime(end, candidates, threshold);
-    end = snap.time;
-    guide = snap.candidate ?? guide;
+    const snapped = snap(end, candidates, threshold);
+    end = snapped.time;
+    guide = snapped.candidate ?? guide;
   }
   return { start, end, guide };
 }
@@ -69,6 +72,11 @@ function freeReviewEditDragRange(args: {
   const { current, edge, duration } = args;
   const delta = (args.deltaPx / args.widthPx) * duration;
   const length = current.end - current.start;
+  if (edge === 'end' && current.kind === 'freeze')
+    return {
+      start: current.start,
+      end: Math.max(current.start + 0.04, Math.min(current.start + 600, current.end + delta)),
+    };
   if (edge === 'end')
     return { start: current.start, end: Math.max(0, Math.min(duration, current.end + delta)) };
   const start = Math.max(
@@ -84,18 +92,21 @@ function snapReviewEditMove(
   end: number,
   duration: number,
   candidates: readonly number[],
-  threshold: number
+  threshold: number,
+  snap: ReviewTimelineSnap
 ): { start: number; end: number; guide: number | null } {
   const length = end - start;
-  const startSnap = snapTimelineTime(
+  const startSnap = snap(
     start,
     candidates.filter((candidate) => candidate >= 0 && candidate <= duration - length),
-    threshold
+    threshold,
+    { start: 0, end: duration - length }
   );
-  const endSnap = snapTimelineTime(
+  const endSnap = snap(
     end,
     candidates.filter((candidate) => candidate >= length && candidate <= duration),
-    threshold
+    threshold,
+    { start: length, end: duration }
   );
   const startDistance =
     startSnap.candidate === null ? Infinity : Math.abs(startSnap.candidate - start);

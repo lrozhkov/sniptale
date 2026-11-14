@@ -27,6 +27,10 @@ export function useReviewTransport(args: {
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
   actionAudio?: readonly ReviewActionAudioSetting[];
+  interactionTimeline?:
+    | import('../../features/video/review/interaction-types').ReviewInteractionTimeline
+    | undefined;
+  interactionEnabled?: { keyboard?: boolean; mouse?: boolean };
   actionsApplied?: boolean;
   onSeek(value: number): void;
   boundaries(): readonly number[] | undefined;
@@ -37,12 +41,23 @@ export function useReviewTransport(args: {
   silent?: boolean;
 }) {
   const { session, source } = args.resource;
+  const playbackAudio = useRef<ReturnType<typeof useReviewEditorAudioRuntime> | null>(null);
+  function failTransport(reason?: ReviewActionAudioUnavailable['reason']) {
+    playbackAudio.current?.stopPlayback();
+    pause();
+    args.onTransportFailure(reason);
+  }
   const {
     video,
+    pause,
+    seekResult,
+    readResultTime,
+    heldResultTime,
     time,
     onTime,
     playing,
     setPlaying,
+    playheadClock,
     setPresentationActive,
     onPresentedTime,
     seek,
@@ -62,17 +77,23 @@ export function useReviewTransport(args: {
     retainCutTime: args.silent ?? false,
     boundaries: args.boundaries,
     onSeek: args.onSeek,
-    onFailure: args.onTransportFailure,
+    onFailure: failTransport,
+    prepareAfterSeek: () => playbackAudio.current?.preparePlayback() ?? Promise.resolve(true),
+    onPreparedPlay: () => playbackAudio.current?.startPlayback(),
     onRecovered: args.onTransportRecovered,
     onInvalidRange: args.onInvalidRange,
   });
-  const timeline = useReviewTimeMap(source, args.edits, time);
+  const timeline = useReviewTimeMap(source, args.edits, time, heldResultTime, readResultTime);
   const actionPlan = useMemo(
     () =>
       buildReviewActionAudioPlan({
-        markers: args.resource.telemetry
-          ? projectReviewTelemetry(args.resource.telemetry, source.duration).markers
-          : [],
+        markers: projectReviewTelemetry(
+          args.resource.telemetry ?? { actionEvents: [], signals: [], cursorTrack: null },
+          source.duration,
+          false,
+          args.interactionTimeline,
+          args.interactionEnabled
+        ).markers,
         settings: args.actionAudio ?? [],
         segments: timeline.timeMap.getSegments(),
         applied: args.actionsApplied === true,
@@ -80,6 +101,8 @@ export function useReviewTransport(args: {
     [
       args.resource.telemetry,
       source.duration,
+      args.interactionTimeline,
+      args.interactionEnabled,
       args.actionAudio,
       args.actionsApplied,
       timeline.timeMap,
@@ -94,16 +117,26 @@ export function useReviewTransport(args: {
             edits: args.edits,
             settings: args.actionAudio ?? [],
             applied: args.actionsApplied === true,
+            interactionTimeline: args.interactionTimeline,
+            interactionEnabled: args.interactionEnabled,
           }
         : null,
-    [args.resource.historyProject, source, args.edits, args.actionAudio, args.actionsApplied]
+    [
+      args.resource.historyProject,
+      source,
+      args.edits,
+      args.actionAudio,
+      args.actionsApplied,
+      args.interactionTimeline,
+      args.interactionEnabled,
+    ]
   );
   const [recordingAudio, setRecordingAudio] = useState<{
     request: typeof recordingAudioRequest;
     source: RecordingProjectActionAudioSource | null;
   } | null>(null);
-  const onFailure = useRef(args.onTransportFailure);
-  onFailure.current = args.onTransportFailure;
+  const onFailure = useRef(failTransport);
+  onFailure.current = failTransport;
   useEffect(() => {
     if (!recordingAudioRequest) {
       setRecordingAudio(null);
@@ -125,31 +158,41 @@ export function useReviewTransport(args: {
     playing: playing && !args.silent,
     silent: args.silent ?? false,
     outputTime: timeline.sceneOutputTime,
-    sourceToResult: timeline.toOutputTime,
+    sourceToResult: timeline.readOutputTime,
     seekRevision,
     originalAudio: args.originalAudio,
+    originalSource: {
+      file: args.resource.file,
+      segments: timeline.timeMap.getSegments(),
+      edits: args.edits,
+    },
     voiceover: args.voiceover,
     music: args.music,
     actionPlan,
     ...(recordingActionSource ? { recordingActionSource } : {}),
     sessionKey: session.getSnapshot().snapshot.workspace.aggregateId,
-    onFailure: args.onTransportFailure,
+    onFailure: failTransport,
     onActionAudioRecovered: args.onActionAudioRecovered,
   });
+  playbackAudio.current = actionSoundPreview;
   return {
     actionSoundPreview,
+    pause,
+    seekResult,
     video,
     time,
     onTime,
     playing,
     setPlaying,
+    playheadClock,
     setPresentationActive,
     onPresentedTime,
     seek,
     play: async () => {
-      if (video.current?.paused && !args.silent) {
+      const active = playing || video.current?.paused === false;
+      if (!active && !args.silent) {
         if (!(await actionSoundPreview.preparePlayback())) return;
-      }
+      } else if (active) actionSoundPreview.stopPlayback();
       play();
     },
     timeline,

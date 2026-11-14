@@ -1,3 +1,4 @@
+import { parseCameraSpatialMotion } from '../../project/motion/spatial';
 import {
   type QuickEditBorder,
   type QuickEditSpotlight,
@@ -12,6 +13,7 @@ import {
 import {
   quickEditFocusType,
   quickEditFocusConflicts,
+  resolveQuickEditActiveFocusRegions,
   resolveQuickEditFocusLink,
 } from './focus-layout';
 import type {
@@ -90,6 +92,8 @@ export function createQuickEditZoomRegion(args: {
 }
 
 export type QuickEditZoomRegionPatch = {
+  effect?: '3d' | null;
+  spatialMotion?: QuickEditZoomRegion['spatialMotion'] | null;
   cameraFollow?: QuickEditZoomRegion['cameraFollow'] | null;
   followCursor?: boolean;
   cursorComposition?: QuickEditZoomRegion['cursorComposition'];
@@ -116,6 +120,7 @@ export function updateQuickEditZoomRegion(
   patch: QuickEditZoomRegionPatch
 ): QuickEditZoomRegion[] {
   if (
+    (patch.spatialMotion !== null && parseCameraSpatialMotion(patch.spatialMotion) === null) ||
     parseCursorCompositionSettings(patch.cursorComposition) === null ||
     parseQuickEditPerspective(patch.perspective) === null ||
     parseQuickEditDepth(patch.depthOfField) === null
@@ -127,6 +132,8 @@ export function updateQuickEditZoomRegion(
     if (region.id !== id) return region;
     const timing = changesPhases ? fitQuickEditZoomTransitions(region) : region;
     const {
+      effect: previousEffect,
+      spatialMotion: previousMotion,
       linkTo: previousLink,
       spotlight: previousSpotlight,
       border: previousBorder,
@@ -148,6 +155,12 @@ export function updateQuickEditZoomRegion(
       patch.cameraFollow === undefined ? previousCameraFollow : patch.cameraFollow;
     const updated = {
       ...rest,
+      ...((patch.effect === undefined ? previousEffect : patch.effect)
+        ? { effect: '3d' as const }
+        : {}),
+      ...((patch.spatialMotion === undefined ? previousMotion : patch.spatialMotion)
+        ? { spatialMotion: patch.spatialMotion ?? previousMotion! }
+        : {}),
       ...(cameraFollow ? { cameraFollow } : {}),
       ...(patch.followCursor === undefined ? {} : { followCursor: patch.followCursor }),
       ...(patch.cursorComposition ? { cursorComposition: patch.cursorComposition } : {}),
@@ -206,7 +219,7 @@ export function resolveQuickEditZoomLink(
   regions: readonly QuickEditZoomRegion[],
   id: string
 ): { source: QuickEditZoomRegion; target: QuickEditZoomRegion } | null {
-  return resolveQuickEditFocusLink(regions, id);
+  return resolveQuickEditFocusLink(resolveQuickEditActiveFocusRegions(regions), id);
 }
 
 /**
@@ -225,6 +238,8 @@ export function clampQuickEditZoomRegion(
       (region) =>
         region.id === id ||
         (selected &&
+          !selected.overlapPolicy &&
+          !region.overlapPolicy &&
           quickEditFocusType(selected) === 'zoom' &&
           quickEditFocusType(region) === 'zoom' &&
           !region.dormant)
@@ -263,7 +278,7 @@ export function availableQuickEditZoomRange(args: {
   type?: 'zoom' | 'spotlight' | 'border';
 }): { start: number; end: number } | null {
   const preferredLength = args.preferredLength ?? DEFAULT_REGION_SECONDS;
-  const active = args.regions
+  const active = resolveQuickEditActiveFocusRegions(args.regions)
     .filter(
       (region) =>
         !region.dormant && (args.type ?? 'zoom') === 'zoom' && quickEditFocusType(region) === 'zoom'
@@ -348,6 +363,8 @@ function activeQuickEditZoomWindow(regions: readonly QuickEditZoomRegion[], id: 
       (region) =>
         region.id === id ||
         (!region.dormant &&
+          !region.overlapPolicy &&
+          !selected?.overlapPolicy &&
           selected &&
           quickEditFocusType(selected) === 'zoom' &&
           quickEditFocusType(region) === 'zoom')

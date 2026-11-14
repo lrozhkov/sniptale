@@ -1,3 +1,4 @@
+import { duplicateAudioProcessing } from '../audio/effects/presets';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseReviewAudioClip } from '../review/audio-clip-validation';
 import { parseVoiceoverSegments } from '../review/voiceover-validation';
@@ -38,6 +39,7 @@ const takeFields = [
   'dormant',
   'transcript',
   'textSnapshot',
+  'audioProcessing',
 ];
 
 /** Admits authored takes, never the disposable playback rate, slices or fade phase. */
@@ -303,7 +305,18 @@ export function duplicateProjectSourceVoiceoverDocuments(
               : { originalAudioSourceInstanceId: originalInstance }),
             id: createId(),
             binding: { ...document.binding, sourceInstanceId },
-            take: { ...structuredClone(document.take), id: createId() },
+            take: {
+              ...structuredClone(document.take),
+              id: createId(),
+              ...(document.take.audioProcessing
+                ? {
+                    audioProcessing: duplicateAudioProcessing(
+                      document.take.audioProcessing,
+                      createId
+                    ),
+                  }
+                : {}),
+            },
           },
         ]
       : [];

@@ -1,3 +1,4 @@
+import { ReviewTimelineMultiSelectionContext } from './selection-actions';
 import { createPortal } from 'react-dom';
 import { useReviewTrackHeader } from './timeline-panes';
 import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
@@ -22,6 +23,7 @@ type ReviewTrackControlsState = {
   selectedTrack?: QuickEditTrack | null;
   selectable?: Partial<Record<QuickEditTrack, boolean>>;
   selectTrack?(track: QuickEditTrack): void;
+  focusItemTrack?(track: QuickEditTrack): void;
   busy: boolean;
   unavailable: Partial<Record<QuickEditTrack, boolean>>;
   setEnabled(track: Exclude<QuickEditTrack, 'source'>, enabled: boolean): void;
@@ -66,6 +68,7 @@ export function ReviewTrackRow(props: TrackRowProps) {
     !!(track && controls && reviewTrackEnabled(controls.ui, track)) &&
     !unavailable &&
     !props.placeholder;
+  const multiSelection = useContext(ReviewTimelineMultiSelectionContext);
   const muted = !!props.muted || !!(track && controls && !enabled);
   const visible =
     !(props.placeholder && !controls?.configuring) &&
@@ -84,6 +87,7 @@ export function ReviewTrackRow(props: TrackRowProps) {
     <div
       ref={placement.body}
       data-review-track={track}
+      data-review-track-selected={!!track && controls?.selectedTrack === track ? 'true' : 'false'}
       data-review-track-muted={muted ? 'true' : 'false'}
       className={[
         placement.header
@@ -96,6 +100,15 @@ export function ReviewTrackRow(props: TrackRowProps) {
       <div
         data-review-track-content
         className="relative min-w-0"
+        onKeyDownCapture={(event) => {
+          if (
+            track &&
+            (event.key === 'Enter' || event.key === ' ') &&
+            event.target instanceof Element &&
+            event.target.closest('[data-review-removal-key],button,[role="button"]')
+          )
+            controls?.focusItemTrack?.(track);
+        }}
         onPointerDownCapture={(event) => {
           if (
             !track ||
@@ -105,12 +118,22 @@ export function ReviewTrackRow(props: TrackRowProps) {
           )
             return;
           if (
+            event.target instanceof Element &&
+            event.target.closest('[data-review-removal-key],button,[role="button"]')
+          ) {
+            controls?.focusItemTrack?.(track);
+            multiSelection?.captureModified(event);
+            return;
+          }
+          if (
             !(event.target instanceof Element) ||
             event.target.closest(
               'button,input,select,textarea,a,[role="button"],[data-audio-id],[data-text-id],[data-review-removal-key]'
             )
           )
             return;
+          // Empty-space gestures on the active lane retain its drawing tool and inspector.
+          if (controls?.selectedTrack === track) return;
           controls?.selectTrack?.(track);
         }}
       >
@@ -211,18 +234,19 @@ export function ReviewTrackCuts({
 }: {
   projection?: import('./track-projection').ReviewTrackProjection | undefined;
 }) {
-  return projection?.cuts.map((cut) => (
-    <div
-      key={cut.sourceStart}
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-y-0 z-10 bg-[var(--sniptale-color-surface-panel)]
-        opacity-80 border-x border-dashed border-[var(--sniptale-color-border-soft)]"
-      style={{
-        left: `${(cut.sourceStart / projection.duration) * 100}%`,
-        width: `${((cut.sourceEnd - cut.sourceStart) / projection.duration) * 100}%`,
-      }}
-    />
-  ));
+  return projection?.cuts.map((cut) => {
+    const left = projection.focus.position(cut.sourceStart);
+    const right = projection.focus.position(cut.sourceEnd, 'end');
+    return (
+      <div
+        key={cut.sourceStart}
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 z-10 bg-[var(--sniptale-color-surface-panel)]
+          opacity-80 border-x border-dashed border-[var(--sniptale-color-border-soft)]"
+        style={{ left: `${left * 100}%`, width: `${(right - left) * 100}%` }}
+      />
+    );
+  });
 }
 
 /** Timeline density is a view preference, separate from enabled/editing state. */

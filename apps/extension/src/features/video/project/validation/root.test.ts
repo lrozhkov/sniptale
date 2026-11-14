@@ -1,3 +1,4 @@
+import { createSourceImageFilter } from '../../../image-filters/contract';
 import { createQuickEditBorder, createQuickEditSpotlight } from '../scene/focus-appearance';
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../factories/creation';
@@ -667,7 +668,7 @@ it('requires schema29 for explicit text duration modes and retains old roots wit
   };
   expect(isHydratableVideoProject({ ...project, version: 29, textDocuments: [entry] })).toBe(true);
   expect(isHydratableVideoProject({ ...project, version: 28, textDocuments: [entry] })).toBe(false);
-  expect(isHydratableVideoProject({ ...project, version: 52, textDocuments: [entry] })).toBe(false);
+  expect(isHydratableVideoProject({ ...project, version: 56, textDocuments: [entry] })).toBe(false);
   expect(
     isHydratableVideoProject({
       ...project,
@@ -707,7 +708,7 @@ it('requires schema30 for explicit audio duration modes', async () => {
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
     expect(isHydratableVideoProject({ ...project, version })).toBe(true);
   }
-  expect(isHydratableVideoProject({ ...changed, version: 52 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 56 })).toBe(false);
   expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(30);
 });
 
@@ -754,7 +755,7 @@ it('admits complete source cursor observations only at schema33 without changing
   expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
   for (let version = 2; version < 33; version++)
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-  expect(isHydratableVideoProject({ ...changed, version: 52 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 56 })).toBe(false);
   expect(isHydratableVideoProject(project)).toBe(true);
   for (const time of [9, 86400]) {
     const beyondMedia = {
@@ -881,8 +882,10 @@ it('fences and validates converted motion area directions at the project boundar
 
 it('fences explicit effect attachment at schema38 and retains dormant source placement', async () => {
   const { readFileSync } = await import('node:fs');
-  const { sha256EffectV1Bytes, validateEffectV1Document } =
-    await import('@sniptale/runtime-contracts/effect-v1');
+  const { validateAnimationTemplate } =
+    await import('@sniptale/runtime-contracts/animation-template');
+  const { sha256: hashBytes } = await import('@noble/hashes/sha2.js');
+  const { bytesToHex } = await import('@noble/hashes/utils.js');
   const { createVideoProjectFromRecording } = await import('../factories/creation');
   const { createEffectHostClip } = await import('../factories/overlay-clip');
   const project = createVideoProjectFromRecording({
@@ -898,11 +901,13 @@ it('fences explicit effect attachment at schema38 and retains dormant source pla
   if (sourceClip.type !== 'VIDEO') throw new Error('Expected video source');
   sourceClip.sourceInstanceId = 'source-instance';
   const source = readFileSync(
-    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
+    'apps/extension/public/video-effects/animations/frame.sniptale-animation.json',
     'utf8'
   );
-  const document = validateEffectV1Document(JSON.parse(source)).document!;
-  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(source));
+  const result = validateAnimationTemplate(JSON.parse(source));
+  if (!result.ok) throw new Error(JSON.stringify(result.diagnostics));
+  const document = result.template;
+  const sha256 = bytesToHex(hashBytes(new TextEncoder().encode(source)));
   const host = createEffectHostClip({
     effectInstanceId: 'annotation',
     duration: 3,
@@ -926,7 +931,7 @@ it('fences explicit effect attachment at schema38 and retains dormant source pla
         source,
         documentId: document.id,
         kind: 'standalone',
-        schemaVersion: 'sniptale.effect.v1',
+        schemaVersion: 'sniptale.animation.v1',
         assets: [],
         retainedByteLength: new TextEncoder().encode(source).byteLength,
       },
@@ -950,7 +955,7 @@ it('fences explicit effect attachment at schema38 and retains dormant source pla
   expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
   for (let version = 2; version < 38; version++)
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-  expect(isHydratableVideoProject({ ...changed, version: 52 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 56 })).toBe(false);
   expect(isHydratableVideoProject({ ...changed, clips: [host] })).toBe(true);
   for (const attachment of [
     null,
@@ -1055,7 +1060,7 @@ it('fences retained experimental watermark metadata at schema42 without discardi
   expect(isHydratableVideoProject(project)).toBe(true);
   expect(isHydratableVideoProject(JSON.parse(JSON.stringify(project)))).toBe(true);
   expect(isHydratableVideoProject({ ...project, version: 41 })).toBe(false);
-  expect(isHydratableVideoProject({ ...project, version: 52 })).toBe(false);
+  expect(isHydratableVideoProject({ ...project, version: 56 })).toBe(false);
   expect(
     isHydratableVideoProject({
       ...project,
@@ -1085,4 +1090,89 @@ it.each([
   expect(isHydratableVideoProject({ ...project, version: 47, motionRegions: [region] })).toBe(
     false
   );
+});
+
+it('fences known source filters at schema fifty-two and refuses unsupported source operations', async () => {
+  const { createVideoProjectFromRecording } = await import('../factories/creation');
+  const project = createVideoProjectFromRecording({
+    recordingId: 'source-filters',
+    filename: 'source.webm',
+    width: 640,
+    height: 360,
+    duration: 3,
+    mimeType: 'video/webm',
+    size: 100,
+  });
+  const stack = {
+    version: 1 as const,
+    filters: [
+      createSourceImageFilter('color', 'color'),
+      { ...createSourceImageFilter('blur', 'blur'), enabled: false },
+    ],
+  };
+  const changed = applyVideoProjectMutationPatch(project, {
+    clips: project.clips.map((clip) =>
+      clip.type === 'VIDEO' ? { ...clip, sourceFilters: stack } : clip
+    ),
+  });
+  expect(changed.version).toBe(52);
+  expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
+  expect(isHydratableVideoProject({ ...changed, version: 51 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 56 })).toBe(false);
+  for (const sourceFilters of [
+    null,
+    { ...stack, version: 2 },
+    {
+      version: 1,
+      filters: [{ id: 'unsupported', kind: 'custom', enabled: true, intensity: 1, parameters: {} }],
+    },
+  ]) {
+    const raw = {
+      ...changed,
+      clips: changed.clips.map((clip) =>
+        clip.type === 'VIDEO' ? { ...clip, sourceFilters } : clip
+      ),
+    };
+    const before = structuredClone(raw);
+    expect(isHydratableVideoProject(raw)).toBe(false);
+    expect(raw).toEqual(before);
+  }
+  const removed = applyVideoProjectMutationPatch(changed, { clips: project.clips });
+  expect(removed.version).toBe(52);
+  expect(project.clips.some((clip) => 'sourceFilters' in clip)).toBe(false);
+});
+
+it('retains placement audio processing only at schema 53 and preserves the fence after removal', async () => {
+  const { createVideoProjectFromRecording } = await import('../factories/creation');
+  const { parseHydratableVideoProject } = await import('./root');
+  const base = createVideoProjectFromRecording({
+    recordingId: 'audio-source',
+    filename: 'Source.webm',
+    width: 640,
+    height: 360,
+    duration: 4,
+    mimeType: 'video/webm',
+    size: 100,
+    hasAudio: true,
+  });
+  const processing = { version: 1 as const, bypassed: false, effects: [] };
+  const clips = base.clips.map((clip) =>
+    clip.type === 'VIDEO' || clip.type === 'AUDIO' ? { ...clip, audioProcessing: processing } : clip
+  );
+  const project = applyVideoProjectMutationPatch(base, { clips });
+  expect(project.version).toBe(53);
+  expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(project)))).toEqual(project);
+  expect(isHydratableVideoProject({ ...project, version: 52 })).toBe(false);
+  const invalid = {
+    ...project,
+    clips: project.clips.map((clip) => ({
+      ...clip,
+      audioProcessing: { ...processing, arbitraryCode: 'forbidden' },
+    })),
+  };
+  expect(isHydratableVideoProject(invalid)).toBe(false);
+  const removed = applyVideoProjectMutationPatch(project, { clips: base.clips });
+  expect(removed.version).toBe(53);
+  expect(isHydratableVideoProject(removed)).toBe(true);
+  expect(base.clips.every((clip) => !('audioProcessing' in clip))).toBe(true);
 });

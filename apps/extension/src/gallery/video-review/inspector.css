@@ -237,9 +237,12 @@
 }
 
 /* The viewport owns the edge gutter so rail targets and heading hover surfaces are not clipped. */
-.review-inspector-scroll {
+.review-inspector-scroll,
+.review-track-items-host {
   margin-inline: -12px;
   padding-inline: 12px;
+}
+.review-inspector-scroll {
   overflow-x: hidden;
 }
 
@@ -439,4 +442,38 @@
 [data-ui='gallery.videoReview.inspector'] .review-project-title:focus-visible {
   outline: 1px solid var(--sniptale-color-border-strong);
   outline-offset: -1px;
+}
+
+/* Removal affordances share one semantic hover color in both action presentations. */
+.review-inspector-danger:enabled:hover svg {
+  color: var(--sniptale-color-danger);
+}
+
+/* Exact endpoints stay on the first row; source/result durations use the full inspector width. */
+.review-interval {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+}
+.review-interval [data-ui='gallery.videoReview.intervalValues'] {
+  display: contents;
+}
+.review-interval [data-ui='gallery.videoReview.intervalRange'] {
+  grid-column: 2;
+  overflow-wrap: anywhere;
+}
+.review-interval [data-ui='gallery.videoReview.intervalDuration'] {
+  grid-column: 1 / -1;
+  justify-self: end;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 100%;
+  white-space: normal;
+  font-size: 12px;
+}
+.review-interval [data-ui='gallery.videoReview.intervalDuration'] > span:first-child {
+  display: none;
+}
+.review-interval [data-ui='gallery.videoReview.intervalDuration'] > span {
+  white-space: nowrap;
 }

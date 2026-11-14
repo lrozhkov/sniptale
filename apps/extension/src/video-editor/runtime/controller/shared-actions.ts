@@ -233,11 +233,17 @@ function createMotionRegionUpdaters(store: WorkspaceProjectUpdaterStore) {
 }
 
 function createMotionRegionAdder(store: PreviewProjectUpdaterStore) {
-  return (startTime?: number) => {
+  return (startTime?: number, effect?: '3d') => {
     store.updateProject((project) => {
       if (project.motionRegions?.length && getVideoProjectUtilityLanes(project).camera.locked)
         return project;
-      const range = getMotionInsertionRange(project, startTime ?? store.getCurrentTime());
+      const time = startTime ?? store.getCurrentTime();
+      const range =
+        effect === '3d'
+          ? Number.isFinite(time) && time >= 0 && time < project.duration
+            ? { startTime: time, duration: project.duration - time }
+            : null
+          : getMotionInsertionRange(project, time);
       if (!range) return project;
       const created = createVideoProjectMotionRegion(
         project,
@@ -246,6 +252,17 @@ function createMotionRegionAdder(store: PreviewProjectUpdaterStore) {
       );
       const region = bindMotionRegionToUniqueVideo(project, {
         ...created,
+        ...(created.cursorComposition
+          ? { cursorComposition: { ...created.cursorComposition, mode: 'off' as const } }
+          : {}),
+        ...(effect === '3d'
+          ? {
+              effect,
+              focusMode: 'MANUAL' as const,
+              scale: 1,
+              perspective: { enabled: true, rotateX: -12, rotateY: 18, rotateZ: 0, strength: 0.5 },
+            }
+          : {}),
         duration: Math.min(created.duration, range.duration),
       });
       queueMicrotask(() => store.selectMotionRegion(region.id));

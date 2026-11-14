@@ -1,3 +1,4 @@
+import { ReviewCursorMotionOverlay } from './cursor-motion-overlay';
 import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
 import {
   reviewPresentedStageProjection,
@@ -52,7 +53,15 @@ import {
   type ReviewStageFocusPicker,
 } from './stage-focus';
 import { ReviewSpotlightOverlay } from './spotlight-overlay';
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+  type ReactNode,
+} from 'react';
 import { projectVideoRegion } from '../../features/video/review/geometry';
 import type {
   CanvasComment,
@@ -89,6 +98,8 @@ type ReviewStageCommentBinding = {
 };
 
 type ReviewStageProps = {
+  previewOverlay?: ReactNode;
+  cursorMotions?: import('../../features/video/project/cursor-motion').CursorMotion[] | undefined;
   cursorPath?: Omit<Parameters<typeof ReviewCursorPathOverlay>[0], 'width' | 'height'> | undefined;
   annotationEditing?: ReviewAnnotationEditing | undefined;
   onAnnotationGeometry?: ReviewAnnotationEditing['editor']['setGeometry'] | undefined;
@@ -209,14 +220,19 @@ export function ReviewStage(props: ReviewStageProps) {
   const receiveGeometry = useCallback(
     (geometry: ReviewPresentedGeometry | null, sourceTime?: number, sourceIdentity?: string) => {
       if (sourceIdentity !== undefined && sourceIdentity !== props.url) return;
-      setReceipt((previous) =>
-        previous?.source === props.url && previous.geometry === geometry
-          ? previous
-          : { source: props.url, geometry }
-      );
-      if (geometry && sourceTime !== undefined) onPresentedTime?.(props.url, sourceTime);
+      const publish = () => {
+        setReceipt((previous) =>
+          previous?.source === props.url && previous.geometry === geometry
+            ? previous
+            : { source: props.url, geometry }
+        );
+        if (sourceTime !== undefined) onPresentedTime?.(props.url, sourceTime);
+      };
+      // One displayed frame must not cause separate urgent geometry and deferred clock commits.
+      if (props.preview?.playing) startTransition(publish);
+      else publish();
     },
-    [props.url, onPresentedTime]
+    [props.url, props.preview?.playing, onPresentedTime]
   );
   const presented = receipt?.source === props.url ? receipt.geometry : null;
   const representedProps =
@@ -263,6 +279,47 @@ export function ReviewStage(props: ReviewStageProps) {
     size,
     receiveGeometry
   );
+  useEffect(() => {
+    const video = props.video.current;
+    if (presentation.active || !video || !onPresentedTime) return;
+    let frame: number | null = null;
+    let paint: number | null = null;
+    const cancel = () => {
+      if (frame !== null) video.cancelVideoFrameCallback(frame);
+      if (paint !== null) cancelAnimationFrame(paint);
+      frame = null;
+      paint = null;
+    };
+    const seeking = () => {
+      cancel();
+      const target = video.currentTime;
+      if (typeof video.requestVideoFrameCallback !== 'function') return;
+      const presented = () => {
+        frame = null;
+        if (video.currentTime !== target) return;
+        if (video.seeking) frame = video.requestVideoFrameCallback(presented);
+        else onPresentedTime(props.url, target);
+      };
+      frame = video.requestVideoFrameCallback(presented);
+    };
+    const seeked = () => {
+      if (typeof video.requestVideoFrameCallback === 'function') return;
+      const target = video.currentTime;
+      paint = requestAnimationFrame(() => {
+        paint = requestAnimationFrame(() => {
+          paint = null;
+          if (!video.seeking && video.currentTime === target) onPresentedTime(props.url, target);
+        });
+      });
+    };
+    video.addEventListener('seeking', seeking);
+    video.addEventListener('seeked', seeked);
+    return () => {
+      cancel();
+      video.removeEventListener('seeking', seeking);
+      video.removeEventListener('seeked', seeked);
+    };
+  }, [presentation.active, props.video, props.url, onPresentedTime]);
   const manual = presentation.active && presentation.status.actualRaster !== null;
   const { header, motion, projection, windowProjection, plane, projected } =
     useStageInteractionGeometry(
@@ -386,6 +443,7 @@ export function ReviewStage(props: ReviewStageProps) {
           captions={props.captions}
           onCaptionSelect={props.onCaptionSelect}
         />
+        {props.previewOverlay}
       </div>
     </div>
   );
@@ -509,6 +567,8 @@ function ReviewStageNativeEffects({
     <>
       {(!props.drawing || sceneLayout?.spatial) && props.scene && sceneLayout ? (
         <ReviewMotionBlurPreview
+          sourceFilters={props.scene.sourceFilters}
+          sourceSize={props.source}
           scene={{ ...props.scene, source: props.source }}
           focus={props.scene.focus}
           camera={props.scene.camera}
@@ -628,7 +688,7 @@ function ReviewStageContent({
             video={computeQuickEditSourceWindowTransform(sceneLayout)}
           />
         ) : null}
-        {props.cursorPath && sceneLayout && !projection ? (
+        {props.cursorPath && !props.cursorPath.authoredMotion && sceneLayout && !projection ? (
           <div
             className="pointer-events-none absolute"
             style={{
@@ -666,6 +726,14 @@ function ReviewStageContent({
         ) : null}
         {windowFocus ? null : focus}
       </div>
+      {props.cursorPath?.authoredMotion && sceneLayout ? (
+        <ReviewCursorMotionOverlay
+          {...props.cursorPath}
+          output={size}
+          video={sceneLayout.videoTransform}
+          projection={projection}
+        />
+      ) : null}
       {windowFocus ? (
         <div
           className="pointer-events-none absolute inset-0"

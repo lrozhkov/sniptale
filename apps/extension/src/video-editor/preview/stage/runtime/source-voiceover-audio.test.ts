@@ -7,6 +7,7 @@ import type {
   QuickEditAudioPlanEntry,
   QuickEditClipSchedule,
 } from '../../../../features/video/review/advanced/audio-plan';
+import { createAudioEffectInstance } from '../../../../features/video/audio/effects/catalog';
 import { createProjectSourceVoiceoverAudioRuntime } from './source-voiceover-audio';
 
 class Engine implements ReviewAudioEngine {
@@ -252,4 +253,79 @@ it('does not publish an aborted preparation and prepares it again before retry',
   expect(engine.prepareClip).toHaveBeenCalledTimes(2);
   await runtime.sync(input());
   expect(engine.scheduleClip).toHaveBeenCalledOnce();
+});
+
+it('primes active processing at1x before playback, schedules once, and rebuilds after pause', async () => {
+  const { runtime, engine } = fixture();
+  const dispose = vi.fn(),
+    stop = vi.fn();
+  const schedule = vi.fn(() => ({ stop }));
+  const prepareProcessedClip = vi.fn(async () => ({ schedule, dispose }));
+  Object.assign(engine, { prepareProcessedClip });
+  const args = {
+    ...input(),
+    entries: [
+      {
+        ...entry,
+        playbackRate: 1,
+        audioProcessing: {
+          version: 1 as const,
+          bypassed: false,
+          effects: [createAudioEffectInstance('eq', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1')],
+        },
+      },
+    ],
+  };
+  await runtime.prepare(args, new AbortController().signal);
+  expect(engine.decode).not.toHaveBeenCalled();
+  expect(prepareProcessedClip).toHaveBeenCalledWith(
+    expect.any(Blob),
+    args.entries[0],
+    1,
+    expect.any(AbortSignal),
+    expect.any(Function)
+  );
+  expect(schedule).not.toHaveBeenCalled();
+  await runtime.sync(args);
+  expect(prepareProcessedClip).toHaveBeenCalledOnce();
+  expect(schedule).toHaveBeenCalledWith(expect.objectContaining({ offset: 1.37, duration: 3 }));
+  await runtime.sync({ ...args, currentTime: 2.05 });
+  expect(schedule).toHaveBeenCalledOnce();
+  await runtime.sync({ ...args, isPlaying: false });
+  expect(dispose).toHaveBeenCalledOnce();
+  await runtime.prepare(args, new AbortController().signal);
+  expect(prepareProcessedClip).toHaveBeenCalledTimes(2);
+  runtime.close();
+});
+
+it('reports processed failure through the existing owner and restores only explicit bypass', async () => {
+  const { runtime, engine } = fixture();
+  const dispose = vi.fn(),
+    schedule = vi.fn(() => ({ stop: vi.fn() }));
+  const prepareProcessedClip = vi.fn<NonNullable<ReviewAudioEngine['prepareProcessedClip']>>(
+    async () => ({ dispose, schedule })
+  );
+  Object.assign(engine, { prepareProcessedClip });
+  const processing = {
+    version: 1 as const,
+    bypassed: false,
+    effects: [createAudioEffectInstance('eq', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1')],
+  };
+  const args = {
+    ...input(),
+    entries: [{ ...entry, playbackRate: 1, audioProcessing: processing }],
+  };
+  await runtime.prepare(args, new AbortController().signal);
+  await runtime.sync(args);
+  prepareProcessedClip.mock.calls[0]![4](new Error('Processed underrun'));
+  await expect(runtime.sync({ ...args, currentTime: 2.02 })).rejects.toThrow('Processed underrun');
+  expect(engine.decode).not.toHaveBeenCalled();
+  expect(engine.scheduleClip).not.toHaveBeenCalled();
+  await runtime.sync({
+    ...args,
+    entries: [{ ...args.entries[0]!, audioProcessing: { ...processing, bypassed: true } }],
+  });
+  expect(engine.decode).toHaveBeenCalledOnce();
+  expect(engine.scheduleClip).toHaveBeenCalledOnce();
+  runtime.close();
 });

@@ -336,10 +336,10 @@ it.each(['commit', 'cancel'] as const)(
     );
     if (ending === 'commit') {
       expect(scenario.onUpdateClipTransform).toHaveBeenCalledOnce();
-      expect(scenario.onUpdateClipTransform).toHaveBeenCalledWith(
-        host.id,
-        expect.objectContaining({ x: expect.closeTo(200, 7), y: expect.closeTo(150, 7) })
-      );
+      expect(scenario.onUpdateClipTransform).toHaveBeenCalledWith(host.id, {
+        x: expect.closeTo(200, 7),
+        y: expect.closeTo(150, 7),
+      });
     } else {
       expect(scenario.onUpdateClipTransform).not.toHaveBeenCalled();
       expect(restore).toHaveBeenCalledWith(host.id);

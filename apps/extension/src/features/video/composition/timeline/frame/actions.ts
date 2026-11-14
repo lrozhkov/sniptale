@@ -1,3 +1,4 @@
+import { projectSourceInteractionActions } from '../../../project/source-interaction-documents';
 import { recordingEventProjectActions } from '../../../project/recording-events/project-facts';
 import { resolveCursorSourcePointMapping } from './cursor';
 import { getVideoClipPresentationTime } from '../../../project/timeline/rate';
@@ -100,23 +101,26 @@ export function resolveVideoCompositionActions(
     if (state)
       states.push({ ...state, clipId: null, keyStyleViewportWidth: REVIEW_KEY_VIEWPORT_WIDTH });
   }
+  const sourceActions = projectSourceInteractionActions(
+    project,
+    recordingEventProjectActions(project)
+  );
   for (const feedback of evaluateProjectGestureFeedback(project, currentTime)) {
     const clip = project.clips.find((clip) => clip.id === feedback.clipId);
     const instanceId = clip?.type === 'VIDEO' ? clip.sourceInstanceId : null;
-    const event = recordingEventProjectActions(project).find(
+    const event = sourceActions.find(
       (event) =>
-        event.anchor.kind === 'recording-source' &&
+        event.anchor.kind !== 'project' &&
         event.anchor.sourceEventId === feedback.eventId &&
         event.anchor.sourceInstanceId === instanceId
     );
-    if (!event) continue;
+    if (!event || event.presentation?.enabled === false) continue;
     const occurrence = {
       event,
       eventId: event.id,
       clipId: feedback.clipId,
       time: currentTime,
-      sourceInstanceId:
-        event.anchor.kind === 'recording-source' ? event.anchor.sourceInstanceId : null,
+      sourceInstanceId: event.anchor.kind !== 'project' ? event.anchor.sourceInstanceId : null,
       playbackRun: null,
     };
     states.push({
@@ -142,12 +146,13 @@ export function resolveVideoCompositionActionSourceMapping(
   currentTime: number
 ): Omit<VisualLayerSourcePointMapping, 'point'> | null {
   const anchor = occurrence.event.anchor;
-  if (anchor.kind !== 'recording-source') return null;
+  if (anchor.kind === 'project') return null;
   const clip = project.clips.find((item) => item.id === occurrence.clipId);
   if (
     clip?.type !== 'VIDEO' ||
     !hasCameraMediaAt(project, clip, currentTime) ||
     clip.sourceInstanceId !== anchor.sourceInstanceId ||
+    (anchor.kind === 'source' && clip.assetId !== anchor.assetId) ||
     anchor.sourceTime < clip.sourceStart ||
     anchor.sourceTime >= clip.sourceStart + clip.sourceDuration
   )

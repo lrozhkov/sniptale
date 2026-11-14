@@ -45,7 +45,11 @@ export function reviewAdvancedContentBaseline(state: {
   keyAnimations?: QuickEditAdvancedContent['keyAnimations'];
   clickAnimations?: QuickEditAdvancedContent['clickAnimations'];
   actionAudio?: QuickEditAdvancedContent['actionAudio'];
+  interactionTimeline?: QuickEditAdvancedContent['interactionTimeline'];
   cursorFocusPath?: QuickEditAdvancedContent['cursorFocusPath'];
+  cursorMotions?: QuickEditAdvancedContent['cursorMotions'];
+  cursorMotionEnabled?: boolean;
+  sourceFilters?: QuickEditAdvancedContent['sourceFilters'];
   canvas?: QuickEditAdvancedContent['canvas'];
   windowHeader?: QuickEditAdvancedContent['windowHeader'];
   webcam?: QuickEditAdvancedContent['webcam'];
@@ -60,11 +64,17 @@ export function reviewAdvancedContentBaseline(state: {
     zoom: state.zoom,
     background: state.background,
     audio: state.audio,
+    ...(state.sourceFilters ? { sourceFilters: state.sourceFilters } : {}),
     ...(state.actionsEnabled === undefined ? {} : { actionsEnabled: state.actionsEnabled }),
     ...(state.keyAnimations ? { keyAnimations: state.keyAnimations } : {}),
     ...(state.clickAnimations ? { clickAnimations: state.clickAnimations } : {}),
     ...(state.actionAudio ? { actionAudio: state.actionAudio } : {}),
+    ...(state.interactionTimeline ? { interactionTimeline: state.interactionTimeline } : {}),
     ...(state.cursorFocusPath ? { cursorFocusPath: state.cursorFocusPath } : {}),
+    ...(state.cursorMotions ? { cursorMotions: state.cursorMotions } : {}),
+    ...(state.cursorMotionEnabled === undefined
+      ? {}
+      : { cursorMotionEnabled: state.cursorMotionEnabled }),
     ...(state.canvas ? { canvas: state.canvas } : {}),
     ...(state.windowHeader ? { windowHeader: state.windowHeader } : {}),
     ...(state.webcam ? { webcam: state.webcam } : {}),
@@ -100,12 +110,10 @@ function replaceAdvancedContent(
   before: QuickEditAdvancedContent,
   after: QuickEditAdvancedContent
 ): QuickEditAdvancedContent {
-  const currentJson = JSON.stringify(current);
-  const beforeJson = JSON.stringify(before);
-  if (currentJson !== beforeJson) {
+  if (!equalAdvancedContentValue(current, before)) {
     throw new ReviewHistoryError('before-mismatch');
   }
-  if (beforeJson === JSON.stringify(after)) {
+  if (equalAdvancedContentValue(before, after)) {
     throw new ReviewHistoryError('no-change');
   }
   return after;
@@ -205,6 +213,7 @@ export function applyReviewOperation(
   const previousEnd: Record<'cut' | 'speed', number> = { cut: 0, speed: 0 };
   let removed = 0;
   for (const edit of ordered) {
+    if (edit.kind === 'freeze') continue;
     if (edit.start < previousEnd[edit.kind]) throw new ReviewHistoryError('edit-overlap');
     previousEnd[edit.kind] = edit.end;
     if (edit.kind === 'cut') removed += edit.end - edit.start;
@@ -248,6 +257,13 @@ export function applyReviewOperation(
       audio: {
         ...advancedContent.audio,
         voiceoverSegments: buildReviewTimeMap(source.duration, edits),
+        music: advancedContent.audio.music.map((clip) =>
+          clip.sourceAnchor ||
+          operation.before?.kind === 'freeze' ||
+          operation.after?.kind === 'freeze'
+            ? anchorReviewVoiceover(clip, previous)
+            : clip
+        ),
         voiceover: advancedContent.audio.voiceover.map((clip) => {
           const anchored = anchorReviewVoiceover(clip, previous);
           return operation.normalizeVoiceoverTempo

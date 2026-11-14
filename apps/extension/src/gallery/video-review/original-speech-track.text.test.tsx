@@ -377,3 +377,42 @@ it('replaces the old native placement only when an anchored text drag commits', 
   expect(current.fragments[0]).toMatchObject({ start: 1.5, end: 2.5, timingRevision: 1 });
   expect(current.fragments[0]?.sourceAnchor).toBeUndefined();
 });
+
+it('anchors result-text resize to its edge when a handle is grabbed off-center across a speed boundary', async () => {
+  const initial: ReviewTextDocument = {
+    version: 1,
+    fragments: [
+      {
+        id: 'text',
+        text: 'edge',
+        originalText: '',
+        start: 1,
+        end: 3,
+        timeDomain: 'result',
+        revision: 0,
+        timingRevision: 0,
+        alignment: 'manual',
+        showInVideo: true,
+      },
+    ],
+  };
+  const edits: ReviewEdit[] = [
+    {
+      id: 'rate',
+      kind: 'speed',
+      start: 4,
+      end: 8,
+      requestedStart: 4,
+      requestedEnd: 8,
+      rate: 2,
+      audio: 'speed',
+    },
+  ];
+  act(() => root.render(<Fixture initial={initial} edits={edits} />));
+  const block = prepare();
+  await pointer(block.querySelector('[data-text-edge="end"]')!, 'pointerdown', 294, true);
+  await pointer(block, 'pointermove', 494, true);
+  await pointer(block, 'pointerup', 494, true);
+  expect(current.fragments[0]!.end).toBeCloseTo(4.5, 7);
+  expect(editor.sourceInterval(current.fragments[0]!).end).toBeCloseTo(5, 7);
+});

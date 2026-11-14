@@ -32,7 +32,7 @@ export type ReviewAudioLane = 'voiceover' | 'music';
 
 type ReviewAudioArgs = {
   audio: QuickEditAudioState;
-  setAudio(update: (audio: QuickEditAudioState) => QuickEditAudioState): void;
+  setAudio(update: (audio: QuickEditAudioState) => QuickEditAudioState, discrete?: boolean): void;
   timelineDuration: number;
   sourceDuration?: number;
   voiceoverEnabled?: boolean;
@@ -113,7 +113,10 @@ export function useReviewAudio(args: ReviewAudioArgs) {
     },
     ...clipActions,
     setOriginal: (patch: Partial<QuickEditOriginalAudio>) =>
-      args.setAudio((audio) => updateOriginalAudio(audio, patch)),
+      args.setAudio(
+        (audio) => updateOriginalAudio(audio, patch),
+        Object.hasOwn(patch, 'audioProcessing')
+      ),
   };
 }
 
@@ -126,23 +129,28 @@ function createReviewAudioClipActions(
 ) {
   const patchLane = (
     lane: ReviewAudioLane,
-    patch: (clips: QuickEditAudioClip[]) => QuickEditAudioClip[]
-  ) => args.setAudio((audio) => ({ ...audio, [lane]: patch(audio[lane]) }));
+    patch: (clips: QuickEditAudioClip[]) => QuickEditAudioClip[],
+    discrete = false
+  ) => args.setAudio((audio) => ({ ...audio, [lane]: patch(audio[lane]) }), discrete);
   const laneDuration = (lane: ReviewAudioLane) =>
-    lane === 'voiceover' && args.audio.voiceoverSegments
+    args.audio[lane].some((clip) => clip.sourceAnchor) && args.audio.voiceoverSegments
       ? args.audio.voiceoverSegments.at(-1)!.sourceEnd
       : args.timelineDuration;
   const updateClip = (
     lane: ReviewAudioLane,
     id: string,
-    patch: (clip: QuickEditAudioClip) => QuickEditAudioClip
+    patch: (clip: QuickEditAudioClip) => QuickEditAudioClip,
+    discrete = false
   ) =>
-    patchLane(lane, (clips) =>
-      clips.map((clip) => {
-        if (clip.id !== id) return clip;
-        const next = patch(clip);
-        return next.id === id ? clampQuickEditAudioClip(next, laneDuration(lane)) : next;
-      })
+    patchLane(
+      lane,
+      (clips) =>
+        clips.map((clip) => {
+          if (clip.id !== id) return clip;
+          const next = patch(clip);
+          return next.id === id ? clampQuickEditAudioClip(next, laneDuration(lane)) : next;
+        }),
+      discrete
     );
   return {
     addClip: (clip: QuickEditAudioClip, lane: ReviewAudioLane) =>
@@ -165,7 +173,7 @@ function createReviewAudioClipActions(
           clip,
           timelineStart,
           laneDuration(lane),
-          lane === 'voiceover' ? args.audio.voiceoverSegments : undefined
+          args.audio.voiceoverSegments
         )
       ),
     trimClip: (
@@ -182,7 +190,7 @@ function createReviewAudioClipActions(
           timelineTime,
           laneDuration(lane),
           assetDuration ?? args.assets.get(clip.assetId)?.duration,
-          lane === 'voiceover' ? args.audio.voiceoverSegments : undefined
+          args.audio.voiceoverSegments
         )
       ),
     patchClip: (
@@ -191,16 +199,23 @@ function createReviewAudioClipActions(
       patch: Partial<Omit<QuickEditAudioClip, 'id' | 'assetId'>>
     ) => {
       if (lane !== 'voiceover' || patch.tempo === undefined)
-        return updateClip(lane, id, (clip) => updateQuickEditAudioClip(clip, patch));
-      args.setAudio((audio) =>
-        updateQuickEditVoiceoverTempo({
-          audio,
+        return updateClip(
+          lane,
           id,
-          patch,
-          segments:
-            audio.voiceoverSegments ??
-            buildReviewTimeMap(args.sourceDuration ?? args.timelineDuration, args.edits ?? []),
-        })
+          (clip) => updateQuickEditAudioClip(clip, patch),
+          Object.hasOwn(patch, 'audioProcessing')
+        );
+      args.setAudio(
+        (audio) =>
+          updateQuickEditVoiceoverTempo({
+            audio,
+            id,
+            patch,
+            segments:
+              audio.voiceoverSegments ??
+              buildReviewTimeMap(args.sourceDuration ?? args.timelineDuration, args.edits ?? []),
+          }),
+        Object.hasOwn(patch, 'audioProcessing')
       );
     },
     removeClip: (lane: ReviewAudioLane, id: string) => {

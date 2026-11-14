@@ -405,3 +405,45 @@ it('disposes the composition sampler before revoking its borrowed media URLs and
   cleanupJob(job);
   expect(dispose).toHaveBeenCalledOnce();
 });
+
+it('retires the shared image producer once before releasing borrowed export URLs', () => {
+  const order: string[] = [];
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {
+    order.push('url');
+  });
+  const dispose = vi.fn(() => {
+    order.push('composition');
+  });
+  const job: ProjectExportRuntimeState = {
+    mediaRecorder: null,
+    clipMediaElements: new Map(),
+    clipAudioNodes: new Map(),
+    audioContext: null,
+    audioDestination: null,
+    exportAudioSettings: null,
+    assetUrls: ['blob:borrowed'],
+    cleanupNode: null,
+    exportAbortController: null,
+    exportStream: null,
+    sharedComposition: {
+      project: createEmptyVideoProject(),
+      settings: {
+        format: 'MP4',
+        mp4VideoCodec: 'AVC',
+        fps: 30,
+        width: 8,
+        height: 4,
+        quality: 'MEDIUM',
+        resolution: 'SOURCE',
+        downloadAfterExport: false,
+      },
+      async render() {},
+      dispose,
+    },
+  };
+  cleanupJob(job);
+  expect(order).toEqual(['composition', 'url']);
+  expect(job.sharedComposition).toBeUndefined();
+  cleanupJob(job);
+  expect(dispose).toHaveBeenCalledOnce();
+});

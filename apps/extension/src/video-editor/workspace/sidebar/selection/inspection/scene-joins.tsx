@@ -1,3 +1,5 @@
+import { useGlTransitionCatalog } from '../../../../../composition/gl-transition-presets/catalog';
+import { GlTransitionPresetActions } from '../../../../../composition/gl-transition-presets/actions';
 import { DetailList, DetailItem } from '../shared/panel';
 import { useLayoutEffect, useState } from 'react';
 import { ArrowRightLeft, LocateFixed } from 'lucide-react';
@@ -21,6 +23,7 @@ export function SceneJoinFields(props: {
   runtime: VideoEditorSceneEdgesInspectorRuntime;
 }) {
   const locale = useAppLocale();
+  const glCatalog = useGlTransitionCatalog();
   const update = useVideoEditorTimelineEditingPort((port) => port.updateCompositionJoins);
   const playback = useVideoEditorPlaybackPort((port) => ({
     seek: port.setCurrentTime,
@@ -61,6 +64,13 @@ export function SceneJoinFields(props: {
           if (clip && clip.type !== 'VIDEO' && clip.type !== 'IMAGE') return null;
           const assetId = clip?.assetId ?? boundary.sourceRange?.assetId;
           const asset = props.project.assets.find((item) => item.id === assetId);
+          const commitTransition = (value: CompositionJoinSettings | null) => {
+            const proposal = propose(boundary, value);
+            const result = proposal ? update(proposal, props.project) : null;
+            setRefused(!result || result.status === 'rejected');
+            onPreview(null);
+            return !!result && result.status !== 'rejected';
+          };
           return (
             <InspectorDetails
               key={boundary.id}
@@ -107,16 +117,26 @@ export function SceneJoinFields(props: {
                 </DetailList>
               ) : null}
               <PresentationJoinFields
+                glCatalog={glCatalog}
                 label={translate('videoEditor.sidebar.compositionJoin')}
                 value={boundary.transition}
+                glPresetActions={
+                  boundary.transition?.type === 'gl' ? (
+                    <GlTransitionPresetActions
+                      ownerKey={`${props.project.id}:join:${boundary.id}`}
+                      ownerRevision={props.project}
+                      selection={boundary.transition.selection}
+                      onApply={(selection) =>
+                        boundary.transition?.type === 'gl'
+                          ? commitTransition({ ...boundary.transition, selection })
+                          : false
+                      }
+                    />
+                  ) : undefined
+                }
                 Details={InspectorDetails}
                 preferenceId={`scene.compositionJoins.${boundary.id}`}
-                onChange={(value) => {
-                  const proposal = propose(boundary, value);
-                  const result = proposal ? update(proposal, props.project) : null;
-                  setRefused(!result || result.status === 'rejected');
-                  onPreview(null);
-                }}
+                onChange={commitTransition}
                 onPreview={(value) => {
                   const proposal = value ? propose(boundary, value) : null;
                   onPreview(

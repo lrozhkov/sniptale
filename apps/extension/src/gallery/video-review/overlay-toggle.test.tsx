@@ -104,12 +104,9 @@ it.each([false, true])(
       );
       if (advanced) {
         await fixture.click('advancedEditing');
-        await act(async () =>
-          [...fixture.host.querySelectorAll<HTMLButtonElement>('aside button')]
-            .find((button) => button.textContent === 'gallery.videoReview.comments')!
-            .click()
-        );
+        await fixture.click('comments');
       }
+      if (!advanced) await fixture.click('comments');
       expect(fixture.host.textContent).toContain('Saved note');
       expect(
         fixture.host.querySelector('[aria-label="gallery.videoReview.showOnVideo"]')

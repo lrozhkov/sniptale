@@ -1,0 +1,77 @@
+.review-track-items {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-height: 0;
+  min-width: 0;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+.review-track-items-toolbar {
+  display: grid;
+  flex: none;
+  gap: 8px;
+}
+.review-track-items-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: var(--sniptale-radius-sm);
+  color: var(--sniptale-color-text-secondary);
+}
+.review-track-items-search input {
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  font-size: 12px;
+}
+.review-track-items-search:focus-within {
+  border-color: var(--sniptale-color-accent);
+}
+.review-track-items-results {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.review-track-items-open {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-size: 12px;
+}
+.review-track-items-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--sniptale-color-text-secondary);
+  font-size: 11px;
+}
+.review-track-items .review-history-row[data-active] {
+  border-color: var(--sniptale-color-accent);
+}
+.review-track-items .review-history-row:hover {
+  background-color: var(--sniptale-color-surface-hover);
+}
+.review-track-items-host:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+/* Keep the list still when its 32px batch commands appear above the existing bottom separator. */
+.review-track-items .review-history-selection {
+  min-height: 41px;
+  box-sizing: border-box;
+}

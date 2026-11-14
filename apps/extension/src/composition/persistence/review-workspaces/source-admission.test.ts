@@ -1,7 +1,8 @@
 import { reviewAdvancedContentBaseline } from '../../../features/video/review/document';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
+import { createHash } from 'node:crypto';
+import * as animationTemplate from '@sniptale/runtime-contracts/animation-template';
 import type { ReviewAnnotationEffectSnapshot } from '../../../features/video/review/annotation-effects/types';
 import { readReviewAnnotationEffectDocument } from '../../../features/video/review/annotation-effects/validation';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -67,35 +68,58 @@ beforeEach(() => {
 });
 
 async function effectSnapshot(imported = false): Promise<ReviewAnnotationEffectSnapshot> {
-  const source = readFileSync(
-    imported
-      ? 'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conformance.sniptale-effect.json'
-      : 'apps/extension/public/video-effects/effects/annotations/sniptale-title/effect.sniptale-effect.json',
+  let source = readFileSync(
+    'apps/extension/public/video-effects/animations/title.sniptale-animation.json',
     'utf8'
   );
-  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(source));
-  const document = readReviewAnnotationEffectDocument(source)!;
-  const assets = imported
-    ? document.assets.map((asset) => ({
-        id: asset.id,
-        kind: 'svg' as const,
-        mimeType: asset.mimeType,
-        sha256: asset.sha256!,
-        byteLength: asset.byteLength!,
-        assetId: 'project-asset:effect-mark',
-      }))
-    : [];
+  if (imported) {
+    const definition = readReviewAnnotationEffectDocument(source);
+    if (!definition) throw new Error('Invalid shipped source');
+    definition.id = 'inline-resource-title';
+    const base64 =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZlSAAAAAASUVORK5CYII=';
+    const bytes = Buffer.from(base64, 'base64');
+    definition.resources.push({
+      path: 'images/mark.png',
+      mimeType: 'image/png',
+      base64,
+      byteLength: bytes.length,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    });
+    definition.animation['assets'] = [
+      { id: 'inline-mark', u: 'images/', p: 'mark.png', w: 1, h: 1 },
+    ];
+    definition.animation.layers.push({
+      ty: 2,
+      ind: 900,
+      refId: 'inline-mark',
+      ddd: 0,
+      ip: 0,
+      op: 90,
+      st: 0,
+      sr: 1,
+      ks: {
+        o: { a: 0, k: 100 },
+        r: { a: 0, k: 0 },
+        p: { a: 0, k: [0, 0] },
+        a: { a: 0, k: [0, 0] },
+        s: { a: 0, k: [100, 100] },
+      },
+    });
+    source = JSON.stringify(definition);
+  }
+  const document = readReviewAnnotationEffectDocument(source);
+  if (!document) throw new Error('Invalid self-contained source fixture');
+  const sha256 = createHash('sha256').update(source).digest('hex');
   return {
     id: `effect:${sha256}`,
     sha256,
-    schemaVersion: 'sniptale.effect.v1',
+    schemaVersion: 'sniptale.animation.v1',
     kind: 'standalone',
     documentId: document.id,
     source,
-    retainedByteLength:
-      new TextEncoder().encode(source).byteLength +
-      assets.reduce((total, asset) => total + asset.byteLength, 0),
-    assets,
+    retainedByteLength: Buffer.byteLength(source),
+    assets: [],
   };
 }
 
@@ -233,123 +257,96 @@ it('refuses rewriting retained immutable source on whole-buffer Save', async () 
   expect(await readVideoWorkspace(id)).toEqual(saved);
 });
 
-it('verifies private SVG bytes before the write transaction and admits the exact unpublished source', async () => {
-  const opened = await openVideoWorkspace(id, source);
-  const snapshot = await effectSnapshot(true);
-  const descriptor = snapshot.assets[0]!;
-  const bytes = readFileSync('tooling/test/e2e/fixtures/effect-v1/assets/neutral-mark.svg');
-  const entry = {
-    id: 'effect-mark',
-    assetId: 'physical-effect-mark',
-    mimeType: descriptor.mimeType,
-    size: descriptor.byteLength,
-    createdAt: 1,
-  };
-  const ref = {
-    assetId: entry.assetId,
-    mimeType: entry.mimeType,
-    size: entry.size,
-    createdAt: 1,
-    sha256: null,
-    location: { kind: 'opfs' as const, objectKey: `objects/${entry.assetId}` },
-  };
-  journals.push({
-    journalId: 'ready-effect',
-    domain: 'project-assets',
-    createdAt: 1,
-    assetRefs: [ref],
-    payload: {
-      entry,
-      filename: 'mark.svg',
-      publishToLibrary: false,
-      expectedAssetId: null,
-      requiredReviewAnnotationEffect: {
-        aggregateId: id,
-        sourceAssetId: opened.workspace.sourceAssetId,
-        snapshotId: snapshot.id,
-        resourceId: descriptor.id,
-        sha256: descriptor.sha256,
-      },
-    },
-  });
-  rows.set('asset_refs', new Map());
-  const capturedWrites = writesStarted;
-  harness.readFile.mockImplementation(async () => {
-    expect(writesStarted).toBe(capturedWrites);
-    return new File([Uint8Array.from(bytes)], 'mark.svg', { type: entry.mimeType });
-  });
-  const args = {
-    aggregateId: id,
-    expectedRevision: opened.workspace.revision,
-    expectedSourceAssetId: opened.workspace.sourceAssetId,
-    operation: effectOperation(opened, snapshot),
-    effectSnapshots: [snapshot],
-  };
-  const saved = await commitVideoWorkspace(args);
-  expect(harness.readFile).toHaveBeenCalledExactlyOnceWith(ref, 'effect-mark');
-  expect(saved.workspace.history).toHaveLength(1);
-  expect(rows.get('project_assets')!.size).toBe(0);
-  expect(await readVideoWorkspace(id)).toEqual(saved);
+it('verifies embedded font and PNG bytes before publication without external acquisition', async () => {
+  const opened = await openVideoWorkspace(id, source),
+    snapshot = await effectSnapshot(true);
+  const capturedWrites = writesStarted,
+    actualVerify = animationTemplate.verifyAnimationResource;
+  const verify = vi
+    .spyOn(animationTemplate, 'verifyAnimationResource')
+    .mockImplementation(async (resource) => {
+      expect(writesStarted).toBe(capturedWrites);
+      return actualVerify(resource);
+    });
+  try {
+    const saved = await commitVideoWorkspace({
+      aggregateId: id,
+      expectedRevision: opened.workspace.revision,
+      expectedSourceAssetId: opened.workspace.sourceAssetId,
+      operation: effectOperation(opened, snapshot),
+      effectSnapshots: [snapshot],
+    });
+    expect(verify).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'images/mark.png', mimeType: 'image/png' })
+    );
+    expect(verify).toHaveBeenCalledWith(expect.objectContaining({ mimeType: 'font/ttf' }));
+    expect(harness.readFile).not.toHaveBeenCalled();
+    verify.mockRestore();
+    expect(saved.workspace.history).toHaveLength(1);
+    expect(saved.workspace.effectSnapshots).toEqual([snapshot]);
+    expect(rows.get('project_assets')!.size).toBe(0);
+    expect(await readVideoWorkspace(id)).toEqual(saved);
+  } finally {
+    verify.mockRestore();
+  }
 });
 
-it.each(['corrupt-bytes', 'missing', 'physical-replacement', 'revision-conflict'] as const)(
-  'refuses %s during verified source admission without inserting annotation history',
+it.each(['corrupt-resource', 'wrong-mime', 'missing-resource', 'revision-conflict'] as const)(
+  'refuses %s during verified package admission without inserting annotation history',
   async (failure) => {
-    const opened = await openVideoWorkspace(id, source);
-    const snapshot = await effectSnapshot(true);
-    const descriptor = snapshot.assets[0]!;
-    const bytes = Uint8Array.from(
-      readFileSync('tooling/test/e2e/fixtures/effect-v1/assets/neutral-mark.svg')
-    );
-    const entry = {
-      id: 'effect-mark',
-      assetId: 'physical-mark',
-      createdAt: 1,
-      mimeType: descriptor.mimeType,
-      size: descriptor.byteLength,
-    };
-    const ref = {
-      assetId: entry.assetId,
-      createdAt: 1,
-      size: entry.size,
-      mimeType: entry.mimeType,
-      sha256: null,
-      location: { kind: 'opfs' as const, objectKey: `objects/${entry.assetId}` },
-    };
-    rows.get('project_assets')!.set(entry.id, entry);
-    rows.set('asset_refs', new Map([[ref.assetId, ref]]));
-    harness.readFile.mockImplementation(async () => {
-      if (failure === 'missing') throw new Error('Private raw OPFS error');
-      if (failure === 'corrupt-bytes') bytes[0] = 0;
-      if (failure === 'physical-replacement')
-        rows.get('project_assets')!.set(entry.id, { ...entry, assetId: 'replaced-mark' });
-      if (failure === 'revision-conflict') {
-        const head = rows.get('video_workspaces')!.get(id);
-        if (!isRecord(head) || typeof head['revision'] !== 'number')
-          throw new Error('Invalid fixture');
-        rows.get('video_workspaces')!.set(id, { ...head, revision: head['revision'] + 1 });
-      }
-      return new File([bytes], 'mark.svg', { type: entry.mimeType });
-    });
-    await expect(
-      commitVideoWorkspace({
-        aggregateId: id,
-        expectedRevision: opened.workspace.revision,
-        expectedSourceAssetId: opened.workspace.sourceAssetId,
-        operation: effectOperation(opened, snapshot),
-        effectSnapshots: [snapshot],
-      })
-    ).rejects.toMatchObject({
-      code:
-        failure === 'revision-conflict'
-          ? 'conflict'
-          : failure === 'corrupt-bytes'
-            ? 'invalid'
-            : 'missing-media',
-    });
-    const retained = await readVideoWorkspace(id);
-    expect(retained?.workspace.history).toEqual([]);
-    expect(retained?.workspace.effectSnapshots).toBeUndefined();
+    const opened = await openVideoWorkspace(id, source),
+      snapshot = await effectSnapshot(true);
+    const definition = readReviewAnnotationEffectDocument(snapshot.source);
+    if (!definition) throw new Error('Invalid inline package');
+    const image = definition.resources.find((resource) => resource.path === 'images/mark.png')!;
+    if (failure === 'corrupt-resource') {
+      const bytes = Buffer.from(image.base64, 'base64');
+      bytes[bytes.length - 1] = bytes.at(-1)! ^ 1;
+      image.base64 = bytes.toString('base64');
+    }
+    if (failure === 'wrong-mime') image.mimeType = 'image/webp';
+    if (failure === 'missing-resource')
+      definition.resources = definition.resources.filter((resource) => resource !== image);
+    snapshot.source = JSON.stringify(definition);
+    snapshot.sha256 = createHash('sha256').update(snapshot.source).digest('hex');
+    snapshot.id = `effect:${snapshot.sha256}`;
+    snapshot.retainedByteLength = Buffer.byteLength(snapshot.source);
+    const capturedWrites = writesStarted,
+      actualVerify = animationTemplate.verifyAnimationResource;
+    let changed = false;
+    const verify = vi
+      .spyOn(animationTemplate, 'verifyAnimationResource')
+      .mockImplementation(async (resource) => {
+        const result = await actualVerify(resource);
+        if (failure === 'revision-conflict' && !changed) {
+          changed = true;
+          const head = rows.get('video_workspaces')!.get(id);
+          if (!isRecord(head) || typeof head['revision'] !== 'number')
+            throw new Error('Invalid fixture head');
+          rows.get('video_workspaces')!.set(id, { ...head, revision: head['revision'] + 1 });
+        }
+        return result;
+      });
+    try {
+      await expect(
+        commitVideoWorkspace({
+          aggregateId: id,
+          expectedRevision: opened.workspace.revision,
+          expectedSourceAssetId: opened.workspace.sourceAssetId,
+          operation: effectOperation(opened, snapshot),
+          effectSnapshots: [snapshot],
+        })
+      ).rejects.toMatchObject({ code: failure === 'revision-conflict' ? 'conflict' : 'invalid' });
+      if (failure !== 'revision-conflict') expect(writesStarted).toBe(capturedWrites);
+      else expect(changed).toBe(true);
+      expect(harness.readFile).not.toHaveBeenCalled();
+      verify.mockRestore();
+      const retained = await readVideoWorkspace(id);
+      expect(retained?.workspace.history).toEqual([]);
+      expect(retained?.workspace.effectSnapshots).toBeUndefined();
+    } finally {
+      verify.mockRestore();
+    }
   }
 );
 

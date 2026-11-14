@@ -53,7 +53,7 @@ export function FramingPreviewSurface(props: FramingPreviewProps) {
   const cameraReady = preparation.canRender(time);
   const renderProps = { ...props, project };
   const following = props.region.focusMode === VideoMotionFocusMode.CURSOR;
-  const [overview, setOverview] = useState(true);
+  const [overview, setOverview] = useState(props.region.effect !== '3d');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gpuHostRef = useRef<HTMLDivElement>(null);
   const {
@@ -87,15 +87,17 @@ export function FramingPreviewSurface(props: FramingPreviewProps) {
           {translate('videoEditor.sidebar.cameraExpansionApplied')}
         </p>
       ) : null}
-      <OptionButtonsField
-        label={translate('videoEditor.sidebar.framingPreviewLabel')}
-        value={overview ? 'area' : 'result'}
-        options={[
-          { value: 'area', label: translate('videoEditor.sidebar.framingAreaView') },
-          { value: 'result', label: translate('videoEditor.sidebar.framingResultView') },
-        ]}
-        onChange={(value) => setOverview(value === 'area')}
-      />
+      {props.region.effect !== '3d' ? (
+        <OptionButtonsField
+          label={translate('videoEditor.sidebar.framingPreviewLabel')}
+          value={overview ? 'area' : 'result'}
+          options={[
+            { value: 'area', label: translate('videoEditor.sidebar.framingAreaView') },
+            { value: 'result', label: translate('videoEditor.sidebar.framingResultView') },
+          ]}
+          onChange={(value) => setOverview(value === 'area')}
+        />
+      ) : null}
       <button
         type="button"
         data-video-editor-local-navigation="true"

@@ -10,8 +10,8 @@ import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import { persistedReviewContent } from '../support/voiceover-speech-fixture';
 
 for (const variant of [
-  { width: 1280, height: 560, locale: 'ru', theme: 'light', title: 'Главная мысль' },
-  { width: 1920, height: 900, locale: 'en', theme: 'dark', title: 'Main idea' },
+  { width: 1280, height: 560, locale: 'ru', theme: 'light', title: 'Заголовок' },
+  { width: 1920, height: 900, locale: 'en', theme: 'dark', title: 'Title' },
 ] as const) {
   test(`GPU annotations paint, follow perspective and retain editing at ${variant.width}`, async ({
     page,
@@ -55,7 +55,7 @@ for (const variant of [
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.advancedEditing').click();
       await expect.poll(async () => (await persistedReviewContent(page))?.zoom.enabled).toBe(true);
-      await addReviewFocus(page);
+      await addReviewFocus(page, variant.locale);
       await button('gallery.videoReview.spatialToolTilt').click();
       const tilt = dialog.getByRole('textbox', {
         name: label('gallery.videoReview.perspectiveY'),

@@ -35,7 +35,9 @@ export function createReviewRecordingRenderSource(
       1,
       ...settings.map((style) => Math.max(style.before, style.after) + Math.abs(style.offset))
     ) * Math.max(1, ...segments.map((segment) => segment.rate));
-  const reader = dependencies.createReader(args.project, args.telemetry);
+  const reader = dependencies.createReader(args.project, args.telemetry, undefined, {
+    interactionTimeline: advanced.interactionTimeline,
+  });
   type Prepared = Awaited<ReturnType<typeof reader.read>>;
   const views: { center: number; prepared: Prepared }[] = [];
   let reading = false;
@@ -76,7 +78,13 @@ export function createReviewRecordingRenderSource(
         }
         const telemetry = view.prepared.telemetry;
         const effective = resolveQuickEditEffectiveState(advanced, { facts: telemetry, source });
-        const markers = projectReviewTelemetry(telemetry, source.duration).markers;
+        const markers = projectReviewTelemetry(
+          telemetry,
+          source.duration,
+          false,
+          advanced.interactionTimeline,
+          advanced.ui.tracks
+        ).markers;
         const conflicts = resolveReviewCameraConflicts(
           effective.zoomRegions,
           {

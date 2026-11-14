@@ -36,7 +36,7 @@ This index lists current active documents and their authority.
 - [Storage state authority](architecture/storage-state-authority.md) owns state classes and mutation rules.
 - [Persistence contracts](architecture/persistence-contracts.md) owns IndexedDB admission, domain versions, migration, and recovery policy.
 - [Parser architecture](architecture/parser-architecture.md), [i18n architecture](architecture/i18n-architecture.md), and [platform tradeoffs](architecture/platform-patterns-and-tradeoffs.md) own their domain contracts.
-- [Video editor layering](architecture/video-editor-layering.md) and [EffectV1 bundles](architecture/video-effect-bundles.md) own their domain contracts.
+- [Video editor layering](architecture/video-editor-layering.md) and [Lottie animation packages and GL transitions](architecture/video-effect-bundles.md) own their domain contracts.
 - [Design reference](design/index.md) owns product UX, accessibility, theme, control semantics, screen composition, and interaction requirements. Local `DESIGN.md` routes to these documents.
 
 ## Implementation, operation, and release

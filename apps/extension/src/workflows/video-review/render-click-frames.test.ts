@@ -3,7 +3,7 @@ import { resolveQuickEditEffectiveState } from '../../features/video/review/adva
 import { contextFixture } from './render-export.test-support';
 import { expect, it, vi } from 'vitest';
 import { VideoSample } from 'mediabunny';
-import { renderRenderWindowFrames } from './render-export';
+import { renderRenderWindowFrames } from './render-export-composition.test-support';
 import { drawSceneSpotlights } from '../../features/video/composition/draw/spotlight';
 import { createCanvasComment } from '../../features/video/review/comments';
 import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';

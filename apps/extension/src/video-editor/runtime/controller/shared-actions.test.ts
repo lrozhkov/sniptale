@@ -293,3 +293,16 @@ it('changes camera mode in one history operation and keeps equal retries as no-o
   expect(store.getState().project?.sceneBackground?.zoomBehavior).toBe('content');
   store.setState(store.getInitialState(), true);
 });
+
+it('adds independent 3D on an occupied zoom interval without changing the zoom', () => {
+  const project = createEmptyVideoProject('Spatial placement');
+  project.duration = 10;
+  const store = createStore(project);
+  const actions = createWorkspaceProjectUpdaters(store);
+  actions.addMotionRegion(2);
+  const zoom = structuredClone(project.motionRegions![0]);
+  actions.addMotionRegion(2, '3d');
+  expect(project.motionRegions).toHaveLength(2);
+  expect(project.motionRegions![0]).toEqual(zoom);
+  expect(project.motionRegions![1]).toMatchObject({ effect: '3d', scale: 1, startTime: 2 });
+});

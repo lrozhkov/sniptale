@@ -1,3 +1,4 @@
+import { parseAudioProcessing } from '@sniptale/runtime-contracts/audio-effects';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { isBoundedNumber } from '../project/validation/primitives';
 import { MAX_AUDIO_FADE_SECONDS } from '../audio/fades';
@@ -27,6 +28,11 @@ export function parseReviewAudioClip(value: unknown): QuickEditAudioClip | null 
     !isBoundedNumber(value['fadeOut'], 0, MAX_AUDIO_FADE_SECONDS)
   )
     return null;
+  const audioProcessing =
+    value['audioProcessing'] === undefined
+      ? undefined
+      : parseAudioProcessing(value['audioProcessing']);
+  if (audioProcessing === null) return null;
   const sourceAnchor =
     value['sourceAnchor'] === undefined
       ? undefined
@@ -41,6 +47,7 @@ export function parseReviewAudioClip(value: unknown): QuickEditAudioClip | null 
       : parseReviewVoiceTextSnapshot(value['textSnapshot']);
   if (sourceAnchor === null || transcript === null || textSnapshot === null) return null;
   return {
+    ...(audioProcessing ? { audioProcessing } : {}),
     ...(textSnapshot ? { textSnapshot } : {}),
     ...(sourceAnchor ? { sourceAnchor } : {}),
     ...(transcript ? { transcript } : {}),

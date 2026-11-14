@@ -680,7 +680,7 @@ it.each(['spotlight', 'border', 'lens'] as const)(
   }
 );
 
-it('does not duplicate a camera, unresolved placement, or missing selection', () => {
+it('does not duplicate an unresolved placement or missing selection', () => {
   const setZoom = vi.fn();
   let editor!: ReturnType<typeof useReviewZoomEditor>;
   function Harness() {
@@ -698,7 +698,7 @@ it('does not duplicate a camera, unresolved placement, or missing selection', ()
     return null;
   }
   act(() => root.render(<Harness />));
-  for (const id of ['camera', 'dormant', 'missing']) {
+  for (const id of ['dormant', 'missing']) {
     act(() => {
       expect(editor.duplicate(id)).toBeNull();
     });
@@ -740,9 +740,37 @@ it.each(['zoom', 'spotlight', 'border', 'lens'] as const)(
     );
     expect(reset.regions[0]).toEqual({
       ...expected,
-      cursorComposition: { mode: 'orbit', amount: 0.5, smoothness: 0.6 },
+      cursorComposition: { mode: type === 'zoom' ? 'off' : 'orbit', amount: 0.5, smoothness: 0.6 },
       linkTo: 'next',
     });
     expect(reset.regions[1]).toBe(neighbour);
   }
 );
+
+it('keeps a camera copy inactive through reset and activates it after moving clear', () => {
+  let editor!: ReturnType<typeof useReviewZoomEditor>;
+  let state!: QuickEditZoomState;
+  function Harness() {
+    const [zoom, setZoom] = useState({ enabled: true, regions: [region('original', 1, 3)] });
+    state = zoom;
+    editor = useReviewZoomEditor({ zoom, setZoom, timelineDuration: 10 });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  act(() => {
+    editor.duplicate('original');
+  });
+  const id = editor.selection!;
+  expect(state.regions).toHaveLength(2);
+  expect(projectReviewFocus(state.regions).map((r) => r.id)).toEqual(['original']);
+  act(() => {
+    editor.resetPosition(id);
+  });
+  expect(state.regions.find((r) => r.id === id)?.overlapPolicy).toBe('suppress');
+  expect(projectReviewFocus(state.regions).map((r) => r.id)).toEqual(['original']);
+  act(() => {
+    editor.commitDrag(id, { start: 4, end: 6 }, 'move');
+  });
+  expect(state.regions.find((r) => r.id === id)).toMatchObject({ start: 4, end: 6 });
+  expect(projectReviewFocus(state.regions).map((r) => r.id)).toEqual(['original', id]);
+});

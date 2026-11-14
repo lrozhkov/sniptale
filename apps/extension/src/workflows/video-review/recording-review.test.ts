@@ -417,3 +417,53 @@ it('accepts exact project EOF while rejecting rounded-overrun and invalid direct
     reader.dispose();
   }
 });
+
+it('renders a relocated archived key from original bounded facts without persisting the archive', async () => {
+  const { telemetry, project } = await original(false);
+  const probe = createReviewRecordingHistorySource(project, telemetry, dependencies, {
+    includeCursor: false,
+  });
+  const first = await probe.read(0.1);
+  const key = projectReviewTelemetry(first.telemetry, source.duration).markers.find(
+    (marker) => marker.ref.id === 'key-1'
+  )!;
+  expect(key.eventType).toBe('KEY_HOLD');
+  probe.dispose();
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  advanced.keyAnimations = [{ ...REVIEW_KEY_DEFAULT, id: key.ref.id, enabled: true }];
+  advanced.interactionTimeline = {
+    presses: [],
+    overrides: [
+      {
+        ref: key.ref,
+        start: 10,
+        end: 10 + key.end - key.start,
+        enabled: true,
+        sourceRange: { start: key.start, end: key.end },
+      },
+    ],
+  };
+  const before = JSON.stringify(project);
+  const reader = createReviewRecordingRenderSource(
+    { project, telemetry, source, advanced, edits: [] },
+    {
+      createReader: (project, telemetry, _dependencies, options) =>
+        createReviewRecordingHistorySource(project, telemetry, dependencies, options),
+    }
+  );
+  try {
+    const result = await reader.read(10.01, 10.01, {
+      width: 1920,
+      height: 900,
+      frameDuration: 1 / 30,
+    });
+    expect(result.keyCues).toEqual([
+      expect.objectContaining({ start: 10, end: 11.2, label: key.target }),
+    ]);
+    expect(JSON.stringify(project)).toBe(before);
+    expect(JSON.stringify(advanced.interactionTimeline)).not.toContain('ticks');
+  } finally {
+    reader.dispose();
+  }
+});

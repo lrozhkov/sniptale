@@ -1,3 +1,4 @@
+import type { VideoEditorTransitionTemplatePatch } from '../../../contracts/commands/patches';
 import type { VideoEditorSceneBackgroundEdit } from '../../../contracts/commands/patches';
 import type { VideoEditorMediaClipEdit } from '../../../contracts/commands/patches';
 import type { VideoProjectTextVoiceController } from '../../../runtime/session/text-voice';
@@ -177,9 +178,7 @@ export interface WorkspaceSidebarProps {
   onUpdateTransitionEasing?: (transitionId: string, easing: VideoTransitionEasing) => void;
   onUpdateTransitionTemplate?: (
     transitionId: string,
-    patch: Partial<
-      Pick<VideoProjectTransition, 'direction' | 'highlightColor' | 'intensity' | 'templateKind'>
-    >
+    patch: VideoEditorTransitionTemplatePatch
   ) => void;
   onDeleteEffectInstance?: (instanceId: string) => void;
   onDuplicateEffectInstance?: (instanceId: string) => string | null;

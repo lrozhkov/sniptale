@@ -1,3 +1,5 @@
+import { SourceImageFilterFields } from '../../ui/source-image-filter-fields';
+import { resolveQuickEditActiveFocusRegions } from '../../features/video/review/advanced/focus-layout';
 import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
 import { ReviewButton, ReviewDetails } from './controls';
 import { ReviewPresentationBinding } from './presentation-binding';
@@ -83,12 +85,17 @@ export function ReviewAdvancedPanels(input: ReviewAdvancedPanelsProps) {
       ) : zoomRegion ? (
         <ReviewZoomInspector
           region={zoomRegion}
+          conflictSuppressed={
+            !zoomRegion.dormant &&
+            !resolveQuickEditActiveFocusRegions(args.advanced.zoom.regions).some(
+              (region) => region.id === zoomRegion.id
+            )
+          }
           cameraFollowDefaults={args.advanced.cameraFollowDefaults}
           cursorPath={args.cursorPath}
           cursorAvailable={args.cursorAvailable}
           cursorPending={args.cursorPending}
           spatialPreview={args.zoom.previewRegion(zoomRegion)}
-          zoomConversionBlocked={!args.zoom.canConvertToZoom(zoomRegion)}
           onPreview={(patch) => args.zoom.preview(zoomRegion.id, patch)}
           cutSuppressed={
             !!zoomRegion.sourceAnchor &&
@@ -112,6 +119,7 @@ export function ReviewAdvancedPanels(input: ReviewAdvancedPanelsProps) {
 
 /** Scene controls are independent of the selected zoom and its property panel. */
 export function ReviewSceneProperties(props: {
+  track?: import('../../features/video/review/advanced/types').QuickEditTrack;
   cropPreview?: { file: File; time: number } | undefined;
   cursorPath?: ReactNode;
   focus?: { advanced: QuickEditAdvancedState; time: number } | undefined;
@@ -122,7 +130,10 @@ export function ReviewSceneProperties(props: {
   onCaptions?(settings: NonNullable<QuickEditAdvancedState['captions']>): void;
   presentation?: ComponentProps<typeof ReviewPresentationBinding>;
   watermark?: Omit<ComponentProps<typeof WatermarkInspector>, 'Disclosure' | 'dataUi'>;
+  sourceFilters?: QuickEditAdvancedState['sourceFilters'];
+  onSourceFilters?(value: QuickEditAdvancedState['sourceFilters']): void;
   windowHeader?: QuickEditAdvancedState['windowHeader'];
+  headerIdentity?: string | undefined;
   onWindowHeader?(header: QuickEditAdvancedState['windowHeader']): void;
   source: { width: number; height: number };
   audio: QuickEditAdvancedState['audio'];
@@ -153,6 +164,22 @@ export function ReviewSceneProperties(props: {
         ) : null}
         <ReviewInspectorSections
           sections={[
+            ...(props.onSourceFilters
+              ? [
+                  {
+                    id: 'source-filters',
+                    label: translate('videoEditor.sidebar.sourceFiltersTitle'),
+                    icon: Scan,
+                    content: (
+                      <SourceImageFilterFields
+                        value={props.sourceFilters}
+                        disabled={props.busy}
+                        onChange={props.onSourceFilters}
+                      />
+                    ),
+                  },
+                ]
+              : []),
             {
               id: 'canvas',
               label: translate('gallery.videoReview.canvas'),
@@ -172,6 +199,7 @@ export function ReviewSceneProperties(props: {
               icon: PanelTop,
               content: (
                 <ReviewWindowHeaderSettings
+                  identity={props.headerIdentity}
                   header={props.windowHeader}
                   onChange={props.onWindowHeader}
                 />
@@ -248,6 +276,13 @@ export function ReviewSceneProperties(props: {
                     content: (
                       <ReviewSceneAudio
                         audio={props.audio}
+                        lane={
+                          props.track === 'voiceover' || props.track === 'music'
+                            ? props.track
+                            : props.track === 'originalAudio'
+                              ? 'original'
+                              : undefined
+                        }
                         hasOriginalAudio={props.hasOriginalAudio}
                         onOriginal={props.onOriginalVolume}
                         onLaneVolume={props.onLaneVolume}
@@ -266,7 +301,29 @@ export function ReviewSceneProperties(props: {
                   },
                 ]
               : []),
-          ]}
+          ].filter(
+            (section) =>
+              !props.track ||
+              (props.track === 'source'
+                ? [
+                    'source-filters',
+                    'canvas',
+                    'window-header',
+                    'background',
+                    'presentation',
+                    'watermark',
+                  ]
+                : props.track === 'cursorMotion'
+                  ? ['cursor-path']
+                  : props.track === 'text'
+                    ? ['captions']
+                    : props.track === 'voiceover' ||
+                        props.track === 'music' ||
+                        props.track === 'originalAudio'
+                      ? ['audio']
+                      : []
+              ).includes(section.id)
+          )}
         />
       </fieldset>
     </>

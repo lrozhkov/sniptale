@@ -2,7 +2,7 @@ import type { PreviewRendererStatus } from '../../features/video/preview/prefere
 import { useReviewZoomPreview } from './zoom-editor';
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
 import { resolveReviewCursorFocusPath } from '../../features/video/review/advanced/cursor-focus-path';
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
 import { resolveReviewOutputProfile } from '../../workflows/video-review/render-settings';
@@ -45,6 +45,7 @@ type PreviewState = Pick<
   | 'onMediaError'
   | 'recovering'
 > & {
+  cursorMotion?: EditorState['cursorMotion'];
   history?: EditorState['history'];
   setCursorFocusPath?: EditorState['setCursorFocusPath'];
   selectCursorFocusKey?: EditorState['selectCursorFocusKey'];
@@ -55,8 +56,10 @@ type PreviewState = Pick<
   text: Pick<EditorState['text'], 'jump'>;
   features: Pick<
     EditorState['features'],
+    | 'cursorMotions'
     | 'webcam'
     | 'canvas'
+    | 'sourceFilters'
     | 'windowHeader'
     | 'zoomRegions'
     | 'background'
@@ -73,7 +76,9 @@ type PreviewState = Pick<
   audio: Pick<EditorState['audio'], 'originalFeedback' | 'dismissOriginalFeedback'>;
   webcam: Pick<EditorState['webcam'], 'failed' | 'pending' | 'retry'> &
     NonNullable<StageProps['webcam']>['editor'];
-  timeline: Pick<EditorState['timeline'], 'sceneOutputTime' | 'resultDuration' | 'timeMap'>;
+  seekResult?: EditorState['seekResult'];
+  timeline: Pick<EditorState['timeline'], 'sceneOutputTime' | 'resultDuration' | 'timeMap'> &
+    Partial<Pick<EditorState['timeline'], 'readOutputTime'>>;
   editing: { exporter: Pick<EditorState['editing']['exporter'], 'phase'> };
   advanced: EditorState['advanced'];
   backgroundPreview?: EditorState['backgroundPreview'];
@@ -95,15 +100,19 @@ export function ReviewPreviewBinding({
   resource,
   state: sourceState,
   sceneActive,
+  previewOverlay,
   previewPreferences,
   onPreviewRaster,
   onPreviewRendererStatus,
   onOpenPreviewSettings,
+  annotationMagnetEnabled,
 }: {
   resource: Pick<LoadedReview, 'file' | 'url' | 'session'> &
     Partial<Pick<LoadedReview, 'telemetry'>>;
   state: PreviewState;
   sceneActive: boolean;
+  annotationMagnetEnabled?: boolean;
+  previewOverlay?: ReactNode;
   previewPreferences?: QuickPreviewPreferences | undefined;
   onPreviewRendererStatus?: ((status: PreviewRendererStatus | null) => void) | undefined;
   onPreviewRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
@@ -187,6 +196,11 @@ export function ReviewPreviewBinding({
         onPlay={() => state.beforeAction(state.play)}
         onSeek={(value) =>
           state.beforeAction(() => {
+            if (state.seekResult) {
+              state.setActiveSelection({ kind: 'none' });
+              state.seekResult(value);
+              return;
+            }
             const sourceTime = state.timeline.timeMap.timelineToSource(value);
             if (sourceTime !== null) {
               state.setActiveSelection({ kind: 'none' });
@@ -200,7 +214,9 @@ export function ReviewPreviewBinding({
             resource={resource}
             state={state}
             sceneActive={sceneActive}
+            annotationMagnetEnabled={annotationMagnetEnabled}
             fullscreen={fullscreen}
+            previewOverlay={previewOverlay}
             focusInteracting={zoom.previewing}
             previewPreferences={previewPreferences}
             onPreviewRaster={onPreviewRaster}
@@ -242,7 +258,9 @@ function ReviewPreviewStage({
   resource,
   state,
   sceneActive,
+  previewOverlay,
   fullscreen,
+  annotationMagnetEnabled,
   focusInteracting,
   previewPreferences,
   onPreviewRaster,
@@ -252,6 +270,8 @@ function ReviewPreviewStage({
     Partial<Pick<LoadedReview, 'telemetry'>>;
   state: PreviewState;
   sceneActive: boolean;
+  annotationMagnetEnabled?: boolean | undefined;
+  previewOverlay?: ReactNode;
   fullscreen: boolean;
   focusInteracting: boolean;
   previewPreferences?: QuickPreviewPreferences | undefined;
@@ -261,16 +281,27 @@ function ReviewPreviewStage({
   const { busy, features, composer, snapshot, canvasComments } = state;
   const captionPreview = useReviewCaptionPreview(state);
   const outerFadePlan = useReviewOuterFadePlan(state);
-  const sceneEditable =
-    !state.playing && !busy && state.editing.exporter.phase === 'idle' && !composer.annotation;
+  const sceneAvailable =
+    !state.playing && state.editing.exporter.phase === 'idle' && !composer.annotation;
+  const sceneEditable = sceneAvailable && !busy;
   return (
     <ReviewStageBinding
+      previewOverlay={previewOverlay}
       {...captionPreview}
-      cursorPath={reviewCursorPathOverlayBinding(
-        state,
-        state.history?.telemetry ?? resource.telemetry,
-        sceneEditable
-      )}
+      cursorMotions={features.cursorMotions}
+      cursorPath={
+        sceneEditable &&
+        state.advanced.ui.mode === 'advanced' &&
+        state.advanced.ui.tracks.cursorMotion !== false &&
+        state.advanced.cursorMotionEnabled !== false &&
+        state.activeSelection?.kind === 'cursor-motion'
+          ? state.cursorMotion?.overlay
+          : reviewCursorPathOverlayBinding(
+              state,
+              state.history?.telemetry ?? resource.telemetry,
+              sceneEditable
+            )
+      }
       annotationEffects={
         features.annotationEffects
           ? {
@@ -285,9 +316,10 @@ function ReviewPreviewStage({
         state.annotationEffects &&
         state.advanced.ui.mode === 'advanced' &&
         state.advanced.ui.tracks.annotationEffects !== false &&
-        sceneEditable &&
+        sceneAvailable &&
         features.overlaysVisible
           ? {
+              magnetEnabled: annotationMagnetEnabled ?? false,
               editor: state.annotationEffects,
               selectedId:
                 state.activeSelection?.kind === 'annotation-effect'
@@ -319,7 +351,8 @@ function ReviewPreviewStage({
               onPresentationActive: state.setPresentationActive,
               onPresentedTime: state.onPresentedTime,
               interacting: focusInteracting,
-              sourceToResult: state.timeline.timeMap.sourceToTimeline,
+              sourceToResult:
+                state.timeline.readOutputTime ?? state.timeline.timeMap.sourceToTimeline,
               onRaster: onPreviewRaster,
               onRendererStatus: onPreviewRendererStatus,
               sourceFrameRate: state.exporter.index?.frameRate,
@@ -361,6 +394,7 @@ function ReviewPreviewStage({
       url={resource.url}
       source={state.source}
       canvas={features.canvas}
+      sourceFilters={features.sourceFilters}
       windowHeader={features.windowHeader}
       video={state.video}
       drawing={!!composer.annotation && !state.playing && !busy}

@@ -89,7 +89,8 @@ function audioArgs(kind: 'processed' | 'copy', add: ReturnType<typeof vi.fn>) {
 }
 
 const decoration = vi.hoisted(() => ({ dispose: vi.fn() }));
-vi.mock('../../features/video/composition/canvas/watermark', () => ({
+vi.mock('../../features/video/composition/canvas/watermark', async (original) => ({
+  ...(await original<typeof import('../../features/video/composition/canvas/watermark')>()),
   createWatermarkRenderer: async () => ({
     draw() {},
     bounds: null,
@@ -108,7 +109,7 @@ it('preserves the encoding phase through frame composition failure cleanup', asy
   for (const sample of state.drawn) expect(sample.close).toHaveBeenCalledOnce();
 });
 
-it('compensates partially prepared decorations before returning a failed scene', async () => {
+it('rejects missing fragment overlay clocks before acquiring optional decorations', async () => {
   decoration.dispose.mockClear();
   const args = argsFixture();
   args.advanced.captions = { ...createReviewCaptionSettings(), enabled: true };
@@ -131,7 +132,8 @@ it('compensates partially prepared decorations before returning a failed scene',
   };
   const failed = writeReviewFrames({ ...args, fragmentOffset: 1 });
   await expect(failed).rejects.toMatchObject({ stage: 'compose' });
-  await expect(failed).rejects.toThrow('Fragment captions require');
-  expect(decoration.dispose).toHaveBeenCalledOnce();
+  await expect(failed).rejects.toThrow('Fragment overlays require');
+  expect(decoration.dispose).not.toHaveBeenCalled();
+  expect(args.readProjectAsset).not.toHaveBeenCalled();
   expect(state.encoded).toHaveLength(0);
 });

@@ -1,3 +1,5 @@
+import { reviewTrackEnabled } from './advanced/track-controls';
+import type { VideoProjectSourceInteractionDocument } from '../project/source-interaction-documents';
 import {
   planReviewProjectPresentation,
   type ReviewProjectBookendResource,
@@ -68,6 +70,7 @@ type ReviewProjectConversionPlan =
 function minimumConvertedSceneSchemaVersion(
   scene: Extract<ReturnType<typeof planReviewProjectScene>, { status: 'prepared' }>
 ): VideoProject['version'] {
+  if (scene.video.sourceFilters !== undefined) return 52;
   const background = scene.scene.sceneBackground;
   if (background?.motion !== undefined) return 51;
   if (background?.zoomBehavior !== undefined) return 37;
@@ -141,9 +144,29 @@ export function planReviewProjectConversion(args: {
   const hasFeedback =
     document.advancedContent.actionAudio !== undefined ||
     document.advancedContent.clickAnimations !== undefined ||
-    document.advancedContent.keyAnimations !== undefined;
-  if ((hasFeedback || document.advancedContent.cursorFocusPath) && !recordingId)
-    pending.push({ kind: 'interaction-source' });
+    document.advancedContent.keyAnimations !== undefined ||
+    document.advancedContent.interactionTimeline !== undefined;
+  if (!recordingId && hasFeedback) {
+    const inputs = document.advancedContent.interactionTimeline;
+    const ids = new Set([
+      ...(inputs?.presses ?? []).map((press) => press.id),
+      ...(inputs?.overrides ?? []).flatMap((override) =>
+        override.source ? [override.source.id] : []
+      ),
+    ]);
+    const content = document.advancedContent;
+    if (
+      (content.actionAudio ?? []).some(
+        (setting) => setting.ref.kind !== 'action' || !ids.has(setting.ref.id)
+      ) ||
+      (content.clickAnimations ?? []).some((style) => !ids.has(style.id)) ||
+      (content.keyAnimations ?? []).some((style) => !ids.has(style.id)) ||
+      (inputs?.overrides ?? []).some(
+        (override) => override.ref.kind !== 'action' || !ids.has(override.ref.id)
+      )
+    )
+      pending.push({ kind: 'interaction-source' });
+  }
   if (
     document.advancedContent.cursorFocusPath?.segments.some(
       (segment) =>
@@ -274,6 +297,42 @@ export function planReviewProjectConversion(args: {
     tracks: [...seedTracks, ...externalAudio.tracks, ...camera.tracks],
   });
   if (!annotations) return blocked({ kind: 'unmapped-content', field: 'annotationEffects' });
+  const authored = document.advancedContent;
+  const sourceInteractionDocuments: VideoProjectSourceInteractionDocument[] =
+    authored.cursorMotions !== undefined ||
+    authored.cursorMotionEnabled !== undefined ||
+    authored.interactionTimeline !== undefined ||
+    (!recordingId && hasFeedback)
+      ? [
+          {
+            id: `${args.seed.id}:source-input`,
+            binding: { assetId: asset.id, sourceInstanceId: timeline.sourceInstanceId },
+            ...(!recordingId
+              ? {
+                  feedback: {
+                    settings: structuredClone(authored.actionAudio ?? []),
+                    ...(authored.clickAnimations
+                      ? { gestureStyles: structuredClone(authored.clickAnimations) }
+                      : {}),
+                    ...(authored.keyAnimations
+                      ? { keyStyles: structuredClone(authored.keyAnimations) }
+                      : {}),
+                  },
+                }
+              : {}),
+            cursorMotions: structuredClone(authored.cursorMotions ?? []),
+            cursorEnabled:
+              args.ui.mode === 'advanced' &&
+              authored.cursorMotionEnabled !== false &&
+              args.ui.tracks.cursorMotion !== false,
+            timeline: structuredClone(
+              authored.interactionTimeline ?? { presses: [], overrides: [] }
+            ),
+            keyboardEnabled: args.ui.mode === 'advanced' && reviewTrackEnabled(args.ui, 'keyboard'),
+            mouseEnabled: args.ui.mode === 'advanced' && reviewTrackEnabled(args.ui, 'mouse'),
+          },
+        ]
+      : [];
   const original = document.advancedContent.audio.original;
   const sourceMutes = (original.mutes ?? []).flatMap((mute) =>
     mute.kind === 'range'
@@ -283,48 +342,68 @@ export function planReviewProjectConversion(args: {
   const originalAudioEnabled = application.originalAudioApplied && !original.muted;
   const master = <T extends VideoProjectVideoClip | VideoProjectAudioClip>(clip: T) => ({
     ...clip,
+    ...(original.audioProcessing && (clip.type === 'AUDIO' || timeline.audioClips.length === 0)
+      ? { audioProcessing: structuredClone(original.audioProcessing) }
+      : {}),
     volume: original.volume,
     audioGainStart: original.volume,
     audioGainEnd: original.volume,
     muted: clip.muted || (clip.type === 'VIDEO' && !originalAudioEnabled),
   });
-  const contentVersion = camera.clips.some((clip) => clip.cameraShadowDirection !== undefined)
-    ? 47
-    : camera.clips.some(
-          (clip) =>
-            clip.cameraScreenBehavior !== undefined ||
-            clip.cameraPositions?.some((position) => position.cameraScreenBehavior !== undefined)
-        )
-      ? 46
-      : externalAudio.clips.some((clip) => clip.transcript !== undefined)
-        ? 44
-        : compositionJoins.length
-          ? 40
-          : annotations.clips.length
-            ? 38
-            : cursor?.sourceObservations
-              ? 33
-              : camera.clips.length
-                ? 32
-                : externalAudio.sourceVoiceoverDocuments.length ||
-                    externalAudio.originalSpeech !== undefined
-                  ? 31
-                  : externalAudio.clips.length
-                    ? 30
-                    : documents.textDocuments.some((entry) => entry.durationMode !== undefined)
-                      ? 29
-                      : original.ranges?.length || sourceMutes.length
-                        ? 28
-                        : timeline.videoClips.some((clip) => (clip.playbackRate ?? 1) < 0.1)
-                          ? 27
-                          : 26;
+  const hasAudioProcessing =
+    original.audioProcessing !== undefined ||
+    externalAudio.clips.some((clip) => clip.audioProcessing !== undefined) ||
+    externalAudio.sourceVoiceoverDocuments.some(
+      (document) => document.take.audioProcessing !== undefined
+    );
+  const contentVersion = sourceInteractionDocuments.length
+    ? 54
+    : hasAudioProcessing
+      ? 53
+      : camera.clips.some((clip) => clip.cameraShadowDirection !== undefined)
+        ? 47
+        : camera.clips.some(
+              (clip) =>
+                clip.cameraScreenBehavior !== undefined ||
+                clip.cameraPositions?.some(
+                  (position) => position.cameraScreenBehavior !== undefined
+                )
+            )
+          ? 46
+          : externalAudio.clips.some((clip) => clip.transcript !== undefined)
+            ? 44
+            : compositionJoins.length
+              ? 40
+              : annotations.clips.length
+                ? 38
+                : cursor?.sourceObservations
+                  ? 33
+                  : camera.clips.length
+                    ? 32
+                    : externalAudio.sourceVoiceoverDocuments.length ||
+                        externalAudio.originalSpeech !== undefined
+                      ? 31
+                      : externalAudio.clips.length
+                        ? 30
+                        : documents.textDocuments.some((entry) => entry.durationMode !== undefined)
+                          ? 29
+                          : original.ranges?.length || sourceMutes.length
+                            ? 28
+                            : timeline.videoClips.some((clip) => (clip.playbackRate ?? 1) < 0.1)
+                              ? 27
+                              : 26;
   const sceneVersion = minimumConvertedSceneSchemaVersion(scene);
-  const minimumVersion = sceneVersion > contentVersion ? sceneVersion : contentVersion;
+  const compositionVersion = sceneVersion > contentVersion ? sceneVersion : contentVersion;
+  const minimumVersion =
+    timeline.videoClips.some((clip) => clip.playbackWindow) && compositionVersion < 43
+      ? 43
+      : compositionVersion;
   let project: VideoProject = {
     ...structuredClone(args.seed),
     version: args.seed.version > minimumVersion ? args.seed.version : minimumVersion,
     name: args.name,
     cursorTrack: cursor,
+    ...(sourceInteractionDocuments.length ? { sourceInteractionDocuments } : {}),
     duration: timeline.duration,
     ...(compositionJoins.length ? { compositionJoins } : {}),
     backgroundColor: '#00000000',
@@ -394,6 +473,16 @@ export function planReviewProjectConversion(args: {
           cameraFollowDefaults: structuredClone(document.advancedContent.cameraFollowDefaults),
         }),
   };
+  if (document.advancedContent.cursorFocusPath && !recordingId) {
+    project.cursorFocusPath = {
+      ...structuredClone(document.advancedContent.cursorFocusPath),
+      segments: document.advancedContent.cursorFocusPath.segments.map((segment) => ({
+        ...structuredClone(segment),
+        binding: { kind: 'source', assetId: asset.id, sourceInstanceId: timeline.sourceInstanceId },
+      })),
+    };
+    if (project.version < 54) project.version = 54;
+  }
   project.cursorTrack = materializeVideoProjectCursorSourceObservations(project);
   if (document.advancedContent.cursorFocusPath && recordingId) {
     const { actionsEnabled: _enabled, ...content } = document.advancedContent;
@@ -484,6 +573,7 @@ function sourceTemplates(seed: VideoProject): {
     seed.textDocuments?.length ||
     seed.commentDocuments?.length ||
     seed.sourceVoiceoverDocuments?.length ||
+    seed.sourceInteractionDocuments?.length ||
     seed.cursorFocusPath ||
     seed.watermark ||
     seed.sceneEdges ||
@@ -545,9 +635,11 @@ function pendingContent(): ReviewProjectConversionIssue[] {
     text: false,
     captions: false,
     actionsEnabled: false,
+    interactionTimeline: false,
     zoom: false,
     background: false,
     audio: false,
+    sourceFilters: false,
     canvas: false,
     windowHeader: false,
     webcam: false,
@@ -556,6 +648,8 @@ function pendingContent(): ReviewProjectConversionIssue[] {
     presentation: false,
     cameraFollowDefaults: false,
     cursorFocusPath: false,
+    cursorMotions: false,
+    cursorMotionEnabled: false,
 
     actionAudio: false,
     clickAnimations: false,

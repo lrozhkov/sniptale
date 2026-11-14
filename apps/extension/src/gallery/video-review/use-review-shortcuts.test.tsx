@@ -119,6 +119,27 @@ it('uses physical shortcut keys across layouts and leaves text editing alone', (
       .querySelector('textarea')!
       .dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
     expect(play).not.toHaveBeenCalled();
+    const overlay = document.createElement('div');
+    const shadow = overlay.attachShadow({ mode: 'open' });
+    const comment = document.createElement('textarea');
+    shadow.append(comment);
+    host.append(overlay);
+    for (const [key, code] of [
+      [' ', 'Space'],
+      ['ArrowRight', 'ArrowRight'],
+      ['Backspace', 'Backspace'],
+    ] as const) {
+      const event = new KeyboardEvent('keydown', {
+        key,
+        code,
+        bubbles: true,
+        composed: true,
+        cancelable: true,
+      });
+      act(() => comment.dispatchEvent(event));
+      expect(event.defaultPrevented).toBe(false);
+    }
+    expect(play).not.toHaveBeenCalled();
     const sliderEvent = new KeyboardEvent('keydown', {
       key: 'ArrowRight',
       bubbles: true,

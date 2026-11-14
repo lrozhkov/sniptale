@@ -1,7 +1,8 @@
+import { verifyRuntimeAnimationSource } from '../../../contracts/effect-runtime/animation';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { createHash } from 'node:crypto';
 import { expect, it } from 'vitest';
-import { validateEffectV1Document } from '@sniptale/runtime-contracts/effect-v1';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import { reviewAdvancedContentBaseline } from '../../../features/video/review/document';
 import type {
@@ -32,33 +33,21 @@ import { areNewReviewSourcesAvailable } from './new-reference-admission';
 
 function snapshot(): ReviewAnnotationEffectSnapshot {
   const source = readFileSync(
-    resolve(
-      'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conformance.sniptale-effect.json'
-    ),
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
-  const result = validateEffectV1Document(JSON.parse(source));
-  if (!result.ok || !result.document) throw new Error('Invalid source fixture');
-  const asset = result.document.assets[0]!;
-  const hash = 'a'.repeat(64);
+  const result = parseAnimationTemplateSource(source);
+  if (!result.template) throw Error('Invalid source fixture');
+  const hash = createHash('sha256').update(source).digest('hex');
   return {
     id: `effect:${hash}`,
-    schemaVersion: 'sniptale.effect.v1',
+    schemaVersion: 'sniptale.animation.v1',
     kind: 'standalone',
-    documentId: result.document.id,
+    documentId: result.template.id,
     sha256: hash,
     source,
-    retainedByteLength: new TextEncoder().encode(source).byteLength + asset.byteLength!,
-    assets: [
-      {
-        id: asset.id,
-        kind: 'svg',
-        mimeType: asset.mimeType,
-        byteLength: asset.byteLength!,
-        sha256: asset.sha256!,
-        assetId: 'project-asset:mark',
-      },
-    ],
+    retainedByteLength: new TextEncoder().encode(source).byteLength,
+    assets: [],
   };
 }
 function annotation(snapshotId: string): ReviewAnnotationEffect {
@@ -71,6 +60,7 @@ function annotation(snapshotId: string): ReviewAnnotationEffect {
     attachment: 'viewport',
     transform: { x: 0, y: 0, width: 1, height: 1, rotation: 0 },
     controls: { accent: '#123456' },
+    anchors: { tip: { x: 0.5, y: 0.5 } },
     order: 0,
   };
 }
@@ -97,43 +87,26 @@ function workspace(cursor = 0): VideoWorkspace {
   };
 }
 
-it.each([0, 1])('exact private claims survive disabled retained history at cursor %i', (cursor) => {
-  const value = workspace(cursor);
-  const snapshot = value.effectSnapshots![0]!;
-  const asset = snapshot.assets[0]!;
-  const claim = {
-    sourceAssetId: value.sourceAssetId,
-    snapshotId: snapshot.id,
-    resourceId: asset.id,
-    sha256: asset.sha256,
-  };
-  const resource = {
-    assetId: asset.assetId,
-    mimeType: asset.mimeType,
-    byteLength: asset.byteLength,
-  };
-  expect(reviewWorkspaceHasAnnotationEffectResource(value, claim, resource)).toBe(true);
-  for (const change of [
-    { sourceAssetId: 'other' },
-    { snapshotId: `effect:${'b'.repeat(64)}` },
-    { resourceId: 'other' },
-    { sha256: 'b'.repeat(64) },
-  ])
+it.each([0, 1])(
+  'embedded sources cannot authorize detached private claims at cursor %i',
+  (cursor) => {
+    const value = workspace(cursor),
+      retained = value.effectSnapshots![0]!;
     expect(
-      reviewWorkspaceHasAnnotationEffectResource(value, { ...claim, ...change }, resource)
+      reviewWorkspaceHasAnnotationEffectResource(
+        value,
+        {
+          sourceAssetId: value.sourceAssetId,
+          snapshotId: retained.id,
+          resourceId: 'legacy-mark',
+          sha256: 'a'.repeat(64),
+        },
+        { assetId: 'project-asset:mark', mimeType: 'image/svg+xml', byteLength: 358 }
+      )
     ).toBe(false);
-  for (const change of [
-    { assetId: 'project-asset:other' },
-    { mimeType: 'image/png' },
-    { byteLength: asset.byteLength + 1 },
-  ])
-    expect(
-      reviewWorkspaceHasAnnotationEffectResource(value, claim, { ...resource, ...change })
-    ).toBe(false);
-  expect(
-    reviewWorkspaceHasAnnotationEffectResource({ ...value, history: [] }, claim, resource)
-  ).toBe(false);
-});
+    expect(collectReviewAssetReferences(value)).toEqual(new Set());
+  }
+);
 
 it('prunes only unreferenced snapshots when a redo branch is discarded', () => {
   const value = workspace(0);
@@ -150,39 +123,16 @@ it('prunes only unreferenced snapshots when a redo branch is discarded', () => {
   expect(value.history).toHaveLength(1);
 });
 
-it('admits only exact available private prepared claims, refusing generic prepared annotation bytes', async () => {
-  const next = workspace();
-  const previous = { ...next, history: [], effectSnapshots: [] };
-  const retained = next.effectSnapshots![0]!;
-  const asset = retained.assets[0]!;
-  const entry = {
-    id: 'mark',
-    assetId: 'physical-mark',
-    createdAt: 1,
-    mimeType: asset.mimeType,
-    size: asset.byteLength,
-  };
-  const payload = {
-    entry,
-    filename: 'mark.svg',
-    expectedAssetId: null,
-    publishToLibrary: false,
-    requiredReviewAnnotationEffect: {
-      aggregateId: next.aggregateId,
-      sourceAssetId: next.sourceAssetId,
-      snapshotId: retained.id,
-      resourceId: asset.id,
-      sha256: asset.sha256,
-    },
-  };
+it('requires exact verified source admission without external prepared resource claims', async () => {
+  const next = workspace(),
+    previous = { ...next, history: [], effectSnapshots: [] },
+    retained = next.effectSnapshots![0]!;
   const stores = { assets: { get: async () => undefined }, media: { get: async () => undefined } };
   const prepared = {
     assets: new Map(),
     libraryAudioClaims: [],
-    resourceClaims: [{ payload, available: true }],
-    annotationEffectSources: [
-      { snapshot: retained, resources: new Map([[asset.assetId, entry.assetId]]) },
-    ],
+    resourceClaims: [],
+    annotationEffectSources: [{ snapshot: retained, resources: new Map() }],
   };
   expect(await areNewReviewSourcesAvailable(next, previous, stores, prepared)).toBe(true);
   expect(
@@ -191,33 +141,12 @@ it('admits only exact available private prepared claims, refusing generic prepar
       annotationEffectSources: [],
     })
   ).toBe(false);
-  for (const claims of [
-    [],
-    [{ payload, available: false }],
-    [
-      {
-        payload: {
-          ...payload,
-          requiredReviewAnnotationEffect: {
-            ...payload.requiredReviewAnnotationEffect,
-            sourceAssetId: 'other',
-          },
-        },
-        available: true,
-      },
-    ],
-    [{ payload: { ...payload, entry: { ...entry, size: entry.size + 1 } }, available: true }],
-  ])
-    expect(
-      await areNewReviewSourcesAvailable(next, previous, stores, {
-        ...prepared,
-        resourceClaims: claims,
-      })
-    ).toBe(false);
   expect(
     await areNewReviewSourcesAvailable(next, previous, stores, {
-      assets: new Map([[entry.id, entry]]),
-      libraryAudioClaims: [],
+      ...prepared,
+      annotationEffectSources: [
+        { snapshot: { ...retained, sha256: '0'.repeat(64) }, resources: new Map() },
+      ],
     })
   ).toBe(false);
 });
@@ -233,9 +162,7 @@ it.each([0, 1])(
     expect(parsed.document?.advancedContent.annotationEffects?.instances.length ?? 0).toBe(cursor);
     expect(parseVideoWorkspace(parsed.workspace)).toEqual(parsed.workspace);
     expect(raw).toEqual(original);
-    expect(collectReviewAssetReferences(parsed.workspace!)).toEqual(
-      new Set(['project-asset:mark'])
-    );
+    expect(collectReviewAssetReferences(parsed.workspace!)).toEqual(new Set());
   }
 );
 
@@ -310,37 +237,28 @@ it('keeps registry out of the slim head and every operation row, and rejects mix
   ).toBeNull();
 });
 
-it('portable roundtrip remaps registry resources, refusing missing maps and local keys', () => {
-  const raw = workspace();
-  const { sourceAssetId: _source, ...portable } = raw;
-  expect(() => assertPortableReviewAssetRefs(portable)).toThrow('local asset id');
+it('portable roundtrip preserves self-contained source bytes without resource remapping', () => {
+  const raw = workspace(),
+    { sourceAssetId: _source, ...portable } = raw;
+  expect(() => assertPortableReviewAssetRefs(portable)).not.toThrow();
   const encoded = encodePortableReviewAssetRefs({ workspace: portable, draft: null });
-  expect(() => assertPortableReviewAssetRefs(encoded.workspace)).not.toThrow();
-  expect(encoded.workspace.effectSnapshots?.[0]?.assets[0]).not.toHaveProperty('assetId');
+  expect(encoded.workspace.effectSnapshots?.[0]?.assets).toEqual([]);
   expect(decodePortableReviewAssetRefs(encoded.workspace)).toEqual(portable);
-  const input = { workspace: raw, draft: null };
-  expect(() => remapReviewAssetReferences(input, new Map())).toThrow('unresolved');
-  const copied = remapReviewAssetReferences(input, new Map([['mark', 'copied']]));
-  expect(copied.workspace.effectSnapshots?.[0]?.assets[0]?.assetId).toBe('project-asset:copied');
+  const copied = remapReviewAssetReferences({ workspace: raw, draft: null }, new Map());
+  expect(copied.workspace.effectSnapshots).toEqual(raw.effectSnapshots);
   expect(copied.workspace.history).toEqual(raw.history);
-  expect(raw.effectSnapshots?.[0]?.assets[0]?.assetId).toBe('project-asset:mark');
   expect(parseVideoWorkspace(copied.workspace)).not.toBeNull();
 });
-
 it.each([0, 1])(
-  'confirmed asset removal cleans snapshots and redo together at cursor %i',
+  'unrelated asset removal preserves embedded sources and retained history at cursor %i',
   (cursor) => {
-    const raw = workspace(cursor);
-    const cleaned = stripReviewAssetReference(raw, 'project-asset:mark', 2);
-    expect(cleaned.effectSnapshots).toEqual([]);
+    const raw = workspace(cursor),
+      cleaned = stripReviewAssetReference(raw, 'project-asset:mark', 2);
+    expect(cleaned.effectSnapshots).toEqual(raw.effectSnapshots);
+    expect(cleaned.history).toEqual(raw.history);
     expect(cleaned.cursor).toBe(cursor);
-    expect(cleaned.history).toHaveLength(1);
-    const retained = cleaned.history[0]!;
-    if (retained.target !== 'advancedContent') throw new Error('Invalid retained target');
-    expect(retained.after.annotationEffects).toEqual({ enabled: false, instances: [] });
     expect(collectReviewAssetReferences(cleaned).size).toBe(0);
     expect(parseVideoWorkspace(cleaned)).not.toBeNull();
-    expect(raw.history).toHaveLength(1);
   }
 );
 
@@ -418,4 +336,17 @@ it('moves the cursor without rewriting sources and appends only baseline, operat
   expect(writes[0]?.value).not.toHaveProperty('effectSnapshots');
   expect(writes[1]?.value).toHaveProperty('effectSnapshots');
   expect(writes[2]?.value).not.toHaveProperty('effectSnapshots');
+});
+
+it('retains snapshot closure checks when immutable source metadata is already verified', async () => {
+  const value = workspace(1),
+    retained = value.effectSnapshots![0]!;
+  expect(await verifyRuntimeAnimationSource(retained.source, retained.sha256)).not.toBeNull();
+  expect(inspectVideoWorkspace(value).failure).toBeNull();
+  const before = structuredClone(value);
+  const operation = value.history[0]!;
+  if (operation.target !== 'advancedContent') throw new Error('Missing authored content');
+  operation.after.annotationEffects!.instances[0]!.controls['undeclared-control'] = 123;
+  expect(inspectVideoWorkspace(value).failure).not.toBeNull();
+  expect(value.effectSnapshots).toEqual(before.effectSnapshots);
 });

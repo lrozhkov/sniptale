@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../../../features/video/project/transition/gl-catalog';
 import { describe, expect, it } from 'vitest';
 import {
   createEmptyVideoProject,
@@ -13,7 +14,6 @@ import {
   VideoCursorVisualPreset,
   VideoTemporalEasing,
   VideoTransitionEasing,
-  VideoTransitionKind,
 } from '../../../features/video/project/types';
 import { applyProjectUpdate } from './helpers';
 import { resetVideoEditorProjectHistory } from '../history';
@@ -78,7 +78,8 @@ function createSelectionTransition() {
     duration: 1,
     easing: VideoTransitionEasing.LINEAR,
     id: 'transition-1',
-    kind: VideoTransitionKind.CROSSFADE,
+    kind: 'gl' as const,
+    selection: createGlTransitionSelection('Fade')!,
     leadingClipId: 'video-1',
     trailingClipId: 'audio-1',
   };

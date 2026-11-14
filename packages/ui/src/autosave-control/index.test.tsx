@@ -56,7 +56,7 @@ it('opens a themed disclosure, toggles the setting and restores focus on Escape'
 });
 it('does not flash a spinner for short saves and respects reduced motion', () => {
   draw({ state: 'saving' });
-  expect(host.querySelector('.lucide-cloud-sync')).not.toBeNull();
+  expect(host.querySelector('.lucide-cloud-sync')).toBeNull();
   act(() => vi.advanceTimersByTime(200));
   expect(host.querySelector('.lucide-cloud-sync path[class]')).toBeNull();
   draw({ state: 'saved' });
@@ -129,4 +129,25 @@ it('contains Tab traversal and restores the trigger after document-level dismiss
   act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   expect(document.querySelector('[role=dialog]')).toBeNull();
   expect(document.activeElement).toBe(trigger);
+});
+
+it('does not measure the anchor while the autosave disclosure is closed', () => {
+  draw();
+  const anchor = host.querySelector<HTMLElement>('[data-ui="autosave-control"]')!;
+  const measure = vi.spyOn(anchor, 'getBoundingClientRect');
+  for (const state of ['dirty', 'saving', 'saved', 'error', 'conflict'] as const) draw({ state });
+  expect(measure).not.toHaveBeenCalled();
+  const trigger = anchor.querySelector('button')!;
+  act(() => trigger.click());
+  expect(measure).toHaveBeenCalled();
+  expect(document.querySelector('[role=dialog]')).not.toBeNull();
+  act(() =>
+    document
+      .querySelector('[role=dialog]')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(document.activeElement).toBe(trigger);
+  measure.mockClear();
+  draw({ state: 'saved' });
+  expect(measure).not.toHaveBeenCalled();
 });

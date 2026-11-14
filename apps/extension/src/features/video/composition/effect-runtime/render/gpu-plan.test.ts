@@ -1,6 +1,11 @@
+import type { EffectRuntimeGpuRasterResource } from '../../../../../contracts/effect-runtime/gpu-plan';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { EffectRuntimeGpuPlanResult } from '../../../../../contracts/effect-runtime/types';
-import type { GpuPreviewGroup, GpuPreviewRenderer } from '../../canvas/gpu-preview';
+import type {
+  GpuPreviewGroup,
+  GpuPreviewLayer,
+  GpuPreviewRenderer,
+} from '../../canvas/gpu-preview';
 import { buildEffectRuntimeGpuPlan, prepareEffectRuntimeGpuScene } from './gpu-plan';
 class Bitmap implements ImageBitmap {
   close = vi.fn();
@@ -11,7 +16,9 @@ class Bitmap implements ImageBitmap {
 }
 beforeEach(() => vi.stubGlobal('ImageBitmap', Bitmap));
 afterEach(() => vi.unstubAllGlobals());
-function plan(depth = 1): EffectRuntimeGpuPlanResult {
+function plan(
+  depth = 1
+): EffectRuntimeGpuPlanResult & { resources: EffectRuntimeGpuRasterResource[] } {
   return {
     kind: 'gpu-plan',
     effectInstanceId: 'effect',
@@ -54,7 +61,7 @@ const layer = (source: GpuPreviewGroup) => ({
   inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1] as const,
 });
 function backend() {
-  const render = vi.fn(async () => new Bitmap());
+  const render = vi.fn<GpuPreviewRenderer['render']>(async () => new Bitmap());
   const gpu: GpuPreviewRenderer = { allocatedBytes: 0, render, dispose: vi.fn() };
   return { gpu, render };
 }
@@ -123,4 +130,150 @@ it('keeps covered clear rectangles numeric when a pass also contains operation m
   const group = buildEffectRuntimeGpuPlan(p);
   expect(group.layers[0]!.rect).toEqual({ x: 0, y: 0, width: 8, height: 8 });
   expect(Object.values(group.layers[0]!.rect).every(Number.isFinite)).toBe(true);
+});
+
+it('keeps closed paint and coverage in the shared graph without materialization', async () => {
+  const p: EffectRuntimeGpuPlanResult = plan();
+  const paint = {
+    path: [],
+    draw: { op: 'fillRect' as const, args: [0, 0, 8, 8] },
+    transform: [1, 0, 0, 1, 0, 0] as const,
+    style: {
+      fill: '#ffffff',
+      stroke: '#000000',
+      font: '10px sans-serif',
+      lineWidth: 1,
+      lineCap: 'butt' as const,
+      lineJoin: 'miter' as const,
+      miterLimit: 10,
+      textAlign: 'start' as const,
+      textBaseline: 'alphabetic' as const,
+      direction: 'inherit' as const,
+    },
+  };
+  p.resources = [
+    { id: 0, kind: 'paint', width: 8, height: 8, paint },
+    { id: 1, kind: 'paint', width: 8, height: 8, coverage: true, paint },
+  ];
+  const operation = p.passes[0]!.operations[0]!;
+  if (operation.op !== 'draw') throw new Error('Expected draw');
+  operation.coverage = 1;
+  const root = buildEffectRuntimeGpuPlan(p);
+  const { gpu, render } = backend();
+  const prepared = await prepareEffectRuntimeGpuScene({
+    layers: [layer(root)],
+    gpu,
+    signal: new AbortController().signal,
+  });
+  expect(root.layers[0]!.source).toMatchObject({ kind: 'paint', width: 8, height: 8, paint });
+  expect(root.layers[0]!.operationClip?.source).toMatchObject({
+    kind: 'paint',
+    width: 8,
+    height: 8,
+    paint,
+  });
+  expect(render).not.toHaveBeenCalled();
+  prepared.release();
+  prepared.release();
+});
+
+function largeGpuScene(count = 4, width = 2048): GpuPreviewLayer[] {
+  const size = { width, height: 2048 };
+  return Array.from({ length: count }, () => {
+    let source: GpuPreviewLayer['source'] = new Bitmap(size.width, size.height);
+    for (let depth = 0; depth < 4; depth++)
+      source = {
+        kind: 'group',
+        output: size,
+        logical: size,
+        layers: [{ source, rect: { x: 0, y: 0, ...size }, inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1] }],
+      };
+    if (!('kind' in source) || source.kind !== 'group') throw new Error('Expected group fixture');
+    return {
+      ...layer(source),
+      opacity: 0.75,
+      clip: { rect: { x: 0, y: 0, width: 8, height: 8 }, radius: 2 },
+    };
+  });
+}
+
+it('stages a large isolated group on the same GPU before the final texture budget is exceeded', async () => {
+  const layers = largeGpuScene();
+  const { gpu, render } = backend();
+  render.mockImplementation(
+    async (request) => new Bitmap(request.output.width, request.output.height)
+  );
+  const prepared = await prepareEffectRuntimeGpuScene({
+    boundTextures: true,
+    layers,
+    gpu,
+    signal: new AbortController().signal,
+  });
+  try {
+    expect(render).toHaveBeenCalledOnce();
+    expect(render.mock.calls[0]![0].output).toEqual({ width: 2048, height: 2048 });
+    expect(prepared.layers[0]!.source).toBeInstanceOf(Bitmap);
+    expect({ ...prepared.layers[0], source: layers[0]!.source }).toEqual(layers[0]);
+    expect(prepared.layers.slice(1)).toEqual(layers.slice(1));
+    expect((await render.mock.results[0]!.value).close).not.toHaveBeenCalled();
+  } finally {
+    prepared.release();
+  }
+  expect((await render.mock.results[0]!.value).close).toHaveBeenCalledOnce();
+});
+
+it('closes completed stages when a later GPU stage fails', async () => {
+  const layers = largeGpuScene(5);
+  const { gpu, render } = backend();
+  const first = new Bitmap(2048, 2048);
+  const failure = new Error('GPU stage failed');
+  render.mockResolvedValueOnce(first).mockRejectedValueOnce(failure);
+  await expect(
+    prepareEffectRuntimeGpuScene({
+      boundTextures: true,
+      layers,
+      gpu,
+      signal: new AbortController().signal,
+    })
+  ).rejects.toBe(failure);
+  expect(first.close).toHaveBeenCalledOnce();
+});
+
+it('closes a stage completed after cancellation without publishing the replacement', async () => {
+  const controller = new AbortController();
+  const { gpu, render } = backend();
+  const late = new Bitmap(2048, 2048);
+  render.mockImplementationOnce(async () => {
+    controller.abort();
+    return late;
+  });
+  await expect(
+    prepareEffectRuntimeGpuScene({
+      boundTextures: true,
+      layers: largeGpuScene(),
+      gpu,
+      signal: controller.signal,
+    })
+  ).rejects.toThrow();
+  expect(late.close).toHaveBeenCalledOnce();
+});
+
+it('keeps retained GPU stage bitmaps within the existing 128MiB limit', async () => {
+  const { gpu, render } = backend();
+  const outputs: Bitmap[] = [];
+  render.mockImplementation(async (request) => {
+    const bitmap = new Bitmap(request.output.width, request.output.height);
+    outputs.push(bitmap);
+    return bitmap;
+  });
+  await expect(
+    prepareEffectRuntimeGpuScene({
+      boundTextures: true,
+      layers: largeGpuScene(10, 4000),
+      gpu,
+      signal: new AbortController().signal,
+    })
+  ).rejects.toThrow();
+  expect(outputs).toHaveLength(4);
+  expect(outputs.every((bitmap) => bitmap.close.mock.calls.length === 1)).toBe(true);
 });

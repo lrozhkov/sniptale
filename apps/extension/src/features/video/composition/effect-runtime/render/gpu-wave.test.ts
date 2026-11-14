@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { EffectRuntimeSandboxExecutor } from '../../../../../contracts/effect-runtime/types';
 import type { EffectRuntimeFramePlan } from '../runtime/types';
@@ -31,14 +33,19 @@ function createPass(time: number, frame: VideoCompositionFrame): VideoCompositio
   return { alpha: 1, frame, time, transitionOverlays: [] };
 }
 
+const source = readFileSync(
+  'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
+  'utf8'
+);
+const hash = createHash('sha256').update(source).digest('hex');
 function createPlan(id: string): EffectRuntimeFramePlan {
   return {
     assets: [],
     controls: {},
     dimensions: { height: 10, width: 10 },
     renderDimensions: { height: 10, width: 10 },
-    documentSha256: 'a'.repeat(64),
-    documentSource: '{}',
+    documentSha256: hash,
+    documentSource: source,
     duration: 2,
     effectInstanceId: id,
     fps: 30,

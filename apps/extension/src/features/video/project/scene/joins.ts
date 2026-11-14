@@ -67,7 +67,8 @@ export function parseVideoProjectCompositionJoins(
     if (
       raw !== undefined &&
       (!isRecord(raw) ||
-        Object.keys(raw).some((key) => !['type', 'before', 'after', 'color'].includes(key)))
+        (raw['type'] !== 'gl' &&
+          Object.keys(raw).some((key) => !['type', 'before', 'after', 'color'].includes(key))))
     )
       return null;
     const transition = raw === undefined ? undefined : parseCompositionJoinSettings(raw);

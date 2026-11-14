@@ -160,6 +160,7 @@ export function ReviewCanvasSettings(props: {
 
 /** Lane masters preserve clip-level gains and remain separate from track visibility. */
 export function ReviewSceneAudio(props: {
+  lane?: 'original' | 'voiceover' | 'music' | undefined;
   audio: QuickEditAudioState;
   hasOriginalAudio: boolean;
   onOriginal(volume: number): void;
@@ -176,7 +177,7 @@ export function ReviewSceneAudio(props: {
         ]
       : []),
     ...(['voiceover', 'music'] as const)
-      .filter((lane) => props.audio[lane].length > 0)
+      .filter((lane) => props.lane === lane || props.audio[lane].length > 0)
       .map((lane) => ({
         key: lane,
         label:
@@ -189,36 +190,43 @@ export function ReviewSceneAudio(props: {
   if (!lanes.length) return null;
   return (
     <section className="review-inspector-columns" data-ui="gallery.videoReview.sceneAudio">
-      {lanes.map((lane) => {
-        const change = (value: number) =>
-          lane.key === 'original'
-            ? props.onOriginal(value / 100)
-            : props.onLaneVolume(lane.key, value / 100);
-        return (
-          <ReviewNumberRow
-            key={lane.key}
-            label={translate(lane.label)}
-            unit="%"
-            value={Math.round(lane.volume * 100)}
-            min={0}
-            max={200}
-            step={1}
-            onChange={change}
-          />
-        );
-      })}
+      {lanes
+        .filter((lane) => !props.lane || lane.key === props.lane)
+        .map((lane) => {
+          const change = (value: number) =>
+            lane.key === 'original'
+              ? props.onOriginal(value / 100)
+              : props.onLaneVolume(lane.key, value / 100);
+          return (
+            <ReviewNumberRow
+              key={lane.key}
+              label={translate(lane.label)}
+              unit="%"
+              value={Math.round(lane.volume * 100)}
+              min={0}
+              max={200}
+              step={1}
+              onChange={change}
+            />
+          );
+        })}
     </section>
   );
 }
 
 /** A source-window decoration, independent of the background and selected effect. */
 export function ReviewWindowHeaderSettings(props: {
+  identity?: string | undefined;
   header: QuickEditWindowHeader | undefined;
   onChange?: ((header: QuickEditWindowHeader | undefined) => void) | undefined;
 }) {
   return (
     <section data-ui="gallery.videoReview.windowHeader">
-      <WindowHeaderSettings header={props.header} onChange={(header) => props.onChange?.(header)} />
+      <WindowHeaderSettings
+        key={props.identity}
+        header={props.header}
+        onChange={(header) => props.onChange?.(header)}
+      />
     </section>
   );
 }

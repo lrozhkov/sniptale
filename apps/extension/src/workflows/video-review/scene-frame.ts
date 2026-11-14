@@ -1,3 +1,8 @@
+import {
+  hasSourceImageFilters,
+  SourceImageFilterError,
+} from '../../features/image-filters/contract';
+import { withSourceImageFilterCanvas } from '../../features/video/composition/canvas/source-image-filter';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import type { ReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import { withReviewWindowRaster, type ReviewWindowRaster } from './window-header';
@@ -85,6 +90,41 @@ export function drawReviewSceneFrame(
     motionBlur?: readonly { camera: QuickEditCameraTransform; alpha: number }[] | undefined;
     drawOverlays?: ((raster: ReviewWindowRaster | null) => void) | undefined;
   }
+) {
+  if (args.sourceFilters && hasSourceImageFilters(args.sourceFilters)) {
+    const size = args.sourceSize;
+    if (!size) throw new SourceImageFilterError();
+    withSourceImageFilterCanvas(
+      {
+        stack: args.sourceFilters,
+        projectTime: args.currentTime,
+        logical: size,
+        raster: size,
+        resources: args.resources,
+        ownerDocument: context.canvas.ownerDocument,
+        paint(target, physical) {
+          args.sample.draw(target, 0, 0, physical.width, physical.height);
+        },
+      },
+      (canvas) => {
+        drawReviewSourceSceneFrame(context, {
+          ...args,
+          windowRaster: undefined,
+          sample: {
+            draw(target, x, y, width, height) {
+              target.drawImage(canvas, x, y, width, height);
+            },
+          },
+        });
+      }
+    );
+    return;
+  }
+  drawReviewSourceSceneFrame(context, args);
+}
+function drawReviewSourceSceneFrame(
+  context: CanvasRenderingContext2D,
+  args: Parameters<typeof drawReviewSceneFrame>[1]
 ) {
   args = { ...args, backgroundCacheContext: args.backgroundCacheContext ?? context };
   const paint = (raster: ReviewWindowRaster | null) => {
@@ -468,6 +508,8 @@ function drawReviewSceneSample(
     };
     background: QuickEditAdvancedState['background'];
     image: (CanvasImageSource & { width: number; height: number }) | null;
+    sourceFilters?: QuickEditAdvancedState['sourceFilters'];
+    sourceSize?: { width: number; height: number } | undefined;
     headerImage?: CanvasImageSource | null | undefined;
     sample: {
       draw(
@@ -486,6 +528,7 @@ function drawReviewSceneSample(
     backgroundOnly?: boolean;
     deferComments?: boolean;
     comments?: readonly CanvasCommentExport[];
+    cursorMotions?: import('../../features/video/project/cursor-motion').CursorMotion[] | undefined;
     sourceTime?: number;
     currentTime?: number | undefined;
     cameraScale?: number;
@@ -508,7 +551,15 @@ function drawReviewSceneSample(
     if (
       !sampling ||
       !demandId ||
-      !drawReviewPreparedSource(target, sampling.frame.sampling, demandId, { x, y, width, height })
+      !drawReviewPreparedSource(
+        target,
+        sampling.frame.sampling,
+        demandId,
+        { x, y, width, height },
+        args.sourceFilters,
+        args.resources,
+        args.currentTime
+      )
     )
       sample.draw(target, x, y, width, height);
   };

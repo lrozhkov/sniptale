@@ -1,8 +1,11 @@
 import {
-  parseEffectV1Source,
-  sha256EffectV1Bytes,
-  resolveEffectV1ControlDefault,
-} from '@sniptale/runtime-contracts/effect-v1';
+  parseAnimationTemplateSource,
+  type AnimationTemplate,
+} from '@sniptale/runtime-contracts/animation-template';
+import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
+import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import { createReviewAnnotationRenderer } from '../../../../apps/extension/src/workflows/video-review/annotation-renderer';
 import { createPreviewRenderResources } from '../../../../apps/extension/src/workflows/video-review/preview-render-resources';
 import { createReviewSpatialRenderer } from '../../../../apps/extension/src/features/video/composition/canvas/spatial-renderer';
@@ -21,21 +24,19 @@ const size = { width: 640, height: 360 };
 const rgb = [68, 136, 204] as const;
 const surface = () => Object.assign(document.createElement('canvas'), size);
 async function definition(name: 'frame' | 'title') {
-  const response = await fetch(
-    `/video-effects/effects/annotations/sniptale-${name}/effect.sniptale-effect.json`
-  );
+  const response = await fetch(`/video-effects/animations/${name}.sniptale-animation.json`);
   if (!response.ok) throw new Error('Color source unavailable');
   const source = await response.text(),
-    parsed = parseEffectV1Source(source);
-  if (!parsed.ok || !parsed.document) throw new Error('Color document invalid');
-  const document = parsed.document;
+    parsed = parseAnimationTemplateSource(source);
+  if (!parsed.ok || !parsed.template) throw new Error('Color document invalid');
+  const document = parsed.template;
   const bytes = new TextEncoder().encode(source),
-    sha256 = await sha256EffectV1Bytes(bytes);
+    hash = bytesToHex(sha256(bytes));
   const snapshot: ReviewAnnotationEffectSnapshot = {
-    id: `effect:${sha256}`,
-    sha256,
+    id: `effect:${hash}`,
+    sha256: hash,
     source,
-    schemaVersion: 'sniptale.effect.v1',
+    schemaVersion: 'sniptale.animation.v1',
     kind: 'standalone',
     documentId: document.id,
     retainedByteLength: bytes.byteLength,
@@ -43,6 +44,86 @@ async function definition(name: 'frame' | 'title') {
   };
   return { document, snapshot };
 }
+/** Author text color and independent opacity in checked Lottie data; do not emulate removed ink controls. */
+function authoredTextColor(
+  base: Awaited<ReturnType<typeof definition>>,
+  role: 'primary' | 'secondary',
+  alpha: number
+) {
+  const template = structuredClone(base.document);
+  const slot = role === 'primary' ? 'title' : 'subtitle';
+  // This fixture declares RGBA8 values. Quantize the composed alpha once before
+  // authoring the Lottie opacity, so the engine cannot quantize the same byte twice.
+  const effectiveAlpha = Math.round(alpha * (role === 'secondary' ? 0.84 : 1));
+  // Use the interior of the target RGBA8 bin, not its floating-point lower boundary.
+  const factor = Math.min(255, effectiveAlpha + 0.5) / 255;
+  const slots = template.animation['slots'];
+  if (!isPlainRecord(slots) || !isPlainRecord(slots[slot]) || !isPlainRecord(slots[slot]['p']))
+    throw new Error('Text color slot missing');
+  const setFill = (frames: unknown) => {
+    if (!Array.isArray(frames) || !frames.length) throw new Error('Text color frames missing');
+    for (const frame of frames) {
+      if (!isPlainRecord(frame) || !isPlainRecord(frame['s']))
+        throw new Error('Text color document missing');
+      frame['s']['fc'] = rgb.map((channel) => channel / 255);
+    }
+  };
+  setFill(slots[slot]['p']['k']);
+  const layers = template.animation['layers'];
+  if (!Array.isArray(layers)) throw new Error('Text color layers missing');
+  let found = false;
+  for (const layer of layers) {
+    if (
+      !isPlainRecord(layer) ||
+      !isPlainRecord(layer['t']) ||
+      !isPlainRecord(layer['t']['d']) ||
+      layer['t']['d']['sid'] !== slot
+    )
+      continue;
+    setFill(layer['t']['d']['k']);
+    if (!isPlainRecord(layer['ks']) || !isPlainRecord(layer['ks']['o']))
+      throw new Error('Text opacity missing');
+    const opacity = layer['ks']['o'];
+    if (opacity['a'] === 0 && typeof opacity['k'] === 'number') opacity['k'] *= factor;
+    else if (opacity['a'] === 1 && Array.isArray(opacity['k'])) {
+      for (const frame of opacity['k']) {
+        if (!isPlainRecord(frame)) throw new Error('Text opacity keyframe missing');
+        for (const key of ['s', 'e']) {
+          const values = frame[key];
+          if (values === undefined) continue;
+          if (
+            !Array.isArray(values) ||
+            !values.every((value) => typeof value === 'number' && Number.isFinite(value))
+          )
+            throw new Error('Text opacity keyframe invalid');
+          frame[key] = values.map((value) => value * factor);
+        }
+      }
+    } else throw new Error('Text opacity unsupported');
+    found = true;
+  }
+  if (!found) throw new Error('Text color layer missing');
+  return checkedDefinition(template);
+}
+function checkedDefinition(document: AnimationTemplate) {
+  const source = JSON.stringify(document),
+    parsed = parseAnimationTemplateSource(source);
+  if (!parsed.template) throw new Error('Authored color fixture invalid');
+  const bytes = new TextEncoder().encode(source),
+    hash = bytesToHex(sha256(bytes));
+  const snapshot: ReviewAnnotationEffectSnapshot = {
+    id: `effect:${hash}`,
+    sha256: hash,
+    source,
+    schemaVersion: 'sniptale.animation.v1',
+    kind: 'standalone',
+    documentId: parsed.template.id,
+    retainedByteLength: bytes.byteLength,
+    assets: [],
+  };
+  return { document: parsed.template, snapshot };
+}
+
 function bitmapInterior(bitmap: ImageBitmap) {
   const canvas = Object.assign(document.createElement('canvas'), {
     width: bitmap.width,
@@ -86,25 +167,20 @@ async function colorFrame(args: {
   spatial: boolean;
   background: 255 | 32;
 }) {
-  const { document, snapshot } = args.definition;
+  const { document, snapshot } =
+    args.role === 'outline'
+      ? args.definition
+      : authoredTextColor(args.definition, args.role, args.alpha);
   const color = args.alpha === 255 ? '#4488ccff' : '#4488cc80';
   const controls = Object.fromEntries(
-    document.controls.map((control) => [control.id, resolveEffectV1ControlDefault(control, 'en')])
+    document.controls.map((control) => [control.id, resolveEffectControlDefault(control, 'en')])
   );
-  Object.assign(controls, {
-    surface: '#00000000',
-    accent: args.role === 'outline' ? color : '#00000000',
-  });
-  if (args.role === 'outline') Object.assign(controls, { line: 8 });
+  Object.assign(controls, { accent: args.role === 'outline' ? color : '#00000000', title: '' });
+  if (args.role === 'outline') controls['stroke'] = 8;
   else
     Object.assign(controls, {
-      ink: color,
       title: args.role === 'primary' ? 'MMMMMMMM' : '',
-      line2: '',
-      eyebrow: '',
       subtitle: args.role === 'secondary' ? 'MMMMMMMM' : '',
-      font: 76,
-      bodyFont: 26,
     });
   const instance: ReviewAnnotationEffect = {
     id: 'color',

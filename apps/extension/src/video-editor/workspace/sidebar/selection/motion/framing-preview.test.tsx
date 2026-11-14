@@ -1,3 +1,5 @@
+import { createSourceImageFilter } from '../../../../../features/image-filters/contract';
+import { applyVideoProjectMutationPatch } from '../../../../../features/video/project/mutation';
 // @vitest-environment jsdom
 import type {
   GpuPreviewOutput,
@@ -1308,4 +1310,64 @@ it('keeps one source materializer across pending camera edits and discards the o
   expect(draw).toHaveBeenCalledOnce();
   expect(button().disabled).toBe(false);
   expect(materializer.dispose).not.toHaveBeenCalled();
+});
+
+it('keeps source filters in the Native inspector materializer and replaces it on a filter-only edit', async () => {
+  const base = createVideoProjectFromRecording({
+    recordingId: 'filtered-inspector',
+    filename: 'source.webm',
+    width: 800,
+    height: 600,
+    duration: 3,
+    mimeType: 'video/webm',
+    size: 1,
+    hasAudio: false,
+  });
+  const color = createSourceImageFilter('color', 'color');
+  if (color.kind !== 'color') throw new Error('Expected color');
+  color.parameters.brightness = 2;
+  const first = applyVideoProjectMutationPatch(base, {
+    clips: base.clips.map((clip) =>
+      clip.type === 'VIDEO' ? { ...clip, sourceFilters: { version: 1, filters: [color] } } : clip
+    ),
+  });
+  const motion = { ...createVideoProjectMotionRegion(first, 0), scale: 2 };
+  await render(false, first, motion);
+  await ready();
+  expect(mocks.create).toHaveBeenCalledOnce();
+  const firstMaterializer = mocks.create.mock.calls[0]![0];
+  expect(
+    firstMaterializer.project.clips.find(
+      (clip: (typeof first.clips)[number]) => clip.type === 'VIDEO'
+    ).sourceFilters
+  ).toEqual({ version: 1, filters: [color] });
+  const next = applyVideoProjectMutationPatch(first, {
+    clips: first.clips.map((clip) =>
+      clip.type === 'VIDEO'
+        ? {
+            ...clip,
+            sourceFilters: {
+              version: 1,
+              filters: [{ ...color, parameters: { ...color.parameters, brightness: 0.5 } }],
+            },
+          }
+        : clip
+    ),
+  });
+  await render(false, next, motion);
+  await ready(1);
+  expect(mocks.create).toHaveBeenCalledTimes(2);
+  expect(pending[0]!.dispose).toHaveBeenCalledOnce();
+  const nextMaterializer = mocks.create.mock.calls[1]![0];
+  expect(
+    nextMaterializer.project.clips.find(
+      (clip: (typeof next.clips)[number]) => clip.type === 'VIDEO'
+    ).sourceFilters.filters[0].parameters.brightness
+  ).toBe(0.5);
+  expect(
+    firstMaterializer.project.clips.find(
+      (clip: (typeof first.clips)[number]) => clip.type === 'VIDEO'
+    ).sourceFilters.filters[0].parameters.brightness
+  ).toBe(2);
+  expect(button().disabled).toBe(false);
 });

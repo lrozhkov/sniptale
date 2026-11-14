@@ -1,9 +1,9 @@
 import { readEffectPresentationDocument } from '../effect-bundle/presentation-document';
 import {
-  mapEffectV1ObjectPoint,
-  mapEffectV1ScenePoint,
-  type EffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
+  mapAnimationObjectPoint,
+  mapAnimationScenePoint,
+  type AnimationTemplate,
+} from '@sniptale/runtime-contracts/animation-template';
 import type { VideoProject, VideoProjectClip, VideoProjectTransform } from '../types';
 
 /** Reads immutable authored body geometry; instance controls never own these dimensions. */
@@ -11,8 +11,14 @@ export function getEffectClipObjectLayout(project: VideoProject, clip: VideoProj
   if (clip.type !== 'EFFECT') return undefined;
   const instance = project.effectInstances?.find(({ id }) => id === clip.effectInstanceId);
   const snapshot = project.effectSnapshots?.find(({ id }) => id === instance?.snapshotId);
-  return snapshot
-    ? readEffectPresentationDocument(snapshot.source).document?.objectLayout
+  const document = snapshot ? readEffectPresentationDocument(snapshot.source).document : null;
+  return document
+    ? {
+        ...document.objectLayout,
+        width: document.animation.w,
+        height: document.animation.h,
+        resize: 'scale' as const,
+      }
     : undefined;
 }
 
@@ -35,9 +41,8 @@ export function resolveEffectClipTransformPatch(
 }
 
 export function initializeEffectSceneAnchors(
-  document: EffectV1Document,
-  transform: VideoProjectTransform,
-  scene: { width: number; height: number }
+  document: AnimationTemplate,
+  transform: VideoProjectTransform
 ): Record<string, { x: number; y: number }> | undefined {
   const layout = document.objectLayout;
   if (!layout?.handles?.length) return undefined;
@@ -50,16 +55,16 @@ export function initializeEffectSceneAnchors(
       const y = defaults[handle.yControl];
       if (typeof x !== 'number' || typeof y !== 'number')
         throw new Error('Invalid effect handle default');
-      const point = mapEffectV1ObjectPoint(
-        layout,
+      const point = mapAnimationObjectPoint(
+        document,
         { ...transform, rotation: (transform.rotation * Math.PI) / 180 },
         { x, y }
       );
       return [
         handle.id,
         {
-          x: Math.max(0, Math.min(scene.width, point.x)),
-          y: Math.max(0, Math.min(scene.height, point.y)),
+          x: point.x,
+          y: point.y,
         },
       ];
     })
@@ -67,7 +72,7 @@ export function initializeEffectSceneAnchors(
 }
 
 export function resolveEffectObjectControls(
-  document: EffectV1Document,
+  document: AnimationTemplate,
   instance: NonNullable<VideoProject['effectInstances']>[number],
   transform: VideoProjectTransform
 ): Record<string, number | string> {
@@ -80,8 +85,8 @@ export function resolveEffectObjectControls(
   for (const handle of layout.handles) {
     const point = instance.sceneAnchors?.[handle.id];
     if (!point) throw new Error('Missing effect scene anchor');
-    const local = mapEffectV1ScenePoint(
-      layout,
+    const local = mapAnimationScenePoint(
+      document,
       { ...transform, rotation: (transform.rotation * Math.PI) / 180 },
       point
     );

@@ -1,0 +1,11 @@
+{
+  "id": "golos-text-lottie",
+  "version": "2.004",
+  "sourceUrl": "https://github.com/googlefonts/golos-text",
+  "fontSha256": "17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063",
+  "fontBytes": 184292,
+  "copyright": "Copyright 2019 The Golos Text Project Authors (https://github.com/googlefonts/golos-text)",
+  "license": "OFL-1.1",
+  "packaging": "Embedded base64 in self-contained Lottie animation packages; font bytes unchanged",
+  "documents": ["animations/frame.sniptale-animation.json"]
+}

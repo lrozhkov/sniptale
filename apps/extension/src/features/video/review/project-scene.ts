@@ -114,6 +114,7 @@ export function planReviewProjectScene(args: {
         Partial<
           Pick<
             VideoProjectVideoClip,
+            | 'sourceFilters'
             | 'sourceCrop'
             | 'rememberedSourceCrop'
             | 'windowHeader'
@@ -229,6 +230,7 @@ export function planReviewProjectScene(args: {
             },
           }
         : {}),
+      ...(content.sourceFilters ? { sourceFilters: structuredClone(content.sourceFilters) } : {}),
       ...(layout.sourceCrop ? { sourceCrop: layout.sourceCrop } : {}),
       ...(ui.mode === 'basic' && content.canvas?.crop
         ? {

@@ -1,3 +1,5 @@
+import { useAudioPresets } from '../../../../../composition/audio-preset-resources/use-audio-presets';
+import { AudioPresetControls } from '../../../../../ui/audio/preset-controls';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { Copy, Trash2, FileAudio, LocateFixed } from 'lucide-react';
 import type { VideoProject } from '../../../../../features/video/project/types';
@@ -28,6 +30,8 @@ export function InspectSourceVoiceoverPanel(props: { project: VideoProject; docu
   const document = props.project.sourceVoiceoverDocuments?.find(
     (item) => item.id === props.documentId
   );
+  const ownerKey = JSON.stringify([props.project.id, props.documentId]);
+  const presets = useAudioPresets(ownerKey, document?.take.audioProcessing);
   if (!document) return null;
   const disabled = !isProjectSourceVoiceoverEditable(props.project, document);
   const patch = (take: Partial<Omit<QuickEditAudioClip, 'id' | 'assetId'>>) =>
@@ -60,6 +64,16 @@ export function InspectSourceVoiceoverPanel(props: { project: VideoProject; docu
                   onChange={(muted) => patch({ muted })}
                 />
                 <AudioTakeLevelFields
+                  presetControls={
+                    <AudioPresetControls
+                      key={ownerKey}
+                      {...presets}
+                      hasValue={!!document.take.audioProcessing}
+                      disabled={disabled}
+                      onApply={(audioProcessing) => patch({ audioProcessing })}
+                    />
+                  }
+                  createDefaultProcessing={presets.createDefaultProcessing}
                   clip={document.take}
                   disabled={disabled}
                   showTempo

@@ -49,6 +49,9 @@ import {
   STORE_NAME,
   THUMBNAILS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
+  VIDEO_ANIMATION_PACKAGES_STORE,
+  VIDEO_VISUAL_PREFERENCES_STORE,
+  VIDEO_GL_TRANSITION_PRESETS_STORE,
   VIDEO_PROJECTS_STORE,
   VIDEO_PROJECT_REVISIONS_STORE,
   WEB_SNAPSHOTS_STORE,
@@ -180,6 +183,9 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, AGGREGATE_PRESENTATIONS_STORE, ['aggregateKind', 'aggregateId'], ['updatedAt']);
   createStore(db, WEB_SNAPSHOTS_STORE, 'id', ['createdAt']);
   createStore(db, VIDEO_EFFECT_BUNDLES_STORE, 'packId', ['enabled', 'updatedAt']);
+  createStore(db, VIDEO_ANIMATION_PACKAGES_STORE, 'packId', ['enabled', 'updatedAt']);
+  createStore(db, VIDEO_VISUAL_PREFERENCES_STORE, ['kind', 'packId'], []);
+  createStore(db, VIDEO_GL_TRANSITION_PRESETS_STORE, 'id', ['updatedAt']);
   createStore(db, PROJECT_EXPORT_INPUTS_STORE, 'jobId', ['createdAt']);
   createStore(db, FRAME_ANNOTATION_RASTER_JOBS_STORE, 'jobId', ['createdAt']);
   createStore(db, EDITOR_CUSTOM_SHAPES_STORE, 'id', ['enabled', 'updatedAt']);

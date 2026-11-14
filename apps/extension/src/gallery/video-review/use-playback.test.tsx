@@ -698,3 +698,276 @@ it('keeps presented-time callbacks stable and uses the current duration without 
     test.dispose();
   }
 });
+
+it('clears a previous transport failure only after an explicit Play succeeds', async () => {
+  const test = playbackHarness();
+  const recovered = vi.fn(),
+    failure = vi.fn();
+  let accept!: () => void;
+  test.play.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        accept = resolve;
+      })
+  );
+  try {
+    test.update({ onRecovered: recovered, onFailure: failure });
+    act(() => test.hook.play());
+    expect(recovered).not.toHaveBeenCalled();
+    await act(async () => accept());
+    expect(recovered).toHaveBeenCalledOnce();
+    expect(failure).not.toHaveBeenCalled();
+    test.play.mockRejectedValueOnce(new Error('Playback refused'));
+    await act(async () => test.hook.play());
+    expect(recovered).toHaveBeenCalledOnce();
+    expect(failure).toHaveBeenCalledOnce();
+  } finally {
+    test.dispose();
+  }
+});
+
+it('ignores late Play success after the playback owner unmounts', async () => {
+  const test = playbackHarness();
+  const recovered = vi.fn(),
+    failure = vi.fn();
+  let accept!: () => void;
+  test.play.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        accept = resolve;
+      })
+  );
+  test.update({ onRecovered: recovered, onFailure: failure });
+  act(() => test.hook.play());
+  test.dispose();
+  await act(async () => accept());
+  expect(recovered).not.toHaveBeenCalled();
+  expect(failure).not.toHaveBeenCalled();
+});
+
+it('holds an automatic loop at its exact target until audio is prepared', async () => {
+  const test = playbackHarness();
+  let paused = true;
+  let accept!: (ready: boolean) => void;
+  const prepareAfterSeek = vi.fn(
+    () =>
+      new Promise<boolean>((resolve) => {
+        accept = resolve;
+      })
+  );
+  const node = test.hook.video.current!;
+  Object.defineProperty(node, 'paused', { configurable: true, get: () => paused });
+  test.pause.mockImplementation(() => {
+    paused = true;
+  });
+  test.play.mockImplementation(async () => {
+    paused = false;
+  });
+  try {
+    test.update({ prepareAfterSeek, edits: [] });
+    act(() => test.hook.setPlaybackRange({ start: 1, end: 2 }));
+    paused = false;
+    act(() => test.hook.setPlaying(true));
+    await act(async () => test.hook.onTime(2.1));
+    expect(paused).toBe(true);
+    expect(node.currentTime).toBe(1);
+    expect(prepareAfterSeek).toHaveBeenCalledOnce();
+    expect(test.play).not.toHaveBeenCalled();
+    await act(async () => accept(true));
+    expect(test.play).toHaveBeenCalledOnce();
+    expect(node.currentTime).toBe(1);
+  } finally {
+    test.dispose();
+  }
+});
+it('replaces pending seek preparation without allowing an old result to resume playback', async () => {
+  const test = playbackHarness();
+  let paused = false;
+  const gates: ((ready: boolean) => void)[] = [];
+  const prepareAfterSeek = vi.fn(() => new Promise<boolean>((resolve) => gates.push(resolve)));
+  const node = test.hook.video.current!;
+  Object.defineProperty(node, 'paused', { configurable: true, get: () => paused });
+  test.pause.mockImplementation(() => {
+    paused = true;
+  });
+  test.play.mockImplementation(async () => {
+    paused = false;
+  });
+  try {
+    test.update({ prepareAfterSeek, edits: [] });
+    await act(async () => test.hook.seek(3, false));
+    expect(prepareAfterSeek).toHaveBeenCalledOnce();
+    expect(paused).toBe(true);
+    await act(async () => test.hook.seek(5, false));
+    expect(prepareAfterSeek).toHaveBeenCalledTimes(2);
+    await act(async () => gates[0]!(true));
+    expect(test.play).not.toHaveBeenCalled();
+    await act(async () => gates[1]!(true));
+    expect(test.play).toHaveBeenCalledOnce();
+    expect(node.currentTime).toBe(5);
+  } finally {
+    test.dispose();
+  }
+});
+it('keeps a refused audio seek paused and ignores a preparation result after unmount', async () => {
+  const test = playbackHarness();
+  let paused = false;
+  let accept!: (ready: boolean) => void;
+  const prepareAfterSeek = vi.fn(
+    () =>
+      new Promise<boolean>((resolve) => {
+        accept = resolve;
+      })
+  );
+  const node = test.hook.video.current!;
+  Object.defineProperty(node, 'paused', { configurable: true, get: () => paused });
+  test.pause.mockImplementation(() => {
+    paused = true;
+  });
+  try {
+    test.update({ prepareAfterSeek, edits: [] });
+    await act(async () => test.hook.seek(3, false));
+    await act(async () => accept(false));
+    expect(test.play).not.toHaveBeenCalled();
+    expect(paused).toBe(true);
+    paused = false;
+    await act(async () => test.hook.seek(5, false));
+    test.dispose();
+    await act(async () => accept(true));
+    expect(test.play).not.toHaveBeenCalled();
+  } catch (error) {
+    test.dispose();
+    throw error;
+  }
+});
+
+it('keeps urgent seek and pause ahead of a pending presented-time transition', () => {
+  const test = playbackHarness();
+  try {
+    test.update({ edits: [] });
+    const node = test.hook.video.current!;
+    Object.defineProperty(node, 'paused', { configurable: true, value: false });
+    act(() => test.hook.setPresentationActive('source', true));
+    act(() => {
+      test.hook.onPresentedTime('source', 3);
+      test.hook.seek(7, false);
+    });
+    expect(test.hook.time).toBe(7);
+    expect(node.currentTime).toBe(7);
+    Object.defineProperty(node, 'paused', { configurable: true, value: true });
+    act(() => {
+      node.dispatchEvent(new Event('pause'));
+      test.hook.onPresentedTime('source', 4);
+    });
+    expect(test.hook.time).toBe(7);
+  } finally {
+    test.dispose();
+  }
+});
+
+it('holds the original sample while project time plays, pauses, resumes and is removed', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  let now = 0,
+    paused = true,
+    sequence = 0;
+  const callbacks = new Map<number, FrameRequestCallback>();
+  vi.spyOn(performance, 'now').mockImplementation(() => now);
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    callbacks.set(++sequence, callback);
+    return sequence;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => callbacks.delete(id));
+  vi.spyOn(HTMLMediaElement.prototype, 'paused', 'get').mockImplementation(() => paused);
+  vi.spyOn(HTMLMediaElement.prototype, 'readyState', 'get').mockReturnValue(3);
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(function (
+    this: HTMLMediaElement
+  ) {
+    paused = true;
+    this.dispatchEvent(new Event('pause'));
+  });
+  vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(async function (
+    this: HTMLMediaElement
+  ) {
+    paused = false;
+    this.dispatchEvent(new Event('play'));
+  });
+  const root = createRoot(document.createElement('div'));
+  let hook!: ReturnType<typeof useReviewPlayback>;
+  const hold = {
+    id: 'hold',
+    kind: 'freeze' as const,
+    start: 4,
+    end: 4,
+    requestedStart: 4,
+    requestedEnd: 4,
+    duration: 2,
+    frameTime: 3.98,
+    frameDuration: 0.04,
+  };
+  let edits = [hold];
+  function Harness() {
+    hook = useReviewPlayback({
+      duration: 12,
+      edits,
+      boundaries: () => undefined,
+      onSeek() {},
+      onFailure() {},
+      original: { muted: false, volume: 1 },
+    });
+    return (
+      <video
+        ref={hook.video}
+        onPlay={() => hook.setPlaying(true)}
+        onPause={() => hook.setPlaying(false)}
+      />
+    );
+  }
+  const tick = (time: number) =>
+    act(() => {
+      now = time;
+      const batch = [...callbacks.values()];
+      callbacks.clear();
+      batch.forEach((callback) => callback(time));
+    });
+  try {
+    act(() => root.render(<Harness />));
+    act(() => hook.seek(3.9, false));
+    await act(async () => hook.play());
+    hook.video.current!.currentTime = 4.01;
+    tick(100);
+    tick(200);
+    tick(800);
+    expect(hook.playing).toBe(true);
+    expect(paused).toBe(true);
+    expect(hook.video.current!.currentTime).toBe(3.98);
+    expect(hook.readResultTime()).toBeCloseTo(4.6);
+    act(() => hook.pause());
+    tick(1200);
+    expect(hook.readResultTime()).toBeCloseTo(4.6);
+    await act(async () => hook.play());
+    tick(1200);
+    tick(2800);
+    expect(hook.readResultTime()).toBeNull();
+    expect(paused).toBe(false);
+    act(() => hook.pause());
+    act(() => hook.setPlaybackRange({ start: 4, end: 7 }));
+    await act(async () => hook.play());
+    tick(2900);
+    tick(3000);
+    tick(3200);
+    expect(hook.readResultTime()).toBeCloseTo(4.2);
+    act(() => hook.pause());
+    act(() => hook.seekResult(5));
+    expect(hook.playbackRange).toEqual({ start: 4, end: 7 });
+    expect(hook.readResultTime()).toBe(5);
+    edits = [];
+    act(() => root.render(<Harness />));
+    expect(hook.readResultTime()).toBeNull();
+    expect(hook.playing).toBe(false);
+    expect(hook.video.current!.currentTime).toBe(4);
+  } finally {
+    act(() => root.unmount());
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  }
+});

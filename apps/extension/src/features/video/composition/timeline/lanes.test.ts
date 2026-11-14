@@ -1,7 +1,8 @@
+import { createGlTransitionSelection } from '../../project/transition/gl-catalog';
 import { expect, it } from 'vitest';
 import { applyVideoProjectMutationPatch } from '../../project/mutation';
 import { createEmptyVideoProject } from '../../project/factories/creation';
-import { VideoTransitionEasing, VideoTransitionKind } from '../../project/types/index';
+import { VideoTransitionEasing } from '../../project/types/index';
 import {
   buildVideoCompositionCursorSegments,
   buildVideoCompositionMotionSegments,
@@ -20,9 +21,8 @@ function expectCrossfadeTransitionSegments(project: ReturnType<typeof createLane
       trailingClipId: 'clip-b',
       transition: expect.objectContaining({
         id: 'transition-1',
-        kind: VideoTransitionKind.CROSSFADE,
-        renderKind: 'COMPOSITE',
-        templateKind: 'CROSSFADE',
+        kind: 'gl' as const,
+        selection: createGlTransitionSelection('Fade')!,
       }),
     }),
   ]);
@@ -117,7 +117,8 @@ it('skips non-overlapping transitions and drops zero-length cursor spans', () =>
       duration: 1,
       easing: VideoTransitionEasing.LINEAR,
       id: 'missing-clips',
-      kind: VideoTransitionKind.CROSSFADE,
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       leadingClipId: 'missing-a',
       trailingClipId: 'missing-b',
     },

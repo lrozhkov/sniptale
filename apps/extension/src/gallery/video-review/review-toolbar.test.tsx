@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import {
   ReviewTimelineToolbar,
+  ReviewModeControl,
   ReviewTrackControls,
   type ReviewAnnotationTool,
 } from './review-toolbar';
@@ -178,7 +179,7 @@ it('annotation addition is advanced-only, admitted through the note owner and bl
   }
 });
 
-it('moves the mode switch between the labelled toolbar and first compact lane control', async () => {
+it('keeps one labelled mode control outside the track controls in both modes', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   const root = createRoot(host);
@@ -209,6 +210,7 @@ it('moves the mode switch between the labelled toolbar and first compact lane co
               changeAudio: vi.fn(),
             }}
           />
+          <ReviewModeControl advanced={advanced} busy={busy} setMode={setMode} />
           <ReviewTrackControls {...controls} />
         </>
       )
@@ -223,7 +225,7 @@ it('moves the mode switch between the labelled toolbar and first compact lane co
   };
   try {
     await render('basic');
-    expect(modeButton().closest('[data-ui="gallery.videoReview.workspaceTools"]')).not.toBeNull();
+    expect(modeButton().closest('[data-ui="gallery.videoReview.trackControls"]')).toBeNull();
     expect(modeButton().textContent).toBe(translate('gallery.videoReview.advancedEditing'));
     expect(modeButton().getAttribute('aria-pressed')).toBe('false');
     await act(async () => modeButton().click());
@@ -231,8 +233,8 @@ it('moves the mode switch between the labelled toolbar and first compact lane co
 
     await render('advanced');
     const tracks = host.querySelector('[data-ui="gallery.videoReview.trackControls"]')!;
-    expect(tracks.querySelector('button')).toBe(modeButton());
-    expect(modeButton().textContent).toBe('');
+    expect(tracks.contains(modeButton())).toBe(false);
+    expect(modeButton().textContent).toBe(translate('gallery.videoReview.advancedEditing'));
     expect(modeButton().getAttribute('aria-pressed')).toBe('true');
     expect(host.querySelector('[data-ui="gallery.videoReview.workspaceTools"]')).toBeNull();
     await act(async () => modeButton().click());
@@ -244,7 +246,7 @@ it('moves the mode switch between the labelled toolbar and first compact lane co
     expect(setMode).toHaveBeenCalledTimes(2);
 
     await render('basic');
-    expect(modeButton().closest('[data-ui="gallery.videoReview.workspaceTools"]')).not.toBeNull();
+    expect(modeButton().closest('[data-ui="gallery.videoReview.trackControls"]')).toBeNull();
     expect(modeButton().textContent).toBe(translate('gallery.videoReview.advancedEditing'));
     expect(host.querySelector('[data-ui="gallery.videoReview.trackControls"]')).toBeNull();
     expect(setTrackVisibility).not.toHaveBeenCalled();
@@ -287,10 +289,9 @@ it('keeps track settings quiet while preserving active and focus states', async 
     expect(button.getAttribute('aria-pressed')).toBe('true');
     await act(async () => button.click());
     expect(toggle).toHaveBeenCalledOnce();
-    const mode = host.querySelector<HTMLButtonElement>(
-      `[aria-label="${translate('gallery.videoReview.advancedEditing')}"]`
-    )!;
-    expect(mode.className).not.toContain('enabled:hover:!border-');
+    expect(
+      host.querySelector(`[aria-label="${translate('gallery.videoReview.advancedEditing')}"]`)
+    ).toBeNull();
     expect(
       host.querySelector(`[aria-label="${translate('gallery.videoReview.telemetry')}"]`)
     ).toBeNull();
@@ -301,137 +302,104 @@ it('keeps track settings quiet while preserving active and focus states', async 
   }
 });
 
-it('shows the Focus type only while Focus is active and retains the insertion choice', async () => {
+it('offers five direct focus types, retains the choice, and preserves admission and busy guards', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
-  document.body.append(host);
   const root = createRoot(host);
   const advanced = createQuickEditAdvancedState();
   advanced.ui.mode = 'advanced';
   advanced.ui.tracks.zoom = true;
-  let kind: 'zoom' | 'spotlight' | 'border' | undefined;
   let admitted = true;
-  const onToggle = vi.fn();
-  const setCutting = vi.fn();
-  const toggle = vi.fn();
-  const changeRate = vi.fn();
-  const changeAudio = vi.fn();
-  const onType = vi.fn((value: 'zoom' | 'spotlight' | 'border') => {
-    kind = value;
+  let type: 'zoom' | 'spotlight' | 'lens' | 'border' | '3d' = 'zoom';
+  const onToggle = vi.fn((next: typeof type) => {
+    type = next;
   });
+  const setCutting = vi.fn();
   const beforeAction = vi.fn((action: () => void) => {
     if (admitted) action();
   });
-  const render = (active: boolean, busy = false, selectedTrack: 'source' | 'zoom' = 'zoom') =>
+  const render = (active = false, busy = false) =>
     act(async () =>
       root.render(
         <ReviewTimelineToolbar
-          selectedTrack={selectedTrack}
+          selectedTrack="zoom"
           advanced={advanced}
           busy={busy}
-          beforeAction={beforeAction}
           composerBusy={false}
+          beforeAction={beforeAction}
           setMode={vi.fn()}
           setTrackVisibility={vi.fn()}
           telemetryAvailable
           selection={{ kind: 'point', time: 0 }}
           edits={[]}
           onDownloadFragment={vi.fn()}
-          focusTool={{ active, available: true, ...(kind ? { type: kind } : {}), onType, onToggle }}
+          focusTool={{ active, type, available: true, onToggle }}
           editing={{
-            mode: active ? null : 'speed',
+            mode: null,
             rate: 2,
             audio: 'speed',
-            exporter: {
-              index: {
-                duration: 6,
-                boundaries: [0, 6],
-                videoCodec: 'vp8',
-                audioCodec: null,
-                container: 'webm',
-                rotation: 0,
-              },
-              phase: 'idle',
-            },
+            exporter: { index: null, phase: 'idle' },
             setCutting,
-            toggle,
+            toggle: vi.fn(),
             canApply: vi.fn(() => true),
-            changeRate,
-            changeAudio,
+            changeRate: vi.fn(),
+            changeAudio: vi.fn(),
           }}
         />
       )
     );
-  const selector = () =>
+  const options = [
+    'zoomRegionLabel',
+    'focusSpotlight',
+    'focusLens',
+    'focus3d',
+    'focusBorder',
+  ] as const;
+  const button = (key: (typeof options)[number]) =>
     host.querySelector<HTMLButtonElement>(
-      `[aria-label="${translate('gallery.videoReview.focusType')}"]`
-    );
-  const choose = async (label: string) => {
-    await act(async () => selector()!.click());
-    const option = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
-      (node) => node.textContent?.includes(label)
+      `[aria-label="${translate(`gallery.videoReview.${key}`)}"]`
     )!;
-    expect(option).toBeDefined();
-    await act(async () => option.click());
-  };
-  const click = async (key: Parameters<typeof translate>[0]) =>
-    act(async () =>
-      host.querySelector<HTMLButtonElement>(`button[aria-label="${translate(key)}"]`)!.click()
+  try {
+    await render();
+    expect(host.querySelectorAll('[data-ui="gallery.videoReview.focusTools"] button')).toHaveLength(
+      5
     );
-  const speedOption = async (key: Parameters<typeof translate>[0], label: string) => {
-    await click(key);
+    expect(
+      host.querySelector(`[aria-label="${translate('gallery.videoReview.focusType')}"]`)
+    ).toBeNull();
+    for (const [index, key] of options.entries()) {
+      await act(async () => button(key).click());
+      expect(onToggle).toHaveBeenLastCalledWith(
+        (['zoom', 'spotlight', 'lens', '3d', 'border'] as const)[index]
+      );
+      await render(true);
+      expect(button(key).getAttribute('aria-pressed')).toBe('true');
+    }
+    admitted = false;
+    await act(async () => button('zoomRegionLabel').click());
+    expect(onToggle).toHaveBeenCalledTimes(5);
+    expect(beforeAction).toHaveBeenCalledTimes(6);
+    admitted = true;
+    await render(true, true);
+    expect(button('focusLens').disabled).toBe(true);
+    await act(async () => button('focusLens').click());
+    expect(onToggle).toHaveBeenCalledTimes(5);
+    await render(true);
     await act(async () =>
-      [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
-        .find((node) => node.textContent === label)!
+      host
+        .querySelector<HTMLButtonElement>(
+          `[aria-label="${translate('gallery.videoReview.pointerTool')}"]`
+        )!
         .click()
     );
-  };
-  try {
-    await render(false);
-    await click('gallery.videoReview.focusRangeTool');
-    expect(onToggle).toHaveBeenCalledOnce();
-    await click('gallery.videoReview.pointerTool');
     expect(setCutting).toHaveBeenCalledWith(false);
-    await render(false, false, 'source');
-    await click('gallery.videoReview.speedMode');
-    expect(toggle).toHaveBeenCalledWith('speed');
-    await speedOption('gallery.videoReview.speedRate', '4×');
-    expect(changeRate).toHaveBeenCalledWith(4);
-    await speedOption('gallery.videoReview.speedAudio', translate('gallery.videoReview.muteSound'));
-    expect(changeAudio).toHaveBeenCalledWith('mute');
-    beforeAction.mockClear();
-    expect(selector()).toBeNull();
-    await render(true);
-    expect(selector()?.textContent).toContain(translate('gallery.videoReview.zoomRegionLabel'));
-    await choose(translate('gallery.videoReview.focusSpotlight'));
-    expect(onType).toHaveBeenLastCalledWith('spotlight');
-    await render(true);
-    await choose(translate('gallery.videoReview.focusBorder'));
-    expect(onType).toHaveBeenLastCalledWith('border');
-    await render(false);
-    expect(selector()).toBeNull();
-    await render(true);
-    expect(selector()?.textContent).toContain(translate('gallery.videoReview.focusBorder'));
-    admitted = false;
-    await choose(translate('gallery.videoReview.zoomRegionLabel'));
-    expect(onType).toHaveBeenCalledTimes(2);
-    expect(beforeAction).toHaveBeenCalledTimes(3);
-    admitted = true;
-    await choose(translate('gallery.videoReview.zoomRegionLabel'));
-    expect(onType).toHaveBeenLastCalledWith('zoom');
-    await render(true, true);
-    expect(selector()?.disabled).toBe(true);
-    await act(async () => selector()!.click());
-    expect(document.querySelector('[role="option"]')).toBeNull();
-    expect(onType).toHaveBeenCalledTimes(3);
   } finally {
     await act(async () => root.unmount());
-    host.remove();
     vi.unstubAllGlobals();
   }
 });
 
-it('keeps one global density control available in both editing modes without toggling tracks', async () => {
+it('shows the density control only in advanced mode without toggling tracks', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   document.body.appendChild(host);
@@ -458,7 +426,11 @@ it('keeps one global density control available in both editing modes without tog
         const buttons = host.querySelectorAll<HTMLButtonElement>(
           `[aria-label="${translate('gallery.videoReview.compactTrackHeight')}"]`
         );
-        expect(buttons).toHaveLength(1);
+        expect(buttons).toHaveLength(mode === 'advanced' ? 1 : 0);
+        if (mode === 'basic') {
+          expect(host.querySelector('[data-ui="gallery.videoReview.trackControls"]')).toBeNull();
+          continue;
+        }
         expect(buttons[0]!.title).toBe(
           translate(
             compact
@@ -470,7 +442,7 @@ it('keeps one global density control available in both editing modes without tog
         await act(async () => buttons[0]!.click());
       }
     }
-    expect(onToggle).toHaveBeenCalledTimes(4);
+    expect(onToggle).toHaveBeenCalledTimes(2);
     expect(setTrackVisibility).not.toHaveBeenCalled();
   } finally {
     await act(async () => root.unmount());

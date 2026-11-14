@@ -52,7 +52,7 @@ function renderTimeline(overrides: Partial<Parameters<typeof ReviewTimeline>[0]>
   return { props, host: environment.host! };
 }
 
-it('groups cursor telemetry without losing captured sample identities', async () => {
+it('hides technical cursor telemetry while preserving capture facts and mouse selection', async () => {
   const action = {
     ref: { kind: 'action' as const, id: 'click' },
     eventType: 'CLICK',
@@ -69,18 +69,9 @@ it('groups cursor telemetry without losing captured sample identities', async ()
   const cursorButtons = [
     ...host.querySelectorAll<HTMLButtonElement>('button[title^="gallery.videoReview.eventCursor"]'),
   ];
-  expect(cursorButtons).toHaveLength(1);
-  // Point events render at the shared screen-space floor width.
-  for (const button of cursorButtons)
-    expect(Number.parseFloat(button.style.width)).toBeGreaterThanOrEqual(32);
-  const cluster = host.querySelector<HTMLButtonElement>(
-    '[data-ui="gallery.videoReview.historyCluster"] button'
-  )!;
-  await act(async () => cluster.click());
-  const options = [...document.querySelectorAll<HTMLButtonElement>('[role=option]')];
-  expect(options).toHaveLength(3);
-  await act(async () => options[1]!.click());
-  expect(props.onMarker).toHaveBeenCalledWith(cursors[1]);
+  expect(cursorButtons).toHaveLength(0);
+  expect(host.querySelector('[data-history-family="cursor"]')).toBeNull();
+  expect(props.markers).toEqual([action, ...cursors]);
   act(() =>
     host.querySelector<HTMLButtonElement>('[title^="gallery.videoReview.eventClick"]')!.click()
   );
@@ -95,15 +86,17 @@ it('groups colliding actions within its populated lane without losing dense tail
     end: 1 + index * 0.01,
   }));
   const { host, props } = renderTimeline({ markers });
-  const strip = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.historyStrip"]')!;
+  const strip = host.querySelector<HTMLElement>(
+    '[data-review-track="mouse"] [data-ui="gallery.videoReview.historyStrip"]'
+  )!;
   // Dense events share one row; every group member remains selectable.
-  expect(strip.style.height).toBe('20px');
+  expect(strip.style.height).toBe('28px');
   expect(strip.className).toContain('overflow-hidden');
   const markerButtons = [
     ...strip.querySelectorAll<HTMLButtonElement>('button[title^="gallery.videoReview.eventClick"]'),
   ];
   expect(markerButtons).toHaveLength(0);
-  for (const button of markerButtons) expect(button.style.height).toBe('20px');
+  for (const button of markerButtons) expect(button.style.height).toBe('28px');
   const cluster = strip.querySelector<HTMLButtonElement>(
     '[data-ui="gallery.videoReview.historyCluster"] button'
   )!;
@@ -124,13 +117,15 @@ it('highlights only the explicitly selected action, independently of playback', 
     time: 2.2,
     ...(markers[0] ? { selectedTelemetryRef: markers[0]!.ref } : {}),
   });
-  const strip = host.querySelector('[data-ui="gallery.videoReview.historyStrip"]')!;
+  const strip = host.querySelector(
+    '[data-review-track="mouse"] [data-ui="gallery.videoReview.historyStrip"]'
+  )!;
   const [selected, scrolled] = [...strip.querySelectorAll<HTMLButtonElement>('button')];
   expect(selected?.getAttribute('aria-pressed')).toBe('true');
-  expect(selected?.className).toContain('border-[var(--sniptale-color-accent)]');
+  expect(selected?.className).toContain('review-timeline-item-selected');
   expect(selected?.className).not.toContain('bg-[var(--sniptale-color-accent');
-  expect(selected?.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
-  expect(scrolled?.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
+  expect(selected?.className).toContain('review-interaction-item');
+  expect(scrolled?.className).toContain('review-interaction-item');
   expect(scrolled?.getAttribute('aria-pressed')).toBe('false');
   expect(scrolled?.className).not.toContain('accent');
   expect(scrolled?.className).not.toContain('ring-');

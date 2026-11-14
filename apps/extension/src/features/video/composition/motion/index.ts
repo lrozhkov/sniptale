@@ -1,3 +1,10 @@
+import { getVideoClipSourceTime } from '../../project/timeline/rate';
+import { cameraSpatialMotionPose } from '../../project/motion/spatial';
+import {
+  resolveActiveSpatialMotionRegions,
+  resolveMotionConnectionSource,
+  resolveMotionConnectionEdges,
+} from '../../project/motion';
 import { projectCursorSpatialSettings, projectCursorSpatial } from './cursor-orientation';
 import { resolveVideoCompositionActions } from '../timeline/frame/actions';
 import { resolveCursorSample } from '../timeline/frame/cursor';
@@ -112,12 +119,20 @@ export function resolveVideoCompositionCamera(params: {
     return createDefaultCameraState(params.project);
   }
 
+  return applySourceWindowCameraMode(
+    params.project,
+    applyIndependentSpatial(params, resolveFramingCamera(params)),
+    params.currentTime
+  );
+}
+
+function resolveFramingCamera(
+  params: Parameters<typeof resolveVideoCompositionCamera>[0]
+): VideoCompositionCameraState {
   const activeRegion = resolveActiveMotionRegion(params.project, params.currentTime);
   if (!activeRegion) {
     const connected = resolveConnectingCamera(params);
-    return connected
-      ? applySourceWindowCameraMode(params.project, connected, params.currentTime)
-      : createDefaultCameraState(params.project);
+    return connected ?? createDefaultCameraState(params.project);
   }
 
   const edges = resolveProjectCameraEdges(params.project, activeRegion);
@@ -172,16 +187,12 @@ export function resolveVideoCompositionCamera(params: {
         : undefined
     );
     if (windowCamera)
-      return applySourceWindowCameraMode(
-        params.project,
-        {
-          ...windowCamera,
-          regionId: activeRegion.id,
-          motionBlurAmount,
-          overlayZoomMode: resolveMotionOverlayZoomMode(activeRegion.overlayZoomMode),
-        },
-        params.currentTime
-      );
+      return {
+        ...windowCamera,
+        regionId: activeRegion.id,
+        motionBlurAmount,
+        overlayZoomMode: resolveMotionOverlayZoomMode(activeRegion.overlayZoomMode),
+      };
   }
   if (following)
     return {
@@ -434,4 +445,103 @@ export function mapViewportPointToComposition(
     x: point.x / camera.scale + camera.viewportX,
     y: point.y / camera.scale + camera.viewportY,
   };
+}
+
+/** Framing, spatial interpolation and publication use the same final camera state. */
+function applyIndependentSpatial(
+  params: Parameters<typeof resolveVideoCompositionCamera>[0],
+  camera: VideoCompositionCameraState
+): VideoCompositionCameraState {
+  const regions = resolveActiveSpatialMotionRegions(params.project);
+  const project = { ...params.project, motionRegions: regions };
+  const time = params.currentTime;
+  const pose = (region: VideoProjectMotionRegion, at: number) => {
+    const geometry = resolveMotionSourceWindow(
+      project,
+      region,
+      Math.min(at, region.startTime + region.duration - 1e-6)
+    );
+    const window = geometry?.window;
+    const binding = region.sourceBinding;
+    const clip = project.clips.find((item) => item.id === binding?.clipId);
+    const sourceProgress =
+      binding && clip?.type === 'VIDEO'
+        ? (binding.animation.start +
+            ((getVideoClipSourceTime(clip, at) +
+              (clip.cameraTiming?.offsetSeconds ?? 0) -
+              binding.sourceStart) /
+              (binding.sourceEnd - binding.sourceStart)) *
+              (binding.animation.end - binding.animation.start)) /
+          binding.animation.duration
+        : getMotionAnimationTime(region, at - region.startTime, project) /
+          (region.animation?.duration ?? region.duration);
+    const effective = projectCursorSpatialSettings(params.project, region, at);
+    const { spatialMotion: _motion, ...automatic } = effective;
+    const target =
+      region.cursorComposition && region.cursorComposition.mode !== 'off'
+        ? { ...automatic, focusMode: 'CURSOR' as const }
+        : effective;
+    return cameraSpatialMotionPose(
+      {
+        ...target,
+        ...(window
+          ? {
+              spatialReference: {
+                x: window.x / project.width,
+                y: window.y / project.height,
+                width: window.width / project.width,
+                height: window.height / project.height,
+              },
+            }
+          : {}),
+      },
+      sourceProgress
+    );
+  };
+  const publish = (
+    region: VideoProjectMotionRegion,
+    spatial: VideoCompositionCameraState['spatial']
+  ) => {
+    if (!spatial) return camera;
+    const geometry = resolveMotionSourceWindow(project, region, time);
+    return {
+      ...camera,
+      ...(geometry
+        ? { sourceClipId: geometry.clipId, regionId: camera.regionId ?? region.id }
+        : {}),
+      spatial: {
+        ...spatial,
+        ...(geometry?.planeTransform ? { planeTransform: geometry.planeTransform } : {}),
+      },
+    };
+  };
+  for (const region of regions) {
+    const source = resolveMotionConnectionSource(project, region);
+    if (source && time >= source.startTime + source.duration && time < region.startTime) {
+      const progress = motionConnectionProgress(
+        region,
+        (time - source.startTime - source.duration) /
+          (region.startTime - source.startTime - source.duration)
+      );
+      const spatial = evaluateMotionSpatial(
+        project,
+        pose(source, source.startTime + source.duration),
+        pose(region, region.startTime),
+        progress
+      );
+      return publish(region, spatial);
+    }
+    if (time < region.startTime || time >= region.startTime + region.duration) continue;
+    const edges = resolveMotionConnectionEdges(project, region);
+    const progress = resolveMotionProgress(
+      project,
+      region,
+      time,
+      edges.connectedIn,
+      edges.connectedOut
+    );
+    const spatial = evaluateMotionSpatial(project, null, pose(region, time), progress);
+    return publish(region, spatial);
+  }
+  return camera;
 }

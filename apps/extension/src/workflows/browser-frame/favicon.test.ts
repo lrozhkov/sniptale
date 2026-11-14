@@ -60,44 +60,72 @@ it('rejects oversized discovery and icon bodies without decoding them', async ()
   expect(fetch).toHaveBeenCalledTimes(2);
 });
 
-it('normalizes an acquired raster and releases its temporary URL', async () => {
-  const png =
-    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII=';
-  const fetch = vi
-    .fn()
-    .mockResolvedValueOnce(new Response('', { status: 404 }))
-    .mockResolvedValueOnce(
-      new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/png' } })
+it.each(['image/png', 'application/octet-stream'])(
+  'normalizes an acquired %s raster and releases its temporary URL',
+  async (mime) => {
+    const png =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII=';
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
+      .mockResolvedValueOnce(
+        new Response(new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]), {
+          headers: { 'content-type': mime },
+        })
+      );
+    vi.stubGlobal('fetch', fetch);
+    vi.stubGlobal(
+      'Image',
+      class {
+        src = '';
+        naturalWidth = 128;
+        naturalHeight = 64;
+        decode = async () => undefined;
+      }
     );
-  vi.stubGlobal('fetch', fetch);
-  vi.stubGlobal(
-    'Image',
-    class {
-      src = '';
-      naturalWidth = 128;
-      naturalHeight = 64;
-      decode = async () => undefined;
+    const drawImage = vi.fn();
+    vi.stubGlobal('document', {
+      createElement: () => ({
+        width: 0,
+        height: 0,
+        getContext: () => ({ drawImage }),
+        toDataURL: () => png,
+      }),
+    });
+    const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test-icon');
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    try {
+      expect(await acquireWindowHeaderFavicon('example.test', new AbortController().signal)).toBe(
+        png
+      );
+      expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 16, 64, 32);
+      expect(revoke).toHaveBeenCalledWith('blob:test-icon');
+    } finally {
+      create.mockRestore();
+      revoke.mockRestore();
     }
-  );
-  const drawImage = vi.fn();
-  vi.stubGlobal('document', {
-    createElement: () => ({
-      width: 0,
-      height: 0,
-      getContext: () => ({ drawImage }),
-      toDataURL: () => png,
-    }),
-  });
-  const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test-icon');
-  const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-  try {
-    expect(await acquireWindowHeaderFavicon('example.test', new AbortController().signal)).toBe(
-      png
-    );
-    expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 16, 64, 32);
-    expect(revoke).toHaveBeenCalledWith('blob:test-icon');
-  } finally {
-    create.mockRestore();
-    revoke.mockRestore();
   }
+);
+
+it('rejects HTML and SVG disguised as generic binary without image decoding', async () => {
+  const Image = vi.fn();
+  vi.stubGlobal('Image', Image);
+  for (const body of [
+    '<html>login</html>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"></svg>',
+  ]) {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response('', { status: 404 }))
+        .mockResolvedValueOnce(
+          new Response(body, { headers: { 'content-type': 'application/octet-stream' } })
+        )
+    );
+    expect(
+      await acquireWindowHeaderFavicon('example.test', new AbortController().signal)
+    ).toBeNull();
+  }
+  expect(Image).not.toHaveBeenCalled();
 });

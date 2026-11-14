@@ -1,3 +1,4 @@
+import { AUDIO_PRESET_ID_MAX_LENGTH } from '../../composition/persistence/audio-presets/catalog';
 // policyStateIds: [] - transfer strategy and catalog sets are immutable planning policy, not authority state.
 import type {
   SettingsTransferChangeSummary,
@@ -102,7 +103,10 @@ function mergeValue(args: {
 function mergeArray(args: Parameters<typeof mergeValue>[0]): SettingsTransferJsonValue[] {
   const current = args.current as SettingsTransferJsonValue[];
   const imported = args.imported as SettingsTransferJsonValue[];
-  if (args.path === 'styles.video-effects.preferences')
+  if (
+    args.path === 'styles.video-effects.preferences' ||
+    args.path === 'styles.video-effects.transitionPreferences'
+  )
     return mergeEffectPreferences(args, current, imported);
   if (!current.every(hasStringId) || !imported.every(hasStringId)) {
     const decision = registerConflict(args, 'scalar');
@@ -126,7 +130,10 @@ function mergeArray(args: Parameters<typeof mergeValue>[0]): SettingsTransferJso
       continue;
     }
     const currentItem = result[index]!;
-    if (deepEqual(currentItem, importedRecord)) {
+    if (
+      deepEqual(currentItem, importedRecord) ||
+      sameImmutableGlPreset(args.path, currentItem, importedRecord)
+    ) {
       args.summary.unchanged += 1;
       continue;
     }
@@ -139,7 +146,7 @@ function mergeArray(args: Parameters<typeof mergeValue>[0]): SettingsTransferJso
     if (decision === 'import-as-copy') {
       const nextId =
         args.remap.get(args.path)?.get(importedRecord.id) ??
-        createCopyId(importedRecord.id, result);
+        createCopyId(importedRecord.id, result, args.path);
       result.push(materializeImportedCopy(args.path, importedRecord, nextId));
       args.summary.copiedRemapped += 1;
       continue;
@@ -148,6 +155,23 @@ function mergeArray(args: Parameters<typeof mergeValue>[0]): SettingsTransferJso
     args.summary.updated += 1;
   }
   return result;
+}
+
+/** Content IDs exclude timestamps; identical GL source does not create a false copied identity. */
+function sameImmutableGlPreset(
+  path: string,
+  current: SettingsTransferJsonValue,
+  imported: SettingsTransferJsonValue
+): boolean {
+  return (
+    path === 'styles.video-effects.transitionItems' &&
+    isRecord(current) &&
+    isRecord(imported) &&
+    typeof current['source'] === 'string' &&
+    typeof current['sourceSha256'] === 'string' &&
+    current['source'] === imported['source'] &&
+    current['sourceSha256'] === imported['sourceSha256']
+  );
 }
 
 function mergeEffectPreferences(
@@ -256,7 +280,12 @@ function collectValueCopyRemaps(args: {
     const reservedIds = new Set([...args.current, ...args.imported].map((item) => item.id));
     for (const importedItem of args.imported) {
       const currentItem = args.current.find((item) => item.id === importedItem.id);
-      if (!currentItem || deepEqual(currentItem, importedItem)) continue;
+      if (
+        !currentItem ||
+        deepEqual(currentItem, importedItem) ||
+        sameImmutableGlPreset(args.path, currentItem, importedItem)
+      )
+        continue;
       const conflictPath = `${args.path}.${importedItem.id}`;
       const requested = args.decisions[conflictPath];
       const decision =
@@ -264,7 +293,7 @@ function collectValueCopyRemaps(args: {
           ? requested
           : defaultConflictDecision(args.strategy, 'item');
       if (decision !== 'import-as-copy') continue;
-      const nextId = createCopyIdFromIds(importedItem.id, reservedIds);
+      const nextId = createCopyIdFromIds(importedItem.id, reservedIds, args.path);
       reservedIds.add(nextId);
       const collection = args.remaps.get(args.path) ?? new Map<string, string>();
       collection.set(importedItem.id, nextId);
@@ -377,7 +406,14 @@ function remapContextMenuCommand(command: string, remaps: CollectionRemaps): str
 }
 
 function referenceTargetCollection(path: string): string | null {
+  if (
+    path === 'styles.audio-effects.preferences.defaultId' ||
+    path === 'styles.audio-effects.preferences.disabledIds'
+  )
+    return 'styles.audio-effects.presets';
   if (path === 'styles.video-effects.preferences.packId') return 'styles.video-effects.items';
+  if (path === 'styles.video-effects.transitionPreferences.packId')
+    return 'styles.video-effects.transitionItems';
   if (path.startsWith('capture.quick-actions.items.') && path.endsWith('.viewportPresetId'))
     return 'capture.viewport-presets.items';
   if (path === 'capture.viewport-presets.defaultId') return 'capture.viewport-presets.items';
@@ -418,16 +454,25 @@ function defaultConflictDecision(
   return strategy === 'safe-merge' && kind === 'item' ? 'import-as-copy' : 'use-imported';
 }
 
-function createCopyId(id: string, existing: readonly SettingsTransferJsonValue[]): string {
+function createCopyId(
+  id: string,
+  existing: readonly SettingsTransferJsonValue[],
+  path: string
+): string {
   const ids = new Set(existing.filter(hasStringId).map((item) => item.id));
-  return createCopyIdFromIds(id, ids);
+  return createCopyIdFromIds(id, ids, path);
 }
 
-function createCopyIdFromIds(id: string, ids: ReadonlySet<string>): string {
-  let suffix = 1;
-  let candidate = `${id}-imported`;
-  while (ids.has(candidate)) candidate = `${id}-imported-${++suffix}`;
-  return candidate;
+function createCopyIdFromIds(id: string, ids: ReadonlySet<string>, path: string): string {
+  let index = 1;
+  const budget =
+    path === 'styles.audio-effects.presets' ? AUDIO_PRESET_ID_MAX_LENGTH : Number.MAX_SAFE_INTEGER;
+  const candidate = () => {
+    const suffix = index === 1 ? '-imported' : `-imported-${index}`;
+    return `${id.slice(0, budget - suffix.length)}${suffix}`;
+  };
+  while (ids.has(candidate())) index++;
+  return candidate();
 }
 
 function hasStringId(

@@ -15,7 +15,7 @@ for (const published of [false, true])
       await page.goto(host.origin);
       await reader.goto(host.origin);
       const source = await readFile(
-        'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conformance.sniptale-effect.json',
+        'tooling/test/e2e/fixtures/lottie/neutral.sniptale-animation.json',
         'utf8'
       );
       const bundle = await build({

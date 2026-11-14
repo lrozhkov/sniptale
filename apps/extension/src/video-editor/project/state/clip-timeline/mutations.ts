@@ -1,5 +1,4 @@
 import { sliceClipPlaybackWindow } from '../../../../features/video/project/timeline/rate';
-import { mapScopedEffectIntervals } from '../../../../features/video/project/effect-instance/time-map';
 import { getReachableClipTimingBounds } from './reachable-placement';
 import { clampNumber } from '../../../../features/video/project/timeline/basics';
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
@@ -100,29 +99,7 @@ export function closeProjectTrackGap(
 
   return applyVideoProjectMutationPatch(
     project,
-    (() => {
-      const patch = createShiftedClipStartPatch({
-        clipIds: clipIdsToMove,
-        delta: -gapDuration,
-        project,
-      });
-      return {
-        ...patch,
-        ...(patch.effectInstances
-          ? {
-              effectInstances: mapScopedEffectIntervals(
-                patch.effectInstances,
-                new Set(
-                  project.clips
-                    .filter((clip) => clipIdsToMove.has(clip.id))
-                    .map((clip) => clip.trackId)
-                ),
-                { start: gapStart, end: gapEnd, duration: 0 }
-              ),
-            }
-          : {}),
-      };
-    })()
+    createShiftedClipStartPatch({ clipIds: clipIdsToMove, delta: -gapDuration, project })
   );
 }
 

@@ -14,6 +14,7 @@ vi.mock('./audio-peaks-stream', () => ({ loadStreamingAudioPeaks: streaming }));
 const originalAudioContext = window.AudioContext;
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   streaming.mockClear();
   Object.defineProperty(window, 'AudioContext', {
@@ -150,4 +151,76 @@ it('preserves a short transient between sampled strides and retains silent windo
   expect(peaks).toHaveLength(200);
   expect(Math.max(...peaks!)).toBeCloseTo(0.8);
   expect(peaks!.slice(100).every((value) => value === 0)).toBe(true);
+});
+
+it('lets foreground work run before a long reduction completes and retains context ownership', async () => {
+  vi.useFakeTimers();
+  let clock = 0;
+  vi.spyOn(performance, 'now').mockImplementation(() => (clock += 2));
+  const events: string[] = [];
+  const close = vi.fn(async () => undefined);
+  const channel = new Float32Array(400).fill(0.25);
+  let closesAtForeground = -1;
+  class AudioContextMock {
+    close = close;
+    decodeAudioData = async () => ({
+      length: channel.length,
+      numberOfChannels: 1,
+      getChannelData: () => {
+        setTimeout(() => {
+          events.push('foreground');
+          closesAtForeground = close.mock.calls.length;
+        }, 0);
+        return channel;
+      },
+    });
+  }
+  Object.defineProperty(window, 'AudioContext', { configurable: true, value: AudioContextMock });
+  const blob = new Blob(['audio']);
+  Object.defineProperty(blob, 'arrayBuffer', { value: async () => new ArrayBuffer(1) });
+  const pending = loadAudioPeaks(blob, 2).then((value) => {
+    events.push('complete');
+    return value;
+  });
+  await vi.runAllTimersAsync();
+  expect(await pending).toEqual(new Array<number>(200).fill(0.25));
+  expect(events).toEqual(['foreground', 'complete']);
+  expect(closesAtForeground).toBe(0);
+  expect(close).toHaveBeenCalledOnce();
+});
+
+it('keeps reduction failures after a task yield fail-soft and closes the owned context once', async () => {
+  vi.useFakeTimers();
+  let clock = 0;
+  vi.spyOn(performance, 'now').mockImplementation(() => (clock += 2));
+  let failReads = false;
+  const channel = new Proxy(new Float32Array(400).fill(0.25), {
+    get(target, key) {
+      if (failReads && typeof key === 'string' && /^\d+$/.test(key))
+        throw new Error('PCM read failed');
+      return Reflect.get(target, key, target);
+    },
+  });
+  const close = vi.fn(async () => undefined);
+  class AudioContextMock {
+    close = close;
+    decodeAudioData = async () => ({
+      length: channel.length,
+      numberOfChannels: 1,
+      getChannelData: () => {
+        setTimeout(() => {
+          failReads = true;
+        }, 0);
+        return channel;
+      },
+    });
+  }
+  Object.defineProperty(window, 'AudioContext', { configurable: true, value: AudioContextMock });
+  const blob = new Blob(['audio']);
+  Object.defineProperty(blob, 'arrayBuffer', { value: async () => new ArrayBuffer(1) });
+  const pending = loadAudioPeaks(blob, 2);
+  await vi.runAllTimersAsync();
+  expect(failReads).toBe(true);
+  await expect(pending).resolves.toBeNull();
+  expect(close).toHaveBeenCalledOnce();
 });

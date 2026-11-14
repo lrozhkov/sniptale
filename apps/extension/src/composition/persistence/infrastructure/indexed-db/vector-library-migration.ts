@@ -11,12 +11,12 @@ export const editorVectorLibraryMigration: DatabaseMigrationDescriptor = {
   backupCoverage: 'none',
   domainVersions: [
     { domainId: 'editorVectorLibrary', from: 0, to: 1 },
-    { domainId: 'mediaLibrary', from: 35, to: 36 },
+    { domainId: 'mediaLibrary', from: 38, to: 39 },
     { domainId: 'scenarioProjects', from: 11, to: 12 },
   ],
   estimateAdditionalBytes: async () => 64 * 1024,
-  fromDatabaseVersion: 54,
-  toDatabaseVersion: 55,
+  fromDatabaseVersion: 60,
+  toDatabaseVersion: 61,
   risk: 'additive',
   stores: [
     EDITOR_VECTOR_LIBRARY_STORE,
@@ -24,6 +24,7 @@ export const editorVectorLibraryMigration: DatabaseMigrationDescriptor = {
     SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   ],
   migrate(db) {
+    if (db.objectStoreNames.contains(EDITOR_VECTOR_LIBRARY_STORE)) return undefined;
     const store = db.createObjectStore(EDITOR_VECTOR_LIBRARY_STORE, { keyPath: 'key' });
     store.createIndex('kind', 'kind');
     store.createIndex('definitionId', 'definitionId');

@@ -20,7 +20,7 @@ const MANIFEST_PATH = 'apps/extension/manifest.json';
 const OFFSCREEN_DOCUMENT_DTO_PATH =
   'apps/extension/src/background/offscreen-document/create-options.ts';
 const EXPECTED_ACTION_DEFAULT_TITLE = 'Open Sniptale';
-const EXPECTED_EXTENSION_PAGES_CSP = "script-src 'self'; object-src 'self';";
+const EXPECTED_EXTENSION_PAGES_CSP = "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';";
 const PASS_MESSAGE = 'Manifest integrity passed';
 const EXPECTED_OFFSCREEN_REASONS = {
   createPrivacyErasureOffscreenDocumentOptions: ['LOCAL_STORAGE'],

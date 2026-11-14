@@ -47,6 +47,7 @@ export const LOCAL_EXTENSION_PAGE_STORAGE_PREFIXES = [
 ] as const;
 
 const localPreferenceKeys = [
+  'sniptale_audio_presets',
   'sniptale_welcome_shown',
   'sniptale-theme-preference',
   'sniptale-locale-preference',

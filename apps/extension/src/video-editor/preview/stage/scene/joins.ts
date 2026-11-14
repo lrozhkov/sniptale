@@ -9,7 +9,10 @@ import {
   createVideoPreviewFrameMaterializer,
   type VideoPreviewFrameMaterializer,
 } from '../../cache/materializer';
-import { resolvePreviewCompositionFrameSize, publishPreviewCompositionFrame } from './canvas';
+import {
+  resolvePreviewCompositionFrameSize,
+  publishPreviewCompositionFrame,
+} from '../../../../workflows/video/native-composition/canvas';
 import type { renderPreviewScene } from './render-preview';
 import type { PreviewScenePreparedFrame } from './types';
 

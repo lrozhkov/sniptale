@@ -4,7 +4,7 @@ import type {
   VideoProjectEffectTarget,
 } from '../../../project/effect-instance/types';
 
-export interface EffectRuntimeFrameDimensions {
+interface EffectRuntimeFrameDimensions {
   height: number;
   width: number;
 }
@@ -95,6 +95,9 @@ export function isSameEffectTarget(
 /** Placement is independent of the concrete CPU bitmap or checked GPU scene representation. */
 export type EffectRuntimeFrameMetadata = Omit<EffectRuntimeRenderedFrame, 'bitmap'>;
 export interface EffectRuntimeGpuPreparedFrame extends EffectRuntimeFrameMetadata {
+  /** Stable only while this owner retains the exact immutable bitmap contents. */
+  rasterCache?: NonNullable<GpuPreviewLayer['cache']>;
+
   source: GpuPreviewLayer['source'];
   retain(): { release(): void };
   dispose(): void;

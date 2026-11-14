@@ -1,13 +1,14 @@
-import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
+import {
+  parseAnimationTemplateSource,
+  verifyAnimationResource,
+} from '@sniptale/runtime-contracts/animation-template';
 
-/** Retained native PNG/SVG closure survives Trash and real archive duplicate restore without a catalog. */
+/** Embedded source resources survive Trash and archive duplicate restore without a catalogue. */
 export async function portableProbe(aggregateId: string) {
   const { readVideoWorkspace } =
     await import('../../../../apps/extension/src/composition/persistence/review-workspaces/store');
   const { initDB, VIDEO_WORKSPACES_STORE } =
     await import('../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/core');
-  const { getProjectAsset } =
-    await import('../../../../apps/extension/src/composition/persistence/projects');
   const { moveStoredItemsToTrash, restoreStoredItemsFromTrash } =
     await import('../../../../apps/extension/src/composition/persistence/library-lifecycle/trash');
   const { createMediaHubBackupExportOptions } =
@@ -50,23 +51,28 @@ export async function portableProbe(aggregateId: string) {
   const duplicate = await readVideoWorkspace(newIds[0]);
   if (!duplicate?.workspace.effectSnapshots?.length)
     throw new Error('Duplicated native source absent');
-  const assets = [];
-  for (const snapshot of duplicate.workspace.effectSnapshots)
-    for (const asset of snapshot.assets) {
-      const value = await getProjectAsset(asset.assetId.slice('project-asset:'.length));
-      if (value.status !== 'ready') throw new Error('Duplicated native bytes unavailable');
-      const sha256 = await sha256EffectV1Bytes(
-        new Uint8Array(await value.entry.file.arrayBuffer())
-      );
-      assets.push({
-        mimeType: asset.mimeType,
-        exact: sha256 === asset.sha256 && value.entry.file.size === asset.byteLength,
-        rebound: !original.workspace.effectSnapshots.some((source) =>
-          source.assets.some((old) => old.assetId === asset.assetId)
-        ),
+  const resources = [];
+  for (const snapshot of duplicate.workspace.effectSnapshots) {
+    const template = parseAnimationTemplateSource(snapshot.source).template;
+    if (!template || snapshot.assets.length) throw new Error('Expected self-contained animation.');
+    const prior = original.workspace.effectSnapshots.find((entry) => entry.id === snapshot.id);
+    const originalTemplate = prior ? parseAnimationTemplateSource(prior.source).template : null;
+    for (const resource of template.resources)
+      resources.push({
+        path: resource.path,
+        mimeType: resource.mimeType,
+        exact:
+          (await verifyAnimationResource(resource)) &&
+          !!originalTemplate?.resources.some(
+            (old) =>
+              old.path === resource.path &&
+              old.sha256 === resource.sha256 &&
+              old.base64 === resource.base64
+          ),
+        embedded: snapshot.source.includes(resource.base64),
       });
-    }
-  const discarded = await discardedResourceProbe(newIds[0]);
+  }
+  const discarded = await discardedSourceProbe(newIds[0]);
   return {
     discarded,
     archiveBytes: file.size,
@@ -87,43 +93,34 @@ export async function portableProbe(aggregateId: string) {
         (entry) => entry.id === snapshot.id && entry.source === snapshot.source
       )
     ),
-    assets,
+    resources,
+    detachedAssets: duplicate.workspace.effectSnapshots.reduce(
+      (count, snapshot) => count + snapshot.assets.length,
+      0
+    ),
   };
 }
 
-/** Real adopted resources survive Undo, then release before parent purge after a new branch. */
-async function discardedResourceProbe(aggregateId: string) {
+/** Source-only Undo and branch pruning leave unrelated physical rows intact. */
+async function discardedSourceProbe(aggregateId: string) {
   const { readVideoWorkspace, moveVideoWorkspaceHistory, commitVideoWorkspace } =
     await import('../../../../apps/extension/src/composition/persistence/review-workspaces/store');
-  const {
-    initDB,
-    PROJECT_ASSETS_STORE,
-    ASSET_REFS_STORE,
-    ASSET_OWNERS_STORE,
-    MEDIA_LIBRARY_STORE,
-  } =
+  const { initDB, MEDIA_LIBRARY_STORE } =
     await import('../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/core');
-  const { parseProjectAssetEntry } =
-    await import('../../../../apps/extension/src/composition/persistence/projects/read-guards');
-  const { parseAssetRef, readAssetFile, MissingAssetObjectError } =
-    await import('../../../../apps/extension/src/composition/persistence/assets');
   const { deleteVideoWorkspaceProject } =
     await import('../../../../apps/extension/src/composition/persistence/review-workspaces/project-commands');
   const { deleteMediaAssetWithProjectCascade } =
     await import('../../../../apps/extension/src/composition/persistence/media-library/delete-cascade');
   const db = await initDB();
   const adopted = await readVideoWorkspace(aggregateId);
-  if (!adopted) throw new Error('Adopted review unavailable');
-  const resources = [];
-  for (const snapshot of adopted.workspace.effectSnapshots ?? [])
-    for (const asset of snapshot.assets) {
-      const id = asset.assetId.slice('project-asset:'.length);
-      const entry = parseProjectAssetEntry(await db.get(PROJECT_ASSETS_STORE, id));
-      const ref = entry ? parseAssetRef(await db.get(ASSET_REFS_STORE, entry.assetId)) : null;
-      if (!ref) throw new Error('Adopted private resource unavailable');
-      await readAssetFile(ref, 'before-discard');
-      resources.push({ id, ref });
-    }
+  if (!adopted?.workspace.effectSnapshots?.length) throw new Error('Adopted source missing.');
+  const snapshots = adopted.workspace.effectSnapshots;
+  const embeddedResources = snapshots.flatMap((snapshot) => {
+    const template = parseAnimationTemplateSource(snapshot.source).template;
+    if (!template || snapshot.assets.length) throw new Error('Expected self-contained source.');
+    return template.resources;
+  });
+  const physicalRows = JSON.stringify(await db.getAll('project_assets'));
   const undone = await moveVideoWorkspaceHistory({
     aggregateId,
     expectedRevision: adopted.workspace.revision,
@@ -131,16 +128,7 @@ async function discardedResourceProbe(aggregateId: string) {
     direction: 'start',
   });
   const redoRetained =
-    undone.workspace.effectSnapshots?.length === adopted.workspace.effectSnapshots?.length &&
-    (
-      await Promise.all(
-        resources.map(
-          async ({ id, ref }) =>
-            !!(await db.get(PROJECT_ASSETS_STORE, id)) &&
-            (await readAssetFile(ref, 'redo')).size === ref.size
-        )
-      )
-    ).every(Boolean);
+    JSON.stringify(undone.workspace.effectSnapshots) === JSON.stringify(snapshots);
   const branch = await commitVideoWorkspace({
     aggregateId,
     expectedRevision: undone.workspace.revision,
@@ -152,59 +140,49 @@ async function discardedResourceProbe(aggregateId: string) {
       before: null,
       after: {
         id: crypto.randomUUID(),
-        text: 'Retained-resource branch proof',
+        text: 'Retained-source branch proof',
         anchor: { kind: 'point', time: 0 },
       },
     },
   });
-  const rowsReleased = (
-    await Promise.all(
-      resources.map(
-        async ({ id, ref }) =>
-          (await db.get(PROJECT_ASSETS_STORE, id)) === undefined &&
-          (await db.get(ASSET_REFS_STORE, ref.assetId)) === undefined &&
-          (await db.get(ASSET_OWNERS_STORE, ['project-asset', id, 'body'])) === undefined
-      )
-    )
-  ).every(Boolean);
-  const bytesAbsent = async () =>
-    (
-      await Promise.all(
-        resources.map(async ({ ref }) => {
-          try {
-            await readAssetFile(ref, 'after-discard');
-            return false;
-          } catch (error) {
-            return (
-              error instanceof MissingAssetObjectError ||
-              (error instanceof DOMException && error.name === 'NotFoundError')
-            );
-          }
-        })
-      )
-    ).every(Boolean);
-  const branchBytesReleased = await bytesAbsent();
+  const detachedRowsUnchanged = JSON.stringify(await db.getAll('project_assets')) === physicalRows;
+  const registryPruned = !branch.workspace.effectSnapshots?.length;
+  const sourceBytesReleased = embeddedResources.every(
+    (resource) => !JSON.stringify(branch.workspace).includes(resource.base64)
+  );
   await deleteVideoWorkspaceProject(aggregateId, branch.workspace.revision);
   await deleteMediaAssetWithProjectCascade(aggregateId, []);
   const parentPurged = (await db.get(MEDIA_LIBRARY_STORE, aggregateId)) === undefined;
-  const purgeBytesAbsent = await bytesAbsent();
+  const sourceAbsent = (await readVideoWorkspace(aggregateId)) === null;
   if (
-    resources.length !== 2 ||
+    embeddedResources.length !== 3 ||
+    embeddedResources.filter((resource) => resource.mimeType.startsWith('image/')).length !== 2 ||
+    embeddedResources.filter((resource) => resource.mimeType.startsWith('font/')).length !== 1 ||
     !redoRetained ||
-    branch.workspace.effectSnapshots?.length ||
-    !rowsReleased ||
-    !branchBytesReleased ||
+    !registryPruned ||
+    !detachedRowsUnchanged ||
+    !sourceBytesReleased ||
     !parentPurged ||
-    !purgeBytesAbsent
-  )
-    throw new Error('Adopted annotation branch/purge cleanup failed');
+    !sourceAbsent
+  ) {
+    const facts = {
+      resources: embeddedResources.length,
+      redoRetained,
+      registryPruned,
+      detachedRowsUnchanged,
+      sourceBytesReleased,
+      parentPurged,
+      sourceAbsent,
+    };
+    throw new Error(`Embedded source branch/purge cleanup failed: ${JSON.stringify(facts)}`);
+  }
   return {
-    resources: resources.length,
+    resources: embeddedResources.length,
     redoRetained,
-    registryPruned: !branch.workspace.effectSnapshots?.length,
-    rowsReleased,
-    branchBytesReleased,
+    registryPruned,
+    detachedRowsUnchanged,
+    sourceBytesReleased,
     parentPurged,
-    purgeBytesAbsent,
+    sourceAbsent,
   };
 }

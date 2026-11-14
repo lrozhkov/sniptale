@@ -1,4 +1,10 @@
 // @vitest-environment jsdom
+import { createEffectRuntimeFailure } from '../../contracts/effect-runtime/identity';
+import { closeEffectRuntimeBitmaps } from '../../contracts/effect-runtime/bitmap-lifetime';
+import type {
+  EffectRuntimeFrameFailure,
+  EffectRuntimeRenderCommand,
+} from '../../contracts/effect-runtime/types';
 import { createEffectRuntimeSandboxExecutor } from './effect-runtime-sandbox';
 import * as sandboxRender from './effect-runtime-sandbox-render';
 
@@ -300,7 +306,11 @@ it.each([undefined, 'gpu-preview', 'gpu-scene', 'gpu-scene-plan'] as const)(
         ? 'function'
         : 'undefined'
     );
+    expect(executor.gpuFrameReuseContext !== undefined).toBe(
+      compositionBackend === 'gpu-scene' || compositionBackend === 'gpu-scene-plan'
+    );
     executor.dispose();
+    expect(executor.gpuFrameReuseContext).toBeUndefined();
   }
 );
 
@@ -447,5 +457,250 @@ it('retries explicit transport preload without posting frames and retains readin
   } finally {
     executor.dispose();
     for (const port of ports) port.close();
+  }
+});
+
+function controlledSessionAdmission() {
+  const started: {
+    command: EffectRuntimeRenderCommand;
+    response: ReturnType<typeof Promise.withResolvers<EffectRuntimeFrameFailure>>;
+    authority: sandboxRender.EffectRuntimeSandboxRenderAuthority;
+  }[] = [];
+  const render = vi
+    .spyOn(sandboxRender, 'renderEffectRuntimeSandboxFrame')
+    .mockImplementation(async (authority, command) => {
+      const response = Promise.withResolvers<EffectRuntimeFrameFailure>();
+      started.push({ command, response, authority });
+      return response.promise;
+    });
+  const manager = new EffectRuntimeSandboxSessionManager(document, {
+    loadTimeoutMs: 1000,
+    requestTimeoutMs: 1000,
+    compositionBackend: 'gpu-scene',
+  });
+  const bitmaps = Array.from({ length: 5 }, () => createInputBitmap());
+  const commands = bitmaps.map((bitmap, index) => ({
+    ...createRequest(bitmap),
+    requestId: 'admission-' + index,
+  }));
+  const complete = (index: number) => {
+    const request = started[index];
+    if (!request) throw new Error('Expected admitted request');
+    closeEffectRuntimeBitmaps(request.command.inputFrames);
+    request.response.resolve(createEffectRuntimeFailure(request.command, 'inputRejected'));
+  };
+  const cleanup = () => {
+    manager.dispose();
+    for (const request of started)
+      request.response.resolve(createEffectRuntimeFailure(request.command, 'crashed'));
+    render.mockRestore();
+  };
+  return { manager, started, commands, bitmaps, complete, cleanup };
+}
+
+it('shares two active and two waiting slots across frame and GPU requests', async () => {
+  const f = controlledSessionAdmission();
+  const pending = [
+    f.manager.renderFrame(f.commands[0]!),
+    f.manager.prepareGpuFrame(f.commands[1]!),
+    f.manager.renderFrame(f.commands[2]!),
+    f.manager.prepareGpuFrame(f.commands[3]!),
+  ];
+  try {
+    expect(f.started).toHaveLength(2);
+    expect(await f.manager.prepareGpuFrame(f.commands[4]!)).toMatchObject({
+      kind: 'error',
+      code: 'queueDepthExceeded',
+    });
+    expect(f.bitmaps[4]!.close).toHaveBeenCalledOnce();
+    f.complete(1);
+    await vi.waitFor(() => expect(f.started).toHaveLength(3));
+    expect(f.started[2]!.command).toBe(f.commands[2]);
+    f.complete(0);
+    await vi.waitFor(() => expect(f.started).toHaveLength(4));
+    expect(f.started[3]!.command).toBe(f.commands[3]);
+    f.complete(3);
+    f.complete(2);
+    await Promise.all(pending);
+    for (const bitmap of f.bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+  } finally {
+    f.cleanup();
+    await Promise.all(pending);
+  }
+});
+
+it.each(['abort', 'preaborted', 'dispose', 'reset'] as const)(
+  'refuses unsent inputs after %s without transferring them',
+  async (operation) => {
+    const f = controlledSessionAdmission();
+    const controller = new AbortController();
+    const active = [
+      f.manager.prepareGpuFrame(f.commands[0]!),
+      f.manager.prepareGpuFrame(f.commands[1]!),
+    ];
+    if (operation === 'preaborted') controller.abort();
+    const waiting = f.manager.prepareGpuFrame(f.commands[2]!, controller.signal);
+    try {
+      expect(f.started).toHaveLength(2);
+      if (operation === 'abort') controller.abort();
+      else if (operation === 'dispose') f.manager.dispose();
+      else if (operation === 'reset') {
+        const authority = f.started[0]!.authority;
+        authority.clearSession(authority.ensureSession());
+      }
+      await expect(waiting).resolves.toMatchObject({ kind: 'error' });
+      expect(f.bitmaps[2]!.close).toHaveBeenCalledOnce();
+      expect(f.started).toHaveLength(2);
+      f.complete(0);
+      f.complete(1);
+      await Promise.all(active);
+      expect(f.started).toHaveLength(2);
+    } finally {
+      f.cleanup();
+      await Promise.all([...active, waiting]);
+    }
+  }
+);
+
+it.each(['timeout', 'malformed'] as const)(
+  'settles both retired reply owners while preserving the initiating %s',
+  async (failure) => {
+    vi.useFakeTimers();
+    installSynchronousMessageChannel();
+    const Channel = MessageChannel;
+    const channels: MessageChannel[] = [];
+    vi.stubGlobal(
+      'MessageChannel',
+      class extends Channel {
+        constructor() {
+          super();
+          channels.push(this);
+        }
+      }
+    );
+    const f = controlledSessionAdmission();
+    const first = f.manager.prepareGpuFrame(f.commands[0]!);
+    const second = f.manager.prepareGpuFrame(f.commands[1]!);
+    const waiting = f.manager.prepareGpuFrame(f.commands[2]!);
+    let secondSettled = false;
+    void second.then(() => {
+      secondSettled = true;
+    });
+    try {
+      const authority = f.started[0]!.authority;
+      const session = authority.ensureSession();
+      const control = new MessageChannel();
+      session.controlPort = control.port1;
+      const requests = [0, 1].map(
+        (index) =>
+          new PendingEffectRuntimeRequest({
+            active: authority.active,
+            clearSession: () => authority.clearSession(session),
+            current: session,
+            request: { ...createWireRequest(), requestId: f.commands[index]!.requestId },
+            timeoutMs: index === 0 ? 10 : 1000,
+          })
+      );
+      for (const [index, request] of requests.entries())
+        void request.start().then((result) => {
+          if (result.kind !== 'error' || result.code === 'cacheMiss')
+            throw new Error('Expected controlled retirement failure');
+          f.started[index]!.response.resolve(result);
+        });
+      if (failure === 'malformed') {
+        const reply = channels[1]!.port1;
+        reply.onmessageerror?.call(reply, new MessageEvent('messageerror'));
+        await vi.advanceTimersByTimeAsync(0);
+      } else await vi.advanceTimersByTimeAsync(10);
+      expect(secondSettled).toBe(true);
+      await expect(first).resolves.toMatchObject({ kind: 'error', code: failure });
+      await expect(second).resolves.toMatchObject({ kind: 'error', code: 'crashed' });
+      await expect(waiting).resolves.toMatchObject({ kind: 'error', code: 'crashed' });
+      expect(f.started).toHaveLength(2);
+      expect(f.bitmaps[2]!.close).toHaveBeenCalledOnce();
+      expect(authority.active.size).toBe(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(authority.active.size).toBe(0);
+    } finally {
+      f.complete(0);
+      f.complete(1);
+      f.cleanup();
+      await Promise.all([first, second, waiting]);
+      vi.useRealTimers();
+    }
+  }
+);
+
+it('retires reusable contents on runtime failure while client cancellation preserves the generation', async () => {
+  const request = createRequest();
+  const rendered = vi
+    .spyOn(sandboxRender, 'renderEffectRuntimeSandboxFrame')
+    .mockResolvedValueOnce(createEffectRuntimeFailure(request, 'resourceLimit'));
+  const manager = new EffectRuntimeSandboxSessionManager(document, {
+    loadTimeoutMs: 100,
+    requestTimeoutMs: 100,
+    compositionBackend: 'gpu-scene',
+  });
+  try {
+    const initial = manager.gpuFrameReuseContext;
+    await expect(manager.prepareGpuFrame(request)).resolves.toMatchObject({
+      code: 'resourceLimit',
+    });
+    const recovered = manager.gpuFrameReuseContext;
+    expect(recovered).not.toBe(initial);
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      manager.prepareGpuFrame(createRequest(), controller.signal)
+    ).resolves.toMatchObject({ code: 'stale' });
+    expect(manager.gpuFrameReuseContext).toBe(recovered);
+    manager.dispose();
+    expect(manager.gpuFrameReuseContext).toBeUndefined();
+  } finally {
+    manager.dispose();
+    rendered.mockRestore();
+  }
+});
+
+it('keeps a pure foreground reuse token through the actual completed standby handoff', async () => {
+  const rendered = vi
+    .spyOn(sandboxRender, 'renderEffectRuntimeSandboxFrame')
+    .mockImplementation(async (_authority, request) => {
+      const bitmap = createInputBitmap();
+      return {
+        kind: 'frame',
+        bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        effectInstanceId: request.effectInstanceId,
+        requestId: request.requestId,
+        snapshotId: request.snapshotId,
+        sequenceId: request.sequenceId,
+        acknowledged: {
+          documentId: request.documentRef.id,
+          assetSelectionId: request.assetSelectionRef.id,
+        },
+      };
+    });
+  const primary = createEffectRuntimeSandboxExecutor({
+    compositionBackend: 'gpu-scene',
+    timeoutMs: 100,
+  });
+  try {
+    const before = primary.gpuFrameReuseContext;
+    const warm = primary.createWarmExecutor!();
+    if (!warm) throw new Error('Reading the context must not consume foreground admission.');
+    const first = await warm.prepareGpuFrame!(createRequest());
+    if (first.kind === 'frame') first.bitmap.close();
+    warm.dispose();
+    const next = await primary.prepareGpuFrame!(createRequest());
+    if (next.kind === 'frame') next.bitmap.close();
+    expect(next.kind).toBe('frame');
+    expect(primary.gpuFrameReuseContext).toBe(before);
+    primary.dispose();
+    expect(primary.gpuFrameReuseContext).toBeUndefined();
+  } finally {
+    primary.dispose();
+    rendered.mockRestore();
   }
 });

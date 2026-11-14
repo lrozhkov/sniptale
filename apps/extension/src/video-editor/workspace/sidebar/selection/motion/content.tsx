@@ -22,7 +22,6 @@ import {
 } from './fields';
 import { ManualFocusFields } from './focus';
 import { DetailItem, DetailList } from '../shared/panel';
-import { MotionCursorCompositionFields } from './spatial';
 
 export function MotionCameraFields(props: {
   motionRegion: VideoProjectMotionRegion;
@@ -56,7 +55,6 @@ export function MotionCameraFields(props: {
       <MotionScaleFields motionRegion={props.motionRegion} panel={props.panel} />
       {props.motionRegion.focusMode === VideoMotionFocusMode.CURSOR ? (
         <>
-          <MotionCursorCompositionFields {...props} />
           <InspectorDetails
             preferenceId="motion:camera-follow-policy"
             label={translate('videoEditor.sidebar.inspectorMoreDetails')}

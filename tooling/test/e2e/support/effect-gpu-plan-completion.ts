@@ -43,6 +43,105 @@ export function installEffectGpuPlanCompletionObserver(binding: string): void {
       return result;
     });
   };
+  type PaintProof = { width: number; height: number; proof: Proof };
+  const paints = new WeakMap<object, PaintProof>();
+  const retainedPaints = new Map<string, PaintProof>();
+  const paintTextures = new WeakMap<object, PaintProof>();
+  let pendingPaint: PaintProof | undefined;
+  const stringify = JSON.stringify;
+  // textureFor serializes admitted contents before allocating or reusing its texture.
+  // Keep attribution tied to that exact content and the next synchronous allocation.
+  Reflect.set(JSON, 'stringify', function (...args: unknown[]) {
+    const result: unknown = Reflect.apply(stringify, JSON, args);
+    const paint = object(args[0]) ? paints.get(args[0]) : undefined;
+    if (paint && typeof result === 'string') {
+      const key = `${paint.width}:${paint.height}:${result}`;
+      const retained = retainedPaints.get(key);
+      if (retained) merge(retained.proof, paint.proof);
+      else {
+        if (retainedPaints.size >= 512) throw new Error('Paint proof budget exceeded.');
+        retainedPaints.set(key, paint);
+      }
+      pendingPaint = retained ?? paint;
+      const active = pendingPaint;
+      queueMicrotask(() => {
+        if (pendingPaint === active) pendingPaint = undefined;
+      });
+    }
+    return result;
+  });
+  if (typeof Reflect.get(GPUDevice.prototype, 'createTexture') === 'function')
+    hook(GPUDevice.prototype, 'createTexture', (_device, args, texture) => {
+      const paint = pendingPaint;
+      pendingPaint = undefined;
+      const size = get(args[0], 'size');
+      const width = Array.isArray(size) ? size[0] : get(size, 'width');
+      const height = Array.isArray(size) ? size[1] : get(size, 'height');
+      if (paint && object(texture) && width === paint.width && height === paint.height)
+        paintTextures.set(texture, paint);
+    });
+  const peers = new WeakMap<object, object>();
+  const NativeChannel = MessageChannel;
+  Reflect.set(
+    globalThis,
+    'MessageChannel',
+    class extends NativeChannel {
+      constructor() {
+        super();
+        peers.set(this.port1, this.port2);
+        peers.set(this.port2, this.port1);
+      }
+    }
+  );
+  const requests = new WeakMap<
+    object,
+    Map<
+      string,
+      {
+        effectInstanceId: string;
+        snapshotId: string;
+        sequenceId: number;
+        documentId: string;
+        assetSelectionId: string;
+      }
+    >
+  >();
+  hook(MessagePort.prototype, 'postMessage', (_port, args) => {
+    if (get(args[0], 'type') !== 'sniptale:effect-runtime:render') return;
+    const transfers = Array.isArray(args[1]) ? args[1] : get(args[1], 'transfer');
+    const transferred = Array.isArray(transfers) ? transfers[0] : undefined;
+    const port = object(transferred) ? peers.get(transferred) : undefined;
+    if (!port) return;
+    const message = get(args[0], 'request'),
+      id = get(message, 'requestId'),
+      kind = get(message, 'kind'),
+      effectInstanceId = get(message, 'effectInstanceId'),
+      snapshotId = get(message, 'snapshotId'),
+      sequenceId = get(message, 'sequenceId'),
+      documentId = get(get(message, 'documentRef'), 'id'),
+      assetSelectionId = get(get(message, 'assetSelectionRef'), 'id');
+    if (
+      (kind !== 'renderFrame' && kind !== 'prepareGpuFrame') ||
+      get(message, 'protocolVersion') !== 7 ||
+      typeof id !== 'string' ||
+      typeof effectInstanceId !== 'string' ||
+      typeof snapshotId !== 'string' ||
+      typeof sequenceId !== 'number' ||
+      !Number.isSafeInteger(sequenceId) ||
+      typeof documentId !== 'string' ||
+      typeof assetSelectionId !== 'string'
+    )
+      return;
+    const pending = requests.get(port) ?? new Map();
+    pending.set(id, {
+      effectInstanceId,
+      snapshotId,
+      sequenceId,
+      documentId,
+      assetSelectionId,
+    });
+    requests.set(port, pending);
+  });
   const descriptor = Object.getOwnPropertyDescriptor(MessagePort.prototype, 'onmessage');
   const setter = descriptor?.set;
   if (!descriptor || !setter) throw new Error('Effect result observation is unavailable.');
@@ -56,6 +155,23 @@ export function installEffectGpuPlanCompletionObserver(binding: string): void {
               const result = event.data,
                 id = get(result, 'requestId'),
                 rasters = get(result, 'resources');
+              const bitmap = get(result, 'bitmap'),
+                pending = typeof id === 'string' ? requests.get(this)?.get(id) : undefined;
+              if (
+                get(result, 'kind') === 'frame' &&
+                typeof id === 'string' &&
+                bitmap instanceof ImageBitmap &&
+                pending &&
+                get(result, 'effectInstanceId') === pending.effectInstanceId &&
+                get(result, 'snapshotId') === pending.snapshotId &&
+                get(result, 'sequenceId') === pending.sequenceId &&
+                get(get(result, 'acknowledged'), 'documentId') === pending.documentId &&
+                get(get(result, 'acknowledged'), 'assetSelectionId') === pending.assetSelectionId
+              ) {
+                requests.get(this)?.delete(id);
+                counters.plans++;
+                resources.set(bitmap, { ids: new Set([id]), video: false });
+              }
               if (
                 get(result, 'kind') === 'gpu-plan' &&
                 typeof id === 'string' &&
@@ -66,6 +182,20 @@ export function installEffectGpuPlanCompletionObserver(binding: string): void {
                 if (typeof progress === 'function')
                   Reflect.apply(progress, globalThis, [{ ...counters }]);
                 for (const raster of rasters) {
+                  const paint = get(raster, 'paint'),
+                    width = get(raster, 'width'),
+                    height = get(raster, 'height');
+                  if (
+                    get(raster, 'kind') === 'paint' &&
+                    object(paint) &&
+                    typeof width === 'number' &&
+                    typeof height === 'number'
+                  )
+                    paints.set(paint, {
+                      width,
+                      height,
+                      proof: { ids: new Set([id]), video: false },
+                    });
                   const bitmap = get(raster, 'bitmap');
                   if (bitmap instanceof ImageBitmap)
                     resources.set(bitmap, { ids: new Set([id]), video: false });
@@ -83,7 +213,16 @@ export function installEffectGpuPlanCompletionObserver(binding: string): void {
     const texture = get(args[1], 'texture'),
       source = get(args[0], 'source');
     if (!object(texture)) return;
-    const uploaded = empty();
+    const paint = paintTextures.get(texture);
+    const painted =
+      paint &&
+      typeof OffscreenCanvas !== 'undefined' &&
+      source instanceof OffscreenCanvas &&
+      source.width === paint.width &&
+      source.height === paint.height
+        ? paint.proof
+        : undefined;
+    const uploaded = painted ?? empty();
     merge(uploaded, proof(source));
     uploaded.video ||= typeof VideoFrame !== 'undefined' && source instanceof VideoFrame;
     if (uploaded.ids.size) counters.uploads++;

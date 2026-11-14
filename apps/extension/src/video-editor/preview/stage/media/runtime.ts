@@ -36,6 +36,8 @@ interface PreviewStageMediaRuntimeParams {
   previewRasterSize: VideoEditorPreviewRasterSize;
   project: VideoProject;
   recordingProject?: VideoProject;
+  /** Authored source timing is independent of transient canvas placement. */
+  sourceProject?: VideoProject;
   renderGenerationRef: MutableRefObject<number>;
   registerPreviewRuntime: (runtime: PlaybackPreviewRuntime | null) => void;
 }
@@ -44,7 +46,7 @@ export function usePreviewStageMediaRuntime(params: PreviewStageMediaRuntimePara
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
   const audioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
   const sourceRuntime = useNativePreviewSourceRuntime({
-    project: params.project,
+    project: params.sourceProject ?? params.project,
     assetUrls: params.assetUrls,
     enabled: params.previewMode !== 'cache',
     retryVersion: params.effectRuntimeFeedback.retryVersion,
@@ -107,8 +109,10 @@ function usePreviewMediaSynchronization(
     syncedClips: media.videoBankClips,
     videoRefs: media.videoRefs,
   });
-  usePreviewStageAudioSync({
+  const processedAudio = usePreviewStageAudioSync({
     audioRefs: media.audioRefs,
+    assetUrls: params.assetUrls,
+    retryVersion: params.effectRuntimeFeedback.retryVersion,
     currentTime: params.currentTime,
     isPlaying: params.isPlaying,
     mutePreviewAudio: params.mutePreviewAudio ?? false,
@@ -116,6 +120,7 @@ function usePreviewMediaSynchronization(
     syncedClips: media.audioBankClips,
   });
   return usePreviewEffectAudio({
+    processedAudio,
     assetUrls: params.assetUrls,
     currentTime: params.currentTime,
     feedback: params.effectRuntimeFeedback,

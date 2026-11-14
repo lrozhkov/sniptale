@@ -1,3 +1,8 @@
+import {
+  hasSourceImageFilters,
+  type SourceImageFilterStack,
+} from '../../features/image-filters/contract';
+import { withSourceImageFilterCanvas } from '../../features/video/composition/canvas/source-image-filter';
 import type { ReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import { createReviewWindowRaster } from '../../workflows/video-review/window-header';
 import {
@@ -28,6 +33,9 @@ export type ZoomPreviewLayout = ReturnType<typeof computeQuickEditSceneLayout>;
 export function paintZoomPreview(
   context: CanvasRenderingContext2D,
   args: {
+    sourceFilters?: SourceImageFilterStack | undefined;
+    currentTime?: number | undefined;
+    sourceSize?: { width: number; height: number } | undefined;
     spatialRenderer?: ReviewSpatialRenderer | undefined;
     background?: QuickEditBackgroundSettings;
     headerImage?: CanvasImageSource | null | undefined;
@@ -43,6 +51,28 @@ export function paintZoomPreview(
     showControls?: boolean;
   }
 ) {
+  if (args.frame && args.sourceFilters && hasSourceImageFilters(args.sourceFilters)) {
+    const frame = args.frame;
+    withSourceImageFilterCanvas(
+      {
+        stack: args.sourceFilters,
+        projectTime: args.currentTime,
+        logical: args.sourceSize ?? frame,
+        raster: { width: frame.width, height: frame.height },
+        ownerDocument: context.canvas.ownerDocument,
+        paint(target, size) {
+          target.drawImage(frame.image, 0, 0, size.width, size.height);
+        },
+      },
+      (canvas) =>
+        paintZoomPreview(context, {
+          ...args,
+          sourceFilters: undefined,
+          frame: { ...frame, image: canvas },
+        })
+    );
+    return;
+  }
   if (args.view === 'result' && args.camera.spatial) return paintSpatialZoomPreview(context, args);
   const { videoRect, videoTransform } = args.layout;
   const motion = computeQuickEditSceneCamera(args.layout, args.background ?? { enabled: false });

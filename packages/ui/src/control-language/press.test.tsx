@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, createRef, type ReactNode } from 'react';
+import { act, createRef, Suspense, startTransition, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -352,3 +352,34 @@ it.each(['outside', 'cancel'] as const)(
     expect(command).toHaveBeenCalledTimes(1);
   }
 );
+
+it('retains native press callbacks across frame renders and invokes only committed current commands', async () => {
+  const initial = vi.fn(),
+    current = vi.fn(),
+    abandoned = vi.fn();
+  let callbacks: ReturnType<typeof useCommandPress>['props'] | undefined;
+  function Probe({ onClick, suspend = false }: { onClick(): void; suspend?: boolean }) {
+    const press = useCommandPress({ onClick });
+    callbacks = press.props;
+    if (suspend) throw new Promise(() => {});
+    return <button {...press.props}>Run</button>;
+  }
+  const render = (onClick: () => void, suspend = false) =>
+    root.render(
+      <Suspense fallback={<span>Waiting</span>}>
+        <Probe onClick={onClick} suspend={suspend} />
+      </Suspense>
+    );
+  act(() => render(initial));
+  const retained = callbacks!;
+  act(() => render(current));
+  for (const key of Object.keys(retained) as (keyof typeof retained)[])
+    expect(callbacks![key]).toBe(retained[key]);
+  act(() => host.querySelector('button')!.click());
+  expect(initial).not.toHaveBeenCalled();
+  expect(current).toHaveBeenCalledTimes(1);
+  await act(async () => startTransition(() => render(abandoned, true)));
+  act(() => host.querySelector('button')!.click());
+  expect(abandoned).not.toHaveBeenCalled();
+  expect(current).toHaveBeenCalledTimes(2);
+});

@@ -19,6 +19,20 @@ export function projectReviewAnnotationEffect(
   let duration = 0;
   for (const segment of segments) {
     if (segment.kind === 'cut') continue;
+    if (segment.kind === 'freeze') {
+      const source = segment.frameTime ?? segment.sourceStart;
+      if (annotation.start <= source && source < annotation.end) {
+        slices.push({
+          sourceStart: source,
+          sourceEnd: source,
+          start: segment.resultStart,
+          end: segment.resultEnd,
+          offset: duration,
+        });
+        duration += segment.resultEnd - segment.resultStart;
+      }
+      continue;
+    }
     const sourceStart = Math.max(annotation.start, segment.sourceStart);
     const sourceEnd = Math.min(annotation.end, segment.sourceEnd);
     if (sourceEnd <= sourceStart) continue;
@@ -57,14 +71,23 @@ export function resolveUpcomingReviewAnnotationEffectSlice<
 >(
   instances: readonly T[],
   segments: readonly ReviewTimeSegment[],
-  resultTime: number
+  resultTime: number,
+  lookaheadSeconds = 1
 ): { instance: T; start: number; end: number } | null {
-  if (!Number.isFinite(resultTime)) return null;
+  if (
+    !Number.isFinite(resultTime) ||
+    !Number.isFinite(lookaheadSeconds) ||
+    lookaheadSeconds <= 0 ||
+    lookaheadSeconds > 2
+  )
+    return null;
   const candidates = instances
     .filter((instance) => instance.enabled)
     .flatMap((instance) =>
       projectReviewAnnotationEffect(instance, segments)
-        .slices.filter((slice) => slice.start > resultTime && slice.start <= resultTime + 1)
+        .slices.filter(
+          (slice) => slice.start > resultTime && slice.start <= resultTime + lookaheadSeconds
+        )
         .map(({ start, end }) => ({ instance, start, end }))
     );
   candidates.sort(

@@ -1,7 +1,5 @@
-import { resolveEffectV1ControlDefault } from '@sniptale/runtime-contracts/effect-v1';
-import { prepareProjectAsset } from '../../composition/persistence/projects';
-import { readVideoWorkspace } from '../../composition/persistence/review-workspaces/store';
-import { collectReviewAssetReferences } from '../../composition/persistence/review-workspaces/asset-refs';
+import { animationRuntimeDuration } from '../../contracts/effect-runtime/animation';
+import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
 import type { EffectBundleCatalogEntry } from '../../features/video/project/effect-bundle/catalog';
 import { applyInitialEffectPreset } from '../../features/video/project/effect-bundle/catalog/presets';
 import { readVerifiedCatalogDocument } from '../../features/video/project/effect-instance/catalog-reader';
@@ -11,10 +9,6 @@ import type {
   ReviewAnnotationEffect,
   ReviewAnnotationEffectSnapshot,
 } from '../../features/video/review/annotation-effects/types';
-import {
-  createReviewAnnotationResourceRetention,
-  type ReviewPreparedAnnotationResource,
-} from './annotation-resources';
 import type { createVideoReviewSession } from './session';
 
 /** Content-free acquisition failure; the picker can explain unsupported catalog choices. */
@@ -31,7 +25,7 @@ export class ReviewAnnotationAcquisitionError extends Error {
   }
 }
 
-const acquisition = { prepareProjectAsset, readVideoWorkspace, readVerifiedCatalogDocument };
+const acquisition = { readVerifiedCatalogDocument };
 
 /** Applies one verified catalog document through the existing session's atomic history and resource admission. */
 export async function applyReviewAnnotationCatalogDocument(
@@ -62,14 +56,13 @@ export async function applyReviewAnnotationCatalogDocument(
     throw new ReviewAnnotationAcquisitionError('unsupported-kind');
   const loaded = await deps.readVerifiedCatalogDocument(args.catalog, args.documentId);
   signal.throwIfAborted();
-  if (
-    loaded.document.kind !== 'standalone' ||
-    loaded.assets.some(({ asset }) => asset.kind === 'audio')
-  )
+  if (loaded.catalogDocument.kind !== 'standalone')
     throw new ReviewAnnotationAcquisitionError('unsupported-kind');
   const text = loaded.catalogDocument.source;
   if (text === undefined) throw new Error('Annotation source is unavailable.');
-  const end = args.end ?? Math.min(source.source.duration, args.start + loaded.document.duration);
+  const end =
+    args.end ??
+    Math.min(source.source.duration, args.start + animationRuntimeDuration(loaded.document));
   if (
     !Number.isFinite(args.start) ||
     !Number.isFinite(end) ||
@@ -97,34 +90,16 @@ export async function applyReviewAnnotationCatalogDocument(
   const snapshot: ReviewAnnotationEffectSnapshot = previous ?? {
     id: `effect:${loaded.catalogDocument.sha256}`,
     sha256: loaded.catalogDocument.sha256,
-    schemaVersion: 'sniptale.effect.v1',
+    schemaVersion: 'sniptale.animation.v1',
     kind: 'standalone',
     documentId: loaded.document.id,
     source: text,
-    retainedByteLength:
-      new TextEncoder().encode(text).byteLength +
-      loaded.assets.reduce((sum, entry) => sum + entry.asset.byteLength, 0),
-    assets: loaded.assets.map(({ asset, id, sha256 }) => {
-      if (asset.kind === 'audio') throw new ReviewAnnotationAcquisitionError('unsupported-kind');
-      return {
-        id,
-        assetId: `project-asset:${crypto.randomUUID()}`,
-        kind: asset.kind,
-        sha256,
-        mimeType: asset.mimeType,
-        byteLength: asset.byteLength,
-      };
-    }),
+    retainedByteLength: new TextEncoder().encode(text).byteLength,
+    assets: [],
   };
-  const blobs = new Map(
-    snapshot.assets.map((entry) => [
-      entry.assetId,
-      loaded.assets.find((asset) => asset.id === entry.id)?.asset.blob,
-    ])
-  );
   const verified = await verifyReviewAnnotationEffectSnapshot(
     snapshot,
-    async (reference) => blobs.get(reference),
+    async () => undefined,
     signal
   );
   const document = verified.document;
@@ -133,7 +108,7 @@ export async function applyReviewAnnotationCatalogDocument(
     Object.fromEntries(
       document.controls.map((control) => [
         control.id,
-        resolveEffectV1ControlDefault(control, args.locale),
+        resolveEffectControlDefault(control, args.locale),
       ])
     ),
     loaded.catalogDocument.presetPreferences,
@@ -156,70 +131,14 @@ export async function applyReviewAnnotationCatalogDocument(
     ...(anchors ? { anchors } : {}),
     order: 0,
   };
-  const resources: ReviewPreparedAnnotationResource[] = [];
-  const cleanup = createReviewAnnotationResourceRetention({
-    readDurableReferences: async () => {
-      const workspace = await deps.readVideoWorkspace(source.aggregateId);
-      return workspace ? collectReviewAssetReferences(workspace.workspace) : new Set<string>();
-    },
+  current();
+  signal.throwIfAborted();
+  await session.applyAnnotationEffect({
+    expectedSourceAssetId: source.sourceAssetId,
+    snapshot,
+    instance,
+    resources: [],
+    signal,
   });
-  try {
-    if (!previous)
-      for (const asset of verified.assets) {
-        signal.throwIfAborted();
-        current();
-        const prepared = await deps.prepareProjectAsset(
-          asset.blob,
-          asset.mimeType,
-          asset.id,
-          asset.assetId.slice('project-asset:'.length),
-          Date.now(),
-          undefined,
-          {
-            publishToLibrary: false,
-            requiredReviewAnnotationEffect: {
-              aggregateId: source.aggregateId,
-              sourceAssetId: source.sourceAssetId,
-              snapshotId: snapshot.id,
-              resourceId: asset.id,
-              sha256: asset.sha256,
-            },
-          }
-        );
-        let release: () => Promise<void> = async () => undefined;
-        resources.push({
-          assetId: asset.assetId,
-          physicalAssetId: prepared.ref.assetId,
-          publish: prepared.publish,
-          cancel: prepared.cancel,
-          release: () => release(),
-          read: (signal) => {
-            if (!prepared.readForSession)
-              throw new Error('Annotation resource reader is unavailable.');
-            return prepared.readForSession(signal);
-          },
-        });
-        release = await prepared.retainForSession();
-        signal.throwIfAborted();
-      }
-    current();
-    signal.throwIfAborted();
-    await session.applyAnnotationEffect({
-      expectedSourceAssetId: source.sourceAssetId,
-      snapshot,
-      instance,
-      resources,
-      signal,
-    });
-    return instance.id;
-  } catch (error) {
-    const unowned = resources.filter((resource) => !session.ownsAnnotationResource(resource));
-    cleanup.admit(unowned, new Set(snapshot.assets.map((asset) => asset.assetId)));
-    try {
-      await cleanup.dispose();
-    } catch {
-      throw new AggregateError([error], 'Annotation acquisition cleanup is deferred.');
-    }
-    throw error;
-  }
+  return instance.id;
 }

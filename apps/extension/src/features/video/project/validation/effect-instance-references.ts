@@ -1,5 +1,4 @@
 import { isEffectHostTimingValid } from '../effect-instance/timing';
-import { isVideoEffectTrack } from '../effect-instance/owner';
 import type {
   VideoProjectEffectInstance,
   VideoProjectEffectSnapshot,
@@ -21,7 +20,6 @@ interface EffectReferenceContext {
   instanceIds: Set<string>;
   project: VideoProjectEffectReferenceModel;
   snapshots: Map<string, Pick<VideoProjectEffectSnapshot, 'id' | 'kind'>>;
-  transitionTargets: Set<string>;
 }
 
 export function hasValidEffectProjectReferences(
@@ -38,7 +36,6 @@ export function hasValidEffectProjectReferences(
     instanceIds: new Set(),
     project,
     snapshots: new Map((project.effectSnapshots ?? []).map((snapshot) => [snapshot.id, snapshot])),
-    transitionTargets: new Set(),
   };
   if (!(project.effectInstances ?? []).every((instance) => isValidInstance(instance, context))) {
     return false;
@@ -70,10 +67,11 @@ function isValidInstance(
   context.instanceIds.add(instance.id);
   const snapshot = context.snapshots.get(instance.snapshotId);
   if (!snapshot || snapshot.kind !== instance.kind) return false;
-  if (instance.target.kind === 'scene') return isValidStandaloneInstance(instance, context);
-  if (instance.kind === 'targetEffect')
-    return isValidTargetEffectInstance(instance, context.project);
-  return isValidTransitionInstance(instance, context);
+  return (
+    instance.kind === 'standalone' &&
+    instance.target.kind === 'scene' &&
+    isValidStandaloneInstance(instance, context)
+  );
 }
 
 function isValidStandaloneInstance(
@@ -84,40 +82,6 @@ function isValidStandaloneInstance(
   return (
     instance.kind === 'standalone' && host !== undefined && isEffectHostTimingValid(host, instance)
   );
-}
-
-function isValidTargetEffectInstance(
-  instance: VideoProjectEffectInstance,
-  project: VideoProjectEffectReferenceModel
-): boolean {
-  if (instance.kind !== 'targetEffect') return false;
-  if (instance.target.kind === 'video-group') return true;
-  if (instance.target.kind === 'track') {
-    const trackId = instance.target.trackId;
-    return (
-      project.tracks?.some((track) => track.id === trackId && isVideoEffectTrack(track)) === true
-    );
-  }
-  if (instance.target.kind !== 'clip') return false;
-  const { clipId } = instance.target;
-  return project.clips.some(({ id, type }) => id === clipId && type !== VideoProjectClipType.AUDIO);
-}
-
-function isValidTransitionInstance(
-  instance: VideoProjectEffectInstance,
-  context: EffectReferenceContext
-): boolean {
-  const target = instance.target;
-  if (
-    instance.kind !== 'transition' ||
-    target.kind !== 'transition' ||
-    context.project.transitions?.some(({ id }) => id === target.transitionId) !== true ||
-    context.transitionTargets.has(target.transitionId)
-  ) {
-    return false;
-  }
-  context.transitionTargets.add(target.transitionId);
-  return true;
 }
 
 /** Removed source placements are dormant; an attachment cannot select another material. */

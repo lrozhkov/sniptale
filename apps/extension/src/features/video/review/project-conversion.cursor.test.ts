@@ -339,8 +339,8 @@ function denseCursorInput(count: number) {
   return { input, cursorTrack };
 }
 
-it('retains a complete 64688-sample recording through conversion and canonical reopen', () => {
-  const { input, cursorTrack } = denseCursorInput(64688);
+it('retains source cursor samples beyond the 5000-key authoring limit through conversion and reopen', () => {
+  const { input, cursorTrack } = denseCursorInput(5001);
   const before = structuredClone(input.seed.cursorTrack);
   const plan = planReviewProjectConversion(input);
   expect(plan.status).toBe('prepared');
@@ -493,3 +493,76 @@ it.each(['recording', 'project-asset'] as const)(
     expect(planReviewProjectConversion(extraGroup).status).toBe('blocked');
   }
 );
+
+it('retains authored cursor artwork and source-time motion through cut conversion and Native reopen', () => {
+  const input = fixture();
+  const motion = {
+    id: 'authored-cursor',
+    start: 1,
+    end: 7,
+    enabled: true,
+    shape: 'pointer' as const,
+    size: 44,
+    color: '#eeeeee',
+    outline: '#252525',
+    shadow: true,
+    easing: 'smooth' as const,
+    points: [
+      { id: 'from', at: 0, x: 0.2, y: 0.3 },
+      { id: 'to', at: 1, x: 0.8, y: 0.7 },
+    ],
+  };
+  input.document.advancedContent.cursorMotions = [motion];
+  input.document.advancedContent.cursorMotionEnabled = true;
+  const before = structuredClone(input);
+  const result = planReviewProjectConversion(input);
+  expect(result.status).toBe('prepared');
+  if (result.status !== 'prepared') throw new Error('Authored cursor was not mapped');
+  const reopened = parseHydratableVideoProject(JSON.parse(JSON.stringify(result.project)));
+  expect(reopened).not.toBeNull();
+  expect(reopened).toMatchObject({
+    sourceInteractionDocuments: [
+      {
+        binding: {
+          assetId: input.seed.assets[0]!.id,
+          sourceInstanceId: result.timeline.sourceInstanceId,
+        },
+        cursorMotions: [motion],
+        cursorEnabled: true,
+      },
+    ],
+  });
+  expect(input).toEqual(before);
+});
+
+it('maps authored cursor motion on an imported Gallery video without recording ancestry', () => {
+  const input = fixture();
+  input.seed.assets[0]!.source = { kind: 'project-asset', projectAssetId: 'imported-video' };
+  input.seed.source = { kind: 'manual' };
+  input.seed.baseRecordingId = null;
+  input.document.advancedContent.cursorMotions = [
+    {
+      id: 'imported-cursor',
+      start: 1,
+      end: 7,
+      enabled: true,
+      shape: 'arrow',
+      size: 44,
+      color: '#eeeeee',
+      outline: '#222222',
+      shadow: true,
+      easing: 'smooth',
+      points: [
+        { id: 'a', at: 0, x: 0.2, y: 0.3 },
+        { id: 'b', at: 1, x: 0.8, y: 0.7 },
+      ],
+    },
+  ];
+  const result = planReviewProjectConversion(input);
+  expect(result.status).toBe('prepared');
+  if (result.status !== 'prepared') throw new Error('Imported source authoring was not mapped');
+  expect(
+    parseHydratableVideoProject(JSON.parse(JSON.stringify(result.project)))
+      ?.sourceInteractionDocuments?.[0]?.cursorMotions
+  ).toEqual(input.document.advancedContent.cursorMotions);
+});

@@ -1,10 +1,13 @@
+import { readNativeVideoProject } from '../support/native-video-project';
 import { addVideoProjectCommentDocument } from '../../../../apps/extension/src/features/video/project/comments/authoring';
 import { addProjectSourceVoiceoverDocument } from '../../../../apps/extension/src/features/video/project/source-voiceover';
 import { createVideoProjectTrack } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { anchorReviewVoiceoverAtSource } from '../../../../apps/extension/src/features/video/review/voiceover-edits';
 import { buildReviewTimeMap } from '../../../../apps/extension/src/features/video/review/timeline';
 import { formatPreciseTime } from '../../../../apps/extension/src/video-editor/timeline/project/interaction-state/helpers';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { build } from 'esbuild';
 import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import type {
@@ -21,11 +24,15 @@ import {
 } from '../support/inspector-utilities';
 import { seedActionAudioFacts } from '../support/action-audio-fixture';
 import { textModelResponse } from '../support/text-rewrite-fixture';
-import { applyHarnessBootstrap, VIDEO_EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
 import {
-  EFFECT_V1_STANDALONE_FIXTURE,
-  EFFECT_V1_TARGET_FIXTURE,
-  EFFECT_V1_TRANSITION_FIXTURE,
+  applyHarnessBootstrap,
+  GALLERY_HARNESS_PATH,
+  VIDEO_EDITOR_HARNESS_PATH,
+} from '../extension-critical.helpers';
+import {
+  LOTTIE_ANNOTATION_FIXTURE,
+  applyBuiltinSourceFilter,
+  chooseGlTransition,
   countPersistedEffectInstances,
   importEffectFile,
 } from './extension-critical-video-effects.helpers';
@@ -324,10 +331,31 @@ async function openAuditProject(
 ) {
   page.setDefaultTimeout(10_000);
   const fixture = createInspectorAuditFixture();
+  const recordings = await Promise.all(
+    [
+      { id: 'beta-v1-recording', filename: 'review-vp8-opus.webm' },
+      { id: 'audit-camera', filename: 'review-webcam-clock.webm' },
+      { id: 'audit-microphone', filename: 'review-vp8-opus.webm' },
+    ].map(async ({ id, filename }) => ({
+      id,
+      filename,
+      bytes: [...(await readFile(resolve('tooling/test/e2e/fixtures', filename)))],
+    }))
+  );
+  const image =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#286b8a"/></svg>';
+  for (const asset of fixture.project.assets) {
+    if (asset.source.kind !== 'recording') continue;
+    const recordingId = asset.source.recordingId;
+    const source = recordings.find(({ id }) => id === recordingId);
+    if (source) asset.metadata.size = source.bytes.length;
+    else if (recordingId === 'audit-image') asset.metadata.size = Buffer.byteLength(image);
+  }
   if (decorate) fixture.project = decorate(fixture.project);
   await page.setViewportSize({ ...variant.size });
   await page.emulateMedia({ colorScheme: variant.theme });
   await applyHarnessBootstrap(page, {
+    preserveMediaLibrary: true,
     apiBehavior: { runtimeFallback: 'typed-success' },
     videoProjects: [fixture.project],
     runtimeResponses: { AI_SETTINGS_QUERY: textModelResponse },
@@ -336,8 +364,7 @@ async function openAuditProject(
         id: 'audit-image',
         filename: 'audit.svg',
         mimeType: 'image/svg+xml',
-        bytes:
-          '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#286b8a"/></svg>',
+        bytes: image,
       },
     ],
     storage: {
@@ -349,9 +376,18 @@ async function openAuditProject(
     if (window === window.top) localStorage.setItem('sniptale-locale-preference', locale);
   }, variant.locale);
   const url = `${hostOrigin}${VIDEO_EDITOR_HARNESS_PATH}?project=${fixture.project.id}&theme=${variant.theme}`;
+  await page.goto(`${hostOrigin}${GALLERY_HARNESS_PATH}`);
+  await expect(page.locator('[data-ui="gallery.page.root"]')).toBeVisible();
+  await seedAuditRecordings(page, recordings);
+  await seedActionAudioFacts(page);
+  await page.addInitScript(() => {
+    const bootstrap = window.__sniptaleHarnessBootstrap;
+    if (!bootstrap) return;
+    Reflect.deleteProperty(bootstrap, 'recordings');
+    Reflect.deleteProperty(bootstrap, 'videoProjects');
+  });
   await page.goto(url);
   await expect(page.locator(INSPECTOR)).toBeVisible();
-  await seedActionAudioFacts(page);
   await page.reload();
   await expect(page.locator(`[data-project-timeline-clip="${fixture.text.id}"]`)).toBeVisible();
   await expect(page.locator('[data-action-id="audit-click"]')).toHaveCount(1);
@@ -360,6 +396,45 @@ async function openAuditProject(
   await page.evaluate(() => document.fonts.ready);
   await setInspectorWidth(page, 320);
   return fixture;
+}
+
+async function seedAuditRecordings(
+  page: Page,
+  sources: Array<{ id: string; filename: string; bytes: number[] }>
+) {
+  const ownerPath = JSON.stringify(
+    resolve('apps/extension/src/composition/persistence/recordings/index.ts')
+  );
+  const writer = await build({
+    stdin: {
+      contents: `export { saveRecordingsBatch } from ${ownerPath};`,
+      resolveDir: process.cwd(),
+    },
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    write: false,
+    loader: { '.woff2': 'dataurl', '.svg': 'text', '.bin': 'dataurl' },
+    define: { 'process.env.NODE_ENV': '"production"' },
+  });
+  await page.evaluate(
+    async ({ text, sources }) => {
+      const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+      try {
+        const { saveRecordingsBatch } = await import(url);
+        await saveRecordingsBatch(
+          sources.map(({ id, filename, bytes }) => ({
+            id,
+            filename,
+            blob: new Blob([new Uint8Array(bytes)], { type: 'video/webm' }),
+          }))
+        );
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    },
+    { text: writer.outputFiles[0]!.text, sources }
+  );
 }
 
 async function saveAuditInventory(
@@ -909,78 +984,63 @@ async function auditImportedEffects(
   fixture: ReturnType<typeof createInspectorAuditFixture>,
   locale: 'en' | 'ru'
 ) {
-  const cases = [
-    {
-      id: 'neutral-standalone',
-      path: EFFECT_V1_STANDALONE_FIXTURE,
-      action: 'videoEditor.effectsLibrary.applyToScene',
-      target: '[data-ui="video-editor.viewer.scene"]',
-    },
-    {
-      id: 'demo-target-overlay',
-      path: EFFECT_V1_TARGET_FIXTURE,
-      action: 'videoEditor.effectsLibrary.applyToClip',
-      target: `[data-project-timeline-clip="${fixture.image.first.id}"]`,
-    },
-    {
-      id: 'neutral-transition',
-      path: EFFECT_V1_TRANSITION_FIXTURE,
-      action: 'videoEditor.effectsLibrary.applyToTransition',
-      target: '[data-ui="timeline.track-transition-zone"]',
-    },
-  ] as const;
-  for (const item of cases) {
-    if (item.id === 'demo-target-overlay') await selectAuditClip(page, fixture.image.first, locale);
-    else {
-      await selectAuditClip(
-        page,
-        item.id === 'neutral-transition' ? fixture.image.first : fixture.text,
-        locale
-      );
-      const target =
-        item.id === 'neutral-standalone'
-          ? page.getByRole('button', {
-              name: translate('videoEditor.sidebar.sceneProperties', locale),
-              exact: true,
-            })
-          : page.locator(item.target).first();
-      await target.click();
-    }
-    await importEffectFile(page, { documentId: item.id, fixturePath: item.path, locale });
-    const card = page.locator(`[data-effect-document="${item.id}"]`);
-    await card.hover();
-    const before = await countPersistedEffectInstances(page);
-    const apply = card.getByRole('button', {
-      name: translate(
-        item.id === 'neutral-standalone' ? 'videoEditor.app.materialsAppend' : item.action,
-        locale
-      ),
-      exact: true,
-    });
-    await expect(apply).toBeEnabled();
-    await apply.click();
-    await expect
-      .poll(
-        async () => ({
-          persistedInstances: await countPersistedEffectInstances(page),
-          operationErrors: await page
-            .locator('[data-ui="video-editor.effects-library.dock"]')
-            .getByRole('alert')
-            .allTextContents(),
-          saveStatus: await page
-            .locator('[data-ui="autosave-control"] button')
-            .first()
-            .getAttribute('title'),
-        }),
-        { message: `${item.id} must commit before closing the material library` }
+  await selectAuditClip(page, fixture.text, locale);
+  const before = await countPersistedEffectInstances(page);
+  await importEffectFile(page, {
+    documentId: 'audit-lottie',
+    fixturePath: LOTTIE_ANNOTATION_FIXTURE,
+    locale,
+  });
+  const card = page.locator('[data-effect-document="audit-lottie"]');
+  await card.hover();
+  const apply = card.getByRole('button', {
+    name: translate('videoEditor.effectsLibrary.applyToScene', locale),
+    exact: true,
+  });
+  await expect(apply).toBeEnabled();
+  await apply.click();
+  await expect
+    .poll(async () => ({
+      persistedInstances: await countPersistedEffectInstances(page),
+      operationErrors: await page
+        .locator('[data-ui="video-editor.effects-library.dock"]')
+        .getByRole('alert')
+        .allTextContents(),
+    }))
+    .toMatchObject({ persistedInstances: before + 1, operationErrors: [] });
+  await page.locator('[data-ui="video-editor.materials.close"]').click();
+  const panel = page.locator(INSPECTOR);
+  if (!(await panel.locator('[data-presentation="all"]').count()))
+    await page.locator(TOGGLE).click();
+  await openAllDetails(panel);
+  await expect(panel.locator('[data-effect-instance]').first()).toBeVisible();
+  await auditSelection(page, info, inventory, 'imported-lottie');
+
+  const video = fixture.project.clips.find(
+    (clip) =>
+      clip.type === 'VIDEO' &&
+      fixture.project.tracks.find((track) => track.id === clip.trackId)?.role !== 'CAMERA'
+  );
+  if (!video) throw new Error('Missing source-filter audit video.');
+  await selectAuditClip(page, video, locale);
+  await applyBuiltinSourceFilter(page, locale);
+  await expect
+    .poll(async () => {
+      const clip = (await readNativeVideoProject(page))?.clips.find((item) => item.id === video.id);
+      return clip?.type === 'VIDEO' ? clip.sourceFilters?.filters.length : 0;
+    })
+    .toBe(1);
+  await auditSelection(page, info, inventory, 'source-video-filter');
+
+  await selectAuditClip(page, fixture.image.first, locale);
+  await page.locator('[data-ui="timeline.track-transition-zone"]').first().click();
+  await chooseGlTransition(page, 'CrossZoom');
+  await expect
+    .poll(async () =>
+      (await readNativeVideoProject(page))?.transitions?.some(
+        (transition) => transition.kind === 'gl' && transition.selection.name === 'CrossZoom'
       )
-      .toMatchObject({ persistedInstances: before + 1, operationErrors: [] });
-    await page.locator('[data-ui="video-editor.materials.close"]').click();
-    const panel = page.locator(INSPECTOR);
-    if (!(await panel.locator('[data-presentation="all"]').count()))
-      await page.locator(TOGGLE).click();
-    await openAllDetails(panel);
-    await expect(panel.locator('[data-effect-instance]').first()).toBeVisible();
-    await auditSelection(page, info, inventory, `imported-effect-${item.id}`);
-  }
+    )
+    .toBe(true);
+  await auditSelection(page, info, inventory, 'gl-transition');
 }

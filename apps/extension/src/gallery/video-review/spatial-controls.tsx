@@ -32,6 +32,7 @@ export const ReviewSpatialToolContext = createContext<{
 
 /** Navigation stays outside the canvas capture scope and never mutates the selected target. */
 export function ReviewSpatialToolbar(props: {
+  effect?: '3d' | undefined;
   tool: SpatialTool;
   axis: SpatialAxis;
   disabled: boolean;
@@ -68,7 +69,10 @@ export function ReviewSpatialToolbar(props: {
         role="group"
         aria-label={translate('gallery.videoReview.spatialTools')}
       >
-        {(['position', 'tilt', 'rotation', 'focus'] as const).map((tool) => {
+        {(props.effect === '3d'
+          ? (['tilt', 'rotation', 'focus'] as const)
+          : (['position'] as const)
+        ).map((tool) => {
           const Icon = toolIcons[tool];
           return (
             <ProductActionButton

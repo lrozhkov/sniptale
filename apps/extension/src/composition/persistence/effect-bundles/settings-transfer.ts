@@ -1,136 +1,211 @@
+import { z } from 'zod';
+import type { AnimationCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
+import type { VisualCatalogPreference } from '../../../features/video/project/effect-bundle/catalog/presets';
+import { parseAnimationCatalogEntry, parseStoredAnimationCatalogEntry } from './entry';
+import { assertAnimationCatalogIntegrity } from './integrity';
 import {
-  parseEffectCatalogPreferences,
-  readEffectCatalogPreferences,
-  writeEffectCatalogPreferences,
-} from './preferences';
-import { EFFECT_BUNDLE_LIMITS } from '../../../features/video/project/effect-bundle';
-import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
-import { parseEffectBundleCatalogEntry } from './entry';
-import { assertEffectBundleCatalogIntegrity } from './integrity';
-import { initDB, VIDEO_EFFECT_BUNDLES_STORE } from '../infrastructure/indexed-db/core';
+  parseGlPresetCatalogEntry,
+  resolveGlPresetCatalogEntry,
+  GL_PRESET_CATALOG_MAX_BYTES,
+  GL_PRESET_CATALOG_MAX_ENTRIES,
+  type GlPresetCatalogEntry,
+} from './gl-presets';
+import { admitVisualCatalogPreferences } from './preferences';
+import {
+  initDB,
+  VIDEO_ANIMATION_PACKAGES_STORE,
+  VIDEO_GL_TRANSITION_PRESETS_STORE,
+  VIDEO_VISUAL_PREFERENCES_STORE,
+} from '../infrastructure/indexed-db/core';
 import {
   isActivePersistenceMutationPermit,
   type PersistenceMutationPermit,
 } from '../infrastructure/mutation-barrier';
 
-type PortableEntry = Omit<EffectBundleCatalogEntry, 'assets'> & {
-  id: string;
-  name: string;
-  assets: Array<Omit<EffectBundleCatalogEntry['assets'][number], 'blob'> & { base64: string }>;
-};
-
-export async function encodeEffectSettingsEntry(
-  entry: EffectBundleCatalogEntry
-): Promise<PortableEntry> {
-  if (entry.source === 'builtin' || entry.materializeDocument)
-    throw new Error('Builtin resources are not transferable');
-  const assets = await Promise.all(
-    entry.assets.map(async ({ blob, ...asset }) => {
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      let binary = '';
-      for (let offset = 0; offset < bytes.length; offset += 8192)
-        binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
-      return { ...asset, base64: btoa(binary) };
-    })
-  );
-  return {
-    ...entry,
-    documents: entry.documents.map(({ presetPreferences: _preferences, ...document }) => document),
-    id: entry.packId,
-    name: entry.label.en,
-    assets,
-  };
+/** Transfer immutable sources separately from effective catalogue availability and user preferences. */
+export async function encodeEffectSettingsEntry(entry: AnimationCatalogEntry) {
+  await assertAnimationCatalogIntegrity(entry);
+  return { ...structuredClone(entry), id: entry.packId, name: entry.label.en };
 }
-
-export function decodeEffectSettingsEntry(value: unknown): EffectBundleCatalogEntry {
-  if (
-    !isRecord(value) ||
-    typeof value['id'] !== 'string' ||
-    !Array.isArray(value['assets']) ||
-    value['assets'].length > EFFECT_BUNDLE_LIMITS.maxAssets ||
-    value['assets'].reduce(
-      (total: number, asset: unknown) =>
-        total +
-        (isRecord(asset) && typeof asset['base64'] === 'string' ? asset['base64'].length : 0),
-      0
-    ) >
-      Math.ceil(EFFECT_BUNDLE_LIMITS.maxInflatedBytes / 3) * 4
-  )
-    throw new Error('Invalid effect settings entry');
-  const assets = value['assets'].map((asset) => {
-    if (
-      !isRecord(asset) ||
-      typeof asset['base64'] !== 'string' ||
-      asset['base64'].length > Math.ceil(EFFECT_BUNDLE_LIMITS.maxEntryBytes / 3) * 4 ||
-      !isBase64(asset['base64']) ||
-      typeof asset['mimeType'] !== 'string'
-    )
-      throw new Error('Invalid effect settings asset');
-    const bytes = Uint8Array.from(atob(asset['base64']), (char) => char.charCodeAt(0));
-    return { ...asset, blob: new Blob([bytes], { type: asset['mimeType'] }) };
-  });
-  const entry = parseEffectBundleCatalogEntry({ ...value, packId: value['id'], assets });
-  if (!entry) throw new Error('Invalid effect settings catalog');
+export function decodeEffectSettingsEntry(value: unknown): AnimationCatalogEntry {
+  if (!isRecord(value) || typeof value['id'] !== 'string' || typeof value['name'] !== 'string')
+    throw new Error('Invalid animation settings entry');
+  const { id, name: _name, ...resource } = value;
+  // The transfer planner owns a copy identity; retained document sources remain unchanged.
+  const entry = parseAnimationCatalogEntry({ ...resource, packId: id });
+  if (!entry) throw new Error('Invalid animation settings catalog');
   return entry;
 }
+export function encodeGlPresetSettingsEntry(entry: GlPresetCatalogEntry) {
+  return { ...entry, name: resolveGlPresetCatalogEntry(entry, []).name };
+}
+export function decodeGlPresetSettingsEntry(value: unknown): GlPresetCatalogEntry {
+  if (!isRecord(value) || typeof value['name'] !== 'string')
+    throw new Error('Invalid GL settings entry');
+  const { name: _name, ...resource } = value;
+  const entry = parseGlPresetCatalogEntry(resource);
+  if (!entry) throw new Error('Invalid GL settings catalog');
+  return entry;
+}
+export function parseVisualSettingsPreferences(
+  value: unknown,
+  kind: VisualCatalogPreference['kind']
+) {
+  const preferences = admitVisualCatalogPreferences(value);
+  if (preferences.some((row) => row.kind !== kind))
+    throw new Error('Visual preference kind does not match its settings field');
+  return preferences;
+}
+const collection = z.strictObject({
+  items: z.array(z.unknown()).optional(),
+  preferences: z.array(z.unknown()).optional(),
+  transitionItems: z.array(z.unknown()).optional(),
+  transitionPreferences: z.array(z.unknown()).optional(),
+});
+function assertPermit(
+  permit: PersistenceMutationPermit | undefined
+): asserts permit is PersistenceMutationPermit {
+  if (!isActivePersistenceMutationPermit(permit)) throw new Error('Invalid persistence permit');
+}
+function keyOf(value: unknown, field: 'id' | 'packId'): string {
+  if (!isRecord(value) || typeof value[field] !== 'string')
+    throw new Error('Invalid visual resource identity');
+  return value[field];
+}
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
-/** Validate all assets before any settings writer commits. The caller owns cross-store rollback. */
+/** The caller holds its exclusive settings workflow permit through preparation, commit and compensation. */
 export async function prepareEffectSettingsMutation(
   value: unknown,
   permit?: PersistenceMutationPermit
 ) {
-  if (!isActivePersistenceMutationPermit(permit)) throw new Error('Invalid persistence permit');
-  if (!isRecord(value) || !Array.isArray(value['items']))
-    throw new Error('Invalid effect settings collection');
-  const entries = value['items'].map(decodeEffectSettingsEntry);
-  const preferences = parseEffectCatalogPreferences(value['preferences']);
-  const beforePreferences = await readEffectCatalogPreferences();
+  assertPermit(permit);
+  const input = collection.parse(value),
+    entries = input.items?.map(decodeEffectSettingsEntry);
+  if (entries) {
+    if (
+      new Set(entries.map((entry) => entry.packId)).size !== entries.length ||
+      entries.reduce((sum, entry) => sum + entry.retainedByteLength, 0) > 512 * 1024 * 1024
+    )
+      throw new Error('Invalid animation settings inventory');
+    for (const entry of entries) await assertAnimationCatalogIntegrity(entry);
+  }
+  const glEntries = input.transitionItems?.map(decodeGlPresetSettingsEntry);
   if (
-    new Set(entries.map((entry) => entry.packId)).size !== entries.length ||
-    entries.reduce((sum, entry) => sum + entry.retainedByteLength, 0) > 512 * 1024 * 1024
+    glEntries &&
+    (glEntries.length > GL_PRESET_CATALOG_MAX_ENTRIES ||
+      new Set(glEntries.map((entry) => entry.id)).size !== glEntries.length ||
+      glEntries.reduce((sum, entry) => sum + entry.retainedByteLength, 0) >
+        GL_PRESET_CATALOG_MAX_BYTES)
   )
-    throw new Error('Invalid effect settings inventory');
-  for (const entry of entries) await assertEffectBundleCatalogIntegrity(entry);
+    throw new Error('Invalid GL settings inventory');
+  const animationPreferences =
+    input.preferences && parseVisualSettingsPreferences(input.preferences, 'animation');
+  const transitionPreferences =
+    input.transitionPreferences &&
+    parseVisualSettingsPreferences(input.transitionPreferences, 'transition');
   const db = await initDB(permit);
-  const before = await db.getAll(VIDEO_EFFECT_BUNDLES_STORE);
-  const write = async (values: typeof before) => {
-    if (!isActivePersistenceMutationPermit(permit)) throw new Error('Invalid persistence permit');
-    const tx = db.transaction(VIDEO_EFFECT_BUNDLES_STORE, 'readwrite');
+  const beforeEntries: unknown[] | undefined =
+    entries && (await db.getAll(VIDEO_ANIMATION_PACKAGES_STORE));
+  const beforeGlEntries: unknown[] | undefined =
+    glEntries && (await db.getAll(VIDEO_GL_TRANSITION_PRESETS_STORE));
+  const beforePreferences =
+    animationPreferences || transitionPreferences
+      ? admitVisualCatalogPreferences(await db.getAll(VIDEO_VISUAL_PREFERENCES_STORE))
+      : undefined;
+  if (beforeEntries)
+    for (const value of beforeEntries) {
+      const entry = parseStoredAnimationCatalogEntry(value);
+      if (!entry) throw new Error('Invalid retained animation settings catalog');
+      await assertAnimationCatalogIntegrity(entry);
+    }
+  if (beforeGlEntries && beforeGlEntries.some((value) => !parseGlPresetCatalogEntry(value)))
+    throw new Error('Invalid retained GL settings catalog');
+  const preferences =
+    beforePreferences &&
+    admitVisualCatalogPreferences([
+      ...beforePreferences.filter((row) =>
+        row.kind === 'animation' ? !animationPreferences : !transitionPreferences
+      ),
+      ...(animationPreferences ?? []),
+      ...(transitionPreferences ?? []),
+    ]);
+  const stores = [
+    ...(entries ? [VIDEO_ANIMATION_PACKAGES_STORE] : []),
+    ...(glEntries ? [VIDEO_GL_TRANSITION_PRESETS_STORE] : []),
+    ...(preferences ? [VIDEO_VISUAL_PREFERENCES_STORE] : []),
+  ];
+  async function write(resources: {
+    animations?: readonly unknown[] | undefined;
+    gl?: readonly unknown[] | undefined;
+    preferences?: VisualCatalogPreference[] | undefined;
+  }) {
+    assertPermit(permit);
+    if (!stores.length) return;
+    const tx = db.transaction(stores, 'readwrite');
     try {
-      await tx.store.clear();
-      for (const entry of values) await tx.store.put(entry);
+      for (const [storeName, field, values] of [
+        [VIDEO_ANIMATION_PACKAGES_STORE, 'packId', resources.animations],
+        [VIDEO_GL_TRANSITION_PRESETS_STORE, 'id', resources.gl],
+      ] as const) {
+        if (!values) continue;
+        const store = tx.objectStore(storeName),
+          current: unknown[] = await store.getAll();
+        const keys = new Set(values.map((value) => keyOf(value, field)));
+        assertPermit(permit);
+        for (const value of current)
+          if (!keys.has(keyOf(value, field))) {
+            assertPermit(permit);
+            await store.delete(keyOf(value, field));
+          }
+        for (const value of values) {
+          const previous = current.find((item) => keyOf(item, field) === keyOf(value, field));
+          if (JSON.stringify(previous) !== JSON.stringify(value)) {
+            assertPermit(permit);
+            await store.put(value);
+          }
+        }
+      }
+      if (resources.preferences) {
+        const store = tx.objectStore(VIDEO_VISUAL_PREFERENCES_STORE),
+          current = admitVisualCatalogPreferences(await store.getAll());
+        assertPermit(permit);
+        for (const row of current)
+          if (
+            !resources.preferences.some(
+              (next) => next.kind === row.kind && next.packId === row.packId
+            )
+          ) {
+            assertPermit(permit);
+            await store.delete([row.kind, row.packId]);
+          }
+        for (const row of resources.preferences) {
+          const previous = current.find(
+            (item) => item.kind === row.kind && item.packId === row.packId
+          );
+          if (JSON.stringify(previous) !== JSON.stringify(row)) {
+            assertPermit(permit);
+            await store.put(row);
+          }
+        }
+      }
+      assertPermit(permit);
       await tx.done;
     } catch (error) {
       try {
         tx.abort();
       } catch {
-        /* The failed transaction may already be aborted. */
+        /* A failed native request can already have aborted it. */
       }
       await tx.done.catch(() => undefined);
       throw error;
     }
-  };
-  return {
-    commit: async () => {
-      await write(entries);
-      await writeEffectCatalogPreferences(preferences, permit);
-    },
-    rollback: async () => {
-      await write(before);
-      await writeEffectCatalogPreferences(beforePreferences, permit);
-    },
-  };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isBase64(value: string): boolean {
-  if (value.length % 4 !== 0) return false;
-  try {
-    return btoa(atob(value)) === value;
-  } catch {
-    return false;
   }
+  return {
+    commit: () => write({ animations: entries, gl: glEntries, preferences }),
+    rollback: () =>
+      write({ animations: beforeEntries, gl: beforeGlEntries, preferences: beforePreferences }),
+  };
 }

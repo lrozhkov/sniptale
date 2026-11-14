@@ -5,10 +5,8 @@ import { REVIEW_CLICK_DEFAULT } from '../../../../apps/extension/src/features/vi
 import { REVIEW_KEY_DEFAULT } from '../../../../apps/extension/src/features/video/project/action-feedback/key-animation';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import {
-  validateEffectV1Document,
-  resolveEffectV1ControlDefault,
-} from '@sniptale/runtime-contracts/effect-v1';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
+import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
 import { initializeReviewAnnotationEffectAnchors } from '../../../../apps/extension/src/features/video/review/annotation-effects/layout';
 import type {
   ReviewAnnotationEffectSnapshot,
@@ -202,20 +200,23 @@ export async function performanceAnnotations(
   const count = performanceScenario(recipe).annotations ?? 0;
   if (!count) return null;
   const source = await readFile(
-    'apps/extension/public/video-effects/effects/annotations/sniptale-title/effect.sniptale-effect.json',
+    'apps/extension/public/video-effects/animations/title.sniptale-animation.json',
     'utf8'
   );
-  const raw: unknown = JSON.parse(source);
-  const parsed = validateEffectV1Document(raw);
-  if (!parsed.ok || !parsed.document?.objectLayout)
+  const parsed = parseAnimationTemplateSource(source);
+  if (!parsed.ok || !parsed.template)
     throw new Error('Invalid builtin annotation performance fixture');
-  const document = parsed.document,
-    layout = parsed.document.objectLayout;
+  const document = parsed.template,
+    layout = {
+      width: document.animation.w,
+      height: document.animation.h,
+      handles: document.objectLayout?.handles,
+    };
   const sha256 = createHash('sha256').update(source).digest('hex');
   const snapshot: ReviewAnnotationEffectSnapshot = {
     id: `effect:${sha256}`,
     sha256,
-    schemaVersion: 'sniptale.effect.v1',
+    schemaVersion: 'sniptale.animation.v1',
     kind: 'standalone',
     documentId: document.id,
     source,
@@ -223,7 +224,7 @@ export async function performanceAnnotations(
     assets: [],
   };
   const controls = Object.fromEntries(
-    document.controls.map((control) => [control.id, resolveEffectV1ControlDefault(control, 'en')])
+    document.controls.map((control) => [control.id, resolveEffectControlDefault(control, 'en')])
   );
   const lane: ReviewAnnotationEffects = {
     enabled: true,

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { resolveEffectV1ControlDefault } from '@sniptale/runtime-contracts/effect-v1';
+import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
 import { readReviewAnnotationEffectDocument } from '../../features/video/review/annotation-effects/validation';
 import { initializeReviewAnnotationEffectAnchors } from '../../features/video/review/annotation-effects/layout';
 import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
@@ -27,13 +27,15 @@ const geometry = createReviewAnnotationGeometry({
 })!;
 function fixture(name = 'callout', attachment: ReviewAnnotationEffect['attachment'] = 'content') {
   const text = readFileSync(
-    `apps/extension/public/video-effects/effects/annotations/sniptale-${name}/effect.sniptale-effect.json`,
+    name === 'callout'
+      ? 'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
+      : `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
     'utf8'
   );
   const document = readReviewAnnotationEffectDocument(text)!;
   const transform = { x: 0.3, y: 0.3, width: 0.4, height: 0.2, rotation: 0 };
   const controls = Object.fromEntries(
-    document.controls.map((control) => [control.id, resolveEffectV1ControlDefault(control, 'en')])
+    document.controls.map((control) => [control.id, resolveEffectControlDefault(control, 'en')])
   );
   const anchors = initializeReviewAnnotationEffectAnchors(
     document,
@@ -72,6 +74,10 @@ function fixture(name = 'callout', attachment: ReviewAnnotationEffect['attachmen
       remove: vi.fn(),
       duplicate: vi.fn(),
       beginGesture: vi.fn(() => true),
+      bodyMeasurements: new Map(),
+      refreshBodyGeometry: vi.fn(),
+      movement: { subscribe: vi.fn(() => () => undefined) },
+      previewMovement: vi.fn(() => false),
       previewGesture: vi.fn(),
       cancelGesture: vi.fn(),
       commitGesture: vi.fn(async () => true),
@@ -83,7 +89,7 @@ function fixture(name = 'callout', attachment: ReviewAnnotationEffect['attachmen
     snapshots: [
       {
         id: 'immutable',
-        schemaVersion: 'sniptale.effect.v1',
+        schemaVersion: 'sniptale.animation.v1',
         kind: 'standalone',
         documentId: document.id,
         sha256: '0'.repeat(64),
@@ -258,7 +264,7 @@ it('moves only a fixed tip and supports keyboard body, resize and rotation comma
   const resized = vi.mocked(binding.editor.previewGesture).mock.lastCall?.[0]?.transform;
   if (!resized) throw new Error('Resize gesture did not preview a transform.');
   expect((resized.width * source.width) / (resized.height * source.height)).toBeCloseTo(
-    document.objectLayout!.width / document.objectLayout!.height
+    document.animation.w / document.animation.h
   );
   const rotate = host.querySelector('[data-handle="rotate"]')!;
   act(() =>
@@ -295,3 +301,72 @@ it.each(['resize', 'rotate', 'tip'])(
     expect(binding.editor.previewGesture).not.toHaveBeenCalled();
   }
 );
+
+it('snaps a pointer move, bypasses with Alt without moving the pointer and cancels without commit', () => {
+  const { binding, instance } = fixture('title', 'viewport');
+  instance.transform = { x: 0.295, y: 0.3, width: 0.4, height: 0.2, rotation: 0 };
+  binding.magnetEnabled = true;
+  const svg = render(binding);
+  pointer(host.querySelector('[data-annotation-id]')!, 'pointerdown', 100, 30);
+  pointer(svg, 'pointermove', 101, 30);
+  const patch = () => vi.mocked(binding.editor.previewGesture).mock.lastCall?.[0];
+  expect(patch()?.transform?.x).toBeCloseTo(0.3, 10);
+  expect(
+    host.querySelectorAll('[data-ui="gallery.videoReview.annotationMagnetGuides"] line').length
+  ).toBeGreaterThan(0);
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt' })));
+  expect(patch()?.transform?.x).toBeCloseTo(0.295 + 1 / 320, 10);
+  expect(
+    host.querySelectorAll('[data-ui="gallery.videoReview.annotationMagnetGuides"] line')
+  ).toHaveLength(0);
+  act(() => window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt' })));
+  expect(patch()?.transform?.x).toBeCloseTo(0.3, 10);
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  expect(binding.editor.cancelGesture).toHaveBeenCalled();
+  expect(binding.editor.commitGesture).not.toHaveBeenCalled();
+  expect(
+    host.querySelectorAll('[data-ui="gallery.videoReview.annotationMagnetGuides"] line')
+  ).toHaveLength(0);
+});
+
+it('does not snap keyboard nudges and commits a snapped pointer gesture exactly once', () => {
+  const { binding, instance } = fixture('title', 'viewport');
+  instance.transform = { x: 0.295, y: 0.3, width: 0.4, height: 0.2, rotation: 0 };
+  binding.magnetEnabled = true;
+  const svg = render(binding);
+  const body = host.querySelector('[data-annotation-id]')!;
+  act(() => body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })));
+  expect(vi.mocked(binding.editor.previewGesture).mock.lastCall?.[0]?.transform?.x).toBeCloseTo(
+    0.295 + 1 / 1280,
+    10
+  );
+  vi.mocked(binding.editor.commitGesture).mockClear();
+  pointer(body, 'pointerdown', 100, 30);
+  pointer(svg, 'pointermove', 101, 30);
+  pointer(svg, 'pointerup', 101, 30);
+  pointer(svg, 'pointerup', 101, 30);
+  expect(binding.editor.commitGesture).toHaveBeenCalledOnce();
+  expect(vi.mocked(binding.editor.previewGesture).mock.lastCall?.[0]?.transform?.x).toBeCloseTo(
+    0.3,
+    10
+  );
+  expect(
+    host.querySelectorAll('[data-ui="gallery.videoReview.annotationMagnetGuides"] line')
+  ).toHaveLength(0);
+});
+
+it('selects near a magnet without changing placement when the pointer has not moved', () => {
+  const { binding, instance } = fixture('title', 'viewport');
+  instance.transform = { x: 0.295, y: 0.3, width: 0.4, height: 0.2, rotation: 0 };
+  binding.magnetEnabled = true;
+  const svg = render(binding);
+  pointer(host.querySelector('[data-annotation-id]')!, 'pointerdown', 100, 30);
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt' })));
+  act(() => window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt' })));
+  pointer(svg, 'pointerup', 100, 30);
+  expect(binding.onSelect).toHaveBeenCalledWith(instance.id);
+  expect(binding.editor.previewGesture).not.toHaveBeenCalled();
+  expect(
+    host.querySelectorAll('[data-ui="gallery.videoReview.annotationMagnetGuides"] line')
+  ).toHaveLength(0);
+});

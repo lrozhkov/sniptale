@@ -27,16 +27,25 @@ export function projectSourceFocusPhases<T extends CameraTransitionType>(
     visible.reduce(
       (duration, part) =>
         duration +
-        Math.max(0, Math.min(end, part.sourceEnd) - Math.max(start, part.sourceStart)) / part.rate,
+        (part.rate === 0
+          ? start <= part.sourceStart && part.sourceStart < end
+            ? part.end - part.start
+            : 0
+          : Math.max(0, Math.min(end, part.sourceEnd) - Math.max(start, part.sourceStart)) /
+            part.rate),
       0
     );
   const spans: SourceFocusSpan[] = [];
   for (const part of visible) {
     const sourceStart = Math.max(focus.sourceStart, part.sourceStart);
     const sourceEnd = Math.min(focus.sourceEnd, part.sourceEnd);
-    if (sourceEnd <= sourceStart) continue;
-    const start = part.start + (sourceStart - part.sourceStart) / part.rate;
-    const end = part.start + (sourceEnd - part.sourceStart) / part.rate;
+    const held =
+      part.rate === 0 &&
+      focus.sourceStart <= part.sourceStart &&
+      part.sourceStart < focus.sourceEnd;
+    if (sourceEnd <= sourceStart && !held) continue;
+    const start = held ? part.start : part.start + (sourceStart - part.sourceStart) / part.rate;
+    const end = held ? part.end : part.start + (sourceEnd - part.sourceStart) / part.rate;
     const previous = spans.at(-1);
     // Source and result boundaries both must touch; a timeline gap is not a held phase.
     if (

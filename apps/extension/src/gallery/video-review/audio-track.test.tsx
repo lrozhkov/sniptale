@@ -466,7 +466,7 @@ it('shows filenames and visible handles, and clamps the preview to the original 
   const block = lane.querySelector<HTMLDivElement>('[role="button"]')!;
   expect(block.title).toBe('voice.wav');
   expect(block.textContent?.trim()).toBe('');
-  expect(block.querySelectorAll('[data-audio-edge] span')).toHaveLength(2);
+  expect(block.querySelectorAll('[data-audio-edge].review-timeline-resize-handle')).toHaveLength(2);
   Object.assign(block, { setPointerCapture: vi.fn() });
   const edge = block.querySelector('[data-audio-edge="end"]')!;
   await act(async () =>

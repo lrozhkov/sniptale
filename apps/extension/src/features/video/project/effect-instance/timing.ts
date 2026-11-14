@@ -29,9 +29,7 @@ export function isEffectInstanceSourceRangeValid(
     Number.isFinite(instance.playbackRate) &&
     instance.playbackRate > 0 &&
     Number.isFinite(sourceEnd) &&
-    sourceEnd <= documentDuration + EFFECT_INSTANCE_TIMING_EPSILON &&
-    (instance.kind !== 'transition' ||
-      (sourceStart === 0 && isEffectInstanceTimingEqual(sourceEnd, documentDuration)))
+    sourceEnd <= documentDuration + EFFECT_INSTANCE_TIMING_EPSILON
   );
 }
 

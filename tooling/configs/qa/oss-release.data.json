@@ -142,6 +142,11 @@
       "source": "LICENSES/dependencies/@iconify__utils-3.1.7.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/@lottiefiles__dotlottie-web-0.82.1.txt",
+      "sha256": "779cec663b3c6590082566f2a000170d7a4d1a4bfc6f954e61efa4adddc652a8",
+      "source": "LICENSES/dependencies/@lottiefiles__dotlottie-web-0.82.1.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/@noble__hashes-2.4.0.txt",
       "sha256": "4f221aee6e072336700c408c68ab3b96a3fc09f6aebe6f48f1bd99e5ef13faec",
       "source": "LICENSES/dependencies/@noble__hashes-2.4.0.txt"
@@ -446,13 +451,88 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "e3a82d962b5e6154acdaa16a3e356f6e6a9fb1438ca45a517dd6fcad1babaa18",
+      "sha256": "d99b2f37d79e23855a193d583fe394b650b101ef2a934472b6ebc36308e2d1bf",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "d19ce0fcb4b791e6a15fc2b53439c05bd562ac6885b919e30587e36a900cd979",
+      "sha256": "f4f2a35e6f5786cc9e5dedb9279da493f4c24e48fcc9cae5af533dfdc49bcd52",
       "source": "THIRD_PARTY_NOTICES.md"
+    },
+    {
+      "archivePath": "apps/extension/public/video-effects/fonts/NOTICE.txt",
+      "sha256": "7fc56df9fae16e89186f10c2104828777864f552e187319bcfd17b56b212379f",
+      "source": "apps/extension/public/video-effects/fonts/NOTICE.txt"
+    },
+    {
+      "archivePath": "apps/extension/public/video-effects/fonts/OFL.txt",
+      "sha256": "ff532f9e8789f09a9fdffc3c0954eedfb0a48be77b2e2eb90f5f82e4f347f50c",
+      "source": "apps/extension/public/video-effects/fonts/OFL.txt"
+    },
+    {
+      "archivePath": "apps/extension/public/video-effects/fonts/identity.json",
+      "sha256": "05b6d0ea0e29856142c3c4ddb75f6e2f1a7628283aabd29ae5ac8c8f0ae61516",
+      "source": "apps/extension/public/video-effects/fonts/identity.json"
+    },
+    {
+      "archivePath": "apps/extension/public/video-effects/notices/opus-caveat-OFL.txt",
+      "sha256": "1f9d81d094273d82f3898a1ee8b598a717d050ecbf5ff7bede105b704880157b",
+      "source": "apps/extension/public/video-effects/notices/opus-caveat-OFL.txt"
+    },
+    {
+      "archivePath": "apps/extension/public/video-effects/notices/opus-cormorantgaramond-OFL.txt",
+      "sha256": "60700d351cac4650c51f3f9db318d2a420f8b45052dba2715eb5fec41f0f6956",
+      "source": "apps/extension/public/video-effects/notices/opus-cormorantgaramond-OFL.txt"
+    },
+    {
+      "archivePath": "apps/extension/public/video-effects/notices/opus-fonts.json",
+      "sha256": "7e02012daa470663268b9263498ade0b75196f8918e962e5e3fd21c61798ed61",
+      "source": "apps/extension/public/video-effects/notices/opus-fonts.json"
+    },
+    {
+      "archivePath": "apps/extension/public/video-effects/notices/opus-inter-OFL.txt",
+      "sha256": "5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57",
+      "source": "apps/extension/public/video-effects/notices/opus-inter-OFL.txt"
+    },
+    {
+      "archivePath": "apps/extension/public/video-effects/notices/opus-jetbrainsmono-OFL.txt",
+      "sha256": "b2fe5e8987594e9ffd1d2ca52a2f5d73eb8335243893c5d6254b5ad69269591d",
+      "source": "apps/extension/public/video-effects/notices/opus-jetbrainsmono-OFL.txt"
+    },
+    {
+      "archivePath": "apps/extension/public/video-effects/notices/opus-motion-caveat-NOTICE.txt",
+      "sha256": "99a057d0f23008fbe33306d351bcfdd0531faba792cf4c359e0fd57177b3fb76",
+      "source": "apps/extension/public/video-effects/notices/opus-motion-caveat-NOTICE.txt"
+    },
+    {
+      "archivePath": "apps/extension/public/video-effects/notices/opus-motion-cormorantgaramond-NOTICE.txt",
+      "sha256": "4f2bb3f7a4ed021b51826eb1f609da6504afad0411df3bc98e6b4d6dea2f2c13",
+      "source": "apps/extension/public/video-effects/notices/opus-motion-cormorantgaramond-NOTICE.txt"
+    },
+    {
+      "archivePath": "apps/extension/public/video-effects/notices/opus-motion-inter-NOTICE.txt",
+      "sha256": "99a1068548bd4ee27a8f80de4c358d00ecc590312d54cdf2112b656fb8e28beb",
+      "source": "apps/extension/public/video-effects/notices/opus-motion-inter-NOTICE.txt"
+    },
+    {
+      "archivePath": "apps/extension/public/video-effects/notices/opus-motion-jetbrainsmono-NOTICE.txt",
+      "sha256": "1e1a008f557f30a3a1b603f87883da443db9e1449f120eebffae9cd8b3b1ae4a",
+      "source": "apps/extension/public/video-effects/notices/opus-motion-jetbrainsmono-NOTICE.txt"
+    },
+    {
+      "archivePath": "apps/extension/public/video-effects/notices/opus-motion-reference-adaptations-NOTICE.txt",
+      "sha256": "0b726c8b6de3e0b005f773036c75476b27e55c27358500e436e6a21789446059",
+      "source": "apps/extension/public/video-effects/notices/opus-motion-reference-adaptations-NOTICE.txt"
+    },
+    {
+      "archivePath": "apps/extension/public/video-effects/notices/opus-motion-reference-adaptations-identity.json",
+      "sha256": "c89b641a89acdbfef9355392558db7fe0b783ed98617ae2b1fcbdf82eb04ce98",
+      "source": "apps/extension/public/video-effects/notices/opus-motion-reference-adaptations-identity.json"
+    },
+    {
+      "archivePath": "apps/extension/public/video-effects/notices/opus-motion.txt",
+      "sha256": "277a332d935ce9bd36be0f77d591e6698c328086443c7b7722e7def769a38ca2",
+      "source": "apps/extension/public/video-effects/notices/opus-motion.txt"
     },
     {
       "archivePath": "apps/extension/src/editor/raster-editing/vendor/LICENSE",
@@ -470,6 +550,21 @@
       "source": "apps/extension/src/editor/raster-editing/vendor/provenance.json"
     },
     {
+      "archivePath": "apps/extension/src/features/image-filters/vendor/pixi-filters/LICENSE",
+      "sha256": "d554721b2cd409d9bc075d743bb34f960e05ba55de1818a62fa60caf21ca6188",
+      "source": "apps/extension/src/features/image-filters/vendor/pixi-filters/LICENSE"
+    },
+    {
+      "archivePath": "apps/extension/src/features/image-filters/vendor/pixi-filters/NOTICE.txt",
+      "sha256": "7035cbca1a28d7ce44138d9e672106d35854bb8ef7a6b566f34ea434eead220c",
+      "source": "apps/extension/src/features/image-filters/vendor/pixi-filters/NOTICE.txt"
+    },
+    {
+      "archivePath": "apps/extension/src/features/image-filters/vendor/pixi-filters/identity.json",
+      "sha256": "0978ccc5143e059d0b17b93bcaeede34f5c881ecae0113c9301e598f598bd25d",
+      "source": "apps/extension/src/features/image-filters/vendor/pixi-filters/identity.json"
+    },
+    {
       "archivePath": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/LICENSE",
       "sha256": "d66ccc11682c7458b19b376e1335e8665cbe412ff71f554bfec25f1791cddfa0",
       "source": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/LICENSE"
@@ -483,6 +578,21 @@
       "archivePath": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/identity.json",
       "sha256": "27425919296cb19185ab1de022f9a5016c3bf4911cdd25b65f006a0c5c93c53e",
       "source": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/identity.json"
+    },
+    {
+      "archivePath": "apps/extension/src/features/video/project/cursor-motion/apple/LICENSE",
+      "sha256": "b506d1619aaec697f71d1230af32190c46777bf541e68f0fa6bf54d48f72c935",
+      "source": "apps/extension/src/features/video/project/cursor-motion/apple/LICENSE"
+    },
+    {
+      "archivePath": "apps/extension/src/features/video/project/cursor-motion/apple/NOTICE.txt",
+      "sha256": "252d495836fccc8ccca2037c38356c27b73242962a332dca6a0b32bbf8a91fb6",
+      "source": "apps/extension/src/features/video/project/cursor-motion/apple/NOTICE.txt"
+    },
+    {
+      "archivePath": "apps/extension/src/features/video/project/cursor-motion/apple/identity.json",
+      "sha256": "da5facca6df3558e5a9d9c18e55089f5923ebe4e8ff3ef62aebe40e94eed50a8",
+      "source": "apps/extension/src/features/video/project/cursor-motion/apple/identity.json"
     }
   ],
   "bundledAssets": [
@@ -680,6 +790,302 @@
             "sha256": "9e44f82752bfcdc8ef3dc0783194b116c7cb8c7831c8757c00ca13579954ed93",
             "sourceUrl": "https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/klecks/brushes/eraser-brush.ts",
             "sourceSha256": "9aa231d02d555a3a13976a22ad74ce0f2f24c0e98e8e741c3f78971206dbb007"
+          }
+        ]
+      },
+      {
+        "id": "apple-cursor",
+        "name": "Apple Cursor artwork",
+        "attribution": "ful1e5 and Apple Cursor contributors",
+        "license": "GPL-3.0-only",
+        "sourceUrl": "https://github.com/ful1e5/apple_cursor/tree/fe044a42b4e9cea16ea762d2ed9004f6d7b35543",
+        "licensePath": "apps/extension/src/features/video/project/cursor-motion/apple/LICENSE",
+        "licenseSha256": "b506d1619aaec697f71d1230af32190c46777bf541e68f0fa6bf54d48f72c935",
+        "noticePath": "apps/extension/src/features/video/project/cursor-motion/apple/NOTICE.txt",
+        "noticeSha256": "252d495836fccc8ccca2037c38356c27b73242962a332dca6a0b32bbf8a91fb6",
+        "provenancePath": "apps/extension/src/features/video/project/cursor-motion/apple/identity.json",
+        "provenanceSha256": "da5facca6df3558e5a9d9c18e55089f5923ebe4e8ff3ef62aebe40e94eed50a8",
+        "modifications": "Extract SVG path attributes and hotspots into apple-shapes.json. Apply runtime fill, outline, scale and shadow. The generated artifact source hash identifies the source set in identity.json.",
+        "artifacts": [
+          {
+            "path": "apps/extension/src/features/video/project/cursor-motion/apple/left_ptr.svg",
+            "sha256": "1ed0122e8247c483374ebb0ab42895a890eebe0fb0c99824e3b56359f40be682",
+            "sourceUrl": "https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/left_ptr.svg",
+            "sourceSha256": "1ed0122e8247c483374ebb0ab42895a890eebe0fb0c99824e3b56359f40be682"
+          },
+          {
+            "path": "apps/extension/src/features/video/project/cursor-motion/apple/hand2.svg",
+            "sha256": "1059f09b64ebe72946523d625fe1c4802ce1523f39c9519fb4620c66972bf5ab",
+            "sourceUrl": "https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/hand2.svg",
+            "sourceSha256": "1059f09b64ebe72946523d625fe1c4802ce1523f39c9519fb4620c66972bf5ab"
+          },
+          {
+            "path": "apps/extension/src/features/video/project/cursor-motion/apple/hand1.svg",
+            "sha256": "dcb385764c2414870d1216f4c937bb21ff853a0a2e4519cc98913b622b0eb76b",
+            "sourceUrl": "https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/hand1.svg",
+            "sourceSha256": "dcb385764c2414870d1216f4c937bb21ff853a0a2e4519cc98913b622b0eb76b"
+          },
+          {
+            "path": "apps/extension/src/features/video/project/cursor-motion/apple/xterm.svg",
+            "sha256": "81ccdbbbd3d3b9a65678b37096e2d12b93d7b3cbbfd1719ebb759a2c322c475e",
+            "sourceUrl": "https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/xterm.svg",
+            "sourceSha256": "81ccdbbbd3d3b9a65678b37096e2d12b93d7b3cbbfd1719ebb759a2c322c475e"
+          },
+          {
+            "path": "apps/extension/src/features/video/project/cursor-motion/apple/crosshair.svg",
+            "sha256": "dd41110cc30dd228f59e5acdcd091a5c01454d9ca86d574dcc1896197ef514c5",
+            "sourceUrl": "https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/crosshair.svg",
+            "sourceSha256": "dd41110cc30dd228f59e5acdcd091a5c01454d9ca86d574dcc1896197ef514c5"
+          },
+          {
+            "path": "apps/extension/src/features/video/project/cursor-motion/apple/x.build.toml",
+            "sha256": "a1995c40a5621b3f5eeea016784f0aee0643632fae8bb2a4ef2a5e0b967fd997",
+            "sourceUrl": "https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/configs/x.build.toml",
+            "sourceSha256": "a1995c40a5621b3f5eeea016784f0aee0643632fae8bb2a4ef2a5e0b967fd997"
+          },
+          {
+            "path": "apps/extension/src/features/video/project/cursor-motion/apple-shapes.json",
+            "sha256": "d3180d9ecfc0471a9f3bb281a34f3befcadf5b15f63e2d95ff3107fc87f15f3e",
+            "sourceUrl": "https://github.com/ful1e5/apple_cursor/tree/fe044a42b4e9cea16ea762d2ed9004f6d7b35543",
+            "sourceSha256": "f307941ba096017f0b6a62b7bfcff94d1f3171e5376415aed934ee29d0ff2237"
+          }
+        ]
+      },
+      {
+        "id": "golos-text-lottie-2-004",
+        "name": "Golos Text 2.004 in Lottie templates",
+        "attribution": "Copyright 2019 The Golos Text Project Authors (https://github.com/googlefonts/golos-text)",
+        "license": "OFL-1.1",
+        "sourceUrl": "https://github.com/googlefonts/golos-text",
+        "licensePath": "apps/extension/public/video-effects/fonts/OFL.txt",
+        "licenseSha256": "ff532f9e8789f09a9fdffc3c0954eedfb0a48be77b2e2eb90f5f82e4f347f50c",
+        "noticePath": "apps/extension/public/video-effects/fonts/NOTICE.txt",
+        "noticeSha256": "7fc56df9fae16e89186f10c2104828777864f552e187319bcfd17b56b212379f",
+        "provenancePath": "apps/extension/public/video-effects/fonts/identity.json",
+        "provenanceSha256": "05b6d0ea0e29856142c3c4ddb75f6e2f1a7628283aabd29ae5ac8c8f0ae61516",
+        "modifications": "The font bytes do not change. Sniptale animation files embed the bytes as base64. The OFL license applies to the font bytes.",
+        "artifacts": [
+          {
+            "path": "apps/extension/public/video-effects/animations/frame.sniptale-animation.json",
+            "sha256": "d4a52d535d3fc657ca5387b8ec97bcfdde6e8dae2b8e0e8f29871477c18a42a3",
+            "sourceUrl": "https://github.com/googlefonts/golos-text",
+            "sourceSha256": "17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063"
+          },
+          {
+            "path": "apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json",
+            "sha256": "7638aac7a193c14792950668081a780685c2995a12206e4b446c5c600ef17cce",
+            "sourceUrl": "https://github.com/googlefonts/golos-text",
+            "sourceSha256": "17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063"
+          }
+        ]
+      },
+      {
+        "id": "pixi-filters-source-kernels-6-1-5",
+        "name": "Pixi Filters source image kernels v6.1.5",
+        "attribution": "Copyright (c) 2013-2025 Mathew Groves, Chad Engler",
+        "license": "MIT",
+        "sourceUrl": "https://github.com/pixijs/filters/tree/e9d1ca987864f121680bb0d7e9612c05b37748de",
+        "licensePath": "apps/extension/src/features/image-filters/vendor/pixi-filters/LICENSE",
+        "noticePath": "apps/extension/src/features/image-filters/vendor/pixi-filters/NOTICE.txt",
+        "provenancePath": "apps/extension/src/features/image-filters/vendor/pixi-filters/identity.json",
+        "modifications": "Adapt adjustment, clamped Kawase blur and bloom for the existing compositor device. Add Sniptale monochrome, sepia, sharpen, pixelate, vignette and deterministic grain. Reconstruct canonical source texels before interpolation. Use explicit logical coordinates, project time and valid premultiplied alpha. Provide an independent CPU image reference.",
+        "artifacts": [
+          {
+            "path": "apps/extension/src/features/image-filters/shader.ts",
+            "sha256": "10284e4e4823c336cbf1279fcb93016f16363e5d1d3bd2ad6b7eea5b39a739d5",
+            "sourceUrl": "https://codeload.github.com/pixijs/filters/tar.gz/e9d1ca987864f121680bb0d7e9612c05b37748de",
+            "sourceSha256": "35a9c08c1a245f97181f62ed89e7ebe06b8559f4973f34abe47dd910a9fcc0b9"
+          },
+          {
+            "path": "apps/extension/src/features/image-filters/reference.ts",
+            "sha256": "450a1a4383b8472e4be3fca49ad42c266f0694647d236ce316640a16a7597186",
+            "sourceUrl": "https://codeload.github.com/pixijs/filters/tar.gz/e9d1ca987864f121680bb0d7e9612c05b37748de",
+            "sourceSha256": "35a9c08c1a245f97181f62ed89e7ebe06b8559f4973f34abe47dd910a9fcc0b9"
+          }
+        ],
+        "licenseSha256": "d554721b2cd409d9bc075d743bb34f960e05ba55de1818a62fa60caf21ca6188",
+        "noticeSha256": "7035cbca1a28d7ce44138d9e672106d35854bb8ef7a6b566f34ea434eead220c",
+        "provenanceSha256": "0978ccc5143e059d0b17b93bcaeede34f5c881ecae0113c9301e598f598bd25d"
+      },
+      {
+        "id": "opus-motion-inter",
+        "name": "inter renamed static Lottie fonts",
+        "attribution": "Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter)",
+        "license": "OFL-1.1",
+        "sourceUrl": "https://github.com/google/fonts/tree/main/ofl/inter",
+        "licensePath": "apps/extension/public/video-effects/notices/opus-inter-OFL.txt",
+        "licenseSha256": "5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57",
+        "noticePath": "apps/extension/public/video-effects/notices/opus-motion-inter-NOTICE.txt",
+        "noticeSha256": "99a1068548bd4ee27a8f80de4c358d00ecc590312d54cdf2112b656fb8e28beb",
+        "provenancePath": "apps/extension/public/video-effects/notices/opus-fonts.json",
+        "provenanceSha256": "7e02012daa470663268b9263498ade0b75196f8918e962e5e3fd21c61798ed61",
+        "modifications": "Static weight instances with renamed Sniptale family names. Original copyright and OFL records are retained. Font bytes are embedded in self-contained animation packages.",
+        "artifacts": [
+          {
+            "path": "apps/extension/public/video-effects/animations/lower-third.sniptale-animation.json",
+            "sha256": "4b25c244870d368632e9390c9c33dad1a619f448920d59857a15fce60803aab1",
+            "sourceUrl": "https://github.com/google/fonts/tree/main/ofl/inter",
+            "sourceSha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
+          },
+          {
+            "path": "apps/extension/public/video-effects/animations/chapters.sniptale-animation.json",
+            "sha256": "a3e0a09b9f3b8480f1ffbe292996bb6d834dce7b6de8405049511b864414cea7",
+            "sourceUrl": "https://github.com/google/fonts/tree/main/ofl/inter",
+            "sourceSha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
+          },
+          {
+            "path": "apps/extension/public/video-effects/animations/title.sniptale-animation.json",
+            "sha256": "ef5c2089af74d188e9d723ff043f0409b07db7218ad9c88452b9ff3ac0f09d40",
+            "sourceUrl": "https://github.com/google/fonts/tree/main/ofl/inter",
+            "sourceSha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
+          },
+          {
+            "path": "apps/extension/public/video-effects/animations/interview-tag.sniptale-animation.json",
+            "sha256": "7b91ef1e0b0bb3d21852ef0b11277a21398afd577d758382d4995eab0383114d",
+            "sourceUrl": "https://github.com/google/fonts/tree/main/ofl/inter",
+            "sourceSha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
+          },
+          {
+            "path": "apps/extension/public/video-effects/animations/interview-rule.sniptale-animation.json",
+            "sha256": "e2451fec7f6b7b4e045ff89f7f6eed80cf5fa28884254c281f1d6e883a90bec5",
+            "sourceUrl": "https://github.com/google/fonts/tree/main/ofl/inter",
+            "sourceSha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
+          },
+          {
+            "path": "apps/extension/public/video-effects/animations/interview-center.sniptale-animation.json",
+            "sha256": "4a5cbfe04c12fab3543faa7a7d5cc9720d72957e28b0f6cad73fc4cdea92a7be",
+            "sourceUrl": "https://github.com/google/fonts/tree/main/ofl/inter",
+            "sourceSha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
+          }
+        ]
+      },
+      {
+        "id": "opus-motion-caveat",
+        "name": "caveat renamed static Lottie fonts",
+        "attribution": "Copyright 2014 The Caveat Project Authors (https://github.com/googlefonts/caveat)",
+        "license": "OFL-1.1",
+        "sourceUrl": "https://github.com/google/fonts/tree/main/ofl/caveat",
+        "licensePath": "apps/extension/public/video-effects/notices/opus-caveat-OFL.txt",
+        "licenseSha256": "1f9d81d094273d82f3898a1ee8b598a717d050ecbf5ff7bede105b704880157b",
+        "noticePath": "apps/extension/public/video-effects/notices/opus-motion-caveat-NOTICE.txt",
+        "noticeSha256": "99a057d0f23008fbe33306d351bcfdd0531faba792cf4c359e0fd57177b3fb76",
+        "provenancePath": "apps/extension/public/video-effects/notices/opus-fonts.json",
+        "provenanceSha256": "7e02012daa470663268b9263498ade0b75196f8918e962e5e3fd21c61798ed61",
+        "modifications": "Static weight instances with renamed Sniptale family names. Original copyright and OFL records are retained. Font bytes are embedded in self-contained animation packages.",
+        "artifacts": [
+          {
+            "path": "apps/extension/public/video-effects/animations/arrow.sniptale-animation.json",
+            "sha256": "8d7662b65baa97e0407219b121691e793a72dcb7b98d07fb38c08eded2cd13cd",
+            "sourceUrl": "https://github.com/google/fonts/tree/main/ofl/caveat",
+            "sourceSha256": "0bdb6b660482d31531b3945849fba5916b3ef8695da7024a9e6b9ee3c4157988"
+          }
+        ]
+      },
+      {
+        "id": "opus-motion-cormorantgaramond",
+        "name": "cormorantgaramond renamed static Lottie fonts",
+        "attribution": "Copyright 2015 the Cormorant Project Authors (github.com/CatharsisFonts/Cormorant)",
+        "license": "OFL-1.1",
+        "sourceUrl": "https://github.com/google/fonts/tree/main/ofl/cormorantgaramond",
+        "licensePath": "apps/extension/public/video-effects/notices/opus-cormorantgaramond-OFL.txt",
+        "licenseSha256": "60700d351cac4650c51f3f9db318d2a420f8b45052dba2715eb5fec41f0f6956",
+        "noticePath": "apps/extension/public/video-effects/notices/opus-motion-cormorantgaramond-NOTICE.txt",
+        "noticeSha256": "4f2bb3f7a4ed021b51826eb1f609da6504afad0411df3bc98e6b4d6dea2f2c13",
+        "provenancePath": "apps/extension/public/video-effects/notices/opus-fonts.json",
+        "provenanceSha256": "7e02012daa470663268b9263498ade0b75196f8918e962e5e3fd21c61798ed61",
+        "modifications": "Static weight instances with renamed Sniptale family names. Original copyright and OFL records are retained. Font bytes are embedded in self-contained animation packages.",
+        "artifacts": [
+          {
+            "path": "apps/extension/public/video-effects/animations/interview-center.sniptale-animation.json",
+            "sha256": "4a5cbfe04c12fab3543faa7a7d5cc9720d72957e28b0f6cad73fc4cdea92a7be",
+            "sourceUrl": "https://github.com/google/fonts/tree/main/ofl/cormorantgaramond",
+            "sourceSha256": "b20b7d9626dd956b2c5e558692ad328b1f19e3275e2782db4fa07670d83f35e0"
+          }
+        ]
+      },
+      {
+        "id": "opus-motion-jetbrainsmono",
+        "name": "jetbrainsmono renamed static Lottie fonts",
+        "attribution": "Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)",
+        "license": "OFL-1.1",
+        "sourceUrl": "https://github.com/google/fonts/tree/main/ofl/jetbrainsmono",
+        "licensePath": "apps/extension/public/video-effects/notices/opus-jetbrainsmono-OFL.txt",
+        "licenseSha256": "b2fe5e8987594e9ffd1d2ca52a2f5d73eb8335243893c5d6254b5ad69269591d",
+        "noticePath": "apps/extension/public/video-effects/notices/opus-motion-jetbrainsmono-NOTICE.txt",
+        "noticeSha256": "1e1a008f557f30a3a1b603f87883da443db9e1449f120eebffae9cd8b3b1ae4a",
+        "provenancePath": "apps/extension/public/video-effects/notices/opus-fonts.json",
+        "provenanceSha256": "7e02012daa470663268b9263498ade0b75196f8918e962e5e3fd21c61798ed61",
+        "modifications": "Static weight instances with renamed Sniptale family names. Original copyright and OFL records are retained. Font bytes are embedded in self-contained animation packages.",
+        "artifacts": [
+          {
+            "path": "apps/extension/public/video-effects/animations/leader-labels.sniptale-animation.json",
+            "sha256": "d36fbf97defb0bcf8b9a560355228dcd6db4afbb3fa0d5277811da65e75f71eb",
+            "sourceUrl": "https://github.com/google/fonts/tree/main/ofl/jetbrainsmono",
+            "sourceSha256": "48715a42ec242c21e9f02692891e147d022299a52e48d5e413e1a942193ffeda"
+          }
+        ]
+      },
+      {
+        "id": "opus-motion-reference-adaptations",
+        "name": "Opus Motion animation adaptations",
+        "attribution": "Copyright (c) 2026 Govindu Sasanka",
+        "license": "MIT",
+        "sourceUrl": "https://github.com/GovinduSasanka/opus-motion-library",
+        "licensePath": "apps/extension/public/video-effects/notices/opus-motion.txt",
+        "licenseSha256": "277a332d935ce9bd36be0f77d591e6698c328086443c7b7722e7def769a38ca2",
+        "noticePath": "apps/extension/public/video-effects/notices/opus-motion-reference-adaptations-NOTICE.txt",
+        "noticeSha256": "0b726c8b6de3e0b005f773036c75476b27e55c27358500e436e6a21789446059",
+        "provenancePath": "apps/extension/public/video-effects/notices/opus-motion-reference-adaptations-identity.json",
+        "provenanceSha256": "c89b641a89acdbfef9355392558db7fe0b783ed98617ae2b1fcbdf82eb04ce98",
+        "modifications": "Adapted reference choreography and layouts to local parameterized Lottie animation packages. No Remotion runtime is included.",
+        "artifacts": [
+          {
+            "path": "apps/extension/public/video-effects/animations/lower-third.sniptale-animation.json",
+            "sha256": "4b25c244870d368632e9390c9c33dad1a619f448920d59857a15fce60803aab1",
+            "sourceUrl": "https://github.com/GovinduSasanka/opus-motion-library",
+            "sourceSha256": "7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff"
+          },
+          {
+            "path": "apps/extension/public/video-effects/animations/chapters.sniptale-animation.json",
+            "sha256": "a3e0a09b9f3b8480f1ffbe292996bb6d834dce7b6de8405049511b864414cea7",
+            "sourceUrl": "https://github.com/GovinduSasanka/opus-motion-library",
+            "sourceSha256": "7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff"
+          },
+          {
+            "path": "apps/extension/public/video-effects/animations/title.sniptale-animation.json",
+            "sha256": "ef5c2089af74d188e9d723ff043f0409b07db7218ad9c88452b9ff3ac0f09d40",
+            "sourceUrl": "https://github.com/GovinduSasanka/opus-motion-library",
+            "sourceSha256": "7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff"
+          },
+          {
+            "path": "apps/extension/public/video-effects/animations/arrow.sniptale-animation.json",
+            "sha256": "8d7662b65baa97e0407219b121691e793a72dcb7b98d07fb38c08eded2cd13cd",
+            "sourceUrl": "https://github.com/GovinduSasanka/opus-motion-library",
+            "sourceSha256": "c2cb9e7c430c51666be1bdb15e0afed1a5be8fd6085dbf3ca5d9a50f847ae4a6"
+          },
+          {
+            "path": "apps/extension/public/video-effects/animations/interview-tag.sniptale-animation.json",
+            "sha256": "7b91ef1e0b0bb3d21852ef0b11277a21398afd577d758382d4995eab0383114d",
+            "sourceUrl": "https://github.com/GovinduSasanka/opus-motion-library",
+            "sourceSha256": "7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff"
+          },
+          {
+            "path": "apps/extension/public/video-effects/animations/interview-rule.sniptale-animation.json",
+            "sha256": "e2451fec7f6b7b4e045ff89f7f6eed80cf5fa28884254c281f1d6e883a90bec5",
+            "sourceUrl": "https://github.com/GovinduSasanka/opus-motion-library",
+            "sourceSha256": "7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff"
+          },
+          {
+            "path": "apps/extension/public/video-effects/animations/interview-center.sniptale-animation.json",
+            "sha256": "4a5cbfe04c12fab3543faa7a7d5cc9720d72957e28b0f6cad73fc4cdea92a7be",
+            "sourceUrl": "https://github.com/GovinduSasanka/opus-motion-library",
+            "sourceSha256": "7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff"
+          },
+          {
+            "path": "apps/extension/public/video-effects/animations/leader-labels.sniptale-animation.json",
+            "sha256": "d36fbf97defb0bcf8b9a560355228dcd6db4afbb3fa0d5277811da65e75f71eb",
+            "sourceUrl": "https://github.com/GovinduSasanka/opus-motion-library",
+            "sourceSha256": "e09eee6432facf8f5cfa08719a4acb36e0abe807624ec1a810658ade0718f9fd"
           }
         ]
       }

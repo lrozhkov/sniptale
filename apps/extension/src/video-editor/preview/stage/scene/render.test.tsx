@@ -41,7 +41,7 @@ vi.mock('./render-preview', async (original) => ({
   renderPreviewScene: vi.fn().mockResolvedValue(undefined),
 }));
 import { renderPreviewScene, PreviewGpuSerialFallback } from './render-preview';
-import * as nativeGpu from './gpu-preview';
+import * as nativeGpu from '../../../../workflows/video/native-composition/gpu-preview';
 import * as cachedGpu from '../../cache/render';
 import { createVideoPreviewExactFrameCache } from '../../cache/exact-frame-cache';
 import { createPreviewSceneRenderScheduler } from './render-scheduler';
@@ -867,4 +867,78 @@ it('keeps one cache renderer across retry and retires it without clearing caller
   root = null;
   expect(cached.dispose).toHaveBeenCalledOnce();
   expect(clearData).not.toHaveBeenCalled();
+});
+
+it('withdraws retained gesture work when cursor admission rejects the next committed request', async () => {
+  vi.useFakeTimers();
+  const real = await vi.importActual<typeof import('./render-scheduler')>('./render-scheduler');
+  const completion = Promise.withResolvers<void>();
+  const render = vi.fn((_input: Parameters<typeof renderPreviewScene>[0]) => completion.promise);
+  const onSuccess = vi.fn();
+  vi.mocked(createPreviewSceneRenderScheduler).mockImplementationOnce((options) => {
+    const { prepare: _prepare, ...rest } = options;
+    return real.createPreviewSceneRenderScheduler({ ...rest, render, onSuccess });
+  });
+  const clip = createVideoClip();
+  const project = createProject([clip]);
+  const interaction = { clipId: clip.id };
+  const images = {};
+  const feedback = createPreviewEffectRuntimeFeedbackTestStub();
+  function GestureHarness({ x, blocked = false }: { x: number; blocked?: boolean }) {
+    const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+    const stageRef = React.useRef<HTMLDivElement | null>(null);
+    const videoRefs = React.useRef({});
+    const next = React.useMemo(
+      () => ({ ...project, clips: [{ ...clip, transform: { ...clip.transform, x } }] }),
+      [x]
+    );
+    usePreviewStageCanvasRender({
+      activeClips: [],
+      canvasRef,
+      stageRef,
+      videoRefs,
+      currentTime: 2.5,
+      effectRuntimeFeedback: feedback,
+      imageBank: images,
+      isPlaying: false,
+      project: next,
+      previewRenderer: 'gpu',
+      previewCacheBypass: true,
+      transformInteraction: interaction,
+      resizeVersion: 0,
+      videoFrameState: { canRender: true, version: 0 },
+      canRenderCursorFrame: () => !blocked,
+    });
+    return (
+      <div ref={stageRef}>
+        <canvas ref={canvasRef} />
+      </div>
+    );
+  }
+  try {
+    await act(async () => {
+      root?.render(<GestureHarness x={10} />);
+      await vi.advanceTimersByTimeAsync(20);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20);
+    });
+    expect(render).toHaveBeenCalledOnce();
+    const signal = render.mock.calls[0]![0].signal!;
+    await act(async () => root?.render(<GestureHarness x={20} />));
+    expect(signal.aborted).toBe(false);
+    await act(async () => root?.render(<GestureHarness x={30} blocked />));
+    expect(signal.aborted).toBe(true);
+    completion.resolve();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20);
+    });
+    expect(onSuccess).not.toHaveBeenCalled();
+  } finally {
+    completion.resolve();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20);
+    });
+    vi.useRealTimers();
+  }
 });

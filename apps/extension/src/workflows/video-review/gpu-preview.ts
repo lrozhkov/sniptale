@@ -1,3 +1,8 @@
+import { createSceneSpotlightMaterialOwner } from '../../features/video/composition/draw/spotlight-material';
+import { glTransitionUniforms } from '../../features/video/project/transition/gl-catalog';
+import { createPreparedSourceBudget } from '../../features/video/composition/export-enhancement/prepared-source';
+import type { ExportEnhancer } from '../../features/video/composition/export-enhancement/enhancer';
+import { prepareReviewExportSourceSampling } from './export-source-sampling';
 import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
 import {
   reviewGpuAnnotationLayer,
@@ -29,6 +34,7 @@ import type { QuickEditHomography } from '../../features/video/composition/motio
 import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
 import type { QuickEditCameraTransform } from '../../features/video/review/advanced/types';
 import { hasSceneBackgroundMotion } from '../../features/video/project/scene/background-motion';
+import { resolveQuickEditShadow } from '../../features/video/review/advanced/shadow';
 import { drawReviewSceneShadow } from './scene-shadow';
 import type { PreviewScene, PreviewSceneDimensions } from './preview-scene';
 import type { prepareReviewCaptions } from './render-captions';
@@ -51,6 +57,8 @@ interface ReviewGpuRenderInput {
   dimensions: Dimensions;
   geometry: ReviewPresentedGeometry;
   frame: VideoFrame;
+  exportEnhancer?: ExportEnhancer | undefined;
+  sourceSample?: Pick<ReviewTransitionSample, 'timestamp' | 'draw'> | undefined;
   orientation?: VideoCompositionFrameSource['orientation'];
   sourceTime: number;
   context: CanvasRenderingContext2D;
@@ -134,13 +142,14 @@ export function createReviewGpuPreview(args: {
   let sceneReleased = false;
   let artworkRevision = 0;
   let coverage = createRetainedRasterMaterialOwner<HTMLCanvasElement>();
+  let spotlightMaterials = createSceneSpotlightMaterialOwner();
   const lifetime = new AbortController();
   let sceneLifetime = new AbortController();
   type Artwork = {
     painter: ReturnType<typeof createReviewBackgroundPainter>;
     background: RenderCanvasLease;
-    decoration: RenderCanvasLease;
-    overlay: RenderCanvasLease;
+    decoration: RenderCanvasLease | null;
+    overlay: RenderCanvasLease | null;
     rect: { x: number; y: number; width: number; height: number };
     key: string;
     backgroundRevision: number;
@@ -156,11 +165,13 @@ export function createReviewGpuPreview(args: {
   const clearSlot = (slot: (typeof slots)[number]) => {
     slot.artwork?.painter.dispose();
     slot.artwork?.background.release();
-    slot.artwork?.decoration.release();
-    slot.artwork?.overlay.release();
+    slot.artwork?.decoration?.release();
+    slot.artwork?.overlay?.release();
     slot.artwork = null;
   };
   const clear = () => {
+    spotlightMaterials.dispose();
+    spotlightMaterials = createSceneSpotlightMaterialOwner();
     coverage.dispose();
     coverage = createRetainedRasterMaterialOwner<HTMLCanvasElement>();
     for (const slot of slots) clearSlot(slot);
@@ -287,17 +298,20 @@ export function createReviewGpuPreview(args: {
     const sceneSignal = sceneLifetime.signal;
     const signal = AbortSignal.any([input.signal, lifetime.signal, sceneSignal]);
     active++;
-    const primitives = createReviewGpuPrimitives(args.resources, (role, key, size, paint) =>
-      coverage.borrow(args.resources, JSON.stringify([role, key, size]), () => {
-        const raster = args.resources.canvas(role, size);
-        try {
-          paint(raster.context);
-          return { value: raster.canvas, release: () => raster.release() };
-        } catch (error) {
-          raster.release();
-          throw error;
-        }
-      })
+    const primitives = createReviewGpuPrimitives(
+      args.resources,
+      (role, key, size, paint) =>
+        coverage.borrow(args.resources, JSON.stringify([role, key, size]), () => {
+          const raster = args.resources.canvas(role, size);
+          try {
+            paint(raster.context);
+            return { value: raster.canvas, release: () => raster.release() };
+          } catch (error) {
+            raster.release();
+            throw error;
+          }
+        }),
+      spotlightMaterials.acquire
     );
     const ownedFrames: VideoFrame[] = [];
     const endpointOutputs: { bitmap: ImageBitmap; release(): void }[] = [];
@@ -357,19 +371,21 @@ export function createReviewGpuPreview(args: {
         try {
           const bg = args.resources.canvas('preview-gpu-background', paintSize);
           retained.push(bg);
-          const decoration = args.resources.canvas('preview-gpu-decoration', decorRect);
-          retained.push(decoration);
-          const overlay = args.resources.canvas('preview-gpu-captions', dimensions.backing);
-          retained.push(overlay);
-          const ctx = decoration.context;
-          ctx.translate(-decorRect.x, -decorRect.y);
-          const radius = background.enabled ? background.layout.cornerRadius : 0;
-          drawReviewSceneShadow(ctx, background, base.windowRect, radius, scale);
+          const decoration = resolveQuickEditShadow(background, scale)
+            ? args.resources.canvas('preview-gpu-decoration', decorRect)
+            : null;
+          if (decoration) {
+            retained.push(decoration);
+            const ctx = decoration.context;
+            ctx.translate(-decorRect.x, -decorRect.y);
+            const radius = background.enabled ? background.layout.cornerRadius : 0;
+            drawReviewSceneShadow(ctx, background, base.windowRect, radius, scale);
+          }
           slot.artwork = {
             painter: createReviewBackgroundPainter(args.resources),
             background: bg,
             decoration,
-            overlay,
+            overlay: null,
             rect: decorRect,
             key,
             backgroundRevision: 0,
@@ -417,10 +433,12 @@ export function createReviewGpuPreview(args: {
           .map((cue) => cue.id)
           .join('|') ?? '';
       if (
-        art.captionOwner !== input.captions ||
-        art.captionKey !== captionKey ||
-        art.captionRevision === 0
+        captionKey &&
+        (art.captionOwner !== input.captions ||
+          art.captionKey !== captionKey ||
+          art.captionRevision === 0)
       ) {
+        art.overlay ??= args.resources.canvas('preview-gpu-captions', dimensions.backing);
         const ctx = art.overlay.context;
         ctx.clearRect(0, 0, dimensions.backing.width, dimensions.backing.height);
         ctx.save();
@@ -430,18 +448,21 @@ export function createReviewGpuPreview(args: {
         );
         input.captions?.draw(ctx, geometry.resultTime);
         ctx.restore();
-        art.captionOwner = input.captions;
-        art.captionKey = captionKey;
         art.captionRevision = ++artworkRevision;
       }
+      art.captionOwner = input.captions;
+      art.captionKey = captionKey;
       const full = { x: 0, y: 0, ...dimensions.canonical };
       const radius = background.enabled ? background.layout.cornerRadius : 0;
-      const caption: GpuPreviewLayer = {
-        source: art.overlay.canvas,
-        rect: full,
-        inverse: identity,
-        cache: { key: 'captions', revision: art.captionRevision },
-      };
+      const caption: GpuPreviewLayer | undefined =
+        captionKey && art.overlay
+          ? {
+              source: art.overlay.canvas,
+              rect: full,
+              inverse: identity,
+              cache: { key: 'captions', revision: art.captionRevision },
+            }
+          : undefined;
       const sceneInputs = {
         dimensions,
         base,
@@ -449,7 +470,7 @@ export function createReviewGpuPreview(args: {
         header: input.header,
         artwork: {
           background: art.background.canvas,
-          decoration: art.decoration.canvas,
+          decoration: art.decoration?.canvas ?? null,
           rect: art.rect,
           backgroundRevision: art.backgroundRevision,
           retainedDrift: drift !== null,
@@ -473,10 +494,55 @@ export function createReviewGpuPreview(args: {
       };
       const moving: Pick<ReviewTransitionSample, 'timestamp' | 'draw' | 'toVideoFrame'> = {
         timestamp: input.frame.timestamp / 1e6,
-        draw() {},
+        draw(context, x, y, width, height) {
+          if (!input.sourceSample) throw new Error('Enhanced GPU source pixels are unavailable.');
+          input.sourceSample.draw(context, x, y, width, height);
+        },
+      };
+      const samplingBudget = createPreparedSourceBudget();
+      const buildScene = async (
+        sceneInput: Parameters<typeof buildReviewGpuScene>[0],
+        sample: Pick<ReviewTransitionSample, 'timestamp' | 'draw'>
+      ) => {
+        const current = sceneInput.scene;
+        const sampling = input.exportEnhancer
+          ? await prepareReviewExportSourceSampling({
+              enhancer: input.exportEnhancer,
+              budget: samplingBudget,
+              scene: {
+                sourceSize: current.source,
+                sourceFilters: current.sourceFilters,
+                ...(current.canvas ? { baseCanvas: current.canvas } : {}),
+                windowHeader: current.windowHeader,
+                background: current.background,
+                zoomRegions: current.zoomRegions,
+                clickCues: current.clicks,
+                sceneScale:
+                  dimensions.canonical.width / (current.canvas?.width ?? current.source.width),
+              },
+              output: dimensions.backing,
+              sample,
+              sourceTime: sceneInput.sourceTime,
+              resultTime: sceneInput.geometry.resultTime,
+              signal,
+              ...(input.cameraOverride ? { camera: sceneInput.geometry.camera } : {}),
+            })
+          : null;
+        if (sampling) primitives.retain({ release: sampling.dispose });
+        return buildReviewGpuScene({ ...sceneInput, sampling });
       };
       let main: GpuPreviewGroup;
-      if (input.transition?.blend.plan.type === 'dissolve') {
+      if (input.transition && input.transition.blend.plan.type !== 'fade-black') {
+        const transition = input.transition.blend;
+        if (
+          transition.plan.type === 'gl' &&
+          !glTransitionUniforms(
+            transition.plan.selection,
+            transition.incoming,
+            dimensions.canonical.width / dimensions.canonical.height
+          )
+        )
+          throw new Error('GL transition settings are unavailable.');
         const sides = reviewCutTransitionSides(
           input.transition.blend,
           input.transition.frames,
@@ -498,17 +564,20 @@ export function createReviewGpuPreview(args: {
             input.cameraOverride
           );
           const firstHold = annotationHolds.length;
-          const endpoint = await buildReviewGpuScene({
-            ...sceneInputs,
-            source: frame,
-            scene: currentScene,
-            geometry: pose,
-            sourceTime: side.sample.timestamp,
-            orientation:
-              side.sample === moving
-                ? input.orientation
-                : { rotation: side.sample.rotation ?? 0, flip: side.sample.flip ?? false },
-          });
+          const endpoint = await buildScene(
+            {
+              ...sceneInputs,
+              source: frame,
+              scene: currentScene,
+              geometry: pose,
+              sourceTime: side.sample.timestamp,
+              orientation:
+                side.sample === moving
+                  ? input.orientation
+                  : { rotation: side.sample.rotation ?? 0, flip: side.sample.flip ?? false },
+            },
+            side.sample
+          );
           if (annotationHolds.slice(firstHold).every((hold) => hold.independent))
             sources.push(endpoint);
           else {
@@ -539,17 +608,27 @@ export function createReviewGpuPreview(args: {
           kind: 'group',
           output: dimensions.backing,
           logical: dimensions.canonical,
+          ...(transition.plan.type === 'gl'
+            ? {
+                composition: {
+                  kind: 'gl-transition' as const,
+                  selection: transition.plan.selection,
+                  progress: transition.incoming,
+                },
+              }
+            : {}),
           layers: sources.map((source, index) => ({
             source,
             rect: full,
             inverse: identity,
-            opacity: index === 0 ? 1 : input.transition!.blend.incoming,
+            opacity: transition.plan.type === 'gl' || index === 0 ? 1 : transition.incoming,
           })),
         };
       } else {
         let source = input.frame;
         let sourceTime = input.sourceTime;
         let orientation = input.orientation;
+        let selectedSample: Pick<ReviewTransitionSample, 'timestamp' | 'draw'> = moving;
         if (input.transition) {
           const sides = reviewCutTransitionSides(
             input.transition.blend,
@@ -559,6 +638,7 @@ export function createReviewGpuPreview(args: {
             input.transition.resultOffset
           );
           const sample = sides[input.transition.blend.beforeSeam ? 0 : 1].sample;
+          selectedSample = sample;
           if (sample !== moving) {
             const frame = sample.toVideoFrame?.();
             if (!frame) throw new Error('Transition GPU pixels are unavailable.');
@@ -568,14 +648,17 @@ export function createReviewGpuPreview(args: {
             orientation = { rotation: sample.rotation ?? 0, flip: sample.flip ?? false };
           }
         }
-        main = await buildReviewGpuScene({
-          ...sceneInputs,
-          source,
-          scene,
-          geometry,
-          sourceTime,
-          orientation,
-        });
+        main = await buildScene(
+          {
+            ...sceneInputs,
+            source,
+            scene,
+            geometry,
+            sourceTime,
+            orientation,
+          },
+          selectedSample
+        );
       }
       const layers = reviewGpuFinishLayers({
         scene,
@@ -584,7 +667,7 @@ export function createReviewGpuPreview(args: {
         sourceTime: input.sourceTime,
         resultTime: geometry.resultTime,
         primitives,
-        caption,
+        ...(caption ? { caption } : {}),
         watermark: input.watermark ?? null,
         ...(input.camera ? { camera: input.camera } : {}),
         ...(input.transition?.blend.plan.type === 'fade-black'
@@ -596,7 +679,12 @@ export function createReviewGpuPreview(args: {
             }
           : {}),
       });
-      preparedEffects = await prepareEffectRuntimeGpuScene({ layers, gpu: renderer, signal });
+      preparedEffects = await prepareEffectRuntimeGpuScene({
+        layers,
+        gpu: renderer,
+        signal,
+        boundTextures: !!input.exportEnhancer,
+      });
       const request = {
         output: dimensions.backing,
         logical: dimensions.canonical,

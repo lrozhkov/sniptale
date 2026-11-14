@@ -16,6 +16,7 @@ export const SETTINGS_TRANSFER_SECTION_COVERAGE = {
     'styles.palettes',
     'styles.surfaces',
     'styles.gradients',
+    'styles.audio-effects',
   ],
   'ai-connections': ['ai.providers', 'ai.models', 'ai.chrome'],
   'ai-prompts': ['ai.prompts', 'ai.prompt-templates'],
@@ -39,6 +40,7 @@ export const SETTINGS_TRANSFER_VIEW_COVERAGE = {
     palettes: 'styles.palettes',
     surfaces: 'styles.surfaces',
     gradients: 'styles.gradients',
+    audio: 'styles.audio-effects',
   },
   annotations: {
     borders: 'styles.borders',
@@ -100,6 +102,12 @@ export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
     'action/status'
   ),
   excluded('styles/video-effects/controller.ts', ['deleteEffectBundle'], 'action/status'),
+  excluded('styles/video-effects/gl-catalog.tsx', ['deleteGlPresetCatalogEntry'], 'action/status'),
+  transferable(
+    'styles/video-effects/gl-catalog.tsx',
+    ['setBuiltinGlTransitionEnabled', 'setGlPresetCatalogEnabled'],
+    ['styles.video-effects']
+  ),
   transferable(
     'styles/video-effects/controller.ts',
     ['setEffectDocumentEnabled'],

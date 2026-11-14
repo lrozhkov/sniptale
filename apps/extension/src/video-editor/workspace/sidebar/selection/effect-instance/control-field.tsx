@@ -1,7 +1,7 @@
 import {
   resolveEffectLocaleText,
   type ControlDefinition,
-} from '@sniptale/runtime-contracts/effect-v1';
+} from '@sniptale/runtime-contracts/effect-controls';
 import { useAppLocale } from '../../../../../platform/i18n';
 import { useInspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
 import { TextField } from '../../../../../ui/compact-inspector-controls';

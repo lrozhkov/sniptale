@@ -1,6 +1,7 @@
 import {
   evaluateCompositionJoin,
   fitCompositionJoinPortions,
+  type CompositionJoinSettings,
 } from '../project/scene/composition-join';
 import { buildReviewTimeMap } from './timeline';
 import { isReviewSpeedRate } from './speed';
@@ -117,17 +118,12 @@ export function reviewPlaybackTime(time: number, edits: readonly ReviewEdit[]): 
 }
 
 /** Effective result-time window plus the only source intervals allowed to supply its frames. */
-export interface ReviewCutTransitionPlan {
+export type ReviewCutTransitionPlan = CompositionJoinSettings & {
   id: string;
-  type: 'dissolve' | 'fade-black';
-  /** Absent in legacy transitions; resolves to opaque black without rewriting history. */
-  color?: string;
   seam: number;
-  before: number;
-  after: number;
   left: { start: number; end: number };
   right: { start: number; end: number };
-}
+};
 
 /** Fits authored portions to retained islands without changing any timeline coordinate. */
 export function planReviewCutTransitions(
@@ -155,9 +151,8 @@ export function planReviewCutTransitions(
     if (left.start >= left.end || right.start >= right.end) continue;
     const seam = segments.find((segment) => segment.sourceStart === cut.start)!.resultStart;
     plans.push({
+      ...cut.transition,
       id: cut.id,
-      type: cut.transition.type,
-      ...(cut.transition.color === undefined ? {} : { color: cut.transition.color }),
       seam,
       left,
       right,
@@ -186,7 +181,13 @@ export function planReviewCutTransitions(
 /** Shared blend evaluation; outside a transition the native frame remains unchanged. */
 export function reviewCutTransitionAt(time: number, plans: readonly ReviewCutTransitionPlan[]) {
   for (const plan of plans) {
-    const blend = evaluateCompositionJoin(time, plan.seam, plan.before, plan.after);
+    const blend = evaluateCompositionJoin(
+      time,
+      plan.seam,
+      plan.before,
+      plan.after,
+      plan.type === 'gl' ? plan.easing : 'LINEAR'
+    );
     if (blend) return { plan, ...blend };
   }
   return null;

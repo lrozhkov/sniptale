@@ -1,3 +1,6 @@
+import { audioEffects } from './build/audio-effects.ts';
+import { glTransitions } from './build/gl-transitions.ts';
+import { lottieSchema } from './build/lottie-schema.ts';
 import { normalizeMediabunny } from '../../tooling/ci/mediabunny/normalize.mjs';
 import { createZodRuntimeFallbackPlugin } from './build/injected-build-support.ts';
 import { i18nCatalogs } from './build/i18n-catalogs.ts';
@@ -150,6 +153,9 @@ export default defineConfig(({ mode }) => ({
     createZodRuntimeFallbackPlugin(),
     tourPlayerScript(),
     videoEffectResources(join(APP_ROOT, 'public/video-effects')),
+    lottieSchema(),
+    glTransitions(),
+    audioEffects(),
     extensionHtmlInputs(BUILD_LAYOUT),
     copyDevExtensionFonts(),
     tailwindcss(),

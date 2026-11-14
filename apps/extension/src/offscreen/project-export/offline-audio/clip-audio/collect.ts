@@ -82,6 +82,9 @@ export function collectRenderableAudioClips(
         ? { ...window.fadePhase }
         : { offset: 0, duration: clip.duration },
     };
+    delete prepared.audioProcessingSource;
+    if (clip.audioProcessing !== undefined)
+      prepared.audioProcessingSource = { start: clip.sourceStart, duration: clip.sourceDuration };
     delete prepared.audioGainPhase;
     if (retainedGainPhase) prepared.audioGainPhase = { ...retainedGainPhase };
     return [prepared];
@@ -169,6 +172,16 @@ export function clipAudioClipToExportRange(
               ? [{ ...cell, start: start - range.start, end: end - range.start }]
               : [];
           }),
+        }
+      : {}),
+    ...('audioProcessing' in clip && clip.audioProcessing !== undefined
+      ? {
+          audioProcessingSource: {
+            ...(clip.audioProcessingSource ?? {
+              start: clip.sourceStart,
+              duration: clip.sourceDuration,
+            }),
+          },
         }
       : {}),
     startTime: overlapStart - range.start,

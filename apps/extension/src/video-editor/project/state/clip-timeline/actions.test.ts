@@ -1,3 +1,4 @@
+import { createAudioEffectInstance } from '../../../../features/video/audio/effects/catalog';
 import { expect, it, vi } from 'vitest';
 import {
   createEmptyVideoProject,
@@ -507,4 +508,31 @@ it('deletes an explicitly selected group in one history step and refuses locked 
     undoVideoEditorProjectHistory(runtime.getState().projectHistory, runtime.getState().project!)
   ).toMatchObject({ status: 'applied', project: { clips: original.clips } });
   expect(runtime.getState().project?.assets).toEqual(original.assets);
+});
+
+it('duplicates linked audio DSP values with fresh instances and no shared parameter objects', () => {
+  const runtime = createMutableState();
+  seedLinkedClipState(runtime);
+  const project = runtime.getState().project!;
+  const audio = project.clips.find((clip) => clip.id === 'audio-1');
+  if (!audio || audio.type !== 'AUDIO') throw new Error('Missing audio fixture');
+  audio.audioProcessing = {
+    version: 1,
+    bypassed: false,
+    effects: [createAudioEffectInstance('eq', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1')],
+  };
+  project.version = 53;
+  const before = structuredClone(project);
+  createVideoEditorProjectClipTimelineActions(runtime.set).duplicateClip('video-1');
+  const copy = runtime
+    .getState()
+    .project!.clips.find((clip) => clip.type === 'AUDIO' && clip.id !== audio.id);
+  if (!copy || copy.type !== 'AUDIO' || !copy.audioProcessing)
+    throw new Error('Missing processed audio copy');
+  expect(copy.audioProcessing.effects[0]!.id).not.toBe(audio.audioProcessing.effects[0]!.id);
+  expect(copy.audioProcessing.effects[0]!.parameters).toEqual(
+    audio.audioProcessing.effects[0]!.parameters
+  );
+  copy.audioProcessing.effects[0]!.wet = 0.2;
+  expect(project).toEqual(before);
 });

@@ -1,3 +1,6 @@
+import type { CursorMotion } from '../cursor-motion';
+import type { ReviewInteractionTimeline } from '../../review/interaction-types';
+import type { VideoProjectActionFeedback } from '../action-feedback/types';
 import type { CameraShadowDirection } from '../camera/shadow-direction';
 import type { ReviewOriginalSpeech } from '../../review/original-speech';
 import type { SourceAudioGainRange } from '../../audio/source-envelope';
@@ -27,17 +30,25 @@ import type {
   VideoProjectTrack,
   VideoProjectTransform,
 } from './layout';
-import type {
-  VideoTemplateDirection,
-  VideoTemplateIntensity,
-  VideoTransitionRenderKind,
-} from './templates';
 import type { VideoProjectMediaVisualFields } from './media';
-import { VideoTransitionTemplateKind } from './templates';
+import type { GlTransitionSelection } from '../transition/gl-catalog';
 import type {
   VideoProjectEffectInstance,
   VideoProjectEffectSnapshot,
 } from '../effect-instance/types';
+
+/** Source-clock authoring stays independent from immutable capture facts and current clip placements. */
+export interface VideoProjectSourceInteractionDocument {
+  id: string;
+  binding: { assetId: string; sourceInstanceId: string };
+  cursorMotions: CursorMotion[];
+  cursorEnabled: boolean;
+  timeline: ReviewInteractionTimeline;
+  keyboardEnabled: boolean;
+  mouseEnabled: boolean;
+  actionOverrides?: VideoProjectActionFeedback['actionOverrides'];
+  feedback?: Pick<VideoProjectActionFeedback, 'settings' | 'gestureStyles' | 'keyStyles'>;
+}
 
 /** Source content survives cuts and missing placements without extending the composition. */
 export interface VideoProjectSourceAudioDocument {
@@ -124,7 +135,8 @@ export type VideoClipTransitionKind =
   (typeof VideoClipTransitionKind)[keyof typeof VideoClipTransitionKind];
 
 export const VideoTransitionKind = {
-  ...VideoTransitionTemplateKind,
+  GL: 'gl',
+  AUDIO: 'audio',
 } as const;
 
 export type VideoTransitionKind = (typeof VideoTransitionKind)[keyof typeof VideoTransitionKind];
@@ -227,19 +239,16 @@ interface VideoProjectBaseClip {
   transform: VideoProjectTransform;
 }
 
-export interface VideoProjectTransition {
+interface VideoProjectTransitionBoundary {
   id: string;
   leadingClipId: string;
   trailingClipId: string;
-  kind: VideoTransitionKind;
   duration: number;
   easing: VideoTransitionEasing;
-  templateKind?: VideoTransitionTemplateKind;
-  renderKind?: VideoTransitionRenderKind;
-  direction?: VideoTemplateDirection;
-  intensity?: VideoTemplateIntensity;
-  highlightColor?: string;
 }
+
+export type VideoProjectTransition = VideoProjectTransitionBoundary &
+  ({ kind: 'gl'; selection: GlTransitionSelection; presetId?: string } | { kind: 'audio' });
 
 export interface VideoProjectTransitionSegment {
   end: number;
@@ -263,6 +272,9 @@ export interface VideoProjectUtilityLanes {
 }
 
 export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjectMediaVisualFields {
+  /** Authored placement processing; source-level edits update bound placements explicitly. */
+  audioProcessing?: import('@sniptale/runtime-contracts/audio-effects').AudioProcessing;
+  sourceFilters?: import('../../../image-filters/contract').SourceImageFilterStack;
   cameraShadowDirection?: CameraShadowDirection;
   cameraSplit?: CameraSplitSide | undefined;
   cameraScreenBehavior?: CameraScreenBehavior | undefined;
@@ -284,6 +296,7 @@ export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjec
 }
 
 export interface VideoProjectAudioClip extends VideoProjectBaseClip {
+  audioProcessing?: import('@sniptale/runtime-contracts/audio-effects').AudioProcessing;
   /** Retain the full take without extending the montage when set to project. */
   durationMode?: VideoProjectDurationMode;
   /** Independent attenuation follows this take; targets confer no resource ownership. */
@@ -418,7 +431,12 @@ export interface VideoProject {
     | 48
     | 49
     | 50
-    | 51;
+    | 51
+    | 52
+    | 53
+    | 54
+    | 55;
+  sourceInteractionDocuments?: VideoProjectSourceInteractionDocument[];
   sourceVoiceoverDocuments?: VideoProjectSourceVoiceoverDocument[];
   sourceAudioDocuments?: VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];

@@ -164,3 +164,43 @@ it('uses only current canonical default oxlint roots', async () => {
     module.DEFAULT_OXLINT_ROOTS.every((root) => fs.existsSync(path.join(process.cwd(), root)))
   ).toBe(true);
 });
+
+it('limits generated Ajv style noise to its exact artifact and keeps security rules active', () => {
+  const config: unknown = JSON.parse(fs.readFileSync('.oxlintrc.json', 'utf8'));
+  if (
+    !config ||
+    typeof config !== 'object' ||
+    !('overrides' in config) ||
+    !Array.isArray(config.overrides)
+  )
+    throw new Error('Missing Oxlint overrides');
+  const overrides: unknown[] = config.overrides;
+  const generated = overrides.filter(
+    (override) =>
+      override !== null &&
+      typeof override === 'object' &&
+      'files' in override &&
+      Array.isArray(override.files) &&
+      override.files.includes(
+        'packages/runtime-contracts/src/animation-template/lottie-schema.generated.js'
+      )
+  );
+  expect(generated).toEqual([
+    {
+      files: ['packages/runtime-contracts/src/animation-template/lottie-schema.generated.js'],
+      rules: {
+        'no-redeclare': 'off',
+        'no-unused-vars': 'off',
+        'no-useless-assignment': 'off',
+      },
+    },
+  ]);
+  expect(config).toMatchObject({
+    rules: {
+      'no-eval': 'error',
+      'no-new-func': 'error',
+      'security/detect-bidi-characters': 'error',
+      'security/detect-unsafe-regex': 'warn',
+    },
+  });
+});

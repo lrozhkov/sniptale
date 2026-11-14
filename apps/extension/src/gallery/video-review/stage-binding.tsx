@@ -2,7 +2,7 @@ import { prepareReviewCameraPlans } from '../../features/video/review/advanced/c
 import { projectReviewFocus } from '../../features/video/review/focus-edits';
 import type { ReviewTimeSegment } from '../../features/video/review/timeline';
 import type { ReviewCutPreviewBinding } from './cut-transition-preview';
-import type { RefObject } from 'react';
+import type { RefObject, ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   createReviewPreviewPresentation,
@@ -34,6 +34,8 @@ import type { ReviewWebcamStageBinding } from './webcam-overlay';
  * exclude disabled lanes. The paused framing midpoint shows the full selected target.
  */
 type ReviewStageBindingProps = {
+  previewOverlay?: ReactNode;
+  cursorMotions?: import('../../features/video/project/cursor-motion').CursorMotion[] | undefined;
   cursorPath?: Parameters<typeof ReviewStage>[0]['cursorPath'];
   captions?: Parameters<typeof ReviewStage>[0]['captions'];
   annotationEffects?: Parameters<typeof ReviewStage>[0]['annotationEffects'];
@@ -54,6 +56,7 @@ type ReviewStageBindingProps = {
   url: string;
   source: ReviewSource;
   canvas?: { width: number; height: number } | undefined;
+  sourceFilters?: import('../../features/video/review/advanced/types').QuickEditAdvancedState['sourceFilters'];
   windowHeader?:
     | import('../../features/video/review/advanced/types').QuickEditWindowHeader
     | undefined;
@@ -285,6 +288,7 @@ export function ReviewStageBinding(props: ReviewStageBindingProps) {
         onAnnotationGeometry={props.onAnnotationGeometry}
         readAsset={props.readAsset}
         onCaptionSelect={props.onCaptionSelect}
+        previewOverlay={props.previewOverlay}
         outerFadePlan={props.outerFadePlan}
         preview={props.preview}
         watermark={props.watermark}
@@ -293,6 +297,7 @@ export function ReviewStageBinding(props: ReviewStageBindingProps) {
         webcam={props.webcam}
         focusPicker={props.focusPicker}
         cursorPath={props.cursorPath}
+        cursorMotions={props.cursorMotions}
         backgroundImageUrl={image.url}
         backgroundPending={props.backgroundPending}
         cutPreview={props.cutPreview}
@@ -302,6 +307,7 @@ export function ReviewStageBinding(props: ReviewStageBindingProps) {
         drawing={props.drawing}
         region={props.region}
         scene={{
+          sourceFilters: props.sourceFilters,
           background: sceneInput.background,
           camera,
           canvas: sceneInput.canvas,

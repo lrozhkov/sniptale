@@ -1,3 +1,5 @@
+import { createVideoProjectFromRecording } from '../../../features/video/project/factories/creation';
+import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
 import { createQuickEditWatermark } from '../../../features/video/project/scene/watermark';
 import { videoProjectCaptionInput } from '../../../features/video/project/text/captions';
 import { planReviewCaptions } from '../../../features/video/review/caption-plan';
@@ -526,4 +528,60 @@ it('isolates exact-frame and persistent segment revisions by selected preview re
   expect(await createVideoPreviewSegmentRevision(project, range, 'gpu')).not.toBe(
     await createVideoPreviewSegmentRevision(project, range, 'legacy')
   );
+});
+
+it('invalidates exact and persistent frame caches when transferred source cursor authoring changes', async () => {
+  const source = createVideoProjectFromRecording({
+    recordingId: 'cursor-source',
+    filename: 'source.webm',
+    width: 640,
+    height: 360,
+    duration: 8,
+    mimeType: 'video/webm',
+    size: 100,
+    hasAudio: false,
+  });
+  const clip = source.clips.find((clip) => clip.type === 'VIDEO')!;
+  const project = applyVideoProjectMutationPatch(source, {
+    sourceInteractionDocuments: [
+      {
+        id: 'source-input',
+        binding: { assetId: clip.assetId, sourceInstanceId: clip.sourceInstanceId! },
+        cursorEnabled: true,
+        keyboardEnabled: true,
+        mouseEnabled: true,
+        timeline: { presses: [], overrides: [] },
+        cursorMotions: [
+          {
+            id: 'cursor',
+            start: 0,
+            end: 8,
+            enabled: true,
+            shape: 'arrow',
+            size: 44,
+            color: '#eeeeee',
+            outline: '#222222',
+            shadow: true,
+            easing: 'linear',
+            points: [
+              { id: 'a', at: 0, x: 0.2, y: 0.3 },
+              { id: 'b', at: 1, x: 0.8, y: 0.7 },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+  const before = await createVideoPreviewRenderRevision(project);
+  const range = { startFrame: 0, endFrame: 30 };
+  const segment = await createVideoPreviewSegmentRevision(project, range);
+  const doc = project.sourceInteractionDocuments![0]!;
+  const changed = applyVideoProjectMutationPatch(project, {
+    sourceInteractionDocuments: [
+      { ...doc, cursorMotions: [{ ...doc.cursorMotions[0]!, color: '#00ccff' }] },
+    ],
+  });
+  await expect(createVideoPreviewRenderRevision(changed)).resolves.not.toBe(before);
+  await expect(createVideoPreviewSegmentRevision(changed, range)).resolves.not.toBe(segment);
+  expect(project.sourceInteractionDocuments![0]!.cursorMotions[0]!.color).toBe('#eeeeee');
 });

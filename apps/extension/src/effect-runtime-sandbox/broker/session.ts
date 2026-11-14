@@ -16,7 +16,6 @@ import { createEffectRuntimeDocumentCache } from './cache/documents';
 import { createEffectRuntimeAssetSelectionCache } from './cache/asset-selections';
 import { parseEffectRuntimeRenderRequest } from './request-boundary';
 import { createEffectRuntimeWorkerSession, type EffectRuntimeWorkerLike } from './worker-request';
-import type { createEffectRuntimeGpuPlanRenderer } from './gpu-plan-renderer';
 
 export interface EffectRuntimeBrokerSession {
   execute(value: unknown): Promise<EffectRuntimeSceneResult>;
@@ -25,7 +24,6 @@ export interface EffectRuntimeBrokerSession {
 
 interface SessionDependencies {
   compositionBackend?: 'gpu-scene' | 'gpu-scene-plan';
-  gpu?: ReturnType<typeof createEffectRuntimeGpuPlanRenderer>;
   prepare?(request: EffectRuntimeRenderRequest): Promise<EffectRuntimeWorkerMessage>;
   workerFactory(): EffectRuntimeWorkerLike;
 }
@@ -42,8 +40,6 @@ export function createEffectRuntimeBrokerSession(
   const documentCache = createEffectRuntimeDocumentCache();
   const assetSelectionCache = createEffectRuntimeAssetSelectionCache();
   const workerSession = createEffectRuntimeWorkerSession({
-    planOnly: dependencies.compositionBackend === 'gpu-scene-plan',
-    ...(dependencies.gpu ? { gpu: dependencies.gpu } : {}),
     onReset: () => {
       documentCache.clear();
       assetSelectionCache.clear();

@@ -163,28 +163,3 @@ it('rejects overlap, absent neighbors and locks across either complete group', (
   };
   expect(planClipSwap(overlap, 'A', 'right')).toEqual({ status: 'unavailable', reason: 'overlap' });
 });
-
-it('keeps a clip effect document phase when its preroll moves before project zero', () => {
-  const before = fixture();
-  before.effectInstances = [
-    {
-      id: 'fx',
-      kind: 'targetEffect',
-      snapshotId: 'snapshot',
-      enabled: true,
-      target: { kind: 'clip', clipId: 'B' },
-      startTime: 4,
-      duration: 5,
-      playbackRate: 2,
-      sourceStart: 3,
-      controls: {},
-    },
-  ];
-  const after = swapProjectClips(before, 'B', 'left');
-  expect(after.effectInstances?.[0]).toMatchObject({
-    startTime: 0,
-    duration: 3,
-    playbackRate: 2,
-    sourceStart: 7,
-  });
-});

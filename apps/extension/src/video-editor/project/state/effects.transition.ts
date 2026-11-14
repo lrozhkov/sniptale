@@ -1,6 +1,7 @@
+import type { VideoProject, VideoProjectTransition } from '../../../features/video/project/types';
 import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
 import { getClipEndTime } from '../../../features/video/project/timeline';
-import { normalizeVideoProjectTransition } from '../../../features/video/project/transition/template';
+import { parseVideoProjectTransition } from '../../../features/video/project/transition/contract';
 import type { VideoEditorTransitionTemplatePatch } from '../../contracts/commands/patches';
 import type { VideoEditorProjectState, VideoEditorProjectSliceSet } from './contracts';
 import { applyProjectUpdate } from './helpers';
@@ -34,13 +35,11 @@ export function createTransitionEasingUpdater(set: VideoEditorStoreSet) {
   ) =>
     set((state) =>
       applyProjectUpdate(state, (project) =>
-        applyVideoProjectMutationPatch(project, {
-          transitions: (project.transitions ?? []).map((transition) =>
-            transition.id === transitionId
-              ? normalizeVideoProjectTransition({ ...transition, easing })
-              : transition
-          ),
-        })
+        updateExplicitTransition(project, transitionId, (transition) =>
+          transition.easing === easing
+            ? transition
+            : (parseVideoProjectTransition({ ...transition, easing }) ?? transition)
+        )
       )
     );
 }
@@ -49,13 +48,35 @@ export function createTransitionTemplateUpdater(set: VideoEditorStoreSet) {
   return (transitionId: string, patch: VideoEditorTransitionTemplatePatch) =>
     set((state) =>
       applyProjectUpdate(state, (project) =>
-        applyVideoProjectMutationPatch(project, {
-          transitions: (project.transitions ?? []).map((transition) =>
-            transition.id === transitionId
-              ? normalizeVideoProjectTransition({ ...transition, ...patch })
-              : transition
-          ),
-        })
+        updateExplicitTransition(project, transitionId, (transition) =>
+          transition.kind === 'gl' ? updateTransitionSelection(transition, patch) : transition
+        )
       )
     );
+}
+
+function updateExplicitTransition(
+  project: VideoProject,
+  id: string,
+  update: (transition: VideoProjectTransition) => VideoProjectTransition
+): VideoProject {
+  let changed = false;
+  const transitions = project.transitions?.map((transition) => {
+    const next = transition.id === id ? update(transition) : transition;
+    if (next !== transition) changed = true;
+    return next;
+  });
+  return changed && transitions
+    ? applyVideoProjectMutationPatch(project, { transitions })
+    : project;
+}
+
+function updateTransitionSelection(
+  transition: Extract<VideoProjectTransition, { kind: 'gl' }>,
+  patch: VideoEditorTransitionTemplatePatch
+) {
+  const next = { ...transition, selection: patch.selection };
+  if (patch.presetId === null) delete next.presetId;
+  else if (patch.presetId !== undefined) next.presetId = patch.presetId;
+  return parseVideoProjectTransition(next) ?? transition;
 }

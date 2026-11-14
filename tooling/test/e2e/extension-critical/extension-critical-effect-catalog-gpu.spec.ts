@@ -1,44 +1,30 @@
-import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
 import { expect, test, type Locator } from '@playwright/test';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
-import { enableGpuPreviewProof, observeEffectGpuPlans } from '../support/gpu-preview-proof';
+import { observeEffectGpuPlans } from '../support/gpu-preview-proof';
 import { startHostServer } from '../support/host-server';
 import { SETTINGS_HARNESS_PATH } from '../extension-critical.helpers';
 import {
-  EFFECT_V1_STANDALONE_FIXTURE,
-  EFFECT_V1_TRANSITION_FIXTURE,
+  LOTTIE_ANNOTATION_FIXTURE,
   openEffectVideoEditorHarness,
+  readAnimationFixtureSource,
 } from './extension-critical-video-effects.helpers';
 
-enableGpuPreviewProof();
-
 const examples = [
-  {
-    id: 'neutral-standalone',
-    title: 'Neutral Standalone',
-    tab: 'annotations',
-    file: EFFECT_V1_STANDALONE_FIXTURE,
-  },
-  {
-    id: 'neutral-target-effect',
-    title: 'Neutral Target Effect',
-    tab: 'effects',
+  { id: 'e2e-title', title: 'E2E e2e-title', file: LOTTIE_ANNOTATION_FIXTURE },
+  ...(['callout', 'frame'] as const).map((name) => ({
+    id: `e2e-${name}`,
+    title: `E2E e2e-${name}`,
     file: fileURLToPath(
       new URL(
-        '../../../../packages/runtime-contracts/src/effect-v1/fixtures/valid/neutra' +
-          'l-target-effect.sniptale-effect.json',
+        name === 'callout'
+          ? '../../../../apps/extension/src/features/video/project/effect-bundle/' +
+              'fixtures/retained/callout.sniptale-animation.json'
+          : `../../../../apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
         import.meta.url
       )
     ),
-  },
-  {
-    id: 'neutral-transition',
-    title: 'Neutral Transition',
-    tab: 'transitions',
-    file: EFFECT_V1_TRANSITION_FIXTURE,
-  },
+  })),
 ];
 
 async function pixels(canvas: Locator) {
@@ -53,46 +39,88 @@ async function pixels(canvas: Locator) {
   });
 }
 
+async function paintCount(canvas: Locator) {
+  return canvas.evaluate((node) => {
+    const read: unknown = Reflect.get(window, 'sniptaleTestCatalogPaintCount');
+    if (typeof read !== 'function') throw new Error('Missing catalogue paint observer');
+    const count: unknown = Reflect.apply(read, window, [node]);
+    if (typeof count !== 'number') throw new Error('Invalid catalogue paint count');
+    return count;
+  });
+}
+
 async function scrub(canvas: Locator) {
   await expect(canvas).toBeVisible();
-  await canvas.hover({ position: { x: 10, y: 10 } });
+  await canvas.hover();
   await expect.poll(() => pixels(canvas)).not.toBe('');
-  const before = await pixels(canvas);
   const bounds = await canvas.boundingBox();
   if (!bounds) throw new Error('Catalog preview has no bounds.');
-  await canvas.hover({ position: { x: bounds.width * 0.8, y: bounds.height * 0.5 } });
-  await expect.poll(() => pixels(canvas)).not.toBe(before);
+  // A new manual paint establishes the clock; an autoplay baseline can equal an authored hold.
+  await canvas.hover({ position: { x: bounds.width * 0.35, y: bounds.height * 0.5 } });
+  await expect.poll(() => paintCount(canvas)).toBeGreaterThan(0);
+  await expect.poll(() => pixels(canvas)).not.toBe('');
+  const before = await pixels(canvas);
+  await canvas.hover({ position: { x: bounds.width * 0.05, y: bounds.height * 0.5 } });
+  await expect.poll(() => paintCount(canvas)).toBeGreaterThan(0);
+  await expect
+    .poll(async () => {
+      const frame = await pixels(canvas);
+      return frame && frame !== before ? frame : '';
+    })
+    .not.toBe('');
 }
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
-  test(`Effect catalog GPU cards and Settings scrub at ${viewport.name}`, async ({
+  test(`Lottie catalog ready pixels and Settings scrub at ${viewport.name}`, async ({
     page,
   }, info) => {
     await page.setViewportSize({ ...viewport.size });
-    const completed = await observeEffectGpuPlans(page);
+    await page.addInitScript(() => {
+      const counts = new WeakMap<object, number>();
+      const pointerBaselines = new WeakMap<object, number>();
+      document.addEventListener(
+        'pointermove',
+        (event) => {
+          if (event.target instanceof HTMLCanvasElement)
+            pointerBaselines.set(event.target, counts.get(event.target) ?? 0);
+        },
+        true
+      );
+      const draw = CanvasRenderingContext2D.prototype.drawImage;
+      Reflect.set(
+        CanvasRenderingContext2D.prototype,
+        'drawImage',
+        function (this: CanvasRenderingContext2D, ...args: unknown[]) {
+          const result = Reflect.apply(draw, this, args);
+          counts.set(this.canvas, (counts.get(this.canvas) ?? 0) + 1);
+          return result;
+        }
+      );
+      Reflect.set(
+        window,
+        'sniptaleTestCatalogPaintCount',
+        (canvas: HTMLCanvasElement) =>
+          (counts.get(canvas) ?? 0) - (pointerBaselines.get(canvas) ?? 0)
+      );
+    });
+    const completed = await observeEffectGpuPlans(page, { requireParentScene: false });
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     const host = await startHostServer();
     try {
       await openEffectVideoEditorHarness(page, host.origin);
-      await page.locator('[data-ui="video-editor.library-tab.effects"]').click();
+      await page.locator('[data-ui="video-editor.library-tab.annotations"]').click();
       const dock = page.locator('[data-ui="video-editor.effects-library.dock"]');
       for (const example of examples) {
-        const parsed = parseEffectV1Source(await readFile(example.file, 'utf8'));
-        if (!parsed.document) throw new Error('Catalog fixture is invalid.');
-        // Keep the starter's animated primitives inside the catalog's 640 by 360 logical view.
-        const fixture = {
-          ...parsed.document,
-          layers: parsed.document.layers.map((layer) => ({ ...layer, x: 0, y: 0 })),
-        };
         await dock.locator('input[type="file"]').setInputFiles({
-          name: `${example.id}.sniptale-effect.json`,
+          name: `${example.id}.sniptale-animation.json`,
           mimeType: 'application/json',
-          buffer: Buffer.from(JSON.stringify(fixture)),
+          buffer: Buffer.from(await readAnimationFixtureSource(example.file, example.id)),
         });
-        await page.locator(`[data-ui="video-editor.library-tab.${example.tab}"]`).click();
-        await scrub(page.locator(`[data-effect-document="${example.id}"] canvas`).first());
-        await expect.poll(completed).toBeGreaterThan(0);
+        await test.step(`Native ${example.id}`, async () => {
+          await scrub(page.locator(`[data-effect-document="${example.id}"] canvas`).first());
+          await expect.poll(completed).toBeGreaterThan(0);
+        });
       }
       await page.screenshot({ path: info.outputPath('native-catalog.png'), fullPage: false });
       await page.goto(`${host.origin}${SETTINGS_HARNESS_PATH}?section=video-effects`);
@@ -101,8 +129,10 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
           .locator('[data-settings-collection-item]')
           .filter({ hasText: example.title });
         const before = completed();
-        await scrub(card.locator('canvas'));
-        await expect.poll(completed).toBeGreaterThan(before);
+        await test.step(`Settings ${example.id}`, async () => {
+          await scrub(card.locator('canvas'));
+          await expect.poll(completed).toBeGreaterThan(before);
+        });
       }
       await page.screenshot({ path: info.outputPath('settings-catalog.png'), fullPage: false });
       expect(errors).toEqual([]);

@@ -1,3 +1,4 @@
+import { parseSourceImageFilterStack } from '../../../../features/image-filters/contract';
 import {
   resolveMediaPaddingLayout,
   maximumMediaPadding,
@@ -55,6 +56,17 @@ export function createClipMediaStyleActions(
         applyProjectUpdate(state, (project) => {
           const clip = project.clips.find((item) => item.id === clipId);
           if (!isMediaClip(clip) || !areClipTracksEditable(project, [clipId])) return project;
+          if (edit.kind === 'source-filters') {
+            if (clip.type !== VideoProjectClipType.VIDEO) return project;
+            const stack = edit.stack === null ? undefined : parseSourceImageFilterStack(edit.stack);
+            if (stack === null || JSON.stringify(stack) === JSON.stringify(clip.sourceFilters))
+              return project;
+            const { sourceFilters: _previous, ...rest } = clip;
+            const updated = stack ? { ...rest, sourceFilters: stack } : rest;
+            return applyVideoProjectMutationPatch(project, {
+              clips: project.clips.map((item) => (item.id === clipId ? updated : item)),
+            });
+          }
           if (edit.kind === 'padding') return updateMediaPadding(project, clip, edit.padding);
           if (edit.kind === 'window-layout-restore') {
             const layout = clip.rememberedWindowLayout;

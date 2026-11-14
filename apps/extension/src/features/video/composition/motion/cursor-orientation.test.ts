@@ -614,3 +614,84 @@ it('uses the resolved movement policy for the same Native and Gallery cursor act
     }
   }
 });
+
+it('renders cursor-driven 3D without a zoom and preserves its prepared orientation path', async () => {
+  const { resolveVideoCompositionCamera } = await import('./index');
+  const { compileProjectCameraBundle } = await import('./project-camera-preparation');
+  const { attachPreparedProjectCamera } = await import('./prepared-project-camera');
+  const project = createVideoProjectFromRecording({
+    recordingId: 'independent-auto-3d',
+    filename: 'cursor.webm',
+    width: 1000,
+    height: 600,
+    duration: 4,
+    mimeType: 'video/webm',
+    size: 10,
+  });
+  const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+  project.cursorTrack = {
+    captureMode: 'separate',
+    skin: normalizeVideoProjectCursorSkin(undefined),
+    samples: [0, 1, 2, 4].map((time, index) => ({
+      id: `point:${index}`,
+      time,
+      x: index < 2 ? 100 : 900,
+      y: 300,
+      visible: true,
+      recordingPoint: { x: index < 2 ? 0.1 : 0.9, y: 0.5 },
+      captureSegment: 0,
+      sourceAnchor: {
+        kind: 'recording-source' as const,
+        recordingId: 'independent-auto-3d',
+        sourceClipId: clip.id,
+        sourceTime: time,
+      },
+    })),
+  };
+  const region = bindMotionRegionToClip(
+    {
+      ...createVideoProjectMotionRegion(project, 0),
+      effect: '3d',
+      focusMode: 'MANUAL',
+      cursorComposition: { ...settings, smoothness: 0 },
+      scale: 1,
+      duration: 4,
+    },
+    clip
+  );
+  project.motionRegions = [region];
+  const bundle = compileProjectCameraBundle(project);
+  expect(bundle.cameras).toHaveLength(0);
+  expect(bundle.orientations.some((entry) => entry.plan !== undefined)).toBe(true);
+  const prepared = attachPreparedProjectCamera(project, bundle);
+  const sample = (time: number) =>
+    resolveVideoCompositionCamera({
+      project: prepared,
+      currentTime: time,
+      actions: [],
+      cursorSample: null,
+    });
+  expect(sample(1).scale).toBe(1);
+  expect(sample(3).scale).toBe(1);
+  expect(sample(1).spatial?.rotation).toBeDefined();
+  expect(sample(1).spatial?.rotation).not.toEqual(sample(3).spatial?.rotation);
+  expect(sample(3).spatial?.rotation).toEqual(
+    resolveVideoCompositionCamera({ project, currentTime: 3, actions: [], cursorSample: null })
+      .spatial?.rotation
+  );
+  const { effect: _effect, ...camera } = region;
+  const zoom = {
+    ...camera,
+    id: 'independent-zoom',
+    scale: 2,
+    cursorComposition: { ...settings, mode: 'off' as const },
+  };
+  const combined = resolveVideoCompositionCamera({
+    project: { ...project, motionRegions: [zoom, region] },
+    currentTime: 3,
+    actions: [],
+    cursorSample: null,
+  });
+  expect(combined.scale).toBe(2);
+  expect(combined.spatial?.rotation).toEqual(sample(3).spatial?.rotation);
+});

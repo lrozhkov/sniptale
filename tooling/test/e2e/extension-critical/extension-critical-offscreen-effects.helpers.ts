@@ -19,11 +19,13 @@ import {
   VideoTrackKind,
   type VideoProject,
 } from '../../../../apps/extension/src/features/video/project/types';
-import type {
-  EffectV1Document,
-  EffectV1Kind,
-} from '../../../../packages/runtime-contracts/src/effect-v1/model/types';
-import { parseEffectV1Source } from '../../../../packages/runtime-contracts/src/effect-v1/validation/index';
+import {
+  parseAnimationTemplateSource,
+  type AnimationTemplate,
+} from '@sniptale/runtime-contracts/animation-template';
+import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
+import { initializeEffectSceneAnchors } from '../../../../apps/extension/src/features/video/project/effect-instance/layout';
+import { animationRuntimeDuration } from '../../../../apps/extension/src/contracts/effect-runtime/animation';
 import {
   emitTrustedOffscreenHarnessRuntimeMessage,
   getRuntimeMessagesByType,
@@ -37,56 +39,40 @@ type OffscreenHarnessBridge = {
   ) => Promise<ProjectExportInputReference>;
 };
 type EffectSnapshot = NonNullable<VideoProject['effectSnapshots']>[number];
-type SerializableEffectSnapshot = Omit<EffectSnapshot, 'assets'> & {
-  assets: Array<Omit<EffectSnapshot['assets'][number], 'blob'> & { blob: Blob | null }>;
-};
-type SerializableEffectProject = Omit<VideoProject, 'effectSnapshots'> & {
-  effectSnapshots?: SerializableEffectSnapshot[];
-};
-const TARGET_EFFECT_SOURCE = readFileSync(
-  new URL('../fixtures/effect-v1/demo-target-overlay.sniptale-effect.json', import.meta.url),
-  'utf8'
+const LOTTIE_SOURCES = ['title', 'callout'].map((name) =>
+  readFileSync(
+    new URL(
+      name === 'callout'
+        ? '../../../../apps/extension/src/features/video/project/effect-bundle/' +
+            'fixtures/retained/callout.sniptale-animation.json'
+        : `../../../../apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
+      import.meta.url
+    ),
+    'utf8'
+  )
 );
-const STANDALONE_EFFECT_SOURCE = readFileSync(
-  new URL(
-    '../../../../packages/runtime-contracts/src/effect-v1/fixtures/valid/' +
-      'neutral-runtime-conformance.sniptale-effect.json',
-    import.meta.url
-  ),
-  'utf8'
-);
-const STANDALONE_ASSET_SOURCE = readFileSync(
-  new URL('../fixtures/effect-v1/assets/neutral-mark.svg', import.meta.url),
-  'utf8'
-);
-const TARGET_DOCUMENT = parseFixtureDocument(TARGET_EFFECT_SOURCE, 'targetEffect');
-const STANDALONE_DOCUMENT = parseFixtureDocument(STANDALONE_EFFECT_SOURCE, 'standalone');
-
-function parseFixtureDocument(source: string, expectedKind: EffectV1Kind): EffectV1Document {
-  const result = parseEffectV1Source(source);
-  if (!result.ok || !result.document || result.document.kind !== expectedKind) {
-    throw new Error(`Invalid ${expectedKind} EffectV1 E2E fixture`);
-  }
-  return result.document;
+function parseFixtureDocument(source: string): AnimationTemplate {
+  const result = parseAnimationTemplateSource(source);
+  if (!result.template) throw new Error('Invalid Lottie E2E fixture.');
+  return result.template;
 }
 
-export async function renderEffectV1Mp4Projects(page: Page): Promise<void> {
-  await renderEffectMp4Project(page, 'effect-v1-target-mp4-e2e', createTargetEffectExportProject());
-  await renderEffectMp4Project(
-    page,
-    'effect-v1-standalone-mp4-e2e',
-    createStandaloneEffectExportProject(),
-    STANDALONE_ASSET_SOURCE
-  );
+export async function renderLottieMp4Projects(page: Page): Promise<void> {
+  for (const [index, source] of LOTTIE_SOURCES.entries()) {
+    await renderEffectMp4Project(
+      page,
+      `lottie-mp4-e2e-${index}`,
+      createLottieExportProject(source, index === 0)
+    );
+  }
 }
 
 async function renderEffectMp4Project(
   page: Page,
   jobId: string,
-  project: SerializableEffectProject,
-  assetSource?: string
+  project: VideoProject
 ): Promise<void> {
-  const input = await stageEffectExportInput(page, jobId, project, assetSource);
+  const input = await stageEffectExportInput(page, jobId, project);
   await emitTrustedOffscreenHarnessRuntimeMessage(page, {
     input,
     jobId,
@@ -108,34 +94,15 @@ async function renderEffectMp4Project(
   await expectEffectExportCompleted(page, jobId);
 }
 
-async function stageEffectExportInput(
-  page: Page,
-  jobId: string,
-  project: SerializableEffectProject,
-  assetSource?: string
-) {
+async function stageEffectExportInput(page: Page, jobId: string, project: VideoProject) {
   return page.evaluate(
-    async ({ nextAssetSource, nextJobId, nextProject }) => {
+    ({ nextJobId, nextProject }) => {
       const bridge = (window as Window & { __sniptaleOffscreenHarness?: OffscreenHarnessBridge })
         .__sniptaleOffscreenHarness;
       if (!bridge) throw new Error('Offscreen harness bridge unavailable');
-      const effectSnapshots = nextProject.effectSnapshots?.map((snapshot) => ({
-        ...snapshot,
-        assets: snapshot.assets.map((asset) => {
-          if (asset.blob) return asset;
-          if (nextAssetSource === undefined) {
-            throw new Error('EffectV1 asset bytes unavailable');
-          }
-          return { ...asset, blob: new Blob([nextAssetSource], { type: asset.mimeType }) };
-        }),
-      }));
-      const hydratedProject: VideoProject = {
-        ...nextProject,
-        ...(effectSnapshots ? { effectSnapshots } : {}),
-      };
-      return bridge.stageProjectExportInput(nextJobId, hydratedProject);
+      return bridge.stageProjectExportInput(nextJobId, nextProject);
     },
-    { nextAssetSource: assetSource, nextJobId: jobId, nextProject: project }
+    { nextJobId: jobId, nextProject: project }
   );
 }
 
@@ -158,121 +125,66 @@ async function expectEffectExportCompleted(page: Page, jobId: string): Promise<v
     .toEqual({ completed: true, failed: [] });
 }
 
-function createTargetEffectExportProject(): VideoProject {
-  const project = createEmptyVideoProject('EffectV1 MP4 E2E', 160, 90);
-  const track = createVideoProjectTrack('Effects', 0, VideoTrackKind.PRIMARY);
+function createLottieExportProject(source: string, withText: boolean): VideoProject {
+  const document = parseFixtureDocument(source);
+  const project = createEmptyVideoProject('Lottie MP4 E2E', 160, 90);
+  const track = createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY);
   project.tracks.push(track);
-  const clip = {
-    ...createTextClip(track.id, project.width, project.height, 0),
-    duration: 1,
-    id: 'effect-v1-mp4-target',
-  };
-  const sha256 = createHash('sha256').update(TARGET_EFFECT_SOURCE).digest('hex');
+  const instanceId = `lottie-mp4-${document.id}`;
+  const sha256 = createHash('sha256').update(source).digest('hex');
   const snapshotId = `effect:${sha256}`;
-  return {
-    ...project,
-    clips: [clip],
-    duration: 1,
-    effectInstances: [
-      {
-        controls: getDefaultControls(TARGET_DOCUMENT),
-        duration: 1,
-        enabled: true,
-        id: 'effect-v1-mp4-instance',
-        kind: TARGET_DOCUMENT.kind,
-        playbackRate: TARGET_DOCUMENT.duration,
-        snapshotId,
-        startTime: 0,
-        target: { clipId: clip.id, kind: 'clip' },
-      },
-    ],
-    effectSnapshots: [
-      createSnapshot(TARGET_DOCUMENT, snapshotId, sha256, TARGET_EFFECT_SOURCE, []),
-    ],
-  };
-}
-
-function createStandaloneEffectExportProject(): SerializableEffectProject {
-  const project = createEmptyVideoProject('Standalone EffectV1 MP4 E2E', 160, 90);
-  const track = createVideoProjectTrack('Effects', 0, VideoTrackKind.PRIMARY);
-  project.tracks.push(track);
-  const instanceId = 'effect-v1-standalone-mp4-instance';
-  const sha256 = createHash('sha256').update(STANDALONE_EFFECT_SOURCE).digest('hex');
-  const snapshotId = `effect:${sha256}`;
-  return {
-    ...project,
-    clips: [
-      createEffectHostClip({
-        duration: 1,
-        effectInstanceId: instanceId,
-        name: STANDALONE_DOCUMENT.id,
-        projectHeight: project.height,
-        projectWidth: project.width,
-        startTime: 0,
-        trackId: track.id,
-      }),
-    ],
-    duration: 1,
-    effectInstances: [
-      {
-        controls: getDefaultControls(STANDALONE_DOCUMENT),
-        duration: 1,
-        enabled: true,
-        id: instanceId,
-        kind: STANDALONE_DOCUMENT.kind,
-        playbackRate: STANDALONE_DOCUMENT.duration,
-        snapshotId,
-        startTime: 0,
-        target: { kind: 'scene' },
-      },
-    ],
-    effectSnapshots: [createStandaloneSnapshot(snapshotId, sha256)],
-  };
-}
-
-function createStandaloneSnapshot(snapshotId: string, sha256: string): SerializableEffectSnapshot {
-  const declaredAsset = STANDALONE_DOCUMENT.assets[0];
-  if (
-    !declaredAsset ||
-    declaredAsset.kind !== 'svg' ||
-    declaredAsset.byteLength === undefined ||
-    declaredAsset.sha256 === undefined
-  ) {
-    throw new Error('Standalone EffectV1 asset unavailable');
+  if (withText) {
+    const textTrack = createVideoProjectTrack('Text', 1, VideoTrackKind.PRIMARY);
+    project.tracks.push(textTrack);
+    project.clips.push({
+      ...createTextClip(textTrack.id, project.width, project.height, 0),
+      duration: 1,
+    });
   }
-  const assets = [{ ...declaredAsset, blob: null }];
-  const retainedByteLength =
-    new TextEncoder().encode(STANDALONE_EFFECT_SOURCE).byteLength + declaredAsset.byteLength;
-  return createSnapshot(
-    STANDALONE_DOCUMENT,
-    snapshotId,
-    sha256,
-    STANDALONE_EFFECT_SOURCE,
-    assets,
-    retainedByteLength
+  const host = createEffectHostClip({
+    dimensions: { width: document.animation.w, height: document.animation.h },
+    duration: 1,
+    effectInstanceId: instanceId,
+    name: document.id,
+    projectHeight: project.height,
+    projectWidth: project.width,
+    startTime: 0,
+    trackId: track.id,
+  });
+  project.clips.push(host);
+  const sceneAnchors = initializeEffectSceneAnchors(document, host.transform);
+  const controls = Object.fromEntries(
+    document.controls.map((control) => [control.id, resolveEffectControlDefault(control, 'en')])
   );
-}
-
-function createSnapshot(
-  document: EffectV1Document,
-  id: string,
-  sha256: string,
-  source: string,
-  assets: SerializableEffectSnapshot['assets'],
-  retainedByteLength = new TextEncoder().encode(source).byteLength
-): SerializableEffectSnapshot {
-  return {
-    assets,
+  for (const handle of document.objectLayout?.handles ?? []) {
+    delete controls[handle.xControl];
+    delete controls[handle.yControl];
+  }
+  project.duration = 1;
+  project.effectInstances = [
+    {
+      controls,
+      duration: 1,
+      enabled: true,
+      id: instanceId,
+      kind: 'standalone',
+      playbackRate: animationRuntimeDuration(document),
+      snapshotId,
+      startTime: 0,
+      target: { kind: 'scene' },
+      ...(sceneAnchors ? { sceneAnchors } : {}),
+    },
+  ];
+  const snapshot: EffectSnapshot = {
+    assets: [],
     documentId: document.id,
-    id,
-    kind: document.kind,
-    retainedByteLength,
-    schemaVersion: 'sniptale.effect.v1',
+    id: snapshotId,
+    kind: 'standalone',
+    retainedByteLength: new TextEncoder().encode(source).byteLength,
+    schemaVersion: 'sniptale.animation.v1',
     sha256,
     source,
   };
-}
-
-function getDefaultControls(document: EffectV1Document) {
-  return Object.fromEntries(document.controls.map(({ defaultValue, id }) => [id, defaultValue]));
+  project.effectSnapshots = [snapshot];
+  return project;
 }

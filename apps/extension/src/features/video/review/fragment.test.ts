@@ -101,3 +101,35 @@ it('retains transition intent but constrains endpoint authority to the selected 
   expect(planReviewCutTransitions(10, edge.edits)).toEqual([]);
   expect(edits).toEqual(original);
 });
+
+it('includes insertions at fragment start and the original EOF without importing later holds', () => {
+  const hold = (id: string, start: number): ReviewEdit => ({
+    id,
+    kind: 'freeze',
+    start,
+    end: start,
+    requestedStart: start,
+    requestedEnd: start,
+    duration: 2,
+    frameTime: start === 10 ? 9.96 : start,
+    frameDuration: 0.04,
+  });
+  const edits = [hold('first', 2), hold('next', 8), hold('eof', 10)];
+  const before = structuredClone(edits);
+  const fragment = createReviewFragment({ ...input, edits })!;
+  expect(fragment.edits.filter((edit) => edit.kind === 'freeze').map((edit) => edit.id)).toEqual([
+    'first',
+  ]);
+  expect(buildReviewTimeMap(10, fragment.edits).at(-1)!.resultEnd).toBe(8);
+  const tail = createReviewFragment({
+    ...input,
+    edits,
+    selection: { kind: 'range', start: 8, end: 10 },
+  })!;
+  expect(tail.edits.filter((edit) => edit.kind === 'freeze').map((edit) => edit.id)).toEqual([
+    'next',
+    'eof',
+  ]);
+  expect(buildReviewTimeMap(10, tail.edits).at(-1)!.resultEnd).toBe(6);
+  expect(edits).toEqual(before);
+});

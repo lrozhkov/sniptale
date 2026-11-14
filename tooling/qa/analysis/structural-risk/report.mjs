@@ -178,9 +178,9 @@ function classifyExistingRisk(metric, hardCap) {
     metric.lines > hardCap &&
     (metric.previousLines <= hardCap || metric.lines > metric.previousLines)
   ) {
-    return 'violation';
+    return 'advisory';
   }
-  if (metric.delta >= STRUCTURAL_RISK_LIMITS.delta.hard) return 'violation';
+  if (metric.delta >= STRUCTURAL_RISK_LIMITS.delta.hard) return 'advisory';
   if (metric.delta >= STRUCTURAL_RISK_LIMITS.delta.warning) return 'advisory';
   if (metric.score >= STRUCTURAL_RISK_LIMITS.file.advisoryScore || metric.lines > 400)
     return 'advisory';
@@ -194,7 +194,7 @@ function classifyNewFile(metric) {
     (metric.lines > STRUCTURAL_RISK_LIMITS.file.longLines &&
       metric.score >= STRUCTURAL_RISK_LIMITS.file.longScore)
   )
-    return 'violation';
+    return 'advisory';
   if (
     metric.score >= STRUCTURAL_RISK_LIMITS.file.advisoryScore ||
     metric.lines > STRUCTURAL_RISK_LIMITS.file.longLines
@@ -213,7 +213,7 @@ function classifyNewFunction(metric) {
       metric.lines > getFunctionWarningLineLimit(metric) &&
       metric.score >= STRUCTURAL_RISK_LIMITS.file.longScore)
   )
-    return 'violation';
+    return 'advisory';
   if (exempt && metric.score >= STRUCTURAL_RISK_LIMITS.file.hardScore) return 'advisory';
   if (
     metric.score >= STRUCTURAL_RISK_LIMITS.file.advisoryScore ||

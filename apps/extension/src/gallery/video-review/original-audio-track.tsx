@@ -1,3 +1,4 @@
+import { useReviewTimelineSnap, type ReviewTimelineSnap } from './timeline-magnets';
 import { ReviewTrackVisibilityButton } from './track-row';
 import { SNAP_THRESHOLD_PX, snapTimelineTime } from '../../features/video/review/snap';
 import { reviewTrackMetrics, ReviewTrackRow, ReviewTrackCuts } from './track-row';
@@ -64,10 +65,11 @@ export function ReviewOriginalAudioTrack(props: {
     (time: number) => originalAudioGainAt(playback, time, props.edits),
     [playback, props.edits]
   );
-  const rectStyle = (start: number, end: number) => ({
-    left: `${(start / duration) * 100}%`,
-    width: `${((end - start) / duration) * 100}%`,
-  });
+  const rectStyle = (start: number, end: number) => {
+    const left = props.projection?.focus.position(start) ?? start / duration;
+    const right = props.projection?.focus.position(end, 'end') ?? end / duration;
+    return { left: `${left * 100}%`, width: `${(right - left) * 100}%` };
+  };
   return (
     <ReviewTrackRow
       track="originalAudio"
@@ -114,6 +116,7 @@ export function ReviewOriginalAudioTrack(props: {
               compact={props.compact}
               key={range.id}
               range={range}
+              projection={props.projection}
               row={rows.get(range.id) ?? 0}
               duration={duration}
               preview={preview}
@@ -205,6 +208,7 @@ function OriginalAudioControls(props: {
 function ReviewOriginalGainBlock(props: {
   compact?: boolean | undefined;
   range: QuickEditOriginalAudioRange;
+  projection?: ReviewTrackProjection | undefined;
   row: number;
   duration: number;
   preview: Drag | null;
@@ -215,6 +219,8 @@ function ReviewOriginalGainBlock(props: {
   const { range, preview } = props;
   const start = preview?.id === range.id ? preview.from : range.start;
   const end = preview?.id === range.id ? preview.to : range.end;
+  const left = props.projection?.focus.position(start) ?? start / props.duration;
+  const right = props.projection?.focus.position(end, 'end') ?? end / props.duration;
   return (
     <button
       type="button"
@@ -225,6 +231,8 @@ function ReviewOriginalGainBlock(props: {
       data-ui="gallery.videoReview.originalAudioRange"
       data-audio-id={range.id}
       data-review-removal-key={`original-audio:${range.id}`}
+      data-review-snap-start={start}
+      data-review-snap-end={end}
       className={`absolute z-10 flex cursor-grab items-center justify-center disabled:cursor-not-allowed
         rounded border ${reviewTimelineItemTone(props.selected, range.volume === 0 ? 'cut' : 'neutral')}`}
       style={{
@@ -232,8 +240,8 @@ function ReviewOriginalGainBlock(props: {
           props.row * reviewTrackMetrics(props.compact).step +
           reviewTrackMetrics(props.compact).inset,
         height: reviewTrackMetrics(props.compact).body,
-        left: `${(start / props.duration) * 100}%`,
-        width: `${((end - start) / props.duration) * 100}%`,
+        left: `${left * 100}%`,
+        width: `${(right - left) * 100}%`,
       }}
       onClick={(event) => {
         event.stopPropagation();
@@ -252,9 +260,7 @@ function ReviewOriginalGainBlock(props: {
           data-audio-edge={edge}
           data-audio-id={range.id}
           className={`${reviewTimelineResizeHandleClassName} ${edge === 'start' ? 'left-0' : 'right-0'}`}
-        >
-          <span className="h-4 w-px bg-current opacity-60" />
-        </span>
+        ></span>
       ))}
     </button>
   );
@@ -265,27 +271,27 @@ function originalAudioPointerTime(
   event: PointerEvent<HTMLDivElement>,
   duration: number,
   props: Parameters<typeof ReviewOriginalAudioTrack>[0],
-  drag: Drag | null
+  drag: Drag | null,
+  snap: ReviewTimelineSnap = snapTimelineTime
 ) {
   const rect = event.currentTarget.getBoundingClientRect();
+  const displayTime =
+    ((event.clientX - rect.left) / Math.max(1, rect.width)) *
+    (props.projection?.display.duration ?? duration);
   const time = Math.max(
     0,
-    Math.min(duration, ((event.clientX - rect.left) / Math.max(1, rect.width)) * duration)
+    Math.min(duration, props.projection?.display.displayToSource(displayTime) ?? displayTime)
   );
-  if (event.altKey || !drag?.edge || drag.edge === 'move') return time;
+  if (event.altKey || drag?.edge === 'move') return time;
   const candidates = [
     0,
     duration,
     ...(props.edits ?? []).flatMap((edit) => [edit.start, edit.end]),
     ...(props.editor?.originalRanges ?? props.original.ranges ?? [])
-      .filter((range) => range.id !== drag.id)
+      .filter((range) => range.id !== drag?.id)
       .flatMap((range) => [range.start, range.end]),
   ];
-  return snapTimelineTime(
-    time,
-    candidates,
-    (SNAP_THRESHOLD_PX * duration) / Math.max(1, rect.width)
-  ).time;
+  return snap(time, candidates, (SNAP_THRESHOLD_PX * duration) / Math.max(1, rect.width)).time;
 }
 
 /** One pointer transaction for range drawing/resize, with Escape and capture-loss cancellation. */
@@ -293,6 +299,7 @@ function useOriginalAudioGesture(
   props: Parameters<typeof ReviewOriginalAudioTrack>[0],
   duration: number
 ) {
+  const snap = useReviewTimelineSnap();
   const drag = useRef<Drag | null>(null);
   const [preview, setPreview] = useState<Drag | null>(null);
   const boundary = preview;
@@ -326,7 +333,7 @@ function useOriginalAudioGesture(
         if (!item && !props.editor.originalTool) return;
         event.stopPropagation();
         event.preventDefault();
-        const at = originalAudioPointerTime(event, duration, props, drag.current);
+        const at = originalAudioPointerTime(event, duration, props, drag.current, snap);
         const id = item?.dataset['audioId'];
         const edge = item?.dataset['audioEdge'];
         const range =
@@ -367,14 +374,21 @@ function useOriginalAudioGesture(
       },
       onPointerMove: (event: PointerEvent<HTMLDivElement>) => {
         if (!drag.current || event.pointerId !== drag.current.pointerId) return;
-        const at = originalAudioPointerTime(event, duration, props, drag.current);
+        const at = originalAudioPointerTime(event, duration, props, drag.current, snap);
         const current = drag.current;
         const length = current.end - current.start;
         if (current.edge === 'move') {
-          const from = Math.max(
-            current.min,
-            Math.min(current.max - length, current.start + at - current.at)
-          );
+          const free = current.start + at - current.at;
+          const threshold = event.altKey
+            ? 0
+            : (SNAP_THRESHOLD_PX * duration) /
+              Math.max(1, event.currentTarget.getBoundingClientRect().width);
+          const start = snap(free, [], threshold),
+            end = snap(free + length, [], threshold);
+          const a = start.candidate === null ? Infinity : Math.abs(start.time - free);
+          const b = end.candidate === null ? Infinity : Math.abs(end.time - free - length);
+          const moved = a <= b ? start.time : end.time - length;
+          const from = Math.max(current.min, Math.min(current.max - length, moved));
           drag.current = { ...current, from, to: from + length };
         } else if (current.edge === 'start') {
           drag.current = {

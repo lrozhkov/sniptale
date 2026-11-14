@@ -1,24 +1,14 @@
 import { betaV54Fixture } from './beta-v54';
 
-/** Vector backing adds an empty durable store while preserving all released records and bytes. */
+/** Visual preferences are independent durable data; retained package and media bytes do not change. */
 export const betaV55Fixture = {
   ...betaV54Fixture,
   databaseVersion: 55,
-  expectedDigest: '53e7708ee9a94719c09e518f5c3a324b20e9325878bf6b9cbe4a12378746b7cd',
-  domainVersions: {
-    ...betaV54Fixture.domainVersions,
-    editorVectorLibrary: 1,
-    mediaLibrary: 36,
-    scenarioProjects: 12,
-  },
-  stores: [
-    ...betaV54Fixture.stores.slice(0, betaV54Fixture.stores.indexOf('state_manager')),
-    'editor_vector_library',
-    ...betaV54Fixture.stores.slice(betaV54Fixture.stores.indexOf('state_manager')),
-  ],
-  indexes: {
-    ...betaV54Fixture.indexes,
-    editor_vector_library: ['kind', 'definitionId', 'retentionReferenceKeys'],
-  },
-  records: { ...betaV54Fixture.records, editor_vector_library: [] },
+  expectedDigest: '1def705528817df7dfdfff7d6fedf2a9e5f9123b1a19a801af82921fcaf65cf2',
+  domainVersions: { ...betaV54Fixture.domainVersions, effects: 3 },
+  indexes: { ...betaV54Fixture.indexes, video_visual_preferences: [] },
+  records: { ...betaV54Fixture.records, video_visual_preferences: [] },
+  stores: betaV54Fixture.stores.flatMap((name) =>
+    name === 'video_animation_packages' ? [name, 'video_visual_preferences'] : [name]
+  ),
 } as const;

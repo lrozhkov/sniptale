@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 import { readFileSync } from 'node:fs';
+import { isEffectProjectBranches } from '../../../../features/video/project/validation/effect-instances';
+import { createHash } from 'node:crypto';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -33,43 +36,51 @@ function fixture(): PreviewStageCanvasProps {
     trackId: project.tracks[0]!.id,
     projectWidth: 1920,
     projectHeight: 1080,
-    objectLayout: { width: 380, height: 120, resize: 'scale' },
+    dimensions: { width: 320, height: 180 },
   });
   const source = readFileSync(
-    new URL(
-      '../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/' +
-        'sniptale-callout.sniptale-effect.json',
-      import.meta.url
-    ),
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
+  const accepted = parseAnimationTemplateSource(source);
+  if (!accepted.ok) throw new Error(JSON.stringify(accepted.diagnostics));
+  const template = accepted.template;
+  const hash = createHash('sha256').update(source).digest('hex');
+  const snapshotId = `effect:${hash}`;
   project.clips = [clip];
   project.effectSnapshots = [
     {
-      id: 'snapshot',
-      sha256: '0'.repeat(64),
+      id: snapshotId,
+      sha256: hash,
       source,
       assets: [],
-      documentId: 'sniptale-callout-light',
+      documentId: template.id,
       kind: 'standalone',
-      schemaVersion: 'sniptale.effect.v1',
-      retainedByteLength: source.length,
+      schemaVersion: 'sniptale.animation.v1',
+      retainedByteLength: Buffer.byteLength(source),
     },
   ];
   project.effectInstances = [
     {
       id: 'effect',
-      snapshotId: 'snapshot',
+      snapshotId,
       kind: 'standalone',
       target: { kind: 'scene' },
       duration: 4,
       startTime: 0,
       playbackRate: 1,
       enabled: true,
-      controls: {},
+      controls: Object.fromEntries(
+        template.controls.map((control) => [control.id, control.defaultValue])
+      ),
       sceneAnchors: { tip: { x: 100, y: 80 } },
     },
   ];
+  for (const handle of template.objectLayout?.handles ?? []) {
+    delete project.effectInstances[0]!.controls[handle.xControl];
+    delete project.effectInstances[0]!.controls[handle.yControl];
+  }
+  expect(isEffectProjectBranches(project.effectSnapshots, project.effectInstances)).toBe(true);
   const stage = document.createElement('div');
   vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1920, 1080));
   return {

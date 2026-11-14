@@ -1,3 +1,4 @@
+import type { ReviewInteractionTimeline } from '../../features/video/review/interaction-types';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createReviewRecordingHistorySource } from '../../workflows/video-review/recording-review';
 import {
@@ -17,6 +18,7 @@ type Prepared = Awaited<ReturnType<ReturnType<typeof createReviewRecordingHistor
 type Owner = {
   reader: ReturnType<typeof createReviewRecordingHistorySource>;
   includeCursor: boolean;
+  interactionTimeline: ReviewInteractionTimeline | undefined;
   project: Resource['historyProject'];
   telemetry: Resource['telemetry'];
   latest: Request;
@@ -51,9 +53,15 @@ export function useReviewRecordingHistory(
   resource: Resource,
   time: number,
   selection: ReviewSelection,
-  options: { range?: Range; includeCursor?: boolean; reach?: number } = {}
+  options: {
+    range?: Range;
+    includeCursor?: boolean;
+    reach?: number;
+    interactionTimeline?: ReviewInteractionTimeline | undefined;
+  } = {}
 ) {
   const includeCursor = options.includeCursor !== false;
+  const interactionTimeline = options.interactionTimeline;
   const reach = Math.max(1, options.reach ?? 1);
   const range =
     options.range ??
@@ -79,7 +87,8 @@ export function useReviewRecordingHistory(
     current &&
     current.project === resource.historyProject &&
     current.telemetry === resource.telemetry &&
-    current.includeCursor === includeCursor
+    current.includeCursor === includeCursor &&
+    current.interactionTimeline === interactionTimeline
       ? current
       : null;
   useEffect(() => {
@@ -89,11 +98,12 @@ export function useReviewRecordingHistory(
     }
     const next: Owner = {
       includeCursor,
+      interactionTimeline,
       reader: createReviewRecordingHistorySource(
         resource.historyProject,
         resource.telemetry,
         undefined,
-        { includeCursor }
+        { includeCursor, interactionTimeline }
       ),
       project: resource.historyProject,
       telemetry: resource.telemetry,
@@ -108,7 +118,7 @@ export function useReviewRecordingHistory(
       next.disposed = true;
       next.reader.dispose();
     };
-  }, [resource.historyProject, resource.telemetry, includeCursor]);
+  }, [resource.historyProject, resource.telemetry, includeCursor, interactionTimeline]);
   const [view, setView] = useState<View | null>(null);
   const [retryGeneration, setRetryGeneration] = useState(0);
   useEffect(() => {

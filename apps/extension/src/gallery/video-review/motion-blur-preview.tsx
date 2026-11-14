@@ -19,6 +19,10 @@ import type {
 import { drawReviewSceneFrame } from '../../workflows/video-review/scene-frame';
 
 type Props = {
+  sourceFilters?:
+    | import('../../features/image-filters/contract').SourceImageFilterStack
+    | undefined;
+  sourceSize?: { width: number; height: number } | undefined;
   scene?:
     | import('../../features/video/review/advanced/types').QuickEditCameraSceneInput
     | undefined;
@@ -110,6 +114,8 @@ function MotionBlurCanvas(
       context.imageSmoothingQuality = 'high';
       try {
         drawReviewSceneFrame(context, {
+          sourceFilters: props.sourceFilters,
+          sourceSize: props.sourceSize,
           currentTime: props.focus?.time ?? 0,
           spatialRenderer: renderer.current ?? undefined,
           canvas: props.output,

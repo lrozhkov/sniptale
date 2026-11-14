@@ -1,3 +1,4 @@
+import { createEffectHostClip } from '../../../../features/video/project/factories/overlay-clip';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
@@ -25,27 +26,31 @@ describe('clip shift EffectV1 ownership', () => {
 });
 
 describe('clip shift EffectV1 timing', () => {
-  it('moves only clip-target instances by the exact clamped clip delta', () => {
+  it('moves only the shifted host annotation clock by the exact clamped host delta', () => {
     const project = createProject();
-    const [shiftedClip, stableClip] = project.clips;
-    project.effectInstances = [
-      createInstance('shifted', 0.25, { clipId: shiftedClip!.id, kind: 'clip' }),
-      createInstance('stable', 4, { clipId: stableClip!.id, kind: 'clip' }),
-      createInstance('scene', 1, { kind: 'scene' }),
-    ];
-
+    const moving = createInstance('shifted', 1, { kind: 'scene' });
+    const stable = createInstance('stable', 4, { kind: 'scene' });
+    const hosts = [moving, stable].map((instance) =>
+      createEffectHostClip({
+        duration: instance.duration,
+        effectInstanceId: instance.id,
+        name: instance.id,
+        projectHeight: project.height,
+        projectWidth: project.width,
+        startTime: instance.startTime,
+        trackId: project.tracks[0]!.id,
+      })
+    );
+    project.clips.push(...hosts);
+    project.effectInstances = [moving, stable];
     const patch = createShiftedClipStartPatch({
-      clipIds: new Set([shiftedClip!.id]),
+      clipIds: new Set([hosts[0]!.id]),
       delta: -5,
       project,
     });
-
-    expect(patch.clips[0]!.startTime).toBe(0);
-    expect(patch.effectInstances).toEqual([
-      expect.objectContaining({ id: 'shifted', startTime: 0 }),
-      expect.objectContaining({ id: 'stable', startTime: 4 }),
-      expect.objectContaining({ id: 'scene', startTime: 1 }),
-    ]);
+    expect(patch.clips.find((clip) => clip.id === hosts[0]!.id)?.startTime).toBe(0);
+    expect(patch.effectInstances).toEqual([{ ...moving, startTime: 0 }, stable]);
+    expect(project.effectInstances).toEqual([moving, stable]);
   });
 
   it('supports the caller-owned clip updater without changing unrelated clips', () => {
@@ -108,7 +113,7 @@ function createInstance(
     duration: 1,
     enabled: true,
     id,
-    kind: target.kind === 'scene' ? 'standalone' : 'targetEffect',
+    kind: 'standalone',
     playbackRate: 1,
     snapshotId: `snapshot-${id}`,
     startTime,

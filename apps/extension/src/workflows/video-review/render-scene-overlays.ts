@@ -1,3 +1,4 @@
+import { cursorMotionArtwork } from '../../features/video/project/cursor-motion/paint';
 import { isCanvasCommentVisibleAt } from '../../features/video/review/comments';
 import { quickEditPlaneProjection } from '../../features/video/composition/motion/spatial-geometry';
 import {
@@ -32,6 +33,7 @@ import type { ReviewExportSamplingFrame } from './export-source-sampling';
 /** Sharp content annotations project together; viewport comments remain in output space. */
 export function drawReviewSceneOverlays(args: {
   scene: Parameters<typeof drawReviewSceneComments>[1] & {
+    cursorMotions?: import('../../features/video/project/cursor-motion').CursorMotion[] | undefined;
     layout: ReturnType<
       typeof import('../../features/video/review/advanced/scene').computeQuickEditSceneLayout
     >;
@@ -115,6 +117,12 @@ export function drawReviewSceneOverlays(args: {
   const clicks =
     args.exportSampling?.plan.clickFrames ??
     evaluateReviewClicks(args.clicks ?? [], args.globalResultTime);
+  const cursor = cursorMotionArtwork(
+    scene.cursorMotions,
+    scene.sourceTime ?? 0,
+    overlayLayout.videoTransform,
+    (args.sourceWidth * overlayLayout.videoTransform.height) / overlayLayout.videoTransform.width
+  );
   const hasContentComment = burned.some(
     (comment) =>
       comment.attachment === 'content' &&
@@ -137,6 +145,7 @@ export function drawReviewSceneOverlays(args: {
     !borders.length &&
     !clicks.length &&
     !hasContentComment &&
+    !cursor &&
     !annotationFrames.some((frame) => frame.instance.attachment === 'content')
   ) {
     drawReviewSceneComments(context, {
@@ -228,6 +237,21 @@ export function drawReviewSceneOverlays(args: {
           ] as const)
         : [])
     );
+    if (cursor) {
+      overlayContext.save();
+      try {
+        clipReviewSceneContent(overlayContext, overlayLayout, overlayBackground);
+        overlayContext.drawImage(
+          cursor.canvas,
+          cursor.rect.x,
+          cursor.rect.y,
+          cursor.rect.width,
+          cursor.rect.height
+        );
+      } finally {
+        overlayContext.restore();
+      }
+    }
     const contentFrames = annotationFrames.filter(
       (frame) => frame.instance.attachment === 'content'
     );

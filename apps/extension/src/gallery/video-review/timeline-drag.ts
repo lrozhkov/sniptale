@@ -138,6 +138,12 @@ export function reviewPlaneLane(
         ? 'original'
         : 'seek'
       : 'track';
+  if (
+    target.closest(
+      '[data-review-track="keyboard"],[data-review-track="mouse"],[data-review-track="cursorMotion"]'
+    )
+  )
+    return 'seek';
   if (target.closest('[data-ui="gallery.videoReview.zoomLane"]'))
     return focusEnabled ? 'focus' : 'seek';
   if (target.closest('[data-ui="gallery.videoReview.annotationEffectsLane"]'))

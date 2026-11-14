@@ -1,8 +1,4 @@
-import {
-  EFFECT_BUNDLE_CORPUS,
-  readEffectBundleCorpusArchive,
-} from '../../../../../../tooling/test/support/effect-v1-corpus.test-support';
-import { importEffectBundleZip } from '../../../features/video/project/effect-bundle/import/zip';
+import { readValidAnimationSnapshot } from '../effect-bundles/fixture.test-support';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { workspace as template } from '../review-workspaces/backup-restore.test-support';
 import { materializeVideoWorkspaceProject } from '../review-workspaces/project-metadata';
@@ -166,75 +162,13 @@ it('refuses foreign thumbnail association and undeclared binary slots', () => {
   expect(() => parsePreparedVideoReviewReplicaRoot({ ...value, extra: new Blob() })).toThrow();
 });
 
-it('verifies every retained annotation effect resource before native publication', async () => {
-  const corpus = EFFECT_BUNDLE_CORPUS.find(
-    (item) => item.accepted && item.artifact.includes('asset-bearing-conformance')
-  );
-  if (!corpus) throw new Error('Missing effect corpus');
-  const imported = await importEffectBundleZip(readEffectBundleCorpusArchive(corpus));
-  if (!imported.ok) throw new Error('Invalid effect corpus');
-  const document = imported.bundle.documents.find((item) => item.document.kind === 'standalone');
-  if (!document) throw new Error('Missing standalone effect');
-  const value = root();
-  const files = new Map<string, File>();
-  value.assets = document.assets.map((asset, index) => {
-    const id = `effect-resource-${index}`;
-    const ref: AssetRef = {
-      ...reference(`bytes-${id}`, asset.mimeType),
-      size: asset.byteLength,
-      sha256: asset.sha256,
-    };
-    files.set(
-      ref.assetId,
-      new File([Uint8Array.from(asset.bytes).buffer], id, { type: asset.mimeType })
-    );
-    return {
-      entry: createProjectAssetEntry({
-        id,
-        assetId: ref.assetId,
-        size: ref.size,
-        mimeType: ref.mimeType,
-      }),
-      ref,
-      filename: id,
-    };
-  });
-  value.review.workspace.effectSnapshots = [
-    {
-      id: `effect:${document.sha256}`,
-      schemaVersion: 'sniptale.effect.v1',
-      kind: 'standalone',
-      documentId: document.document.id,
-      sha256: document.sha256,
-      source: document.source,
-      retainedByteLength:
-        new TextEncoder().encode(document.source).byteLength +
-        document.assets.reduce((size, asset) => size + asset.byteLength, 0),
-      assets: document.assets.map((asset, index) => {
-        if (asset.kind === 'audio') throw new Error('Annotation fixture must use visual resources');
-        return {
-          id: asset.id,
-          kind: asset.kind,
-          mimeType: asset.mimeType,
-          byteLength: asset.byteLength,
-          sha256: asset.sha256,
-          assetId: `project-asset:${value.assets[index]!.entry.id}`,
-        };
-      }),
-    },
-  ];
-  io.read.mockImplementation(async (ref: AssetRef) => {
-    const file = files.get(ref.assetId);
-    if (!file) throw new Error('Missing test file');
-    return file;
-  });
+it('verifies self-contained annotation sources before native publication', async () => {
+  const value = root(),
+    snapshot = await readValidAnimationSnapshot();
+  value.review.workspace.effectSnapshots = [snapshot];
   expect(
     (await hydratePreparedVideoReviewReplicaRoot(value)).review.workspace.effectSnapshots
-  ).toEqual(value.review.workspace.effectSnapshots);
-  const first = value.assets[0]!;
-  files.set(
-    first.ref.assetId,
-    new File([new Uint8Array(first.ref.size)], 'corrupted', { type: first.ref.mimeType })
-  );
+  ).toEqual([snapshot]);
+  snapshot.sha256 = '0'.repeat(64);
   await expect(hydratePreparedVideoReviewReplicaRoot(value)).rejects.toThrow();
 });

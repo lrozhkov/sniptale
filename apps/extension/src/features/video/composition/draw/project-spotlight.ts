@@ -226,7 +226,7 @@ export function drawCompositionSceneSpotlights(
     args.context.clip();
     args.context.setTransform(1, 0, 0, 1, 0, 0);
     const source =
-      layers.some((layer) => layer.blur > 0) && args.blurSource
+      layers.some((layer) => layer.blur > 0 || layer.lens) && args.blurSource
         ? args.blurSource()
         : args.context.canvas;
     drawSceneSpotlights(args.context, source, null, layers);

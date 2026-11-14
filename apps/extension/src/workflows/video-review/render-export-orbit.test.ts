@@ -1,13 +1,13 @@
 import { expect, it, vi } from 'vitest';
-import * as spatialSession from './spatial-render-session';
+import * as spatialSession from '../../features/video/composition/canvas/spatial-renderer';
 import { contextFixture } from './render-export.test-support';
-import { renderRenderWindowFrames } from './render-export';
+import { renderRenderWindowFrames } from './render-export-composition.test-support';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 
 it('prepares spatial export for a newly created cursor Orbit without authored manual perspective', async () => {
   const draw = vi.fn(),
     dispose = vi.fn();
-  const open = vi.spyOn(spatialSession, 'createReviewSpatialSession').mockImplementation(() => ({
+  const open = vi.spyOn(spatialSession, 'createReviewSpatialRenderer').mockImplementation(() => ({
     get allocations() {
       return [];
     },

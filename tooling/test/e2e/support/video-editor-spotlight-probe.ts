@@ -1,3 +1,4 @@
+import { prepareDecodedVideoFrame } from '../../../../apps/extension/src/features/video/composition/draw/decoded-sample';
 import { drawCompositionVisualLayer } from '../../../../apps/extension/src/features/video/composition/draw/visual';
 import { resolveVideoCompositionFrame } from '../../../../apps/extension/src/features/video/composition/timeline/frame';
 import { createVideoProjectFromRecording } from '../../../../apps/extension/src/features/video/project/factories/creation';
@@ -178,6 +179,7 @@ export async function nativeSceneSpotlightRasterProof(bytes: number[]) {
   board.style.cssText = 'display:grid;grid-template-columns:repeat(4,280px);gap:8px';
   document.body.append(board);
   const results = [];
+  let exportSource: VideoFrame | undefined;
   try {
     await new Promise<void>((resolve, reject) => {
       video.onloadeddata = () => resolve();
@@ -187,6 +189,12 @@ export async function nativeSceneSpotlightRasterProof(bytes: number[]) {
       video.onseeked = () => resolve();
       video.currentTime = 1;
     });
+    // Export sampling supplies prepared RGB, as does the legacy preview capture adapter.
+    const preparedSource = await prepareDecodedVideoFrame(
+      new VideoFrame(video),
+      new AbortController().signal
+    );
+    exportSource = preparedSource;
     for (const raster of [1, 2])
       for (const mode of [
         'canvas',
@@ -298,8 +306,23 @@ export async function nativeSceneSpotlightRasterProof(bytes: number[]) {
         const renderer = mode === 'perspective' ? createReviewSpatialSession() : null;
         try {
           const spatial = renderer ? { spatialRenderer: () => renderer } : {};
-          const sources = new Map([[clip.id, video]]);
-          drawProjectFrame(
+          const sources = new Map([
+            [
+              clip.id,
+              {
+                sourceWidth: preparedSource.displayWidth,
+                sourceHeight: preparedSource.displayHeight,
+                draw: (
+                  context: CanvasRenderingContext2D,
+                  x: number,
+                  y: number,
+                  width: number,
+                  height: number
+                ) => context.drawImage(preparedSource, x, y, width, height),
+              },
+            ],
+          ]);
+          await drawProjectFrame(
             exported.getContext('2d')!,
             project,
             settings,
@@ -312,7 +335,7 @@ export async function nativeSceneSpotlightRasterProof(bytes: number[]) {
             ...project,
             motionRegions: project.motionRegions.filter((region) => !region.spotlight),
           };
-          drawProjectFrame(
+          await drawProjectFrame(
             baseline.getContext('2d')!,
             noSpotlight,
             settings,
@@ -449,6 +472,7 @@ export async function nativeSceneSpotlightRasterProof(bytes: number[]) {
       }
     return results;
   } finally {
+    exportSource?.close();
     video.pause();
     video.removeAttribute('src');
     video.load();

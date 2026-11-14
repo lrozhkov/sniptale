@@ -1,3 +1,4 @@
+import { projectSourceInteractionActions } from './source-interaction-documents';
 import { recordingEventProjectActions } from './recording-events/project-facts';
 import { areVideoClipSourceClocksContinuous } from './timeline/rate';
 import { recordingIdForProjectAsset } from './source-interactions';
@@ -76,15 +77,21 @@ export function resolveVideoProjectActionOccurrences(
     if (clip.type !== 'VIDEO' || !clip.sourceInstanceId) continue;
     const asset = project.assets.find((item) => item.id === clip.assetId);
     const recordingId = recordingIdForProjectAsset(asset);
-    if (!recordingId) continue;
-    const key = JSON.stringify([recordingId, clip.sourceInstanceId]);
-    const group = instances.get(key) ?? [];
-    group.push(clip);
-    instances.set(key, group);
+    const keys = [
+      JSON.stringify(['source', clip.assetId, clip.sourceInstanceId]),
+      ...(recordingId
+        ? [JSON.stringify(['recording-source', recordingId, clip.sourceInstanceId])]
+        : []),
+    ];
+    for (const key of keys) {
+      const group = instances.get(key) ?? [];
+      group.push(clip);
+      instances.set(key, group);
+    }
   }
   const runs = new Map([...instances].map(([key, clips]) => [key, resolveRuns(clips)]));
   const preparedActions = recordingEventProjectActions(project);
-  const sourceActions = [
+  const sourceActions = projectSourceInteractionActions(project, [
     ...preparedActions.filter(
       (event) =>
         !selectedSourceActions.some(
@@ -99,7 +106,7 @@ export function resolveVideoProjectActionOccurrences(
         )
     ),
     ...selectedSourceActions,
-  ];
+  ]);
   const occurrences = sourceActions.flatMap<VideoProjectActionOccurrence>((event) => {
     const anchor = event.anchor;
     if (anchor.kind === 'project') {
@@ -114,7 +121,11 @@ export function resolveVideoProjectActionOccurrences(
         },
       ];
     }
-    const key = JSON.stringify([anchor.recordingId, anchor.sourceInstanceId]);
+    const key = JSON.stringify([
+      anchor.kind,
+      anchor.kind === 'source' ? anchor.assetId : anchor.recordingId,
+      anchor.sourceInstanceId,
+    ]);
     const clips = instances.get(key) ?? [];
     const pointTime = (clip: VideoProjectVideoClip) =>
       clip.startTime +

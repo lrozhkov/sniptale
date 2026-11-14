@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { readFileSync } from 'node:fs';
-import { act, type ComponentProps, type ReactNode } from 'react';
+import { act, useEffect, type ComponentProps, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { parseVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
@@ -56,7 +56,17 @@ vi.mock('./use-presentation-preview', async (original) => {
 vi.mock('./review-dialog', () => ({
   ReviewDialog: ({ children }: { children: ReactNode }) => children,
 }));
-vi.mock('./preview-binding', () => ({ ReviewPreviewBinding: () => null }));
+vi.mock('./preview-binding', () => ({
+  ReviewPreviewBinding: ({
+    onPreviewRaster,
+    previewOverlay,
+  }: ComponentProps<typeof import('./preview-binding').ReviewPreviewBinding>) => {
+    useEffect(() => {
+      onPreviewRaster?.({ width: 640, height: 360 });
+    }, [onPreviewRaster]);
+    return previewOverlay ?? null;
+  },
+}));
 vi.mock('./inspector-binding', async (original) => ({
   ...(await original<typeof import('./inspector-binding')>()),
   ReviewInspectorBinding: () => null,
@@ -96,7 +106,7 @@ let failRead = false;
 const save = vi.fn();
 function setup() {
   const text = readFileSync(
-    'apps/extension/public/video-effects/effects/annotations/sniptale-title/effect.sniptale-effect.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
   const advanced = createQuickEditAdvancedState();
@@ -113,6 +123,7 @@ function setup() {
         enabled: true,
         transform: { x: 0.1, y: 0.1, width: 0.4, height: 0.2, rotation: 0 },
         controls: { title: 'Persisted title' },
+        anchors: { tip: { x: 0.5, y: 0.5 } },
         order: 0,
       },
     ],
@@ -132,9 +143,9 @@ function setup() {
           id: `effect:${'a'.repeat(64)}`,
           sha256: 'a'.repeat(64),
           source: text,
-          schemaVersion: 'sniptale.effect.v1',
+          schemaVersion: 'sniptale.animation.v1',
           kind: 'standalone',
-          documentId: 'sniptale-title',
+          documentId: 'sniptale-callout',
           retainedByteLength: new TextEncoder().encode(text).byteLength,
           assets: [],
         },
@@ -276,7 +287,7 @@ it('passes the coherent EffectV1 snapshots into the Gallery presentation preview
   expect(observed.preview?.effectSnapshots).toBe(
     state().snapshot.snapshot.workspace.effectSnapshots
   );
-  expect(observed.preview?.effectSnapshots?.[0]?.documentId).toBe('sniptale-title');
+  expect(observed.preview?.effectSnapshots?.[0]?.documentId).toBe('sniptale-callout');
 });
 
 it('routes rare commands into one More menu in Basic and Advanced without permanent project actions', async () => {
@@ -296,9 +307,46 @@ it('routes rare commands into one More menu in Basic and Advanced without perman
         translate('videoEditor.app.newProjectAction'),
         translate('gallery.keyboard.title'),
         translate('gallery.app.selectionBackup'),
+        ...(mode === 'advanced' ? [translate('gallery.videoReview.returnBasicMode')] : []),
       ]
     );
     await act(async () => trigger.click());
     expect(document.querySelector('[role="menu"]')).toBeNull();
   }
+});
+
+it('makes the live seek toolbar toggle available after metadata and keeps it outside project history', async () => {
+  setup();
+  let ready!: (index: Awaited<ReturnType<typeof inspectReviewMedia>>) => void;
+  const metadata = new Promise<Awaited<ReturnType<typeof inspectReviewMedia>>>((resolve) => {
+    ready = resolve;
+  });
+  vi.mocked(inspectReviewMedia).mockReturnValue(metadata);
+  await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={vi.fn()} />));
+  const button = () =>
+    host.querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.liveSeekToggle"]')!;
+  expect(button().disabled).toBe(true);
+  await act(async () =>
+    ready({
+      duration: 4,
+      boundaries: [0, 4],
+      videoCodec: 'vp9',
+      audioCodec: null,
+      container: 'webm',
+      rotation: 0,
+      frameRate: 30,
+      width: 640,
+      height: 360,
+    })
+  );
+  expect(button().disabled).toBe(false);
+  expect(button().getAttribute('aria-pressed')).toBe('false');
+  const before = loaded.session.getSnapshot();
+  await act(async () => button().click());
+  expect(button().getAttribute('aria-pressed')).toBe('true');
+  expect(loaded.session.getSnapshot().snapshot).toEqual(before.snapshot);
+  expect(loaded.session.getSnapshot().dirty).toBe(before.dirty);
+  await act(async () => button().click());
+  expect(button().getAttribute('aria-pressed')).toBe('false');
+  expect(loaded.session.getSnapshot().snapshot).toEqual(before.snapshot);
 });

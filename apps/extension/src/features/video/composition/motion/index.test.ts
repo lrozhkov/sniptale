@@ -377,3 +377,38 @@ it('frames only the named source occurrence, maps its layer geometry and never r
   project.tracks[0]!.role = 'CAMERA';
   expect(resolve().focusPoint).toEqual({ x: 10, y: 20 });
 });
+
+it('applies independent spatial focus without replacing zoom and excludes a conflicting 3D fragment', async () => {
+  const { createVideoProjectMotionRegion } = await import('../../project/motion');
+  const { DEFAULT_CAMERA_PERSPECTIVE } = await import('../../project/motion/spatial');
+  const project = createEmptyVideoProject('Independent spatial', 1000, 800);
+  project.duration = 10;
+  const zoom = { ...createVideoProjectMotionRegion(project, 0), duration: 8 };
+  const spatial = {
+    ...zoom,
+    id: '3d',
+    effect: '3d' as const,
+    startTime: 1,
+    duration: 5,
+    perspective: { ...DEFAULT_CAMERA_PERSPECTIVE, enabled: true, rotateY: 25 },
+  };
+  const copy = {
+    ...spatial,
+    id: 'copy',
+    startTime: 2,
+    duration: 5,
+    perspective: { ...spatial.perspective, rotateY: -40 },
+  };
+  const sample = (regions: NonNullable<typeof project.motionRegions>, currentTime: number) =>
+    resolveVideoCompositionCamera({
+      project: { ...project, motionRegions: regions },
+      currentTime,
+      actions: [],
+      cursorSample: null,
+    });
+  expect(sample([zoom, spatial, copy], 3).scale).toBe(sample([zoom], 3).scale);
+  expect(sample([zoom, spatial, copy], 3).spatial?.rotation).toEqual(
+    sample([spatial], 3).spatial?.rotation
+  );
+  expect(sample([zoom, spatial, copy], 6.5).spatial).toBeUndefined();
+});

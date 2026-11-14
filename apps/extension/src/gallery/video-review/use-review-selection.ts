@@ -1,3 +1,5 @@
+import { reviewInteractionFamily } from '../../features/video/review/interaction-timeline';
+import { reviewTrackEnabled } from '../../features/video/review/advanced/track-controls';
 import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
 import { originalAudioRangeViews } from '../../features/video/review/advanced/original-audio-mutes';
@@ -46,6 +48,8 @@ export function reviewSelectionExists(
   cursorFocusKeys: readonly { id: string }[] = []
 ): boolean {
   if (selection.kind === 'none') return false;
+  if (selection.kind === 'cursor-motion')
+    return !!advanced.cursorMotions?.some((m) => m.id === selection.id);
   if (selection.kind === 'cursor-focus')
     return (
       cursorFocusKeys.some((key) => key.id === selection.id) ||
@@ -113,6 +117,7 @@ export function useReviewSelectionLifecycle(args: {
   cursorFocusKeys?: readonly { id: string }[];
   historyPending?: boolean;
   deleteCursorFocus?(id: string): void;
+  deleteCursorMotion?(id: string): void;
   commit(operation: ReviewOperation): Promise<unknown>;
   run(action: () => Promise<unknown>): Promise<unknown>;
   deleteCanvas(id: string): void;
@@ -122,13 +127,27 @@ export function useReviewSelectionLifecycle(args: {
   deleteZoomLink(id: string): void;
   deleteAudio(lane: 'voiceover' | 'music', id: string): void;
   deleteOriginalAudio?(id: string): void;
+  deleteTelemetry?(marker: ReviewTelemetryMarker): void;
   deleteWebcam?(
     selection: Extract<ReviewSelection, { kind: 'webcam' | 'webcam-position' | 'webcam-hidden' }>
   ): void;
   clearAnnotation(): void;
 }) {
   const remove = () => {
-    if (args.selection.kind === 'none' || args.selection.kind === 'telemetry') return;
+    if (args.selection.kind === 'none') return;
+    if (args.selection.kind === 'telemetry') {
+      const ref = args.selection.ref;
+      const marker = (args.markers ?? []).find(
+        (m) => m.ref.kind === ref.kind && m.ref.id === ref.id
+      );
+      if (marker) args.deleteTelemetry?.(marker);
+      return;
+    }
+    if (args.selection.kind === 'cursor-motion') {
+      args.deleteCursorMotion?.(args.selection.id);
+      args.setSelection({ kind: 'none' });
+      return;
+    }
     if (args.selection.kind === 'cursor-focus') {
       const selectedId = args.selection.id;
       const key = args.cursorFocusPath?.segments
@@ -189,10 +208,12 @@ export function reviewSelectionSourceTime(
   markers: readonly ReviewTelemetryMarker[] = [],
   originalAudioVisible = true
 ): number | null {
-  if (!selectionTrackVisible(selection, advanced, originalAudioVisible)) return null;
+  if (!selectionTrackVisible(selection, advanced, originalAudioVisible, markers)) return null;
   const midpoint = (range: { start: number; end: number } | undefined) =>
     range ? (range.start + range.end) / 2 : null;
   switch (selection.kind) {
+    case 'cursor-motion':
+      return midpoint(advanced.cursorMotions?.find((m) => m.id === selection.id));
     case 'cursor-focus':
       return selection.time;
     case 'none':
@@ -280,10 +301,13 @@ function focusSourceRange(
 function selectionTrackVisible(
   selection: ReviewSelection,
   advanced: QuickEditAdvancedState,
-  originalAudioVisible: boolean
+  originalAudioVisible: boolean,
+  markers: readonly ReviewTelemetryMarker[]
 ) {
   const features = resolveQuickEditEffectiveFeatures(advanced);
   switch (selection.kind) {
+    case 'cursor-motion':
+      return advanced.ui.mode === 'advanced' && advanced.ui.tracks.cursorMotion !== false;
     case 'webcam':
     case 'webcam-position':
     case 'webcam-hidden':
@@ -296,8 +320,13 @@ function selectionTrackVisible(
       return features.zoomApplied;
     case 'audio':
       return features.audioTrackVisible;
-    case 'telemetry':
-      return features.actionsTrackVisible;
+    case 'telemetry': {
+      const marker = markers.find(
+        (item) => item.ref.kind === selection.ref.kind && item.ref.id === selection.ref.id
+      );
+      const family = marker ? reviewInteractionFamily(marker) : undefined;
+      return features.actionsTrackVisible && (!family || reviewTrackEnabled(advanced.ui, family));
+    }
     case 'canvas-comment':
       return features.overlaysVisible;
     case 'original-audio':

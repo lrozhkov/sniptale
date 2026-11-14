@@ -1,12 +1,13 @@
+import { createGlTransitionSelection } from '../../../../apps/extension/src/features/video/project/transition/gl-catalog';
 import { isExportReadyVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
 import { createQuickEditWatermark } from '../../../../apps/extension/src/features/video/project/scene/watermark';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
-import {
-  parseEffectV1Source,
-  resolveEffectV1ControlDefault,
-} from '@sniptale/runtime-contracts/effect-v1';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
+import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
+import { animationRuntimeDuration } from '../../../../apps/extension/src/contracts/effect-runtime/animation';
+import { createEffectHostClip } from '../../../../apps/extension/src/features/video/project/factories/overlay-clip';
 import {
   createVideoProjectFromRecording,
   createVideoProjectTrack,
@@ -568,7 +569,8 @@ async function createBookendCompositionFixture(locale: 'ru' | 'en') {
       id: 'join',
       leadingClipId: leading.id,
       trailingClipId: trailing.id,
-      kind: 'CROSSFADE',
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       duration: 0.4,
       easing: 'LINEAR',
     },
@@ -627,12 +629,12 @@ async function createBookendCompositionFixture(locale: 'ru' | 'en') {
   }
   const source = await readFile(
     new URL(
-      '../../../../packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-target-effect.sniptale-effect.json',
+      '../../../../apps/extension/public/video-effects/animations/title.sniptale-animation.json',
       import.meta.url
     ),
     'utf8'
   );
-  const effect = parseEffectV1Source(source).document;
+  const effect = parseAnimationTemplateSource(source).template;
   if (!effect) throw new Error('Invalid effect fixture');
   const sha256 = createHash('sha256').update(source).digest('hex');
   project.effectSnapshots = [
@@ -641,8 +643,8 @@ async function createBookendCompositionFixture(locale: 'ru' | 'en') {
       sha256,
       source,
       documentId: effect.id,
-      kind: effect.kind,
-      schemaVersion: 'sniptale.effect.v1',
+      kind: 'standalone',
+      schemaVersion: 'sniptale.animation.v1',
       assets: [],
       retainedByteLength: Buffer.byteLength(source),
     },
@@ -650,21 +652,38 @@ async function createBookendCompositionFixture(locale: 'ru' | 'en') {
   project.effectInstances = [
     {
       id: 'fx',
-      kind: 'targetEffect',
-      target: { kind: 'clip', clipId: leading.id },
+      kind: 'standalone',
+      target: { kind: 'scene' },
       snapshotId: `effect:${sha256}`,
       enabled: true,
       startTime: 0,
       duration: 0.8,
-      playbackRate: effect.duration / 0.8,
-      rangeMode: 'owner',
-      controls: Object.fromEntries(
-        effect.controls.map((control) => [
-          control.id,
-          resolveEffectV1ControlDefault(control, locale),
-        ])
-      ),
+      playbackRate: animationRuntimeDuration(effect) / 0.8,
+      controls: {
+        ...Object.fromEntries(
+          effect.controls.map((control) => [
+            control.id,
+            resolveEffectControlDefault(control, locale),
+          ])
+        ),
+        // This row proves source/clock retention; other layers own the bookend pixel oracle.
+        opacity: 0,
+      },
     },
   ];
+  const annotationTrack = createVideoProjectTrack('Retained annotation', -2, 'PRIMARY');
+  project.tracks.push(annotationTrack);
+  project.clips.push(
+    createEffectHostClip({
+      dimensions: { width: effect.animation.w, height: effect.animation.h },
+      duration: 0.8,
+      effectInstanceId: 'fx',
+      name: 'Retained annotation',
+      projectWidth: project.width,
+      projectHeight: project.height,
+      startTime: 0,
+      trackId: annotationTrack.id,
+    })
+  );
   return project;
 }

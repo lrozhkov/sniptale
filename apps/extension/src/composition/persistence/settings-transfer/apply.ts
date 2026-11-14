@@ -32,6 +32,14 @@ import {
 import { parsePagePackageCaptureTimingPolicy } from '@sniptale/runtime-contracts/page-package';
 import { parseExportResourceLimits } from '@sniptale/runtime-contracts/export';
 
+import {
+  AUDIO_PRESET_STORAGE_KEY,
+  parseAudioPresetCatalog,
+  projectAudioPresetTransfer,
+  parseAudioPresetTransfer,
+  restoreAudioPresetCatalog,
+} from '../audio-presets/catalog';
+
 const SYNC_KEYS = [
   'sniptale_settings',
   'sniptale_highlighter_settings',
@@ -42,6 +50,7 @@ const SYNC_KEYS = [
   'sniptale_surface_style_presets',
 ] as const;
 const LOCAL_KEYS = [
+  AUDIO_PRESET_STORAGE_KEY,
   'sniptale-theme-preference',
   'sniptale-locale-preference',
   'sniptale_popup_startup',
@@ -79,6 +88,21 @@ export async function applySettingsTransferDomains(args: {
     currentVideo,
     domains: args.domains,
   });
+  const audioData = args.domains['styles.audio-effects'];
+  if (audioData) {
+    const current = parseAudioPresetCatalog(beforeLocal[AUDIO_PRESET_STORAGE_KEY]);
+    const incoming = parseAudioPresetTransfer(audioData.data);
+    if (!current || !incoming) throw new TypeError('Audio preset transfer is invalid.');
+    const previous = projectAudioPresetTransfer(current);
+    const restored = restoreAudioPresetCatalog(current, {
+      ...(incoming.presets && JSON.stringify(incoming.presets) !== JSON.stringify(previous.presets)
+        ? { presets: incoming.presets }
+        : {}),
+      ...(incoming.preferences ? { preferences: incoming.preferences } : {}),
+    });
+    if (!restored) throw new TypeError('Audio preset references are invalid.');
+    localWrites[AUDIO_PRESET_STORAGE_KEY] = restored;
+  }
   const previousStoredSettings = beforeSync['sniptale_settings'];
   const previousManifest =
     previousStoredSettings &&

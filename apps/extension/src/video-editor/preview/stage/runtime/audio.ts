@@ -1,4 +1,6 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { createProjectProcessedAudioRuntime } from './processed-audio';
+import type { VideoEditorPreviewPrepareRequest } from '../../../contracts/preview-runtime';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 
 import {
   getClipEndTime,
@@ -81,11 +83,19 @@ export function usePreviewStageAudioBankClips(
   }, [activeAudioClips, currentTime, project]);
 }
 
-export function usePreviewStageAudioSync(params: PreviewStageAudioSyncParams): void {
+export function usePreviewStageAudioSync(
+  params: PreviewStageAudioSyncParams & {
+    assetUrls?: Readonly<Record<string, string>>;
+    retryVersion?: number;
+  }
+) {
   const { audioRefs, currentTime, isPlaying, mutePreviewAudio, project, syncedClips } = params;
   const audioGraphStateRef = useRef(createPreviewAudioGraphState());
   const mediaSyncStateRef = useRef(createPreviewMediaSyncState());
-
+  const latest = useRef(params);
+  latest.current = params;
+  const processed = useRef(createProjectProcessedAudioRuntime(audioGraphStateRef.current));
+  const retryVersion = useRef(params.retryVersion);
   useLayoutEffect(() => {
     syncPreviewAudioElements({
       audioGraphState: audioGraphStateRef.current,
@@ -99,11 +109,35 @@ export function usePreviewStageAudioSync(params: PreviewStageAudioSyncParams): v
     } satisfies PreviewStageAudioElementSyncParams);
     updatePreviewMediaSyncState(mediaSyncStateRef.current, currentTime, isPlaying);
   }, [audioRefs, currentTime, isPlaying, mutePreviewAudio, project, syncedClips]);
-
   useEffect(() => {
     const audioGraphState = audioGraphStateRef.current;
+    const runtime = processed.current;
     return () => {
+      // React can replay effect setup with the same refs. Reset preserves a reusable owner.
+      runtime.reset();
       cleanupPreviewAudio({ audioGraphState, audioRefs });
     };
   }, [audioRefs]);
+  const prepare = useCallback(async (request: VideoEditorPreviewPrepareRequest) => {
+    const current = latest.current;
+    if (current.mutePreviewAudio) return;
+    await processed.current.prepare(
+      { project: current.project, assetUrls: current.assetUrls ?? {} },
+      request
+    );
+  }, []);
+  const sync = useCallback(async () => {
+    const current = latest.current;
+    if (retryVersion.current !== current.retryVersion) {
+      retryVersion.current = current.retryVersion;
+      processed.current.reset();
+    }
+    processed.current.sync({
+      project: current.project,
+      assetUrls: current.assetUrls ?? {},
+      currentTime: current.currentTime,
+      isPlaying: current.isPlaying && !current.mutePreviewAudio,
+    });
+  }, []);
+  return useMemo(() => ({ prepare, sync }), [prepare, sync]);
 }

@@ -1,3 +1,4 @@
+import { ReviewPlaybackPresentationClockContext } from './playback-presentation-clock';
 import { documentAutosaveLabels } from '../../ui/document-autosave-labels';
 import { ReviewTrackRow } from './track-row';
 import { ReviewKeyboardHelp } from './keyboard-help';
@@ -24,6 +25,10 @@ import {
   FileVideo,
 } from 'lucide-react';
 import {
+  memo,
+  useCallback,
+  useContext,
+  useLayoutEffect,
   useEffect,
   useRef,
   useState,
@@ -45,13 +50,6 @@ export function ReviewRuler({
   width: number;
   interaction?: HTMLAttributes<HTMLDivElement>;
 }) {
-  const required = duration / Math.max(1, width / 80);
-  const magnitude = 10 ** Math.floor(Math.log10(required));
-  const major =
-    [1, 2, 5, 10].map((value) => value * magnitude).find((value) => value >= required) ??
-    magnitude * 10;
-  const minor = major / 5;
-  const count = Math.min(2000, Math.floor(duration / minor));
   return (
     <div
       data-ui="gallery.videoReview.ruler"
@@ -60,6 +58,28 @@ export function ReviewRuler({
       className="relative h-7 select-none overflow-hidden outline-none focus-visible:ring-1
         focus-visible:ring-inset focus-visible:ring-[var(--sniptale-color-accent)] touch-none"
     >
+      <ReviewRulerTicks duration={duration} width={width} />
+    </div>
+  );
+}
+
+/** Ruler marks depend on axis geometry, not playback time or gesture callbacks. */
+const ReviewRulerTicks = memo(function ReviewRulerTicks({
+  duration,
+  width,
+}: {
+  duration: number;
+  width: number;
+}) {
+  const required = duration / Math.max(1, width / 80);
+  const magnitude = 10 ** Math.floor(Math.log10(required));
+  const major =
+    [1, 2, 5, 10].map((value) => value * magnitude).find((value) => value >= required) ??
+    magnitude * 10;
+  const minor = major / 5;
+  const count = Math.min(2000, Math.floor(duration / minor));
+  return (
+    <>
       {Array.from({ length: count + 1 }, (_, index) => {
         const time = index * minor;
         const labelled = index % 5 === 0;
@@ -80,9 +100,9 @@ export function ReviewRuler({
           </div>
         );
       })}
-    </div>
+    </>
   );
-}
+});
 
 /** Sticky ruler chrome shares the track coordinate system and keeps its marker above scrolled lanes. */
 export function ReviewRulerRow(props: {
@@ -124,14 +144,25 @@ function playbackTime(value: number): string {
 
 /** The maximum source-clock format reserves space without changing the live readout. */
 function ReviewPlaybackClock(props: { time: number; duration: number }) {
+  const clock = useContext(ReviewPlaybackPresentationClockContext);
+  const readout = useRef<HTMLSpanElement>(null);
+  const label = (time: number) => `${playbackTime(time)} / ${playbackTime(props.duration)}`;
+  const update = useCallback(() => {
+    if (!clock?.isPlaying() || !readout.current) return;
+    const value = `${playbackTime(clock.read())} / ${playbackTime(props.duration)}`;
+    if (readout.current.textContent !== value) readout.current.textContent = value;
+  }, [clock, props.duration]);
+  useLayoutEffect(() => clock?.subscribe(update), [clock, update]);
+  // A late root commit must not replace the time of an already displayed frame.
+  useLayoutEffect(update);
   const sample = playbackTime(props.duration).replace(/\d/g, '8');
   return (
     <span className="review-playback-clock whitespace-nowrap text-xs font-semibold tabular-nums">
       <span aria-hidden="true" className="invisible">
         {sample} / {playbackTime(props.duration)}
       </span>
-      <span className="review-playback-clock-value">
-        {playbackTime(props.time)} / {playbackTime(props.duration)}
+      <span ref={readout} className="review-playback-clock-value">
+        {label(clock?.isPlaying() ? clock.read() : props.time)}
       </span>
     </span>
   );
@@ -181,15 +212,36 @@ export function ReviewPlayhead(props: {
   gutter: number;
   width: number;
 }) {
+  const clock = useContext(ReviewPlaybackPresentationClockContext);
+  const node = useRef<HTMLDivElement>(null);
+  const position = useCallback(
+    (time: number) =>
+      props.gutter + Math.max(0, Math.min(1, time / props.duration)) * props.width - 5,
+    [props.gutter, props.duration, props.width]
+  );
+  const update = useCallback(() => {
+    if (clock?.isPlaying() && node.current) {
+      const left = position(clock.read());
+      const displayed = Number.parseFloat(node.current.style.transform.slice('translateX('.length));
+      // CSS serializes fractional pixels; sub-millipixel roundoff is not a new position.
+      if (!Number.isFinite(displayed) || Math.abs(displayed - left) > 0.001)
+        node.current.style.transform = `translateX(${left}px)`;
+    }
+  }, [clock, position]);
+  useLayoutEffect(() => clock?.subscribe(update), [clock, update]);
+  // A delayed React commit cannot restore an older playhead position over a published frame.
+  useLayoutEffect(update);
   return (
     <div
       aria-hidden="true"
+      ref={node}
       data-ui={props.ruler ? 'gallery.videoReview.rulerPlayhead' : 'gallery.videoReview.playhead'}
       className={`pointer-events-none absolute ${props.ruler ? 'bottom-0' : 'bottom-2'} top-0 z-20
         bg-[var(--sniptale-color-accent-emphasis)] group-focus-visible/plane:brightness-125`}
       style={{
-        left:
-          props.gutter + Math.max(0, Math.min(1, props.time / props.duration)) * props.width - 5,
+        left: 0,
+        transform: `translateX(${position(clock?.isPlaying() ? clock.read() : props.time)}px)`,
+        willChange: 'transform',
         width: 10,
         clipPath: 'polygon(0 0, 100% 0, 55% 8px, 55% 100%, 45% 100%, 45% 8px)',
       }}
@@ -208,6 +260,8 @@ export function ReviewToolbar(props: {
   resultDuration?: number;
   historyControls?: ReactNode;
   utilityControls?: ReactNode;
+  modeControl?: ReactNode;
+  inspectorControls?: ReactNode;
   tools?: ReactNode;
   expandedTools?: boolean;
   onPlay(): void;
@@ -222,6 +276,7 @@ export function ReviewToolbar(props: {
   return (
     <div ref={toolbar} data-ui="gallery.videoReview.toolbar" className="review-timeline-toolbar">
       <div data-toolbar-side="leading" className="flex min-w-0 items-center">
+        {props.modeControl}
         {props.tools}
       </div>
       <div data-toolbar-transport className="flex shrink-0 items-center justify-center gap-2">
@@ -298,6 +353,7 @@ export function ReviewToolbar(props: {
         {props.onOpenExport ? (
           <>
             <ReviewToolbarSeparator />
+            {props.inspectorControls}
             <ReviewButton
               data-ui="gallery.videoReview.openExport"
               label={translate('gallery.videoReview.exportSection')}

@@ -1,8 +1,5 @@
-import { createHash } from 'node:crypto';
-import {
-  parseEffectV1Source,
-  resolveEffectV1ControlDefault,
-} from '@sniptale/runtime-contracts/effect-v1';
+import { createGlTransitionSelection } from '../../../../apps/extension/src/features/video/project/transition/gl-catalog';
+import { createSourceImageFilter } from '../../../../apps/extension/src/features/image-filters/contract';
 import { readFile, writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { createShapeClip } from '../../../../apps/extension/src/features/video/project/factories/overlay-clip';
@@ -305,53 +302,19 @@ for (const format of ['MP4', 'WEBM'] as const) {
           id: 'scene-edge-crossfade',
           leadingClipId: leading.id,
           trailingClipId: trailing.id,
-          kind: 'CROSSFADE',
+          kind: 'gl' as const,
+          selection: createGlTransitionSelection('Fade')!,
           duration: 0.4,
           easing: 'LINEAR',
         },
       ];
-      const source = await readFile(
-        new URL(
-          '../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/' +
-            'sniptale-video-warm.sniptale-effect.json',
-          import.meta.url
-        ),
-        'utf8'
-      );
-      const document = parseEffectV1Source(source).document;
-      if (!document) throw new Error('Invalid effect fixture');
-      const sha256 = createHash('sha256').update(source).digest('hex');
-      project.effectSnapshots = [
-        {
-          id: `effect:${sha256}`,
-          sha256,
-          source,
-          assets: [],
-          retainedByteLength: Buffer.byteLength(source),
-          schemaVersion: 'sniptale.effect.v1',
-          documentId: document.id,
-          kind: 'targetEffect',
-        },
-      ];
-      project.effectInstances = [
-        {
-          id: 'scene-edge-effect',
-          kind: 'targetEffect',
-          target: { kind: 'clip', clipId: leading.id },
-          snapshotId: `effect:${sha256}`,
-          controls: Object.fromEntries(
-            document.controls.map((control) => [
-              control.id,
-              resolveEffectV1ControlDefault(control, 'en'),
-            ])
-          ),
-          rangeMode: 'owner',
-          enabled: true,
-          startTime: 0,
-          duration: 0.8,
-          playbackRate: document.duration / 0.8,
-        },
-      ];
+      const warmth = createSourceImageFilter('color', 'scene-edge-warmth');
+      if (warmth.kind !== 'color') throw new Error('Expected color filter.');
+      warmth.parameters.temperature = 0.3;
+      warmth.parameters.saturation = 0.8;
+      warmth.intensity = 0.3;
+      leading.sourceFilters = { version: 1, filters: [warmth] };
+      project.version = 52;
       project.textDocuments = [
         {
           id: 'scene-edge-captions',

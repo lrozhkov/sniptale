@@ -428,45 +428,24 @@ it('does not invent a handle for a missing point and rejects stale or invalid-ti
   expect(update).not.toHaveBeenCalled();
 });
 
-it('blocks only active clip effects or transitions affecting the selected source', () => {
-  const { project, clip, repeat, occurrences } = createCapturedOverlayFixture();
+it('keeps source action editing available with an independent scene annotation', () => {
+  const { project, clip, occurrences } = createCapturedOverlayFixture();
   const occurrence = occurrences().find((item) => item.clipId === clip.id)!;
-  const effect = {
-    id: 'effect',
-    kind: 'targetEffect' as const,
-    snapshotId: 'snapshot',
-    controls: {},
-    startTime: 0,
-    duration: 2,
-    enabled: true,
-    playbackRate: 1,
-    target: { kind: 'clip' as const, clipId: repeat.id },
-  };
-  project.effectInstances = [effect];
-  expect(canEditActionOccurrenceOnCanvas(project, occurrence, 1)).toBe(true);
-  effect.target.clipId = clip.id;
-  expect(canEditActionOccurrenceOnCanvas(project, occurrence, 1)).toBe(false);
-  effect.enabled = false;
-  expect(canEditActionOccurrenceOnCanvas(project, occurrence, 1)).toBe(true);
-  effect.enabled = true;
-  expect(canEditActionOccurrenceOnCanvas(project, occurrence, 2.5)).toBe(true);
-  project.transitions = [
+  project.effectInstances = [
     {
-      id: 'transition',
-      leadingClipId: clip.id,
-      trailingClipId: repeat.id,
-      duration: 1,
-      easing: 'LINEAR',
-      kind: 'CROSSFADE',
+      id: 'annotation',
+      kind: 'standalone',
+      snapshotId: 'snapshot',
+      controls: {},
+      startTime: 0,
+      duration: 2,
+      enabled: true,
+      playbackRate: 1,
+      target: { kind: 'scene' },
     },
   ];
-  project.effectInstances = [
-    { ...effect, kind: 'transition', target: { kind: 'transition', transitionId: 'transition' } },
-  ];
-  expect(canEditActionOccurrenceOnCanvas(project, occurrence, 1)).toBe(false);
-  project.transitions[0]!.leadingClipId = 'unrelated';
-  project.transitions[0]!.trailingClipId = 'other';
   expect(canEditActionOccurrenceOnCanvas(project, occurrence, 1)).toBe(true);
+  expect(canEditActionOccurrenceOnCanvas(project, occurrence, 2.5)).toBe(true);
 });
 
 it('drags the selected repeated occurrence in source coordinates and preserves its exact pair', () => {

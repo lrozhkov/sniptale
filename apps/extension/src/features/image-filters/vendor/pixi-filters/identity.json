@@ -1,0 +1,60 @@
+{
+  "repository": "https://github.com/pixijs/filters",
+  "tag": "v6.1.5",
+  "tagObject": "f00c01489d415fa051ca5edaa24c3efafcb6bfd6",
+  "commit": "e9d1ca987864f121680bb0d7e9612c05b37748de",
+  "files": [
+    {
+      "path": "LICENSE",
+      "sha256": "d554721b2cd409d9bc075d743bb34f960e05ba55de1818a62fa60caf21ca6188",
+      "byteLength": 1092,
+      "url": "https://raw.githubusercontent.com/pixijs/filters/e9d1ca987864f121680bb0d7e9612c05b37748de/LICENSE"
+    },
+    {
+      "path": "src/adjustment/adjustment.wgsl",
+      "sha256": "5a84abf603301aea816c7e8b0ea124d0066dbf26160091c62e0903297eb33a90",
+      "byteLength": 1082,
+      "url": "https://raw.githubusercontent.com/pixijs/filters/e9d1ca987864f121680bb0d7e9612c05b37748de/src/adjustment/adjustment.wgsl"
+    },
+    {
+      "path": "src/kawase-blur/kawase-blur-clamp.wgsl",
+      "sha256": "a4fff3bae89b20b2acd000d03f3517a065d746f5804f35d8d64e0dc1ad680484",
+      "byteLength": 1418,
+      "url": "https://raw.githubusercontent.com/pixijs/filters/e9d1ca987864f121680bb0d7e9612c05b37748de/src/kawase-blur/kawase-blur-clamp.wgsl"
+    },
+    {
+      "path": "src/kawase-blur/KawaseBlurFilter.ts",
+      "sha256": "90b2a44e2468f5f32d000b364d7da0f1c9b7e19f175b52aade75d60ed823b58f",
+      "byteLength": 9192,
+      "url": "https://raw.githubusercontent.com/pixijs/filters/e9d1ca987864f121680bb0d7e9612c05b37748de/src/kawase-blur/KawaseBlurFilter.ts"
+    },
+    {
+      "path": "src/advanced-bloom/extract-brightness.wgsl",
+      "sha256": "5c05a436463973f8f8b3323aaba3809801b4f5fe3b8fb19f1e0970d4ef196e26",
+      "byteLength": 797,
+      "url": "https://raw.githubusercontent.com/pixijs/filters/e9d1ca987864f121680bb0d7e9612c05b37748de/src/advanced-bloom/extract-brightness.wgsl"
+    },
+    {
+      "path": "src/advanced-bloom/advanced-bloom.wgsl",
+      "sha256": "54bd026b44d02f65b3bde4f067ba6110b6a264f292cb16468b658c0040ab5aec",
+      "byteLength": 780,
+      "url": "https://raw.githubusercontent.com/pixijs/filters/e9d1ca987864f121680bb0d7e9612c05b37748de/src/advanced-bloom/advanced-bloom.wgsl"
+    },
+    {
+      "path": "src/advanced-bloom/AdvancedBloomFilter.ts",
+      "sha256": "35b217fa30d328250432d7b68be39a88b4c96efd26e4895e4a461fe394217c11",
+      "byteLength": 6598,
+      "url": "https://raw.githubusercontent.com/pixijs/filters/e9d1ca987864f121680bb0d7e9612c05b37748de/src/advanced-bloom/AdvancedBloomFilter.ts"
+    }
+  ],
+  "adaptations": [
+    "Explicit local uniforms, coordinates and borrowed-device frame-slot resources",
+    "Neutral radius bypass and bounded authored intensity",
+    "Valid premultiplied alpha for bloom on transparent sources"
+  ],
+  "sourceArchive": {
+    "url": "https://codeload.github.com/pixijs/filters/tar.gz/e9d1ca987864f121680bb0d7e9612c05b37748de",
+    "sha256": "35a9c08c1a245f97181f62ed89e7ebe06b8559f4973f34abe47dd910a9fcc0b9",
+    "byteLength": 735624
+  }
+}

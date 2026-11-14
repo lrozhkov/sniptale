@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { createGlTransitionSelection } from './transition/gl-catalog';
 import { createVideoProjectTrack } from './factories/creation';
 import { reviewSpeechTextSignature } from '../review/speech-transcript';
 import { createSceneGradientBackground } from './scene/background-gradient';
@@ -9,7 +11,7 @@ import { createShapeClip } from './factories/overlay-clip';
 import { createVideoProjectMotionRegion } from './motion';
 import { removeVideoProjectLibrarySources } from './library-source-removal';
 import type { VideoProjectAssetSource } from './types';
-import { VideoProjectAssetType, VideoTransitionEasing, VideoTransitionKind } from './types';
+import { VideoProjectAssetType, VideoTransitionEasing } from './types';
 import { isExportReadyVideoProject } from './validation/root';
 
 function fixture(source: VideoProjectAssetSource) {
@@ -71,7 +73,8 @@ it('removes embedded references, background, transitions and object-track source
       leadingClipId: removedClip.id,
       trailingClipId: keptClip.id,
       duration: 1,
-      kind: VideoTransitionKind.CROSSFADE,
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       easing: VideoTransitionEasing.LINEAR,
     },
   ];
@@ -700,19 +703,19 @@ it.each(
 
 it('purges confirmed source-attached effect hosts but retains viewport hosts and shared snapshots', async () => {
   const { readFileSync } = await import('node:fs');
-  const { sha256EffectV1Bytes, validateEffectV1Document } =
-    await import('@sniptale/runtime-contracts/effect-v1');
   const { createEffectHostClip } = await import('./factories/overlay-clip');
   const source = { kind: 'project-asset' as const, projectAssetId: 'attached-source' };
   const { project, removed, removedClip, keptClip } = fixture(source);
   if (removedClip.type !== 'VIDEO') throw new Error('Expected video');
   removedClip.sourceInstanceId = 'attached-placement';
   const text = readFileSync(
-    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
-  const document = validateEffectV1Document(JSON.parse(text)).document!;
-  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(text));
+  const { parseAnimationTemplateSource } =
+    await import('@sniptale/runtime-contracts/animation-template');
+  const document = parseAnimationTemplateSource(text).template!;
+  const sha256 = await createHash('sha256').update(new TextEncoder().encode(text)).digest('hex');
   const attached = createEffectHostClip({
     duration: 3,
     effectInstanceId: 'attached',
@@ -741,7 +744,7 @@ it('purges confirmed source-attached effect hosts but retains viewport hosts and
       sha256,
       documentId: document.id,
       source: text,
-      schemaVersion: 'sniptale.effect.v1',
+      schemaVersion: 'sniptale.animation.v1',
       kind: 'standalone',
       assets: [],
       retainedByteLength: new TextEncoder().encode(text).byteLength,
@@ -757,6 +760,7 @@ it('purges confirmed source-attached effect hosts but retains viewport hosts and
     duration: 3,
     playbackRate: 1,
     target: { kind: 'scene' },
+    sceneAnchors: { tip: { x: 50, y: 50 } },
   }));
   expect(isExportReadyVideoProject(project)).toBe(true);
   const original = structuredClone(project);

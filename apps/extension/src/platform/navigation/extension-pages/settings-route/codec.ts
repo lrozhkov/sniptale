@@ -28,7 +28,15 @@ export const SETTINGS_SECTION_VIEWS = {
   'media-quality': ['image', 'video'],
   saving: ['settings', 'files', 'drafts', 'storage', 'templates', 'queue', 'connection'],
   annotations: ['borders', 'callouts', 'numbering', 'tags'],
-  'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients', 'backgrounds', 'icons'],
+  'editor-resources': [
+    'tools',
+    'palettes',
+    'surfaces',
+    'gradients',
+    'audio',
+    'backgrounds',
+    'icons',
+  ],
   'ai-connections': ['integrations', 'chrome-ai'],
   'ai-prompts': ['templates', 'scenario-templates', 'prompts'],
   'voice-input': [],
@@ -63,7 +71,7 @@ export type SettingsRoute =
   | { section: 'annotations'; view?: 'borders' | 'callouts' | 'numbering' | 'tags' }
   | {
       section: 'editor-resources';
-      view?: 'tools' | 'palettes' | 'surfaces' | 'gradients' | 'backgrounds' | 'icons';
+      view?: 'tools' | 'palettes' | 'surfaces' | 'gradients' | 'backgrounds' | 'audio' | 'icons';
     }
   | { section: 'ai-connections'; view?: 'integrations' | 'chrome-ai' }
   | { section: 'ai-prompts'; view?: 'templates' | 'scenario-templates' | 'prompts' }

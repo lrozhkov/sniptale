@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import * as framePlan from '../stage/scene/frame-plan';
+import * as framePlan from '../../../workflows/video/native-composition/frame-plan';
 import type { PreviewSceneRenderInput } from '../stage/scene/types';
 import type { PreviewSourceProvider } from '../../../workflows/video/preview-source';
 import {
@@ -18,7 +18,9 @@ vi.mock('../../../workflows/video/preview-source', async (original) => ({
   ...(await original<typeof import('../../../workflows/video/preview-source')>()),
   createPreviewSourceProvider: io.create,
 }));
-vi.mock('../stage/scene/render-preview', () => ({ renderPreviewScene: io.render }));
+vi.mock('../../../workflows/video/native-composition/render-scene', () => ({
+  renderNativeCompositionScene: io.render,
+}));
 vi.mock('../../../workflows/video-review/recording-events', () => ({
   createRecordingEventsRenderer: () => ({
     prepare: async (project: PreviewSceneRenderInput['project']) => ({
@@ -39,7 +41,7 @@ class SourceFrame {
     return new SourceFrame();
   }
 }
-function fixture(renderer: 'gpu' | 'legacy' = 'gpu') {
+function fixture(renderer: 'gpu' | 'legacy' = 'gpu', sourceDiscontinuity?: boolean) {
   vi.stubGlobal('VideoFrame', SourceFrame);
   vi.stubGlobal('VideoDecoder', class {});
   const clip = createVideoClip({
@@ -88,6 +90,7 @@ function fixture(renderer: 'gpu' | 'legacy' = 'gpu') {
     project,
     rasterSize: { width: 320, height: 180 },
     previewRenderer: renderer,
+    ...(sourceDiscontinuity === undefined ? {} : { sourceDiscontinuity }),
   });
   return { owner, project, provider, release, frames };
 }
@@ -337,5 +340,22 @@ it('does not replace a real ordinary playback-window source failure with a retai
     expect(io.render).not.toHaveBeenCalled();
   } finally {
     f.owner.dispose();
+  }
+});
+
+it('retains sequential export source acquisition while random preview keeps explicit discontinuity', async () => {
+  for (const discontinuity of [false, true]) {
+    const f = fixture('gpu', discontinuity);
+    try {
+      await f.owner.renderFrame(1.26, new AbortController().signal);
+      await f.owner.renderFrame(1.27, new AbortController().signal);
+      expect(vi.mocked(f.provider.acquire).mock.calls.map((call) => call[2])).toEqual([
+        { discontinuity },
+        { discontinuity },
+      ]);
+      expect(f.release).toHaveBeenCalledTimes(2);
+    } finally {
+      f.owner.dispose();
+    }
   }
 });

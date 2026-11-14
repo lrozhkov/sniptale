@@ -1,3 +1,5 @@
+import { resolveProjectSourceInteractionDocument } from '../../../project/source-interaction-documents';
+import { evaluateCursorMotion } from '../../../project/cursor-motion';
 import { resolveProjectSourceCursorObservation } from '../../../project/cursor-focus-path/projection';
 import {
   hasCameraMediaAt,
@@ -5,7 +7,7 @@ import {
   cameraSourceTime,
 } from '../../../project/camera/animation';
 import { isCameraHiddenAt } from '../../../project/camera/visibility';
-import { resolveClipTransitionVisualState } from '../../../project/transition/presentation';
+import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../../project/transition/presentation.types';
 import {
   mapSourceNormalizedPointToVisualLayer,
   getFittedMediaContentFrame,
@@ -174,14 +176,45 @@ function resolveCursorSkin(project: VideoProject, sample: VideoProjectCursorSamp
 export function resolveVideoCompositionCursor(
   project: VideoProject,
   currentTime: number,
-  _actions: VideoCompositionActionState[]
+  _actions: VideoCompositionActionState[],
+  sourceClipId?: string
 ): VideoCompositionCursorState | null {
+  const authored = resolveProjectSourceInteractionDocument(project, currentTime, sourceClipId);
+  const motion = authored?.document.cursorEnabled
+    ? evaluateCursorMotion(authored.document.cursorMotions, authored.sourceTime)
+    : null;
+  if (motion && authored) {
+    const mapping = resolveCursorSourcePointMapping(project, authored.clip.id, currentTime);
+    const point =
+      mapping &&
+      mapSourceNormalizedPointToVisualLayer({ ...mapping, point: { x: motion.x, y: motion.y } });
+    if (!mapping || !point) return null;
+    const content = getFittedMediaContentFrame(mapping);
+    return {
+      artwork: {
+        shape: motion.motion.shape,
+        color: motion.motion.color,
+        outline: motion.motion.outline,
+        shadow: motion.motion.shadow,
+      },
+      animationPreset: 'NONE',
+      captureMode: 'separate',
+      color: motion.motion.color,
+      preset: 'ARROW',
+      scale: (motion.motion.size * content.height) / mapping.sourceHeight / 256,
+      shadow: false,
+      time: currentTime,
+      visible: true,
+      x: point.x,
+      y: point.y,
+    };
+  }
   const cursorTrack = project.cursorTrack;
   if (!cursorTrack) {
     return null;
   }
 
-  const sample = resolveCursorSample(project, currentTime);
+  const sample = resolveCursorSample(project, currentTime, sourceClipId);
   if (!sample || !sample.visible) {
     return null;
   }
@@ -226,7 +259,9 @@ export function resolveVideoCompositionCursor(
     preset: skin.preset,
     scale:
       skin.scale *
-      (skin.animationPreset === 'PRESS' ? resolveClickPressScale(project, currentTime) : 1),
+      (skin.animationPreset === 'PRESS'
+        ? resolveClickPressScale(project, currentTime, sourceClipId)
+        : 1),
     shadow: skin.shadow,
     time: currentTime,
     visible: true,
@@ -236,10 +271,17 @@ export function resolveVideoCompositionCursor(
 }
 
 /** Feedback is tied to an actual click, never an idle oscillation or zoom region. */
-function resolveClickPressScale(project: VideoProject, currentTime: number): number {
+function resolveClickPressScale(
+  project: VideoProject,
+  currentTime: number,
+  sourceClipId?: string
+): number {
   const click = resolveVideoProjectActionOccurrences(project).find(
     (item) =>
-      item.event.kind === 'CLICK' && currentTime >= item.time && currentTime < item.time + 0.25
+      (!sourceClipId || item.clipId === sourceClipId) &&
+      item.event.kind === 'CLICK' &&
+      currentTime >= item.time &&
+      currentTime < item.time + 0.25
   );
   return click ? 1 - 0.18 * Math.sin(((currentTime - click.time) / 0.25) * Math.PI) : 1;
 }
@@ -271,7 +313,7 @@ export function resolveCursorSourcePointMapping(
     sourceWidth: asset.metadata.width,
     sourceHeight: asset.metadata.height,
     ...(clip.windowHeader && !camera ? { windowHeader: clip.windowHeader } : {}),
-    renderState: resolveClipTransitionVisualState(project, visual, time),
+    renderState: IDENTITY_TRANSITION_VISUAL_STATE,
   };
 }
 

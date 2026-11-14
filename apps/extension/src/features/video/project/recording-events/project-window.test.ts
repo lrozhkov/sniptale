@@ -270,3 +270,50 @@ it('reads the authored action reach and rejects a cached window with obsolete re
     descriptor
   );
 });
+
+it('reads only the retained source interval for a moved event and invalidates it after authoring changes', async () => {
+  const seed = fixture();
+  const clip = seed.clips.find((clip) => clip.type === 'VIDEO')!;
+  const project = applyVideoProjectMutationPatch(seed, {
+    sourceInteractionDocuments: [
+      {
+        id: 'authored',
+        binding: { assetId: clip.assetId, sourceInstanceId: clip.sourceInstanceId! },
+        cursorMotions: [],
+        cursorEnabled: false,
+        keyboardEnabled: true,
+        mouseEnabled: true,
+        timeline: {
+          presses: [],
+          overrides: [
+            {
+              ref: { kind: 'action', id: 'moved' },
+              start: 100,
+              end: 101,
+              enabled: true,
+              sourceRange: { start: 2000, end: 2001 },
+            },
+          ],
+        },
+      },
+    ],
+  });
+  const read = readEmpty();
+  const rendered = await prepareRecordingEventsProject(project, { start: 100, end: 101 }, read);
+  expect(read.mock.calls.map(([range]) => [range.fromTimeUs, range.toTimeUs])).toEqual([
+    [93000000, 108000000],
+    [2000000000, 2001000000],
+  ]);
+  expect(recordingEventsProjectCoversTime(rendered, 100.5)).toBe(true);
+  const changed = applyVideoProjectMutationPatch(rendered, {
+    sourceInteractionDocuments: [
+      { ...project.sourceInteractionDocuments![0]!, timeline: { presses: [], overrides: [] } },
+    ],
+  });
+  expect(recordingEventsProjectCoversTime(changed, 100.5)).toBe(false);
+  read.mockClear();
+  await prepareRecordingEventsProject(changed, { start: 100, end: 101 }, read);
+  expect(read.mock.calls.map(([range]) => [range.fromTimeUs, range.toTimeUs])).toEqual([
+    [93000000, 108000000],
+  ]);
+});

@@ -1,3 +1,4 @@
+import { createSourceImageFilter } from '../../features/image-filters/contract';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -36,6 +37,7 @@ it('paints the current raster only during enabled motion and leaves pending cut 
     exit: { type: 'linear', duration: 1 },
     motionBlur: { enter: { enabled: true, strength: 0.5 } },
   };
+  const sourceFilters = { version: 1 as const, filters: [createSourceImageFilter('blur', 'blur')] };
   const raster = document.createElement('canvas');
   const render = (time: number, frame: CanvasImageSource | null, cameraOverride = false) => {
     const camera = cameraOverride
@@ -46,6 +48,8 @@ it('paints the current raster only during enabled motion and leaves pending cut 
     act(() =>
       root.render(
         <ReviewMotionBlurPreview
+          sourceFilters={sourceFilters}
+          sourceSize={output}
           focus={{ regions: [region], time }}
           camera={camera}
           layout={computeQuickEditSceneLayout({ output, source: output, background, camera })}
@@ -65,6 +69,8 @@ it('paints the current raster only during enabled motion and leaves pending cut 
   const drawImage = vi.fn();
   paint.mock.calls.at(-1)![1].sample.draw({ drawImage }, 1, 2, 3, 4);
   expect(drawImage).toHaveBeenCalledWith(raster, 1, 2, 3, 4);
+  expect(paint.mock.calls.at(-1)![1].sourceFilters).toEqual(sourceFilters);
+  expect(paint.mock.calls.at(-1)![1].sourceSize).toEqual({ width: 320, height: 180 });
   expect(paint.mock.calls.at(-1)![1].motionBlur).toHaveLength(5);
   for (const [time, override] of [
     [2, false],

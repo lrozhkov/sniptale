@@ -1,3 +1,6 @@
+import { ReviewAnnotationEffectsTrack } from './annotation-effects-track';
+import type { useReviewAnnotationEffects } from './annotation-effects-editor';
+import type { ComponentProps } from 'react';
 import { ReviewZoomTrack } from './zoom-track';
 import { ReviewAudioTrack } from './audio-track';
 import type { ReviewBeforeAction } from './note-transitions';
@@ -101,6 +104,47 @@ export function ReviewAudioLane(props: {
       onTrimClip={props.audio.trimClip}
       onOriginal={props.audio.setOriginal}
       onImportFile={props.onImportFile}
+    />
+  );
+}
+
+/** Annotation lane maps the retained editor gestures to the same timeline interval contract. */
+export function ReviewAnnotationLane({
+  sourceId,
+  tool,
+  editor,
+  advanced,
+  onSelect,
+  ...lane
+}: Omit<
+  ComponentProps<typeof ReviewAnnotationEffectsTrack>,
+  | 'instances'
+  | 'enabled'
+  | 'onEnabled'
+  | 'onBegin'
+  | 'onPreview'
+  | 'onCommit'
+  | 'onCancel'
+  | 'onSelect'
+> & {
+  sourceId: string | undefined;
+  tool: string;
+  editor: ReturnType<typeof useReviewAnnotationEffects>;
+  advanced: QuickEditAdvancedState;
+  onSelect: ((id: string) => void) | undefined;
+}) {
+  return (
+    <ReviewAnnotationEffectsTrack
+      {...lane}
+      key={JSON.stringify([sourceId, tool])}
+      instances={advanced.annotationEffects?.instances ?? []}
+      enabled={advanced.annotationEffects?.enabled !== false}
+      onEnabled={editor.enabled}
+      onSelect={(id) => onSelect?.(id)}
+      onBegin={editor.beginGesture}
+      onPreview={editor.previewGesture}
+      onCommit={editor.commitGesture}
+      onCancel={editor.cancelGesture}
     />
   );
 }

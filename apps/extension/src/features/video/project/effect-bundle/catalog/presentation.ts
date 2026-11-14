@@ -1,29 +1,32 @@
-import type { EffectV1Document } from '@sniptale/runtime-contracts/effect-v1';
+import type { AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
+import { animationRuntimeDuration } from '../../../../../contracts/effect-runtime/animation';
 import { readEffectPresentationDocument } from '../presentation-document';
 
 /** Small catalog projection. Rendering and application always require the full validated source. */
 export type EffectCatalogPresentation = Pick<
-  EffectV1Document,
-  'label' | 'description' | 'duration' | 'defaultControlPresetId'
+  AnimationTemplate,
+  'label' | 'description' | 'defaultControlPresetId'
 > & {
-  controlPresets?: Array<
-    Pick<NonNullable<EffectV1Document['controlPresets']>[number], 'id' | 'theme' | 'style'>
-  >;
+  duration: number;
+  controlPresets?:
+    | Array<
+        Pick<NonNullable<AnimationTemplate['controlPresets']>[number], 'id' | 'theme' | 'style'>
+      >
+    | undefined;
 };
 export function readCatalogPresentation(entry: {
   source?: string;
   presentation?: EffectCatalogPresentation;
 }): EffectCatalogPresentation | undefined {
-  return (
-    entry.presentation ??
-    (entry.source ? readEffectPresentationDocument(entry.source).document : undefined)
-  );
+  if (entry.presentation) return entry.presentation;
+  const document = entry.source ? readEffectPresentationDocument(entry.source).document : null;
+  return document ? projectCatalogPresentation(document) : undefined;
 }
-export function projectCatalogPresentation(document: EffectV1Document): EffectCatalogPresentation {
+export function projectCatalogPresentation(document: AnimationTemplate): EffectCatalogPresentation {
   return {
     label: document.label,
     ...(document.description ? { description: document.description } : {}),
-    duration: document.duration,
+    duration: animationRuntimeDuration(document),
     ...(document.defaultControlPresetId
       ? { defaultControlPresetId: document.defaultControlPresetId }
       : {}),

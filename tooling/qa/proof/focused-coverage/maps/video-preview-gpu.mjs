@@ -1,5 +1,41 @@
 export const VIDEO_PREVIEW_GPU_OWNER_MAPPINGS = [
   {
+    owner: 'native-interaction-viewport-geometry',
+    productionFile: 'apps/extension/src/video-editor/preview/stage/canvas/geometry.ts',
+    allowCrossOwner: true,
+    reason:
+      'Canvas interaction and shared composition use the same contained viewport and coordinate projections.',
+    testFiles: [
+      'apps/extension/src/video-editor/preview/stage/scene/geometry.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/scene/overlay-scale.test.tsx',
+      'apps/extension/src/features/video/composition/canvas/viewport.test.ts',
+    ],
+  },
+
+  {
+    owner: 'native-shared-export-composition',
+    productionFile: 'apps/extension/src/offscreen/project-export/shared-composition.ts',
+    reason:
+      'Required export frames use the same complete Native image producer with export admission and output settings.',
+    testFiles: [
+      'apps/extension/src/offscreen/project-export/shared-composition.test.ts',
+      'apps/extension/src/offscreen/project-export/composition-joins.test.ts',
+      'apps/extension/src/offscreen/project-export/runtime.test.ts',
+    ],
+  },
+  {
+    owner: 'shared-gpu-plan-normalization',
+    productionFile: 'apps/extension/src/features/video/composition/canvas/gpu-preview-plan.ts',
+    reason:
+      'Graph admission and normalization preserve source coverage before GPU resource mutation.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/canvas/gpu-preview-plan.test.ts',
+      'apps/extension/src/features/video/composition/canvas/gpu-preview.test.ts',
+      'apps/extension/src/features/video/composition/canvas/gpu-preview-dag.test.ts',
+      'apps/extension/src/features/video/composition/canvas/gpu-preview-presentation.test.ts',
+    ],
+  },
+  {
     owner: 'native-persistent-gpu-frames',
     productionFile: 'apps/extension/src/video-editor/preview/cache/build-persistent.ts',
     reason:
@@ -64,7 +100,7 @@ export const VIDEO_PREVIEW_GPU_OWNER_MAPPINGS = [
       'apps/extension/src/features/video/composition/canvas/bookend-preview-gpu.test.ts',
       'apps/extension/src/workflows/video-review/gpu-preview.test.ts',
       'apps/extension/src/workflows/video-review/gpu-preview-annotations.test.ts',
-      'apps/extension/src/video-editor/preview/stage/scene/gpu-preview.test.ts',
+      'apps/extension/src/workflows/video/native-composition/gpu-preview.test.ts',
       'apps/extension/src/video-editor/preview/cache/materializer-gpu-joins.test.ts',
     ],
   },
@@ -82,12 +118,13 @@ export const VIDEO_PREVIEW_GPU_OWNER_MAPPINGS = [
     ],
   },
   {
+    allowCrossOwner: true,
     owner: 'native-retained-gpu-source-provider',
-    productionFile: 'apps/extension/src/video-editor/preview/stage/scene/gpu-preview.ts',
+    productionFile: 'apps/extension/src/workflows/video/native-composition/gpu-preview.ts',
     reason:
       'Native source and final output leases retain the configured provider through GPU completion.',
     testFiles: [
-      'apps/extension/src/video-editor/preview/stage/scene/gpu-preview.test.ts',
+      'apps/extension/src/workflows/video/native-composition/gpu-preview.test.ts',
       'apps/extension/src/video-editor/preview/cache/materializer.test.ts',
       'apps/extension/src/video-editor/preview/cache/materializer-gpu-joins.test.ts',
       'apps/extension/src/video-editor/preview/stage/scene/render.test.tsx',

@@ -20,6 +20,7 @@ import {
 
 /** Editor-only bounded handles. One pointer gesture owns its draft, cancellation and commit. */
 interface ReviewCursorOverlayProps {
+  authoredMotion?: boolean;
   path: CursorFocusPath;
   time: number;
   width: number;

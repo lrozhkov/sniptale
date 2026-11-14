@@ -1,3 +1,8 @@
+import { createValidGlPresetSourceEntry } from '../../../composition/persistence/effect-bundles/fixture.test-support';
+import {
+  encodeEffectBundleMetadata,
+  visualCatalogMetadataRootId,
+} from './root-codecs/effect-bundle';
 import { describe, expect, it, vi } from 'vitest';
 import { openArchiveReader } from '../../../composition/archive-transfer';
 import { createArchiveMemorySink } from '../../../composition/archive-transfer/test-support';
@@ -258,43 +263,31 @@ function root(bytes = 'media') {
 }
 
 function effectBundleRoot() {
-  const blob = new Blob(['image'], { type: 'image/png' });
-  const objectId = 'effect-bundle-000001-object-000001';
+  const entry = createValidGlPresetSourceEntry(),
+    blob = new Blob([entry.source], { type: 'application/json' }),
+    objectId = 'effect-bundle-000001-object-000001';
+  const metadata = encodeEffectBundleMetadata({ entry, objectIds: [objectId] });
+  assertMetadataJson(metadata);
+  const rootId = visualCatalogMetadataRootId(metadata);
   return {
     descriptor: {
       mediaSubtype: 'effect-bundle' as const,
-      metadataPath: '_sniptale/metadata/media/effect-bundle-demo-pack.json',
+      metadataPath: `_sniptale/metadata/media/effect-bundle-${encodeURIComponent(rootId)}.json`,
       objectCount: 1,
-      rootId: 'demo-pack',
+      rootId,
       rootKind: 'media' as const,
       totalBytes: blob.size,
     },
     load: vi.fn(async () => ({
-      metadata: {
-        entry: {
-          assets: [
-            {
-              byteLength: blob.size,
-              kind: 'image',
-              mimeType: blob.type,
-              objectId,
-              sha256: 'a'.repeat(64),
-            },
-          ],
-          documents: [{}],
-          packId: 'demo-pack',
-          retainedByteLength: blob.size,
-          version: '1',
-        },
-      },
+      metadata,
       objects: [
         {
           blob,
           ref: {
-            filename: 'asset-000001',
-            mimeType: 'image/png',
+            filename: 'source.json',
+            mimeType: 'application/json',
             objectId,
-            path: `_sniptale/assets/${objectId}/asset-000001`,
+            path: `_sniptale/assets/${objectId}/source.json`,
             size: blob.size,
           },
         },
@@ -438,7 +431,7 @@ describe('media backup v6 archive writing', () => {
     const output = createArchiveMemorySink();
     await exportMediaHubBackupV6({ plan, sink: output.sink });
     await expect(inspectMediaHubBackupV6(output.blob())).resolves.toMatchObject({
-      rootKeys: ['media:effect-bundle:demo-pack'],
+      rootKeys: [`media:effect-bundle:${effectBundleRoot().descriptor.rootId}`],
     });
   });
 });

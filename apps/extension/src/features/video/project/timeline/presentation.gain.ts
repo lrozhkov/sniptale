@@ -10,10 +10,7 @@ import {
 } from '../../audio/source-attenuation';
 import { clampNumber } from './basics';
 import type { VideoProject, VideoProjectClip } from '../types/index';
-import {
-  resolveClipTransitionAudioMultiplier,
-  resolveClipTransitionVisualState,
-} from '../transition/presentation';
+import { resolveClipTransitionAudioMultiplier } from '../transition/presentation';
 
 function fadeClock(clip: VideoProjectClip, currentTime: number, visual: boolean) {
   const phase = clip.playbackWindow?.fadePhase;
@@ -78,16 +75,11 @@ export function getClipAudioGain(clip: VideoProjectClip, currentTime: number): n
 }
 
 export function getClipCompositeVisualOpacity(
-  project: VideoProject,
+  _project: VideoProject,
   clip: VideoProjectClip,
   currentTime: number
 ): number {
-  const transitionState = resolveClipTransitionVisualState(project, clip, currentTime);
-  return clampNumber(
-    getClipVisualOpacity(clip, currentTime) * transitionState.opacityMultiplier,
-    0,
-    1
-  );
+  return getClipVisualOpacity(clip, currentTime);
 }
 
 export function getClipCompositeAudioGain(

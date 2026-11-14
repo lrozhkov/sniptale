@@ -107,3 +107,12 @@ it('selects the nearest enabled projected onset within one result second after c
   expect(resolveUpcomingReviewAnnotationEffectSlice(instances, segments, 0)).toBeNull();
   expect(resolveUpcomingReviewAnnotationEffectSlice([], segments, 1)).toBeNull();
 });
+
+it('allows a bounded two-second preparation window without changing the default onset query', () => {
+  const instances = [{ id: 'cohort', enabled: true, order: 0, start: 4, end: 8 }];
+  const segments = buildReviewTimeMap(10, []);
+  expect(resolveUpcomingReviewAnnotationEffectSlice(instances, segments, 2)).toBeNull();
+  expect(resolveUpcomingReviewAnnotationEffectSlice(instances, segments, 2, 2)?.start).toBe(4);
+  expect(resolveUpcomingReviewAnnotationEffectSlice(instances, segments, 1.9, 2)).toBeNull();
+  expect(resolveUpcomingReviewAnnotationEffectSlice(instances, segments, 2, Infinity)).toBeNull();
+});

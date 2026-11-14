@@ -14,6 +14,10 @@ import type {
   QuickEditWindowHeader,
 } from '../../features/video/review/advanced/types';
 import { translate } from '../../platform/i18n';
+const acquisition = vi.hoisted(() => ({ acquire: vi.fn() }));
+vi.mock('../../workflows/browser-frame/favicon', () => ({
+  acquireWindowHeaderFavicon: acquisition.acquire,
+}));
 vi.mock('./use-zoom-preview-source', () => ({
   useZoomPreviewSource: () => ({}),
   useZoomPreviewFrame: () => ({ frame: null, status: 'failed', retry: vi.fn() }),
@@ -220,5 +224,52 @@ it('returns focus to crop editing after Escape, Cancel and Apply', async () => {
     await act(async () => root.unmount());
     host.remove();
     vi.unstubAllGlobals();
+  }
+});
+
+it('cancels a favicon request when switching projects with the same URL', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  let signal: AbortSignal | undefined;
+  let resolve: (icon: string) => void = () => undefined;
+  acquisition.acquire.mockImplementation((_url, requestSignal) => {
+    signal = requestSignal;
+    return new Promise<string>((done) => {
+      resolve = done;
+    });
+  });
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const changed = vi.fn();
+  const header = {
+    ...DEFAULT_WINDOW_HEADER,
+    enabled: true,
+    kind: 'browser' as const,
+    url: 'https://example.com',
+  };
+  try {
+    await act(async () =>
+      root.render(
+        <ReviewWindowHeaderSettings identity="first" header={header} onChange={changed} />
+      )
+    );
+    const toggle = host.querySelector<HTMLButtonElement>(
+      `button[aria-label="${translate('windowHeader.favicon')}"]`
+    )!;
+    expect(toggle).not.toBeNull();
+    await act(async () => toggle.click());
+    expect(signal).toBeDefined();
+    await act(async () =>
+      root.render(
+        <ReviewWindowHeaderSettings identity="second" header={header} onChange={changed} />
+      )
+    );
+    expect(signal?.aborted).toBe(true);
+    const before = changed.mock.calls.length;
+    await act(async () => resolve('data:image/png;base64,unused-late-result'));
+    expect(changed).toHaveBeenCalledTimes(before);
+  } finally {
+    act(() => root.unmount());
+    host.remove();
   }
 });

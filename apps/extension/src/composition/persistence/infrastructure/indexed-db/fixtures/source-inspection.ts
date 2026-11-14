@@ -1,3 +1,5 @@
+import { imageAppV54Fixture } from './image-app-v54';
+import { imageAppV55Fixture } from './image-app-v55';
 import { SCHEMA_CONTRACTS_STORE } from '../core.stores.ts';
 import { SUPPORTED_BETA_DATABASE_FIXTURES, type BetaDatabaseFixtureContract } from './index';
 import { nativeAppV47Fixture } from './native-app-v47';
@@ -72,6 +74,8 @@ export async function inspectSupportedSourceDatabase(
     ...SUPPORTED_BETA_DATABASE_FIXTURES,
     nativeAppV47Fixture,
     nativeAppV48Fixture,
+    imageAppV54Fixture,
+    imageAppV55Fixture,
   ]
 ): Promise<SupportedSourceDatabaseInspection | null> {
   const candidates = fixtures.filter(({ databaseVersion }) => databaseVersion === db.version);

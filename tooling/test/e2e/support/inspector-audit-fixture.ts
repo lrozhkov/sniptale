@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../../../../apps/extension/src/features/video/project/transition/gl-catalog';
 import { createVideoProjectFromMultiSourceRecording } from '../../../../apps/extension/src/features/video/project/factories/multi-source-recording';
 import {
   createVideoProjectAsset,
@@ -23,7 +24,6 @@ import {
   VideoTemporalEasing,
   VideoTrackKind,
   VideoTransitionEasing,
-  VideoTransitionKind,
   type VideoProject,
 } from '../../../../apps/extension/src/features/video/project/types';
 
@@ -65,7 +65,8 @@ export function createInspectorAuditFixture() {
       id: 'audit-transition',
       leadingClipId: image.first.id,
       trailingClipId: image.second.id,
-      kind: VideoTransitionKind.CROSSFADE,
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       easing: VideoTransitionEasing.EASE_IN_OUT,
       duration: 1,
     },

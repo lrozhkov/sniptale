@@ -1,6 +1,7 @@
+import { createAudioEffectInstance } from '../../../features/video/audio/effects/catalog';
 import { createAudioClipFromAsset } from '../../../features/video/project/factories/clip';
 import { editSourceVoiceoverTiming } from '../../../features/video/project/source-voiceover-timing';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { useVideoEditorStore } from '../../state/store';
 import {
   createVideoProjectFromRecording,
@@ -424,4 +425,40 @@ it('keeps the paired original identity through whole-take edits duplication and 
     copied.sourceVoiceoverDocuments
   );
   expect(store.getState().selection).toEqual({ kind: 'source-voiceover', documentId: copyId });
+});
+
+it('duplicates canonical DSP instances independently and restores accepted values through Undo and Redo', () => {
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now());
+  try {
+    const { store } = fixture();
+    const project = store.getState().project!;
+    const take = project.sourceVoiceoverDocuments![0]!.take;
+    const processing = {
+      version: 1 as const,
+      bypassed: false,
+      effects: [createAudioEffectInstance('eq', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1')],
+    };
+    expect(
+      store.getState().editSourceVoiceover(project, 'document', {
+        take: { ...take, audioProcessing: processing },
+      })
+    ).toBe(true);
+    const before = structuredClone(store.getState().project!);
+    const id = store.getState().duplicateSourceVoiceover('document');
+    expect(id).not.toBeNull();
+    const copy = store
+      .getState()
+      .project!.sourceVoiceoverDocuments!.find((item) => item.id === id)!;
+    expect(copy.take.audioProcessing?.effects[0]?.id).not.toBe(processing.effects[0]!.id);
+    expect(copy.take.audioProcessing?.effects[0]?.parameters).toEqual(
+      processing.effects[0]!.parameters
+    );
+    const accepted = structuredClone(store.getState().project!);
+    store.getState().undoProject();
+    expect(store.getState().project).toEqual(before);
+    store.getState().redoProject();
+    expect(store.getState().project).toEqual(accepted);
+  } finally {
+    clock.mockRestore();
+  }
 });

@@ -33,6 +33,7 @@ import {
 } from './controls';
 
 const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0]> = {
+  'source-filters': 'videoEditor.sidebar.sourceFiltersTitle',
   canvas: 'gallery.videoReview.canvas',
   'canvas-size': 'gallery.videoReview.exportBlockerCanvasSize',
   'key-animations': 'gallery.videoReview.keyDisplay',
@@ -41,11 +42,13 @@ const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0
   webcam: 'gallery.videoReview.webcam',
   watermark: 'gallery.videoReview.watermark',
   captions: 'gallery.videoReview.captions',
+  'cursor-motion': 'gallery.videoReview.cursorMotionTrack',
   'annotation-effects': 'gallery.videoReview.annotationEffects',
   'caption-layout': 'gallery.videoReview.captionConflict',
   'camera-follow': 'gallery.videoReview.cameraFollowConflict',
   presentation: 'gallery.videoReview.presentation',
   'precise-edits': 'gallery.videoReview.exportPreciseEdits',
+  'freeze-frame': 'gallery.videoReview.freezeFrame',
   'cut-transition': 'gallery.videoReview.cutTransition',
   'transition-frames': 'gallery.videoReview.cutTransitionFramesUnavailable',
   zoom: 'gallery.videoReview.exportBlockerZoom',
@@ -80,6 +83,7 @@ const CAMERA_REASON_LABEL: Record<
 export function ReviewTimelineTools(props: {
   mode: 'cut' | 'speed' | 'audio' | 'focus' | 'annotation' | null;
   sourceTools?: boolean;
+  showPointer?: boolean;
   available: boolean;
   cutAvailable?: boolean;
   cutHint?: string | undefined;
@@ -95,15 +99,17 @@ export function ReviewTimelineTools(props: {
 }) {
   return (
     <>
-      <ReviewButton
-        label={translate('gallery.videoReview.pointerTool')}
-        toolbarLabel={translate('gallery.videoReview.toolbarPointer')}
-        aria-pressed={props.mode === null}
-        className={plain}
-        onClick={props.onPointer}
-      >
-        <MousePointer2 size={16} />
-      </ReviewButton>
+      {props.showPointer !== false ? (
+        <ReviewButton
+          label={translate('gallery.videoReview.pointerTool')}
+          toolbarLabel={translate('gallery.videoReview.toolbarPointer')}
+          aria-pressed={props.mode === null}
+          className={plain}
+          onClick={props.onPointer}
+        >
+          <MousePointer2 size={16} />
+        </ReviewButton>
+      ) : null}
       {props.sourceTools !== false ? (
         <>
           <ReviewButton

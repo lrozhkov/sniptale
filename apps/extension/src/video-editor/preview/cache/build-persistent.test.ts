@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
   encode: vi.fn(),
   commit: vi.fn(),
 }));
-vi.mock('./materializer-gpu-outputs', () => ({
+vi.mock('../../../workflows/video/native-composition/materializer-gpu-outputs', () => ({
   createMaterializerGpuOutputs: mocks.createOutputs,
 }));
 vi.mock('./encode', () => ({ encodePersistentVideoPreview: mocks.encode }));

@@ -1,5 +1,10 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { attachReviewWebcam, findReviewWebcam, recoverReviewWebcam } from './webcam-source';
+import {
+  attachReviewWebcam,
+  findReviewWebcam,
+  recoverReviewWebcam,
+  readReviewWebcamInformation,
+} from './webcam-source';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
 
@@ -11,6 +16,7 @@ const io = vi.hoisted(() => ({
   read: vi.fn(),
   inspect: vi.fn(),
   prepare: vi.fn(),
+  getAsset: vi.fn(),
   protect: vi.fn(),
   publish: vi.fn(),
   cancel: vi.fn(),
@@ -24,7 +30,10 @@ vi.mock('../../composition/persistence/media-library', () => ({
   getMediaLibraryEntry: io.get,
   listMediaLibrary: io.list,
 }));
-vi.mock('../../composition/persistence/projects', () => ({ prepareProjectAsset: io.prepare }));
+vi.mock('../../composition/persistence/projects', () => ({
+  prepareProjectAsset: io.prepare,
+  getProjectAsset: io.getAsset,
+}));
 vi.mock('./source', () => ({ readReviewMediaOriginal: io.read, inspectReviewVideo: io.inspect }));
 vi.mock('../../composition/persistence/review-workspaces/store', () => ({
   readVideoWorkspace: io.readWorkspace,
@@ -214,4 +223,45 @@ it('discovers and attaches the archived workspace source while retaining archive
   await attachReviewWebcam(args);
   expect(args.attach).toHaveBeenCalledWith('project-asset:private', source);
   expect(io.prepare.mock.calls[0]?.[5]).toEqual({ aggregateId: 'archived', clipId: 'webcam' });
+});
+
+it('reads retained camera metadata with its library filename instead of the internal File name', async () => {
+  const file = new File(['data'], 'internal-asset-id');
+  io.getAsset.mockResolvedValue({
+    status: 'ready',
+    entry: { file, originMediaId: 'recording:camera' },
+  });
+  io.get.mockResolvedValue({
+    filename: 'renamed-camera.webm',
+    originalFilename: 'original-camera.webm',
+  });
+  const signal = new AbortController().signal;
+  await expect(readReviewWebcamInformation('project-asset:private', signal)).resolves.toEqual({
+    source,
+    filename: 'original-camera.webm',
+  });
+  expect(io.getAsset).toHaveBeenCalledWith('private');
+  expect(io.inspect).toHaveBeenCalledWith(file, signal);
+  expect(io.get).toHaveBeenCalledWith('recording:camera');
+  expect(io.prepare).not.toHaveBeenCalled();
+});
+it('refuses unavailable camera bytes and cancellation without inventing a filename', async () => {
+  io.getAsset.mockResolvedValue({ status: 'not-found' });
+  await expect(
+    readReviewWebcamInformation('project-asset:missing', new AbortController().signal)
+  ).rejects.toThrow('unavailable');
+  expect(io.inspect).not.toHaveBeenCalled();
+  io.getAsset.mockResolvedValue({
+    status: 'ready',
+    entry: { file: new File(['x'], 'private-id') },
+  });
+  io.get.mockResolvedValue(undefined);
+  await expect(
+    readReviewWebcamInformation('project-asset:private', new AbortController().signal)
+  ).resolves.toEqual({ source, filename: null });
+  const abort = new AbortController();
+  abort.abort();
+  await expect(
+    readReviewWebcamInformation('project-asset:private', abort.signal)
+  ).rejects.toThrow();
 });

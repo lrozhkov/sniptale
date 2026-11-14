@@ -1,3 +1,7 @@
+import { resolveReviewInteractions } from './interaction-timeline';
+import { patchReviewClicks } from './advanced/click-animation';
+import { patchReviewKeys } from '../project/action-feedback/key-animation';
+import { resolveVideoCompositionActions } from '../composition/timeline/frame/actions';
 import eventsFixture from '../project/recording-events/fixtures.json';
 import { isRecordingEventsDescriptor } from '../project/recording-events/records';
 import { applyVideoProjectMutationPatch } from '../project/mutation';
@@ -257,3 +261,192 @@ it('preserves the original event stream descriptor without materializing its fac
   expect(reopened?.actionEvents).toEqual([]);
   expect(reopened?.actionFeedback?.[0]?.signals).toEqual([]);
 });
+
+it('maps authored interaction source data without silently dropping it', () => {
+  const input = fixture();
+  input.document.advancedContent.interactionTimeline = {
+    presses: [
+      {
+        id: 'authored',
+        family: 'keyboard',
+        start: 1,
+        end: 2,
+        label: 'Cmd+K',
+        keys: ['Cmd', 'K'],
+        button: 0,
+        x: 0.5,
+        y: 0.5,
+      },
+    ],
+    overrides: [],
+  };
+  const before = structuredClone(input.document);
+  const result = planReviewProjectConversion(input);
+  expect(result.status).toBe('prepared');
+  if (result.status !== 'prepared') throw new Error('Expected complete authoring mapping');
+  expect(result.project.sourceInteractionDocuments?.[0]?.timeline).toEqual(
+    input.document.advancedContent.interactionTimeline
+  );
+  expect(input.document).toEqual(before);
+});
+
+it('retains authored keyboard and mouse source intervals independently from captured facts', () => {
+  const { input } = actionFixture();
+  const timeline = {
+    presses: [
+      {
+        id: 'authored-key',
+        family: 'keyboard' as const,
+        start: 1,
+        end: 2,
+        label: 'Cmd+K',
+        keys: ['Cmd', 'K'],
+        button: 0,
+        x: 0.4,
+        y: 0.5,
+      },
+      {
+        id: 'authored-click',
+        family: 'mouse' as const,
+        start: 4,
+        end: 4.2,
+        label: 'Click',
+        button: 0,
+        x: 0.3,
+        y: 0.2,
+      },
+    ],
+    overrides: [
+      { ref: { kind: 'action' as const, id: 'click' }, start: 2, end: 2.1, enabled: false },
+    ],
+  };
+  input.document.advancedContent.interactionTimeline = timeline;
+  const before = structuredClone(input);
+  const result = planReviewProjectConversion(input);
+  expect(result.status).toBe('prepared');
+  if (result.status !== 'prepared') throw new Error('Authored interactions were not mapped');
+  const reopened = parseHydratableVideoProject(JSON.parse(JSON.stringify(result.project)));
+  expect(reopened).not.toBeNull();
+  expect(reopened).toMatchObject({ sourceInteractionDocuments: [{ timeline }] });
+  expect(reopened?.actionEvents).toEqual(
+    before.seed.actionEvents.map((event) => ({
+      ...event,
+      anchor: { ...event.anchor, sourceInstanceId: result.timeline.sourceInstanceId },
+    }))
+  );
+  expect(input).toEqual(before);
+});
+
+it.each(['recording', 'imported'] as const)(
+  'preserves %s authored key/click pixels and sound through cut, rate, reopen and clip movement',
+  (kind) => {
+    const input = fixture();
+    if (kind === 'imported') {
+      input.seed.assets[0]!.source = { kind: 'project-asset', projectAssetId: 'imported-video' };
+      input.seed.source = { kind: 'manual' };
+      input.seed.baseRecordingId = null;
+    }
+    input.document.edits.push({
+      id: 'rate',
+      kind: 'speed',
+      start: 4,
+      end: 6,
+      requestedStart: 4,
+      requestedEnd: 6,
+      rate: 2,
+      audio: 'speed',
+    });
+    const timeline = {
+      presses: [
+        {
+          id: 'key',
+          family: 'keyboard' as const,
+          start: 1.2,
+          end: 1.3,
+          label: 'Cmd+K',
+          keys: ['Cmd', 'K'],
+          button: 0,
+          x: 0.4,
+          y: 0.5,
+        },
+        {
+          id: 'click',
+          family: 'mouse' as const,
+          start: 5,
+          end: 5.1,
+          label: 'Click',
+          button: 0,
+          x: 0.3,
+          y: 0.2,
+        },
+      ],
+      overrides: [],
+    };
+    input.document.advancedContent.interactionTimeline = timeline;
+    input.document.advancedContent.clickAnimations = patchReviewClicks([], ['click'], {
+      effect: 'ripple',
+    });
+    input.document.advancedContent.keyAnimations = patchReviewKeys([], ['key'], { enabled: true });
+    const settings = [
+      {
+        ref: { kind: 'action' as const, id: 'click' },
+        enabled: true,
+        presetId: 'mouse-soft-v1' as const,
+        volume: 0.5,
+        offset: 0,
+      },
+    ];
+    input.document.advancedContent.actionAudio = settings;
+    const result = planReviewProjectConversion(input);
+    expect(result.status).toBe('prepared');
+    if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+    const reopened = parseHydratableVideoProject(JSON.parse(JSON.stringify(result.project)))!;
+    expect(reopened).not.toBeNull();
+    expect(reopened.actionEvents).toEqual([]);
+    expect(
+      resolveVideoProjectActionOccurrences(reopened).map((o) => [o.event.label, o.time])
+    ).toEqual([
+      ['Cmd+K', 1.2],
+      ['Click', 3.5],
+    ]);
+    expect(
+      resolveVideoCompositionActions(reopened, 1.25).some(
+        (state) => state.renderKind === 'keystroke' && state.event.label === 'Cmd+K'
+      )
+    ).toBe(true);
+    expect(
+      resolveVideoCompositionActions(reopened, 3.6).some(
+        (state) => state.gestureFeedback?.effect === 'ripple'
+      )
+    ).toBe(true);
+    const cues = (plan: ReturnType<typeof buildReviewActionAudioPlan>) =>
+      [...iterateReviewActionAudioCues(plan, { start: 0, end: plan.duration })]
+        .flat()
+        .map(({ id: _id, ...cue }) => cue);
+    const gallery = buildReviewActionAudioPlan({
+      markers: resolveReviewInteractions([], timeline),
+      settings,
+      segments: buildReviewTimeMap(input.source.duration, input.document.edits),
+      applied: true,
+    });
+    expect(cues(gallery).length).toBeGreaterThan(0);
+    expect(cues(buildProjectActionAudioPlan(reopened))).toEqual(cues(gallery));
+    const clip = reopened.clips.find((clip) => clip.type === 'VIDEO' && clip.sourceStart === 4)!;
+    const moved = applyVideoProjectMutationPatch(reopened, {
+      duration: reopened.duration + 10,
+      clips: reopened.clips.map((item) =>
+        item.id === clip.id ? { ...item, startTime: item.startTime + 10 } : item
+      ),
+    });
+    expect(
+      resolveVideoProjectActionOccurrences(moved).find((o) => o.event.label === 'Click')?.time
+    ).toBe(13.5);
+    expect(
+      resolveVideoCompositionActions(moved, 13.6).some(
+        (state) => state.gestureFeedback?.effect === 'ripple'
+      )
+    ).toBe(true);
+    expect(moved.sourceInteractionDocuments).toEqual(reopened.sourceInteractionDocuments);
+    if (kind === 'imported') expect(reopened.actionFeedback).toBeUndefined();
+  }
+);

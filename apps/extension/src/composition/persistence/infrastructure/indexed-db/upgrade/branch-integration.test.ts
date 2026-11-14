@@ -1,3 +1,6 @@
+import { betaV55Fixture } from '../fixtures/beta-v55';
+import { betaV54Fixture } from '../fixtures/beta-v54';
+import { betaV53Fixture } from '../fixtures/beta-v53';
 import '../fake-indexed-db.test-support';
 import { deleteDB, openDB } from 'idb';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -16,6 +19,10 @@ import {
   RECORDING_CURSOR_TRAJECTORIES_STORE,
   RECORDING_CURSOR_BLOCKS_STORE,
   RECORDING_EVENTS_STORE,
+  VIDEO_EFFECT_BUNDLES_STORE,
+  VIDEO_ANIMATION_PACKAGES_STORE,
+  VIDEO_VISUAL_PREFERENCES_STORE,
+  VIDEO_GL_TRANSITION_PRESETS_STORE,
 } from '../core.stores';
 import { CURRENT_SCHEMA_CONTRACTS, DATABASE_MIGRATIONS } from '../schema-contracts';
 import { executeDatabaseUpgrade, handleDatabaseUpgrade } from './core';
@@ -61,22 +68,28 @@ type SourceCorruption =
   | 'mixed-contracts';
 
 async function createSource(
-  version: 47 | 48 | 51,
+  version: 47 | 48 | 51 | 53 | 54 | 55,
   corruption?: SourceCorruption,
   canonical = false
 ): Promise<string> {
   const name = DB_NAME;
   databases.push(name);
   const base =
-    version === 51
-      ? betaV51Fixture
-      : canonical
-        ? version === 47
-          ? betaV47Fixture
-          : betaV48Fixture
-        : version === 47
-          ? nativeAppV47Fixture
-          : nativeAppV48Fixture;
+    version === 55
+      ? betaV55Fixture
+      : version === 54
+        ? betaV54Fixture
+        : version === 53
+          ? betaV53Fixture
+          : version === 51
+            ? betaV51Fixture
+            : canonical
+              ? version === 47
+                ? betaV47Fixture
+                : betaV48Fixture
+              : version === 47
+                ? nativeAppV47Fixture
+                : nativeAppV48Fixture;
   const sourceStores: readonly string[] = base.stores;
   const sourceIndexes = new Map<string, readonly string[]>(Object.entries(base.indexes));
   const db = await openDB(name, version, {
@@ -276,6 +289,289 @@ it.each([47, 48] as const)(
       await expect(inspectDatabaseAdmission()).resolves.toEqual({
         databaseVersion: DB_VERSION,
         status: 'ready',
+      });
+    } finally {
+      upgraded.close();
+    }
+  }
+);
+
+it.each([false, true])(
+  'creates the animation namespace without parsing or rewriting opaque legacy rows, interrupted=%s',
+  async (interrupted) => {
+    const name = await createSource(53);
+    const legacy = {
+      packId: 'legacy-v1',
+      source: 'opaque legacy bytes; not a new animation package',
+      bytes: new Uint8Array([0, 255, 16, 32]),
+    };
+    const source = await openDB(name);
+    await source.put(VIDEO_EFFECT_BUNDLES_STORE, legacy);
+    source.close();
+    if (interrupted) {
+      const migrations = DATABASE_MIGRATIONS.map((migration) =>
+        migration.toDatabaseVersion === 54
+          ? {
+              ...migration,
+              migrate(
+                db: Parameters<typeof migration.migrate>[0],
+                transaction: Parameters<typeof migration.migrate>[1]
+              ): undefined {
+                migration.migrate(db, transaction);
+                throw new Error('Interrupted animation namespace creation');
+              },
+            }
+          : migration
+      );
+      await expect(
+        openDB(name, DB_VERSION, {
+          upgrade(db, oldVersion, newVersion, transaction) {
+            try {
+              executeDatabaseUpgrade(db, oldVersion, newVersion, transaction, migrations);
+            } catch {
+              /* The open request reports the aborted upgrade. */
+            }
+          },
+        })
+      ).rejects.toMatchObject({ name: 'AbortError' });
+      const retained = await openDB(name);
+      expect(retained.version).toBe(53);
+      expect(retained.objectStoreNames.contains(VIDEO_ANIMATION_PACKAGES_STORE)).toBe(false);
+      expect(await retained.get(VIDEO_EFFECT_BUNDLES_STORE, legacy.packId)).toEqual(legacy);
+      retained.close();
+    }
+    await expect(inspectDatabaseAdmission()).resolves.toEqual({
+      databaseVersion: DB_VERSION,
+      status: 'ready',
+    });
+    const upgraded = await openDB(name, DB_VERSION, { upgrade: handleDatabaseUpgrade });
+    expect(await upgraded.get(VIDEO_EFFECT_BUNDLES_STORE, legacy.packId)).toEqual(legacy);
+    expect(await upgraded.getAll(VIDEO_ANIMATION_PACKAGES_STORE)).toEqual([]);
+    expect([...upgraded.transaction(VIDEO_ANIMATION_PACKAGES_STORE).store.indexNames]).toEqual([
+      'enabled',
+      'updatedAt',
+    ]);
+    upgraded.close();
+  }
+);
+
+it.each([false, true])(
+  'copies prototype preferences without rewriting package or legacy rows, interrupted=%s',
+  async (interrupted) => {
+    const name = await createSource(54);
+    const source = JSON.stringify({
+      format: 'sniptale-animation',
+      version: 1,
+      id: 'retained-animation',
+      label: { en: 'Retained' },
+      controls: [],
+      resources: [],
+      bindings: [],
+      animation: { v: '5.12.2', w: 320, h: 180, fr: 30, ip: 0, op: 60, layers: [], assets: [] },
+    });
+    const sha256 = Array.from(
+      new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source))),
+      (byte) => byte.toString(16).padStart(2, '0')
+    ).join('');
+    const presetPreferences = {
+      presets: [{ id: 'retained', name: 'Retained preference', values: { accent: '#f59a45' } }],
+    };
+    const packageRow = {
+      format: 'sniptale-animation-catalog',
+      version: 1,
+      packId: 'animation.retained-animation',
+      source: 'lottie-json',
+      sourceSha256: sha256,
+      label: { en: 'Retained' },
+      enabled: false,
+      createdAt: 1,
+      updatedAt: 1,
+      retainedByteLength:
+        new TextEncoder().encode(source).byteLength +
+        new TextEncoder().encode(JSON.stringify(presetPreferences)).byteLength,
+      documents: [{ id: 'retained-animation', source, sha256, enabled: false, presetPreferences }],
+    };
+    const opaque = {
+      packId: 'opaque-legacy',
+      source: 'Do not interpret old EffectV1 bytes',
+      value: [0, 255],
+    };
+    const old = await openDB(name, 54);
+    await old.put(VIDEO_ANIMATION_PACKAGES_STORE, packageRow);
+    await old.put(VIDEO_EFFECT_BUNDLES_STORE, opaque);
+    old.close();
+    if (interrupted) {
+      await expect(
+        openDB(name, DB_VERSION, {
+          upgrade(db, oldVersion, newVersion, transaction) {
+            executeDatabaseUpgrade(
+              db,
+              oldVersion,
+              newVersion,
+              transaction,
+              DATABASE_MIGRATIONS.map((migration) =>
+                migration.toDatabaseVersion === 55
+                  ? {
+                      ...migration,
+                      migrate(database, tx) {
+                        migration.migrate(database, tx);
+                        throw new Error('Interrupted preference copy');
+                      },
+                    }
+                  : migration
+              )
+            );
+          },
+        })
+      ).rejects.toThrow();
+      const retained = await openDB(name, 54);
+      expect(retained.objectStoreNames.contains(VIDEO_VISUAL_PREFERENCES_STORE)).toBe(false);
+      expect(await retained.get(VIDEO_ANIMATION_PACKAGES_STORE, packageRow.packId)).toEqual(
+        packageRow
+      );
+      retained.close();
+    }
+    const upgraded = await openDB(name, DB_VERSION, { upgrade: handleDatabaseUpgrade });
+    try {
+      expect(await upgraded.get(VIDEO_ANIMATION_PACKAGES_STORE, packageRow.packId)).toEqual(
+        packageRow
+      );
+      expect(await upgraded.get(VIDEO_EFFECT_BUNDLES_STORE, opaque.packId)).toEqual(opaque);
+      expect(
+        await upgraded.get(VIDEO_VISUAL_PREFERENCES_STORE, ['animation', packageRow.packId])
+      ).toEqual({
+        format: 'sniptale-visual-preferences',
+        version: 1,
+        kind: 'animation',
+        packId: packageRow.packId,
+        enabled: false,
+        documents: {
+          'retained-animation': { sourceSha256: sha256, enabled: false, presetPreferences },
+        },
+      });
+      expect(await upgraded.get('schema_contracts', 'effects')).toEqual({
+        domainId: 'effects',
+        schemaVersion: 4,
+      });
+    } finally {
+      upgraded.close();
+    }
+  }
+);
+
+it('rolls back coupled package and preference deletion before allowing an atomic retry', async () => {
+  const name = await createSource(54);
+  const db = await openDB(name, DB_VERSION, { upgrade: handleDatabaseUpgrade });
+  const source = JSON.stringify({
+    format: 'sniptale-animation',
+    version: 1,
+    id: 'atomic',
+    label: { en: 'Atomic' },
+    controls: [],
+    resources: [],
+    bindings: [],
+    animation: { v: '5.12.2', w: 320, h: 180, fr: 30, ip: 0, op: 60, layers: [], assets: [] },
+  });
+  const sha256 = Array.from(
+    new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source))),
+    (byte) => byte.toString(16).padStart(2, '0')
+  ).join('');
+  const packet = {
+    format: 'sniptale-animation-catalog',
+    version: 2,
+    packId: 'animation.atomic',
+    source: 'lottie-json',
+    sourceSha256: sha256,
+    label: { en: 'Atomic' },
+    createdAt: 1,
+    updatedAt: 1,
+    retainedByteLength: new TextEncoder().encode(source).byteLength,
+    documents: [{ id: 'atomic', source, sha256 }],
+  };
+  const preference = {
+    format: 'sniptale-visual-preferences',
+    version: 1,
+    kind: 'animation',
+    packId: packet.packId,
+    documents: { atomic: { sourceSha256: sha256, enabled: false } },
+  };
+  await db.put(VIDEO_ANIMATION_PACKAGES_STORE, packet);
+  await db.put(VIDEO_VISUAL_PREFERENCES_STORE, preference);
+  const failed = db.transaction(
+    [VIDEO_ANIMATION_PACKAGES_STORE, VIDEO_VISUAL_PREFERENCES_STORE],
+    'readwrite'
+  );
+  await failed.objectStore(VIDEO_ANIMATION_PACKAGES_STORE).delete(packet.packId);
+  failed.abort();
+  await expect(failed.done).rejects.toThrow();
+  expect(await db.get(VIDEO_ANIMATION_PACKAGES_STORE, packet.packId)).toEqual(packet);
+  expect(await db.get(VIDEO_VISUAL_PREFERENCES_STORE, ['animation', packet.packId])).toEqual(
+    preference
+  );
+  const retry = db.transaction(
+    [VIDEO_ANIMATION_PACKAGES_STORE, VIDEO_VISUAL_PREFERENCES_STORE],
+    'readwrite'
+  );
+  await retry.objectStore(VIDEO_ANIMATION_PACKAGES_STORE).delete(packet.packId);
+  await retry.objectStore(VIDEO_VISUAL_PREFERENCES_STORE).delete(['animation', packet.packId]);
+  await retry.done;
+  expect(await db.get(VIDEO_ANIMATION_PACKAGES_STORE, packet.packId)).toBeUndefined();
+  expect(
+    await db.get(VIDEO_VISUAL_PREFERENCES_STORE, ['animation', packet.packId])
+  ).toBeUndefined();
+  db.close();
+});
+
+it.each([false, true])(
+  'adds GL preset storage without changing existing resources, interrupted=%s',
+  async (interrupted) => {
+    const name = await createSource(55),
+      source = await openDB(name, 55);
+    const previousRows: Record<string, unknown[]> = {};
+    for (const store of source.objectStoreNames) previousRows[store] = await source.getAll(store);
+    const opaque = { packId: 'opaque-gl-upgrade', bytes: [0, 255, 17] };
+    await source.put(VIDEO_EFFECT_BUNDLES_STORE, opaque);
+    previousRows[VIDEO_EFFECT_BUNDLES_STORE] = await source.getAll(VIDEO_EFFECT_BUNDLES_STORE);
+    source.close();
+    if (interrupted) {
+      await expect(
+        openDB(name, DB_VERSION, {
+          upgrade(db, oldVersion, newVersion, tx) {
+            executeDatabaseUpgrade(
+              db,
+              oldVersion,
+              newVersion,
+              tx,
+              DATABASE_MIGRATIONS.map((migration) =>
+                migration.toDatabaseVersion === 56
+                  ? {
+                      ...migration,
+                      migrate(database, transaction) {
+                        migration.migrate(database, transaction);
+                        throw new Error('Interrupted GL store creation');
+                      },
+                    }
+                  : migration
+              )
+            );
+          },
+        })
+      ).rejects.toThrow();
+      const retained = await openDB(name, 55);
+      expect(retained.objectStoreNames.contains(VIDEO_GL_TRANSITION_PRESETS_STORE)).toBe(false);
+      expect(await retained.get(VIDEO_EFFECT_BUNDLES_STORE, opaque.packId)).toEqual(opaque);
+      retained.close();
+    }
+    const upgraded = await openDB(name, DB_VERSION, { upgrade: handleDatabaseUpgrade });
+    try {
+      for (const [store, rows] of Object.entries(previousRows)) {
+        if (store === 'schema_contracts') continue;
+        expect(await upgraded.getAll(store)).toEqual(rows);
+      }
+      expect(await upgraded.getAll(VIDEO_GL_TRANSITION_PRESETS_STORE)).toEqual([]);
+      expect(await upgraded.get('schema_contracts', 'effects')).toEqual({
+        domainId: 'effects',
+        schemaVersion: 4,
       });
     } finally {
       upgraded.close();

@@ -1,3 +1,4 @@
+import { useReviewTimelineSnap, type ReviewTimelineSnap } from './timeline-magnets';
 import { SNAP_THRESHOLD_PX, snapTimelineTime } from '../../features/video/review/snap';
 import {
   reviewTrackMetrics,
@@ -46,7 +47,6 @@ export function ReviewTextTrack(props: TextTrackProps) {
   const rowCount = Math.max(1, ...Array.from(rows.values(), (row) => row + 1));
   const metrics = reviewTrackMetrics(props.compact);
   const step = metrics.step;
-  const duration = Math.max(0.01, props.editor.projection.duration);
   return (
     <ReviewTrackRow
       track="text"
@@ -74,6 +74,8 @@ export function ReviewTextTrack(props: TextTrackProps) {
       >
         {fragments.map((fragment) => {
           const range = props.editor.sourceInterval(fragment);
+          const left = props.editor.projection.display.sourceToDisplay(range.start);
+          const right = props.editor.projection.display.sourceToDisplay(range.end, 'end');
           return (
             <div
               key={fragment.id}
@@ -87,6 +89,8 @@ export function ReviewTextTrack(props: TextTrackProps) {
               aria-disabled={props.busy}
               data-text-id={fragment.id}
               data-review-removal-key={`text:${fragment.id}`}
+              data-review-snap-start={range.start}
+              data-review-snap-end={range.end}
               data-dragging={gesture.draggingId === fragment.id ? 'true' : undefined}
               className={[
                 'absolute min-w-px touch-none select-none overflow-hidden rounded border px-3 text-left text-[11px]',
@@ -95,8 +99,8 @@ export function ReviewTextTrack(props: TextTrackProps) {
               style={{
                 top: (rows.get(fragment.id) ?? 0) * step + metrics.inset,
                 height: metrics.body,
-                left: `${(range.start / duration) * 100}%`,
-                width: `${(Math.max(0, range.end - range.start) / duration) * 100}%`,
+                left: `${(left / props.editor.projection.display.duration) * 100}%`,
+                width: `${(Math.max(0, right - left) / props.editor.projection.display.duration) * 100}%`,
               }}
               onKeyDown={(event) => {
                 if (props.busy || (event.key !== 'Enter' && event.key !== ' ')) return;
@@ -110,7 +114,11 @@ export function ReviewTextTrack(props: TextTrackProps) {
               onLostPointerCapture={gesture.cancel}
             >
               <span className="flex h-full items-center">
-                <span className="block min-w-0 truncate">
+                <span
+                  className="block min-w-0 truncate
+                  text-[color:var(--review-item-foreground,var(--sniptale-color-text-secondary))]
+                  font-[number:var(--review-label-weight,400)]"
+                >
                   {fragment.text || translate('gallery.videoReview.speechText')}
                 </span>
               </span>
@@ -119,9 +127,7 @@ export function ReviewTextTrack(props: TextTrackProps) {
                   key={edge}
                   data-text-edge={edge}
                   className={`${reviewTimelineResizeHandleClassName} ${edge === 'start' ? 'left-0' : 'right-0'}`}
-                >
-                  <span className="h-4 w-px bg-current opacity-60" />
-                </span>
+                ></span>
               ))}
             </div>
           );
@@ -134,10 +140,10 @@ export function ReviewTextTrack(props: TextTrackProps) {
 
 /** One pointer capture owns the disposable preview, admission, Escape and final timing commit. */
 function useReviewTextTrackGesture(props: TextTrackProps) {
+  const snap = useReviewTimelineSnap();
   const drag = useRef<{
     base: ReviewTextFragment;
     x: number;
-    sourceAt: number;
     width: number;
     edge: 'start' | 'end' | 'move';
     node: HTMLElement;
@@ -185,7 +191,6 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
     drag.current = {
       base: fragment,
       x: event.clientX,
-      sourceAt: ((event.clientX - bounds.left) / bounds.width) * duration,
       width: bounds.width,
       edge: edge === 'start' || edge === 'end' ? edge : 'move',
       node: event.currentTarget,
@@ -201,11 +206,17 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
     if (!current) return;
     const base = current.base;
     const limit = base.timeDomain === 'source' ? duration : props.editor.projection.resultDuration;
+    const sourceRange = props.editor.sourceInterval(base);
+    const sourceAnchor = current.edge === 'end' ? sourceRange.end : sourceRange.start;
     const freeDelta =
       base.timeDomain === 'source'
-        ? ((event.clientX - current.x) / current.width) * duration
-        : props.editor.projection.delta(current.sourceAt, event.clientX - current.x, current.width);
-    const delta = textResizeDelta(props.editor, current, freeDelta, event.altKey);
+        ? props.editor.projection.focus.delta(
+            props.editor.projection.focus.source(base.start),
+            event.clientX - current.x,
+            current.width
+          )
+        : props.editor.projection.delta(sourceAnchor, event.clientX - current.x, current.width);
+    const delta = textResizeDelta(props.editor, current, freeDelta, event.altKey, snap);
     const shift = Math.max(-base.start, Math.min(limit - base.end, delta));
     const start =
       current.edge === 'move'
@@ -249,13 +260,12 @@ function textResizeDelta(
   editor: TextTrackProps['editor'],
   gesture: { base: ReviewTextFragment; edge: 'start' | 'end' | 'move'; width: number },
   delta: number,
-  bypass: boolean
+  bypass: boolean,
+  snapTime: ReviewTimelineSnap = snapTimelineTime
 ) {
-  if (bypass || gesture.edge === 'move') return delta;
+  if (bypass) return delta;
   const { base, edge, width } = gesture;
   const sourceClock = base.timeDomain === 'source';
-  const requested = base[edge] + delta;
-  const time = sourceClock ? requested : editor.projection.source(requested, edge);
   const playhead = editor.playhead(base);
   const candidates = [
     0,
@@ -268,11 +278,21 @@ function textResizeDelta(
         return [span.start, span.end];
       }),
   ];
-  const snap = snapTimelineTime(
-    time,
-    candidates,
-    (SNAP_THRESHOLD_PX * editor.projection.duration) / Math.max(1, width)
-  );
-  if (snap.candidate === null) return delta;
-  return (sourceClock ? snap.time : editor.projection.output(snap.time)) - base[edge];
+  const threshold = (SNAP_THRESHOLD_PX * editor.projection.duration) / Math.max(1, width);
+  const snappedDelta = (boundary: 'start' | 'end') => {
+    const requested = base[boundary] + delta;
+    const time = sourceClock ? requested : editor.projection.source(requested, boundary);
+    const snap = snapTime(time, candidates, threshold);
+    return {
+      delta:
+        snap.candidate === null
+          ? delta
+          : (sourceClock ? snap.time : editor.projection.output(snap.time)) - base[boundary],
+      distance: snap.candidate === null ? Infinity : Math.abs(snap.time - time),
+    };
+  };
+  if (edge !== 'move') return snappedDelta(edge).delta;
+  const start = snappedDelta('start'),
+    end = snappedDelta('end');
+  return start.distance <= end.distance ? start.delta : end.delta;
 }

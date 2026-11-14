@@ -1,10 +1,6 @@
 import { MAX_CAPTURE_ROWS } from './contracts';
 import { beforeEach, expect, it, vi } from 'vitest';
-import {
-  EFFECT_BUNDLE_CORPUS,
-  readEffectBundleCorpusArchive,
-} from '../../../../../../tooling/test/support/effect-v1-corpus.test-support';
-import { importEffectBundleZip } from '../../../features/video/project/effect-bundle/import/zip';
+import { readValidAnimationSnapshot } from '../effect-bundles/fixture.test-support';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { createProjectExportEntry } from '../projects/index.test-support';
 import { parseVideoProjectEntry } from '../projects/read-guards';
@@ -25,13 +21,7 @@ vi.mock('../assets', async (original) => ({
 beforeEach(() => vi.clearAllMocks());
 
 async function setup() {
-  const corpus = EFFECT_BUNDLE_CORPUS.find(
-    ({ accepted, artifact }) => accepted && artifact.includes('asset-bearing-conformance')
-  );
-  if (!corpus) throw new Error('Missing asset-bearing effect corpus');
-  const imported = await importEffectBundleZip(readEffectBundleCorpusArchive(corpus));
-  if (!imported.ok) throw new Error('Expected valid corpus');
-  const document = imported.bundle.documents[0]!;
+  const snapshot = await readValidAnimationSnapshot();
   const files = new Map<string, File>();
   function staged(assetId: string, bytes: Uint8Array, mimeType: string): AssetRef {
     files.set(assetId, new File([Uint8Array.from(bytes).buffer], assetId, { type: mimeType }));
@@ -49,7 +39,6 @@ async function setup() {
     if (!file) throw new Error('Missing staged file');
     return file;
   });
-  const snapshotId = `effect:${document.sha256}`;
   const project = createEmptyVideoProject('Prepared effect graph');
   const root: PreparedVideoProjectReplicaRoot = {
     entry: {
@@ -59,64 +48,39 @@ async function setup() {
       workspaceRevision: 3,
       project: {
         ...project,
-        effectSnapshots: [
-          {
-            assets: document.assets.map((asset) => ({
-              id: asset.id,
-              byteLength: asset.byteLength,
-              kind: asset.kind,
-              mimeType: asset.mimeType,
-              sha256: asset.sha256,
-            })),
-            documentId: document.document.id,
-            id: snapshotId,
-            kind: document.document.kind,
-            retainedByteLength:
-              new TextEncoder().encode(document.source).byteLength +
-              document.assets.reduce((size, asset) => size + asset.byteLength, 0),
-            schemaVersion: 'sniptale.effect.v1',
-            sha256: document.sha256,
-            source: document.source,
-          },
-        ],
+        effectSnapshots: [snapshot],
       },
     },
     assets: [],
-    snapshotRefs: document.assets.map((asset, index) => ({
-      snapshotId,
-      assetId: asset.id,
-      ref: staged(`effect-${index}`, asset.bytes, asset.mimeType),
-    })),
+    snapshotRefs: [],
   };
   return { root, files, staged };
 }
 
-it('hydrates the asset-bearing effect corpus and detaches bytes before staging invalidation', async () => {
-  const data = await setup();
-  const before = JSON.stringify(data.root);
+it('hydrates exact self-contained animation bytes without staged effect bindings', async () => {
+  const data = await setup(),
+    before = JSON.stringify(data.root);
   const parsed = parsePreparedVideoProjectReplicaRoot(data.root);
   expect(JSON.stringify(data.root)).toBe(before);
-  expect(collectPreparedProjectReplicaRefs(parsed)).toEqual(
-    data.root.snapshotRefs!.map((binding) => binding.ref)
-  );
+  expect(collectPreparedProjectReplicaRefs(parsed)).toEqual([]);
   const hydrated = await hydratePreparedVideoProjectReplicaRoot(parsed);
   expect(parseVideoProjectEntry(hydrated.entry)).not.toBeNull();
   data.files.clear();
-  const assets = hydrated.entry.project.effectSnapshots![0]!.assets;
-  expect(assets.length).toBeGreaterThan(0);
-  expect((await assets[0]!.blob.arrayBuffer()).byteLength).toBe(assets[0]!.byteLength);
+  expect(hydrated.entry.project.effectSnapshots).toEqual(data.root.entry.project.effectSnapshots);
   expect(JSON.stringify(data.root)).toBe(before);
+  expect(io.read).not.toHaveBeenCalled();
 });
-
-it.each(['missing', 'extra', 'duplicate', 'wrong-slot', 'size', 'mime', 'digest'] as const)(
-  'refuses inexact effect binding closure: %s',
+it.each(['extra', 'duplicate', 'wrong-slot', 'size', 'mime', 'digest'] as const)(
+  'refuses unsupported detached effect binding before physical reads: %s',
   async (change) => {
-    const { root } = await setup();
-    const binding = root.snapshotRefs![0]!;
-    if (change === 'missing') root.snapshotRefs = [];
-    if (change === 'extra') root.snapshotRefs!.push({ ...binding, assetId: 'undeclared' });
-    if (change === 'duplicate') root.snapshotRefs!.push(binding);
-    if (change === 'wrong-slot') binding.snapshotId = 'different-snapshot';
+    const { root, staged } = await setup();
+    const binding = {
+      snapshotId: root.entry.project.effectSnapshots![0]!.id,
+      assetId: 'detached',
+      ref: staged('detached', new Uint8Array([1]), 'image/png'),
+    };
+    root.snapshotRefs = change === 'duplicate' ? [binding, binding] : [binding];
+    if (change === 'wrong-slot') binding.snapshotId = 'other';
     if (change === 'size') binding.ref.size++;
     if (change === 'mime') binding.ref.mimeType = 'image/jpeg';
     if (change === 'digest') binding.ref.sha256 = '0'.repeat(64);
@@ -124,21 +88,15 @@ it.each(['missing', 'extra', 'duplicate', 'wrong-slot', 'size', 'mime', 'digest'
     expect(io.read).not.toHaveBeenCalled();
   }
 );
-
-it.each(['missing', 'corrupt', 'size', 'mime'] as const)(
-  'refuses missing or changed staged effect bytes: %s',
+it.each(['missing', 'corrupt'] as const)(
+  'refuses %s embedded animation source before physical reads',
   async (change) => {
-    const { root, files } = await setup();
-    const ref = root.snapshotRefs![0]!.ref;
-    if (change === 'missing') files.delete(ref.assetId);
-    else
-      files.set(
-        ref.assetId,
-        new File([new Uint8Array(change === 'size' ? ref.size + 1 : ref.size)], 'changed', {
-          type: change === 'mime' ? 'image/jpeg' : ref.mimeType,
-        })
-      );
+    const { root } = await setup(),
+      snapshot = root.entry.project.effectSnapshots![0]!;
+    if (change === 'missing') snapshot.source = '{}';
+    else snapshot.sha256 = '0'.repeat(64);
     await expect(hydratePreparedVideoProjectReplicaRoot(root)).rejects.toThrow();
+    expect(io.read).not.toHaveBeenCalled();
   }
 );
 
@@ -150,7 +108,13 @@ it('rejects Blob and class instances at the staged JSON boundary', async () => {
   expect(() => parsePreparedVideoProjectReplicaRoot({ ...root, extra: new Date() })).toThrow(
     'invalid'
   );
-  const asset = root.entry.project.effectSnapshots![0]!.assets[0]!;
+  const asset = {
+    id: 'hidden',
+    kind: 'image',
+    byteLength: 1,
+    mimeType: 'image/png',
+    sha256: '0'.repeat(64),
+  };
   expect(() =>
     parsePreparedVideoProjectReplicaRoot({
       ...root,
@@ -208,7 +172,16 @@ it('hydrates associated presentation and thumbnail sidecars and deduplicates phy
 
 it('refuses inconsistent physical claims and unrelated sidecars', async () => {
   const data = await setup();
-  const ref = data.root.snapshotRefs![0]!.ref;
+  const ref = data.staged('shared', new Uint8Array([1]), 'image/png');
+  data.root.presentation = {
+    entry: {
+      aggregateId: data.root.entry.id,
+      aggregateKind: 'video-project',
+      presentationRevision: 3,
+      updatedAt: 2,
+    },
+    thumbnailRef: ref,
+  };
   data.root.thumbnail = {
     entry: {
       assetId: `video-project:${data.root.entry.id}`,
@@ -269,16 +242,22 @@ it('retains native private source reviews and refuses changed workspace or draft
   expect(() => parsePreparedVideoProjectReplicaRoot(data.root)).toThrow('invalid');
 });
 
-it('refuses duplicate declared effect slots and omitted required bindings', async () => {
+it('accepts omitted empty effect bindings but refuses detached declarations', async () => {
   const { root } = await setup();
-  const snapshot = root.entry.project.effectSnapshots![0]!;
-  const originalBytes = snapshot.retainedByteLength;
-  snapshot.assets.push(snapshot.assets[0]!);
-  snapshot.retainedByteLength += snapshot.assets[0]!.byteLength;
-  expect(() => parsePreparedVideoProjectReplicaRoot(root)).toThrow('invalid');
-  snapshot.assets.pop();
-  snapshot.retainedByteLength = originalBytes;
   delete root.snapshotRefs;
+  expect(parsePreparedVideoProjectReplicaRoot(root).entry.project.effectSnapshots).toEqual(
+    root.entry.project.effectSnapshots
+  );
+  const snapshot = root.entry.project.effectSnapshots![0]!;
+  const asset = {
+    id: 'detached',
+    kind: 'image' as const,
+    byteLength: 1,
+    mimeType: 'image/png',
+    sha256: '0'.repeat(64),
+  };
+  snapshot.assets = [asset, asset];
+  snapshot.retainedByteLength += 2;
   expect(() => parsePreparedVideoProjectReplicaRoot(root)).toThrow('invalid');
 });
 

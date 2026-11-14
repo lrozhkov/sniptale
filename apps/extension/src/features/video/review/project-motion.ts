@@ -1,5 +1,8 @@
 import { requiresExtendedBorderSchema } from '../project/scene/focus-appearance';
-import { resolveQuickEditFocusLink } from './advanced/focus-layout';
+import {
+  resolveQuickEditFocusLink,
+  resolveQuickEditActiveFocusRegions,
+} from './advanced/focus-layout';
 import { projectMotionSourceBinding } from '../project/motion/source-binding';
 import { getVideoProjectUtilityLanes } from '../project/utility-lanes';
 import type {
@@ -16,6 +19,7 @@ export function planReviewProjectMotion(
   applied: boolean
 ): VideoProject | null {
   if (!content.zoom.regions.length) return project;
+  if (content.zoom.regions.some((r) => r.effect === '3d')) project = { ...project, version: 55 };
   if (content.zoom.regions.some((region) => region.border && region.spotlight)) return null;
   const clips = project.clips.filter(
     (clip): clip is VideoProjectVideoClip =>
@@ -23,9 +27,16 @@ export function planReviewProjectMotion(
       project.tracks.some((track) => track.id === clip.trackId && track.isRoot)
   );
   if (!clips.length) return null;
+  const activeIds = new Set(
+    resolveQuickEditActiveFocusRegions(content.zoom.regions).map((region) => region.id)
+  );
+  // Unresolved source placements keep their existing dormant bindings; conflicting copies do not render.
+  const authored = content.zoom.regions.filter(
+    (region) => region.effect === '3d' || region.dormant || activeIds.has(region.id)
+  );
   const regions: VideoProjectMotionRegion[] = [];
   const groups = new Map<string, VideoProjectMotionRegion[]>();
-  for (const region of content.zoom.regions) {
+  for (const region of authored) {
     const anchor = region.sourceAnchor;
     let targets = clips.filter((clip) =>
       anchor
@@ -51,11 +62,11 @@ export function planReviewProjectMotion(
     regions.push(...mapped);
     groups.set(region.id, mapped);
   }
-  for (const region of content.zoom.regions) {
+  for (const region of authored) {
     if (!region.linkTo) continue;
-    const retainedTarget = content.zoom.regions.find((target) => target.id === region.linkTo);
+    const retainedTarget = authored.find((target) => target.id === region.linkTo);
     const link =
-      resolveQuickEditFocusLink(content.zoom.regions, region.id, { sourceTime: true }) ??
+      resolveQuickEditFocusLink(authored, region.id, { sourceTime: true }) ??
       (retainedTarget && (region.dormant || retainedTarget.dormant)
         ? { source: region, target: retainedTarget }
         : null);
@@ -140,6 +151,8 @@ function mappedRegion(
     ...(region.cursorComposition
       ? { cursorComposition: structuredClone(region.cursorComposition) }
       : {}),
+    ...(region.effect ? { effect: region.effect } : {}),
+    ...(region.spatialMotion ? { spatialMotion: structuredClone(region.spatialMotion) } : {}),
     ...(region.perspective ? { perspective: structuredClone(region.perspective) } : {}),
     ...(region.depthOfField ? { depthOfField: structuredClone(region.depthOfField) } : {}),
     ...(region.motionBlur ? { motionBlur: structuredClone(region.motionBlur) } : {}),

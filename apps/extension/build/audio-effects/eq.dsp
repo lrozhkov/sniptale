@@ -1,0 +1,1 @@
+import("stdfaust.lib"); gain=hslider("gain[unit:dB]",0,-24,24,0.1); frequency=hslider("frequency[unit:Hz]",1000,20,20000,1); q=hslider("q",1,0.1,12,0.1); process=par(i,2,fi.peak_eq_cq(gain,frequency,q));

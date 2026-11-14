@@ -1,36 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
-import { VideoTransitionTemplateKind } from '../../../../../features/video/project/types';
+import { expect, it } from 'vitest';
+import { getTransitionEasingOptions } from './transition-options';
 
-vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
-  translate: (key: string) => key,
-}));
-
-import { getTransitionTemplateOptions } from './transition-options';
-
-describe('transition-options', () => {
-  it('threads transition family labels into grouped template options', () => {
-    expect(getTransitionTemplateOptions()).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          description: 'videoEditor.templates.transitionDescriptionCrossfade',
-          groupLabel: 'videoEditor.templates.transitionGroupCore',
-          label: 'videoEditor.sidebar.transitionCrossfade',
-          value: VideoTransitionTemplateKind.CROSSFADE,
-        }),
-        expect.objectContaining({
-          description: 'videoEditor.templates.transitionDescriptionFadeThroughLight',
-          groupLabel: 'videoEditor.templates.transitionGroupCore',
-          label: 'videoEditor.sidebar.transitionFadeThroughLight',
-          value: VideoTransitionTemplateKind.FADE_THROUGH_LIGHT,
-        }),
-        expect.objectContaining({
-          description: 'videoEditor.templates.transitionDescriptionLightSweep',
-          groupLabel: 'videoEditor.templates.transitionGroupReveal',
-          label: 'videoEditor.sidebar.transitionLightSweep',
-          value: VideoTransitionTemplateKind.LIGHT_SWEEP,
-        }),
-      ])
-    );
-  });
+it('retains the two shared timing choices independently of shader style and parameters', () => {
+  const options = getTransitionEasingOptions();
+  expect(options.map((option) => option.value)).toEqual(['LINEAR', 'EASE_IN_OUT']);
+  expect(
+    options.every((option) => typeof option.label === 'string' && option.label.length > 0)
+  ).toBe(true);
 });

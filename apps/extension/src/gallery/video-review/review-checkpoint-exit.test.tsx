@@ -369,6 +369,7 @@ it.each(['accepted', 'new-edit', 'rejected'] as const)(
     const rpc = deferred<unknown>();
     sync.exit.mockReturnValueOnce(rpc.promise);
     try {
+      await f.click('exportSection');
       await act(async () => f.button('openVideoEditor').click());
       expect(sync.exit).toHaveBeenCalledExactlyOnceWith(receipt(1));
       expect(sync.open).not.toHaveBeenCalled();

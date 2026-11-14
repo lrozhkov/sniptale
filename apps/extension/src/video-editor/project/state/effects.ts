@@ -1,3 +1,7 @@
+import {
+  editProjectSourceInteraction,
+  deleteProjectSourceInteraction,
+} from '../../../features/video/project/source-interaction-authoring';
 import { resolveRecordingActionOccurrences } from '../operations/recording-events-selection';
 import { isMotionFocusArea } from '../../../features/video/project/motion/focus-area';
 import {
@@ -167,6 +171,13 @@ function createActionDetailsUpdater(set: VideoEditorStoreSet) {
     set((state) =>
       applyProjectUpdate(state, (project) => {
         if (isVideoProjectUtilityLaneLocked(project, 'actions')) return project;
+        const sourceEdit = editProjectSourceInteraction(project, actionEventId, patch);
+        if (sourceEdit)
+          return sourceEdit === project
+            ? project
+            : applyVideoProjectMutationPatch(project, {
+                sourceInteractionDocuments: sourceEdit.sourceInteractionDocuments!,
+              });
         const observed =
           state.selection.kind === VideoEditorSelectionKind.ACTION_OCCURRENCE &&
           state.selection.eventId === actionEventId
@@ -387,11 +398,15 @@ function createActionDeleter(set: VideoEditorStoreSet) {
         return {};
       }
 
-      const nextState = applyProjectUpdate(state, (project) =>
-        applyVideoProjectMutationPatch(project, {
-          actionEvents: project.actionEvents.filter((event) => event.id !== actionEventId),
-        })
-      );
+      const nextState = applyProjectUpdate(state, (project) => {
+        const sourceEdit = deleteProjectSourceInteraction(project, actionEventId);
+        return applyVideoProjectMutationPatch(
+          project,
+          sourceEdit
+            ? { sourceInteractionDocuments: sourceEdit.sourceInteractionDocuments! }
+            : { actionEvents: project.actionEvents.filter((event) => event.id !== actionEventId) }
+        );
+      });
 
       return {
         ...nextState,
@@ -572,6 +587,7 @@ function mergeMotionRegionProperties(
     perspective: _perspective,
     depthOfField: _depth,
     spatialReference: _reference,
+    spatialMotion: _motion,
     ...withoutSpatial
   } = transition ?? region;
   let updated = {
@@ -580,6 +596,7 @@ function mergeMotionRegionProperties(
     ...(spatial?.perspective ? { perspective: spatial.perspective } : {}),
     ...(spatial?.depthOfField ? { depthOfField: spatial.depthOfField } : {}),
     ...(spatial?.spatialReference ? { spatialReference: spatial.spatialReference } : {}),
+    ...(spatial?.spatialMotion ? { spatialMotion: spatial.spatialMotion } : {}),
     ...properties,
     ...(phases ? { motionBlur: phases } : {}),
   };
@@ -640,9 +657,11 @@ function updateMotionRegionSource(
   } else if (sourceClipId !== undefined && sourceClipId !== region.sourceBinding?.clipId) {
     const bindingRegion =
       focusEdit?.enabled === true
-        ? focusEdit.kind === 'spotlight'
-          ? { ...updated, spotlight: updated.spotlight ?? createQuickEditSpotlight() }
-          : { ...updated, border: updated.border ?? createQuickEditBorder() }
+        ? focusEdit.kind === '3d'
+          ? { ...updated, effect: '3d' as const }
+          : focusEdit.kind === 'spotlight'
+            ? { ...updated, spotlight: updated.spotlight ?? createQuickEditSpotlight() }
+            : { ...updated, border: updated.border ?? createQuickEditBorder() }
         : updated;
     const source = getMotionBindingCandidates(project, bindingRegion).find(
       (item) => item.id === sourceClipId
