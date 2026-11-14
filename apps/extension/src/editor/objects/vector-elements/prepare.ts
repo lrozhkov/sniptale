@@ -1,4 +1,5 @@
 import { Color } from 'fabric';
+import { sanitizeSvgFragment } from '@sniptale/platform/security/sanitizers/svg';
 import {
   isEditorVectorDefinition,
   isEditorVectorProvenance,
@@ -280,7 +281,7 @@ function canonicalXml(element: Element): string {
   return `<${element.localName}${serializedAttributes}>${children}</${element.localName}>`;
 }
 
-function prepareArtwork(
+function normalizeArtwork(
   svg: string
 ): Pick<EditorVectorDefinition, 'viewBox' | 'svg' | 'slots' | 'capabilities'> {
   if (new TextEncoder().encode(svg).byteLength > 2097152) refuse('budget-exceeded');
@@ -380,6 +381,19 @@ function prepareArtwork(
     slots,
     capabilities: { palette: slots.length > 0, strokeScale: hasStroke },
   };
+}
+
+function prepareArtwork(svg: string) {
+  // Admission precedes sanitization so unsupported artwork cannot become a partial import.
+  const admitted = normalizeArtwork(svg);
+  const sanitized = sanitizeSvgFragment(admitted.svg, {
+    allowedTags: Object.keys(GEOMETRY),
+    allowedAttributes: [...COMMON, ...Object.values(GEOMETRY).flat()],
+  });
+  if (sanitized === null) refuse('unsafe-svg');
+  const checked = normalizeArtwork(sanitized);
+  if (JSON.stringify(checked) !== JSON.stringify(admitted)) refuse('unsafe-svg');
+  return checked;
 }
 
 /** Prepare before insertion or persistence. Unsupported features never become partial artwork. */

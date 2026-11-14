@@ -2,6 +2,7 @@
 
 import { act, Children, isValidElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import type { EditorDocument } from '../../../../apps/extension/src/features/editor/document/types';
 
 const harnessMocks = vi.hoisted(() => {
   let resolveHarnessReady: () => void = () => undefined;
@@ -12,6 +13,7 @@ const harnessMocks = vi.hoisted(() => {
       clearSelection: vi.fn(),
       exportDocument: vi.fn(() => ({ sourceName: 'retained source' })),
       getRasterRuntime: vi.fn(),
+      loadDocument: vi.fn<(document: EditorDocument) => Promise<void>>(async () => {}),
     },
     createRootMock: vi.fn(() => ({ render: vi.fn<(node: ReactNode) => void>() })),
     createPayloadMock: vi.fn(() => ({ title: 'Harness capture' })),
@@ -71,6 +73,7 @@ vi.mock('./scenarios/browser-frame-exact', () => ({
 
 beforeEach(() => {
   harnessMocks.controller.applyBrowserFrame.mockClear();
+  harnessMocks.controller.loadDocument.mockReset();
   harnessMocks.initializeAppThemeMock.mockClear();
   vi.useFakeTimers();
   document.body.innerHTML = '<div id="root"></div>';
@@ -106,20 +109,9 @@ function findBridge(node: ReactNode): ReactNode {
 }
 
 it('returns detached raster and document observations without publishing changes', async () => {
-  vi.useRealTimers();
-  await import('./index');
-  await harnessMocks.ready;
-  await Promise.resolve();
   const snapshot = { settings: { color: '#112233' }, busy: false };
   harnessMocks.controller.getRasterRuntime.mockReturnValue({ getSnapshot: () => snapshot });
-  const render = harnessMocks.createRootMock.mock.results[0]!.value.render;
-  const bridge = findBridge(render.mock.calls[0]![0]);
-  expect(bridge).toBeTruthy();
-  const { createRoot } =
-    await vi.importActual<typeof import('react-dom/client')>('react-dom/client');
-  const root = createRoot(document.getElementById('root')!);
-  await act(async () => root.render(bridge));
-  const probe = window.__sniptaleEditorHarness!;
+  const { root, probe } = await mountHarnessBridge();
   expect(probe.getSceneProjection()).toBeNull();
   const observed = probe.getRasterSnapshot()!;
   Reflect.set(observed.settings, 'color', '#ffffff');
@@ -130,4 +122,32 @@ it('returns detached raster and document observations without publishing changes
   expect(harnessMocks.controller.applyBrowserFrame).not.toHaveBeenCalled();
   await act(async () => root.unmount());
   expect(window.__sniptaleEditorHarness).toBeUndefined();
+});
+
+async function mountHarnessBridge() {
+  vi.useRealTimers();
+  await import('./index');
+  await harnessMocks.ready;
+  await Promise.resolve();
+  const render = harnessMocks.createRootMock.mock.results[0]!.value.render;
+  const bridge = findBridge(render.mock.calls[0]![0]);
+  expect(bridge).toBeTruthy();
+  const { createRoot } =
+    await vi.importActual<typeof import('react-dom/client')>('react-dom/client');
+  const root = createRoot(document.getElementById('root')!);
+  await act(async () => root.render(bridge));
+  return { root, probe: window.__sniptaleEditorHarness! };
+}
+
+it('routes document loading through controller admission and retains its refusal', async () => {
+  const { root, probe } = await mountHarnessBridge();
+  try {
+    const document = probe.exportDocument();
+    await probe.loadDocument(document);
+    expect(harnessMocks.controller.loadDocument).toHaveBeenCalledExactlyOnceWith(document);
+    harnessMocks.controller.loadDocument.mockRejectedValueOnce(new Error('document refused'));
+    await expect(probe.loadDocument(document)).rejects.toThrow('document refused');
+  } finally {
+    await act(async () => root.unmount());
+  }
 });

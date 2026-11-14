@@ -35,6 +35,7 @@ declare global {
       getCanvasObjects: () => Array<Record<string, unknown>>;
       renderImage: () => Promise<string>;
       exportDocument: () => EditorDocument;
+      loadDocument: (document: EditorDocument) => Promise<void>;
       getRasterSnapshot: () => RasterSessionSnapshot | null;
       getSceneProjection: () => {
         viewport: number[];
@@ -167,6 +168,7 @@ function HarnessEditorDebugBridge() {
       },
       renderImage: () => controller.renderForExport({ format: 'png', quality: 1 }, 'committed'),
       exportDocument: () => structuredClone(controller.exportDocument()),
+      loadDocument: (document) => controller.loadDocument(document),
       getRasterSnapshot: () => {
         const snapshot = controller.getRasterRuntime()?.getSnapshot();
         return snapshot ? structuredClone(snapshot) : null;

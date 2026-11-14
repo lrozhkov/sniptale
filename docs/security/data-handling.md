@@ -458,3 +458,13 @@ Erasure reserves credential admission synchronously. It drains sync before it ac
 Design Review retains authored feedback, page evidence and bounded PNG previews in local storage. Session-only bindings identify the native tab. A document lease and a revision reject stale writes after navigation or deletion. The session owner acknowledges a save only after storage accepts the write. Failed writes retain the last accepted data. Unavailable page elements never cause automatic feedback deletion. Explicit feedback deletion or Clear removes the selected authored records.
 
 Feedback actions accept native trusted clicks and the existing private mouse bridge. Synthetic page clicks cannot remove retained feedback. Preview images remain inside closed, non-clonable, non-serializable shadow roots. Public host attributes and children contain no raster URL. The user can explicitly export the complete session as text or PDF. Automatic sync, Library and backup omit these local records. Verified local-data erasure excludes new commands, drains accepted writes, revokes leases and removes local records and session bindings.
+
+## Vector SVG admission
+
+The editor applies one preparation policy to local SVG, Iconify artwork, catalog results, and restored vector definitions. Strict admission checks the source size before parsing and enforces the existing SVG profile and geometry limits. Scripts, event handlers, HTML, CSS, resource references, and unsupported SVG features cause explicit refusal.
+
+The platform SVG sanitizer applies DOMPurify to admitted canonical SVG with explicit tag, attribute, and namespace limits. The editor normalizes the sanitized result again. It rejects any change to canonical artwork, geometry, palette slots, or capabilities. Security decisions do not use `DOMPurify.removed`.
+
+An isolated sanitizer preserves admitted attribute whitespace before DOMPurify checks each attribute. It does not override attribute admission or restore removed content.
+
+Definition identities use the existing canonical serialization, independently of DOMPurify serialization. The editor checks restored definitions before Fabric projection, even when their stored digest matches. Palette previews, movement, and resizing do not invoke the sanitizer. Existing DOM-free storage codecs retain their structural and digest checks.

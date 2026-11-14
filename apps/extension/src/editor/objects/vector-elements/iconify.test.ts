@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
+import * as svgSanitizer from '@sniptale/platform/security/sanitizers/svg';
 import { parseEditorIconifySet, prepareEditorIconifyDefinition } from './iconify';
 
 const body = '<path d="M1 2H9V6H1Z" fill="currentColor"/>';
@@ -307,3 +308,29 @@ it('preserves empty array containers admitted by the shared record predicate', (
   expect(set.names).toEqual(['base']);
   expect(set.categories).toEqual({});
 });
+
+it.each(['local-import', 'https://api.iconify.design/'])(
+  'uses the same sanitizer for IconifyJSON bodies from %s without publishing partial artwork',
+  async (sourceId) => {
+    const sanitize = vi.spyOn(svgSanitizer, 'sanitizeSvgFragment');
+    const set = parseEditorIconifySet({
+      prefix: 'test',
+      icons: {
+        base: { body },
+        hostile: { body: body + '<image href="https://svg-attacker.invalid/icon"/>' },
+      },
+    });
+    try {
+      const valid = await prepareEditorIconifyDefinition(set, 'base', sourceId);
+      expect(sanitize).toHaveBeenCalledOnce();
+      await expect(prepareEditorIconifyDefinition(set, 'hostile', sourceId)).rejects.toThrow(
+        'Vector element refused:'
+      );
+      expect(sanitize).toHaveBeenCalledOnce();
+      expect(valid.provenance.sourceId).toBe(sourceId);
+      expect(valid.svg).not.toContain('image');
+    } finally {
+      sanitize.mockRestore();
+    }
+  }
+);

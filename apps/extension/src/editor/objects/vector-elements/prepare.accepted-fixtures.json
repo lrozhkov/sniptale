@@ -1,0 +1,570 @@
+[
+  {
+    "name": "opacity",
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\" viewBox=\"0 0 100 100\"><g opacity=\"0.5\"><rect x=\"10\" y=\"10\" width=\"60\" height=\"60\" fill=\"#ff0000\"/><rect x=\"30\" y=\"30\" width=\"60\" height=\"60\" fill=\"#0000ff\"/></g></svg>",
+    "definition": {
+      "version": 1,
+      "id": "047c605c2e24d6a27aa4bb0c0792e79fe238c369dff5b8318b9a78dac8326cd7",
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 100,
+        "height": 100
+      },
+      "svg": "<svg height=\"100\" id=\"v1\" viewBox=\"0 0 100 100\" width=\"100\" xmlns=\"http://www.w3.org/2000/svg\"><g id=\"v2\" opacity=\"0.5\"><rect color=\"#000000\" fill=\"#ff0000\" height=\"60\" id=\"v3\" stroke=\"none\" width=\"60\" x=\"10\" y=\"10\"></rect><rect color=\"#000000\" fill=\"#0000ff\" height=\"60\" id=\"v4\" stroke=\"none\" width=\"60\" x=\"30\" y=\"30\"></rect></g></svg>",
+      "slots": [
+        {
+          "id": "c0",
+          "kind": "explicit-color",
+          "originalColor": "#ff0000",
+          "bindings": [
+            {
+              "nodeId": "v3",
+              "attribute": "fill"
+            }
+          ]
+        },
+        {
+          "id": "c1",
+          "kind": "explicit-color",
+          "originalColor": "#0000ff",
+          "bindings": [
+            {
+              "nodeId": "v4",
+              "attribute": "fill"
+            }
+          ]
+        }
+      ],
+      "capabilities": {
+        "palette": true,
+        "strokeScale": false
+      },
+      "provenance": {
+        "sourceId": "prototype",
+        "prefix": null,
+        "name": "opacity",
+        "author": null,
+        "authorUrl": null,
+        "license": null,
+        "licenseUrl": null
+      }
+    }
+  },
+  {
+    "name": "nested-opacity",
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\" viewBox=\"0 0 100 100\"><g opacity=\"0.6\"><rect x=\"10\" y=\"10\" width=\"75\" height=\"60\" fill=\"#ff0000\"/><g opacity=\"0.4\"><rect x=\"30\" y=\"30\" width=\"60\" height=\"60\" fill=\"#0000ff\"/><rect x=\"45\" y=\"20\" width=\"35\" height=\"60\" fill=\"#00ff00\"/></g></g></svg>",
+    "definition": {
+      "version": 1,
+      "id": "172d7add6048d66d4dd21a105070be67b3c76544942648207357659a31afcb71",
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 100,
+        "height": 100
+      },
+      "svg": "<svg height=\"100\" id=\"v1\" viewBox=\"0 0 100 100\" width=\"100\" xmlns=\"http://www.w3.org/2000/svg\"><g id=\"v2\" opacity=\"0.6\"><rect color=\"#000000\" fill=\"#ff0000\" height=\"60\" id=\"v3\" stroke=\"none\" width=\"75\" x=\"10\" y=\"10\"></rect><g id=\"v4\" opacity=\"0.4\"><rect color=\"#000000\" fill=\"#0000ff\" height=\"60\" id=\"v5\" stroke=\"none\" width=\"60\" x=\"30\" y=\"30\"></rect><rect color=\"#000000\" fill=\"#00ff00\" height=\"60\" id=\"v6\" stroke=\"none\" width=\"35\" x=\"45\" y=\"20\"></rect></g></g></svg>",
+      "slots": [
+        {
+          "id": "c0",
+          "kind": "explicit-color",
+          "originalColor": "#ff0000",
+          "bindings": [
+            {
+              "nodeId": "v3",
+              "attribute": "fill"
+            }
+          ]
+        },
+        {
+          "id": "c1",
+          "kind": "explicit-color",
+          "originalColor": "#0000ff",
+          "bindings": [
+            {
+              "nodeId": "v5",
+              "attribute": "fill"
+            }
+          ]
+        },
+        {
+          "id": "c2",
+          "kind": "explicit-color",
+          "originalColor": "#00ff00",
+          "bindings": [
+            {
+              "nodeId": "v6",
+              "attribute": "fill"
+            }
+          ]
+        }
+      ],
+      "capabilities": {
+        "palette": true,
+        "strokeScale": false
+      },
+      "provenance": {
+        "sourceId": "prototype",
+        "prefix": null,
+        "name": "nested-opacity",
+        "author": null,
+        "authorUrl": null,
+        "license": null,
+        "licenseUrl": null
+      }
+    }
+  },
+  {
+    "name": "transforms",
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\" viewBox=\"0 0 100 100\"><g transform=\"translate(10 5) rotate(25 40 40) scale(0.8)\"><path d=\"M10 10 L80 20 L20 80 Z\" fill=\"#4499cc\"/><circle cx=\"60\" cy=\"60\" r=\"15\" fill=\"#ff6600\" fill-opacity=\"0.6\" stroke=\"#330033\" stroke-width=\"3\"/></g></svg>",
+    "definition": {
+      "version": 1,
+      "id": "0e43ba7c1e2b21d29a3657fabddb1badc3a940b4a09334fd44a5652b7837fc06",
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 100,
+        "height": 100
+      },
+      "svg": "<svg height=\"100\" id=\"v1\" viewBox=\"0 0 100 100\" width=\"100\" xmlns=\"http://www.w3.org/2000/svg\"><g id=\"v2\" transform=\"translate(10 5) rotate(25 40 40) scale(0.8)\"><path color=\"#000000\" d=\"M10 10 L80 20 L20 80 Z\" fill=\"#4499cc\" id=\"v3\" stroke=\"none\"></path><circle color=\"#000000\" cx=\"60\" cy=\"60\" fill=\"#ff6600\" fill-opacity=\"0.6\" id=\"v4\" r=\"15\" stroke=\"#330033\" stroke-width=\"3\"></circle></g></svg>",
+      "slots": [
+        {
+          "id": "c0",
+          "kind": "explicit-color",
+          "originalColor": "#4499cc",
+          "bindings": [
+            {
+              "nodeId": "v3",
+              "attribute": "fill"
+            }
+          ]
+        },
+        {
+          "id": "c1",
+          "kind": "explicit-color",
+          "originalColor": "#ff6600",
+          "bindings": [
+            {
+              "nodeId": "v4",
+              "attribute": "fill"
+            }
+          ]
+        },
+        {
+          "id": "c2",
+          "kind": "explicit-color",
+          "originalColor": "#330033",
+          "bindings": [
+            {
+              "nodeId": "v4",
+              "attribute": "stroke"
+            }
+          ]
+        }
+      ],
+      "capabilities": {
+        "palette": true,
+        "strokeScale": true
+      },
+      "provenance": {
+        "sourceId": "prototype",
+        "prefix": null,
+        "name": "transforms",
+        "author": null,
+        "authorUrl": null,
+        "license": null,
+        "licenseUrl": null
+      }
+    }
+  },
+  {
+    "name": "currentColor",
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\" viewBox=\"0 0 100 100\"><path d=\"M10 10H40V40H10Z\" fill=\"currentColor\"/><rect x=\"55\" y=\"10\" width=\"30\" height=\"30\" fill=\"#000000\"/><circle cx=\"50\" cy=\"70\" r=\"15\" fill=\"#dd5500\"/></svg>",
+    "definition": {
+      "version": 1,
+      "id": "c6131e96d9e63c4a1a179d857db40206a9a602b18dd723cc131ba4f7c0e060b4",
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 100,
+        "height": 100
+      },
+      "svg": "<svg height=\"100\" id=\"v1\" viewBox=\"0 0 100 100\" width=\"100\" xmlns=\"http://www.w3.org/2000/svg\"><path color=\"#000000\" d=\"M10 10H40V40H10Z\" fill=\"currentColor\" id=\"v2\" stroke=\"none\"></path><rect color=\"#000000\" fill=\"#000000\" height=\"30\" id=\"v3\" stroke=\"none\" width=\"30\" x=\"55\" y=\"10\"></rect><circle color=\"#000000\" cx=\"50\" cy=\"70\" fill=\"#dd5500\" id=\"v4\" r=\"15\" stroke=\"none\"></circle></svg>",
+      "slots": [
+        {
+          "id": "c0",
+          "kind": "current-color",
+          "originalColor": "#000000",
+          "bindings": [
+            {
+              "nodeId": "v2",
+              "attribute": "fill"
+            }
+          ]
+        },
+        {
+          "id": "c1",
+          "kind": "explicit-color",
+          "originalColor": "#000000",
+          "bindings": [
+            {
+              "nodeId": "v3",
+              "attribute": "fill"
+            }
+          ]
+        },
+        {
+          "id": "c2",
+          "kind": "explicit-color",
+          "originalColor": "#dd5500",
+          "bindings": [
+            {
+              "nodeId": "v4",
+              "attribute": "fill"
+            }
+          ]
+        }
+      ],
+      "capabilities": {
+        "palette": true,
+        "strokeScale": false
+      },
+      "provenance": {
+        "sourceId": "prototype",
+        "prefix": null,
+        "name": "currentColor",
+        "author": null,
+        "authorUrl": null,
+        "license": null,
+        "licenseUrl": null
+      }
+    }
+  },
+  {
+    "name": "holes",
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\" viewBox=\"0 0 100 100\"><path fill=\"#227755\" fill-rule=\"evenodd\" d=\"M10 10H90V90H10ZM30 30H70V70H30Z\"/></svg>",
+    "definition": {
+      "version": 1,
+      "id": "b0f6873e6a00c7221987b83e4eb947aa2d2c5766358403843cb712f2828ec31c",
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 100,
+        "height": 100
+      },
+      "svg": "<svg height=\"100\" id=\"v1\" viewBox=\"0 0 100 100\" width=\"100\" xmlns=\"http://www.w3.org/2000/svg\"><path color=\"#000000\" d=\"M10 10H90V90H10ZM30 30H70V70H30Z\" fill=\"#227755\" fill-rule=\"evenodd\" id=\"v2\" stroke=\"none\"></path></svg>",
+      "slots": [
+        {
+          "id": "c0",
+          "kind": "explicit-color",
+          "originalColor": "#227755",
+          "bindings": [
+            {
+              "nodeId": "v2",
+              "attribute": "fill"
+            }
+          ]
+        }
+      ],
+      "capabilities": {
+        "palette": true,
+        "strokeScale": false
+      },
+      "provenance": {
+        "sourceId": "prototype",
+        "prefix": null,
+        "name": "holes",
+        "author": null,
+        "authorUrl": null,
+        "license": null,
+        "licenseUrl": null
+      }
+    }
+  },
+  {
+    "name": "rounded",
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\" viewBox=\"0 0 100 100\"><rect x=\"10\" y=\"10\" width=\"75\" height=\"70\" rx=\"14\" ry=\"8\" fill=\"#22aabb\" stroke=\"#332255\" stroke-width=\"3\"/></svg>",
+    "definition": {
+      "version": 1,
+      "id": "626c161e5cdd36c5a0e2d195c31ed6ca5c2c0ecc7b8a232fbac64b1a40315ed8",
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 100,
+        "height": 100
+      },
+      "svg": "<svg height=\"100\" id=\"v1\" viewBox=\"0 0 100 100\" width=\"100\" xmlns=\"http://www.w3.org/2000/svg\"><rect color=\"#000000\" fill=\"#22aabb\" height=\"70\" id=\"v2\" rx=\"14\" ry=\"8\" stroke=\"#332255\" stroke-width=\"3\" width=\"75\" x=\"10\" y=\"10\"></rect></svg>",
+      "slots": [
+        {
+          "id": "c0",
+          "kind": "explicit-color",
+          "originalColor": "#22aabb",
+          "bindings": [
+            {
+              "nodeId": "v2",
+              "attribute": "fill"
+            }
+          ]
+        },
+        {
+          "id": "c1",
+          "kind": "explicit-color",
+          "originalColor": "#332255",
+          "bindings": [
+            {
+              "nodeId": "v2",
+              "attribute": "stroke"
+            }
+          ]
+        }
+      ],
+      "capabilities": {
+        "palette": true,
+        "strokeScale": true
+      },
+      "provenance": {
+        "sourceId": "prototype",
+        "prefix": null,
+        "name": "rounded",
+        "author": null,
+        "authorUrl": null,
+        "license": null,
+        "licenseUrl": null
+      }
+    }
+  },
+  {
+    "name": "stroke",
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\" viewBox=\"0 0 100 100\"><g fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\"><path d=\"M10 70C10 10 40 10 50 50S80 90 90 20\"/><path d=\"M10 85Q40 45 60 85T95 70\"/></g></svg>",
+    "definition": {
+      "version": 1,
+      "id": "3b8fcaefff973803e68d0f435facdb1061bc2f07af5bc31a6fd36c052e670775",
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 100,
+        "height": 100
+      },
+      "svg": "<svg height=\"100\" id=\"v1\" viewBox=\"0 0 100 100\" width=\"100\" xmlns=\"http://www.w3.org/2000/svg\"><g fill=\"none\" id=\"v2\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-width=\"4\"><path color=\"#000000\" d=\"M10 70C10 10 40 10 50 50S80 90 90 20\" fill=\"none\" id=\"v3\" stroke=\"currentColor\"></path><path color=\"#000000\" d=\"M10 85Q40 45 60 85T95 70\" fill=\"none\" id=\"v4\" stroke=\"currentColor\"></path></g></svg>",
+      "slots": [
+        {
+          "id": "c0",
+          "kind": "current-color",
+          "originalColor": "#000000",
+          "bindings": [
+            {
+              "nodeId": "v3",
+              "attribute": "stroke"
+            },
+            {
+              "nodeId": "v4",
+              "attribute": "stroke"
+            }
+          ]
+        }
+      ],
+      "capabilities": {
+        "palette": true,
+        "strokeScale": true
+      },
+      "provenance": {
+        "sourceId": "prototype",
+        "prefix": null,
+        "name": "stroke",
+        "author": null,
+        "authorUrl": null,
+        "license": null,
+        "licenseUrl": null
+      }
+    }
+  },
+  {
+    "name": "padding-negative",
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"160\" height=\"80\" viewBox=\"-20 -10 80 40\"><rect x=\"-10\" y=\"0\" width=\"30\" height=\"20\" fill=\"#8844aa\"/></svg>",
+    "definition": {
+      "version": 1,
+      "id": "9ed78ac6abcee63f94be51b602835c625f8dfad24deb8c16cce8f9c4512f2d53",
+      "viewBox": {
+        "minX": -20,
+        "minY": -10,
+        "width": 80,
+        "height": 40
+      },
+      "svg": "<svg height=\"40\" id=\"v1\" viewBox=\"-20 -10 80 40\" width=\"80\" xmlns=\"http://www.w3.org/2000/svg\"><rect color=\"#000000\" fill=\"#8844aa\" height=\"20\" id=\"v2\" stroke=\"none\" width=\"30\" x=\"-10\" y=\"0\"></rect></svg>",
+      "slots": [
+        {
+          "id": "c0",
+          "kind": "explicit-color",
+          "originalColor": "#8844aa",
+          "bindings": [
+            {
+              "nodeId": "v2",
+              "attribute": "fill"
+            }
+          ]
+        }
+      ],
+      "capabilities": {
+        "palette": true,
+        "strokeScale": false
+      },
+      "provenance": {
+        "sourceId": "prototype",
+        "prefix": null,
+        "name": "padding-negative",
+        "author": null,
+        "authorUrl": null,
+        "license": null,
+        "licenseUrl": null
+      }
+    }
+  },
+  {
+    "name": "primitives",
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\" viewBox=\"0 0 100 100\"><ellipse cx=\"25\" cy=\"20\" rx=\"16\" ry=\"9\" fill=\"#bb3377\"/><line x1=\"3\" y1=\"45\" x2=\"91\" y2=\"45\" stroke=\"#33bb77\" stroke-width=\"3\"/><polygon points=\"10,60 40,60 25,90\" fill=\"#3377bb\"/><polyline points=\"55,65 70,90 90,55\" fill=\"none\" stroke=\"#bb7733\" stroke-width=\"3\"/></svg>",
+    "definition": {
+      "version": 1,
+      "id": "015c91cee6c9aa8c8682733441e79581db9c2189785e17d98e633a31127f6316",
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 100,
+        "height": 100
+      },
+      "svg": "<svg height=\"100\" id=\"v1\" viewBox=\"0 0 100 100\" width=\"100\" xmlns=\"http://www.w3.org/2000/svg\"><ellipse color=\"#000000\" cx=\"25\" cy=\"20\" fill=\"#bb3377\" id=\"v2\" rx=\"16\" ry=\"9\" stroke=\"none\"></ellipse><line color=\"#000000\" fill=\"#000000\" id=\"v3\" stroke=\"#33bb77\" stroke-width=\"3\" x1=\"3\" x2=\"91\" y1=\"45\" y2=\"45\"></line><polygon color=\"#000000\" fill=\"#3377bb\" id=\"v4\" points=\"10,60 40,60 25,90\" stroke=\"none\"></polygon><polyline color=\"#000000\" fill=\"none\" id=\"v5\" points=\"55,65 70,90 90,55\" stroke=\"#bb7733\" stroke-width=\"3\"></polyline></svg>",
+      "slots": [
+        {
+          "id": "c0",
+          "kind": "explicit-color",
+          "originalColor": "#bb3377",
+          "bindings": [
+            {
+              "nodeId": "v2",
+              "attribute": "fill"
+            }
+          ]
+        },
+        {
+          "id": "c1",
+          "kind": "explicit-color",
+          "originalColor": "#000000",
+          "bindings": [
+            {
+              "nodeId": "v3",
+              "attribute": "fill"
+            }
+          ]
+        },
+        {
+          "id": "c2",
+          "kind": "explicit-color",
+          "originalColor": "#33bb77",
+          "bindings": [
+            {
+              "nodeId": "v3",
+              "attribute": "stroke"
+            }
+          ]
+        },
+        {
+          "id": "c3",
+          "kind": "explicit-color",
+          "originalColor": "#3377bb",
+          "bindings": [
+            {
+              "nodeId": "v4",
+              "attribute": "fill"
+            }
+          ]
+        },
+        {
+          "id": "c4",
+          "kind": "explicit-color",
+          "originalColor": "#bb7733",
+          "bindings": [
+            {
+              "nodeId": "v5",
+              "attribute": "stroke"
+            }
+          ]
+        }
+      ],
+      "capabilities": {
+        "palette": true,
+        "strokeScale": true
+      },
+      "provenance": {
+        "sourceId": "prototype",
+        "prefix": null,
+        "name": "primitives",
+        "author": null,
+        "authorUrl": null,
+        "license": null,
+        "licenseUrl": null
+      }
+    }
+  },
+  {
+    "name": "alpha-paints",
+    "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\" viewBox=\"0 0 100 100\"><g opacity=\"0.7\"><rect x=\"8\" y=\"8\" width=\"70\" height=\"65\" fill=\"rgba(23,61,199,0.4)\"/><circle cx=\"60\" cy=\"60\" r=\"27\" fill=\"#aa337788\" stroke=\"#11ddaa99\" stroke-width=\"4\" stroke-opacity=\"0.6\"/></g></svg>",
+    "definition": {
+      "version": 1,
+      "id": "937971232a123532b63ca4121f8b224c03033f0c96aac6654fb2b3e431177f04",
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 100,
+        "height": 100
+      },
+      "svg": "<svg height=\"100\" id=\"v1\" viewBox=\"0 0 100 100\" width=\"100\" xmlns=\"http://www.w3.org/2000/svg\"><g id=\"v2\" opacity=\"0.7\"><rect color=\"#000000\" fill=\"#173dc766\" height=\"65\" id=\"v3\" stroke=\"none\" width=\"70\" x=\"8\" y=\"8\"></rect><circle color=\"#000000\" cx=\"60\" cy=\"60\" fill=\"#aa337788\" id=\"v4\" r=\"27\" stroke=\"#11ddaa99\" stroke-opacity=\"0.6\" stroke-width=\"4\"></circle></g></svg>",
+      "slots": [
+        {
+          "id": "c0",
+          "kind": "explicit-color",
+          "originalColor": "#173dc766",
+          "bindings": [
+            {
+              "nodeId": "v3",
+              "attribute": "fill"
+            }
+          ]
+        },
+        {
+          "id": "c1",
+          "kind": "explicit-color",
+          "originalColor": "#aa337788",
+          "bindings": [
+            {
+              "nodeId": "v4",
+              "attribute": "fill"
+            }
+          ]
+        },
+        {
+          "id": "c2",
+          "kind": "explicit-color",
+          "originalColor": "#11ddaa99",
+          "bindings": [
+            {
+              "nodeId": "v4",
+              "attribute": "stroke"
+            }
+          ]
+        }
+      ],
+      "capabilities": {
+        "palette": true,
+        "strokeScale": true
+      },
+      "provenance": {
+        "sourceId": "prototype",
+        "prefix": null,
+        "name": "alpha-paints",
+        "author": null,
+        "authorUrl": null,
+        "license": null,
+        "licenseUrl": null
+      }
+    }
+  }
+]
