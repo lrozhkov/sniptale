@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Settings } from '../../../contracts/settings';
 import {
   DEFAULT_BROWSER_FRAME_STATE,
@@ -12,6 +12,7 @@ type SaveSettings = Pick<Settings, 'defaultImagePresetId'>;
 type EditorExportSettings = Pick<Settings, 'imageFormat' | 'imageQuality'>;
 
 const mocks = vi.hoisted(() => ({
+  toastErrorMock: vi.fn(),
   generateFilenameMock: vi.fn(() => 'edited-file.png'),
   loadSettingsMock: vi.fn<() => Promise<SaveSettings>>(async () => ({
     defaultImagePresetId: 'preset-1',
@@ -21,6 +22,10 @@ const mocks = vi.hoisted(() => ({
     imageQuality: 0.92,
   })),
   sendRuntimeMessageMock: vi.fn(async () => ({ success: true })),
+}));
+
+vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({
+  toast: { error: mocks.toastErrorMock },
 }));
 
 vi.mock('../../persistence/export-settings', async (importOriginal) => ({
@@ -181,6 +186,49 @@ function runFileLoadSuite() {
 }
 
 function runExportAndSaveSuite() {
+  it('refuses an oversized project through the actual inspector export handler', async () => {
+    const controller = createController();
+    const retainedPlane = 'data:image/png;base64,' + 'A'.repeat(9 * 1024 * 1024);
+    const session = {
+      ...createEditorDocument(),
+      version: 3 as const,
+      sourceImageData: retainedPlane,
+      canvasJson: JSON.stringify({
+        objects: [
+          {
+            type: 'image',
+            src: retainedPlane,
+            sniptaleRasterState: {
+              version: 1,
+              width: 320,
+              height: 180,
+              crop: { x: 0, y: 0, width: 320, height: 180 },
+            },
+            sniptaleRasterOriginalData: retainedPlane,
+            sniptaleRasterColorData: retainedPlane,
+            sniptaleRasterVisibilityData: retainedPlane,
+            sniptaleRasterKeyData: retainedPlane,
+          },
+        ],
+      }),
+    };
+    vi.mocked(controller.exportDocument).mockReturnValue(session);
+    const setImageData = vi.fn();
+    const handlers = createEditorActionRailHandlers(controller, setImageData, createActionClient());
+    const createElement = vi.spyOn(document, 'createElement');
+
+    await handlers.exportSession();
+
+    expect(mocks.toastErrorMock).toHaveBeenCalledOnce();
+    expect(mocks.toastErrorMock).toHaveBeenCalledWith(expect.stringContaining('JSON'));
+
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(createElement).not.toHaveBeenCalled();
+    expect(setImageData).not.toHaveBeenCalled();
+    expect(controller.loadDocument).not.toHaveBeenCalled();
+    expect(controller.exportDocument()).toBe(session);
+  });
+
   it('exports the current session and delegates rendered image saves to runtime messaging', async () => {
     const controller = createController();
     const handlers = createEditorActionRailHandlers(controller, vi.fn(), createActionClient());
@@ -188,7 +236,10 @@ function runExportAndSaveSuite() {
     const clickSpy = vi.spyOn(link, 'click').mockImplementation(() => {});
     const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(link);
 
+    vi.useFakeTimers();
     await handlers.exportSession();
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    vi.runAllTimers();
     await handlers.saveRenderedImage();
 
     expect(link.download).toMatch(/^Sniptale_editor-session_.*\.json$/);
@@ -233,6 +284,11 @@ function runExportAndSaveSuite() {
 
 describe('editor-action-rail handlers', () => {
   beforeEach(setupActionRailGlobals);
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
   runNoopSuite();
   runFileLoadSuite();
   runExportAndSaveSuite();

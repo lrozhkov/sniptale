@@ -8,7 +8,20 @@ export function getMutableEditorSelection(canvas: Canvas | null): FabricObject[]
   }
 
   const activeObjects = canvas.getActiveObjects().filter(isEditableObject);
-  if (activeObjects.length === 0 || activeObjects.some((object) => object.sniptaleLocked)) {
+  const parent = activeObjects[0]?.parent ?? null;
+  if (
+    activeObjects.length === 0 ||
+    activeObjects.some((object) => {
+      if ((object.parent ?? null) !== parent) return true;
+      let current: FabricObject | undefined = object;
+      while (current) {
+        if (current.sniptaleLocked || (current !== object && current.visible === false))
+          return true;
+        current = current.parent;
+      }
+      return false;
+    })
+  ) {
     return null;
   }
 

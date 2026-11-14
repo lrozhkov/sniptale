@@ -31,6 +31,7 @@ it('commits a workspace with integer CAS while preserving the immutable original
     commitImageWorkspace({ aggregateId: media.id, document, expectedRevision: 2 })
   ).resolves.toMatchObject({
     documentAssetsByRuntimeUrl: expect.any(Map),
+    documentAssetsByVectorDefinitionId: expect.any(Map),
     revision: 3,
     updatedAt: 10,
   });
@@ -132,6 +133,7 @@ it('creates a missing revision-zero aggregate and rejects non-initial missing ro
 
   await expect(commitImageWorkspace(input)).resolves.toMatchObject({
     documentAssetsByRuntimeUrl: expect.any(Map),
+    documentAssetsByVectorDefinitionId: expect.any(Map),
     revision: 1,
     updatedAt: 10,
   });

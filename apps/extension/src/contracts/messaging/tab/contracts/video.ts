@@ -48,7 +48,7 @@ export const tabVideoMessageContracts = {
     ),
     parseResponse: createGuardParser(
       'tab VIDEO_RECORDING_SURFACE_SNAPSHOT response',
-      createRuntimeResponseGuard()
+      createRuntimeResponseGuard({ optional: { capturePreparationId: isString } })
     ),
   },
   ...tabVideoControlledCursorContracts,

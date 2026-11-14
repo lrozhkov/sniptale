@@ -50,6 +50,46 @@
       "line": 84,
       "messageHash": "69516df2e0eea00d6d2a9703efd669880aab7bf5852bf7c23728240773eb63c1",
       "rule": "js/missing-origin-check"
+    },
+    {
+      "contentHash": "4c6e36f948c4be530f7c54d0d7fd866f9acc53cce8ca4a12cf69909517aaa059",
+      "file": "apps/extension/src/editor/raster-editing/worker.ts",
+      "line": 3,
+      "messageHash": "69516df2e0eea00d6d2a9703efd669880aab7bf5852bf7c23728240773eb63c1",
+      "rule": "js/missing-origin-check",
+      "debtId": "noise.codeql.raster-private-worker-message"
+    },
+    {
+      "contentHash": "5f2631a13b5d7b56261f9c9aaef7e6c9549e8b544560eb504c2294ca6a0e6c72",
+      "file": "apps/extension/src/editor/raster-editing/image-state.ts",
+      "line": 43,
+      "messageHash": "239b81f153ffe6d1b47bd0cabb87ba80adbb4b7715b3c5e573308f0849285a13",
+      "rule": "js/client-side-request-forgery",
+      "debtId": "noise.codeql.raster-validated-data-url-fetch"
+    },
+    {
+      "contentHash": "88ba3700c4af5da36e8a9f67053af2510220849726b2c8ac2fd3f55535df5010",
+      "file": "apps/extension/src/composition/archive-transfer/writer.ts",
+      "line": 38,
+      "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
+      "rule": "js/superfluous-trailing-arguments",
+      "debtId": "noise.codeql.archive-source-transformer"
+    },
+    {
+      "contentHash": "0fe363810f9724cef256b6f667ddfb153c1339427cac93dfda0135c2295a3705",
+      "file": "apps/extension/src/workflows/sync-transfer/remote-object-integrity.ts",
+      "line": 16,
+      "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
+      "rule": "js/superfluous-trailing-arguments",
+      "debtId": "noise.codeql.remote-integrity-transformer"
+    },
+    {
+      "contentHash": "199cd281dddb6a1d543c5566ecc3a3ad30faf1befa711efcbfdba61d30ecebd4",
+      "file": "apps/extension/src/workflows/sync-transfer/webdav.ts",
+      "line": 288,
+      "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
+      "rule": "js/superfluous-trailing-arguments",
+      "debtId": "noise.codeql.webdav-metadata-transformer"
     }
   ]
 }

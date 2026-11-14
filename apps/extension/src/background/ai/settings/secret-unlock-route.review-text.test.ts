@@ -93,9 +93,13 @@ function route(
   });
 }
 
-it.each(['gallery', 'video-editor'] as const)(
-  'completes persisted review-text unlock from %s without admitting a foreign owner or replay',
-  async (page) => {
+it.each([
+  { page: 'gallery', purpose: 'review-text' },
+  { page: 'video-editor', purpose: 'review-text' },
+  { page: 'editor', purpose: 'image-editor' },
+] as const)(
+  'completes persisted $purpose unlock from $page without admitting a foreign owner or replay',
+  async ({ page, purpose }) => {
     const owner: chrome.runtime.MessageSender = {
       documentId: `${page}-document`,
       frameId: 0,
@@ -103,7 +107,7 @@ it.each(['gallery', 'video-editor'] as const)(
       url: `chrome-extension://extension-id/apps/extension/src/${page}/index.html`,
     };
     const started = await route(
-      { type: MessageType.AI_SECRET_UNLOCK, operation: 'start', purpose: 'review-text' },
+      { type: MessageType.AI_SECRET_UNLOCK, operation: 'start', purpose },
       owner
     );
     expect(started).toMatchObject({ success: true, status: 'pending' });
@@ -115,7 +119,7 @@ it.each(['gallery', 'video-editor'] as const)(
       requestId,
     } as const;
     expect(sessionState[AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY]).toEqual({
-      [requestId]: expect.objectContaining({ purpose: 'review-text', status: 'pending' }),
+      [requestId]: expect.objectContaining({ purpose, status: 'pending' }),
     });
 
     resetAISecretUnlockRequestsForTests();
@@ -147,7 +151,7 @@ it.each(['gallery', 'video-editor'] as const)(
     });
     expect(unlockProtection).toHaveBeenCalledExactlyOnceWith('passphrase');
     expect(sessionState[AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY]).toEqual({
-      [requestId]: expect.objectContaining({ purpose: 'review-text', status: 'completed' }),
+      [requestId]: expect.objectContaining({ purpose, status: 'completed' }),
     });
     loadProtectionStatus.mockResolvedValue({
       isEnabled: true,

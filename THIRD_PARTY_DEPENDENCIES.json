@@ -229,6 +229,19 @@
       "version": "3.0.33"
     },
     {
+      "archivePath": "LICENSES/dependencies/@antfu__install-pkg-2.1.0.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/@antfu/install-pkg/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@antfu/install-pkg",
+      "packagePath": "node_modules/@antfu/install-pkg",
+      "selectedLicense": "MIT",
+      "sha256": "67cd5e903c1f908edfa27c25606fa806ce629d9a8ddb7d83019d9fd1f83f7fde",
+      "sourceUrl": "https://github.com/antfu-collective/install-pkg.git",
+      "version": "2.1.0"
+    },
+    {
       "archivePath": "LICENSES/dependencies/@fontsource__marck-script-5.3.0.txt",
       "licenseExpression": "OFL-1.1",
       "licenseSource": "node_modules/@fontsource/marck-script/LICENSE",
@@ -286,6 +299,19 @@
       "sha256": "045ce74712fc613fdd74d1c55f5140a08d623836ff2aca44132b38d68fbc67ad",
       "sourceUrl": "https://github.com/iconify/iconify.git",
       "version": "2.0.0"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@iconify__utils-3.1.7.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/@iconify/utils/license.txt",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@iconify/utils",
+      "packagePath": "node_modules/@iconify/utils",
+      "selectedLicense": "MIT",
+      "sha256": "a86793ac023162ce98b91899601c15f6712f44943163c4f92a0a4bf89152b3bf",
+      "sourceUrl": "https://github.com/iconify/iconify.git",
+      "version": "3.1.7"
     },
     {
       "archivePath": "LICENSES/dependencies/@noble__hashes-2.4.0.txt",
@@ -535,6 +561,19 @@
       "version": "3.0.6"
     },
     {
+      "archivePath": "LICENSES/dependencies/import-meta-resolve-4.2.0.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/import-meta-resolve/license",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "import-meta-resolve",
+      "packagePath": "node_modules/import-meta-resolve",
+      "selectedLicense": "MIT",
+      "sha256": "8770a1a4b69ee722636643e81340ce4a8f0b8415b1c568487edc9062338bfcc7",
+      "sourceUrl": "wooorm/import-meta-resolve",
+      "version": "4.2.0"
+    },
+    {
       "archivePath": "LICENSES/dependencies/inherits-2.0.4.txt",
       "licenseExpression": "ISC",
       "licenseSource": "node_modules/inherits/LICENSE",
@@ -693,6 +732,19 @@
       "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
       "sourceUrl": "https://github.com/nordwestt/ollama-ai-provider-v2.git",
       "version": "4.0.1"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/package-manager-detector-1.9.0.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/package-manager-detector/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "package-manager-detector",
+      "packagePath": "node_modules/package-manager-detector",
+      "selectedLicense": "MIT",
+      "sha256": "05c365176db3cc00e951c44b921c809c75b8e99d2d724f7daf00381e26fb0850",
+      "sourceUrl": "https://github.com/antfu-collective/package-manager-detector.git",
+      "version": "1.9.0"
     },
     {
       "archivePath": "LICENSES/dependencies/pako-1.0.11.txt",
@@ -875,6 +927,19 @@
       "sha256": "11f2aafb37d06b3ee5bdaf06e9811141d0da05263c316f3d627f45c20d43261b",
       "sourceUrl": "https://github.com/nodejs/string_decoder.git",
       "version": "1.1.1"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/tinyexec-1.3.1.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/tinyexec/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "tinyexec",
+      "packagePath": "node_modules/tinyexec",
+      "selectedLicense": "MIT",
+      "sha256": "f95f668fe64081ddb4153b322e34fdd719b991285ed08177d5ad7133b7988d92",
+      "sourceUrl": "https://github.com/tinylibs/tinyexec.git",
+      "version": "1.3.1"
     },
     {
       "archivePath": "LICENSES/dependencies/tsdav-2.5.0.txt",

@@ -59,7 +59,9 @@ export function useEditableLayerName(layer: EditorLayerItem) {
     editingName,
     inputRef,
     setDraftName,
-    startEditing: () => setEditingName(true),
+    startEditing: () => {
+      if (!layer.locked) setEditingName(true);
+    },
   };
 }
 

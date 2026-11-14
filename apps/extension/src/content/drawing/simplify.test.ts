@@ -4,6 +4,7 @@ import { Image as CanvasImage } from 'canvas';
 import { createSimplifyRaster } from '../../features/simplify/raster';
 import {
   createDrawingSession,
+  createDrawingCleanup,
   type DrawingSimplifyObject,
   type DrawingObject,
   type DrawingObjectProjection,
@@ -693,3 +694,36 @@ it.each(['append', 'delete', 'reorder'])(
     h.runtime.dispose();
   }
 );
+
+it('converts an accepted blur to cleanup atomically and keeps it unchanged after failure or cancel', async () => {
+  const h = harness();
+  const blur = {
+    id: 'blur-conversion',
+    kind: 'blur' as const,
+    bounds: { x: 10, y: 15, width: 50, height: 40 },
+    amount: 6,
+  };
+  h.session.commitObjects([blur], { select: true });
+  const clean = createDrawingCleanup(blur);
+  const work = h.runtime.submit(clean, new Event('click'));
+  await started(h);
+  expect(h.session.getSnapshot().document.objects).toEqual([blur]);
+  await h.settle();
+  await work;
+  expect(h.session.getSnapshot().document.objects[0]).toMatchObject({
+    id: blur.id,
+    kind: 'simplify',
+    bounds: blur.bounds,
+    blurAmount: 6,
+    settings: { erase: true },
+  });
+  h.session.replaceObject(blur);
+  expect(h.session.getSnapshot().document.objects).toEqual([blur]);
+  const cancelled = h.runtime.submit(clean, new Event('click'));
+  await started(h, 2);
+  h.runtime.cancel();
+  await h.settle();
+  await cancelled;
+  expect(h.session.getSnapshot().document.objects).toEqual([blur]);
+  h.runtime.dispose();
+});

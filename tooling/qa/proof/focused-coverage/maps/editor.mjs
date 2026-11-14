@@ -1,5 +1,13 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'editor-frame-annotation-export',
+    productionFile:
+      'apps/extension/src/editor/controller/public-api/document/frame-annotation-export.ts',
+    reason:
+      'Frame export proof covers render order, proxy restoration, format conversion, cancellation and stale results.',
+    testFiles: ['apps/extension/src/editor/frame-annotation/export.test.ts'],
+  },
+  {
     owner: 'editor-frame-annotation-projection',
     productionFile: 'apps/extension/src/editor/frame-annotation/projection-read-only.tsx',
     reason:
@@ -833,6 +841,8 @@ action-feedback-click-fields.test.tsx',
     testFiles: [
       'apps/extension/src/content/drawing/frame.test.ts',
       'apps/extension/src/content/drawing/freehand-parity.test.ts',
+      'apps/extension/src/content/drawing/render.test.ts',
+      'apps/extension/src/content/drawing/capture.test.ts',
     ],
   },
   {
@@ -875,6 +885,27 @@ action-feedback-click-fields.test.tsx',
     testFiles: [
       'apps/extension/src/editor/state/actions.test.ts',
       'apps/extension/src/editor/state/viewport-preview.test.ts',
+    ],
+  },
+  {
+    owner: 'editor-controller-layer-publication',
+    productionFile: 'apps/extension/src/editor/controller/core/controller-layer-actions.ts',
+    reason:
+      'Real layer publication and Undo proof supplements the existing controller delegation contract.',
+    testFiles: [
+      'apps/extension/src/editor/controller/core/controller-layer-actions.test.ts',
+      'apps/extension/src/editor/controller/core/controller.instance-delegation.test.ts',
+    ],
+  },
+  {
+    owner: 'editor-controller-layer-selection',
+    productionFile: 'apps/extension/src/editor/controller/public-api/layer-selection-actions.ts',
+    reason: 'Block publication and existing selection callbacks share this public API boundary.',
+    testFiles: [
+      'apps/extension/src/editor/controller/core/controller-layer-actions.test.ts',
+      'apps/extension/src/editor/controller/public-api/layer-selection-actions.test.ts',
+      'apps/extension/src/editor/controller/public-api/actions.coverage.test.ts',
+      'apps/extension/src/editor/controller/public-api/actions.callbacks.coverage.test.ts',
     ],
   },
   {
@@ -1300,10 +1331,14 @@ action-feedback-click-fields.test.tsx',
     reason:
       'Shared drawing geometry, creation, updates, selection, and sessions are covered by focused model suites.',
     testFiles: [
+      'apps/extension/src/features/drawing/alignment.test.ts',
+      'apps/extension/src/features/drawing/alignment-relations.test.ts',
       'apps/extension/src/features/drawing/arrow.test.ts',
       'apps/extension/src/features/drawing/create-update.test.ts',
       'apps/extension/src/features/drawing/geometry.test.ts',
       'apps/extension/src/features/drawing/model.test.ts',
+      'apps/extension/src/features/drawing/parser.test.ts',
+      'apps/extension/src/features/drawing/text-ink.test.ts',
       'apps/extension/src/features/drawing/preferences-sync.test.ts',
       'apps/extension/src/features/drawing/selection.test.ts',
       'apps/extension/src/features/drawing/session.test.ts',
@@ -1343,5 +1378,23 @@ action-feedback-click-fields.test.tsx',
       'apps/extension/src/editor/inspector/tools/shape-browser/custom-shapes.stale.test.tsx',
       'apps/extension/src/editor/inspector/tools/shape-browser/custom-shapes.test.tsx',
     ],
+  },
+  {
+    owner: 'editor-raster-region',
+    productionFile: 'apps/extension/src/editor/raster-editing/vendor/flood-fill.ts',
+    reason:
+      'Region, pixel and Worker tests cover fill tolerance, selection, transparency and clipped growth.',
+    testFiles: [
+      'apps/extension/src/editor/raster-editing/region.test.ts',
+      'apps/extension/src/editor/raster-editing/pixels.test.ts',
+      'apps/extension/src/editor/raster-editing/compute.test.ts',
+    ],
+  },
+  {
+    owner: 'editor-raster-brush',
+    productionFile: 'apps/extension/src/editor/raster-editing/vendor/bezier-line.ts',
+    reason:
+      'Brush tests execute interpolation through fast strokes, final segments, single stamps, Restore and clipping.',
+    testFiles: ['apps/extension/src/editor/raster-editing/brush.test.ts'],
   },
 ];

@@ -70,3 +70,32 @@ it('admits bounded provider reasons and rejects private or malformed failure evi
   for (const failureReason of ['PRIVATE_RESPONSE_BODY', { status: 402 }, 402])
     expect(parseContentTextServerMessage({ ...failure, failureReason })).toBeNull();
 });
+
+it('preserves exact approval limits and strict request-bound controls', async () => {
+  const request = await start();
+  for (const key of ['modelId', 'approvedProviderId', 'approvedModelCode']) {
+    for (const value of ['', ' ', ' leading', 'trailing ', 'x'.repeat(257), undefined])
+      expect(parseContentTextClientMessage({ ...request, [key]: value })).toBeNull();
+    expect(parseContentTextClientMessage({ ...request, [key]: 'x'.repeat(256) })).not.toBeNull();
+  }
+  for (const patch of [
+    { requestId: 'invalid' },
+    { approvedDestination: `sha256:${'a'.repeat(63)}` },
+    { approvedDestination: undefined },
+    { llmSessionToken: '' },
+    { llmSessionToken: 'x'.repeat(513) },
+    { llmSessionToken: undefined },
+    { unknown: true },
+  ])
+    expect(parseContentTextClientMessage({ ...request, ...patch })).toBeNull();
+  for (const llmSessionToken of ['x'.repeat(512), ' ']) {
+    const boundaryRequest = { ...request, llmSessionToken };
+    expect(parseContentTextClientMessage(boundaryRequest)).toEqual(boundaryRequest);
+  }
+  for (const type of ['cancel', 'keepalive']) {
+    const command = { type, requestId: requestId };
+    expect(parseContentTextClientMessage(command)).toEqual(command);
+    expect(parseContentTextClientMessage({ ...command, requestId: 'invalid' })).toBeNull();
+    expect(parseContentTextClientMessage({ ...command, unknown: true })).toBeNull();
+  }
+});

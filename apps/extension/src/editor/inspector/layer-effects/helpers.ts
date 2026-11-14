@@ -1,8 +1,10 @@
 import type { EditorLayerEffectCategory } from '../../../features/editor/document/effects';
 import type {
   EditorLayerItem,
+  EditorLayerChild,
   EditorSelectionState,
 } from '../../../features/editor/document/types';
+import type { EditorLayerEffectsTarget } from './shared';
 import { translate } from '../../../platform/i18n';
 import { getEditorLayerEffectDefinitionsByCategory } from '../../controller/layer-effects/registry';
 
@@ -31,20 +33,43 @@ export function isLayerEffectSearchable(category: EditorLayerEffectCategory): bo
   return category !== 'transformations';
 }
 
+function findImageChildEffectsTarget(
+  children: readonly EditorLayerChild[],
+  id: string
+): EditorLayerEffectsTarget | null {
+  for (const child of children) {
+    if (child.id === id && (child.type === 'image' || child.type === 'source-image'))
+      return { id: child.id, name: child.name, effects: child.effects ?? [] };
+    const nested = child.groupChildren && findImageChildEffectsTarget(child.groupChildren, id);
+    if (nested) return nested;
+  }
+  return null;
+}
+
+/** Resolve existing root targets and supported image descendants without flattening the layer tree. */
+export function findLayerEffectsTarget(
+  layers: readonly EditorLayerItem[],
+  id: string
+): EditorLayerEffectsTarget | null {
+  for (const layer of layers) {
+    if (layer.id === id) return { id: layer.id, name: layer.name, effects: layer.effects };
+    const child = layer.groupChildren && findImageChildEffectsTarget(layer.groupChildren, id);
+    if (child) return child;
+  }
+  return null;
+}
+
 export function resolveLayerEffectsActiveLayer(
   layers: EditorLayerItem[],
   selection: EditorSelectionState,
   layerId: string | null
-): EditorLayerItem | null {
+): EditorLayerEffectsTarget | null {
   if (layerId) {
-    const directLayer = layers.find((layer) => layer.id === layerId);
-    if (directLayer) {
-      return directLayer;
-    }
+    const directLayer = findLayerEffectsTarget(layers, layerId);
+    if (directLayer) return directLayer;
   }
-
   return selection.selectedObjectCount === 1 && selection.selectedObjectId
-    ? (layers.find((layer) => layer.id === selection.selectedObjectId) ?? null)
+    ? findLayerEffectsTarget(layers, selection.selectedObjectId)
     : null;
 }
 

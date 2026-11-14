@@ -8,7 +8,7 @@ import { ROW_REFERENCE_INDEX } from './row-index-contract';
 // This is the first stable beta persistence generation. Alpha databases use a different name and
 // are intentionally excluded from the supported migration graph.
 export const DB_NAME = 'sniptale-db';
-export const DB_VERSION = 53;
+export const DB_VERSION = 55;
 export const LEGACY_ALPHA_DB_NAMES = ['sniptale-video-db'] as const;
 export const ALPHA_RESET_JOURNAL_KEY = 'sniptale.persistence.alpha-reset.v1';
 export const DATABASE_RESET_JOURNAL_KEY = 'sniptale.persistence.database-reset.v1';
@@ -46,6 +46,7 @@ export const WEB_SNAPSHOTS_STORE = 'web_snapshots';
 export const VIDEO_EFFECT_BUNDLES_STORE = 'video_effect_bundles';
 export const PROJECT_EXPORT_INPUTS_STORE = 'project_export_inputs';
 export const FRAME_ANNOTATION_RASTER_JOBS_STORE = 'frame_annotation_raster_jobs';
+export const EDITOR_VECTOR_LIBRARY_STORE = 'editor_vector_library';
 export const EDITOR_CUSTOM_SHAPES_STORE = 'editor_custom_shapes';
 export const STATE_MANAGER_STORE = 'state_manager';
 export const NATIVE_TRANSFER_SESSIONS_STORE = 'native_transfer_sessions';
@@ -91,6 +92,7 @@ export const EXPECTED_STORES = [
   PROJECT_EXPORT_INPUTS_STORE,
   FRAME_ANNOTATION_RASTER_JOBS_STORE,
   EDITOR_CUSTOM_SHAPES_STORE,
+  EDITOR_VECTOR_LIBRARY_STORE,
   STATE_MANAGER_STORE,
   NATIVE_TRANSFER_SESSIONS_STORE,
   NATIVE_TRANSFER_CHUNKS_STORE,
@@ -145,6 +147,7 @@ export const EXPECTED_INDEXES = {
   [VIDEO_EFFECT_BUNDLES_STORE]: ['enabled', 'updatedAt'],
   [PROJECT_EXPORT_INPUTS_STORE]: ['createdAt', ROW_REFERENCE_INDEX],
   [FRAME_ANNOTATION_RASTER_JOBS_STORE]: ['createdAt'],
+  [EDITOR_VECTOR_LIBRARY_STORE]: ['kind', 'definitionId', ROW_REFERENCE_INDEX],
   [EDITOR_CUSTOM_SHAPES_STORE]: ['enabled', 'updatedAt'],
   [STATE_MANAGER_STORE]: ['domain', 'updatedAtEpochMs'],
   [NATIVE_TRANSFER_SESSIONS_STORE]: ['createdAt', 'updatedAt'],

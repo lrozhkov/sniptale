@@ -185,13 +185,13 @@
     {
       "name": "<all_urls>",
       "owner": "apps/extension/src/background/page-access/service.ts",
-      "feature": "Optional persistent page tooling and native visible capture authority for shim-restored HTTP/HTTPS pages",
-      "runtimeRoute": "PAGE_ACCESS background-owned route with dynamic top-frame content runtime shim registration, lazy full-runtime injection, and native visible capture routes",
-      "capabilityPolicy": "Optional all-sites access is requested only from extension UI; dynamic content script matches remain owner-registered, HTTP/HTTPS-only, and top-frame only.",
-      "failureBehavior": "Denied or revoked grants leave page tooling inactive; unsupported pages and unavailable visible capture authority fail closed.",
-      "justification": "Shim-restored hotkeys and scenario captures run outside Chrome activeTab user-invocation events, and Chrome tabs.captureVisibleTab checks for literal <all_urls> or activeTab. The all-sites permission therefore has to be the optional literal grant rather than split HTTP/HTTPS origins.",
-      "reviewNote": "Keep optional host access usage centralized in apps/extension/src/background/page-access and capture routes; do not add required host_permissions or source manifest content_scripts.",
-      "userFacingDisclosure": "settings.permissions.sitesDescription"
+      "feature": "Optional persistent page tooling, native visible capture, and explicitly enabled vector catalog metadata",
+      "runtimeRoute": "The PAGE_ACCESS background-owned route owns dynamic registration of the content runtime shim in the top frame. It also owns lazy injection of the full runtime. Native capture routes own visible capture. EDITOR_VECTOR_CATALOG_COMMAND routes catalog metadata through apps/extension/src/background/vector-catalog/route.ts.",
+      "capabilityPolicy": "Request optional all-sites access only from extension UI. Dynamic content script matches remain owner-registered, HTTP/HTTPS-only, and top-frame only. Catalog requests require a chosen HTTPS source, persisted network enablement, accepted disclosure, and its current origin grant. Each catalog fetch repeats source and permission checks.",
+      "failureBehavior": "Denied or revoked grants leave page tooling inactive. Unsupported pages and unavailable visible capture authority fail closed. Catalog refusals preserve local elements and project data. Catalog requests use fixed error codes. Source changes reject stale results.",
+      "justification": "Shim-restored hotkeys and scenario captures run outside Chrome activeTab user-invocation events, and Chrome tabs.captureVisibleTab checks for literal <all_urls> or activeTab. The all-sites permission therefore has to be the optional literal grant rather than split HTTP/HTTPS origins. The same optional declaration permits a user to grant only the chosen catalog origin.",
+      "reviewNote": "Keep page tooling and visible capture checks in their existing owners. Keep catalog metadata fetches in apps/extension/src/workflows/vector-catalog/transport.ts. Route native catalog requests through apps/extension/src/background/vector-catalog/route.ts. Require informed consent and the current source incarnation and generation before egress. Do not add required host_permissions or source manifest content_scripts. Preserve anonymous requests, redirect refusal, a 2 MiB response limit, and fixed errors. No fallback source may receive catalog queries.",
+      "userFacingDisclosure": "settings.permissions.sitesDescription, editor.elements.networkDisclosure, editor.elements.consent"
     },
     {
       "name": "file:///",

@@ -112,6 +112,11 @@
       "source": "LICENSES/dependencies/@ai-sdk__zai-3.0.33.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/@antfu__install-pkg-2.1.0.txt",
+      "sha256": "67cd5e903c1f908edfa27c25606fa806ce629d9a8ddb7d83019d9fd1f83f7fde",
+      "source": "LICENSES/dependencies/@antfu__install-pkg-2.1.0.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/@fontsource__marck-script-5.3.0.txt",
       "sha256": "bc79b2867a4357a57c3aaf112545723516083d022d2675d5af22b3e06090b07c",
       "source": "LICENSES/dependencies/@fontsource__marck-script-5.3.0.txt"
@@ -130,6 +135,11 @@
       "archivePath": "LICENSES/dependencies/@iconify__types-2.0.0.txt",
       "sha256": "045ce74712fc613fdd74d1c55f5140a08d623836ff2aca44132b38d68fbc67ad",
       "source": "LICENSES/dependencies/@iconify__types-2.0.0.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@iconify__utils-3.1.7.txt",
+      "sha256": "a86793ac023162ce98b91899601c15f6712f44943163c4f92a0a4bf89152b3bf",
+      "source": "LICENSES/dependencies/@iconify__utils-3.1.7.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/@noble__hashes-2.4.0.txt",
@@ -227,6 +237,11 @@
       "source": "LICENSES/dependencies/immediate-3.0.6.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/import-meta-resolve-4.2.0.txt",
+      "sha256": "8770a1a4b69ee722636643e81340ce4a8f0b8415b1c568487edc9062338bfcc7",
+      "source": "LICENSES/dependencies/import-meta-resolve-4.2.0.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/inherits-2.0.4.txt",
       "sha256": "5ffe28e7ade7d8f10d85d5337a73fd793dac5c462fb9a28fbf8c5046c7fbca3b",
       "source": "LICENSES/dependencies/inherits-2.0.4.txt"
@@ -305,6 +320,11 @@
       "source": "LICENSES/dependencies/ollama-ai-provider-v2-4.0.1.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/package-manager-detector-1.9.0.txt",
+      "sha256": "05c365176db3cc00e951c44b921c809c75b8e99d2d724f7daf00381e26fb0850",
+      "source": "LICENSES/dependencies/package-manager-detector-1.9.0.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/pako-1.0.11.txt",
       "sha256": "a04665b3b2de56c66730c1f720f528175739e4104f79073614aa611da1e85539",
       "source": "LICENSES/dependencies/pako-1.0.11.txt"
@@ -375,6 +395,11 @@
       "source": "LICENSES/dependencies/string_decoder-1.1.1.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/tinyexec-1.3.1.txt",
+      "sha256": "f95f668fe64081ddb4153b322e34fdd719b991285ed08177d5ad7133b7988d92",
+      "source": "LICENSES/dependencies/tinyexec-1.3.1.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/tsdav-2.5.0.txt",
       "sha256": "2595fc934bdb521ec42681a25f9c75977da1640cebbbf8e69b3a046c431874c0",
       "source": "LICENSES/dependencies/tsdav-2.5.0.txt"
@@ -421,13 +446,28 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "d8b1296f47adcea86dd33eefbca4b01d04b453828d99335164d9094d25f96625",
+      "sha256": "e3a82d962b5e6154acdaa16a3e356f6e6a9fb1438ca45a517dd6fcad1babaa18",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "ade08a2bd7861ecb97ff23fd36df0d187422d2576f08b42d0f37003c911ba2f2",
+      "sha256": "d19ce0fcb4b791e6a15fc2b53439c05bd562ac6885b919e30587e36a900cd979",
       "source": "THIRD_PARTY_NOTICES.md"
+    },
+    {
+      "archivePath": "apps/extension/src/editor/raster-editing/vendor/LICENSE",
+      "sha256": "0234a0861b38c1f3c9198b0f048a1b713bf3b1b198b5cced343acc7335b90785",
+      "source": "apps/extension/src/editor/raster-editing/vendor/LICENSE"
+    },
+    {
+      "archivePath": "apps/extension/src/editor/raster-editing/vendor/NOTICE.txt",
+      "sha256": "180a6efecad16728850abc3a2c9e630eb445b16137e0e6ed8cee29673aed8a03",
+      "source": "apps/extension/src/editor/raster-editing/vendor/NOTICE.txt"
+    },
+    {
+      "archivePath": "apps/extension/src/editor/raster-editing/vendor/provenance.json",
+      "sha256": "9c26643f25e139be15f954e8200cde51cfd036b1e97601ff797b9acc8b8f45cc",
+      "source": "apps/extension/src/editor/raster-editing/vendor/provenance.json"
     },
     {
       "archivePath": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/LICENSE",
@@ -606,6 +646,40 @@
             "sha256": "d78fe2ce0f0a4513364599854b363cddae8c1479de17d2cfca006bdd2de931c6",
             "sourceUrl": "https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/browser/runtimeCapabilities.js",
             "sourceSha256": "d78fe2ce0f0a4513364599854b363cddae8c1479de17d2cfca006bdd2de931c6"
+          }
+        ]
+      },
+      {
+        "id": "klecks-algorithms",
+        "name": "Klecks raster algorithms",
+        "attribution": "bitbof (bitbof.com)",
+        "license": "MIT",
+        "sourceUrl": "https://github.com/bitbof/klecks/tree/b86ba7d0edb2c48ad21ca58aae4775fccf329632",
+        "licensePath": "apps/extension/src/editor/raster-editing/vendor/LICENSE",
+        "licenseSha256": "0234a0861b38c1f3c9198b0f048a1b713bf3b1b198b5cced343acc7335b90785",
+        "noticePath": "apps/extension/src/editor/raster-editing/vendor/NOTICE.txt",
+        "noticeSha256": "180a6efecad16728850abc3a2c9e630eb445b16137e0e6ed8cee29673aed8a03",
+        "provenancePath": "apps/extension/src/editor/raster-editing/vendor/provenance.json",
+        "provenanceSha256": "9c26643f25e139be15f954e8200cde51cfd036b1e97601ff797b9acc8b8f45cc",
+        "modifications": "Sniptale extracts flood-fill, Bezier, and stamp-spacing algorithms with their required helpers. It adds typed source geometry, bounded reads, and row-safe growth. It adds immutable retained planes, independent hardness, Restore mode, selection clipping, and crop clipping. It removes upstream UI, Canvas, pressure, and history dependencies. It adds source-over paint with explicit color and opacity, and incremental preview patches.",
+        "artifacts": [
+          {
+            "path": "apps/extension/src/editor/raster-editing/vendor/flood-fill.ts",
+            "sha256": "c6ddb53f4aaee036d8395d948db7f66ad1d0b12c614270aa2fc625dceaa8941c",
+            "sourceUrl": "https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/klecks/image-operations/flood-fill.ts",
+            "sourceSha256": "c571c4fbc0ff4f4f1df1aedd01af02aadabc7226af187d1001fd26487875a5c0"
+          },
+          {
+            "path": "apps/extension/src/editor/raster-editing/vendor/bezier-line.ts",
+            "sha256": "52cf50f07c10807a44b8b3b36a1738f0e5ee9b96a9bc1e1a4e7fe21efa7b6568",
+            "sourceUrl": "https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/bb/math/line.ts",
+            "sourceSha256": "6336d91fcc70507bb67765310b7bbb3d6e77bbb316e0c0ff9fb443444c6815d0"
+          },
+          {
+            "path": "apps/extension/src/editor/raster-editing/brush.ts",
+            "sha256": "9e44f82752bfcdc8ef3dc0783194b116c7cb8c7831c8757c00ca13579954ed93",
+            "sourceUrl": "https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/klecks/brushes/eraser-brush.ts",
+            "sourceSha256": "9aa231d02d555a3a13976a22ad74ce0f2f24c0e98e8e741c3f78971206dbb007"
           }
         ]
       }

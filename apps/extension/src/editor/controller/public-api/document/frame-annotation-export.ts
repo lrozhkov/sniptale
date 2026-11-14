@@ -1,6 +1,7 @@
+import { serializeEditorCanvasObject } from '../../document/serialization';
 import type { Canvas, FabricObject } from 'fabric';
-import { blobToDataUrl, dataUrlToBlob } from '../../../../platform/media-utils/data-url';
-import { renderEditorCanvasToDataUrl } from '../../document/export';
+import { blobToDataUrl } from '../../../../platform/media-utils/data-url';
+import { renderEditorCanvasToBlob } from '../../document/export';
 import { CUSTOM_JSON_PROPS } from '../../../document/model';
 import type { EditorRenderToDataUrlOptions } from '../../../document/model/render-options';
 import { flushActiveFrameAnnotationDraft } from '../../../frame-annotation/draft-coordinator';
@@ -24,7 +25,7 @@ export async function renderEditorWithFrameAnnotations(options: {
   const canvas = options.canvas;
   if (!canvas) {
     if (options.draftPolicy !== 'committed') flushActiveFrameAnnotationDraft();
-    return renderEditorCanvasToDataUrl(canvas, options.renderOptions);
+    return blobToDataUrl(await renderEditorCanvasToBlob(canvas, options.renderOptions));
   }
   return enqueueFrameAnnotationExport(canvas, () =>
     renderEditorWithFrameAnnotationsInTurn({ ...options, canvas })
@@ -41,7 +42,8 @@ async function renderEditorWithFrameAnnotationsInTurn(options: {
   if (options.draftPolicy !== 'committed') flushActiveFrameAnnotationDraft();
   const { canvas } = options;
   const entries = collectFrameAnnotationProxies(canvas.getObjects());
-  if (entries.length === 0) return renderEditorCanvasToDataUrl(canvas, options.renderOptions);
+  if (entries.length === 0)
+    return blobToDataUrl(await renderEditorCanvasToBlob(canvas, options.renderOptions));
 
   const signature = createCanvasVisualSignature(canvas);
   const output = await rasterizeFrameAnnotations({
@@ -97,13 +99,11 @@ async function renderBaseImage(
   const visibility = proxies.map((object) => ({ object, visible: object.visible !== false }));
   for (const entry of visibility) entry.object.set({ visible: false });
   try {
-    return dataUrlToBlob(
-      renderEditorCanvasToDataUrl(canvas, {
-        format: 'png',
-        quality: 1,
-        ...(outputSize ? { outputSize } : {}),
-      })
-    );
+    return renderEditorCanvasToBlob(canvas, {
+      format: 'png',
+      quality: 1,
+      ...(outputSize ? { outputSize } : {}),
+    });
   } finally {
     for (const entry of visibility) entry.object.set({ visible: entry.visible });
     canvas.requestRenderAll();
@@ -135,7 +135,7 @@ function createCanvasVisualSignature(canvas: Canvas): string {
 }
 
 function serializeCanvasVisualObject(object: FabricObject | undefined): unknown {
-  return object?.toObject([...VISUAL_SIGNATURE_PROPS]) ?? null;
+  return object ? serializeEditorCanvasObject(object, VISUAL_SIGNATURE_PROPS) : null;
 }
 
 function serializeCanvasVisualValue(value: unknown): unknown {
@@ -160,7 +160,15 @@ async function convertRasterBlob(
     canvas.getContext('2d')?.drawImage(image, 0, 0);
     const mime = options.format === 'jpeg' ? 'image/jpeg' : 'image/webp';
     const quality = options.quality > 1 ? options.quality / 100 : options.quality;
-    return canvas.toDataURL(mime, Math.max(0, Math.min(1, quality)));
+    const encoded = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (result) => (result ? resolve(result) : reject(new Error('Editor image encoding failed'))),
+        mime,
+        Math.max(0, Math.min(1, quality))
+      );
+    });
+    options.signal?.throwIfAborted();
+    return blobToDataUrl(encoded);
   } finally {
     URL.revokeObjectURL(url);
   }

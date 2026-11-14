@@ -1,4 +1,4 @@
-import type { Canvas, FabricObject, TPointerEvent } from 'fabric';
+import { Point, util, type Canvas, type FabricObject, type TPointerEvent } from 'fabric';
 
 import {
   appendDrawingSamples,
@@ -18,7 +18,7 @@ import {
   updateEditorDrawingShapeDraft,
 } from '../../drawing/object/vector';
 import type { EditorControllerEventBindings } from './types';
-import { requestEditorFreehandPreview } from './runtime.render';
+import { renderEditorFreehandDraft } from './runtime.render';
 import {
   getEditorFreeCanvasBounds,
   normalizeEditorCropSelection,
@@ -34,8 +34,17 @@ function collectFreehandSamples(canvas: Canvas, events: readonly TPointerEvent[]
       'getCoalescedEvents' in event && typeof event.getCoalescedEvents === 'function'
         ? event.getCoalescedEvents()
         : [];
-    return (coalesced.length > 0 ? coalesced : [event]).map((sampleEvent) => ({
-      ...canvas.getScenePoint(sampleEvent),
+    if (!coalesced.length) return [{ ...canvas.getScenePoint(event), t: event.timeStamp }];
+    const bounds = canvas.upperCanvasEl.getBoundingClientRect();
+    if (!bounds.width || !bounds.height)
+      return [{ ...canvas.getScenePoint(event), t: event.timeStamp }];
+    const inverse = util.invertTransform(canvas.viewportTransform);
+    // Fabric caches the dispatch event's scene point; subevents need their own projection.
+    return coalesced.map((sampleEvent) => ({
+      ...new Point(
+        ((sampleEvent.clientX - bounds.left) * canvas.getWidth()) / bounds.width,
+        ((sampleEvent.clientY - bounds.top) * canvas.getHeight()) / bounds.height
+      ).transform(inverse),
       t: sampleEvent.timeStamp,
     }));
   });
@@ -174,7 +183,7 @@ function applyDrawingPreview(
   }
   if (updateVectorPreview(object, drawing) || updateShapePreview(object, drawing)) {
     if (drawing.kind === 'pencil' || drawing.kind === 'marker') {
-      requestEditorFreehandPreview(bindings);
+      renderEditorFreehandDraft(bindings);
     } else {
       canvas.requestRenderAll();
     }

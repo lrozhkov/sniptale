@@ -18,3 +18,17 @@ it('rejects missing, empty, and locked selections', () => {
     getMutableEditorSelection({ getActiveObjects: () => [{ sniptaleLocked: true }] } as never)
   ).toBeNull();
 });
+
+it('rejects mixed ancestry and mutations beneath a hidden or locked parent', () => {
+  const parent = { sniptaleId: 'parent', sniptaleLocked: false, visible: true };
+  const child = { sniptaleId: 'child', parent };
+  expect(
+    getMutableEditorSelection({ getActiveObjects: () => [parent, child] } as never)
+  ).toBeNull();
+  expect(getMutableEditorSelection({ getActiveObjects: () => [child] } as never)).toEqual([child]);
+  parent.sniptaleLocked = true;
+  expect(getMutableEditorSelection({ getActiveObjects: () => [child] } as never)).toBeNull();
+  parent.sniptaleLocked = false;
+  parent.visible = false;
+  expect(getMutableEditorSelection({ getActiveObjects: () => [child] } as never)).toBeNull();
+});

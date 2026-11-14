@@ -1,3 +1,4 @@
+import { getEditorRasterRuntime } from '../../../raster-editing/runtime';
 import type {
   EditorRasterEffect,
   EditorRasterEffectId,
@@ -10,7 +11,7 @@ import {
   updateEditorLayerRasterEffect,
 } from '../../layer-effects/raster-mutations/effects';
 import {
-  createControllerLayerMutationContext,
+  createControllerLayerCorrectionContext,
   type LayerRasterMutationContextController,
 } from './context';
 
@@ -20,7 +21,7 @@ export async function applyEditorControllerLayerEffect(
   effect: EditorRasterEffect
 ): Promise<void> {
   await applyEditorLayerRasterEffect({
-    ...createControllerLayerMutationContext(controller),
+    ...createControllerLayerCorrectionContext(controller),
     effect,
     id,
   });
@@ -32,7 +33,7 @@ export async function updateEditorControllerLayerEffect(
   effect: EditorRasterEffect
 ): Promise<void> {
   await updateEditorLayerRasterEffect({
-    ...createControllerLayerMutationContext(controller),
+    ...createControllerLayerCorrectionContext(controller),
     id,
     effect,
   });
@@ -43,10 +44,12 @@ export function previewEditorControllerLayerEffect(
   id: string,
   effect: EditorRasterEffect
 ): void {
-  previewEditorLayerRasterEffect({
-    ...createControllerLayerMutationContext(controller),
+  void previewEditorLayerRasterEffect({
+    ...createControllerLayerCorrectionContext(controller),
     id,
     effect,
+  }).catch((error: unknown) => {
+    if (controller.canvas) getEditorRasterRuntime(controller.canvas)?.reportError(error);
   });
 }
 
@@ -54,10 +57,14 @@ export function resetEditorControllerLayerEffectPreview(
   controller: LayerRasterMutationContextController,
   id: string
 ): void {
-  resetEditorLayerRasterEffectPreview({
-    ...createControllerLayerMutationContext(controller),
-    id,
-  });
+  try {
+    resetEditorLayerRasterEffectPreview({
+      ...createControllerLayerCorrectionContext(controller),
+      id,
+    });
+  } catch (error) {
+    if (controller.canvas) getEditorRasterRuntime(controller.canvas)?.reportError(error);
+  }
 }
 
 export function removeEditorControllerLayerEffect(
@@ -65,9 +72,11 @@ export function removeEditorControllerLayerEffect(
   id: string,
   effectId: EditorRasterEffectId
 ): void {
-  removeEditorLayerRasterEffect({
-    ...createControllerLayerMutationContext(controller),
+  void removeEditorLayerRasterEffect({
+    ...createControllerLayerCorrectionContext(controller),
     id,
     effectId,
+  }).catch((error: unknown) => {
+    if (controller.canvas) getEditorRasterRuntime(controller.canvas)?.reportError(error);
   });
 }

@@ -1497,6 +1497,133 @@
         "rule": "js/missing-origin-check"
       },
       "targetAction": "Keep only this exact reviewed private-worker finding. Recheck scope and source evidence on any drift."
+    },
+    {
+      "id": "noise.codeql.raster-private-worker-message",
+      "classification": "tool-noise",
+      "owner": "editor/raster-editing",
+      "risk": "A broad exception could hide public message ingress. This decision covers only the private dedicated-worker port.",
+      "reason": "The editor privately constructs the bundled dedicated Worker in raster-editing/runtime.ts. Its entangled message port receives creator-handle messages rather than Window postMessage traffic. The receiver checks request identity and executeRasterCompute validates commands before execution. A Window origin check does not establish authority on this private port.",
+      "removalCondition": "Remove when CodeQL models dedicated-worker ports, this exact finding disappears, or transport changes to a public Window or shared-worker receiver. Reassess creator-handle exposure and command authority changes.",
+      "reviewBy": "2027-05-14",
+      "source": {
+        "kind": "codeql",
+        "key": "js/missing-origin-check:apps/extension/src/editor/raster-editing/worker.ts:3:4c6e36f948c4be530f7c54d0d7fd866f9acc53cce8ca4a12cf69909517aaa059:69516df2e0eea00d6d2a9703efd669880aab7bf5852bf7c23728240773eb63c1"
+      },
+      "scope": {
+        "contentHash": "4c6e36f948c4be530f7c54d0d7fd866f9acc53cce8ca4a12cf69909517aaa059",
+        "file": "apps/extension/src/editor/raster-editing/worker.ts",
+        "line": 3,
+        "messageHash": "69516df2e0eea00d6d2a9703efd669880aab7bf5852bf7c23728240773eb63c1",
+        "rule": "js/missing-origin-check"
+      },
+      "targetAction": "Retain only this exact reviewed finding. Recheck source evidence and authority on any drift."
+    },
+    {
+      "id": "noise.codeql.raster-validated-data-url-fetch",
+      "classification": "tool-noise",
+      "owner": "editor/raster-editing",
+      "risk": "A broad exception could hide network requests. This decision covers only resources that pass bounded raster data URL validation.",
+      "reason": "The private imageBlob helper receives only image resources admitted by checkedMetadata before decoding. checkedMetadata uses isImageDataUrl and restricts retained non-image resources to data:image/png. The fetch decodes an admitted data URL; HTTP, external, blob and extension URLs cannot reach this sink through supported callers.",
+      "removalCondition": "Remove when CodeQL recognizes the data-URL admission or this exact finding disappears. Reassess all imageBlob callers, resource validation and fetch authority on any change.",
+      "reviewBy": "2027-05-14",
+      "source": {
+        "kind": "codeql",
+        "key": "js/client-side-request-forgery:apps/extension/src/editor/raster-editing/image-state.ts:43:5f2631a13b5d7b56261f9c9aaef7e6c9549e8b544560eb504c2294ca6a0e6c72:239b81f153ffe6d1b47bd0cabb87ba80adbb4b7715b3c5e573308f0849285a13"
+      },
+      "scope": {
+        "contentHash": "5f2631a13b5d7b56261f9c9aaef7e6c9549e8b544560eb504c2294ca6a0e6c72",
+        "file": "apps/extension/src/editor/raster-editing/image-state.ts",
+        "line": 43,
+        "messageHash": "239b81f153ffe6d1b47bd0cabb87ba80adbb4b7715b3c5e573308f0849285a13",
+        "rule": "js/client-side-request-forgery"
+      },
+      "targetAction": "Retain only this exact reviewed finding. Recheck source evidence and authority on any drift."
+    },
+    {
+      "id": "noise.codeql.archive-source-transformer",
+      "classification": "tool-noise",
+      "owner": "composition/archive-transfer",
+      "risk": "A broad exception could hide unchecked source bytes. The native transformer checks chunk types and the declared size.",
+      "reason": "CodeQL resolves this call to the obsolete zero-argument TransformStream record in its 2016 streamsapi.js extern. The installed TypeScript Web Streams contract accepts a transformer with transform and flush hooks as its first constructor argument. The byte-count transform and flush hooks enforce the declared archive source size. Removing the transformer argument removes archive admission checks.",
+      "removalCondition": "Remove when CodeQL models the native transformer constructor or this exact finding disappears. Reassess constructor resolution, transformer hooks and admission authority on any source change.",
+      "reviewBy": "2027-05-14",
+      "source": {
+        "kind": "codeql",
+        "key": "js/superfluous-trailing-arguments:apps/extension/src/composition/archive-transfer/writer.ts:38:88ba3700c4af5da36e8a9f67053af2510220849726b2c8ac2fd3f55535df5010:6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b"
+      },
+      "scope": {
+        "contentHash": "88ba3700c4af5da36e8a9f67053af2510220849726b2c8ac2fd3f55535df5010",
+        "file": "apps/extension/src/composition/archive-transfer/writer.ts",
+        "line": 38,
+        "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
+        "rule": "js/superfluous-trailing-arguments"
+      },
+      "targetAction": "Retain only this exact reviewed finding. Recheck source evidence and authority on any drift."
+    },
+    {
+      "id": "noise.codeql.remote-integrity-transformer",
+      "classification": "tool-noise",
+      "owner": "workflows/sync-transfer/remote-object-integrity",
+      "risk": "A broad exception could hide remote integrity errors. The native transformer checks the body size before digest admission.",
+      "reason": "CodeQL resolves this call to the obsolete zero-argument TransformStream record in its 2016 streamsapi.js extern. The installed TypeScript Web Streams contract accepts a transformer with transform and flush hooks as its first constructor argument. The transform and flush hooks enforce the remote object byte count before digest verification. Removing the transformer argument removes these checks.",
+      "removalCondition": "Remove when CodeQL models the native transformer constructor or this exact finding disappears. Reassess constructor resolution, transformer hooks and admission authority on any source change.",
+      "reviewBy": "2027-05-14",
+      "source": {
+        "kind": "codeql",
+        "key": "js/superfluous-trailing-arguments:apps/extension/src/workflows/sync-transfer/remote-object-integrity.ts:16:0fe363810f9724cef256b6f667ddfb153c1339427cac93dfda0135c2295a3705:6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b"
+      },
+      "scope": {
+        "contentHash": "0fe363810f9724cef256b6f667ddfb153c1339427cac93dfda0135c2295a3705",
+        "file": "apps/extension/src/workflows/sync-transfer/remote-object-integrity.ts",
+        "line": 16,
+        "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
+        "rule": "js/superfluous-trailing-arguments"
+      },
+      "targetAction": "Retain only this exact reviewed finding. Recheck source evidence and authority on any drift."
+    },
+    {
+      "id": "noise.codeql.webdav-metadata-transformer",
+      "classification": "tool-noise",
+      "owner": "workflows/sync-transfer/webdav",
+      "risk": "A broad exception could hide unbounded XML. The native transformer enforces the metadata byte limit before parsing.",
+      "reason": "CodeQL resolves this call to the obsolete zero-argument TransformStream record in its 2016 streamsapi.js extern. The installed TypeScript Web Streams contract accepts a transformer with transform and flush hooks as its first constructor argument. The transform hook bounds streamed PROPFIND metadata even when content-length is absent or misleading. Removing the transformer argument removes this admission limit.",
+      "removalCondition": "Remove when CodeQL models the native transformer constructor or this exact finding disappears. Reassess constructor resolution, transformer hooks and admission authority on any source change.",
+      "reviewBy": "2027-05-14",
+      "source": {
+        "kind": "codeql",
+        "key": "js/superfluous-trailing-arguments:apps/extension/src/workflows/sync-transfer/webdav.ts:288:199cd281dddb6a1d543c5566ecc3a3ad30faf1befa711efcbfdba61d30ecebd4:6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b"
+      },
+      "scope": {
+        "contentHash": "199cd281dddb6a1d543c5566ecc3a3ad30faf1befa711efcbfdba61d30ecebd4",
+        "file": "apps/extension/src/workflows/sync-transfer/webdav.ts",
+        "line": 288,
+        "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
+        "rule": "js/superfluous-trailing-arguments"
+      },
+      "targetAction": "Retain only this exact reviewed finding. Recheck source evidence and authority on any drift."
+    },
+    {
+      "id": "accepted.scc.editor-controller-raster-composition",
+      "classification": "accepted-architecture",
+      "owner": "apps/extension/src/editor",
+      "risk": "An owner-edge allowance could conceal new module cycles or changes to controller history, currentness and native publication authority. This record binds only the two exact owner edges and does not bind the 21 reviewed module imports.",
+      "reason": "Allowed composition: controller lifecycle composes the per-canvas raster runtime and explicit adapter callbacks; raster adapters use controller geometry, preview and native publication operations. Controller retains history, currentness and publication authority. This record binds exactly two owner edges, not the reviewed 21 module imports. Module imports, state/runtime authority and module cycles require reassessment when they change.",
+      "removalCondition": "Remove when either exact owner edge disappears. Reassess changed module imports, added owner edges, state/runtime authority or module cycles before retaining this composition; the owner-edge registry does not bind module edges.",
+      "reviewBy": "2027-05-14",
+      "source": {
+        "kind": "scc",
+        "key": "editor-controller-raster-composition"
+      },
+      "scope": {
+        "edgeDigest": "856cef9343619a08a0ed618a5b92f3c0568ac9c4a1d7bef3c9b1a53c54dd73a9",
+        "id": "editor-controller-raster-composition",
+        "owners": [
+          "apps/extension/src/editor/controller",
+          "apps/extension/src/editor/raster-editing"
+        ]
+      },
+      "targetAction": "Keep only the exact controller/raster owner composition. Reassess module imports, state/runtime authority and cycles on change. Preserve canonical module-cycle checks."
     }
   ]
 }

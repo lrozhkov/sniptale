@@ -5,9 +5,29 @@ import { commitImageWorkspace, imageWorkspacePublicationAdapter } from './mutati
 
 it('does not recreate a purged original image on the first editor save', async () => {
   const puts = installTransaction({ sourceId: 'image-1' });
+  const document = {
+    ...createEditorDocumentFixture(),
+    version: 3 as const,
+    canvasJson: JSON.stringify({
+      objects: [
+        {
+          sniptaleRasterOriginalData: 'data:image/png;base64,b3JpZ2luYWw=',
+          sniptaleRasterColorData: 'data:image/png;base64,Y29sb3I=',
+          sniptaleRasterVisibilityData: 'data:image/png;base64,dmlzaWJpbGl0eQ==',
+          sniptaleRasterKeyData: 'data:image/png;base64,a2V5',
+          sniptaleRasterState: {
+            version: 1,
+            width: 8,
+            height: 6,
+            crop: { x: 2, y: 1, width: 4, height: 3 },
+          },
+        },
+      ],
+    }),
+  };
   const input = {
     aggregateId: 'image-1',
-    document: createEditorDocumentFixture(),
+    document,
     expectedRevision: 0,
     requireExistingRoot: true,
   };

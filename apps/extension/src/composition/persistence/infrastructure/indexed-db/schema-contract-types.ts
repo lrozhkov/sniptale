@@ -6,6 +6,7 @@ export type PersistenceDomainId =
   | 'assetGraph'
   | 'diagnostics'
   | 'editorAssets'
+  | 'editorVectorLibrary'
   | 'effects'
   | 'mediaLibrary'
   | 'recordings'

@@ -1,3 +1,5 @@
+import { isEditorVectorDocumentData } from './vector-document';
+import { inspectEditorRasterCanvas } from './raster-state';
 import {
   DEFAULT_WINDOW_HEADER,
   parseWindowHeader,
@@ -156,10 +158,23 @@ function isBrowserFrameState(value: unknown): boolean {
   );
 }
 
+function hasValidRasterCanvas(canvasJson: string, version: unknown): boolean {
+  try {
+    const result = inspectEditorRasterCanvas(
+      JSON.parse(canvasJson) as unknown,
+      (resource, kind): resource is string =>
+        isImageDataUrl(resource) && (kind === 'image' || resource.startsWith('data:image/png;'))
+    );
+    return result.valid && (version === 3 || version === 4 || !result.hasRaster);
+  } catch {
+    return false;
+  }
+}
+
 export function isEditorDocument(value: unknown): value is EditorDocument {
   return (
     isRecord(value) &&
-    value['version'] === 2 &&
+    (value['version'] === 2 || value['version'] === 3 || value['version'] === 4) &&
     isImageDataUrl(value['sourceImageData']) &&
     isNullableString(value['sourceName']) &&
     (value['displayName'] === undefined || isString(value['displayName'])) &&
@@ -175,6 +190,8 @@ export function isEditorDocument(value: unknown): value is EditorDocument {
     isEditorFrameSettings(value['frame']) &&
     (value['browserFrame'] === undefined || isBrowserFrameState(value['browserFrame'])) &&
     isString(value['canvasJson']) &&
+    hasValidRasterCanvas(value['canvasJson'], value['version']) &&
+    isEditorVectorDocumentData(value['canvasJson'], value['version'], value['vectorDefinitions']) &&
     (value['richShapes'] === undefined || isEditorRichShapeDocumentObjectArray(value['richShapes']))
   );
 }

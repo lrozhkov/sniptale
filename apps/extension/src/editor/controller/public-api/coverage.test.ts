@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   applyFrameMock: vi.fn(),
   applySelectionSettingsMock: vi.fn(),
   buildDocumentMock: vi.fn(() => ({ id: 'document' })),
+  blobToDataUrlMock: vi.fn(async (blob: Blob) => blob.text()),
   closeDocumentMock: vi.fn(),
   copyRenderedMock: vi.fn(),
   getSourceObjectMock: vi.fn(() => 'source-object'),
@@ -15,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   openImageMock: vi.fn(),
   redoMock: vi.fn(() => ({ id: 'redo' })),
   removeBrowserFrameMock: vi.fn(),
+  removeLayerRasterEffectMock: vi.fn(async () => undefined),
+  renderToBlobMock: vi.fn(async () => new Blob(['data-url'], { type: 'image/png' })),
   renderToDataUrlMock: vi.fn(() => 'data-url'),
   resizeCanvasMock: vi.fn(),
   resizeSourceSceneMock: vi.fn(),
@@ -34,8 +37,13 @@ vi.mock('../../state/useEditorStore', () => ({
 vi.mock('../document/export', () => ({
   buildEditorCanvasDocument: mocks.buildDocumentMock,
   copyEditorRenderedImage: mocks.copyRenderedMock,
+  renderEditorCanvasToBlob: mocks.renderToBlobMock,
   renderEditorCanvasToDataUrl: mocks.renderToDataUrlMock,
   resolveEditorImageMimeType: mocks.resolveMimeTypeMock,
+}));
+
+vi.mock('../../../platform/media-utils/data-url', () => ({
+  blobToDataUrl: mocks.blobToDataUrlMock,
 }));
 
 vi.mock('../document/lifecycle/close/run', () => ({
@@ -73,7 +81,7 @@ vi.mock('../layer-effects/merge', () => ({ mergeEditorSelectedLayers: mocks.acti
 vi.mock('../layer-effects/raster-mutations/effects', () => ({
   applyEditorLayerRasterEffect: mocks.actionMock,
   previewEditorLayerRasterEffect: mocks.actionMock,
-  removeEditorLayerRasterEffect: mocks.actionMock,
+  removeEditorLayerRasterEffect: mocks.removeLayerRasterEffectMock,
   resetEditorLayerRasterEffectPreview: mocks.actionMock,
   updateEditorLayerRasterEffect: mocks.actionMock,
 }));
@@ -137,6 +145,7 @@ import {
   undoEditorControllerSnapshot,
   updateEditorControllerLayerEffect,
 } from './';
+import { runEditorDocumentTransition } from '../history/transition-queue';
 
 function createController() {
   const controller = {
@@ -229,6 +238,10 @@ it('bridges document export, render, and history flows', async () => {
   expect(renderEditorControllerToDataUrl(controller, { format: 'png', quality: 0.8 })).toBe(
     'data-url'
   );
+  expect(mocks.renderToDataUrlMock).toHaveBeenCalledWith(controller.canvas, {
+    format: 'png',
+    quality: 0.8,
+  });
   await copyRenderedEditorImageViaController(controller, {
     outputSize: { width: 640, height: 360 },
   });
@@ -249,11 +262,14 @@ it('bridges document export, render, and history flows', async () => {
     dataUrl: 'data-url',
     mimeType: 'image/png',
   });
-  expect(mocks.renderToDataUrlMock).toHaveBeenCalledWith(controller.canvas, {
+  expect(mocks.renderToBlobMock).toHaveBeenCalledWith(controller.canvas, {
     format: 'png',
     outputSize: { height: 360, width: 640 },
     quality: 0.9,
   });
+  expect(mocks.blobToDataUrlMock).toHaveBeenCalledWith(
+    await mocks.renderToBlobMock.mock.results.at(-1)?.value
+  );
   expect(controller.applyDocument).toHaveBeenCalledWith(
     { id: 'undo' },
     { resetHistory: false, updateOriginal: false, preserveViewport: true }
@@ -273,30 +289,30 @@ it('forwards scene actions through the scene public api wrappers', async () => {
 
   resizeEditorControllerCanvas(controller, 100, 50);
   resizeEditorControllerImageScene(controller, 120, 80);
-  await Promise.resolve();
-  await Promise.resolve();
+  await runEditorDocumentTransition(controller.canvas, async () => undefined);
   applyEditorControllerFrame(controller, { padding: 8 } as never);
   await applyEditorControllerBrowserFrame(controller, { enabled: true } as never);
 
   expect(mocks.resizeCanvasMock).toHaveBeenCalled();
   expect(controller.clearCropSelection).toHaveBeenCalledOnce();
-  expect(mocks.renderToDataUrlMock).toHaveBeenCalledWith(controller.canvas, {
+  expect(mocks.renderToBlobMock).toHaveBeenCalledWith(controller.canvas, {
     format: 'png',
     outputSize: { height: 80, width: 120 },
     quality: 1,
   });
-  await vi.waitFor(() =>
-    expect(controller.applyDocument).toHaveBeenCalledWith(
-      expect.objectContaining({
-        canvasHeight: 80,
-        canvasWidth: 120,
-        sourceHeight: 80,
-        sourceImageData: 'data-url',
-        sourceName: 'capture.png',
-        sourceWidth: 120,
-      }),
-      {}
-    )
+  expect(mocks.blobToDataUrlMock).toHaveBeenCalledWith(
+    await mocks.renderToBlobMock.mock.results.at(-1)?.value
+  );
+  expect(controller.applyDocument).toHaveBeenCalledWith(
+    expect.objectContaining({
+      canvasHeight: 80,
+      canvasWidth: 120,
+      sourceHeight: 80,
+      sourceImageData: 'data-url',
+      sourceName: 'capture.png',
+      sourceWidth: 120,
+    }),
+    {}
   );
   expect(mocks.applyFrameMock).toHaveBeenCalled();
   expect(mocks.applyBrowserFrameMock).toHaveBeenCalled();

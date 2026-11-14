@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { FabricObject } from 'fabric';
+import { createTypedTestFixture } from '../../testing/fabric-canvas.test-support';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -27,7 +28,7 @@ const mocks = vi.hoisted(() => ({
   state: {
     canvasCropMode: 'crop',
     toolSettings: {
-      blur: { amount: 20 },
+      blur: { amount: 20, clean: false },
       arrow: { drawFromTip: false },
       text: {
         backgroundColor: null,
@@ -45,7 +46,8 @@ const mocks = vi.hoisted(() => ({
   writeDrawing: vi.fn(),
 }));
 
-vi.mock('../../../features/drawing/public', () => ({
+vi.mock('../../../features/drawing/public', async (original) => ({
+  ...(await original<typeof import('../../../features/drawing/public')>()),
   appendDrawingSamples: mocks.appendSamples,
   clampDrawingTextWidth: vi.fn(() => 80),
   createDrawingBounds: mocks.createBounds,
@@ -61,7 +63,10 @@ vi.mock('./text-target', () => ({
   activateTextTarget: mocks.activateTextTarget,
   isTextTarget: mocks.isTextTarget,
 }));
-vi.mock('./draw-completion', () => ({ completeDrawWorkflowFromBindings: mocks.complete }));
+vi.mock('./draw-completion', () => ({
+  completeDrawWorkflowFromBindings: mocks.complete,
+  releaseFreehandDrawWorkflowFromBindings: mocks.complete,
+}));
 vi.mock('../tools/step-drawing/pointer', () => ({ handleStepMouseDown: mocks.stepDown }));
 vi.mock('../../drawing/object/metadata', () => ({
   isEditorDrawingSelection: mocks.isDrawingSelection,
@@ -168,6 +173,7 @@ function resetDrawingMocks() {
   vi.clearAllMocks();
   mocks.state.toolSettings.arrow.drawFromTip = false;
   mocks.state.canvasCropMode = 'crop';
+  mocks.state.toolSettings.blur.clean = false;
   mocks.cropDown.mockReturnValue(false);
   mocks.isTextTarget.mockReturnValue(false);
   mocks.isDrawingSelection.mockReturnValue(false);
@@ -455,7 +461,7 @@ describe('drawing beyond the image and canvas', () => {
     mocks.updatePath.mockReturnValue(true);
 
     const outside = document.createElement('div');
-    const move = new MouseEvent('mousemove', { bubbles: true });
+    const move = new MouseEvent('mousemove', { bubbles: true, buttons: 1 });
     Object.defineProperty(move, 'target', { value: outside });
     path.handlers.handleMouseMove({ e: move });
 
@@ -485,7 +491,7 @@ describe('drawing pointer continuity', () => {
     mocks.readDrawing.mockReturnValue({ id: 'pencil-1', kind: 'pencil' });
     mocks.updateDrawing.mockReturnValue({ id: 'pencil-1', kind: 'pencil' });
     mocks.updatePath.mockReturnValue(true);
-    const move = new MouseEvent('mousemove', { bubbles: true });
+    const move = new MouseEvent('mousemove', { bubbles: true, buttons: 1 });
     path.canvas.upperCanvasEl.dispatchEvent(move);
 
     path.handlers.handleMouseMove({ e: move });
@@ -505,7 +511,7 @@ describe('drawing pointer continuity', () => {
     mocks.readDrawing.mockReturnValue({ id: 'marker-1', kind: 'marker' });
     mocks.updateDrawing.mockReturnValue({ id: 'marker-1', kind: 'marker' });
     mocks.updatePath.mockReturnValue(true);
-    const move = new MouseEvent('mousemove', { bubbles: true });
+    const move = new MouseEvent('mousemove', { bubbles: true, buttons: 1 });
 
     path.handlers.handleMouseMove({ e: move });
     path.handlers.handleMouseMove({ e: move });
@@ -513,6 +519,23 @@ describe('drawing pointer continuity', () => {
     expect(mocks.appendSamples).toHaveBeenCalledOnce();
     expect(mocks.stageDrawing).toHaveBeenCalledOnce();
   });
+
+  it.each(['pencil', 'marker'] as const)(
+    'finishes %s before ingesting a move with primary released',
+    (tool) => {
+      const path = createBindings(tool);
+      path.bindings.getDrawSession.mockReturnValue({
+        object: { id: 'path-object' },
+        start: { x: 1, y: 2 },
+        tool,
+      });
+      const move = new MouseEvent('mousemove', { buttons: 2 });
+      path.handlers.handleMouseMove({ e: move });
+      expect(mocks.complete).toHaveBeenCalledWith(path.bindings);
+      expect(mocks.appendSamples).not.toHaveBeenCalled();
+      expect(mocks.stageDrawing).not.toHaveBeenCalled();
+    }
+  );
 
   it('starts resizing a geometric draft on the first window move without a hold delay', () => {
     const shape = createBindings('shape');
@@ -524,7 +547,7 @@ describe('drawing pointer continuity', () => {
     });
     mocks.readDrawing.mockReturnValue({ id: 'shape-1', kind: 'rectangle' });
     mocks.updateDrawing.mockReturnValue({ id: 'shape-1', kind: 'rectangle' });
-    const move = new MouseEvent('mousemove', { bubbles: true });
+    const move = new MouseEvent('mousemove', { bubbles: true, buttons: 1 });
 
     shape.handlers.handleMouseMove({ e: move });
 
@@ -560,7 +583,7 @@ describe('drawing pointer continuity', () => {
 
     expect(mocks.appendSamples).toHaveBeenCalledOnce();
     expect(mocks.stageDrawing).toHaveBeenCalledOnce();
-    expect(requestFrame).toHaveBeenCalledOnce();
+    expect(requestFrame).not.toHaveBeenCalled();
   });
 
   it('cancels queued drawing work and the Fabric transform on pointer cancellation', () => {
@@ -766,3 +789,103 @@ it.each(['pencil', 'marker'])('does not repaint the committed scene on %s moves'
   expect(mocks.stageDrawing).toHaveBeenCalledTimes(8);
   expect(path.canvas.requestRenderAll).not.toHaveBeenCalled();
 });
+
+it('starts cleanup from Blur through the Simplify raster path while keeping the Blur gesture', () => {
+  resetDrawingMocks();
+  mocks.state.toolSettings.blur.clean = true;
+  const { bindings, handlers } = createBindings('blur');
+  handlers.handleMouseDown(pointerEvent() as never);
+  expect(mocks.createBlur).not.toHaveBeenCalled();
+  expect(mocks.writeDrawing).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({
+      kind: 'simplify',
+      blurAmount: 20,
+      settings: expect.objectContaining({ erase: true, content: 'all' }),
+    })
+  );
+  expect(bindings.startDrawSession).toHaveBeenCalledWith(
+    'blur',
+    expect.anything(),
+    expect.anything(),
+    null
+  );
+  mocks.state.toolSettings.blur.clean = false;
+});
+
+it('restores a native transform on pointercancel without clearing its accepted selection', () => {
+  const instance = createBindings('select');
+  instance.canvas._currentTransform = {};
+  instance.handlers.handlePointerCancel(new Event('pointercancel') as PointerEvent);
+  expect(instance.canvas.endCurrentTransform).toHaveBeenCalledOnce();
+  expect(instance.bindings.syncRuntimeState).toHaveBeenCalledOnce();
+  expect(instance.bindings.cancelTransientInteraction).not.toHaveBeenCalled();
+  expect(instance.canvas.discardActiveObject).not.toHaveBeenCalled();
+});
+
+it.each(
+  ['pencil', 'marker'].flatMap((kind) => [
+    { kind, zoom: 0.2, cssX: 0.5, cssY: 1.5, backing: 2 },
+    { kind, zoom: 1, cssX: 1, cssY: 1, backing: 3 },
+    { kind, zoom: 4, cssX: 2, cssY: 0.75, backing: 2.5 },
+  ])
+)(
+  'projects every coalesced $kind sample independently at zoom$zoom',
+  ({ kind, zoom, cssX, cssY, backing }) => {
+    resetDrawingMocks();
+    const path = createBindings(kind);
+    const object = new FabricObject({ visible: false });
+    const seed = [{ x: 10, y: 30, t: 50 }];
+    path.bindings.setDrawSession({ object, pointerId: 7, start: { x: 10, y: 30 }, tool: kind });
+    mocks.readDrawing.mockReturnValue({ id: 'coalesced-stroke', kind, samples: seed });
+    const pan = { x: 35, y: 45 };
+    const expected = [
+      { x: 40, y: 70, t: 101 },
+      { x: 80, y: 100, t: 107 },
+      { x: 120, y: 130, t: 115 },
+    ];
+    Object.assign(path.canvas, {
+      viewportTransform: [zoom, 0, 0, zoom, pan.x, pan.y],
+      getWidth: () => 800,
+      getHeight: () => 600,
+    });
+    path.canvas.upperCanvasEl.width = 800 * backing;
+    path.canvas.upperCanvasEl.height = 600 * backing;
+    vi.spyOn(path.canvas.upperCanvasEl, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(120, 80, 800 * cssX, 600 * cssY)
+    );
+    // Fabric caches the dispatch event's scene point while its mouse:move handler runs.
+    path.canvas.getScenePoint.mockReturnValue({ x: 120, y: 130 });
+    const samples = expected.map(({ x, y, t }) =>
+      createTypedTestFixture<PointerEvent>({
+        clientX: 120 + (x * zoom + pan.x) * cssX,
+        clientY: 80 + (y * zoom + pan.y) * cssY,
+        timeStamp: t,
+      })
+    );
+    const event = createTypedTestFixture<PointerEvent>({
+      clientX: samples[2]!.clientX,
+      clientY: samples[2]!.clientY,
+      pointerId: 7,
+      ctrlKey: false,
+      shiftKey: false,
+      timeStamp: 115,
+      getCoalescedEvents: () => samples,
+      composedPath: () => [path.canvas.upperCanvasEl, window],
+    });
+    path.handlers.handleMouseMove({ e: event });
+    path.handlers.handleWindowPointerMove(event);
+    path.handlers.handleMouseMove({ e: event });
+    expect(mocks.appendSamples).toHaveBeenCalledTimes(1);
+    expect(mocks.stageDrawing).toHaveBeenCalledTimes(1);
+    const additions = mocks.appendSamples.mock.calls[0]![1];
+    expect(additions).toHaveLength(3);
+    for (const [index, point] of expected.entries())
+      expect(additions![index]).toMatchObject({
+        x: expect.closeTo(point.x, 6),
+        y: expect.closeTo(point.y, 6),
+        t: point.t,
+      });
+    expect(mocks.appendSamples).toHaveBeenCalledWith(seed, expect.any(Array), kind === 'pencil');
+  }
+);

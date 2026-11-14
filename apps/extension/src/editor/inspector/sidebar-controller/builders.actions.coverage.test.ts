@@ -114,7 +114,8 @@ it('routes controller actions and rich-shape arrangement branches', async () => 
     expect.objectContaining({
       id: 'draft',
       sourceImage: expect.objectContaining({ opacity: 1 }),
-    })
+    }),
+    { allowBackgroundContentEditing: true }
   );
   expect(controller.resizeCanvas).toHaveBeenCalledWith(640, 480);
   expect(controller.resizeImage).toHaveBeenCalledWith(320, 240);

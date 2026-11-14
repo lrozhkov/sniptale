@@ -2,6 +2,7 @@ import { SYNC_QUEUE_SUMMARY_INDEXES } from '../sync-queue-index-migration';
 import { expect, it, vi } from 'vitest';
 import {
   DB_VERSION,
+  EDITOR_VECTOR_LIBRARY_STORE,
   ASSET_RESIDENCY_STORE,
   SYNC_CAPTURE_STORE,
   VIDEO_PROJECT_REVISIONS_STORE,
@@ -66,6 +67,7 @@ it('adds empty scenario units and DB48 reference indexes before publishing curre
     ['recording_cursor_trajectories', { keyPath: ['recordingId', 'trajectoryId'] }],
     ['recording_cursor_blocks', { keyPath: ['recordingId', 'trajectoryId', 'sequence'] }],
     ['recording_events', { keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'] }],
+    [EDITOR_VECTOR_LIBRARY_STORE, { keyPath: 'key' }],
   ]);
   expect(createIndex.mock.calls).toEqual([
     ['projectId', 'projectId'],
@@ -104,6 +106,9 @@ it('adds empty scenario units and DB48 reference indexes before publishing curre
     ['kind', 'kind'],
     ['timeBuckets', 'timeBuckets', { multiEntry: true }],
     ['snapshotAssetId', 'snapshotAssetId'],
+    ['kind', 'kind'],
+    ['definitionId', 'definitionId'],
+    [ROW_REFERENCE_INDEX, ROW_REFERENCE_FIELD, { multiEntry: true }],
   ]);
   await vi.waitFor(() =>
     expect(openCursor).toHaveBeenCalledTimes(REFERENCE_INDEX_STORES.length + 1)
@@ -124,7 +129,8 @@ it('adds empty scenario units and DB48 reference indexes before publishing curre
     ['video_workspace_history'],
   ]);
   expect(openCursor.mock.calls).toEqual(REFERENCE_INDEX_STORES.map(() => []).concat([[]]));
-  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 10 });
+  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 12 });
+  expect(put).toHaveBeenCalledWith({ domainId: 'editorVectorLibrary', schemaVersion: 1 });
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(getAll).not.toHaveBeenCalled();
   expect(tx.abort).not.toHaveBeenCalled();

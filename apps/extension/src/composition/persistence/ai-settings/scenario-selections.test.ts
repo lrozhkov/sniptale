@@ -92,9 +92,15 @@ const models: AIModel[] = ['a-model', 'b-model'].map((code) => ({
   source: 'catalog',
   enabled: true,
   capabilities: {
-    operations: { text: 'supported', transcription: 'supported', speech: 'supported' },
-    input: { text: 'supported', audio: 'supported' },
-    output: { text: 'supported', audio: 'supported' },
+    operations: {
+      text: 'supported',
+      transcription: 'supported',
+      speech: 'supported',
+      'image-generation': 'supported',
+      'image-editing': 'supported',
+    },
+    input: { text: 'supported', audio: 'supported', image: 'supported' },
+    output: { text: 'supported', audio: 'supported', image: 'supported' },
     features: {},
   },
 }));

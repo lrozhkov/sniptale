@@ -22,6 +22,14 @@ Restore retains root-local OPFS staging and existing per-root claims. Thus, fail
 
 Keep one database because recording publication commits recording metadata, media, assets, and the completion outbox atomically.
 
+## Retained raster documents
+
+Logical editor version 3 and stored version 4 admit retained raster metadata. Legacy logical version 2 and stored version 3 remain readable without these fields. Readers refuse retained raster metadata under a legacy version. Reading does not rewrite legacy documents.
+
+Physical database version 54 advances mediaLibrary from 34 to 35 and scenarioProjects from 10 to 11. The additive 53→54 migration changes admission metadata only. It preserves every existing row, workspace, sidecar, history entry, immutable object, store and index. All other domain contracts remain unchanged, including assetGraph version 6. Earlier applications refuse the newer physical database before ordinary mutation.
+
+The document asset owner retains the original image, accepted color image, visibility mask and key image through its existing resource closure. Managed backgrounds keep these fields on the serialized background object. The change adds no Frame binary property, store, journal or archive layout. Portable readers refuse unsupported document versions before restore staging or publication.
+
 ## Recording recovery
 
 The recordings domain owns `recording_recovery_sessions` and `recording_recovery_blocks` in the canonical database. Both stores contain authoritative user data. Database version 33 adds these stores and changes the recordings contract from 2 to 3. The migration preserves all earlier rows and immutable media.

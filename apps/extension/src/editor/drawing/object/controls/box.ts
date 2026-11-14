@@ -64,7 +64,13 @@ const scaleYProportionally = createProportionalSideScale('y');
 const changeTextWidth = controlsUtils.wrapWithFireEvent('resizing', ((_event, transform, x, y) => {
   const { target, originX } = transform;
   const anchor = target.getPositionByOrigin(originX, 'top');
+  const automaticWidth = target.sniptaleDrawingTextAutoWidth;
+  target.sniptaleDrawingTextAutoWidth = false;
   const changed = controlsUtils.changeObjectWidth(_event, transform, x, y);
+  if (!changed) {
+    if (automaticWidth === undefined) delete target.sniptaleDrawingTextAutoWidth;
+    else target.sniptaleDrawingTextAutoWidth = automaticWidth;
+  }
   target.setPositionByOrigin(anchor, transform.originX, 'top');
   return changed;
 }) satisfies TransformActionHandler);
@@ -117,10 +123,7 @@ function resolveBoxActionHandler(object: FabricObject, key: BoxControlKey) {
 function createBoxControl(object: FabricObject, key: BoxControlKey, x: number, y: number) {
   return new Control({
     actionHandler: resolveBoxActionHandler(object, key),
-    cursorStyleHandler:
-      key === 'tl' || key === 'tr' || key === 'br' || key === 'bl'
-        ? createCornerCursorStyleHandler(controlsUtils.scaleCursorStyleHandler)
-        : controlsUtils.scaleCursorStyleHandler,
+    cursorStyleHandler: createCornerCursorStyleHandler(controlsUtils.scaleCursorStyleHandler),
     render: renderDrawingBoxHandle as Control['render'],
     sizeX: DRAWING_BOX_CONTROL_SIZE,
     sizeY: DRAWING_BOX_CONTROL_SIZE,

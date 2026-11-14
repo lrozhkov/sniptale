@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act } from 'react';
-import type { FabricObject } from 'fabric';
+import { Rect, type Canvas, type FabricObject } from 'fabric';
 import { expect, it, vi } from 'vitest';
 import { translate } from '../../../platform/i18n';
 import {
@@ -38,8 +38,8 @@ function createCanvasContextMenuEmitter() {
 
   return {
     canvas: {
-      findTarget: vi.fn(() => null),
-      getActiveObject: vi.fn(() => null),
+      findTarget: vi.fn<Canvas['findTarget']>(() => ({ subTargets: [], currentSubTargets: [] })),
+      getActiveObject: vi.fn(() => undefined),
       getActiveObjects: vi.fn(() => []),
       off: vi.fn((eventName: string) => {
         if (eventName === 'contextmenu') {
@@ -166,4 +166,41 @@ it('opens the no-image menu from the DOM-owned empty canvas state', async () => 
 
   expect(event.defaultPrevented).toBe(true);
   expect(getContextMenuText()).toContain(`${translate('editor.toolbar.openImage')}…`);
+});
+
+it('exposes vector Copy and blank-canvas Paste through actual menu buttons', async () => {
+  const controller = createControllerMock();
+  const emitter = createCanvasContextMenuEmitter();
+  Object.assign(controller, { canvas: emitter.canvas });
+  controller.getVectorClipboardAvailability.mockReturnValue({ canCopy: true, canPaste: false });
+  const target = new Rect({ width: 40, height: 40 });
+  target.sniptaleId = 'vector-layer';
+  target.sniptaleType = 'vector-element';
+  target.sniptaleRole = 'annotation';
+  emitter.canvas.findTarget.mockReturnValue({ target, subTargets: [], currentSubTargets: [] });
+  resetEditorStore({ viewportPreviewOpen: false });
+  await renderCanvasWrapper(controller);
+  await act(async () =>
+    emitter.fireContextMenu(new MouseEvent('contextmenu', { button: 2, clientX: 50, clientY: 50 }))
+  );
+  expect(controller.selectLayer).toHaveBeenCalledWith('vector-layer', { focusViewport: false });
+  const copy = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('[data-ui="editor.canvas.context-menu"] button')
+  ).find((button) => button.textContent?.includes(translate('editor.elements.copyLayers')));
+  expect(copy).toBeDefined();
+  expect(copy?.disabled).toBe(false);
+  await act(async () => copy?.click());
+  expect(controller.copyVectorSelection).toHaveBeenCalledOnce();
+  controller.getVectorClipboardAvailability.mockReturnValue({ canCopy: false, canPaste: true });
+  emitter.canvas.findTarget.mockReturnValue({ subTargets: [], currentSubTargets: [] });
+  await act(async () =>
+    emitter.fireContextMenu(new MouseEvent('contextmenu', { button: 2, clientX: 60, clientY: 60 }))
+  );
+  const paste = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('[data-ui="editor.canvas.context-menu"] button')
+  ).find((button) => button.textContent?.includes(translate('editor.elements.pasteLayers')));
+  expect(paste).toBeDefined();
+  expect(paste?.disabled).toBe(false);
+  await act(async () => paste?.click());
+  expect(controller.pasteVectorSelection).toHaveBeenCalledOnce();
 });

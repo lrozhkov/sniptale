@@ -1,5 +1,5 @@
 import type { AssetOwner, AssetRef, PhysicalDeleteAssetOperation } from '../assets';
-import type { PersistedEditorDocumentV3 } from './contracts';
+import type { PersistedEditorDocument } from './contracts';
 
 interface EditorDocumentAssetStores {
   owners: {
@@ -13,16 +13,16 @@ interface EditorDocumentAssetStores {
   };
 }
 
-export function editorDocumentAssetIds(document: PersistedEditorDocumentV3): string[] {
+export function editorDocumentAssetIds(document: PersistedEditorDocument): string[] {
   return [...new Set(document.assets.map((asset) => asset.assetId))];
 }
 
 export async function replaceEditorDocumentAssetOwnership(args: {
-  nextDocument: PersistedEditorDocumentV3;
+  nextDocument: PersistedEditorDocument;
   nextRefs: readonly AssetRef[];
   ownerId: string;
   ownerKind: string;
-  previousDocument: PersistedEditorDocumentV3 | null;
+  previousDocument: PersistedEditorDocument | null;
   physicalDelete: PhysicalDeleteAssetOperation;
   stores: EditorDocumentAssetStores;
 }): Promise<void> {
@@ -68,7 +68,7 @@ export async function replaceEditorDocumentAssetOwnership(args: {
 }
 
 export async function removeEditorDocumentOwnership(args: {
-  document: PersistedEditorDocumentV3;
+  document: PersistedEditorDocument;
   ownerId: string;
   ownerKind: string;
   physicalDelete: PhysicalDeleteAssetOperation;

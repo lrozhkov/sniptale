@@ -1,3 +1,23 @@
+import {
+  EDITOR_VECTOR_OWNER_KIND,
+  parseEditorVectorBacking,
+  isEditorVectorItem,
+  editorVectorItemHasMembership,
+  isEditorVectorMember,
+  isEditorVectorCollection,
+  isEditorVectorLibraryRow,
+} from '../vector-elements/contracts';
+import {
+  ASSET_REFS_STORE,
+  ASSET_OWNERS_STORE,
+  EDITOR_VECTOR_LIBRARY_STORE,
+} from '../infrastructure/indexed-db/core.stores';
+import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
+import type { IndexedDbWriteTransaction } from '../infrastructure/indexed-db/core';
+import { parseAssetOwner, parseAssetRef, parsePhysicalDeleteAssetOperation } from './guards';
+import type { collectDurableAssetSnapshot } from './retention-authority';
+import type { AssetReadyJournal } from './contracts';
+import { readyJournalClaimsAsset } from './retention-claims';
 import { parseSyncCaptureRecord } from '../sync-capture/guards';
 import { parseSyncConnectionIdentity } from '../remote-connection/model';
 import { checkSyncConnectionAdmission } from '../remote-connection/store';
@@ -78,6 +98,7 @@ export async function completePhysicalDeleteOperations(
       operations.flatMap((operation) => [
         ...operation.assetIds,
         ...(operation.privateSources ?? []).map((source) => source.expectedAssetId),
+        ...(operation.vectorDefinitions ?? []).map((source) => source.expectedAssetId),
       ])
     );
     let authority: Awaited<ReturnType<typeof readPhysicalDeleteAuthority>> | undefined;
@@ -104,8 +125,27 @@ export async function completePhysicalDeleteOperations(
         // Logical mutation invalidates a previous projection; a busy reader needs no graph scan.
         authority = undefined;
       }
+      if (admitted.vectorDefinitions?.length) {
+        admitted =
+          (await tryAssetResourceCleanup(async () => {
+            const ids = (admitted.vectorDefinitions ?? []).map((entry) => entry.expectedAssetId);
+            const snapshot = await runWithIndexedDbMutation((db) =>
+              collectTargetAssetSnapshot(db, ids)
+            );
+            const ready = await readAssetReadyClaims(ids, activePermit);
+            if (!ready.valid) return admitted;
+            return releaseRetiredEditorVectorDefinitions(
+              admitted,
+              snapshot,
+              ready.journals,
+              ready.assetIds
+            );
+          })) ?? admitted;
+        authority = undefined;
+      }
       if (!admitted.assetIds.length) {
-        if (!admitted.privateSources?.length) await finishPhysicalDelete(admitted, [], false);
+        if (!admitted.privateSources?.length && !admitted.vectorDefinitions?.length)
+          await finishPhysicalDelete(admitted, [], false);
         continue;
       }
       for (const id of admitted.assetIds)
@@ -119,7 +159,10 @@ export async function completePhysicalDeleteOperations(
       const retained = admitted.assetIds.filter(
         (id) => !['unowned', 'adopted'].includes(currentAuthority(id))
       );
-      const deferred = retained.length > 0 || Boolean(admitted.privateSources?.length);
+      const deferred =
+        retained.length > 0 ||
+        Boolean(admitted.privateSources?.length) ||
+        Boolean(admitted.vectorDefinitions?.length);
       reportRetainedAssets(admitted.assetIds, currentAuthority);
       await finishPhysicalDelete(admitted, unowned, deferred);
     }
@@ -555,4 +598,119 @@ export async function releasePublishedOperationPins(
       return released;
     })
   );
+}
+
+/** The physical owner holds lifecycle and exclusive reader gates before entering this transaction. */
+async function releaseRetiredEditorVectorDefinitions(
+  operation: PhysicalDeleteAssetOperation,
+  snapshot: Awaited<ReturnType<typeof collectDurableAssetSnapshot>>,
+  journals: readonly AssetReadyJournal[],
+  preparedAssetIds: ReadonlySet<string>
+): Promise<PhysicalDeleteAssetOperation> {
+  if (!operation.vectorDefinitions?.length || !snapshot.authorityValid) return operation;
+  return runWithIndexedDbMutation(async (db) => {
+    const tx = db.transaction(
+      [EDITOR_VECTOR_LIBRARY_STORE, ASSET_REFS_STORE, ASSET_OWNERS_STORE, ASSET_OPERATIONS_STORE],
+      'readwrite'
+    );
+    try {
+      const current = parsePhysicalDeleteAssetOperation(
+        await tx.objectStore(ASSET_OPERATIONS_STORE).get(operation.operationId)
+      );
+      if (!current) {
+        await tx.done;
+        return operation;
+      }
+      const pending: NonNullable<PhysicalDeleteAssetOperation['vectorDefinitions']> = [];
+      const assetIds = new Set(current.assetIds);
+      for (const candidate of current.vectorDefinitions ?? []) {
+        const backing = parseEditorVectorBacking(
+          await tx
+            .objectStore(EDITOR_VECTOR_LIBRARY_STORE)
+            .get(`definition:${candidate.definitionId}`)
+        );
+        if (
+          !backing ||
+          backing.assetId !== candidate.expectedAssetId ||
+          backing.incarnation !== candidate.incarnation
+        )
+          continue;
+        const owners = tx.objectStore(ASSET_OWNERS_STORE);
+        const owner = parseAssetOwner(
+          await owners.get([EDITOR_VECTOR_OWNER_KIND, candidate.definitionId, 'body'])
+        );
+        const ref = parseAssetRef(
+          await tx.objectStore(ASSET_REFS_STORE).get(candidate.expectedAssetId)
+        );
+        if (
+          backing.retained ||
+          (await vectorLibraryMetadataRetains(tx, candidate.definitionId)) ||
+          !ref ||
+          owner?.assetId !== candidate.expectedAssetId ||
+          preparedAssetIds.has(candidate.expectedAssetId) ||
+          journals.some((journal) => readyJournalClaimsAsset(journal, candidate.expectedAssetId)) ||
+          snapshot.protectedRollbackAssetIds.has(candidate.expectedAssetId) ||
+          (await hasOtherOwners(tx, candidate.definitionId, candidate.expectedAssetId, snapshot))
+        ) {
+          pending.push(candidate);
+          continue;
+        }
+        await tx.objectStore(EDITOR_VECTOR_LIBRARY_STORE).delete(backing.key);
+        await owners.delete([EDITOR_VECTOR_OWNER_KIND, candidate.definitionId, 'body']);
+        await tx.objectStore(ASSET_REFS_STORE).delete(candidate.expectedAssetId);
+        assetIds.add(candidate.expectedAssetId);
+      }
+      const next = {
+        ...current,
+        assetIds: [...assetIds],
+        vectorDefinitions: pending,
+        updatedAt: Date.now(),
+      };
+      await tx.objectStore(ASSET_OPERATIONS_STORE).put(next);
+      await tx.done;
+      return next;
+    } catch (error) {
+      return abortIndexedDbMutation(tx, error);
+    }
+  });
+}
+
+async function hasOtherOwners(
+  tx: IndexedDbWriteTransaction,
+  definitionId: string,
+  assetId: string,
+  snapshot: Awaited<ReturnType<typeof collectDurableAssetSnapshot>>
+): Promise<boolean> {
+  const own = (owner: { ownerKind: string; ownerId: string; role: string }) =>
+    owner.ownerKind === EDITOR_VECTOR_OWNER_KIND &&
+    owner.ownerId === definitionId &&
+    owner.role === 'body';
+  if (snapshot.expectedOwners.some((owner) => owner.assetId === assetId && !own(owner)))
+    return true;
+  const rows: unknown[] = await tx.objectStore(ASSET_OWNERS_STORE).index('assetId').getAll(assetId);
+  return rows.some((row) => {
+    const owner = parseAssetOwner(row);
+    return !owner || !own(owner);
+  });
+}
+
+async function vectorLibraryMetadataRetains(
+  tx: IndexedDbWriteTransaction,
+  definitionId: string
+): Promise<boolean> {
+  const store = tx.objectStore(EDITOR_VECTOR_LIBRARY_STORE);
+  const rows: unknown[] = await store.index('definitionId').getAll(definitionId);
+  for (const row of rows) {
+    if (!isEditorVectorLibraryRow(row)) return true;
+    if (isEditorVectorItem(row) && editorVectorItemHasMembership(row)) return true;
+    if (isEditorVectorMember(row)) {
+      const collection: unknown = await store.get(`collection:${row.collectionId}`);
+      if (
+        !isEditorVectorCollection(collection) ||
+        (!collection.deleted && collection.incarnation === row.collectionIncarnation)
+      )
+        return true;
+    }
+  }
+  return false;
 }

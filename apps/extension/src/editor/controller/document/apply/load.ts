@@ -1,3 +1,4 @@
+import { prepareEditorVectorCanvasLoad, bindEditorVectorCanvas } from '../vector-elements';
 import { notifyEditorSimplifyDocumentCommit } from '../../../drawing/simplify-runtime';
 import { normalizeEditorImageSettings } from '../../../../features/editor/document/constants';
 import { applyImageSettings, readImageSettingsFromObject } from '../../../objects/image-style';
@@ -25,7 +26,12 @@ export async function loadPreparedDocumentOnCanvas(
     normalizeScenarioAnnotationsInCanvasJson(options.prepared.normalizedDocument.canvasJson)
   );
   assertValidEditorDrawingCanvasJson(canvasJson);
-  await options.canvas.loadFromJSON(canvasJson);
+  const vectorLoad = await prepareEditorVectorCanvasLoad(
+    canvasJson,
+    options.prepared.normalizedDocument.vectorDefinitions
+  );
+  await options.canvas.loadFromJSON(vectorLoad.canvasJson);
+  await bindEditorVectorCanvas(options.canvas, vectorLoad.definitions);
   const canvasPrepareOptions: Parameters<typeof prepareCanvasForDocumentLoad>[0] = {
     canvas: options.canvas,
     canvasSize: options.prepared.canvasSize,

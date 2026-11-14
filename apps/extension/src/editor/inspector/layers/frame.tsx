@@ -28,9 +28,9 @@ export function LayerPanelFrame(props: LayerPanelFrameProps) {
       data-ui="editor.layers.panel-frame"
       style={frameStyle}
       className={cx(
-        'flex min-h-0 flex-col overflow-hidden border-t ' +
+        'flex min-h-0 flex-col overflow-hidden ' +
           'border-[color:var(--sniptale-color-border-soft)] transition-[height] duration-200',
-        props.fillContainer && props.expanded ? 'flex-1' : 'shrink-0',
+        props.fillContainer && props.expanded ? 'flex-1 border-t-0' : 'shrink-0 border-t',
         props.expanded ? null : 'h-14'
       )}
     >

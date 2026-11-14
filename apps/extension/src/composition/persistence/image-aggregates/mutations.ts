@@ -1,8 +1,14 @@
+import type {
+  CommitImageWorkspaceInput,
+  CommitImageWorkspaceResult,
+  CommitImagePresentationInput,
+  SaveImageAggregateCopyFromDocumentInput,
+  ImageWorkspacePublicationResult,
+} from './contracts';
 import { freezeImageInTransaction, isImageCaptureSource } from '../sync-capture/image-snapshot';
 import { commitImagePresentationCacheInTransaction } from '../sync-capture/presentation';
 import { ASSET_RESIDENCY_STORE } from '../infrastructure/indexed-db/core.stores';
 import { captureCheckpointReceiptInTransaction } from '../sync-capture/checkpoints';
-import type { SyncCheckpointReceipt } from '../sync-capture/contracts';
 import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import {
   captureImageInTransaction,
@@ -12,7 +18,6 @@ import {
 import { SYNC_CAPTURE_STORE } from '../infrastructure/indexed-db/core.stores';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
-import type { EditorDocument } from '../../../features/editor/document/types';
 import { createImageThumbnailBlob } from '../../../platform/media-utils/image-thumbnail';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
@@ -50,7 +55,7 @@ import {
   completePhysicalDeleteOperation,
   createAssetPublicationJournal,
   cancelAssetPublication,
-  discardPreparedAsset,
+  collectPreparedAssetCleanupFailures,
   publishReadyJournalWithRetry,
   parseAssetRef,
   parseAssetOwner,
@@ -65,7 +70,7 @@ import {
   parsePersistedEditorDocument,
   preparePersistedEditorDocument,
   replaceEditorDocumentAssetOwnership,
-  type PersistedEditorDocumentV3,
+  type PersistedEditorDocument,
 } from '../document-assets';
 import { isNumber, isRecord, isString } from '@sniptale/runtime-contracts/validation/primitives';
 
@@ -83,40 +88,13 @@ const IMAGE_SNAPSHOT_STORES = [
 
 interface PreparedImageWorkspaceInput extends Omit<
   CommitImageWorkspaceInput,
-  'document' | 'reusableAssetsByRuntimeUrl'
+  'document' | 'reusableAssetsByRuntimeUrl' | 'reusableAssetsByVectorDefinitionId'
 > {
-  document: PersistedEditorDocumentV3;
+  document: PersistedEditorDocument;
   initialStorageClass?: 'temporary' | 'library';
   refs: AssetRef[];
   publicationId?: string;
   originalWitness?: { createdAt: number; ref: AssetRef; projectAsset: StoredProjectAssetEntry };
-}
-
-export interface CommitImageWorkspaceInput {
-  aggregateId: string;
-  captureTime?: number;
-  document: EditorDocument;
-  expectedRevision: number;
-  imageContentState?: ImageContentState;
-  sourceTitle?: string | null;
-  sourceUrl?: string | null;
-  sourceFavicon?: string | null;
-  sourceGuard?: {
-    aggregateId: string;
-    presentationRevision: number;
-    workspaceRevision: number;
-  };
-  requireMissingRoot?: boolean;
-  /** Editing an observed Library root must not recreate it after permanent deletion. */
-  requireExistingRoot?: boolean;
-  reusableAssetsByRuntimeUrl?: ReadonlyMap<string, AssetRef>;
-}
-
-export interface CommitImageWorkspaceResult {
-  readonly checkpointReceipt?: SyncCheckpointReceipt;
-  documentAssetsByRuntimeUrl: ReadonlyMap<string, AssetRef>;
-  revision: number;
-  updatedAt: number;
 }
 
 type ImageMutationDatabase = Parameters<Parameters<typeof runWithIndexedDbMutation>[0]>[0];
@@ -222,7 +200,7 @@ async function commitImageWorkspaceMutation(
   input: PreparedImageWorkspaceInput,
   prepared: PreparedNewImageAggregate | null,
   lifecyclePermit?: DurableAssetLifecyclePermit
-): Promise<Omit<CommitImageWorkspaceResult, 'documentAssetsByRuntimeUrl'>> {
+): Promise<ImageWorkspacePublicationResult> {
   const tx = db.transaction(
     [...IMAGE_SNAPSHOT_STORES, ASSET_OWNERS_STORE, ASSET_OPERATIONS_STORE],
     'readwrite'
@@ -413,8 +391,15 @@ export async function commitImageWorkspace(
     reusableAssetsByRuntimeUrl.set(input.document.sourceImageData, originalWitness.ref);
   const preparedDocument = await preparePersistedEditorDocument(input.document, {
     reusableAssetsByRuntimeUrl,
+    ...(input.reusableAssetsByVectorDefinitionId
+      ? { reusableAssetsByVectorDefinitionId: input.reusableAssetsByVectorDefinitionId }
+      : {}),
   });
-  const { reusableAssetsByRuntimeUrl: _reusableAssetsByRuntimeUrl, ...serializableInput } = input;
+  const {
+    reusableAssetsByRuntimeUrl: _reusableAssetsByRuntimeUrl,
+    reusableAssetsByVectorDefinitionId: _reusableAssetsByVectorDefinitionId,
+    ...serializableInput
+  } = input;
   const preparedInput: PreparedImageWorkspaceInput = {
     ...serializableInput,
     document: preparedDocument.document,
@@ -429,7 +414,7 @@ export async function commitImageWorkspace(
       payload: preparedInput,
     });
     journalCreated = true;
-    let result: Omit<CommitImageWorkspaceResult, 'documentAssetsByRuntimeUrl'> | undefined;
+    let result: ImageWorkspacePublicationResult | undefined;
     await publishReadyJournalWithRetry(journal, async (ready, permit) => {
       const published = await publishImageWorkspaceJournal(ready, false, permit);
       if (!published) throw new Error('Image workspace publication was superseded.');
@@ -440,14 +425,12 @@ export async function commitImageWorkspace(
     return {
       ...result,
       documentAssetsByRuntimeUrl: preparedDocument.runtimeAssetsByUrl,
+      documentAssetsByVectorDefinitionId: preparedDocument.vectorAssetsByDefinitionId,
     };
   } catch (error) {
     if (!journalCreated) {
-      const cleanup = await Promise.allSettled(
-        preparedDocument.objects.map(({ ref }) => discardPreparedAsset(ref.assetId))
-      );
-      const failures = cleanup.flatMap((result) =>
-        result.status === 'rejected' ? [result.reason as unknown] : []
+      const failures = await collectPreparedAssetCleanupFailures(
+        preparedDocument.objects.map(({ ref }) => ref.assetId)
       );
       if (failures.length > 0) {
         throw new AggregateError([error, ...failures], 'Image workspace save cleanup failed.', {
@@ -586,7 +569,7 @@ async function publishImageWorkspaceJournal(
   journal: AssetReadyJournal,
   allowSuperseded = false,
   lifecyclePermit?: DurableAssetLifecyclePermit
-): Promise<Omit<CommitImageWorkspaceResult, 'documentAssetsByRuntimeUrl'> | null> {
+): Promise<ImageWorkspacePublicationResult | null> {
   if (journal.domain !== IMAGE_WORKSPACE_PUBLICATION_DOMAIN || journal.operationId) {
     throw new Error('Invalid image workspace publication journal.');
   }
@@ -690,13 +673,6 @@ export const imageWorkspacePublicationAdapter: AssetPublicationAdapter = {
 
 export function recoverImageWorkspacePublications(): Promise<number> {
   return recoverStandaloneAssetPublications([imageWorkspacePublicationAdapter]);
-}
-
-export interface CommitImagePresentationInput {
-  aggregateId: string;
-  expectedWorkspaceRevision: number;
-  previewBlob: Blob;
-  thumbnailBlob: Blob;
 }
 
 export async function commitImagePresentation(input: CommitImagePresentationInput): Promise<void> {
@@ -853,18 +829,6 @@ export async function copyImageAggregate(input: {
   } finally {
     sourceWorkspace?.releaseDocumentAssets?.();
   }
-}
-
-export interface SaveImageAggregateCopyFromDocumentInput {
-  document: EditorDocument;
-  imageContentState?: ImageContentState;
-  previewBlob: Blob;
-  sourceFavicon?: string | null;
-  sourceTitle?: string | null;
-  sourceUrl?: string | null;
-  targetAggregateId: string;
-  thumbnailBlob: Blob;
-  sourceGuard?: CommitImageWorkspaceInput['sourceGuard'];
 }
 
 export async function saveImageAggregateCopyFromDocument(

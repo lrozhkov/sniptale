@@ -85,6 +85,7 @@ function setup(
       frames.clear();
       pending.forEach(([, callback]) => callback(0));
     });
+  let pointerHeld = false;
   const send = (
     type: string,
     x: number,
@@ -94,9 +95,12 @@ function setup(
     coalesced?: MouseEvent[]
   ) =>
     act(() => {
+      if (type === 'pointerdown') pointerHeld = true;
+      if (type === 'pointerup' || type === 'pointercancel') pointerHeld = false;
       const event = new MouseEvent(type, {
         bubbles: true,
         button: 0,
+        buttons: pointerHeld ? 1 : 0,
         clientX: x,
         clientY: y,
         shiftKey,

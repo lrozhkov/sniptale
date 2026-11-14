@@ -1,12 +1,9 @@
-import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
-import { useEditorController } from '../../application/controller-context';
-import { createLayerDropHandler } from './drop';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLayerPanelHeight } from './height';
 import { useLayerPanelState } from './state';
 import type { EditorInspectorLayersPanelProps } from './types';
 
 export function useLayerPanelView(args: EditorInspectorLayersPanelProps) {
-  const controller = useEditorController();
   const state = useLayerPanelState({
     expanded: args.expanded,
     draggedLayerId: args.draggedLayerId,
@@ -25,26 +22,34 @@ export function useLayerPanelView(args: EditorInspectorLayersPanelProps) {
       ? {}
       : { maxExpandedHeightRatio: args.maxExpandedHeightRatio }),
   });
+  const [listOverflows, setListOverflows] = useState(false);
+  const rowIdentities = args.layers.map((layer) => layer.id).join(':');
+  useLayoutEffect(() => {
+    const list = height.listRef.current;
+    if (!list || !state.expanded) {
+      setListOverflows(false);
+      return;
+    }
+    const measure = () => setListOverflows(list.scrollHeight > list.clientHeight);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    for (const row of Array.from(list.children)) observer.observe(row);
+    return () => observer.disconnect();
+  }, [height.listRef, state.expanded, rowIdentities]);
   const { initialScrollOffset, onScrollOffsetChange } = args;
   useLayoutEffect(() => {
     const list = height.listRef.current;
-    if (!list || !state.expanded) return;
-    if (initialScrollOffset === undefined && !onScrollOffsetChange) return;
-    if (initialScrollOffset !== undefined) list.scrollTop = initialScrollOffset;
-    const remember = () => onScrollOffsetChange?.(list.scrollTop);
+    if (list && state.expanded && initialScrollOffset !== undefined)
+      list.scrollTop = initialScrollOffset;
+  }, [height.listRef, state.expanded, initialScrollOffset]);
+  useEffect(() => {
+    const list = height.listRef.current;
+    if (!list || !state.expanded || !onScrollOffsetChange) return;
+    const remember = () => onScrollOffsetChange(list.scrollTop);
     list.addEventListener('scroll', remember, { passive: true });
     return () => list.removeEventListener('scroll', remember);
-  }, [height.listRef, state.expanded, initialScrollOffset, onScrollOffsetChange]);
-  const handleLayerDrop = useMemo(
-    () =>
-      createLayerDropHandler({
-        controller,
-        draggedLayerId: state.draggedLayerId,
-        setDraggedLayerId: state.setDraggedLayerId,
-        setDragOverLayerId: state.setDragOverLayerId,
-      }),
-    [controller, state.draggedLayerId, state.setDraggedLayerId, state.setDragOverLayerId]
-  );
+  }, [height.listRef, state.expanded, onScrollOffsetChange]);
   const openLayerEffects = useRef(args.onOpenLayerEffects);
   // Stable row events call only the handler from the latest committed panel render.
   useLayoutEffect(() => {
@@ -57,7 +62,6 @@ export function useLayerPanelView(args: EditorInspectorLayersPanelProps) {
 
   return {
     actions: {
-      handleLayerDrop,
       handleOpenLayerEffects,
       toggleAutoNavigateSelectedLayer: () =>
         state.setAutoNavigateSelectedLayer((enabled) => !enabled),
@@ -65,7 +69,7 @@ export function useLayerPanelView(args: EditorInspectorLayersPanelProps) {
     },
     layout: {
       expandedHeight: height.expandedHeight,
-      reserveScrollbarGutter: true,
+      reserveScrollbarGutter: listOverflows,
       scrollable: args.fillContainer || height.scrollable,
     },
     refs: {

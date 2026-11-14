@@ -354,3 +354,26 @@ it('reads the actual shared session and participation when Settings reloads', as
   expect(protection.readStatus).toHaveBeenCalledOnce();
   expect(storageMocks.loadAISecretProtectionStatus).not.toHaveBeenCalled();
 });
+
+it('projects only a non-secret RouterAI protocol hint with the existing destination binding', async () => {
+  storageMocks.loadAIProviders.mockResolvedValue([
+    {
+      baseUrl: 'https://routerai.ru/api/v1',
+      connectionType: 'openai-compatible',
+      createdAt: 1,
+      hasStoredApiKey: true,
+      id: 'provider-1',
+      name: 'Router',
+    },
+  ]);
+  const response = await resolveAISettingsQueryResponse({
+    operation: 'read-model-selection-bootstrap',
+    type: MessageType.AI_SETTINGS_QUERY,
+  });
+  expect(response.modelSelection?.providers[0]).toMatchObject({
+    imageApi: 'routerai',
+    destinationBinding: expect.stringMatching(/^sha256:/),
+  });
+  expect(response.modelSelection?.providers[0]).not.toHaveProperty('baseUrl');
+  expect(response.modelSelection?.providers[0]).not.toHaveProperty('apiKey');
+});

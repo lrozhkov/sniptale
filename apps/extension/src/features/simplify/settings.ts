@@ -11,6 +11,8 @@ type SimplifyTextAlign = 'left' | 'center' | 'right';
 
 export interface SimplifySettings {
   readonly automatic: boolean;
+  /** Removes detected content without drawing placeholders. */
+  readonly erase?: boolean;
   readonly content: SimplifyContent;
   readonly manualKind: SimplifyManualKind;
   readonly sensitivity: SimplifySensitivity;
@@ -44,6 +46,7 @@ export function createDefaultSimplifySettings(): SimplifySettings {
 export function parseSimplifySettings(value: unknown): SimplifySettings | null {
   if (!isPlainRecord(value)) return null;
   const automatic = value['automatic'];
+  const erase = value['erase'];
   const content = value['content'];
   const manualKind = value['manualKind'];
   const sensitivity = value['sensitivity'];
@@ -54,6 +57,8 @@ export function parseSimplifySettings(value: unknown): SimplifySettings | null {
   const color = value['color'];
   if (
     typeof automatic !== 'boolean' ||
+    (erase !== undefined && typeof erase !== 'boolean') ||
+    (erase === true && (automatic !== true || content !== 'all')) ||
     (content !== 'text' && content !== 'all') ||
     (manualKind !== 'text' && manualKind !== 'image') ||
     (sensitivity !== 10 && sensitivity !== 55 && sensitivity !== 90) ||
@@ -66,6 +71,7 @@ export function parseSimplifySettings(value: unknown): SimplifySettings | null {
   if (color === null)
     return {
       automatic,
+      ...(erase === undefined ? {} : { erase }),
       content,
       manualKind,
       sensitivity,
@@ -80,6 +86,7 @@ export function parseSimplifySettings(value: unknown): SimplifySettings | null {
   if (!parsed || parsed.alpha !== 1) return null;
   return {
     automatic,
+    ...(erase === undefined ? {} : { erase }),
     content,
     manualKind,
     sensitivity,

@@ -190,3 +190,63 @@ describe('useEditorStore document defaults', () => {
   registerDocumentDefaultsTests();
   registerViewportPreviewTests();
 });
+
+it('keeps canonical runtime projections and does not notify for equivalent completion updates', () => {
+  const state = useEditorStore.getState();
+  const notifications: string[] = [];
+  const stop = useEditorStore.subscribe(() => notifications.push('update'));
+  try {
+    for (let index = 0; index < 3; index++) {
+      state.syncRuntime({
+        layers: structuredClone(state.layers),
+        selection: structuredClone(state.selection),
+        history: { ...state.history },
+        viewport: { ...state.viewport },
+        browserFrame: { ...state.browserFrame },
+        frame: state.frame,
+        cropReady: state.cropReady,
+        cropSelection: state.cropSelection ? { ...state.cropSelection } : null,
+      });
+    }
+    expect(useEditorStore.getState()).toBe(state);
+    expect(notifications).toEqual([]);
+  } finally {
+    stop();
+  }
+});
+
+it('publishes changed completion history, selection, viewport, and decoration values', () => {
+  const before = useEditorStore.getState();
+  const selectedObjectIds = ['pencil-object'];
+  const history = { canUndo: true, canRedo: false, index: 1, size: 2 };
+  const selection = {
+    ...before.selection,
+    hasSelection: true,
+    selectedObjectCount: 1,
+    selectedObjectId: selectedObjectIds[0]!,
+    selectedObjectIds,
+    selectedObjectWidth: 100,
+    selectedObjectHeight: 40,
+  };
+  const viewport = { ...before.viewport, zoomPercent: before.viewport.zoomPercent + 1 };
+  const browserFrame = { ...before.browserFrame, title: 'Changed title' };
+  const cropSelection = { left: 5, top: 7, width: 90, height: 30 };
+  before.syncRuntime({
+    selection,
+    history,
+    viewport,
+    browserFrame,
+    frame: { ...before.frame, paddingLeft: before.frame.paddingLeft + 1 },
+    cropReady: true,
+    cropSelection,
+  });
+  const next = useEditorStore.getState();
+  expect(next.selection).toEqual(selection);
+  expect(next.selection).not.toBe(before.selection);
+  expect(next.history).toEqual(history);
+  expect(next.viewport).toEqual(viewport);
+  expect(next.browserFrame).toEqual(browserFrame);
+  expect(next.frame.paddingLeft).toBe(before.frame.paddingLeft + 1);
+  expect(next.cropSelection).toEqual(cropSelection);
+  expect(next.cropReady).toBe(true);
+});

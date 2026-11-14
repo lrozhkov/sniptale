@@ -552,3 +552,48 @@ it('roundtrips Scenario window PNG and placement through canonical portable tour
   expect(result.image?.assetId).toBe('restored');
   expect(tour).toEqual(before);
 });
+
+it('retains stored 4 crop and every original, color and mask reference through metadata transport', async () => {
+  const document = {
+    ...createPersistedEditorDocumentFixture(createEditorDocumentFixture(), 'source'),
+    version: 4 as const,
+  };
+  document.canvasJson = JSON.stringify({
+    objects: [
+      {
+        sniptaleRasterOriginalData: 'sniptale-asset:source',
+        sniptaleRasterColorData: 'sniptale-asset:source',
+        sniptaleRasterVisibilityData: 'sniptale-asset:source',
+        sniptaleRasterKeyData: 'sniptale-asset:source',
+        sniptaleRasterState: {
+          version: 1,
+          width: 8,
+          height: 6,
+          crop: { x: 2, y: 1, width: 4, height: 3 },
+        },
+        cropX: 2,
+        cropY: 1,
+        width: 4,
+        height: 3,
+      },
+    ],
+  });
+  const portable = encodePortableEditorDocument({
+    document,
+    objectsByAssetId: new Map([['source', 'original']]),
+  });
+  const { videoReview: _review, recording: _recording, ...rest } = recordingMetadata();
+  const metadata = {
+    ...rest,
+    entry: { ...rest.entry, id: 'image', kind: 'image', source: { kind: 'stored-asset' } },
+    workspace: { aggregateId: 'image', document: portable, createdAt: 1, updatedAt: 1 },
+  };
+  const { envelope } = await roundtrip(inventory(metadata, 'media', 'image'));
+  const parsed = parsePortableMediaMetadata(envelope.metadata);
+  const restored = decodePortableEditorDocument({
+    document: parsed.workspace!.document,
+    assetsByObjectId: new Map([['original', 'source']]),
+  });
+  expect(restored).toEqual(document);
+  expect(envelope.objects.map(({ objectId }) => objectId)).toEqual(['original']);
+});

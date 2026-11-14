@@ -51,6 +51,7 @@
     "./observability/message-tracer/utils": "./src/observability/message-tracer/utils.ts",
     "./ports/runtime-messaging/content-runtime-shim": "./src/ports/runtime-messaging/content-runtime-shim.ts",
     "./security/sanitizers/html": "./src/security/sanitizers/html.ts",
+    "./security/sanitizers/svg": "./src/security/sanitizers/svg.ts",
     "./security/sanitizers/text": "./src/security/sanitizers/text.ts",
     "./security/ai-dom-privacy/model": "./src/security/ai-dom-privacy/model.ts",
     "./security/ai-payload-input": "./src/security/ai-payload-input.ts",

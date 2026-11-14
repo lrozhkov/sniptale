@@ -1,4 +1,14 @@
-import { useEffect, useLayoutEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react';
+import { INSPECTOR_CONTENT_INSET_CLASS_NAME } from '../../inspector/chrome';
+import { EditorElementsPanel } from '../../inspector/elements';
+import { ImageAIInspector } from '../../ai/inspector';
+import { createImageEditorSession, type ImageEditorSession } from '../../ai/session';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { FloatingChromePanel, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
 import { EditorInspectorLayersPanel } from '../../inspector/layers';
 import { EditorInspectorContent } from '../../inspector/content';
@@ -90,6 +100,7 @@ function EditorFloatingLayersCollapsedToolbar({
 
 function EditorFloatingLayersPanelBody(props: {
   activeMode: EditorLayersPanelMode;
+  aiSession: ImageEditorSession;
   documentController: EditorFloatingDocumentController;
   hasImage: boolean;
   scrollPositions: Map<EditorLayersPanelMode, number>;
@@ -107,6 +118,8 @@ function EditorFloatingLayersPanelBody(props: {
       />
     );
   }
+
+  if (props.activeMode === 'elements') return <EditorElementsPanel />;
 
   if (props.activeMode === 'layers') {
     const layersPanelProps = createEditorInspectorLayersPanelProps(props.documentController);
@@ -134,22 +147,28 @@ function EditorFloatingLayersPanelBody(props: {
         props.scrollPositions.set(props.activeMode, event.currentTarget.scrollTop)
       }
       className={[
-        'min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-2',
-        '[scrollbar-gutter:stable_both-edges] [scrollbar-width:thin]',
+        'min-h-0 flex-1 overflow-x-hidden overflow-y-auto',
+        INSPECTOR_CONTENT_INSET_CLASS_NAME,
+        '[scrollbar-width:thin]',
       ].join(' ')}
     >
-      <EditorInspectorContent
-        {...contentProps}
-        inspector={props.activeMode}
-        showDocumentActions={false}
-        confirmDialog={null}
-      />
+      {props.activeMode === 'ai' ? (
+        <ImageAIInspector session={props.aiSession} />
+      ) : (
+        <EditorInspectorContent
+          {...contentProps}
+          inspector={props.activeMode}
+          showDocumentActions={false}
+          confirmDialog={null}
+        />
+      )}
     </div>
   );
 }
 
 function EditorFloatingExpandedLayersPanel(props: {
   activeMode: EditorLayersPanelMode;
+  aiSession: ImageEditorSession;
   documentController: EditorFloatingDocumentController;
   hasImage: boolean;
   height: number;
@@ -194,6 +213,7 @@ function EditorFloatingExpandedLayersPanel(props: {
       />
       <EditorFloatingLayersPanelBody
         scrollPositions={props.scrollPositions}
+        aiSession={props.aiSession}
         activeMode={props.activeMode}
         documentController={props.documentController}
         hasImage={props.hasImage}
@@ -207,29 +227,35 @@ export function EditorFloatingLayersPanel({
   collapsed,
   documentController,
   hasImage,
-  heightRatio,
+  preferredHeight,
   preferenceError,
   onCollapse,
   onExpand,
-  onHeightRatioChange,
+  onHeightChange,
 }: {
   collapsed: boolean;
   documentController: EditorFloatingDocumentController;
   hasImage: boolean;
-  heightRatio: number | null;
+  preferredHeight: number | null;
   preferenceError: string | null;
   onCollapse: () => void;
   onExpand: () => void;
-  onHeightRatioChange: (heightRatio: number | null) => void;
+  onHeightChange: (preferredHeight: number | null) => void;
 }) {
   const scrollPositions = useRef(new Map<EditorLayersPanelMode, number>());
   const { height, startResize } = useResizableLayersPanelHeight({
-    defaultHeight:
-      documentController.inspector === 'layer-effects' ? 520 : LAYERS_PANEL_DEFAULT_HEIGHT,
-    heightRatio,
-    onHeightRatioChange,
+    defaultHeight: LAYERS_PANEL_DEFAULT_HEIGHT,
+    preferredHeight,
+    onHeightChange,
   });
   const editorController = useEditorController();
+  const [aiSession] = useState(() =>
+    createImageEditorSession(() => editorController.getPublicApiAdapter())
+  );
+  useEffect(() => {
+    aiSession.resetDocument();
+  });
+  useEffect(() => () => aiSession.clear(), [aiSession]);
   const activeMode = resolveEditorLayersPanelMode(documentController.inspector);
   const toolbarActions = createEditorToolbarActions({
     controller: editorController,
@@ -240,6 +266,14 @@ export function EditorFloatingLayersPanel({
   });
   const handleSelectMode = (mode: EditorLayersPanelMode) => {
     if (mode === activeMode && documentController.inspector !== 'layer-effects') return;
+    if (
+      mode === 'ai' ||
+      mode === 'elements' ||
+      ((activeMode === 'ai' || activeMode === 'elements') && mode === 'layers')
+    ) {
+      documentController.setInspector(mode === 'layers' ? 'tool' : mode);
+      return;
+    }
     if (mode === 'layers') {
       toolbarActions.activateTool('select');
       return;
@@ -261,6 +295,7 @@ export function EditorFloatingLayersPanel({
   return (
     <EditorFloatingExpandedLayersPanel
       scrollPositions={scrollPositions.current}
+      aiSession={aiSession}
       activeMode={activeMode}
       documentController={documentController}
       hasImage={hasImage}

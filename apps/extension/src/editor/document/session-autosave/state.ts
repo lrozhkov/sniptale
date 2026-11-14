@@ -57,6 +57,7 @@ export type EditorSessionAutosaveState = {
   > | null;
   presentationTimer: number;
   interactionActive: boolean;
+  pendingCompletionActive: boolean;
   interactionRevision: number;
   interactionWaiters: Array<() => void>;
   presentationPending: boolean;
@@ -64,6 +65,7 @@ export type EditorSessionAutosaveState = {
   presentationAbortController: AbortController | null;
   lastWriteError: unknown | null;
   presentationRetryPromise: Promise<void> | null;
+  documentAssetsByVectorDefinitionId: ReadonlyMap<string, AssetRef>;
   documentAssetsByRuntimeUrl: ReadonlyMap<string, AssetRef>;
   releaseHydratedDocument: (() => void) | null;
 };
@@ -83,6 +85,7 @@ export function createAutosaveState(): EditorSessionAutosaveState {
     coordinator: null,
     presentationTimer: 0,
     interactionActive: false,
+    pendingCompletionActive: false,
     interactionRevision: 0,
     interactionWaiters: [],
     presentationPending: false,
@@ -91,6 +94,7 @@ export function createAutosaveState(): EditorSessionAutosaveState {
     lastWriteError: null,
     presentationRetryPromise: null,
     documentAssetsByRuntimeUrl: new Map(),
+    documentAssetsByVectorDefinitionId: new Map(),
     releaseHydratedDocument: null,
   };
 }
@@ -112,6 +116,7 @@ export function interruptImagePresentation(state: EditorSessionAutosaveState): v
 
 export function releaseAutosaveInteraction(state: EditorSessionAutosaveState): void {
   state.interactionActive = false;
+  state.pendingCompletionActive = false;
   for (const resolve of state.interactionWaiters.splice(0)) resolve();
 }
 

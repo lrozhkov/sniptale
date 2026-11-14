@@ -26,3 +26,14 @@ export function acceptOptionalExtensionPermissionPrompt(): void {
     throw new Error(`Failed to accept Chromium permission prompt: ${result.stderr.trim()}`);
   }
 }
+
+/** Declines Chromium's browser-owned optional extension permission confirmation under Xvfb. */
+export function denyOptionalExtensionPermissionPrompt(): void {
+  if (process.platform !== 'linux' || !process.env.DISPLAY) {
+    throw new Error('Security permission E2E requires Linux with an active X display');
+  }
+  ensureHelper();
+  const result = spawnSync(helperPath, ['Escape'], { encoding: 'utf8' });
+  if (result.status !== 0)
+    throw new Error(`Failed to deny Chromium permission prompt: ${result.stderr.trim()}`);
+}

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createDrawingCleanup } from '../../../../features/drawing/public';
 import { createRecordingDrawingOwner } from './drawing-session';
 
 function commitBox(owner: ReturnType<typeof createRecordingDrawingOwner>, id: string, x = 0) {
@@ -126,4 +127,80 @@ describe('recording drawing owner', () => {
     ]);
     owner.dispose();
   });
+});
+
+it.each([false, true])(
+  'retains accepted Blur without acquiring exposed pixels in recording mode; clock=%s',
+  async (running) => {
+    const acquire = vi.fn(async () => {
+      throw new Error('native capture must not start');
+    });
+    const owner = createRecordingDrawingOwner({
+      simplifyDependencies: {
+        acquire,
+        decode: vi.fn(async () => undefined),
+        send: vi.fn(async () => undefined),
+      },
+    });
+    owner.setClockRunning(running);
+    const blur = {
+      id: 'private',
+      kind: 'blur' as const,
+      amount: 6,
+      bounds: { x: 10, y: 20, width: 80, height: 60 },
+    };
+    owner.controller.session.commitObject(blur);
+    owner.controller.session.setActiveTool('select');
+    owner.controller.session.select(blur.id);
+    await owner.controller.simplify!.submit(createDrawingCleanup(blur), new Event('pointerup'));
+    expect(acquire).not.toHaveBeenCalled();
+    expect(owner.controller.session.getSnapshot().document.objects).toEqual([blur]);
+    expect(owner.controller.simplify!.getFeedback()).toBe('no-source');
+    expect(owner.controller.simplify!.getPending()).toEqual([]);
+    owner.dispose();
+  }
+);
+
+it('does not restart recording expiry when a pending font updates text geometry', async () => {
+  vi.useFakeTimers();
+  let ready = false;
+  let finish!: (faces: unknown[]) => void;
+  const pending = new Promise<unknown[]>((resolve) => {
+    finish = resolve;
+  });
+  vi.stubGlobal('document', {
+    fonts: { check: () => ready, load: () => pending },
+    createElement: () => ({
+      getContext: () => ({
+        font: '',
+        measureText: (value: string) => ({ width: value.length * 10 }),
+      }),
+    }),
+  });
+  const owner = createRecordingDrawingOwner({ initialAutoHideDelay: 3 });
+  try {
+    owner.setClockRunning(true);
+    owner.controller.session.commitObject({
+      id: 'late-text',
+      kind: 'text',
+      text: 'Text',
+      fontSize: 24,
+      color: '#111111',
+      backgroundColor: null,
+      autoWidth: true,
+      wrapWidth: 300,
+      bounds: { x: 10, y: 20, width: 200, height: 90 },
+    });
+    vi.advanceTimersByTime(1000);
+    ready = true;
+    finish([{}]);
+    await pending;
+    await Promise.resolve();
+    expect(owner.controller.session.getSnapshot().document.objects).toHaveLength(1);
+    vi.advanceTimersByTime(2000);
+    expect(owner.controller.session.getSnapshot().document.objects).toEqual([]);
+  } finally {
+    owner.dispose();
+    vi.unstubAllGlobals();
+  }
 });

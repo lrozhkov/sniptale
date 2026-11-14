@@ -305,7 +305,9 @@ function ToolOptions(props: {
       return (
         <DrawingBlurStrengthOptions
           value={props.settings.blur.amount}
-          onChange={(amount) => props.update('blur', { amount })}
+          clean={props.settings.blur.clean === true}
+          onClean={() => props.update('blur', { clean: true })}
+          onChange={(amount) => props.update('blur', { amount, clean: false })}
         />
       );
     case 'selection':

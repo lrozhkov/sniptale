@@ -11,6 +11,9 @@ import { createCompletedDrawWorkflowState } from './completion-complete';
 import { parseEditorDrawingMetadata } from '../../document/import-boundary';
 import { stageEditorDrawingObject } from '../../drawing/object/metadata';
 import { completeEditorDrawWorkflow } from './completion';
+import type { DrawSession } from '../core/types';
+import { createAfterRenderHandler, renderEditorFreehandDraft } from '../events/runtime.render';
+import { createBeforeRenderHandler } from '../events/runtime.canvas';
 
 function canvas() {
   const surface = new Canvas(document.createElement('canvas'));
@@ -59,7 +62,7 @@ describe('drawing completion history', () => {
     expect(syncRuntimeState).toHaveBeenCalledOnce();
     expect(surface.setActiveObject).toHaveBeenCalledWith(object);
     expect(object.borderColor).toBe('#2563eb');
-    expect(object.borderDashArray).toEqual([4, 3]);
+    expect(object.borderDashArray).toBeNull();
     expect(Object.keys(object.controls)).toEqual([
       'tl',
       'mt',
@@ -172,6 +175,104 @@ describe('drawing completion history', () => {
     expect(parseEditorDrawingMetadata(object.sniptaleDrawingJson)).toEqual(final);
     surface.dispose();
   });
+
+  it.each(['pencil', 'marker'] as const)(
+    'retains the accepted %s preview until the scheduled scene render without growing its tail',
+    (kind) => {
+      const frames = new Map<number, FrameRequestCallback>();
+      let frameId = 0;
+      vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+        frames.set(++frameId, callback);
+        return frameId;
+      });
+      vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => frames.delete(id));
+      const surface = new Canvas(document.createElement('canvas'), {
+        width: 240,
+        height: 100,
+        renderOnAddRemove: false,
+      });
+      try {
+        surface.cancelRequestedRender();
+        frames.clear();
+        const initial = {
+          kind,
+          id: 'pending-tail',
+          samples: [
+            { x: 20, y: 40, t: 0 },
+            { x: 80, y: 40, t: 10 },
+          ],
+          color: '#ff0000',
+          width: 12,
+          opacity: 1,
+        };
+        const object = createEditorDrawingFabricObject(initial, 1);
+        object.visible = false;
+        object.objectCaching = false;
+        surface.add(object);
+        let session: DrawSession | null = {
+          tool: kind,
+          object,
+          objectId: initial.id,
+          pointerId: 1,
+          start: new Point(20, 40),
+          lastPoint: new Point(180, 40),
+        };
+        const bindings = { getCanvas: () => surface, getDrawSession: () => session };
+        surface.on('before:render', createBeforeRenderHandler(bindings));
+        surface.on('after:render', createAfterRenderHandler(bindings));
+        const alpha = (context: CanvasRenderingContext2D, x: number) => {
+          const bytes = context.getImageData(x, 32, 20, 16).data;
+          let sum = 0;
+          for (let index = 3; index < bytes.length; index += 4) sum += bytes[index]!;
+          return sum;
+        };
+        const flush = () => {
+          const callbacks = [...frames.values()];
+          frames.clear();
+          callbacks.forEach((callback) => callback(0));
+        };
+        renderEditorFreehandDraft(bindings);
+        flush();
+        expect(alpha(surface.contextTop, 45)).toBeGreaterThan(0);
+        expect(alpha(surface.contextTop, 165)).toBe(0);
+        const final = { ...initial, samples: [...initial.samples, { x: 180, y: 40, t: 20 }] };
+        stageEditorDrawingObject(object, final);
+        renderEditorFreehandDraft(bindings);
+        // The accepted tail must be visible before pointerup starts history work.
+        expect(alpha(surface.contextTop, 165)).toBeGreaterThan(0);
+        const commitHistory = vi.fn(() => {
+          expect(parseEditorDrawingMetadata(object.sniptaleDrawingJson)).toEqual(final);
+          expect(alpha(surface.getContext(), 165)).toBe(0);
+          expect(alpha(surface.contextTop, 165)).toBeGreaterThan(0);
+        });
+        const completion = completeEditorDrawWorkflow({
+          canvas: surface,
+          drawSession: session,
+          canvasDocumentSize: { width: 240, height: 100 },
+          minDrawSize: 8,
+          commitHistory,
+          syncRuntimeState: vi.fn(),
+        });
+        session = completion?.drawSession ?? null;
+        expect(commitHistory).toHaveBeenCalledOnce();
+        expect(completion?.drawSession).toBeNull();
+        // Fabric performs this cleanup after its mouse:up listeners return.
+        surface.renderTop();
+        expect(alpha(surface.contextTop, 165)).toBeGreaterThan(0);
+        expect(alpha(surface.getContext(), 165)).toBe(0);
+        flush();
+        expect(alpha(surface.getContext(), 165)).toBeGreaterThan(0);
+        expect(alpha(surface.contextTop, 45)).toBe(0);
+        const pixels = surface.getContext().getImageData(0, 0, 240, 100).data;
+        flush();
+        expect(surface.getContext().getImageData(0, 0, 240, 100).data).toEqual(pixels);
+        expect(frames.size).toBe(0);
+      } finally {
+        surface.destroy();
+        vi.restoreAllMocks();
+      }
+    }
+  );
 
   it.each([
     { kind: 'visible', visible: true },

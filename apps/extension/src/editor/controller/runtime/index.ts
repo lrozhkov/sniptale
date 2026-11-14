@@ -1,3 +1,5 @@
+import { hasPendingEditorFreehandCompletion } from '../draw-workflow/released';
+import { readEditorHistoryState } from '../history';
 import type { Canvas, FabricObject } from 'fabric';
 import type { EditorViewportState } from '../../../features/editor/document/types';
 import type { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
@@ -14,17 +16,6 @@ function getSelectedObjectLabel(object: FabricObject | null): string | null {
   }
 
   return object.sniptaleRichShape.source?.name ?? object.sniptaleRichShape.shapeKind;
-}
-
-function getEditorHistoryState(history: SnapshotHistory<string> | null) {
-  return history
-    ? {
-        canUndo: history.getState().canUndo,
-        canRedo: history.getState().canRedo,
-        index: history.getState().index,
-        size: history.getState().size,
-      }
-    : { canUndo: false, canRedo: false, index: 0, size: 1 };
 }
 
 function getSelectedObject(activeObjects: FabricObject[]) {
@@ -55,7 +46,10 @@ export function syncEditorRuntimeState(
     syncSelectionToolSettingsFromObject(selectedObject, singleType);
   }
 
-  const historyState = getEditorHistoryState(history);
+  const historyState = readEditorHistoryState(
+    history,
+    hasPendingEditorFreehandCompletion(canvas) ? 1 : 0
+  );
 
   store.syncRuntime({
     layers,
@@ -88,5 +82,18 @@ export function syncEditorRuntimeState(
 export function scheduleEditorZoomToFit(callback: () => void): void {
   requestAnimationFrame(() => {
     requestAnimationFrame(callback);
+  });
+}
+
+/** Publishes only Undo availability while the released stroke awaits its scene capture. */
+export function syncEditorHistoryRuntimeState(
+  canvas: Canvas | null,
+  history: SnapshotHistory<string> | null
+): void {
+  const store = useEditorStore.getState();
+  store.syncRuntime({
+    cropReady: store.cropReady,
+    cropSelection: store.cropSelection,
+    history: readEditorHistoryState(history, hasPendingEditorFreehandCompletion(canvas) ? 1 : 0),
   });
 }

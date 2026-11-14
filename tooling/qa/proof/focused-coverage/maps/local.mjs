@@ -101,10 +101,12 @@ dispatch retry and native replica validation.`,
 purged-root refusal and recovery validation.`,
     testFiles: [
       'apps/extension/src/composition/persistence/document-assets/codec.test.ts',
+      'apps/extension/src/composition/persistence/document-assets/codec.vector-elements.test.ts',
       'apps/extension/src/composition/persistence/document-assets/ownership.test.ts',
       'apps/extension/src/composition/persistence/image-aggregates/mutations.test.ts',
       'apps/extension/src/composition/persistence/image-aggregates/mutations.reused-assets.test.ts',
       'apps/extension/src/composition/persistence/image-aggregates/mutations.root-lifecycle.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.vector-assets.test.ts',
     ],
   },
   {

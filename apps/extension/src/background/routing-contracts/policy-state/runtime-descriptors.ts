@@ -5,6 +5,24 @@ import { CAMERA_RECORDER_DOCUMENT_TTL_MS } from '../../storage/video/camera-reco
 
 export const runtimePolicyStateDescriptors = [
   {
+    authorityFamily: 'vector-catalog-authority',
+    failClosedOnRestart: true,
+    id: 'vector-catalog-requests',
+    oneShot: false,
+    ownerModule: 'apps/extension/src/background/vector-catalog/route.ts',
+    proofModules: [
+      'apps/extension/src/background/vector-catalog/route.test.ts',
+      'apps/extension/src/background/runtime/routing/action-kernel/owned-route-handlers.vector-catalog.test.ts',
+    ],
+    requiresTtl: true,
+    ttlMs: 10_000,
+    restartBehavior:
+      'Worker restart discards requests. A new caller cannot cancel another document request.',
+    restartClass: 'disposable-fail-closed',
+    stateClass: 'runtime-state',
+    storageClass: 'memory-only',
+  },
+  {
     authorityFamily: 'simplify-authority',
     failClosedOnRestart: true,
     id: 'simplify-compute-sessions',

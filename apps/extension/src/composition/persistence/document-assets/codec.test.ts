@@ -1,24 +1,6 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { getDocumentAssetCodecMocks } from './codec.test-support';
+import { expect, it, vi } from 'vitest';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
-
-const mocks = vi.hoisted(() => ({
-  nextId: 0,
-  readAssetFile: vi.fn(),
-  writeBlobToAsset: vi.fn(),
-  discardPreparedAsset: vi.fn(async () => undefined),
-}));
-
-vi.mock('../assets', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../assets')>()),
-  discardPreparedAsset: mocks.discardPreparedAsset,
-  readAssetFile: mocks.readAssetFile,
-  writeBlobToAsset: mocks.writeBlobToAsset,
-}));
-
-vi.mock('../../../platform/media-utils/data-url', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../platform/media-utils/data-url')>()),
-  blobToDataUrl: vi.fn(async (blob: Blob) => `data:${blob.type};base64,${btoa(await blob.text())}`),
-}));
 
 import {
   hydratePersistedEditorDocument,
@@ -27,23 +9,7 @@ import {
 } from './codec';
 import { parsePersistedEditorDocument } from './parser';
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  mocks.nextId = 0;
-  mocks.writeBlobToAsset.mockImplementation(async (blob: Blob) => {
-    const assetId = `asset-${++mocks.nextId}`;
-    return {
-      ref: {
-        assetId,
-        createdAt: 1,
-        location: { kind: 'opfs', objectKey: `objects/${assetId}` },
-        mimeType: blob.type,
-        sha256: null,
-        size: blob.size,
-      },
-    };
-  });
-});
+const mocks = getDocumentAssetCodecMocks();
 
 it('extracts all supported editor raster fields into immutable asset slots', async () => {
   const document = createEditorDocumentFixture();
@@ -352,7 +318,10 @@ it('materializes file-backed slots for the retiring legacy transfer boundary', a
 
 it('reports cleanup failures together with the original preparation error', async () => {
   const document = createEditorDocumentFixture();
-  document.canvasJson = '{';
+  document.frame.backgroundImageData = 'data:image/png;base64,Ymc=';
+  mocks.writeBlobToAsset
+    .mockImplementationOnce(mocks.writeBlobToAsset.getMockImplementation()!)
+    .mockRejectedValueOnce(new Error('write failed'));
   const cleanupFailure = new Error('cleanup failed');
   mocks.discardPreparedAsset.mockRejectedValueOnce(cleanupFailure);
 
@@ -574,3 +543,130 @@ it.each([800, 0, -20])(
     expect(transferred.compositionBase).toEqual(base);
   }
 );
+
+function retainedDocument() {
+  return {
+    ...createEditorDocumentFixture(),
+    version: 3 as const,
+    sourceImageData: 'data:image/png;base64,c291cmNl',
+    canvasJson: JSON.stringify({
+      objects: [
+        {
+          type: 'image',
+          src: 'data:image/png;base64,cHJldmlldw==',
+          sniptaleRasterOriginalData: 'data:image/png;base64,b3JpZ2luYWw=',
+          sniptaleRasterColorData: 'data:image/png;base64,Y29sb3I=',
+          sniptaleRasterVisibilityData: 'data:image/png;base64,dmlzaWJpbGl0eQ==',
+          sniptaleRasterKeyData: 'data:image/png;base64,a2V5',
+          sniptaleRasterState: {
+            version: 1,
+            width: 8,
+            height: 6,
+            crop: { x: 2, y: 1, width: 4, height: 3 },
+          },
+          cropX: 2,
+          cropY: 1,
+          width: 4,
+          height: 3,
+        },
+      ],
+    }),
+  };
+}
+
+it('roundtrips all retained bytes and source crop through stored 4, hydration and transfer', async () => {
+  const document = retainedDocument();
+  const blobs = new Map<string, Blob>();
+  const write = mocks.writeBlobToAsset.getMockImplementation()!;
+  mocks.writeBlobToAsset.mockImplementation(async (blob: Blob) => {
+    const object = await write(blob);
+    blobs.set(object.ref.assetId, blob);
+    return object;
+  });
+  mocks.readAssetFile.mockImplementation(async (ref) => blobs.get(ref.assetId));
+  const prepared = await preparePersistedEditorDocument(document);
+  expect(prepared.document.version).toBe(4);
+  expect(prepared.objects).toHaveLength(6);
+  expect(prepared.document.assets.map(({ role }) => role)).toEqual([
+    'source-image',
+    'canvas:$.objects[0].src',
+    'canvas:$.objects[0].sniptaleRasterOriginalData',
+    'canvas:$.objects[0].sniptaleRasterColorData',
+    'canvas:$.objects[0].sniptaleRasterVisibilityData',
+    'canvas:$.objects[0].sniptaleRasterKeyData',
+  ]);
+  expect(JSON.stringify(prepared.document)).not.toMatch(/data:|blob:/);
+  expect(parsePersistedEditorDocument(prepared.document)).toEqual(prepared.document);
+  const hydrated = await hydratePersistedEditorDocument({
+    document: prepared.document,
+    refs: prepared.refs,
+  });
+  expect(hydrated.document.version).toBe(3);
+  expect(JSON.parse(hydrated.document.canvasJson)).toEqual(JSON.parse(document.canvasJson));
+  const transferred = await materializePersistedEditorDocumentForLegacyTransfer({
+    document: prepared.document,
+    refs: prepared.refs,
+  });
+  expect(transferred.version).toBe(3);
+  expect(JSON.parse(transferred.canvasJson)).toEqual(JSON.parse(document.canvasJson));
+  mocks.writeBlobToAsset.mockClear();
+  const reused = await preparePersistedEditorDocument(hydrated.document, {
+    reusableAssetsByRuntimeUrl: hydrated.assetsByRuntimeUrl,
+  });
+  expect(reused.objects).toEqual([]);
+  expect(reused.refs).toEqual(prepared.refs);
+  expect(mocks.writeBlobToAsset).not.toHaveBeenCalled();
+  hydrated.release();
+});
+
+it.each(['partial', 'legacy', 'remote', 'mask'])(
+  'refuses %s retained metadata before staging',
+  async (kind) => {
+    const document = retainedDocument();
+    const canvas = JSON.parse(document.canvasJson);
+    if (kind === 'partial') delete canvas.objects[0].sniptaleRasterState;
+    if (kind === 'remote')
+      canvas.objects[0].sniptaleRasterOriginalData = 'https://example.test/original.png';
+    if (kind === 'mask') canvas.objects[0].sniptaleRasterKeyData = 'data:image/jpeg;base64,a2V5';
+    const candidate = {
+      ...document,
+      version: kind === 'legacy' ? (2 as const) : (3 as const),
+      canvasJson: JSON.stringify(canvas),
+    };
+    await expect(preparePersistedEditorDocument(candidate)).rejects.toThrow('raster metadata');
+    expect(mocks.writeBlobToAsset).not.toHaveBeenCalled();
+  }
+);
+
+it('cleans only newly staged retained slots after a late failure and retries the complete closure', async () => {
+  const original = await preparePersistedEditorDocument({
+    ...createEditorDocumentFixture(),
+    sourceImageData: 'data:image/png;base64,c291cmNl',
+  });
+  const reusable = original.runtimeAssetsByUrl;
+  const document = retainedDocument();
+  const write = mocks.writeBlobToAsset.getMockImplementation()!;
+  let writes = 0;
+  mocks.writeBlobToAsset.mockImplementation(async (blob: Blob) => {
+    if (++writes === 5) throw new Error('key write refused');
+    return write(blob);
+  });
+  await expect(
+    preparePersistedEditorDocument(document, { reusableAssetsByRuntimeUrl: reusable })
+  ).rejects.toThrow('key write refused');
+  expect(mocks.discardPreparedAsset.mock.calls.flat()).toEqual([
+    'asset-2',
+    'asset-3',
+    'asset-4',
+    'asset-5',
+  ]);
+  expect(mocks.discardPreparedAsset).not.toHaveBeenCalledWith(
+    original.document.sourceImage.assetId
+  );
+  mocks.writeBlobToAsset.mockImplementation(write);
+  const retried = await preparePersistedEditorDocument(document, {
+    reusableAssetsByRuntimeUrl: reusable,
+  });
+  expect(retried.refs).toHaveLength(6);
+  expect(parsePersistedEditorDocument(retried.document)).toEqual(retried.document);
+});

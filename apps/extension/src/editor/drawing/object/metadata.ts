@@ -23,6 +23,19 @@ import {
 } from '../../document/import-boundary';
 
 const transientDrawingObjects = new WeakMap<FabricObject, DrawingObject>();
+const parsedDrawingObjects = new WeakMap<
+  FabricObject,
+  { serialized: string | undefined; drawing: DrawingObject | null }
+>();
+
+function readCommittedDrawingObject(target: FabricObject): DrawingObject | null {
+  const serialized = target.sniptaleDrawingJson;
+  const cached = parsedDrawingObjects.get(target);
+  if (cached && cached.serialized === serialized) return cached.drawing;
+  const drawing = parseEditorDrawingMetadata(serialized);
+  parsedDrawingObjects.set(target, { serialized, drawing });
+  return drawing;
+}
 
 export function writeEditorDrawingObject(target: FabricObject, object: DrawingObject): void {
   transientDrawingObjects.delete(target);
@@ -44,8 +57,7 @@ export function stageEditorDrawingObject(target: FabricObject, object: DrawingOb
 }
 
 export function readEditorDrawingObject(target: FabricObject): DrawingObject | null {
-  const drawing =
-    transientDrawingObjects.get(target) ?? parseEditorDrawingMetadata(target.sniptaleDrawingJson);
+  const drawing = transientDrawingObjects.get(target) ?? readCommittedDrawingObject(target);
   if (drawing?.kind !== 'simplify') return drawing;
   const result =
     target instanceof FabricImage
@@ -196,11 +208,41 @@ function normalizeSynchronizedArrowGeometry<
   util.applyTransformToObject(target, placement);
 }
 
+function inDrawingSceneCoordinates<T>(target: FabricObject, synchronize: () => T): T {
+  const group = target.group;
+  if (!group) return synchronize();
+  const scene = target.calcTransformMatrix();
+  const parent = group.calcTransformMatrix();
+  delete target.group;
+  util.applyTransformToObject(target, scene);
+  try {
+    return synchronize();
+  } finally {
+    const local = util.multiplyTransformMatrices(
+      util.invertTransform(parent),
+      target.calcOwnMatrix()
+    );
+    target.group = group;
+    util.applyTransformToObject(target, local);
+    target.setCoords();
+  }
+}
+
 /** Synchronizes object geometry. A scene transform also scales text and maps retained source bounds. */
 export function synchronizeEditorDrawingObjectFromFabric(
   target: FabricObject,
   sceneTransform?: { x: number; y: number; scaleX: number; scaleY: number }
 ): DrawingObject | null {
+  if (target.group) {
+    const text = readEditorDrawingObject(target)?.kind === 'text';
+    return inDrawingSceneCoordinates(target, () =>
+      synchronizeEditorDrawingObjectFromFabric(
+        target,
+        // Entering scene coordinates also carries the parent font and wrapping scale.
+        sceneTransform ?? (text ? { x: 0, y: 0, scaleX: 1, scaleY: 1 } : undefined)
+      )
+    );
+  }
   const drawing = readEditorDrawingObject(target);
   if (!drawing) return null;
   const previous = getDrawingObjectBounds(drawing);
@@ -247,12 +289,21 @@ export function synchronizeEditorDrawingObjectFromFabric(
       ...rotation,
       ...(skewX ? { skewX } : {}),
     };
-  } else if (drawing.kind === 'text' && target instanceof Textbox && sceneTransform) {
+  } else if (drawing.kind === 'text' && target instanceof Textbox) {
     next = {
       ...drawing,
       bounds,
       ...rotation,
-      fontSize: target.fontSize * target.getObjectScaling().y,
+      autoWidth:
+        (target.sniptaleDrawingTextAutoWidth ?? drawing.autoWidth ?? false) &&
+        (sceneTransform !== undefined || Math.abs(target.getObjectScaling().x - 1) < 0.0001),
+      wrapWidth:
+        (target.sniptaleDrawingTextAutoWidth ?? drawing.autoWidth ?? false) &&
+        (sceneTransform !== undefined || Math.abs(target.getObjectScaling().x - 1) < 0.0001)
+          ? (target.sniptaleDrawingTextMaxWidth ?? drawing.wrapWidth ?? bounds.width) *
+            (sceneTransform ? target.getObjectScaling().x : 1)
+          : bounds.width,
+      ...(sceneTransform ? { fontSize: target.fontSize * target.getObjectScaling().y } : {}),
     };
   } else {
     next = { ...drawing, bounds, ...rotation };
@@ -286,19 +337,29 @@ export function synchronizeEditorDrawingObjectFromFabric(
 }
 
 export function syncEditorDrawingTextObject(textbox: Textbox): boolean {
+  if (textbox.group)
+    return inDrawingSceneCoordinates(textbox, () => {
+      if (!syncEditorDrawingTextObject(textbox)) return false;
+      synchronizeEditorDrawingObjectFromFabric(textbox, { x: 0, y: 0, scaleX: 1, scaleY: 1 });
+      return true;
+    });
   const drawing = readEditorDrawingObject(textbox);
   if (drawing?.kind !== 'text') return false;
   const height = Math.max(1, textbox.height);
-  const width = Math.max(40, textbox.width);
+  const width = Math.max(1, textbox.width);
   const center = textbox.getCenterPoint();
   const bounds =
     textbox.angle || drawing.rotation
       ? { height, width, x: center.x - width / 2, y: center.y - height / 2 }
-      : { ...drawing.bounds, height, width };
+      : { height, width, x: textbox.left, y: textbox.top };
   writeEditorDrawingObject(textbox, {
     ...drawing,
     bounds,
     rotation: Number(textbox.angle),
+    autoWidth: textbox.sniptaleDrawingTextAutoWidth ?? drawing.autoWidth ?? false,
+    wrapWidth: textbox.sniptaleDrawingTextAutoWidth
+      ? (textbox.sniptaleDrawingTextMaxWidth ?? drawing.wrapWidth ?? width)
+      : width,
     text: textbox.text ?? '',
   });
   return true;

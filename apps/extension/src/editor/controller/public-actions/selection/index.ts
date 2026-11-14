@@ -6,6 +6,7 @@ export {
 } from './objects';
 export {
   reorderEditorLayer,
+  reorderEditorLayerBlock,
   renameEditorLayerById,
   resizeEditorLayerById,
   selectEditorLayerById,

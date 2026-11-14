@@ -1,0 +1,770 @@
+// @vitest-environment jsdom
+import { act, type ComponentProps, type ReactNode } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { Canvas, Rect } from 'fabric';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { ImageAIInspector } from './inspector';
+import { ImageAttachments } from './attachments';
+import { ImagePreviewWorkspace } from './preview';
+import { ImageParametersEditor } from './parameters';
+import { createImageEditorSession, type ImageEditorSession } from './session';
+import { ImageJobError } from './client';
+import type {
+  EditorImageSnapshot,
+  ImageApplyController,
+  ImageBounds,
+} from '../controller/ai-image/types';
+import type { requestAIScenarioModelSelection } from '../../workflows/ai-settings/query';
+import type { ImageParameters } from '../../contracts/ai/image';
+import { resolveImageModelProfile } from '../../contracts/ai/image-profile';
+
+type Catalog = Awaited<ReturnType<typeof requestAIScenarioModelSelection>>;
+const io = vi.hoisted(() => ({
+  read: vi.fn<typeof import('../../workflows/ai-settings/query').requestAIScenarioModelSelection>(),
+  remember: vi.fn(async () => {}),
+  maintain: vi.fn(async () => {}),
+  readFile: vi.fn<(_: Blob) => Promise<string>>(),
+  current: vi.fn(() => true),
+  update: vi.fn(() => true),
+}));
+vi.mock('../../workflows/ai-settings/query', () => ({
+  requestAIScenarioModelSelection: io.read,
+  rememberAIScenarioModelSelection: io.remember,
+  refreshManagedAICatalogs: io.maintain,
+}));
+vi.mock('../../platform/i18n', async (original) => ({
+  ...(await original<typeof import('../../platform/i18n')>()),
+  translate: (key: string) => key,
+  useAppLocale: () => 'en',
+}));
+vi.mock('../../platform/media-utils/data-url', () => ({ blobToDataUrl: io.readFile }));
+vi.mock('../controller/ai-image/snapshot', () => ({
+  captureImageEditorSnapshot: vi.fn(),
+  prepareImageEditorSnapshot: vi.fn(),
+  createEditorImageMask: vi.fn(),
+  isImageSnapshotCurrent: io.current,
+}));
+vi.mock('../controller/ai-image/apply', () => ({
+  applyImageEditorResult: vi.fn(),
+  prepareImageEditorResult: vi.fn(async (_snapshot, raster) => raster),
+  canUpdateImageResult: io.update,
+  isImageApplyResultPresent: io.update,
+}));
+vi.mock('../workflows/open-generated-image-document', () => ({
+  openGeneratedImageDocument: vi.fn(),
+}));
+vi.mock('./client', async (original) => ({
+  ...(await original<typeof import('./client')>()),
+  runImageEditorJob: vi.fn(),
+}));
+vi.mock('fabric', async (original) => ({
+  ...(await original<typeof import('fabric')>()),
+  Canvas: class {
+    upperCanvasEl = Object.assign(document.createElement('canvas'), {
+      getBoundingClientRect: () => new DOMRect(0, 0, 100, 100),
+    });
+    viewportTransform = [1, 0, 0, 1, 0, 0];
+    getWidth() {
+      return 100;
+    }
+    getHeight() {
+      return 100;
+    }
+    getScenePoint(event: PointerEvent) {
+      return { x: event.clientX, y: event.clientY };
+    }
+  },
+}));
+vi.mock('../application/controller-context', () => ({ useEditorController: () => controller }));
+vi.mock('../state/useEditorStore', () => ({
+  useEditorStore: Object.assign((select: (_: typeof store) => unknown) => select(store), {
+    getState: () => store,
+  }),
+}));
+vi.mock('../../features/ai/model-selector', () => ({
+  AIModelSelector: (props: {
+    models: Array<{ id: string; displayName: string }>;
+    selectedModelId: string | null;
+    disabled: boolean;
+    onSelect(id: string): void;
+  }) => (
+    <select
+      aria-label="model"
+      value={props.selectedModelId ?? ''}
+      disabled={props.disabled}
+      onChange={(event) => props.onSelect(event.currentTarget.value)}
+    >
+      <option value="" />
+      {props.models.map((model) => (
+        <option key={model.id} value={model.id}>
+          {model.displayName}
+        </option>
+      ))}
+    </select>
+  ),
+}));
+vi.mock('../chrome/ui', async (original) => {
+  const actual = await original<typeof import('../chrome/ui')>();
+  const { forwardRef } = await import('react');
+  type SelectProps = {
+    options: ReadonlyArray<{ value: string; label: string }>;
+    value: string;
+    disabled?: boolean;
+    label?: string;
+    'aria-label'?: string;
+    onChange(value: string): void;
+  };
+  const Select = (props: SelectProps) => (
+    <select
+      aria-label={props.label ?? props['aria-label']}
+      value={props.value}
+      disabled={props.disabled}
+      onChange={(event) => props.onChange(event.currentTarget.value)}
+    >
+      {props.options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
+  return {
+    ...actual,
+    CompactSelect: Select,
+    SelectField: Select,
+    CompactInput: (props: ComponentProps<'input'>) => <input {...props} />,
+    EditorIconButton: forwardRef<HTMLButtonElement, ComponentProps<'button'>>((props, ref) => (
+      <button {...props} ref={ref} aria-label={props.title} />
+    )),
+  };
+});
+vi.mock('@sniptale/ui/product-feedback/confirm-dialog', () => ({
+  ProductConfirmDialog: (props: {
+    title: string;
+    confirmText: string;
+    cancelText: string;
+    onConfirm(): void;
+    onCancel(): void;
+  }) => (
+    <div role="alertdialog" aria-label={props.title}>
+      <button onClick={props.onCancel}>{props.cancelText}</button>
+      <button onClick={props.onConfirm}>{props.confirmText}</button>
+    </div>
+  ),
+}));
+
+const image = {
+  dataUrl:
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAAABFUlEQVR4nO' +
+    '3BMQEAAADCoPVP7WsIoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
+    'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
+    'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
+    'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
+    'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeAMBPAABPO1TCQAAAABJRU5ErkJggg==',
+  width: 256,
+  height: 256,
+};
+let catalog: Catalog;
+let host: HTMLDivElement, root: Root, session: ImageEditorSession;
+let controller: ImageApplyController & {
+  setActiveTool: (_: string) => void;
+  clearSelection(): void;
+  getPublicApiAdapter(): ImageApplyController;
+};
+let store: {
+  cropSelection: ImageBounds | null;
+  selection: { selectedObjectCount: number; selectedObjectIds: string[] };
+  history: { index: number };
+  syncActiveTool: (_: string) => void;
+  setActiveTool: (_: string) => void;
+};
+type Deps = Required<NonNullable<Parameters<typeof createImageEditorSession>[1]>>;
+let deps: { [K in keyof Deps]: ReturnType<typeof vi.fn<Deps[K]>> };
+const originalScroll = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
+function createCatalog(): Catalog {
+  return {
+    scenario: 'image-generation',
+    globalSystemPrompt: '',
+    remembered: null,
+    resolution: { status: 'initial', modelId: 'first', previousSelection: null, reason: null },
+    providers: [
+      {
+        id: 'provider',
+        name: 'Provider',
+        connectionType: 'openai-compatible',
+        imageApi: 'routerai',
+        destinationKind: 'external',
+        destinationBinding: `sha256:${'a'.repeat(64)}`,
+        hasStoredApiKey: true,
+        createdAt: 1,
+      },
+    ],
+    models: ['first', 'second'].map((id) => ({
+      id,
+      providerId: 'provider',
+      displayName: id,
+      modelCode: id === 'first' ? 'black-forest-labs/flux-3-image-klein' : 'other-image',
+      capabilities: {
+        operations: { 'image-generation': 'supported', 'image-editing': 'supported' },
+        input: { text: 'supported', image: 'supported' },
+        output: { image: 'supported' },
+        features: {},
+      },
+    })),
+  };
+}
+function setupSession() {
+  const canvas = new Canvas();
+  controller = {
+    canvas,
+    source: {
+      id: 'source',
+      dataUrl: image.dataUrl,
+      name: 'Source',
+      intrinsicWidth: 256,
+      intrinsicHeight: 256,
+      left: 0,
+      top: 0,
+      displayWidth: 256,
+      displayHeight: 256,
+      visible: true,
+      locked: false,
+    },
+    originalDocument: null,
+    canvasDocumentSize: { width: 100, height: 100 },
+    prepareObject: vi.fn(),
+    setSource: vi.fn(),
+    commitHistory: vi.fn(),
+    syncRuntimeState: vi.fn(),
+    withHistoryMuted: (run) => run(),
+    ensureBrowserFrameOnTop: vi.fn(),
+    setActiveTool: vi.fn(),
+    clearSelection: vi.fn(),
+    getPublicApiAdapter: () => controller,
+  };
+  deps = {
+    mask: vi.fn((raster, _region, mode) => ({ image: raster, mode })),
+    capture: vi.fn(async (_controller, options): Promise<EditorImageSnapshot> => ({
+      id: crypto.randomUUID(),
+      canvas,
+      originalDocument: null,
+      sourceId: 'source',
+      sourceDataUrl: image.dataUrl,
+      sourceTransform: null,
+      intention: options.intention,
+      order: [],
+      sources: [],
+      names: ['Layer one', 'Layer two'],
+      replacementAllowed: options.intention === 'source',
+      raster: options.intention === 'new-image' ? null : image,
+      captureRaster: options.intention === 'new-image' ? null : image,
+      captureBounds: { left: 0, top: 0, width: image.width, height: image.height },
+      contextBounds: { left: 0, top: 0, width: image.width, height: image.height },
+      inputBounds: { left: 0, top: 0, width: image.width, height: image.height },
+      targetBounds: { left: 0, top: 0, width: image.width, height: image.height },
+      contextMode: options.context ?? 'surroundings',
+      regionSource: options.regionSource ?? 'canvas',
+    })),
+    prepare: vi.fn(async (source) => source),
+    apply: vi.fn(async () => ({ object: new Rect(), signature: 'accepted' })),
+    openDocument: vi.fn(async () => {}),
+    run: vi.fn(async ({ request, receive }) => {
+      for (let variant = 0; variant < request.context.parameters.variants; variant++)
+        receive({ type: 'image', requestId: request.requestId, variant, image, costRub: 0.85 });
+    }),
+  };
+  session = createImageEditorSession(() => controller, deps);
+}
+async function render(node: ReactNode = <ImageAIInspector session={session} />) {
+  await act(async () =>
+    root.render(
+      <CommandPressScope value={false}>
+        {(node as React.ReactElement).type === ImageAIInspector ? (
+          node
+        ) : (
+          <ImagePreviewWorkspace
+            session={session}
+            state={session.getSnapshot()}
+            onFinish={() => session.newTask()}
+          >
+            {node}
+          </ImagePreviewWorkspace>
+        )}
+      </CommandPressScope>
+    )
+  );
+}
+function button(name: string): HTMLButtonElement {
+  const result = [...document.querySelectorAll('button')].find(
+    (node) =>
+      node.getAttribute('data-ui') === name ||
+      node.getAttribute('aria-label') === name ||
+      node.title === name ||
+      node.textContent === name
+  );
+  if (!result) throw new Error(`Missing button: ${name}`);
+  return result;
+}
+async function click(name: string) {
+  await act(async () => button(name).click());
+}
+async function select(label: string, value: string) {
+  if (label === 'editor.ai.source') {
+    await click(`editor.ai.mode.${value}`);
+    return;
+  }
+  if (label === 'editor.ai.variants') {
+    for (
+      let index = 0;
+      index < 3 && session.getSnapshot().draft.parameters.variants !== Number(value);
+      index++
+    )
+      await click('editor.ai.variant-count');
+    expect(session.getSnapshot().draft.parameters.variants).toBe(Number(value));
+    return;
+  }
+  const input = document.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)!;
+  await act(async () => {
+    input.value = value;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+async function enter(value: string, selector = '[data-ui="editor.ai.prompt"]') {
+  const input = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector)!;
+  const prototype =
+    input instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+beforeEach(() => {
+  vi.clearAllMocks();
+  io.current.mockReturnValue(true);
+  io.update.mockReturnValue(true);
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: vi.fn(),
+  });
+  store = {
+    cropSelection: { left: 0, top: 0, width: image.width, height: image.height },
+    selection: { selectedObjectCount: 2, selectedObjectIds: ['one', 'two'] },
+    history: { index: 0 },
+    syncActiveTool: vi.fn(),
+    setActiveTool: vi.fn(),
+  };
+  catalog = createCatalog();
+  io.read.mockImplementation(async (scenario) => ({ ...catalog, scenario }));
+  io.readFile.mockResolvedValue(image.dataUrl);
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  setupSession();
+});
+afterEach(async () => {
+  await act(async () => root.unmount());
+  host.remove();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  if (originalScroll)
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', originalScroll);
+  else Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+});
+
+it('previews variants, refines the chosen result and applies without duplicating it', async () => {
+  await render();
+  await select('editor.ai.variants', '3');
+  await enter('Draw a square');
+  expect(deps.run).not.toHaveBeenCalled();
+  await click('editor.ai.generate');
+  expect(session.getSnapshot().steps[0]?.variants.filter(Boolean)).toHaveLength(3);
+  expect(controller.commitHistory).not.toHaveBeenCalled();
+  await click('editor.ai.variants 2');
+  await enter('Refine this choice');
+  await select('editor.ai.variants', '1');
+  await click('editor.ai.generate');
+  expect(deps.run.mock.calls[1]?.[0].request.context.images).toEqual([
+    { ...image, role: 'source' },
+  ]);
+  await click('editor.ai.original');
+  expect(document.querySelector('[data-ui="editor.ai.preview-image"]')?.getAttribute('href')).toBe(
+    deps.run.mock.calls[1]?.[0].request.context.images[0]?.dataUrl
+  );
+  await click('editor.ai.result');
+  await click('editor.ai.apply');
+  expect(deps.apply).toHaveBeenCalledOnce();
+  expect(session.getSelectedVariant()).toBeNull();
+  expect(session.getSnapshot().steps).toHaveLength(2);
+  await click('editor.ai.history.open');
+  await click('editor.ai.variants 1');
+  await click('editor.ai.useOriginal');
+  expect(session.getSnapshot().base).toBeNull();
+  await click('editor.ai.openDocument');
+  expect(deps.openDocument).toHaveBeenCalledWith(image, 'editor.ai.newLayerName');
+  expect(session.getSelectedVariant()).toBeNull();
+});
+
+it('accepts an AI area without Crop or a second source confirmation', async () => {
+  await render();
+  await select('editor.ai.source', 'region');
+  expect(controller.setActiveTool).toHaveBeenCalledWith('select');
+  expect(controller.setActiveTool).not.toHaveBeenCalledWith('crop');
+  const picker = document.querySelector<HTMLElement>('[data-ui="editor.ai.region-picker"]')!;
+  picker.setPointerCapture = vi.fn();
+  await act(async () =>
+    picker.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 10, clientY: 20 }))
+  );
+  await act(async () =>
+    picker.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 40, clientY: 60 }))
+  );
+  expect(document.querySelector('[data-ui="editor.ai.region-picker"]')).toBeNull();
+  expect(deps.capture).toHaveBeenCalledWith(
+    controller,
+    expect.objectContaining({
+      intention: 'region',
+      region: { left: 10, top: 20, width: 30, height: 40 },
+    })
+  );
+  expect(host.textContent).not.toContain('editor.ai.refreshSource');
+  expect(controller.commitHistory).not.toHaveBeenCalled();
+  await enter('Change the chosen area');
+  await click('editor.ai.generate');
+  expect(deps.run.mock.calls[0]?.[0].request.context.intention).toBe('region');
+  await select('editor.ai.source', 'layers');
+  expect(session.getSnapshot().source?.intention).toBe('layers');
+  expect(session.getSnapshot().source?.names).toEqual(['Layer one', 'Layer two']);
+});
+
+it('prepares the main image automatically and cancels AI area selection without a document command', async () => {
+  await render();
+  await select('editor.ai.source', 'source');
+  expect(session.getSnapshot().source?.intention).toBe('source');
+  await enter('Edit the image');
+  expect(button('editor.ai.generate').disabled).toBe(false);
+  await select('editor.ai.source', 'region');
+  await act(async () =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(document.querySelector('[data-ui="editor.ai.region-picker"]')).toBeNull();
+  expect(controller.commitHistory).not.toHaveBeenCalled();
+});
+
+it('keeps generation unavailable when configuration fails and lets the user retry', async () => {
+  io.read.mockRejectedValueOnce(new Error('unavailable'));
+  await render();
+  expect(button('editor.ai.generate').disabled).toBe(true);
+  await click('editor.ai.retryModels');
+  await enter('Retry with the visible model');
+  await click('editor.ai.generate');
+  expect(deps.run).toHaveBeenCalledOnce();
+});
+
+it('keeps history after a new task and requires confirmation to clear retained work', async () => {
+  await render();
+  await enter('Keep this result');
+  await click('editor.ai.generate');
+  await click('editor.ai.new-task');
+  expect(session.getSnapshot().steps).toHaveLength(1);
+  expect(session.getSelectedVariant()).toBeNull();
+  await click('editor.ai.history.open');
+  expect(document.activeElement).toBe(button('editor.ai.back'));
+  await click('editor.ai.history.clear');
+  await click('editor.ai.cancel');
+  expect(session.getSnapshot().steps).toHaveLength(1);
+  await click('editor.ai.history.clear');
+  await click('editor.ai.confirmClear');
+  expect(session.getSnapshot().steps).toHaveLength(0);
+  expect(document.activeElement).toBe(button('editor.ai.history.clear'));
+  await click('editor.ai.back');
+  expect(document.querySelector('[data-ui="editor.ai.prompt"]')).not.toBeNull();
+});
+
+it('stops a partial request and ignores its late result while preserving the prompt', async () => {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  deps.run.mockImplementationOnce(async ({ request, receive }) => {
+    receive({ type: 'image', requestId: request.requestId, variant: 0, image });
+    await held;
+    receive({ type: 'image', requestId: request.requestId, variant: 1, image });
+  });
+  await render();
+  await enter('Retain the unfinished instruction');
+  await click('editor.ai.generate');
+  expect(session.getSnapshot().status).toBe('generating');
+  expect(button('editor.ai.variant-count').disabled).toBe(true);
+  await click('editor.ai.stop');
+  await act(async () => release());
+  expect(session.getSnapshot().error).toBe('cancelled');
+  expect(session.getSnapshot().steps[0]?.variants.filter(Boolean)).toHaveLength(1);
+  expect(session.getSnapshot().draft.prompt).toBe('Retain the unfinished instruction');
+  expect(host.textContent).toContain('editor.ai.stopped');
+});
+
+it('uses an explicitly selected refinement model and preserves the result after preparation failure', async () => {
+  await render();
+  await enter('Original');
+  await click('editor.ai.generate');
+  await select('model', 'second');
+  await enter('Use the chosen model');
+  io.read.mockRejectedValueOnce(new Error('catalog unavailable'));
+  await click('editor.ai.generate');
+  expect(deps.run).toHaveBeenCalledOnce();
+  expect(session.getSelectedVariant()).not.toBeNull();
+  expect(host.querySelector('[role="alert"]')?.textContent).toBe('editor.ai.noModel');
+  await click('editor.ai.generate');
+  expect(deps.run.mock.calls[1]?.[0].request.modelId).toBe('second');
+  expect(deps.run.mock.calls[1]?.[0].request.context.images).toHaveLength(1);
+});
+
+it('retains compatible settings and adapts resolution on an explicit model change', async () => {
+  catalog.models[1]!.modelCode = 'google/gemini-3.1-flash-lite-image';
+  await render();
+  await select('editor.ai.variants', '3');
+  await select('editor.ai.resolution', '4K');
+  await select('editor.ai.ratio', '16:9');
+  await enter('Preserve my settings');
+  await select('model', 'second');
+  expect(deps.run).not.toHaveBeenCalled();
+  expect(button('editor.ai.generate').disabled).toBe(false);
+  expect(session.getSnapshot().draft.parameters).toMatchObject({
+    variants: 3,
+    resolution: '1K',
+    aspectRatio: '16:9',
+  });
+  await click('editor.ai.generate');
+  expect(deps.run.mock.calls[0]?.[0].request.context.parameters).toMatchObject({
+    variants: 3,
+    resolution: '1K',
+    aspectRatio: '16:9',
+  });
+});
+
+it('does not offer an unsupported native image protocol', async () => {
+  catalog.providers[0]!.connectionType = 'google';
+  catalog.providers[0]!.imageApi = undefined;
+  await render();
+  await enter('Do not send');
+  expect(button('editor.ai.generate').disabled).toBe(true);
+  expect(host.textContent).toContain('editor.ai.modelUnsupported');
+  expect(deps.run).not.toHaveBeenCalled();
+});
+
+it('updates only declared parameter choices and validates the seed input', async () => {
+  const profile = resolveImageModelProfile(
+    { operation: 'image-generation', modelCode: 'gpt-image-1-mini' },
+    { connectionType: 'openai' },
+    'image-generation'
+  );
+  if (!profile) throw new Error('Missing native image fixture profile');
+  let value: ImageParameters = { ...profile.defaults };
+  const changed = vi.fn((next: ImageParameters) => {
+    value = next;
+  });
+  const surface = () => (
+    <ImageParametersEditor profile={profile} value={value} disabled={false} onChange={changed} />
+  );
+  await render(surface());
+  for (const [label, choice, key] of [
+    ['editor.ai.size', '1536x1024', 'size'],
+    ['editor.ai.quality', 'high', 'quality'],
+    ['editor.ai.format', 'webp', 'outputFormat'],
+    ['editor.ai.background', 'transparent', 'background'],
+  ] as const) {
+    await select(label, choice);
+    expect(value[key]).toBe(choice);
+    await render(surface());
+  }
+  expect(document.querySelector('option[value="high"]')?.textContent).toBe('editor.ai.high');
+  await render();
+  await enter('-1', 'input[type="number"]');
+  expect(session.getSnapshot().draft.parameters.seed).toBeUndefined();
+  await enter('7', 'input[type="number"]');
+  expect(session.getSnapshot().draft.parameters.seed).toBe(7);
+  await enter('', 'input[type="number"]');
+  expect(session.getSnapshot().draft.parameters.seed).toBeUndefined();
+});
+
+async function attach(files: File[]) {
+  const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+  await act(async () => {
+    Object.defineProperty(input, 'files', { configurable: true, value: files });
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
+it('prepares, previews and removes a valid reference while retaining previous images on invalid input', async () => {
+  const changed = vi.fn(),
+    pending = vi.fn();
+  await render(
+    <ImageAttachments
+      operationId="one"
+      images={[]}
+      disabled={false}
+      onChange={changed}
+      onPendingChange={pending}
+    />
+  );
+  await attach([new File(['png'], 'reference.png', { type: 'image/png' })]);
+  expect(changed).toHaveBeenLastCalledWith([image]);
+  expect(pending).toHaveBeenLastCalledWith(false);
+  await render(
+    <ImageAttachments
+      operationId="one"
+      images={[image]}
+      disabled={false}
+      onChange={changed}
+      onPendingChange={pending}
+    />
+  );
+  expect(host.querySelector('img')?.getAttribute('src')).toBe(image.dataUrl);
+  await click('editor.ai.removeReference');
+  expect(changed).toHaveBeenLastCalledWith([]);
+  changed.mockClear();
+  await attach([new File(['svg'], 'bad.svg', { type: 'image/svg+xml' })]);
+  expect(changed).not.toHaveBeenCalled();
+  expect(host.textContent).toContain('editor.ai.fileError');
+  io.readFile.mockResolvedValueOnce('data:image/png;base64,broken');
+  await attach([new File(['broken'], 'broken.png', { type: 'image/png' })]);
+  expect(changed).not.toHaveBeenCalled();
+  expect(host.querySelector('img')?.getAttribute('src')).toBe(image.dataUrl);
+});
+
+it('discards a late reference read after a new operation and rejects excessive attachment size', async () => {
+  const changed = vi.fn(),
+    pending = vi.fn();
+  let release!: (_: string) => void;
+  io.readFile.mockReturnValueOnce(
+    new Promise<string>((resolve) => {
+      release = resolve;
+    })
+  );
+  const surface = (operationId: string) => (
+    <ImageAttachments
+      operationId={operationId}
+      images={[]}
+      disabled={false}
+      onChange={changed}
+      onPendingChange={pending}
+    />
+  );
+  await render(surface('one'));
+  await attach([new File(['png'], 'late.png', { type: 'image/png' })]);
+  expect(pending).toHaveBeenLastCalledWith(true);
+  await render(surface('two'));
+  await act(async () => release(image.dataUrl));
+  expect(changed).not.toHaveBeenCalled();
+  expect(pending).toHaveBeenLastCalledWith(false);
+  const oversized = new File(['png'], 'large.png', { type: 'image/png' });
+  Object.defineProperty(oversized, 'size', { value: 17 * 1024 * 1024 });
+  await attach([oversized]);
+  expect(changed).not.toHaveBeenCalled();
+  expect(host.textContent).toContain('editor.ai.fileError');
+});
+
+it('retains a count chosen before the first model configuration arrives', async () => {
+  let complete!: (result: Catalog) => void;
+  io.read.mockReturnValueOnce(new Promise<Catalog>((resolve) => (complete = resolve)));
+  await render();
+  await select('editor.ai.variants', '3');
+  expect(session.getSnapshot().draft.parameters.variants).toBe(3);
+  await act(async () => complete(catalog));
+  expect(session.getSnapshot().draft.parameters).toMatchObject({
+    variants: 3,
+    resolution: '768',
+    aspectRatio: '1:1',
+    outputFormat: 'png',
+  });
+  await enter('Preserve my selected count');
+  await click('editor.ai.generate');
+  expect(deps.run.mock.calls[0]?.[0].request.context.parameters.variants).toBe(3);
+});
+
+it('fills missing model defaults and retains an explicit provider default through adaptation', async () => {
+  catalog.models[0]!.modelCode = 'aaa-generic-image';
+  catalog.models[1]!.modelCode = 'black-forest-labs/flux-3-image-klein';
+  await render();
+  await select('editor.ai.variants', '3');
+  await select('model', 'second');
+  expect(session.getSnapshot().draft.parameters).toMatchObject({
+    variants: 3,
+    resolution: '768',
+    aspectRatio: '1:1',
+    outputFormat: 'png',
+  });
+  await select('editor.ai.resolution', '');
+  await select('model', 'first');
+  await select('model', 'second');
+  expect(session.getSnapshot().draft.parameters.resolution).toBeUndefined();
+  await enter('Use the provider resolution default');
+  await click('editor.ai.generate');
+  expect(deps.run.mock.calls[0]?.[0].request.context.parameters.resolution).toBeUndefined();
+  expect(Object.hasOwn(deps.run.mock.calls[0]![0].request.context.parameters, 'resolution')).toBe(
+    false
+  );
+  expect(deps.run.mock.calls[0]?.[0].request.context.parameters.variants).toBe(3);
+});
+
+it('keeps preview outside the inspector and restores focus without changing document history', async () => {
+  await render();
+  await select('editor.ai.variants', '3');
+  await enter('Generate three choices');
+  await click('editor.ai.generate');
+  const preview = document.querySelector<HTMLElement>('[data-ui="editor.ai.preview"]')!;
+  expect(preview).not.toBeNull();
+  expect(host.querySelector('[data-ui="editor.ai.preview"]')).toBeNull();
+  expect(
+    document
+      .querySelector('[data-ui="editor.ai.inspector"]')
+      ?.querySelector('[data-ui="editor.ai.preview-image"]')
+  ).toBeNull();
+  await enter('Keep typing while the preview is open');
+  expect(session.getSnapshot().draft.prompt).toBe('Keep typing while the preview is open');
+  const variant = preview.querySelector<HTMLButtonElement>('[aria-label="editor.ai.variants 2"]')!;
+  await act(async () => variant.click());
+  expect(session.getSnapshot().selected?.variant).toBe(1);
+  await click('editor.ai.preview.zoom');
+  const focus = document.activeElement;
+  await act(async () =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(document.querySelector('[data-ui="editor.ai.preview"]')).toBeNull();
+  expect(document.activeElement).toBe(focus);
+  await click('editor.ai.source-attachment');
+  await act(async () => button('common.actions.close').focus());
+  await click('common.actions.close');
+  expect(document.activeElement).toBe(button('editor.ai.source-attachment'));
+  expect(controller.commitHistory).not.toHaveBeenCalled();
+  expect(deps.apply).not.toHaveBeenCalled();
+});
+
+it('shows the provider rejection and retains the prompt and safe diagnostic stage', async () => {
+  deps.run.mockRejectedValueOnce(
+    new ImageJobError({
+      code: 'provider-failed',
+      phase: 'requesting',
+      reason: 'invalid-credential',
+    })
+  );
+  await render();
+  await enter('Keep my request');
+  await click('editor.ai.generate');
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    'settings.aiProviders.providerStatusInvalidKey'
+  );
+  expect(host.querySelector('[role="alert"] details')?.textContent).toContain('requesting');
+  expect(session.getSnapshot().draft.prompt).toBe('Keep my request');
+  expect(deps.run).toHaveBeenCalledOnce();
+});

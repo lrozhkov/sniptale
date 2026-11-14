@@ -1,5 +1,7 @@
 declare module './' {
   export namespace MessageType {
+    type EDITOR_VECTOR_CATALOG_COMMAND =
+      typeof import('./').MessageType.EDITOR_VECTOR_CATALOG_COMMAND;
     type SIMPLIFY_COMMAND = typeof import('./').MessageType.SIMPLIFY_COMMAND;
     type OFFSCREEN_SIMPLIFY_COMMAND = typeof import('./').MessageType.OFFSCREEN_SIMPLIFY_COMMAND;
     type OFFSCREEN_SYNC_WORKSPACE_START =

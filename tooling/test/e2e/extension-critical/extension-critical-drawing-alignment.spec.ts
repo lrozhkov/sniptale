@@ -48,11 +48,19 @@ async function drawShape(
 async function expectGuide(page: Page, axis: string, coordinate: number) {
   const guide = page.locator(`[data-ui="content.drawing.alignment-guides"] [data-axis="${axis}"]`);
   await expect(page.locator('[data-ui="content.drawing.alignment-guides"]')).toBeVisible();
-  await expect(guide).toBeAttached();
+  await expect(guide.first()).toBeAttached();
   const attribute = axis === 'x' ? 'x1' : 'y1';
   await expect
-    .poll(async () => Number(await guide.getAttribute(attribute)))
-    .toBeCloseTo(coordinate, 0);
+    .poll(async () => {
+      const coordinates = await guide.evaluateAll(
+        (nodes, attribute) => nodes.map((node) => Number(node.getAttribute(attribute))),
+        attribute
+      );
+      return (
+        coordinates.length > 0 && coordinates.every((value) => Math.abs(value - coordinate) < 0.5)
+      );
+    })
+    .toBe(true);
 }
 
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
@@ -88,12 +96,8 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       await page.mouse.move(624, 264, { steps: 8 });
       await expectGuide(page, 'x', 600);
       await expectGuide(page, 'y', 260);
-      await expect(guides.locator('[data-ui="content.drawing.alignment-marker"]')).not.toHaveCount(
-        0
-      );
-      await expect(guides.locator('path[d="M 596 356 L 604 364 M 604 356 L 596 364"]')).toHaveCount(
-        1
-      );
+      await expect(guides.locator('[data-ui="content.drawing.alignment-marker"]')).toHaveCount(0);
+      await expect(guides.locator('[data-ui="content.drawing.alignment-bracket"]')).toHaveCount(0);
       await page.screenshot({ path: info.outputPath('dom-alignment.png'), fullPage: false });
       await page.mouse.up();
       await expect(guides).toHaveCount(0);
@@ -174,18 +178,40 @@ async function readTextLines(element: Locator) {
   return element.evaluate((node) => {
     const content =
       node instanceof HTMLTextAreaElement
-        ? node.parentElement!.querySelector('[data-ui="content.drawing.text-mirror"]')!
-        : node.querySelector('span')!;
+        ? node.parentElement?.querySelector(':scope > span[aria-hidden="true"]')
+        : node.querySelector(':scope > span');
+    if (!content) throw new Error('Drawing text glyph surface unavailable');
     const range = document.createRange();
     range.selectNodeContents(content);
     const origin = content.getBoundingClientRect();
+    const owner = node instanceof HTMLTextAreaElement ? node.parentElement : node;
+    if (!owner) throw new Error('Drawing text bounds unavailable');
+    const bounds = owner.getBoundingClientRect();
     const rects = Array.from(range.getClientRects()).filter((rect) => rect.width > 0);
+    const text = content.firstChild;
+    if (!(text instanceof Text)) throw new Error('Drawing glyph text unavailable');
+    const fittedRects: DOMRect[] = [];
+    let offset = 0;
+    for (const line of text.data.split('\n')) {
+      if (line.trim()) {
+        const fitted = document.createRange();
+        fitted.setStart(text, offset);
+        fitted.setEnd(text, offset + line.trimEnd().length);
+        fittedRects.push(...Array.from(fitted.getClientRects()).filter((rect) => rect.width > 0));
+      }
+      offset += line.length + 1;
+    }
+    const left = Math.min(...fittedRects.map((rect) => rect.left));
+    const right = Math.max(...fittedRects.map((rect) => rect.right));
+    const leftInset = left - bounds.left;
     return {
-      text: node instanceof HTMLTextAreaElement ? node.value : content.textContent,
-      width: origin.width,
-      usedWidth:
-        Math.max(...rects.map((rect) => rect.right - origin.left)) +
-        parseFloat(getComputedStyle(content).paddingRight),
+      text: content.textContent,
+      width: bounds.width,
+      // The visible span retains wrap budget and raw trailing spaces. The fitted object
+      // uses each line's non-trailing advance and balanced ink padding.
+      usedWidth: right - left + 2 * leftInset,
+      leftInset,
+      rightInset: bounds.right - right,
       lines: rects.map((rect) => ({ width: rect.width, top: rect.top - origin.top })),
     };
   });
@@ -219,11 +245,11 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         const text = page.locator('[data-ui="content.drawing.text-object"]').last();
         await expect(text).toBeVisible();
         const after = await readTextLines(text);
-        expect(after.text).toBe(value.trim());
-        if (value === value.trim()) expect(after.lines).toEqual(before.lines);
-        else expect(after.lines).toHaveLength(1);
-        expect(after.width - after.usedWidth).toBeGreaterThanOrEqual(0);
-        expect(after.width - after.usedWidth).toBeLessThanOrEqual(1);
+        expect(after.text).toBe(before.text);
+        expect(after.lines).toEqual(before.lines);
+        expect(after.leftInset).toBeGreaterThanOrEqual(0);
+        expect(after.rightInset).toBeGreaterThanOrEqual(0);
+        expect(Math.abs(after.width - after.usedWidth)).toBeLessThanOrEqual(1);
         await page.screenshot({
           path: info.outputPath(`text-fit-${value.length}.png`),
           fullPage: false,
@@ -231,6 +257,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         const box = (await text.boundingBox())!;
         await page.mouse.dblclick(box.x + 12, box.y + 12);
         await expect(input).toBeVisible();
+        await expect(input).toHaveValue(value);
         await input.fill('Cancelled edit');
         await page.keyboard.press('Escape');
         expect(await readTextLines(text)).toEqual(after);
@@ -355,8 +382,8 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       await page.mouse.down();
       await page.mouse.move(624, 324, { steps: 4 });
       const guides = page.locator('[data-ui="content.drawing.alignment-guides"]');
-      await expect(guides.locator('[data-axis="x"]')).toHaveAttribute('x1', '620');
-      await expect(guides.locator('[data-axis="y"]')).toHaveAttribute('y1', '320');
+      await expectGuide(page, 'x', 620);
+      await expectGuide(page, 'y', 320);
       await page.screenshot({ path: info.outputPath('resize-snapped.png'), fullPage: false });
       await page.keyboard.down('Alt');
       await expect(guides).toHaveCount(0);
@@ -368,7 +395,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       await page.mouse.move(620, 240);
       await page.mouse.down();
       await page.mouse.move(796, 240, { steps: 5 });
-      await expect(guides.locator('[data-axis="x"]')).toHaveAttribute('x1', '800');
+      await expectGuide(page, 'x', 800);
       await expect(guides.locator('[data-axis="y"]')).toHaveCount(0);
       await page.keyboard.down('Alt');
       await expect(guides).toHaveCount(0);
@@ -501,11 +528,12 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await page.mouse.down();
         await page.mouse.move(696, 220, { steps: 6 });
         const guides = surface.locator('[data-ui="content.drawing.alignment-guides"]');
-        await expect(guides.locator('[data-axis="x"]')).toHaveAttribute('x1', '700');
+        await expectGuide(page, 'x', 700);
         await expect(guides.locator('[data-axis="y"]')).toHaveCount(0);
-        await expect(
-          guides.locator('path[d="M 696 376 L 704 384 M 704 376 L 696 384"]')
-        ).toHaveCount(1);
+        await expect(guides.locator('[data-ui="content.drawing.alignment-marker"]')).toHaveCount(0);
+        await expect(guides.locator('[data-ui="content.drawing.alignment-bracket"]')).toHaveCount(
+          0
+        );
         await page.screenshot({
           path: info.outputPath('peer-width-alignment.png'),
           fullPage: false,
@@ -513,7 +541,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await page.keyboard.down('Alt');
         await expect(guides).toHaveCount(0);
         await page.keyboard.up('Alt');
-        await expect(guides.locator('[data-axis="x"]')).toHaveAttribute('x1', '700');
+        await expectGuide(page, 'x', 700);
         await page.mouse.up();
         await expectHandle(page, 700, 220, surface);
         await page.mouse.click(300, 300);
@@ -543,7 +571,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await page.mouse.move(620, 240);
         await page.mouse.down();
         await page.mouse.move(646, 240, { steps: 6 });
-        await expect(guides.locator('[data-axis="x"]')).toHaveAttribute('x1', '650');
+        await expectGuide(page, 'x', 650);
         await page.screenshot({
           path: info.outputPath('crop-and-page-dom-target.png'),
           fullPage: false,
@@ -655,13 +683,13 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await page.mouse.down();
         await page.mouse.move(646, 306, { steps: 6 });
         const guides = surface.locator('[data-ui="content.drawing.alignment-guides"]');
-        await expect(guides.locator('[data-axis="x"]')).toHaveAttribute('x1', '820');
-        await expect(guides.locator('[data-axis="y"]')).toHaveAttribute('y1', '340');
+        await expectGuide(page, 'x', 820);
+        await expectGuide(page, 'y', 340);
         await expect(chrome).toHaveCSS('opacity', '0');
         await page.keyboard.down('Alt');
         await expect(guides).toHaveCount(0);
         await page.keyboard.up('Alt');
-        await expect(guides.locator('[data-axis="x"]')).toHaveAttribute('x1', '820');
+        await expectGuide(page, 'x', 820);
         await page.screenshot({
           path: info.outputPath('group-bounds-snapped.png'),
           fullPage: false,
@@ -721,8 +749,8 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           await page.mouse.down();
           await expect(chrome).toHaveCSS('opacity', '1');
           await page.mouse.move(904, 394, { steps: 8 });
-          await expect(guides.locator('[data-axis="x"]')).toHaveAttribute('x1', '900');
-          await expect(guides.locator('[data-axis="y"]')).toHaveAttribute('y1', '390');
+          await expectGuide(page, 'x', 900);
+          await expectGuide(page, 'y', 390);
           await page.screenshot({
             path: info.outputPath(`${kind}-center-snapped.png`),
             fullPage: false,

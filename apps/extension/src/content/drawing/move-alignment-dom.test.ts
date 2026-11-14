@@ -22,7 +22,7 @@ it('ignores extension chrome and reads a bounded local set instead of scanning t
     { x: 100, y: 100, width: 200, height: 120 },
     { kind: 'viewport', element: null }
   );
-  expect(result).toEqual([{ x: 100, y: 100, width: 200, height: 120 }]);
+  expect(result).toMatchObject([{ x: 100, y: 100, width: 200, height: 120 }]);
   expect(hit).toHaveBeenCalledTimes(9);
 });
 
@@ -44,7 +44,7 @@ it('projects document and internal-scroll geometry into the drawing scene', () =
       { x: 120, y: 370, width: 120, height: 100 },
       { kind: 'element', element: scroller }
     )[0]
-  ).toEqual({ x: 120, y: 370, width: 120, height: 100 });
+  ).toMatchObject({ x: 120, y: 370, width: 120, height: 100 });
   vi.stubGlobal('scrollY', 200);
   expect(
     collectDrawingDomAlignmentBounds(
@@ -92,6 +92,30 @@ it('probes both sides of a grabbed resize edge within the existing nine-hit budg
   hit.mockClear();
   expect(
     collectDrawingDomAlignmentBounds(bounds, { kind: 'viewport', element: null }, { x: 796 })
-  ).toEqual([{ x: 620, y: 320, width: 180, height: 140 }]);
+  ).toMatchObject([{ x: 620, y: 320, width: 180, height: 140 }]);
   expect(hit).toHaveBeenCalledTimes(9);
+});
+
+it('keeps runtime identity across measurement changes and explains only unpainted accepted boxes', () => {
+  const target = document.createElement('div');
+  document.body.append(target);
+  const rect = vi
+    .spyOn(target, 'getBoundingClientRect')
+    .mockReturnValue(new DOMRect(100, 100, 120, 100));
+  Object.defineProperty(document, 'elementsFromPoint', {
+    configurable: true,
+    value: () => [target],
+  });
+  const read = () =>
+    collectDrawingDomAlignmentBounds(
+      { x: 100, y: 100, width: 120, height: 100 },
+      { kind: 'viewport', element: null }
+    );
+  const first = read()[0]?.alignmentTarget;
+  expect(first).toMatchObject({ kind: 'dom', showBounds: true });
+  rect.mockReturnValue(new DOMRect(104, 100, 120, 100));
+  expect(read()[0]?.alignmentTarget.id).toBe(first?.id);
+  target.style.backgroundColor = 'red';
+  expect(read()[0]?.alignmentTarget.showBounds).toBe(false);
+  expect(target.hasAttribute('data-snap-id')).toBe(false);
 });

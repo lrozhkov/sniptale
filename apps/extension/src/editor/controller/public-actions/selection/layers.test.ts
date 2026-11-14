@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   reorderLayerObjectsMock: vi.fn(),
+  reorderLayerBlockObjectsMock: vi.fn(),
   resizeLayerObjectMock: vi.fn(),
   selectLayerObjectMock: vi.fn(),
   syncSourceStateFromObjectMock: vi.fn(),
@@ -13,6 +14,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../layer-actions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../layer-actions')>()),
   reorderLayerObjects: mocks.reorderLayerObjectsMock,
+  reorderLayerBlockObjects: mocks.reorderLayerBlockObjectsMock,
   resizeLayerObject: mocks.resizeLayerObjectMock,
   selectLayerObject: mocks.selectLayerObjectMock,
   toggleLayerLock: mocks.toggleLayerLockMock,
@@ -27,6 +29,7 @@ vi.mock('../../document/source', async (importOriginal) => ({
 import {
   renameEditorLayerById,
   reorderEditorLayer,
+  reorderEditorLayerBlock,
   resizeEditorLayerById,
   selectEditorLayerById,
   toggleEditorLayerLockState,
@@ -277,4 +280,21 @@ describe('editor-controller-public-actions-selection.layers', () => {
   runVisibilityAndLockSuite();
   runResizeSuite();
   runRenameSuite();
+});
+
+it('publishes a block reorder once, with no history for refusal or no-op', () => {
+  const options = {
+    canvas: createCanvas(),
+    ids: ['a', 'c'],
+    beforeId: 'b',
+    sendFrameObjectsToBack: vi.fn(),
+    commitHistory: vi.fn(),
+    syncRuntimeState: vi.fn(),
+  };
+  mocks.reorderLayerBlockObjectsMock.mockReturnValueOnce(false).mockReturnValueOnce(true);
+  reorderEditorLayerBlock(options);
+  expect(options.commitHistory).not.toHaveBeenCalled();
+  reorderEditorLayerBlock(options);
+  expect(options.commitHistory).toHaveBeenCalledOnce();
+  expect(options.syncRuntimeState).toHaveBeenCalledOnce();
 });

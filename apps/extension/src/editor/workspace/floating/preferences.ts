@@ -42,6 +42,7 @@ export function useFloatingLayersPreferenceState() {
   const [preference, setPreference] = useState<EditorFloatingLayersPreference>(
     DEFAULT_EDITOR_FLOATING_LAYERS_PREFERENCE
   );
+  const [layersHeight, setLayersHeight] = useState<number | null>(null);
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const userChangedRef = useRef(false);
   const persistPreference = useFloatingLayersPreferencePersistence(setSaveErrorMessage);
@@ -64,7 +65,7 @@ export function useFloatingLayersPreferenceState() {
 
     void loadEditorFloatingLayersPreference().then((storedPreference) => {
       if (!cancelled && !userChangedRef.current) {
-        setPreference(storedPreference);
+        setPreference({ ...storedPreference, heightRatio: null });
       }
     });
 
@@ -75,9 +76,9 @@ export function useFloatingLayersPreferenceState() {
 
   return {
     layersCollapsed: preference.collapsed,
-    layersHeightRatio: preference.heightRatio,
+    layersHeight,
     layersPreferenceError: saveErrorMessage,
     setLayersCollapsed: (collapsed: boolean) => updatePreference({ collapsed }),
-    setLayersHeightRatio: (heightRatio: number | null) => updatePreference({ heightRatio }),
+    setLayersHeight,
   };
 }

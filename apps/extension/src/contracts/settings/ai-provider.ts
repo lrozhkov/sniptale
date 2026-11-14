@@ -208,7 +208,7 @@ export function listAIProviderDefinitions(): AIProviderDefinition[] {
 }
 
 const PROVIDER_OPERATIONS: Record<AIProviderType, readonly AIModelOperation[]> = {
-  'openai-compatible': ['text', 'transcription', 'speech'],
+  'openai-compatible': ['text', 'transcription', 'speech', 'image-generation', 'image-editing'],
   alibaba: ['text'],
   anthropic: ['text'],
   'chrome-built-in': ['text'],
@@ -216,16 +216,16 @@ const PROVIDER_OPERATIONS: Record<AIProviderType, readonly AIModelOperation[]> =
   deepgram: ['transcription', 'speech'],
   deepseek: ['text'],
   elevenlabs: ['transcription', 'speech'],
-  google: ['text', 'transcription', 'speech'],
+  google: ['text', 'transcription', 'speech', 'image-generation', 'image-editing'],
   'lm-studio': ['text', 'transcription', 'speech'],
   minimax: ['text'],
   mistral: ['text', 'transcription', 'speech'],
   moonshotai: ['text'],
   neuraldeep: ['text', 'transcription', 'speech'],
   ollama: ['text'],
-  openai: ['text', 'transcription', 'speech'],
-  openrouter: ['text'],
-  xai: ['text', 'transcription', 'speech'],
+  openai: ['text', 'transcription', 'speech', 'image-generation', 'image-editing'],
+  openrouter: ['text', 'image-generation', 'image-editing'],
+  xai: ['text', 'transcription', 'speech', 'image-generation', 'image-editing'],
   yandex: ['text'],
   zai: ['text'],
 };

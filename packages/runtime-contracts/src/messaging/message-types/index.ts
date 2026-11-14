@@ -1,6 +1,7 @@
 import type { ContentPrivilegedActionCapability } from '../../protocol/content-privileged-action';
 
 export const MessageType = {
+  EDITOR_VECTOR_CATALOG_COMMAND: 'EDITOR_VECTOR_CATALOG_COMMAND',
   SIMPLIFY_COMMAND: 'SIMPLIFY_COMMAND',
   OFFSCREEN_SIMPLIFY_COMMAND: 'OFFSCREEN_SIMPLIFY_COMMAND',
   ENABLE_SCREENSHOT_MODE: 'ENABLE_SCREENSHOT_MODE',

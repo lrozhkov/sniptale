@@ -1,3 +1,7 @@
+import {
+  EDITOR_VECTOR_LIBRARY_STORE,
+  RECORDING_EVENTS_STORE,
+} from '../infrastructure/indexed-db/core.stores';
 import { createRetentionDatabaseFixture } from './retention-authority.test-support';
 import {
   createMediaLibraryEntry,
@@ -59,29 +63,52 @@ it('finishes retention validation without waiting for background-tab timers', as
 });
 
 it('validates bounded pages and returns only their retention projection', async () => {
+  const recordingCount = 1000;
+  const definitionId = 'a'.repeat(64);
+  const vectorBacking = {
+    key: `definition:${definitionId}`,
+    kind: 'definition',
+    definitionId,
+    assetId: 'vector-bytes',
+    incarnation: 'backing',
+    retained: false,
+  };
   const getAll = vi.fn(async (store: string) =>
-    store === 'recordings'
-      ? Array.from({ length: 1000 }, (_, i) => ({
-          id: `recording-${i}`,
-          assetId: `asset-${i}`,
-          createdAt: 1,
-          filename: 'recording.webm',
-          mimeType: 'video/webm',
-          size: 1,
-        }))
-      : []
+    store === EDITOR_VECTOR_LIBRARY_STORE
+      ? [vectorBacking]
+      : store === 'recordings'
+        ? Array.from({ length: recordingCount }, (_, i) => ({
+            id: `recording-${i}`,
+            assetId: `asset-${i}`,
+            createdAt: 1,
+            filename: 'recording.webm',
+            mimeType: 'video/webm',
+            size: 1,
+          }))
+        : []
   );
   const fixture = installDatabase({ getAll });
-  {
-    const snapshot = await collectDurableAssetSnapshot();
-    expect(snapshot.authorityValid).toBe(true);
-    expect(snapshot.expectedOwners).toHaveLength(1000);
-    expect(getAll).toHaveBeenCalledTimes(15);
-    expect(
-      fixture.pages.mock.calls.filter(([store, , , keys]) => store === 'recordings' && !keys)
-    ).toHaveLength(16);
-    expect(snapshot).not.toHaveProperty('recordings');
-  }
+  const indexedReads = vi.spyOn(fixture, 'getAllFromIndex');
+  const snapshot = await collectDurableAssetSnapshot();
+  expect(snapshot.authorityValid).toBe(true);
+  expect(snapshot.expectedOwners).toHaveLength(recordingCount + 1);
+  expect(snapshot.expectedOwners).toContainEqual({
+    ownerKind: 'editor-vector-definition',
+    ownerId: definitionId,
+    role: 'body',
+    assetId: vectorBacking.assetId,
+  });
+  const snapshotStores = fixture.transaction.mock.calls.flatMap(([stores]) => stores);
+  expect(snapshotStores).toContain(EDITOR_VECTOR_LIBRARY_STORE);
+  expect(indexedReads).toHaveBeenCalledExactlyOnceWith(RECORDING_EVENTS_STORE, 'kind', 'head');
+  const readStores = [...snapshotStores, ...indexedReads.mock.calls.map(([store]) => store)];
+  expect(new Set(readStores).size).toBe(readStores.length);
+  expect(getAll.mock.calls.map(([store]) => store).sort()).toEqual([...readStores].sort());
+  expect(
+    fixture.pages.mock.calls.filter(([store, , , keys]) => store === 'recordings' && !keys)
+  ).toHaveLength(Math.ceil(recordingCount / 64));
+  expect(snapshot).not.toHaveProperty('recordings');
+  expect(snapshot).not.toHaveProperty(EDITOR_VECTOR_LIBRARY_STORE);
 });
 
 it('reports the fixed invalid store while retaining fail-closed deletion authority', async () => {

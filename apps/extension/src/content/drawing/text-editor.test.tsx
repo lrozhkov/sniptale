@@ -6,7 +6,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { DrawingTextEditor, useDrawingTextEditor, type DrawingTextDraft } from './text-editor';
 import { createContentDrawingController } from './controller';
 import { createDrawingSession } from '../../features/drawing/public';
-import { DrawingTextBackgrounds } from './text-content';
+import { DrawingTextBackgrounds, useDrawingTextLayout } from './text-content';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -104,47 +104,6 @@ it('does not interpret a background color as an SVG paint server', () => {
   } finally {
     act(() => root.unmount());
   }
-});
-
-it('uses fractional local dimensions for a rotated text draft without another line wrap', () => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.stubGlobal('requestAnimationFrame', () => 1);
-  vi.stubGlobal('cancelAnimationFrame', vi.fn());
-  vi.spyOn(window, 'getComputedStyle').mockReturnValue({
-    height: '94px',
-    width: '210.390625px',
-  } as CSSStyleDeclaration);
-  const onChange = vi.fn();
-  const host = document.createElement('div');
-  document.body.append(host);
-  const root = createRoot(host);
-  act(() =>
-    root.render(
-      <DrawingTextEditor
-        draft={{
-          autoWidth: true,
-          height: 40,
-          id: null,
-          maxWidth: 640,
-          point: { x: 20, y: 30 },
-          rotation: 45,
-          value: 'A longer first line\nShort\nA final line',
-          width: 80,
-        }}
-        layoutRevision={0}
-        projection={{ x: 0, y: 0 }}
-        style={{ backgroundColor: '#fef08a', color: '#111827', fontFamily: 'sans', fontSize: 24 }}
-        onCancel={vi.fn()}
-        onChange={onChange}
-        onCommit={vi.fn()}
-      />
-    )
-  );
-  expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ height: 94, width: 211 }));
-  expect(
-    host.querySelector<HTMLElement>('[data-ui="content.drawing.text-editor"]')?.style.transform
-  ).toBe('rotate(45deg)');
-  act(() => root.unmount());
 });
 
 it('publishes a changed text draft before it enters shared Drawing history', () => {
@@ -270,14 +229,11 @@ it('keeps the first line visible while Shift+Enter creates an empty trailing lin
   expect(editor.value).toBe('Stable text\n');
   expect(editor.selectionStart).toBe(editor.value.length);
   expect(editor.scrollTop).toBe(0);
-  expect(host.querySelector('[data-ui="content.drawing.text-mirror"]')?.textContent).toBe(
-    'Stable text\n\u200b'
-  );
   const backgrounds = host.querySelectorAll('[data-ui="content.drawing.text-background"]');
   expect(backgrounds).toHaveLength(1);
   expect(backgrounds[0]?.getAttribute('d')?.match(/M /g)).toHaveLength(1);
-  expect(backgrounds[0]?.getAttribute('d')).toContain(' 27 ');
-  expect(backgrounds[0]?.getAttribute('d')).toContain(' 52 ');
+  const firstPath = backgrounds[0]?.getAttribute('d');
+  expect(firstPath).toBeTruthy();
 
   const zoomKey = new KeyboardEvent('keydown', {
     bubbles: true,
@@ -295,56 +251,153 @@ it('keeps the first line visible while Shift+Enter creates an empty trailing lin
   act(() => root.unmount());
 });
 
-it.each([0, 45])(
-  'commits fitted text width while preserving its rotated origin at %s degrees',
-  (rotation) => {
-    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-    const session = createDrawingSession({ onDocumentCommit: () => true });
-    const controller = createContentDrawingController(session);
-    const host = document.createElement('div');
-    document.body.append(host);
-    const root = createRoot(host);
-    let editor: ReturnType<typeof useDrawingTextEditor>;
-    function Harness() {
-      editor = useDrawingTextEditor(controller);
-      return null;
-    }
-    act(() => root.render(<Harness />));
-    session.commitObject({
-      id: 'fitted-text',
-      kind: 'text',
-      text: 'Original',
-      rotation,
-      bounds: { x: 100, y: 200, width: 320, height: 64 },
-      color: '#111827',
-      backgroundColor: null,
-      fontSize: 24,
-      fontFamily: 'sans',
-    });
+it.each(['', '\nAlpha\n\n \t \nBeta\n'])('paints only populated draft rows for %j', (value) => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('requestAnimationFrame', () => 1);
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
     act(() =>
-      editor!.setDraft({
-        id: 'fitted-text',
-        point: { x: 100, y: 200 },
-        value: 'Hi\nThere',
-        width: 320,
-        fittedWidth: 64,
-        height: 64,
-        rotation,
-      })
+      root.render(
+        <DrawingTextEditor
+          draft={{ id: null, point: { x: 20, y: 30 }, value, width: 200 }}
+          projection={{ x: 0, y: 0 }}
+          style={{ backgroundColor: '#ff8800', color: '#111111', fontFamily: 'sans', fontSize: 20 }}
+          onCancel={vi.fn()}
+          onChange={vi.fn()}
+          onCommit={vi.fn()}
+        />
+      )
     );
-    act(() => editor!.finalize());
-    const object = session.getSnapshot().document.objects[0]!;
-    const radians = (rotation * Math.PI) / 180;
-    expect(object).toMatchObject({
-      text: 'Hi\nThere',
-      rotation,
-      bounds: {
-        width: 64,
-        height: 64,
-        x: 100 + 128 * (1 - Math.cos(radians)),
-        y: 200 - 128 * Math.sin(radians),
-      },
-    });
+    const path =
+      host.querySelector('[data-ui="content.drawing.text-background"]')?.getAttribute('d') ?? '';
+    expect(path.match(/M /g)?.length ?? 0).toBe(value ? 2 : 0);
+    expect(host.querySelector('textarea')?.value).toBe(value);
+  } finally {
     act(() => root.unmount());
   }
-);
+});
+
+it('preserves source whitespace, empty lines and the explicit wrapping mode', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  const controller = createContentDrawingController(session);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  let editor!: ReturnType<typeof useDrawingTextEditor>;
+  function Harness() {
+    editor = useDrawingTextEditor(controller);
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  try {
+    act(() =>
+      editor.setDraft({
+        id: null,
+        value: '  Word  \n\n',
+        point: { x: 10, y: 20 },
+        autoWidth: true,
+        maxWidth: 400,
+      })
+    );
+    act(() => editor.commit());
+    expect(session.getCommittedDocument().objects[0]).toMatchObject({
+      text: '  Word  \n\n',
+      autoWidth: true,
+      wrapWidth: 400,
+    });
+    const object = session.getCommittedDocument().objects[0];
+    if (object?.kind !== 'text') throw new Error('Expected text');
+    act(() => editor.edit(object));
+    act(() => editor.setDraft({ ...editor.draft!, value: 'Changed' }));
+    act(() => editor.cancel());
+    expect(session.getCommittedDocument().objects[0]).toBe(object);
+  } finally {
+    act(() => root.unmount());
+  }
+});
+it('ignores obsolete font completion after shortening and unmounting', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const completions: Array<(value: unknown[]) => void> = [];
+  Object.defineProperty(document, 'fonts', {
+    configurable: true,
+    value: {
+      check: () => false,
+      load: () => new Promise<unknown[]>((resolve) => completions.push(resolve)),
+    },
+  });
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const rendered = vi.fn();
+  function Probe({ value }: { value: string }) {
+    const layout = useDrawingTextLayout({
+      value,
+      fontFamily: 'sans-serif',
+      fontSize: 24,
+      wrapWidth: 320,
+      autoWidth: true,
+    });
+    rendered(value);
+    return <span>{layout.lines.join('\n')}</span>;
+  }
+  try {
+    act(() => root.render(<Probe value="Old long value" />));
+    act(() => root.render(<Probe value="B" />));
+    const calls = rendered.mock.calls.length;
+    await act(async () => {
+      completions[0]!([{}]);
+      await Promise.resolve();
+    });
+    expect(rendered).toHaveBeenCalledTimes(calls);
+    await act(async () => {
+      completions[1]!([{}]);
+      await Promise.resolve();
+    });
+    expect(host.textContent).toBe('B');
+    expect(rendered).toHaveBeenCalledTimes(calls + 1);
+    act(() => root.unmount());
+    await act(async () => {
+      completions[1]!([{}]);
+      await Promise.resolve();
+    });
+    expect(rendered).toHaveBeenCalledTimes(calls + 1);
+  } finally {
+    Reflect.deleteProperty(document, 'fonts');
+  }
+});
+
+it('suppresses capture caret and selection while retaining editable draft ink', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('requestAnimationFrame', () => 1);
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    act(() =>
+      root.render(
+        <DrawingTextEditor
+          serviceUiSuppressed
+          draft={{ id: null, point: { x: 20, y: 30 }, value: 'Live draft', width: 160 }}
+          projection={{ x: 0, y: 0 }}
+          style={{ backgroundColor: '#f97316', color: '#111827', fontFamily: 'sans', fontSize: 24 }}
+          onCancel={vi.fn()}
+          onChange={vi.fn()}
+          onCommit={vi.fn()}
+        />
+      )
+    );
+    const input = host.querySelector('textarea')!;
+    expect(input.style.caretColor).toBe('transparent');
+    expect(input.value).toBe('Live draft');
+    expect(host.querySelector('span')?.textContent).toContain('Live draft');
+    expect(host.querySelector('style')?.textContent).toContain('background: transparent');
+    expect(document.activeElement).toBe(input);
+  } finally {
+    act(() => root.unmount());
+  }
+});

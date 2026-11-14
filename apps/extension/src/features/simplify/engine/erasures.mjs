@@ -83,7 +83,11 @@ function sourcePlane(image, box) {
     median(
       surfaceSamples.flat().map((p) => Math.max(...p.map((v, c) => Math.abs(v - flatColor[c]))))
     ) || 0;
-  const useFlat = flat && flatError + 1 < (median(planeResidual) || 0);
+  const uniformSurface =
+    flatError === 0 &&
+    surfaces.every((surface) => surface.every((value, channel) => value === flatColor[channel]));
+  // Exact agreement across surface quadrants outweighs a corner sampled from neighboring ink.
+  const useFlat = flat && (uniformSurface || flatError + 1 < (median(planeResidual) || 0));
   if (useFlat) corners = corners.map((c) => [...flatColor, c[3]]);
   const bend = Math.max(
     ...[0, 1, 2].map((c) =>

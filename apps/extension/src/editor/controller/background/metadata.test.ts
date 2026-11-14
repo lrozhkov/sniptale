@@ -82,3 +82,71 @@ it('converts duplicate backgrounds into annotations without background metadata'
   expect(duplicate.sniptaleBackgroundBlurAmount).toBeUndefined();
   expect(duplicate.sniptaleBackgroundColor).toBeUndefined();
 });
+
+it('retains validated source crop only for the same managed image source', () => {
+  const data = 'data:image/png;base64,QUJDRA==';
+  const frame = createFrame({ backgroundMode: 'image', backgroundImageData: data });
+  const previous = new Rect({});
+  assignBackgroundMetadata(previous, frame);
+  previous.sniptaleRasterOriginalData = data;
+  previous.sniptaleRasterColorData = data;
+  previous.sniptaleRasterVisibilityData = data;
+  previous.sniptaleRasterKeyData = data;
+  previous.sniptaleRasterState = {
+    version: 1,
+    width: 12,
+    height: 8,
+    crop: { x: 2, y: 1, width: 8, height: 6 },
+  };
+  const next = new Rect({});
+  assignBackgroundMetadata(next, {
+    ...frame,
+    backgroundImageFit: 'tile',
+    backgroundBlurAmount: 12,
+  });
+  preserveBackgroundLayerState(next, previous);
+  expect(next.sniptaleRasterState).toEqual(previous.sniptaleRasterState);
+  expect(next.sniptaleRasterOriginalData).toBe(data);
+  expect(next.sniptaleRasterColorData).toBe(data);
+  expect(next.sniptaleRasterVisibilityData).toBe(data);
+  expect(next.sniptaleRasterKeyData).toBe(data);
+  for (const changed of [
+    { ...frame, backgroundImageData: 'data:image/png;base64,RUZHSA==' },
+    { ...frame, backgroundMode: 'color' as const },
+  ]) {
+    assignBackgroundMetadata(next, changed);
+    preserveBackgroundLayerState(next, previous);
+    expect(next.sniptaleRasterState).toBeUndefined();
+    expect(next.sniptaleRasterOriginalData).toBeUndefined();
+  }
+  previous.sniptaleRasterOriginalData = 'https://example.com/source.png';
+  assignBackgroundMetadata(next, frame);
+  preserveBackgroundLayerState(next, previous);
+  expect(next.sniptaleRasterState).toBeUndefined();
+});
+
+it('preserves same-image native orientation/effects and clears them on replacement', () => {
+  const previous = new Rect({ flipX: true, flipY: true });
+  const frame = createFrame({
+    backgroundMode: 'image',
+    backgroundImageData: 'data:image/png;base64,QUJDRA==',
+  });
+  assignBackgroundMetadata(previous, frame);
+  previous.sniptaleEffects = [{ id: 'brightness', enabled: true, amount: 0.3 }];
+  previous.sniptaleContentLocked = false;
+  const next = new Rect();
+  assignBackgroundMetadata(next, { ...frame, backgroundImageFit: 'tile' });
+  preserveBackgroundLayerState(next, previous);
+  expect(next.flipX).toBe(true);
+  expect(next.flipY).toBe(true);
+  expect(next.sniptaleEffects).toEqual(previous.sniptaleEffects);
+  expect(next.sniptaleContentLocked).toBe(false);
+  assignBackgroundMetadata(next, {
+    ...frame,
+    backgroundImageData: 'data:image/png;base64,RUZHSA==',
+  });
+  preserveBackgroundLayerState(next, previous);
+  expect(next.flipX).toBe(false);
+  expect(next.flipY).toBe(false);
+  expect(next.sniptaleEffects).toBeUndefined();
+});

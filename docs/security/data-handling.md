@@ -86,6 +86,14 @@ Parsed SDK error metadata remains inside the bounded background receiver. Only f
 
 Settings transfer excludes credentials, local observations, cached catalog facts and runtime approval state. Export retains a disabled flag for known lifecycle blocks when it omits catalog evidence. Imported configuration carries no request approval. See [AI persistence](../architecture/persistence-contracts.md#ai-settings-graph-and-alpha-reset) for alpha reset and transfer admission.
 
+### Image editor requests
+
+`background/ai/image/request.ts` owns image credentials and network requests. The existing session capability binds each operation to its editor document and approved payload. This payload includes the prompt, raster inputs, parameters and provider destination. Check current provider admission before each dispatch. The editor checks current document applicability before Apply.
+
+Send inline raster data only. Reject remote result URLs. Bound encoded bytes and raster dimensions before bitmap allocation. Request each variant once without automatic paid retries. Preserve completed previews when a later variant fails. Cancellation excludes late previews. Local-data erasure excludes new jobs and drains active jobs through the existing job owner.
+
+Keep prompts and preview bytes in the temporary editor session. Do not add them to request history, diagnostics or settings transfer. Only explicit Apply adds a result to the document. Document retention then follows the existing document policy.
+
 ## Import and export
 
 Media backup payload layouts `library-folders-v2`, `library-folders-v3` and `library-folders-v4` treat authored strings as text rather than binary signatures. Canonical domain owners check resource roles and portable references. Image-document Canvas source/background/blur slots still require declared object references. Restrict PNG window-header transport to the existing normalized PNG/64-pixel decoration profile. Import revalidates the declared JSON/PNG inventory, MIME, UTF-8 and expanded metadata limits directly in the ZIP before runtime staging.
@@ -450,3 +458,13 @@ Erasure reserves credential admission synchronously. It drains sync before it ac
 Design Review retains authored feedback, page evidence and bounded PNG previews in local storage. Session-only bindings identify the native tab. A document lease and a revision reject stale writes after navigation or deletion. The session owner acknowledges a save only after storage accepts the write. Failed writes retain the last accepted data. Unavailable page elements never cause automatic feedback deletion. Explicit feedback deletion or Clear removes the selected authored records.
 
 Feedback actions accept native trusted clicks and the existing private mouse bridge. Synthetic page clicks cannot remove retained feedback. Preview images remain inside closed, non-clonable, non-serializable shadow roots. Public host attributes and children contain no raster URL. The user can explicitly export the complete session as text or PDF. Automatic sync, Library and backup omit these local records. Verified local-data erasure excludes new commands, drains accepted writes, revokes leases and removes local records and session bindings.
+
+## Vector SVG admission
+
+The editor applies one preparation policy to local SVG, Iconify artwork, catalog results, and restored vector definitions. Strict admission checks the source size before parsing and enforces the existing SVG profile and geometry limits. Scripts, event handlers, HTML, CSS, resource references, and unsupported SVG features cause explicit refusal.
+
+The platform SVG sanitizer applies DOMPurify to admitted canonical SVG with explicit tag, attribute, and namespace limits. The editor normalizes the sanitized result again. It rejects any change to canonical artwork, geometry, palette slots, or capabilities. Security decisions do not use `DOMPurify.removed`.
+
+An isolated sanitizer preserves admitted attribute whitespace before DOMPurify checks each attribute. It does not override attribute admission or restore removed content.
+
+Definition identities use the existing canonical serialization, independently of DOMPurify serialization. The editor checks restored definitions before Fabric projection, even when their stored digest matches. Palette previews, movement, and resizing do not invoke the sanitizer. Existing DOM-free storage codecs retain their structural and digest checks.

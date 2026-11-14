@@ -1,14 +1,34 @@
-import type { EditorLayerItem } from '../../../features/editor/document/types';
+import type { EditorLayerChild, EditorLayerItem } from '../../../features/editor/document/types';
 import { translate } from '../../../platform/i18n';
 
 function getSelectedLayers(layers: EditorLayerItem[]) {
-  return layers.filter((layer) => layer.selected);
+  const selected: Array<EditorLayerItem & { nested?: true }> = layers.filter(
+    (layer) => layer.selected
+  );
+  const collect = (children: EditorLayerChild[], parent: EditorLayerItem) => {
+    for (const child of children) {
+      const layer = {
+        ...parent,
+        ...child,
+        immutable: false,
+        reorderable: false,
+        locked: parent.locked || child.locked === true,
+        selected: child.selected === true,
+        nested: true as const,
+      };
+      if (child.selected) selected.push(layer);
+      if (child.groupChildren) collect(child.groupChildren, layer);
+    }
+  };
+  for (const layer of layers) if (layer.groupChildren) collect(layer.groupChildren, layer);
+  return selected;
 }
 
 const groupableLayerTypes = new Set<EditorLayerItem['type']>([
   'pencil',
   'marker',
   'shape',
+  'vector-element',
   'simplify',
   'blur',
   'arrow',
@@ -28,7 +48,9 @@ export function canReorderLayerSelection(layers: EditorLayerItem[]) {
 
 export function canMergeLayerSelection(layers: EditorLayerItem[]) {
   const selectedLayers = getSelectedLayers(layers);
-  return selectedLayers.length >= 2 && selectedLayers.every((layer) => !layer.locked);
+  return (
+    selectedLayers.length >= 2 && selectedLayers.every((layer) => !layer.locked && !layer.nested)
+  );
 }
 
 export function canGroupLayerSelection(layers: EditorLayerItem[]) {

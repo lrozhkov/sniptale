@@ -12,7 +12,8 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock('fabric', () => ({
+vi.mock('fabric', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('fabric')>()),
   FabricImage: {
     fromURL: mocks.fromUrlMock,
   },

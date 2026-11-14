@@ -63,6 +63,8 @@ const EMPTY_DOCUMENT: DrawingDocument = { version: 1, objects: [] };
 export interface DrawingObjectProjection {
   capture(object: DrawingObject, previous?: DrawingObject): void;
   resolve(object: DrawingObject): DrawingObject;
+  /** Invalidates derived layout without publishing a document commit. */
+  subscribe?(listener: () => void): () => void;
 }
 
 type DrawingSessionOptions = {
@@ -106,14 +108,17 @@ class DrawingSessionOwner implements DrawingSession {
   private disposed = false;
   private commitInProgress = false;
   private readonly listeners = new Set<() => void>();
+  private readonly unsubscribeProjection: (() => void) | undefined;
 
   constructor(private readonly options: DrawingSessionOptions) {
     this.document = options.initialDocument ?? EMPTY_DOCUMENT;
     this.document.objects.forEach((object) => options.objectProjection?.capture(object));
     this.defaults = options.defaults ?? createDefaultDrawingToolDefaults();
+    this.unsubscribeProjection = options.objectProjection?.subscribe?.(() => this.emit());
   }
 
   private emit() {
+    if (this.disposed) return;
     this.revision += 1;
     this.listeners.forEach((listener) => listener());
   }
@@ -371,6 +376,7 @@ class DrawingSessionOwner implements DrawingSession {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.unsubscribeProjection?.();
     this.options.onDispose?.();
     this.listeners.clear();
     this.document = EMPTY_DOCUMENT;

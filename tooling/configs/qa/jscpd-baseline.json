@@ -4,6 +4,24 @@
   "description": "Complete exact-finding jscpd tool-noise baseline after repository-wide triage and justified consolidation.",
   "allowances": [
     {
+      "id": "0209593cf8454908da9e8e94ba6e1745edede1a8692f2e07e07cadb5fce73c5b",
+      "classification": "tool-noise",
+      "owner": "editor AI prompt <-> scenario editor voice field",
+      "reason": "The match contains field, latest value, insertion and caret refs and the shared-session callback opening. Image prompting owns operation-change cancellation, trimmed dictated text, a 4000-character limit and separators beside any non-whitespace text. Scenario fields own disabled-only cancellation, configurable limits, single-line newline normalization, punctuation-sensitive separators and preserved dictated whitespace. composition/voice-input/session already owns transport and session lifecycle; extracting refs would create a state bag without unifying placement policy.",
+      "removalCondition": "Remove when this exact pair disappears or an accepted common field-placement contract replaces both consumers.",
+      "reviewBy": "2027-05-14",
+      "firstFile": {
+        "path": "apps/extension/src/editor/ai/prompt.tsx",
+        "start": 16,
+        "end": 23
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/voice-field.tsx",
+        "start": 29,
+        "end": 36
+      }
+    },
+    {
       "id": "02148ac7b09762f19e9f9f74869f8e4d007e24685cf15a1ba5eaa9cf2e6b8df8",
       "classification": "tool-noise",
       "owner": "apps/extension/src/composition/persistence/assets/resource-sessions.ts",
@@ -55,6 +73,24 @@
         "path": "apps/extension/src/composition/frame-annotation-controls/step-badge/preset-list.tsx",
         "start": 131,
         "end": 145
+      }
+    },
+    {
+      "id": "03384ca77ad22b3dcd60f02cbf0f31ab9a4160433838f4727a86184cfae6bce9",
+      "classification": "tool-noise",
+      "owner": "composition/persistence/infrastructure/indexed-db",
+      "reason": "These ranges import canonical store identifiers for separate schema-description and native-upgrade consumers. The match contains no duplicate executable algorithm or store definition.",
+      "removalCondition": "Remove when this exact detector pair disappears or either consumer no longer needs these imports.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.ts",
+        "start": 4,
+        "end": 39
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
+        "start": 6,
+        "end": 41
       }
     },
     {
@@ -544,24 +580,6 @@
       }
     },
     {
-      "id": "2696feb869c7392adcb782e23b021925b86782f13949bf1fa7f4811269da3e9d",
-      "classification": "tool-noise",
-      "owner": "packages/ui design tokens",
-      "reason": "The base rule declares font, geometry, and motion tokens on all theme hosts. The second repeats those hosts inside prefers-reduced-motion and assigns zero-duration/ease motion tokens.",
-      "removalCondition": "Remove this finding if theme host selectors or the reduced-motion override change enough that these exact ranges no longer match.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "packages/ui/src/styles/design-tokens.css",
-        "start": 1,
-        "end": 8
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/design-tokens.css",
-        "start": 194,
-        "end": 201
-      }
-    },
-    {
       "id": "2776d5072aa3b062890873fe2cdf2c499f324e67edf2808199db60638b421582",
       "classification": "tool-noise",
       "owner": "tooling/design-reference example entry pages",
@@ -973,24 +991,6 @@
         "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
         "start": 660,
         "end": 668
-      }
-    },
-    {
-      "id": "456f3325705809f363d6136e12f2ce194bb966a12d0497b2747467f3b3f747ec",
-      "classification": "tool-noise",
-      "owner": "composition/persistence/infrastructure/indexed-db",
-      "reason": "These ranges import canonical store identifiers for separate schema-description and native-upgrade consumers. The match contains no duplicate executable algorithm or store definition.",
-      "removalCondition": "Remove when this exact detector pair disappears or either consumer no longer needs these imports.",
-      "reviewBy": "2027-05-02",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.ts",
-        "start": 4,
-        "end": 38
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
-        "start": 6,
-        "end": 40
       }
     },
     {
@@ -1480,6 +1480,24 @@
       }
     },
     {
+      "id": "69e6d0fa8504c80e19236e11308ed41981efb9c0c7c95bb5a423e4138e49c640",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/workflows/media-hub-backup/v6/root-codecs/editor-document.ts",
+      "reason": "Portable editor-document projection and restoration are inverse recursive traversals with different binary-field terminal operations.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/root-codecs/editor-document.ts",
+        "start": 143,
+        "end": 148
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/root-codecs/editor-document.ts",
+        "start": 52,
+        "end": 57
+      }
+    },
+    {
       "id": "6e1384ef94b9fc327263ed7a99568290be8c66bbdbacb0c09ab042527b75d23b",
       "classification": "tool-noise",
       "owner": "apps/extension/src/features/video/project/factories/project-recording.ts",
@@ -1912,24 +1930,6 @@
       }
     },
     {
-      "id": "92c465654b53e16df9ffa44de355209a1f9a13a7f2f9fc3be429d00cc744f809",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/editor/controller/document/interaction-controls <-> apps/extension/src/editor/drawing/object/controls",
-      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
-      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/editor/controller/document/interaction-controls/rotate.ts",
-        "start": 26,
-        "end": 42
-      },
-      "secondFile": {
-        "path": "apps/extension/src/editor/drawing/object/controls/chrome.ts",
-        "start": 53,
-        "end": 69
-      }
-    },
-    {
       "id": "93515c92082f31b716997e5b5449f5387d5967be2c1118e56070c4dae3c00903",
       "classification": "tool-noise",
       "owner": "tooling/design-reference example entry pages",
@@ -2125,24 +2125,6 @@
         "path": "packages/ui/src/styles/ai-modal-content/preview-actions.css",
         "start": 16,
         "end": 23
-      }
-    },
-    {
-      "id": "990bcb7c4cc687f50f56335fa3707cfa0e6f3c9a74c333753f13a6214a4e12c5",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/workflows/media-hub-backup/v6/root-codecs/editor-document.ts",
-      "reason": "Portable editor-document projection and restoration are inverse recursive traversals with different binary-field terminal operations.",
-      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/workflows/media-hub-backup/v6/root-codecs/editor-document.ts",
-        "start": 121,
-        "end": 126
-      },
-      "secondFile": {
-        "path": "apps/extension/src/workflows/media-hub-backup/v6/root-codecs/editor-document.ts",
-        "start": 44,
-        "end": 49
       }
     },
     {
@@ -2455,7 +2437,7 @@
       "id": "aa6914db950192ac7705fe43e6d735e74c09a67144a00f8e226e9e406d75743e",
       "classification": "tool-noise",
       "owner": "features/video/audio/source-envelope",
-      "reason": "The common initial loop shape surrounds materially different accepted intent: gain allows volume\u22642, minimum0.001s, sorts and rejects overlap; attenuation allows volume\u22641, anypositive duration and retains overlapping/order intent.",
+      "reason": "The common initial loop shape surrounds materially different accepted intent: gain allows volume≤2, minimum0.001s, sorts and rejects overlap; attenuation allows volume≤1, anypositive duration and retains overlapping/order intent.",
       "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
       "reviewBy": "2027-04-15",
       "firstFile": {
@@ -2845,6 +2827,24 @@
         "path": "apps/extension/src/features/simplify/engine/structure.mjs",
         "start": 158,
         "end": 165
+      }
+    },
+    {
+      "id": "c0a4fd02f32fb6fc787186287a5c73ad7fe69fbcb1a185a74b0bfbd4991b3860",
+      "classification": "tool-noise",
+      "owner": "packages/ui design tokens",
+      "reason": "The base rule declares font, geometry, and motion tokens on all theme hosts. The second repeats those hosts inside prefers-reduced-motion and assigns zero-duration/ease motion tokens.",
+      "removalCondition": "Remove this finding if theme host selectors or the reduced-motion override change enough that these exact ranges no longer match.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "packages/ui/src/styles/design-tokens.css",
+        "start": 1,
+        "end": 8
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/design-tokens.css",
+        "start": 198,
+        "end": 205
       }
     },
     {
@@ -3259,24 +3259,6 @@
         "path": "apps/extension/src/popup/shell/app/startup.css",
         "start": 28,
         "end": 35
-      }
-    },
-    {
-      "id": "db7482661d9e46db860943d7740ee467c303623fe2e6febf84ffdb96af364253",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/contracts/ai/content-text.ts",
-      "reason": "Content requests bind privacyProof and extracted text. Review requests bind workspace context and revisioned scope. Equal approval field spelling does not unify these wire protocols.",
-      "removalCondition": "Remove when this exact match disappears or an accepted common owner replaces the stated contract distinction.",
-      "reviewBy": "2027-04-28",
-      "firstFile": {
-        "path": "apps/extension/src/contracts/ai/content-text.ts",
-        "start": 57,
-        "end": 64
-      },
-      "secondFile": {
-        "path": "apps/extension/src/contracts/ai/review-text.ts",
-        "start": 231,
-        "end": 238
       }
     },
     {

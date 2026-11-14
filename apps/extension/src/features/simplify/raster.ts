@@ -1,4 +1,5 @@
 import { prepare, render, paint, drawReplacement, ENGINE_VERSION } from './engine/render.mjs';
+import { findCleanupMedia } from './engine/cleanup-media.mjs';
 import { sampleBackground } from './engine/detector.mjs';
 import { attachEraseSupport, eraseOwned } from './engine/erasures.mjs';
 import type { SimplifySettings } from './settings';
@@ -87,6 +88,7 @@ export function createSimplifyRaster(input: SimplifyPixelSource): SimplifyRaster
       const bounds = { x: region.x, y: region.y, w: region.width, h: region.height };
       const style = {
         content: settings.content,
+        erase: settings.erase === true,
         sensitivity: settings.sensitivity,
         thickness: settings.thickness,
         color: settings.color === null ? ('auto' as const) : ('custom' as const),
@@ -96,6 +98,20 @@ export function createSimplifyRaster(input: SimplifyPixelSource): SimplifyRaster
         prepareCatalog();
         if (!catalog) throw new Error('Simplify analysis is unavailable.');
         render(context, source, catalog, style, bounds);
+        if (settings.erase) {
+          context.save();
+          try {
+            context.beginPath();
+            context.rect(bounds.x, bounds.y, bounds.w, bounds.h);
+            context.clip();
+            for (const box of findCleanupMedia(image, region)) {
+              context.fillStyle = `rgb(${box.bg.join(',')})`;
+              context.fillRect(box.x, box.y, box.w, box.h);
+            }
+          } finally {
+            context.restore();
+          }
+        }
         return;
       }
       context.clearRect(0, 0, image.width, image.height);

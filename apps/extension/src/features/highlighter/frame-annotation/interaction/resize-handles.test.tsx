@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { FrameAnnotationResizeHandleLayer } from './resize-handles';
 
 describe('frame annotation resize handles', () => {
-  it('centers handles on the middle of an outward stroke', () => {
+  it('centers handles on document geometry without compensating for the drawn stroke', () => {
     const html = renderToStaticMarkup(
       <FrameAnnotationResizeHandleLayer
         directions={['nw']}
@@ -20,8 +20,8 @@ describe('frame annotation resize handles', () => {
       />
     );
 
-    expect(html).toContain('left:3px');
-    expect(html).toContain('top:13px');
+    expect(html).toContain('left:5.5px');
+    expect(html).toContain('top:15.5px');
   });
 
   it.each([{ visualScale: 4 }, { visualScale: 0.5 }, { visualScale: 0.2 }])(
@@ -39,9 +39,10 @@ describe('frame annotation resize handles', () => {
         />
       );
 
-      const strokeOutset = (4 * sample.visualScale) / 2;
-      expect(html).toContain(`left:${10 - strokeOutset - 5}px`);
-      expect(html).toContain(`top:${20 - strokeOutset - 5}px`);
+      expect(html).toContain('left:5.5px');
+      expect(html).toContain('top:15.5px');
+      expect(html).toContain('width:9px');
+      expect(html).toContain('height:9px');
     }
   );
 
@@ -65,14 +66,14 @@ describe('frame annotation resize handles', () => {
     const handles = [...container.querySelectorAll<HTMLElement>('.sniptale-resize-handle')];
     expect(handles).toHaveLength(8);
     const expected = [
-      ['nw', 5, 15, 'nwse-resize'],
-      ['n', 55, 15, 'ns-resize'],
-      ['ne', 105, 15, 'nesw-resize'],
-      ['e', 105, 55, 'ew-resize'],
-      ['se', 105, 95, 'nwse-resize'],
-      ['s', 55, 95, 'ns-resize'],
-      ['sw', 5, 95, 'nesw-resize'],
-      ['w', 5, 55, 'ew-resize'],
+      ['nw', 5.5, 15.5, 'nwse-resize'],
+      ['n', 54, 17, 'ns-resize'],
+      ['ne', 105.5, 15.5, 'nesw-resize'],
+      ['e', 107, 54, 'ew-resize'],
+      ['se', 105.5, 95.5, 'nwse-resize'],
+      ['s', 54, 97, 'ns-resize'],
+      ['sw', 5.5, 95.5, 'nesw-resize'],
+      ['w', 7, 54, 'ew-resize'],
     ] as const;
     for (const [index, handle] of handles.entries()) {
       const [direction, left, top, cursor] = expected[index]!;
@@ -89,4 +90,21 @@ describe('frame annotation resize handles', () => {
     act(() => root.unmount());
     vi.unstubAllGlobals();
   });
+});
+
+it('keeps annotation controls on document snap geometry independently of stroke width', () => {
+  for (const strokeWidth of [0, 1, 8, 20]) {
+    const html = renderToStaticMarkup(
+      <FrameAnnotationResizeHandleLayer
+        frameId="aligned"
+        frameRect={{ x: 40, y: 60, width: 100, height: 80 }}
+        handleSize={9}
+        strokeWidth={strokeWidth}
+        directions={['nw']}
+        onResizeStart={vi.fn()}
+      />
+    );
+    expect(html).toContain('left:35.5px');
+    expect(html).toContain('top:55.5px');
+  }
 });

@@ -6,12 +6,13 @@ import {
   type DrawingShapeObject,
 } from './model';
 import { resolveDrawingTextHeight } from './text-layout';
+import { resolveDrawingTextInkLayout, type DrawingTextMetrics } from './text-ink';
 
 export type DrawingTextMeasurementPort = (args: {
   fontFamily: DrawingFontFamily;
   fontSize: number;
   line: string;
-}) => number;
+}) => number | DrawingTextMetrics;
 
 export type SelectedQuickDrawingObject =
   | Extract<DrawingObject, { kind: 'pencil' | 'marker' | 'arrow' | 'text' }>
@@ -39,6 +40,20 @@ function resolveUpdatedTextBounds(
   measureText?: DrawingTextMeasurementPort
 ) {
   if (!typographyChanged) return selected.bounds;
+  const probe = measureText?.({ fontFamily, fontSize, line: '' });
+  if (probe && typeof probe !== 'number' && measureText) {
+    const layout = resolveDrawingTextInkLayout({
+      text: selected.text,
+      fontSize,
+      wrapWidth: selected.wrapWidth ?? selected.bounds.width,
+      autoWidth: selected.autoWidth ?? false,
+      measure: (line) => {
+        const metrics = measureText({ fontFamily, fontSize, line });
+        return typeof metrics === 'number' ? { width: metrics } : metrics;
+      },
+    });
+    return { ...selected.bounds, width: layout.width, height: layout.height };
+  }
   return {
     ...selected.bounds,
     height: Math.ceil(
@@ -46,7 +61,12 @@ function resolveUpdatedTextBounds(
         selected.text,
         fontSize,
         selected.bounds.width,
-        measureText ? (line) => measureText({ fontFamily, fontSize, line }) : undefined
+        measureText
+          ? (line) => {
+              const metrics = measureText({ fontFamily, fontSize, line });
+              return typeof metrics === 'number' ? metrics : metrics.width;
+            }
+          : undefined
       )
     ),
   };

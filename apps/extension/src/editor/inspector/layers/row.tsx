@@ -1,4 +1,5 @@
 import React from 'react';
+import { GripVertical } from 'lucide-react';
 import type { EditorLayerItem } from '../../../features/editor/document/types';
 import { translate, type AppLocale } from '../../../platform/i18n';
 import { useEditorController } from '../../application/controller-context';
@@ -7,17 +8,18 @@ import { LayerActionRail, LayerExpandedActions } from './actions';
 import { LayerName, useEditableLayerName } from './editable-name';
 import { useExpandedActionsVisibility } from './hover-visibility';
 import { LayerPreview } from './preview';
-import { getLayerRowClassName, LAYER_TRIGGER_CLASS_NAME } from './shared';
+import {
+  getLayerRowClassName,
+  LAYER_TRIGGER_CLASS_NAME,
+  LAYER_ICON_CLASS_NAME,
+  LAYER_ICON_SURFACE_CLASS_NAME,
+} from './shared';
 import type { EditorLayerEffectsOpenHandler } from './types';
 
 const selectionToggleFocusClassName =
   'focus-visible:outline-none focus-visible:ring-2 ' +
   'focus-visible:ring-[color:color-mix(in_srgb,var(--sniptale-color-accent)_42%,transparent)]';
 type LayerEffectOpener = EditorLayerEffectsOpenHandler;
-type LayerButtonDragHandlers = Pick<
-  ReturnType<typeof createLayerDragHandlers>,
-  'onDragEnd' | 'onDragStart'
->;
 
 function getLayerSelectionClickOptions(
   event: React.MouseEvent,
@@ -36,7 +38,11 @@ function getLayerSelectionClickOptions(
 function LayerSelectionToggle({
   autoNavigateSelectedLayer,
   layer,
+  onPointerStart,
+  canDrag,
 }: {
+  onPointerStart?: (id: string, event: React.PointerEvent<HTMLButtonElement>) => void;
+  canDrag: boolean;
   autoNavigateSelectedLayer: boolean;
   layer: EditorLayerItem;
 }) {
@@ -46,8 +52,18 @@ function LayerSelectionToggle({
     <button
       type="button"
       aria-pressed={layer.selected}
-      title={translate('editor.toolbar.toggleLayerSelection')}
-      className={cx('shrink-0 rounded-[4px] transition', selectionToggleFocusClassName)}
+      title={translate(
+        canDrag ? 'editor.toolbar.dragLayer' : 'editor.toolbar.toggleLayerSelection'
+      )}
+      data-ui={canDrag ? 'editor.layers.drag-handle' : 'editor.layers.selection-toggle'}
+      draggable={false}
+      onDragStart={(event) => event.preventDefault()}
+      onPointerDown={canDrag ? (event) => onPointerStart?.(layer.id, event) : undefined}
+      className={cx(
+        'shrink-0 rounded-[4px] transition',
+        canDrag && 'cursor-grab active:cursor-grabbing',
+        selectionToggleFocusClassName
+      )}
       onMouseDown={(event) => event.stopPropagation()}
       onClick={(event) => {
         event.preventDefault();
@@ -58,7 +74,13 @@ function LayerSelectionToggle({
         );
       }}
     >
-      <LayerPreview layer={layer} />
+      {canDrag ? (
+        <span aria-hidden className={cx(LAYER_ICON_CLASS_NAME, LAYER_ICON_SURFACE_CLASS_NAME)}>
+          <GripVertical size={14} />
+        </span>
+      ) : (
+        <LayerPreview layer={layer} />
+      )}
     </button>
   );
 }
@@ -87,10 +109,8 @@ function LayerEditingShell(props: {
 }
 
 function LayerButtonTrigger(props: {
-  dragHandlers: LayerButtonDragHandlers;
   editableName: ReturnType<typeof useEditableLayerName>;
   autoNavigateSelectedLayer: boolean;
-  isImmutable: boolean;
   layer: EditorLayerItem;
   triggerClassName: string;
 }) {
@@ -99,9 +119,7 @@ function LayerButtonTrigger(props: {
   return (
     <button
       type="button"
-      draggable={!props.isImmutable}
-      onDragStart={props.dragHandlers.onDragStart}
-      onDragEnd={props.dragHandlers.onDragEnd}
+      draggable={false}
       onClick={(event) =>
         controller.selectLayer(
           props.layer.id,
@@ -123,10 +141,8 @@ function LayerButtonTrigger(props: {
 }
 
 function LayerTrigger(props: {
-  dragHandlers: LayerButtonDragHandlers;
   editableName: ReturnType<typeof useEditableLayerName>;
   autoNavigateSelectedLayer: boolean;
-  isImmutable: boolean;
   layer: EditorLayerItem;
 }) {
   const triggerClassName = cx(
@@ -147,10 +163,8 @@ function LayerTrigger(props: {
 
   return (
     <LayerButtonTrigger
-      dragHandlers={props.dragHandlers}
       editableName={props.editableName}
       autoNavigateSelectedLayer={props.autoNavigateSelectedLayer}
-      isImmutable={props.isImmutable}
       layer={props.layer}
       triggerClassName={triggerClassName}
     />
@@ -158,112 +172,78 @@ function LayerTrigger(props: {
 }
 
 function LayerInlineActionsSlot(props: {
-  dragHandlers: LayerButtonDragHandlers;
   editableName: ReturnType<typeof useEditableLayerName>;
   expandedActionsVisible: boolean;
   autoNavigateSelectedLayer: boolean;
   isImmutable: boolean;
-  isDragDisabled: boolean;
   layer: EditorLayerItem;
   onOpenLayerEffects: LayerEffectOpener;
 }) {
   return (
     <div className="flex min-w-0 w-full items-center overflow-hidden">
       <LayerTrigger
-        dragHandlers={props.dragHandlers}
         editableName={props.editableName}
         autoNavigateSelectedLayer={props.autoNavigateSelectedLayer}
-        isImmutable={props.isDragDisabled}
         layer={props.layer}
       />
       <LayerExpandedActions
+        isImmutable={props.isImmutable}
         autoNavigateSelectedLayer={props.autoNavigateSelectedLayer}
         editingName={props.editableName.editingName}
-        isImmutable={props.isImmutable}
         layer={props.layer}
         visible={props.expandedActionsVisible}
-        onRenameLayer={props.editableName.startEditing}
         onOpenLayerEffects={props.onOpenLayerEffects}
       />
     </div>
   );
 }
 
-function createLayerDragHandlers(props: {
-  isImmutable: boolean;
-  layerId: string;
-  onDrop: (targetLayerId: string) => void;
-  setDraggedLayerId: React.Dispatch<React.SetStateAction<string | null>>;
-  setDragOverLayerId: React.Dispatch<React.SetStateAction<string | null>>;
-}) {
-  return {
-    onDragEnd: () => {
-      props.setDraggedLayerId(null);
-      props.setDragOverLayerId(null);
-    },
-    onDragOver: (event: React.DragEvent<HTMLDivElement>) => {
-      if (!props.isImmutable) {
-        event.preventDefault();
-        props.setDragOverLayerId(props.layerId);
-      }
-    },
-    onDragStart: () => {
-      if (!props.isImmutable) {
-        props.setDraggedLayerId(props.layerId);
-      }
-    },
-    onDrop: (event: React.DragEvent<HTMLDivElement>) => {
-      if (!props.isImmutable) {
-        event.preventDefault();
-        props.onDrop(props.layerId);
-      }
-    },
-  };
-}
-
 export const LayerRow = React.memo(function LayerRow(props: {
   layer: EditorLayerItem;
   // The list's single locale subscription invalidates every memoized row.
   locale: AppLocale;
-  dragOverLayerId: string | null;
+  draggedLayerId?: string | null;
+  dragBlocked?: boolean;
+  onPointerStart?: (id: string, event: React.PointerEvent<HTMLButtonElement>) => void;
   autoNavigateSelectedLayer?: boolean;
-  setDraggedLayerId: React.Dispatch<React.SetStateAction<string | null>>;
-  setDragOverLayerId: React.Dispatch<React.SetStateAction<string | null>>;
-  onDrop: (targetLayerId: string) => void;
   onOpenLayerEffects: LayerEffectOpener;
 }) {
   const isImmutable = Boolean(props.layer.immutable);
   const isDragDisabled = !props.layer.reorderable && (isImmutable || props.layer.locked);
   const editableName = useEditableLayerName(props.layer);
   const expandedActionsVisibility = useExpandedActionsVisibility();
-  const dragHandlers = createLayerDragHandlers({
-    isImmutable: isDragDisabled,
-    layerId: props.layer.id,
-    onDrop: props.onDrop,
-    setDraggedLayerId: props.setDraggedLayerId,
-    setDragOverLayerId: props.setDragOverLayerId,
-  });
 
   return (
     <div
       key={props.layer.id}
-      onDragOver={dragHandlers.onDragOver}
-      onDrop={dragHandlers.onDrop}
+      data-editor-layer-id={props.layer.id}
+      data-parent-context={
+        props.layer.containsSelection && !props.layer.selected ? true : undefined
+      }
       onMouseEnter={expandedActionsVisibility.showExpandedActions}
       onMouseLeave={expandedActionsVisibility.hideExpandedActions}
-      className={getLayerRowClassName(props.layer, props.dragOverLayerId, isImmutable)}
+      data-dragging={props.draggedLayerId === props.layer.id || undefined}
+      className={cx(
+        getLayerRowClassName(props.layer, null, isImmutable),
+        props.draggedLayerId === props.layer.id &&
+          'z-20 !border-[color:var(--sniptale-color-border-strong)] ' +
+            '!bg-[color:var(--sniptale-color-surface-hover)] ring-1 ring-inset ' +
+            'ring-[var(--sniptale-color-border-strong)]'
+      )}
     >
       <LayerSelectionToggle
+        canDrag={props.layer.selected && !isDragDisabled && !props.dragBlocked}
+        {...(props.onPointerStart ? { onPointerStart: props.onPointerStart } : {})}
         autoNavigateSelectedLayer={props.autoNavigateSelectedLayer === true}
         layer={props.layer}
       />
       <LayerInlineActionsSlot
-        dragHandlers={dragHandlers}
         editableName={editableName}
-        expandedActionsVisible={expandedActionsVisibility.expandedActionsVisible}
+        expandedActionsVisible={
+          !props.draggedLayerId && expandedActionsVisibility.expandedActionsVisible
+        }
         autoNavigateSelectedLayer={props.autoNavigateSelectedLayer === true}
         isImmutable={isImmutable}
-        isDragDisabled={isDragDisabled}
         layer={props.layer}
         onOpenLayerEffects={props.onOpenLayerEffects}
       />

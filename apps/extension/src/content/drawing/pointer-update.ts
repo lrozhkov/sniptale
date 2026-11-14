@@ -2,6 +2,8 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import {
   appendDrawingSamples,
   getDrawingSelectionBounds,
+  getDrawingObjectSelectionBounds,
+  type DrawingSnapFeedback,
   transformDrawingObjectVector,
   resolveDrawingMarqueeSelection,
   translateDrawingObject,
@@ -15,10 +17,10 @@ import {
   resolveDrawingMoveAlignment,
   resolveDrawingResizeAlignment,
   getDrawingResizeHandleGeometry,
-  type DrawingAlignmentGuide,
 } from './move-alignment';
 import { collectDrawingDomAlignmentBounds } from './move-alignment-dom';
 import {
+  getDrawingViewportProjection,
   resizeDrawingObject,
   rotateDrawingObject,
   rotateDrawingSelection,
@@ -128,6 +130,8 @@ type DrawingPointerUpdateInput = {
   root: PageScrollRoot;
   modifiers?: { altKey?: boolean; ctrlKey: boolean; shiftKey: boolean };
   alignToPage?: boolean;
+  previousFeedback?: DrawingSnapFeedback;
+  relationObjects?: readonly DrawingObject[];
 };
 
 function updateRawDrawingPointerDraft(args: DrawingPointerUpdateInput): {
@@ -186,58 +190,103 @@ function updateRawDrawingPointerDraft(args: DrawingPointerUpdateInput): {
   };
 }
 
+function visibleRelationObjects(objects: readonly DrawingObject[], root: PageScrollRoot) {
+  const projection = getDrawingViewportProjection(root);
+  const rect = root.kind === 'element' ? root.element.getBoundingClientRect() : null;
+  const visible = {
+    left: Math.max(0, rect?.left ?? 0) + projection.x,
+    top: Math.max(0, rect?.top ?? 0) + projection.y,
+    right: Math.min(window.innerWidth, rect?.right ?? window.innerWidth) + projection.x,
+    bottom: Math.min(window.innerHeight, rect?.bottom ?? window.innerHeight) + projection.y,
+  };
+  return objects.filter((object) => {
+    if (object.kind === 'marker' && object.opacity <= 0) return false;
+    const bounds = getDrawingObjectSelectionBounds(object);
+    return (
+      bounds.x < visible.right &&
+      bounds.y < visible.bottom &&
+      bounds.x + bounds.width > visible.left &&
+      bounds.y + bounds.height > visible.top
+    );
+  });
+}
+
+type AlignmentContext = {
+  objects: readonly DrawingObject[];
+  root: PageScrollRoot;
+  point: DrawingPoint;
+  modifiers: { ctrlKey: boolean; shiftKey: boolean };
+  previousFeedback?: DrawingSnapFeedback;
+  relationObjects: readonly DrawingObject[];
+};
+
+function alignResizeDraft(
+  draft: Extract<PointerDraft, { kind: 'resize' }>,
+  context: AlignmentContext
+) {
+  const { objects, root, point, modifiers, previousFeedback, relationObjects } = context;
+  const bounds = getDrawingSelectionBounds([draft.object]);
+  if (!bounds) return { draft, feedback: { guides: [], relations: [], acceptedByAxis: {} } };
+  const geometry = getDrawingResizeHandleGeometry(draft, point, modifiers.ctrlKey);
+  const horizontal = transformDrawingObjectVector(draft.original, {
+    x: geometry.x ? 1 : 0,
+    y: 0,
+  });
+  const vertical = transformDrawingObjectVector(draft.original, { x: 0, y: geometry.y ? 1 : 0 });
+  const probe = {
+    ...(Math.abs(horizontal.x) > 1e-6 || Math.abs(vertical.x) > 1e-6
+      ? { x: geometry.current.x }
+      : {}),
+    ...(Math.abs(horizontal.y) > 1e-6 || Math.abs(vertical.y) > 1e-6
+      ? { y: geometry.current.y }
+      : {}),
+  };
+  const alignment = resolveDrawingResizeAlignment({
+    draft,
+    point,
+    modifiers,
+    objects,
+    domBounds: collectDrawingDomAlignmentBounds(bounds, root, probe),
+    ...(previousFeedback ? { previousFeedback } : {}),
+    relationObjects,
+  });
+  return {
+    draft: { ...draft, object: alignment.object },
+    feedback: {
+      guides: alignment.guides,
+      relations: alignment.relations,
+      acceptedByAxis: alignment.acceptedByAxis,
+    },
+  };
+}
+
 function alignTransformedDraft(
   draft: PointerDraft,
-  objects: readonly DrawingObject[],
-  root: PageScrollRoot,
-  point: DrawingPoint,
-  modifiers: { ctrlKey: boolean; shiftKey: boolean }
-): { draft: PointerDraft; guides: DrawingAlignmentGuide[] } {
-  if (draft.kind === 'resize') {
-    const bounds = getDrawingSelectionBounds([draft.object]);
-    if (!bounds) return { draft, guides: [] };
-    const geometry = getDrawingResizeHandleGeometry(draft, point, modifiers.ctrlKey);
-    const horizontal = transformDrawingObjectVector(draft.original, {
-      x: geometry.x ? 1 : 0,
-      y: 0,
-    });
-    const vertical = transformDrawingObjectVector(draft.original, { x: 0, y: geometry.y ? 1 : 0 });
-    const probe = {
-      ...(Math.abs(horizontal.x) > 1e-6 || Math.abs(vertical.x) > 1e-6
-        ? { x: geometry.current.x }
-        : {}),
-      ...(Math.abs(horizontal.y) > 1e-6 || Math.abs(vertical.y) > 1e-6
-        ? { y: geometry.current.y }
-        : {}),
-    };
-    const alignment = resolveDrawingResizeAlignment({
-      draft,
-      point,
-      modifiers,
-      objects,
-      domBounds: collectDrawingDomAlignmentBounds(bounds, root, probe),
-    });
-    return { draft: { ...draft, object: alignment.object }, guides: alignment.guides };
-  }
+  context: AlignmentContext
+): { draft: PointerDraft; feedback: DrawingSnapFeedback } {
+  const { objects, root, point, modifiers, previousFeedback, relationObjects } = context;
+  if (draft.kind === 'resize') return alignResizeDraft(draft, context);
   const moving =
     draft.kind === 'move' ? [draft.object] : draft.kind === 'move-selection' ? draft.objects : [];
   const bounds = getDrawingSelectionBounds(moving);
-  if (!bounds) return { draft, guides: [] };
+  if (!bounds) return { draft, feedback: { guides: [], relations: [], acceptedByAxis: {} } };
   const axis = modifiers.shiftKey
     ? Math.abs(point.x - draft.start.x) >= Math.abs(point.y - draft.start.y)
       ? 'x'
       : 'y'
     : undefined;
-  const { delta, guides } = resolveDrawingMoveAlignment({
+  const { delta, ...feedback } = resolveDrawingMoveAlignment({
     moving,
     ...(axis ? { axis } : {}),
     objects,
     domBounds: collectDrawingDomAlignmentBounds(bounds, root),
+    ...(previousFeedback ? { previousFeedback } : {}),
+    relationObjects,
   });
   if (draft.kind === 'move')
     return {
       draft: { ...draft, object: translateDrawingObject(draft.object, delta) },
-      guides,
+      feedback,
     };
   if (draft.kind === 'move-selection')
     return {
@@ -245,15 +294,15 @@ function alignTransformedDraft(
         ...draft,
         objects: draft.objects.map((object) => translateDrawingObject(object, delta)),
       },
-      guides,
+      feedback,
     };
-  return { draft, guides: [] };
+  return { draft, feedback: { guides: [], relations: [], acceptedByAxis: {} } };
 }
 
 export function updateDrawingPointerDraft(args: DrawingPointerUpdateInput): {
   draft: PointerDraft;
   selection?: readonly string[];
-  guides?: DrawingAlignmentGuide[];
+  feedback?: DrawingSnapFeedback;
 } {
   const update = updateRawDrawingPointerDraft(args);
   const modifiers = args.modifiers ?? args.event;
@@ -263,12 +312,16 @@ export function updateDrawingPointerDraft(args: DrawingPointerUpdateInput): {
     Math.hypot(args.point.x - args.draft.start.x, args.point.y - args.draft.start.y) < 4
   )
     return update;
-  const aligned = alignTransformedDraft(
-    update.draft,
-    args.documentObjects,
-    args.root,
-    args.point,
-    modifiers
-  );
-  return { ...update, draft: aligned.draft, guides: aligned.guides };
+  const aligned = alignTransformedDraft(update.draft, {
+    objects: args.documentObjects,
+    root: args.root,
+    point: args.point,
+    modifiers,
+    ...(args.previousFeedback ? { previousFeedback: args.previousFeedback } : {}),
+    relationObjects: visibleRelationObjects(
+      args.relationObjects ?? args.documentObjects,
+      args.root
+    ),
+  });
+  return { ...update, draft: aligned.draft, feedback: aligned.feedback };
 }

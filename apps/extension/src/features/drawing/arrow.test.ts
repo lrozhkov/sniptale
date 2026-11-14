@@ -3,6 +3,7 @@ import {
   buildDrawingArrowOutline,
   buildDrawingFreehandArrowLines,
   resolveDrawingArrowBendTarget,
+  removeDrawingArrowBendAtPoint,
   updateDrawingArrowBend,
 } from './arrow';
 import { MAX_DRAWING_ARROW_BENDS } from './model';
@@ -18,6 +19,136 @@ function createArrow(dynamicWidth: boolean) {
     width: 18,
   };
 }
+
+it('removes only the closest authored bend while preserving source data and endpoints', () => {
+  const arrow = {
+    ...createArrow(false),
+    design: 'freehand' as const,
+    bendPoints: [
+      { x: 96, y: 80 },
+      { x: 104, y: 80 },
+    ],
+  };
+  Object.freeze(arrow.bendPoints);
+  Object.freeze(arrow);
+  const result = removeDrawingArrowBendAtPoint(arrow, { x: 102, y: 80 });
+  expect(result).not.toBe(arrow);
+  expect(result).toEqual({ ...arrow, bendPoints: [arrow.bendPoints[0]] });
+  expect(arrow.bendPoints).toHaveLength(2);
+  expect(result.start).toBe(arrow.start);
+  expect(result.end).toBe(arrow.end);
+});
+
+it('restores the canonical straight shaft when the last bend is removed', () => {
+  const arrow = {
+    ...createArrow(false),
+    design: 'freehand' as const,
+    bendPoints: [{ x: 100, y: 80 }],
+  };
+  const result = removeDrawingArrowBendAtPoint(arrow, { x: 100, y: 80 });
+  expect(result.bendPoints).toEqual([]);
+  expect(buildDrawingFreehandArrowLines(result)).toEqual(
+    buildDrawingFreehandArrowLines({ ...createArrow(false), design: 'freehand' })
+  );
+});
+
+it('protects endpoints and endpoint ties even when a bend is close enough to hit', () => {
+  const arrow = {
+    ...createArrow(false),
+    design: 'freehand' as const,
+    bendPoints: [
+      { x: 10, y: 0 },
+      { x: 190, y: 0 },
+    ],
+  };
+  for (const point of [arrow.start, arrow.end, { x: 5, y: 0 }, { x: 195, y: 0 }])
+    expect(removeDrawingArrowBendAtPoint(arrow, point)).toBe(arrow);
+});
+
+it('does not delete for a shaft insertion target or an unsupported arrow design', () => {
+  const arrow = {
+    ...createArrow(false),
+    design: 'freehand' as const,
+    bendPoints: [
+      { x: 60, y: 80 },
+      { x: 140, y: 80 },
+    ],
+  };
+  const shaft = buildDrawingFreehandArrowLines(arrow)[0]![6]!;
+  expect(resolveDrawingArrowBendTarget(arrow, shaft)).toMatchObject({ insert: true });
+  expect(removeDrawingArrowBendAtPoint(arrow, shaft)).toBe(arrow);
+  const unsupported = { ...createArrow(false), bendPoints: arrow.bendPoints };
+  expect(removeDrawingArrowBendAtPoint(unsupported, arrow.bendPoints[0]!)).toBe(unsupported);
+});
+
+it.each([0.2, 1, 4])(
+  'removes a near-miss bend in the projected14px hit zone at zoom %s',
+  (zoom) => {
+    const arrow = {
+      ...createArrow(false),
+      design: 'freehand' as const,
+      bendPoints: [{ x: 100, y: 80 }],
+    };
+    const project = (point: { x: number; y: number }) => ({ x: point.x * zoom, y: point.y * zoom });
+    expect(
+      removeDrawingArrowBendAtPoint(arrow, { x: 100, y: 80 + 12 / zoom }, project).bendPoints
+    ).toEqual([]);
+    expect(removeDrawingArrowBendAtPoint(arrow, { x: 100, y: 80 + 15 / zoom }, project)).toBe(
+      arrow
+    );
+  }
+);
+
+it('protects the nearest existing bend when the pointer misses its visible circle', () => {
+  const arrow = {
+    ...createArrow(false),
+    design: 'freehand' as const,
+    bendPoints: [
+      { x: 96, y: 80 },
+      { x: 104, y: 80 },
+    ],
+  };
+  expect(resolveDrawingArrowBendTarget(arrow, { x: 102, y: 80 })).toEqual({
+    point: arrow.bendPoints[1],
+    index: 1,
+    insert: false,
+  });
+  expect(resolveDrawingArrowBendTarget(arrow, { x: 96, y: 94 })).toMatchObject({
+    point: arrow.bendPoints[0],
+    index: 0,
+    insert: false,
+  });
+});
+
+it.each([0.2, 1, 4])('keeps bend protection14 screen pixels at zoom %s', (zoom) => {
+  const arrow = {
+    ...createArrow(false),
+    design: 'freehand' as const,
+    bendPoints: [{ x: 100, y: 80 }],
+  };
+  const project = (point: { x: number; y: number }) => ({
+    x: 400 + point.x * zoom,
+    y: 250 + point.y * zoom,
+  });
+  expect(
+    resolveDrawingArrowBendTarget(arrow, { x: 100, y: 80 + 14 / zoom }, 9, project)
+  ).toMatchObject({ index: 0, insert: false });
+  expect(
+    resolveDrawingArrowBendTarget(arrow, { x: 100, y: 80 + 14.1 / zoom }, 9, project)
+  ).not.toMatchObject({ insert: false });
+});
+
+it('tests the actual projected shaft instead of stretching its hit tolerance with the object', () => {
+  const arrow = { ...createArrow(false), design: 'freehand' as const };
+  const project = (point: { x: number; y: number }) => ({ x: point.x * 0.2, y: point.y * 4 });
+  expect(resolveDrawingArrowBendTarget(arrow, { x: 100, y: 2 }, 9, project)).toEqual({
+    point: { x: 100, y: 0 },
+    index: 0,
+    insert: true,
+  });
+  expect(resolveDrawingArrowBendTarget(arrow, { x: 100, y: 3 }, 9, project)).toBeNull();
+  expect(resolveDrawingArrowBendTarget(arrow, { x: 50, y: 0 }, 9, project)).toBeNull();
+});
 
 it('mirrors the editor arrow profile by widening the shaft toward the head', () => {
   const dynamic = buildDrawingArrowOutline(createArrow(true));

@@ -379,3 +379,66 @@ it('restores exact source dimensions instead of rounded Fabric serialization sca
     await canvas.dispose();
   }
 });
+
+it('admits retained native crop before load and exposes loaded metadata to background rebuild', async () => {
+  const image = 'data:image/png;base64,QUJDRA==';
+  const serialized = {
+    type: 'Image',
+    sniptaleRole: 'background',
+    sniptaleType: 'background',
+    src: image,
+    width: 8,
+    height: 6,
+    cropX: 2,
+    cropY: 1,
+    sniptaleRasterState: {
+      version: 1,
+      width: 12,
+      height: 8,
+      crop: { x: 2, y: 1, width: 8, height: 6 },
+    },
+    sniptaleRasterOriginalData: image,
+    sniptaleBackgroundMode: 'image',
+    sniptaleBackgroundImageData: image,
+  };
+  let loaded: unknown[] = [];
+  const canvas = {
+    add: vi.fn(),
+    getObjects: () => loaded,
+    loadFromJSON: vi.fn(async (json: string) => {
+      loaded = JSON.parse(json).objects;
+    }),
+  };
+  const document: EditorDocument = {
+    ...createMockDocument(),
+    version: 3,
+    canvasJson: JSON.stringify({ objects: [serialized] }),
+  };
+  const syncBackgroundLayer = vi.fn(async () => {
+    expect(loaded).toEqual([serialized]);
+  });
+  await loadPreparedDocumentOnCanvas({
+    canvas: createFabricCanvasFixture(canvas),
+    prepared: prepareAppliedDocument(document),
+    prepareObject: vi.fn(),
+    rebuildFrameDecorations: async () => undefined,
+    syncBackgroundLayer,
+    zoomLevel: 1,
+  });
+  expect(syncBackgroundLayer).toHaveBeenCalledOnce();
+  canvas.loadFromJSON.mockClear();
+  const malformed = {
+    ...document,
+    canvasJson: JSON.stringify({ objects: [{ ...serialized, sniptaleRasterState: undefined }] }),
+  };
+  await expect(
+    loadPreparedDocumentOnCanvas({
+      canvas: createFabricCanvasFixture(canvas),
+      prepared: prepareAppliedDocument(malformed),
+      prepareObject: vi.fn(),
+      rebuildFrameDecorations: async () => undefined,
+      zoomLevel: 1,
+    })
+  ).rejects.toThrow('Invalid editor raster metadata');
+  expect(canvas.loadFromJSON).not.toHaveBeenCalled();
+});

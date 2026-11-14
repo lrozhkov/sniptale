@@ -13,7 +13,7 @@ import { useEditorStore } from '../../state/useEditorStore';
 
 describe('editor layer sidebars', () => {
   it('covers layer list orchestration branches through the provider-owned controller', async () => {
-    const controller = createControllerMock();
+    const controller = { ...createControllerMock(), reorderLayerBlock: vi.fn() };
     const { EditorInspectorToolsPanel } = await import('../tools');
     const { EditorInspectorLayersHeader, EditorInspectorLayersList } = await import('./header');
     const { EditorInspectorLayersPanel } = await import('.');
@@ -23,7 +23,6 @@ describe('editor layer sidebars', () => {
     const onToggle = vi.fn();
     const setDraggedLayerId = vi.fn();
     const setDragOverLayerId = vi.fn();
-    const onDrop = vi.fn();
     const setExpanded = vi.fn();
     const layersHeader = (
       <EditorInspectorLayersHeader expanded layerCount={2} onToggle={onToggle} />
@@ -47,10 +46,8 @@ describe('editor layer sidebars', () => {
         />
         <EditorInspectorLayersList
           layers={useEditorStore.getState().layers}
-          dragOverLayerId={null}
           setDraggedLayerId={setDraggedLayerId as never}
           setDragOverLayerId={setDragOverLayerId as never}
-          onDrop={onDrop}
           onOpenLayerEffects={vi.fn()}
         />
         <EditorInspectorLayersPanel
@@ -69,20 +66,21 @@ describe('editor layer sidebars', () => {
     );
 
     const layerTrigger = document.querySelector<HTMLButtonElement>('button[title="Layer 1"]');
-    const layerRow = layerTrigger?.parentElement;
+    const layerRow = layerTrigger?.closest('[data-editor-layer-id]');
+    const grip = layerRow?.querySelector('[data-ui="editor.layers.drag-handle"]');
     await act(async () => {
       Array.from(document.querySelectorAll<HTMLButtonElement>('button'))
         .find((button) => button.title === translate('editor.toolbar.layersTitle'))
         ?.click();
       layerTrigger?.click();
-      layerTrigger?.dispatchEvent(new Event('dragstart', { bubbles: true }));
-      const dragOverEvent = new Event('dragover', { bubbles: true });
-      Object.defineProperty(dragOverEvent, 'preventDefault', { value: vi.fn() });
-      layerRow?.dispatchEvent(dragOverEvent);
-      const dropEvent = new Event('drop', { bubbles: true });
-      Object.defineProperty(dropEvent, 'preventDefault', { value: vi.fn() });
-      layerRow?.dispatchEvent(dropEvent);
-      layerTrigger?.dispatchEvent(new Event('dragend', { bubbles: true }));
+      const pointer = (type: string, y: number) =>
+        Object.assign(
+          new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientY: y }),
+          { pointerId: 1 }
+        );
+      grip?.dispatchEvent(pointer('pointerdown', 20));
+      window.dispatchEvent(pointer('pointermove', -20));
+      window.dispatchEvent(pointer('pointerup', -20));
     });
 
     expect(onToggle).toHaveBeenCalledOnce();
@@ -94,7 +92,10 @@ describe('editor layer sidebars', () => {
     });
     expect(setDraggedLayerId).toHaveBeenCalled();
     expect(setDragOverLayerId).toHaveBeenCalled();
-    expect(onDrop).toHaveBeenCalledWith('layer-1');
+    expect(controller.reorderLayerBlock).toHaveBeenCalledExactlyOnceWith(
+      ['layer-1'],
+      'source-image'
+    );
     expect(setExpanded).toHaveBeenCalled();
   }, 15_000);
 
@@ -223,10 +224,8 @@ describe('editor layer sidebars', () => {
             },
           ] as never
         }
-        dragOverLayerId={null}
         setDraggedLayerId={vi.fn() as never}
         setDragOverLayerId={vi.fn() as never}
-        onDrop={vi.fn()}
         onOpenLayerEffects={vi.fn()}
       />,
       controller
@@ -261,10 +260,8 @@ describe('editor layer sidebars', () => {
             },
           ] as never
         }
-        dragOverLayerId={null}
         setDraggedLayerId={vi.fn() as never}
         setDragOverLayerId={vi.fn() as never}
-        onDrop={vi.fn()}
         onOpenLayerEffects={vi.fn()}
       />,
       controller

@@ -1,4 +1,5 @@
-import { ActiveSelection, type Canvas, type FabricObject } from 'fabric';
+import { EditorCanvas } from '../../../document/canvas-surface/render-region';
+import { ActiveSelection, Group, type Canvas, type FabricObject } from 'fabric';
 
 import { isEditableObject } from '../../../document/model';
 
@@ -23,20 +24,30 @@ function setCanvasSelection(canvas: Canvas, objects: FabricObject[]): void {
 }
 
 function getSelectableTarget(canvas: Canvas, id: string): FabricObject | null {
-  const target = canvas.getObjects().find((object) => object.sniptaleId === id);
+  const find = (objects: FabricObject[]): FabricObject | undefined => {
+    for (const object of objects) {
+      if (object.sniptaleId === id) return object;
+      if (object instanceof Group && object.sniptaleType === 'group') {
+        const child = find(object.getObjects());
+        if (child) return child;
+      }
+    }
+    return undefined;
+  };
+  const target = find(canvas.getObjects());
   return target && isEditableObject(target) ? target : null;
 }
 
 function getOrderedSelectedObjects(canvas: Canvas, ids: Iterable<string>): FabricObject[] {
   const selectedIds = new Set(ids);
-  return canvas
-    .getObjects()
-    .filter(
-      (object): object is FabricObject =>
-        typeof object.sniptaleId === 'string' &&
-        selectedIds.has(object.sniptaleId) &&
-        isEditableObject(object)
-    );
+  return (
+    canvas instanceof EditorCanvas ? canvas.getSelectionScopeObjects() : canvas.getObjects()
+  ).filter(
+    (object): object is FabricObject =>
+      typeof object.sniptaleId === 'string' &&
+      selectedIds.has(object.sniptaleId) &&
+      isEditableObject(object)
+  );
 }
 
 function getCurrentEditableSelectionIds(canvas: Canvas): Set<string> {
@@ -51,8 +62,9 @@ function getCurrentEditableSelectionIds(canvas: Canvas): Set<string> {
 }
 
 function buildRangeSelection(canvas: Canvas, anchorId: string, id: string): FabricObject[] {
-  const layers = canvas
-    .getObjects()
+  const layers = (
+    canvas instanceof EditorCanvas ? canvas.getSelectionScopeObjects() : canvas.getObjects()
+  )
     .filter(
       (object): object is FabricObject => Boolean(object.sniptaleId) && isEditableObject(object)
     )
@@ -85,12 +97,29 @@ export function selectLayerObject(
     return null;
   }
 
+  let ancestor = target.parent;
+  while (ancestor) {
+    if (ancestor.sniptaleLocked || ancestor.visible === false) return null;
+    ancestor = ancestor.parent;
+  }
+  const targetParent = target.parent ?? null;
+  if (canvas instanceof EditorCanvas && canvas.getSelectionGroupScope() !== targetParent) {
+    if (targetParent) {
+      if (!canvas.enterSelectionGroup(targetParent)) return null;
+    } else {
+      while (canvas.exitSelectionGroup()) {
+        /* Leave nested selection before a root row. */
+      }
+      canvas.discardActiveObject();
+    }
+  }
   const recovered = ensureObjectReachable(target);
   const currentSelectedIds = getCurrentEditableSelectionIds(canvas);
   let nextSelection: FabricObject[] = [target];
 
   if (options.range && options.anchorId) {
-    nextSelection = buildRangeSelection(canvas, options.anchorId, id);
+    const range = buildRangeSelection(canvas, options.anchorId, id);
+    nextSelection = range.length ? range : [target];
   } else if (options.additive || options.toggle) {
     if (currentSelectedIds.has(id) && options.toggle) {
       currentSelectedIds.delete(id);

@@ -242,12 +242,7 @@ async function inspectLayers(page: Page, locale: Locale, info: TestInfo) {
   }
   // Keep at least two ordinary glyphs visible beside the admitted hover actions.
   expect(await source.evaluate((node) => node.clientWidth)).toBeGreaterThanOrEqual(32);
-  await actions
-    .getByRole('button', {
-      name: label('editor.toolbar.renameLayer'),
-      exact: true,
-    })
-    .click();
+  await source.getByText(sourceName, { exact: true }).dblclick();
   const input = page.getByRole('textbox', { name: sourceName, exact: true });
   await expect(input).toBeFocused();
   const name =
@@ -260,7 +255,10 @@ async function inspectLayers(page: Page, locale: Locale, info: TestInfo) {
   await expect(layer).toBeVisible();
   await expect(layer).toHaveAttribute('title', name);
   await layer.hover();
-  await ui(page, 'editor.layers.effects-transformations').first().click();
+  await ui(page, 'editor.layers.image-settings').first().click();
+  await page
+    .getByRole('button', { name: label('editor.toolbar.layerEffectsTransformations'), exact: true })
+    .click();
   const effects = ui(page, 'editor.floating.layer-effects-panel');
   await expect(effects).toBeVisible();
   const status = effects.locator('[data-ui="shared.ui.compact-inspector.status-row"]');
@@ -657,6 +655,17 @@ for (const theme of ['light', 'dark'] as const) {
         .first()
         .evaluate((node) => node.clientWidth);
       await inspectLayers(page, 'ru', info);
+      const panel = ui(page, 'editor.floating.layers-panel');
+      const panelBox = (await panel.boundingBox())!;
+      const resizeHandle = ui(page, 'editor.floating.layers.resize-handle');
+      const handleBox = (await resizeHandle.boundingBox())!;
+      const handleX = handleBox.x + handleBox.width / 2;
+      const handleY = handleBox.y + handleBox.height / 2;
+      await page.mouse.move(handleX, handleY);
+      await page.mouse.down();
+      await page.mouse.move(handleX, handleY + panelBox.height - 300, { steps: 8 });
+      await page.mouse.up();
+      await expect.poll(async () => (await panel.boundingBox())!.height).toBeLessThanOrEqual(301);
       for (let index = 0; index < 8; index += 1) {
         await list.locator(':scope > div').last().hover();
         await list

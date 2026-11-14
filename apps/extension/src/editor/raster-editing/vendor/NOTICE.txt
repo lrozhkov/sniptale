@@ -1,0 +1,12 @@
+Klecks algorithms
+
+Source: https://github.com/bitbof/klecks
+Revision: b86ba7d0edb2c48ad21ca58aae4775fccf329632
+License: MIT. See LICENSE in this directory.
+
+Sniptale adapts floodFillBits, BezierLine, and their required private helpers.
+Sniptale also adapts eraser stamp spacing and synchronous segment finalization.
+The provenance.json file records source paths, hashes, and changes.
+
+Sniptale owns the visibility planes, independent hardness, Restore mode, and clipping.
+The adaptation does not include the upstream UI, Canvas owner, or history owner.

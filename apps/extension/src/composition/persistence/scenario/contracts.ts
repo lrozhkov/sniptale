@@ -3,7 +3,7 @@ import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/gu
 import type { EditorDocument } from '../../../features/editor/document/types';
 import type { LibraryLifecycle } from '../library-lifecycle/contracts';
 import type { AssetRef } from '../assets/contracts';
-import type { PersistedEditorDocumentV3 } from '../document-assets/contracts';
+import type { PersistedEditorDocument } from '../document-assets/contracts';
 
 export interface ScenarioSavedVersion {
   revision: number;
@@ -83,5 +83,5 @@ export interface StoredScenarioStepEditorDocumentEntry extends Omit<
   ScenarioStepEditorDocumentEntry,
   'document'
 > {
-  document: PersistedEditorDocumentV3;
+  document: PersistedEditorDocument;
 }

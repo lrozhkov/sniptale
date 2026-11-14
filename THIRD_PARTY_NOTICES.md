@@ -50,6 +50,25 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 | `apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/realtimeVideoUpscaler.js` | https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/browser/realtimeVideoUpscaler.js | `58dd6544858039b4f8ba7a6cf469a4ed22aadc8588c7483ca7b4af2901ac4742` | `c096435fa3aab07a086e72b26a819312383e29f2bd807131c6c190f90f9aa86c` |
 | `apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/runtimeCapabilities.js` | https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/browser/runtimeCapabilities.js | `d78fe2ce0f0a4513364599854b363cddae8c1479de17d2cfca006bdd2de931c6` | `d78fe2ce0f0a4513364599854b363cddae8c1479de17d2cfca006bdd2de931c6` |
 
+## Klecks raster algorithms
+
+- Attribution: bitbof (bitbof.com)
+- Source: https://github.com/bitbof/klecks/tree/b86ba7d0edb2c48ad21ca58aae4775fccf329632
+- License: `MIT`
+- License text: [`apps/extension/src/editor/raster-editing/vendor/LICENSE`](apps/extension/src/editor/raster-editing/vendor/LICENSE)
+- License SHA-256: `0234a0861b38c1f3c9198b0f048a1b713bf3b1b198b5cced343acc7335b90785`
+- Notice text: [`apps/extension/src/editor/raster-editing/vendor/NOTICE.txt`](apps/extension/src/editor/raster-editing/vendor/NOTICE.txt)
+- Notice SHA-256: `180a6efecad16728850abc3a2c9e630eb445b16137e0e6ed8cee29673aed8a03`
+- Provenance record: [`apps/extension/src/editor/raster-editing/vendor/provenance.json`](apps/extension/src/editor/raster-editing/vendor/provenance.json)
+- Provenance SHA-256: `9c26643f25e139be15f954e8200cde51cfd036b1e97601ff797b9acc8b8f45cc`
+- Local changes: Sniptale extracts flood-fill, Bezier, and stamp-spacing algorithms with their required helpers. It adds typed source geometry, bounded reads, and row-safe growth. It adds immutable retained planes, independent hardness, Restore mode, selection clipping, and crop clipping. It removes upstream UI, Canvas, pressure, and history dependencies. It adds source-over paint with explicit color and opacity, and incremental preview patches.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/src/editor/raster-editing/brush.ts` | https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/klecks/brushes/eraser-brush.ts | `9aa231d02d555a3a13976a22ad74ce0f2f24c0e98e8e741c3f78971206dbb007` | `9e44f82752bfcdc8ef3dc0783194b116c7cb8c7831c8757c00ca13579954ed93` |
+| `apps/extension/src/editor/raster-editing/vendor/bezier-line.ts` | https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/bb/math/line.ts | `6336d91fcc70507bb67765310b7bbb3d6e77bbb316e0c0ff9fb443444c6815d0` | `52cf50f07c10807a44b8b3b36a1738f0e5ee9b96a9bc1e1a4e7fe21efa7b6568` |
+| `apps/extension/src/editor/raster-editing/vendor/flood-fill.ts` | https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/klecks/image-operations/flood-fill.ts | `c571c4fbc0ff4f4f1df1aedd01af02aadabc7226af187d1001fd26487875a5c0` | `c6ddb53f4aaee036d8395d948db7f66ad1d0b12c614270aa2fc625dceaa8941c` |
+
 ## Production dependency licenses
 
 ### `@ai-sdk/alibaba` 2.0.69
@@ -259,6 +278,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
 - Repository/source: https://github.com/vercel/ai
 
+### `@antfu/install-pkg` 2.1.0
+
+- Installed path: `node_modules/@antfu/install-pkg`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/@antfu/install-pkg/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@antfu__install-pkg-2.1.0.txt`](LICENSES/dependencies/@antfu__install-pkg-2.1.0.txt)
+- License text SHA-256: `67cd5e903c1f908edfa27c25606fa806ce629d9a8ddb7d83019d9fd1f83f7fde`
+- Repository/source: https://github.com/antfu-collective/install-pkg.git
+
 ### `@fontsource/marck-script` 5.3.0
 
 - Installed path: `node_modules/@fontsource/marck-script`
@@ -308,6 +339,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License storage: `generated-copy`
 - Redistributed license text: [`LICENSES/dependencies/@iconify__types-2.0.0.txt`](LICENSES/dependencies/@iconify__types-2.0.0.txt)
 - License text SHA-256: `045ce74712fc613fdd74d1c55f5140a08d623836ff2aca44132b38d68fbc67ad`
+- Repository/source: https://github.com/iconify/iconify.git
+
+### `@iconify/utils` 3.1.7
+
+- Installed path: `node_modules/@iconify/utils`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/@iconify/utils/license.txt`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@iconify__utils-3.1.7.txt`](LICENSES/dependencies/@iconify__utils-3.1.7.txt)
+- License text SHA-256: `a86793ac023162ce98b91899601c15f6712f44943163c4f92a0a4bf89152b3bf`
 - Repository/source: https://github.com/iconify/iconify.git
 
 ### `@noble/hashes` 2.4.0
@@ -538,6 +581,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `809e66de579fb7d92503848bbe6d1f348f4f6521a71e5d294fe7cc0c87a3b4ff`
 - Repository/source: https://github.com/calvinmetcalf/immediate.git
 
+### `import-meta-resolve` 4.2.0
+
+- Installed path: `node_modules/import-meta-resolve`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/import-meta-resolve/license`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/import-meta-resolve-4.2.0.txt`](LICENSES/dependencies/import-meta-resolve-4.2.0.txt)
+- License text SHA-256: `8770a1a4b69ee722636643e81340ce4a8f0b8415b1c568487edc9062338bfcc7`
+- Repository/source: wooorm/import-meta-resolve
+
 ### `inherits` 2.0.4
 
 - Installed path: `node_modules/inherits`
@@ -666,6 +721,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Redistributed license text: [`LICENSES/dependencies/ollama-ai-provider-v2-4.0.1.txt`](LICENSES/dependencies/ollama-ai-provider-v2-4.0.1.txt)
 - License text SHA-256: `c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4`
 - Repository/source: https://github.com/nordwestt/ollama-ai-provider-v2.git
+
+### `package-manager-detector` 1.9.0
+
+- Installed path: `node_modules/package-manager-detector`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/package-manager-detector/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/package-manager-detector-1.9.0.txt`](LICENSES/dependencies/package-manager-detector-1.9.0.txt)
+- License text SHA-256: `05c365176db3cc00e951c44b921c809c75b8e99d2d724f7daf00381e26fb0850`
+- Repository/source: https://github.com/antfu-collective/package-manager-detector.git
 
 ### `pako` 1.0.11
 
@@ -834,6 +901,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Redistributed license text: [`LICENSES/dependencies/string_decoder-1.1.1.txt`](LICENSES/dependencies/string_decoder-1.1.1.txt)
 - License text SHA-256: `11f2aafb37d06b3ee5bdaf06e9811141d0da05263c316f3d627f45c20d43261b`
 - Repository/source: https://github.com/nodejs/string_decoder.git
+
+### `tinyexec` 1.3.1
+
+- Installed path: `node_modules/tinyexec`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/tinyexec/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/tinyexec-1.3.1.txt`](LICENSES/dependencies/tinyexec-1.3.1.txt)
+- License text SHA-256: `f95f668fe64081ddb4153b322e34fdd719b991285ed08177d5ad7133b7988d92`
+- Repository/source: https://github.com/tinylibs/tinyexec.git
 
 ### `tsdav` 2.5.0
 

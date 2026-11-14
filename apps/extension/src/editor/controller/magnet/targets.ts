@@ -21,14 +21,32 @@ export function isMagnetTarget(target: FabricObject): boolean {
   return isEditableMagnetSibling(target);
 }
 
+/** External point/rectangle proxies carry the document identity, but no Fabric ownership. */
+function resolveAuthoritativeTarget(target: FabricObject): FabricObject {
+  if (!target.sniptaleId) return target;
+  let authoritative = target;
+  target.canvas?.forEachObject((candidate) => {
+    const match = getTargetHierarchy(candidate).find(
+      (object) => object.sniptaleId === target.sniptaleId
+    );
+    if (match) authoritative = match;
+  });
+  return authoritative;
+}
+
 export function collectMagnetTargets(
   target: FabricObject,
   canvasSize: { width: number; height: number }
 ): Set<FabricObject> {
   const targets = new Set<FabricObject>();
-  const selectedChildren = new Set(getTargetHierarchy(target));
+  const authoritative = resolveAuthoritativeTarget(target);
+  const selectedChildren = new Set(getTargetHierarchy(authoritative));
 
-  target.canvas?.forEachObject((candidate) => {
+  const siblings =
+    authoritative instanceof ActiveSelection
+      ? authoritative.getObjects()[0]?.parent
+      : (authoritative.parent ?? authoritative.group);
+  const visit = (candidate: FabricObject) => {
     if (!candidate.visible || !candidate.isOnScreen()) {
       return;
     }
@@ -40,7 +58,9 @@ export function collectMagnetTargets(
     if (isMagnetTarget(candidate)) {
       targets.add(candidate);
     }
-  });
+  };
+  if (siblings?.sniptaleType === 'group') siblings.forEachObject(visit);
+  else target.canvas?.forEachObject(visit);
 
   targets.add(createWorkspaceGuideTarget(canvasSize));
   return targets;

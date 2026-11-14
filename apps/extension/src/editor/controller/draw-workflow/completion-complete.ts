@@ -1,3 +1,4 @@
+import { retainCompletedEditorFreehandPreview } from '../events/runtime.render';
 import { requestEditorSimplify } from '../../drawing/simplify-runtime';
 import type { Canvas } from 'fabric';
 import { isTextbox } from '../core/helpers';
@@ -34,6 +35,7 @@ export function createCompletedDrawWorkflowState(
   applyEditorObjectInteractionControls(completion.object);
   applyEditorDrawingInteractionControls(completion.object);
   if (completion.completedTool === 'pencil' || completion.completedTool === 'marker') {
+    retainCompletedEditorFreehandPreview(canvas, completion.object);
     canvas.discardActiveObject();
   } else {
     canvas.setActiveObject(completion.object);
@@ -43,7 +45,7 @@ export function createCompletedDrawWorkflowState(
     completion.object.enterEditing();
   }
   canvas.requestRenderAll();
-  if (completion.completedTool === 'simplify') {
+  if (drawing?.kind === 'simplify') {
     requestEditorSimplify(canvas, completion.object);
   } else if (completion.completedTool !== 'text') {
     commitHistory();

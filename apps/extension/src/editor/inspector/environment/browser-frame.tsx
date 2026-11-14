@@ -1,4 +1,5 @@
 import React from 'react';
+import { InspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import type { BrowserFrameState } from '../../../features/editor/document/types';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import { WindowHeaderSettings } from '../../../workflows/browser-frame/settings';
@@ -59,20 +60,25 @@ export const EditorInspectorBrowserFramePanelContent: React.FC<{
   useAppLocale();
 
   return (
-    <div className="sniptale-parameter-stack">
-      <EditorWindowHeaderSettings browserFrame={browserFrame} syncBrowserFrame={syncBrowserFrame} />
-      {browserFrame.enabled && (
-        <EditorInspectorDetails
-          preferenceId="browser-frame:layout"
-          label={translate('editor.scene.placementSection')}
-        >
-          <BrowserFrameBehaviorSections
-            browserCanvasModeOptions={browserCanvasModeOptions}
-            browserFrame={browserFrame}
-            syncBrowserFrame={syncBrowserFrame}
-          />
-        </EditorInspectorDetails>
-      )}
-    </div>
+    <InspectorLayout>
+      <div className="space-y-2 [&>fieldset]:!gap-2">
+        <EditorWindowHeaderSettings
+          browserFrame={browserFrame}
+          syncBrowserFrame={syncBrowserFrame}
+        />
+        {browserFrame.enabled && (
+          <EditorInspectorDetails
+            preferenceId="browser-frame:layout"
+            label={translate('editor.scene.placementSection')}
+          >
+            <BrowserFrameBehaviorSections
+              browserCanvasModeOptions={browserCanvasModeOptions}
+              browserFrame={browserFrame}
+              syncBrowserFrame={syncBrowserFrame}
+            />
+          </EditorInspectorDetails>
+        )}
+      </div>
+    </InspectorLayout>
   );
 };

@@ -28,6 +28,8 @@ export interface CropSelection {
 
 export interface ApplyDocumentOptions {
   resetHistory?: boolean;
+  /** Admit content editing only for an explicitly created source image. */
+  freshSourceContent?: boolean;
   updateOriginal?: boolean;
   preserveViewport?: boolean;
 }

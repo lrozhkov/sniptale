@@ -77,17 +77,7 @@ function renderRow(layer: Record<string, unknown> = BASE_LAYER) {
   document.body.appendChild(container);
   root = createRoot(container);
   act(() => {
-    root?.render(
-      <LayerRow
-        locale="en"
-        layer={layer as never}
-        dragOverLayerId={null}
-        setDraggedLayerId={vi.fn() as never}
-        setDragOverLayerId={vi.fn() as never}
-        onDrop={vi.fn()}
-        onOpenLayerEffects={vi.fn()}
-      />
-    );
+    root?.render(<LayerRow locale="en" layer={layer as never} onOpenLayerEffects={vi.fn()} />);
   });
 }
 

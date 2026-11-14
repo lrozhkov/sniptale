@@ -1,4 +1,8 @@
-import { replaceCurrentEditorSnapshotHistory } from '../../../history';
+import { flushEditorFreehandCompletion } from '../../../draw-workflow/released';
+import { mountEditorRasterRuntime } from '../../../../raster-editing/runtime';
+import { createRasterTargetAdapter } from '../../../../raster-editing/adapters';
+import { syncSourceStateFromObject } from '../../../document/source';
+import { flushDeferredEditorHistory, replaceCurrentEditorSnapshotHistory } from '../../../history';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { translate } from '../../../../../platform/i18n';
 import { mountEditorSimplifyRuntime } from '../../../../drawing/simplify-runtime';
@@ -77,6 +81,7 @@ export function mountEditorController(
     if (controller.createSimplifyCompute)
       mountEditorSimplifyRuntime({
         canvas,
+        beforeCommit: () => flushEditorFreehandCompletion(canvas),
         createCompute: controller.createSimplifyCompute,
         prepareObject: (object) => controller.prepareObject(object),
         commitHistory: () => controller.commitHistory(),
@@ -84,6 +89,7 @@ export function mountEditorController(
         publishDerived: () => {
           const history = controller.history;
           if (!history) return false;
+          flushDeferredEditorHistory(history);
           const changed = replaceCurrentEditorSnapshotHistory({
             history,
             expectedRevision: history.getRevision(),
@@ -97,6 +103,47 @@ export function mountEditorController(
         },
         reportFailure: () => showToast(translate('content.toolbar.drawingSimplifyFailed'), 'error'),
       });
+    const rasterAdapter = createRasterTargetAdapter({
+      beforeCommit: () => flushEditorFreehandCompletion(canvas),
+      canvas: () => controller.canvas,
+      frame: () => useEditorStore.getState().frame,
+      documentBounds: () => ({ x: 0, y: 0, ...controller.canvasDocumentSize }),
+      prepareObject: (object) => controller.prepareObject(object),
+      commitNative: (object) => {
+        controller.source = syncSourceStateFromObject(controller.source, object);
+        controller.commitHistory();
+        controller.syncRuntimeState();
+        canvas.requestRenderAll();
+      },
+      publishBackground: (candidate, options) =>
+        controller.applyFrameSettings(
+          {
+            ...useEditorStore.getState().frame,
+            backgroundImageData: candidate.derivedImageData,
+          },
+          { ...options, backgroundCandidate: candidate }
+        ),
+      flipObject: (id, axis) =>
+        controller.applyLayerTransformation(
+          id,
+          axis === 'horizontal' ? 'flip-horizontal' : 'flip-vertical'
+        ),
+    });
+    mountEditorRasterRuntime({
+      canvas,
+      adapter: rasterAdapter,
+      ...(controller.createRasterCompute ? { createCompute: controller.createRasterCompute } : {}),
+      initialColor: useEditorStore.getState().toolSettings.pencil.color,
+      getMainTool: () => controller.activeTool,
+      isPanning: () => controller.isSpacePressed || controller.panSession !== null,
+      onModeChange: (active) => {
+        if (!active) return;
+        controller.activeTool = 'select';
+        controller.toolModeEnabled = true;
+        useEditorStore.getState().syncActiveTool('select');
+        controller.applyToolMode();
+      },
+    });
     controller.viewportElement = viewportElement;
     controller.stageElement = stageElement;
     controller.zoomLevel = 1;

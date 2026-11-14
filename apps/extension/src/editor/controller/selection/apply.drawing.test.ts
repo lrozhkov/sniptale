@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { Canvas, Rect } from 'fabric';
+import { Canvas, Group, Rect } from 'fabric';
+import { createEditorVectorInstance } from '../../../features/editor/document/vector-element';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_EDITOR_TOOL_SETTINGS } from '../../../features/editor/document/constants';
 import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/public';
@@ -161,7 +162,7 @@ describe('drawing selection settings', () => {
   it('writes the chosen strength into a selected blur drawing', () => {
     const object = new Rect();
     const surface = createCanvasWithObject(object);
-    mocks.readEditorDrawingObject.mockReturnValueOnce({
+    mocks.readEditorDrawingObject.mockReturnValue({
       id: 'blur-1',
       kind: 'blur',
       bounds: { x: 0, y: 0, width: 20, height: 20 },
@@ -225,4 +226,64 @@ describe('drawing selection settings', () => {
     expect(mocks.replaceEditorDrawingFabricGeometry).not.toHaveBeenCalled();
     surface.dispose();
   });
+});
+
+it('keeps the layer name, lock and visibility when cleanup returns to Blur', () => {
+  const object = new Rect();
+  object.sniptaleLabel = 'Private account';
+  object.sniptaleLocked = false;
+  object.visible = false;
+  const canvas = createCanvasWithObject(object);
+  mocks.readEditorDrawingObject.mockReturnValue({
+    id: 'cleanup',
+    kind: 'simplify',
+    bounds: { x: 10, y: 20, width: 30, height: 40 },
+    settings: { erase: true },
+    blurAmount: 6,
+  });
+  applySelectionToolSettingsToObjects(canvas, [object], 'blur', {
+    ...settings,
+    blur: { amount: 6, clean: false },
+  });
+  const replacement = vi.mocked(canvas.insertAt).mock.calls[0]?.[1];
+  expect(replacement).toMatchObject({
+    sniptaleId: 'cleanup',
+    sniptaleLabel: 'Private account',
+    sniptaleLocked: false,
+    visible: false,
+  });
+});
+
+it('leaves vector palette, artwork and accepted geometry to the dedicated vector style owner', async () => {
+  vi.clearAllMocks();
+  const artwork = new Rect({
+    left: 5,
+    top: 6,
+    width: 30,
+    height: 20,
+    fill: '#ff0000',
+    stroke: '#0000ff',
+    strokeWidth: 2,
+  });
+  const object = new Group([artwork], { left: 40, top: 50, opacity: 0.7 });
+  object.sniptaleType = 'vector-element';
+  object.sniptaleVectorElement = createEditorVectorInstance('a'.repeat(64));
+  const canvas = new Canvas(document.createElement('canvas'), { renderOnAddRemove: false });
+  canvas.add(object);
+  canvas.setActiveObject(object);
+  const geometry = object.toObject();
+  const instance = structuredClone(object.sniptaleVectorElement);
+  const prepare = vi.fn();
+  try {
+    applySelectionToolSettingsToObjects(canvas, [object], 'vector-element', settings, prepare);
+    expect(canvas.getObjects()).toEqual([object]);
+    expect(canvas.getActiveObject()).toBe(object);
+    expect(object.toObject()).toEqual(geometry);
+    expect(object.sniptaleVectorElement).toEqual(instance);
+    expect(mocks.readEditorDrawingObject).not.toHaveBeenCalled();
+    expect(mocks.replaceEditorDrawingFabricGeometry).not.toHaveBeenCalled();
+    expect(prepare).not.toHaveBeenCalled();
+  } finally {
+    await canvas.dispose();
+  }
 });

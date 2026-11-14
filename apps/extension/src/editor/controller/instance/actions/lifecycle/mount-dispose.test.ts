@@ -8,6 +8,9 @@ import { createMockDocument } from '../../bindings/test-fixtures-document';
 import { createMockController } from '../../bindings/test-fixtures';
 
 const mocks = vi.hoisted(() => ({
+  mountRaster: vi.fn(),
+  unmountRaster: vi.fn(),
+  createRasterAdapter: vi.fn(() => ({ rasterAdapter: true })),
   mountSimplify: vi.fn<(options: Parameters<typeof mountEditorSimplifyRuntime>[0]) => void>(),
   toast: vi.fn(),
   applyViewportZoom: vi.fn(),
@@ -22,12 +25,31 @@ const mocks = vi.hoisted(() => ({
   refreshViewport: vi.fn(),
 }));
 
+vi.mock('../../../../raster-editing/runtime', () => ({
+  mountEditorRasterRuntime: mocks.mountRaster,
+  unmountEditorRasterRuntime: mocks.unmountRaster,
+}));
+vi.mock('../../../../raster-editing/adapters', () => ({
+  createRasterTargetAdapter: mocks.createRasterAdapter,
+}));
 vi.mock('../../../../drawing/simplify-runtime', () => ({
   mountEditorSimplifyRuntime: mocks.mountSimplify,
   unmountEditorSimplifyRuntime: vi.fn(),
 }));
 vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({ showToast: mocks.toast }));
 
+vi.mock('../../../../document/canvas-surface/render-region', async () => {
+  const { Canvas } = await import('fabric');
+  return {
+    EditorCanvas: class extends Canvas {
+      setRenderViewport = vi.fn();
+    },
+  };
+});
+vi.mock('./selection-chrome', () => ({
+  mountEditorSelectionChrome: vi.fn(),
+  disposeEditorSelectionChrome: vi.fn(),
+}));
 vi.mock('fabric', () => ({
   Canvas: class TestCanvas {
     backgroundColor = '';
@@ -119,6 +141,10 @@ it('mounts pointer capture with the canvas lifecycle and detaches it on dispose'
   expect(controller.viewportElement).toBe(viewportElement);
   expect(controller.stageElement).toBe(stageElement);
   expect(mocks.attachEvents).toHaveBeenCalledOnce();
+  expect(mocks.mountRaster).toHaveBeenCalledOnce();
+  expect(mocks.mountRaster.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.attachEvents.mock.invocationCallOrder[0] ?? Infinity
+  );
   expect(mocks.createMagnet.mock.invocationCallOrder[0]).toBeLessThan(
     mocks.attachEvents.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
   );
@@ -133,6 +159,7 @@ it('mounts pointer capture with the canvas lifecycle and detaches it on dispose'
 
   expect(canvasElement.setPointerCapture).not.toHaveBeenCalledWith(10);
   expect(mocks.detachEvents).toHaveBeenCalledOnce();
+  expect(mocks.unmountRaster).toHaveBeenCalledOnce();
   expect(mocks.createMagnet.mock.results[0]?.value.dispose).toHaveBeenCalledOnce();
   expect(cancelAnimationFrameSpy).toHaveBeenCalledWith(27);
   expect(controller.canvas).toBeNull();

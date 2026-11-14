@@ -1,3 +1,4 @@
+import { getProviderImageApi } from '../../../contracts/ai/image-profile';
 import type { SecretProtectionService } from '../../../composition/persistence/secret-protection/model';
 import { loadAIScenarioSelection } from '../../../composition/persistence/ai-settings/scenario-selections';
 import {
@@ -44,6 +45,9 @@ async function createProviderSelectorEntry(provider: AIProvider): Promise<AIProv
     ...(provider.observation !== undefined ? { observation: provider.observation } : {}),
     createdAt: provider.createdAt,
     destinationKind: classifyProviderDestination(provider),
+    ...(getProviderImageApi(provider.baseUrl)
+      ? { imageApi: getProviderImageApi(provider.baseUrl) }
+      : {}),
     destinationBinding: await createAIProviderDestinationBinding(provider),
     hasStoredApiKey: provider.hasStoredApiKey,
     id: provider.id,

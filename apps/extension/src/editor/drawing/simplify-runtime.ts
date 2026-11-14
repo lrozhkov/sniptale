@@ -27,6 +27,7 @@ interface EditorSimplifyRuntimeOptions {
   createCompute: () => EditorSimplifyCompute;
   prepareObject: (object: FabricObject) => void;
   commitHistory: () => void;
+  beforeCommit?: () => void;
   syncRuntimeState: () => void;
   reportFailure?: (error: unknown) => void;
   publishDerived?: () => boolean;
@@ -169,10 +170,11 @@ export function requestEditorSimplify(
   object: FabricObject,
   settings?: SimplifySettings,
   preview = false,
-  derived = false
+  derived = false,
+  replacement?: DrawingSimplifyObject
 ): boolean {
   const runtime = runtimes.get(canvas);
-  const drawing = readEditorDrawingObject(object);
+  const drawing = replacement ?? readEditorDrawingObject(object);
   if (!runtime || drawing?.kind !== 'simplify') return false;
   const previous = runtime.jobs.get(object);
   previous?.cleanup();
@@ -253,7 +255,7 @@ export function requestEditorSimplify(
       const source =
         !nextSettings.automatic && nextSettings.manualKind === 'image'
           ? createManualSource(drawing)
-          : (retainedSource ?? captureSource(canvas, object));
+          : (retainedSource ?? captureSource(canvas, object, drawing));
       const region = sampleEditorSimplifyRegion(
         { ...drawing, settings: nextSettings },
         source
@@ -268,7 +270,11 @@ export function requestEditorSimplify(
       });
       if (!isCurrent()) return;
       const decoded = await FabricImage.fromURL(result.dataUrl);
-      if (!isCurrent()) return;
+      if (!preview) runtime.options.beforeCommit?.();
+      if (!isCurrent()) {
+        decoded.dispose();
+        return;
+      }
       if (preview) {
         retainedPreview = true;
         presentation.show(result.dataUrl, source);
@@ -277,7 +283,7 @@ export function requestEditorSimplify(
       commitComputedObject(runtime, object, drawing, job, result, source, nextSettings, decoded);
     } catch (error) {
       if (isCurrent()) {
-        if (!drawing.result) {
+        if (!drawing.result && !replacement) {
           runtime.jobs.delete(object);
           job.cleanup();
           canvas.remove(object);

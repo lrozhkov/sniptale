@@ -49,6 +49,8 @@ export interface PhysicalDeleteAssetOperation {
   assetIds: string[];
   /** Causal detached private sources; logical release precedes physical deletion. */
   privateSources?: { projectAssetId: string; expectedAssetId: string }[];
+  /** Exact immutable vector binding to retire after all readers and owners release it. */
+  vectorDefinitions?: { definitionId: string; expectedAssetId: string; incarnation: string }[];
 }
 
 export interface ArchiveRestoreSession {

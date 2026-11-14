@@ -74,9 +74,9 @@ it('keeps canvas text backgrounds joined in local coordinates after rotation', (
     { x: 0, y: 0 }
   );
   expect(context.rotate).toHaveBeenCalledWith(Math.PI / 4);
-  expect(context.moveTo).toHaveBeenCalledWith(169, 102);
-  expect(context.arcTo).toHaveBeenNthCalledWith(1, 172, 102, 172, 127, 3);
-  expect(context.arcTo).toHaveBeenNthCalledWith(2, 172, 127, 152, 127, 3);
+  expect(context.moveTo).toHaveBeenCalledWith(169, 100);
+  expect(context.arcTo).toHaveBeenNthCalledWith(1, 172, 100, 172, 137, 3);
+  expect(context.arcTo).toHaveBeenNthCalledWith(2, 172, 137, 152, 137, 3);
   expect(context.roundRect).not.toHaveBeenCalled();
 });
 
@@ -107,10 +107,10 @@ it('shows the standard rotation control without skewing handles and commits live
   const root = createRoot(host);
   act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
   expect(context.transform).not.toHaveBeenCalled();
-  expect(context.scale).toHaveBeenCalledWith(0.65, 0.65);
   const canvas = host.querySelector('canvas')!;
   const handle = getDrawingRotationHandlePoint(rectangle, 'rotate-ne');
   if (!handle) throw new Error('Expected rotation handle');
+  expect(context.translate).toHaveBeenCalledWith(handle.x, handle.y);
   const pointerEvent = (type: string, point: { x: number; y: number }, shiftKey = false) => {
     const event = new MouseEvent(type, {
       bubbles: true,

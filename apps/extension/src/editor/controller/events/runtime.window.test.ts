@@ -172,6 +172,7 @@ it('forwards keyup and blur ownership into the input seam', () => {
   const bindings = {
     cancelTransientInteraction: vi.fn(() => true),
     finalizeSelectionNudge: vi.fn(),
+    syncRuntimeState: vi.fn(),
     getCanvas: vi.fn(() => ({ _currentTransform: {}, endCurrentTransform })),
     setIsSpacePressed: vi.fn(),
   };

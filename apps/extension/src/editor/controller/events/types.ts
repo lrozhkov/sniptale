@@ -96,6 +96,8 @@ export interface EditorControllerEventCommandBindings {
   deleteSelection: () => void;
   applyCropSelection: () => void;
   applyTextSelectionStyle?: (command: EditorTextInlineStyleCommand) => boolean;
+  syncHistoryState?: () => void;
+  beginFreehandCompletion?: () => () => void;
   commitHistory: () => void;
   syncRuntimeState: () => void;
   syncViewportState: () => void;

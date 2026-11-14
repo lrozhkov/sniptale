@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { Canvas, FabricObject, Path, Point, type Transform } from 'fabric';
+import { Canvas, FabricObject, Group, Path, Point, type Transform, util } from 'fabric';
 import { expect, it, vi } from 'vitest';
 import { readEditorDrawingObject } from '../metadata';
 import { createEditorDrawingFabricObject } from '../vector';
@@ -8,6 +8,7 @@ import {
   createDrawingArrowControls,
   updateEditorDrawingArrowHover,
   cancelEditorDrawingArrowBend,
+  removeEditorDrawingArrowBendAtPoint,
 } from './arrow';
 import { createTypedTestFixture } from '../../../testing/fabric-canvas.test-support';
 import { endEditorCanvasTransform } from '../../../controller/input/canvas-actions';
@@ -57,6 +58,97 @@ function createSelectedArrow() {
   return { arrow, canvas, nudge, position, renderedEnd };
 }
 
+it('removes a grouped bend in its authored plane while retaining both scene endpoints', async () => {
+  const canvas = new Canvas(document.createElement('canvas'));
+  canvas.setZoom(0.2);
+  const drawing = {
+    kind: 'arrow' as const,
+    id: 'grouped-removal',
+    design: 'freehand' as const,
+    start: { x: 20, y: 20 },
+    end: { x: 220, y: 20 },
+    bendPoints: [
+      { x: 90, y: 90 },
+      { x: 160, y: 60 },
+    ],
+    color: '#f97316',
+    width: 12,
+    dynamicWidth: false,
+  };
+  const arrow = createEditorDrawingFabricObject(drawing, 1);
+  applyEditorDrawingInteractionControls(arrow);
+  const group = new Group([arrow], { angle: 30, scaleX: 1.6, scaleY: 1.2 });
+  canvas.add(group);
+  canvas.setActiveObject(arrow);
+  const screen = (key: string) => {
+    const control = arrow.controls[key]!;
+    return control.positionHandler(new Point(), [1, 0, 0, 1, 0, 0], arrow, control);
+  };
+  const endpoints = [screen('start'), screen('end')];
+  const retained = screen('bend-1');
+  const point = screen('bend-0').transform(util.invertTransform(canvas.viewportTransform));
+  expect(removeEditorDrawingArrowBendAtPoint(canvas, point)).toBe(true);
+  expect(readEditorDrawingObject(arrow)).toEqual({
+    ...drawing,
+    bendPoints: [drawing.bendPoints[1]],
+  });
+  expect(screen('start').distanceFrom(endpoints[0]!)).toBeLessThan(1e-6);
+  expect(screen('end').distanceFrom(endpoints[1]!)).toBeLessThan(1e-6);
+  expect(screen('bend-0').distanceFrom(retained)).toBeLessThan(1e-6);
+  expect(group.getObjects()).toEqual([arrow]);
+  const restored = await Group.fromObject(
+    group.toObject(['sniptaleDrawingJson', 'sniptaleType', 'sniptaleId'])
+  );
+  canvas.remove(group);
+  canvas.add(restored);
+  const restoredArrow = restored.getObjects()[0]!;
+  applyEditorDrawingInteractionControls(restoredArrow);
+  expect(restored.getObjects()).toHaveLength(1);
+  expect(readEditorDrawingObject(restoredArrow)).toEqual({
+    ...drawing,
+    bendPoints: [drawing.bendPoints[1]],
+  });
+  for (const [index, key] of ['start', 'end'].entries()) {
+    const control = restoredArrow.controls[key]!;
+    const point = control.positionHandler(new Point(), [1, 0, 0, 1, 0, 0], restoredArrow, control);
+    // Native JSON rounds transforms; this remains far below the 0.5 CSS px UI budget.
+    expect(point.distanceFrom(endpoints[index]!)).toBeLessThan(0.001);
+  }
+  const retainedControl = restoredArrow.controls['bend-0']!;
+  expect(
+    retainedControl
+      .positionHandler(new Point(), [1, 0, 0, 1, 0, 0], restoredArrow, retainedControl)
+      .distanceFrom(retained)
+  ).toBeLessThan(0.001);
+  void canvas.dispose();
+});
+
+it('does not remove a bend during an existing captured gesture', () => {
+  const canvas = new Canvas(document.createElement('canvas'));
+  const drawing = {
+    kind: 'arrow' as const,
+    id: 'gesture-removal',
+    design: 'freehand' as const,
+    start: { x: 20, y: 20 },
+    end: { x: 220, y: 20 },
+    bendPoints: [{ x: 120, y: 100 }],
+    color: '#f97316',
+    width: 12,
+    dynamicWidth: false,
+  };
+  const arrow = createEditorDrawingFabricObject(drawing, 1);
+  applyEditorDrawingInteractionControls(arrow);
+  canvas.add(arrow);
+  canvas.setActiveObject(arrow);
+  const control = arrow.controls['bend-0']!;
+  const transform = createTypedTestFixture<Transform>({ target: arrow, actionPerformed: false });
+  control.mouseDownHandler!(new MouseEvent('mousedown'), transform, 120, 100);
+  expect(removeEditorDrawingArrowBendAtPoint(canvas, { x: 120, y: 100 })).toBe(false);
+  expect(readEditorDrawingObject(arrow)).toEqual(drawing);
+  cancelEditorDrawingArrowBend(canvas);
+  void canvas.dispose();
+});
+
 it('inserts a bend only after a drag and cancels its transform without a modified event', () => {
   const canvas = new Canvas(document.createElement('canvas'));
   const drawing = {
@@ -80,11 +172,12 @@ it('inserts a bend only after a drag and cancels its transform without a modifie
   const transform = createTypedTestFixture<Transform>({ target: arrow, actionPerformed: false });
   const event = new MouseEvent('mousemove');
   control.mouseDownHandler!(event, transform, 120, 20);
+  expect(canvas.upperCanvasEl.style.cursor).toBe('grabbing');
   expect(control.actionHandler(event, transform, 120, 22)).toBe(false);
   expect(readEditorDrawingObject(arrow)).toEqual(drawing);
   expect(control.actionHandler(event, transform, 120, 100)).toBe(true);
   expect(readEditorDrawingObject(arrow)).toMatchObject({ bendPoints: [{ x: 120, y: 100 }] });
-  expect(canvas.upperCanvasEl.style.cursor).toBe('none');
+  expect(canvas.upperCanvasEl.style.cursor).toBe('grabbing');
   const modified = vi.fn();
   canvas.on('object:modified', modified);
   canvas._currentTransform = transform;
@@ -271,3 +364,42 @@ it.each(['start', 'end'] as const)(
     canvas.dispose();
   }
 );
+
+it('does not paint a virtual point before or during an insertion gesture', () => {
+  const canvas = new Canvas(document.createElement('canvas'));
+  const arrow = createEditorDrawingFabricObject(
+    {
+      kind: 'arrow',
+      id: 'unmarked-insert',
+      design: 'freehand',
+      start: { x: 20, y: 20 },
+      end: { x: 220, y: 20 },
+      color: '#f97316',
+      width: 4,
+      dynamicWidth: false,
+    },
+    1
+  );
+  canvas.add(arrow);
+  canvas.setActiveObject(arrow);
+  applyEditorDrawingInteractionControls(arrow);
+  updateEditorDrawingArrowHover(canvas, { x: 120, y: 20 });
+  const insert = arrow.controls['bend-insert']!;
+  expect(insert.getVisibility(arrow, 'bend-insert')).toBe(true);
+  const context = canvas.getTopContext();
+  const paint = vi.spyOn(context, 'arc');
+  insert.render(context, 120, 20, {}, arrow);
+  expect(paint).not.toHaveBeenCalled();
+  const event = new MouseEvent('mousemove');
+  const transform = createTypedTestFixture<Transform>({ target: arrow, corner: 'bend-insert' });
+  canvas._currentTransform = transform;
+  insert.mouseDownHandler!(event, transform, 120, 20);
+  insert.actionHandler(event, transform, 120, 80);
+  expect(readEditorDrawingObject(arrow)).toMatchObject({ bendPoints: [{ x: 120, y: 80 }] });
+  insert.render(context, 120, 80, {}, arrow);
+  expect(paint).not.toHaveBeenCalled();
+  expect(cancelEditorDrawingArrowBend(canvas)).toBe(true);
+  canvas._currentTransform = null;
+  paint.mockRestore();
+  void canvas.dispose();
+});

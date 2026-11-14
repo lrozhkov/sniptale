@@ -1,3 +1,7 @@
+import {
+  createNativeEditorVectorCatalogRoute,
+  routeEditorVectorCatalogMessage,
+} from '../../../vector-catalog/route';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
 import {
@@ -57,6 +61,8 @@ type BackgroundOwnedRouteDispatcher = {
   readonly route: BackgroundOwnedRouteHandler;
 };
 
+const vectorCatalogRoute = createNativeEditorVectorCatalogRoute();
+
 const simplifyRoute = createSimplifyRoute({
   async ensureDocument() {
     await ensureOffscreenDocument('Compute Simplify image effects in a dedicated worker');
@@ -76,6 +82,15 @@ const keepOpen = (handled: boolean): ActionResult | null =>
   handled ? { handled: true, keepChannelOpen: true } : null;
 
 export const backgroundOwnedHandlerBindings = {
+  'vector-catalog': (action) =>
+    keepOpen(
+      routeEditorVectorCatalogMessage(
+        vectorCatalogRoute,
+        action.message,
+        action.context.sender,
+        action.context.sendResponse
+      )
+    ),
   'page-launch-preferences': routePageLaunchPreferencesAction,
   'aggregate-promotion': routeAggregatePromotionAction,
   'ai-secret-unlock': routeAiSecretUnlockAction,

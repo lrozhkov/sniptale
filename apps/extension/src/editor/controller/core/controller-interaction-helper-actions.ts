@@ -1,3 +1,4 @@
+import { flushEditorFreehandCompletion } from '../draw-workflow/released';
 import type { Point } from 'fabric';
 import { type FabricObject } from 'fabric';
 import type { EditorObjectType } from '../../../features/editor/document/types';
@@ -22,6 +23,7 @@ import { ImageEditorControllerSceneHelperActions } from './controller-scene-help
 
 export abstract class ImageEditorControllerInteractionHelperActions extends ImageEditorControllerSceneHelperActions {
   cancelTransientInteraction(reason?: 'window-blur') {
+    flushEditorFreehandCompletion(this.canvas);
     return cancelTransientInteractionForController(this.instance, reason);
   }
 
@@ -31,6 +33,7 @@ export abstract class ImageEditorControllerInteractionHelperActions extends Imag
     object: FabricObject,
     pointerId: number | null = null
   ): void {
+    flushEditorFreehandCompletion(this.canvas);
     startDrawSessionForController(this.instance, tool, start, object, pointerId);
   }
 
@@ -39,22 +42,27 @@ export abstract class ImageEditorControllerInteractionHelperActions extends Imag
   }
 
   addObject(object: FabricObject): void {
+    flushEditorFreehandCompletion(this.canvas);
     addObjectForController(this.instance, object);
   }
 
   moveSelection(direction: 1 | -1): void {
+    flushEditorFreehandCompletion(this.canvas);
     moveSelectionForController(this.instance, direction);
   }
 
   moveSelectionToEdge(edge: 'front' | 'back'): void {
+    flushEditorFreehandCompletion(this.canvas);
     moveSelectionToEdgeForController(this.instance, edge);
   }
 
   withHistoryMuted<T>(callback: () => T): T {
+    flushEditorFreehandCompletion(this.canvas);
     return withHistoryMutedForController(this.instance, callback);
   }
 
   commitHistory(): void {
+    flushEditorFreehandCompletion(this.canvas);
     commitHistoryForController(this.instance);
   }
 
@@ -63,10 +71,12 @@ export abstract class ImageEditorControllerInteractionHelperActions extends Imag
   }
 
   refreshActiveToolSettingsPreview(): void {
+    flushEditorFreehandCompletion(this.canvas);
     refreshActiveToolSettingsPreviewForController(this.instance);
   }
 
   switchToSelectTool(): void {
+    flushEditorFreehandCompletion(this.canvas);
     switchToSelectToolForController(this.instance);
   }
 

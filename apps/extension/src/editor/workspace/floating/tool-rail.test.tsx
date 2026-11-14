@@ -15,6 +15,7 @@ import { EditorFloatingToolRail } from './tool-rail';
 
 const controller = vi.hoisted(() => ({
   clearSelection: vi.fn(),
+  getRasterRuntime: vi.fn<() => { getSnapshot(): { editing: boolean } } | null>(() => null),
   redo: vi.fn(async () => undefined),
   resetToOriginal: vi.fn(async () => undefined),
   undo: vi.fn(async () => undefined),
@@ -502,3 +503,35 @@ function getDialogButton(label: string): HTMLButtonElement {
   expect(button).toBeDefined();
   return button as HTMLButtonElement;
 }
+
+it('does not clear the raster target before toolbar Undo or Redo', async () => {
+  controller.getRasterRuntime.mockReturnValue({ getSnapshot: () => ({ editing: true }) });
+  const onBeforeSelectionAwareAction = vi.fn();
+  // The history strip is rendered separately so this test does not construct a raster runtime.
+  const { EditorFloatingToolHistoryControls } = await import('./history-controls');
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  try {
+    act(() =>
+      root?.render(
+        <EditorFloatingToolHistoryControls
+          hasImage
+          autosaveControl={null}
+          history={{ canUndo: true, canRedo: true, index: 2 }}
+          onBeforeSelectionAwareAction={onBeforeSelectionAwareAction}
+        />
+      )
+    );
+    await act(async () => {
+      getHistoryButton('undo').click();
+      getHistoryButton('redo').click();
+    });
+    expect(controller.clearSelection).not.toHaveBeenCalled();
+    expect(onBeforeSelectionAwareAction).not.toHaveBeenCalled();
+    expect(controller.undo).toHaveBeenCalledOnce();
+    expect(controller.redo).toHaveBeenCalledOnce();
+  } finally {
+    controller.getRasterRuntime.mockReturnValue(null);
+  }
+});

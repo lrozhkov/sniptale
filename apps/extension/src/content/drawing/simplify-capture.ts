@@ -25,10 +25,18 @@ const CAPTURE_CHROME = [
   '[data-ui="content.drawing.simplify-feedback"]',
 ].join(',');
 
-function concealCaptureChrome(): () => void {
+function concealCaptureChrome(excludedDrawingObjectId?: string): () => void {
   const hidden = new Map<HTMLElement, { value: string; priority: string }>();
   const conceal = () => {
-    for (const element of queryAllContentUiElements<HTMLElement>(CAPTURE_CHROME)) {
+    const elements = queryAllContentUiElements<HTMLElement>(CAPTURE_CHROME);
+    if (excludedDrawingObjectId) {
+      for (const element of queryAllContentUiElements<HTMLElement>(
+        '[data-sniptale-drawing-object-id]'
+      ))
+        if (element.dataset['sniptaleDrawingObjectId'] === excludedDrawingObjectId)
+          elements.push(element);
+    }
+    for (const element of elements) {
       if (hidden.has(element)) continue;
       hidden.set(element, {
         value: element.style.getPropertyValue('visibility'),
@@ -75,14 +83,15 @@ function waitForCapture<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
 async function captureWithoutChrome<T>(
   capture: () => Promise<T>,
   setUIHidden: (hidden: boolean) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  excludedDrawingObjectId?: string
 ): Promise<T> {
   signal?.throwIfAborted();
   const alreadyHidden =
     resolveContentShadowRoot()?.host.classList.contains('sniptale-capture-ui-hidden') ??
     document.body.classList.contains('sniptale-capture-ui-hidden');
   if (!alreadyHidden) setUIHidden(true);
-  const restoreChrome = concealCaptureChrome();
+  const restoreChrome = concealCaptureChrome(excludedDrawingObjectId);
   try {
     for (let frame = 0; frame < 2; frame += 1)
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -97,9 +106,13 @@ async function captureWithoutChrome<T>(
 /** Serializes source capture and validates its projection before returning retained pixels. */
 export function createSimplifySourceCapture(
   options: SimplifySourceCaptureOptions
-): (event: Event, signal?: AbortSignal) => Promise<DrawingSimplifySource> {
+): (
+  event: Event,
+  signal?: AbortSignal,
+  excludedDrawingObjectId?: string
+) => Promise<DrawingSimplifySource> {
   let captureTail: Promise<void> = Promise.resolve();
-  return async (event, signal) => {
+  return async (event, signal, excludedDrawingObjectId) => {
     signal?.throwIfAborted();
     const retained = options.getRetainedSource?.();
     if (retained) return retained;
@@ -134,7 +147,8 @@ export function createSimplifySourceCapture(
             return response.dataUrl;
           },
           options.setUIHidden,
-          signal
+          signal,
+          excludedDrawingObjectId
         )
       );
     }

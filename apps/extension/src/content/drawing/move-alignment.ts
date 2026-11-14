@@ -1,5 +1,13 @@
 import {
   getDrawingObjectBounds,
+  collectDrawingGapCandidates,
+  verifyDrawingGapCandidate,
+  verifyDrawingDimensionCandidate,
+  type DrawingSnapFeedback,
+  type DrawingGapCandidate,
+  type DrawingDimensionCandidate,
+  type DrawingRelationBox,
+  type DrawingSnapRelation,
   transformDrawingObjectPoint,
   transformDrawingObjectVector,
   untransformDrawingObjectVector,
@@ -8,19 +16,40 @@ import {
   type DrawingBounds,
   type DrawingObject,
   type DrawingPoint,
+  type DrawingAlignmentGuide,
+  type DrawingAlignmentTarget,
+  type DrawingAlignmentAnchor,
 } from '../../features/drawing/public';
 import { resizeDrawingObject, type PointerDraft } from './interaction';
+import {
+  collectDrawingResizeDimensionChoices,
+  measureDrawingRelationDimensions,
+} from './alignment-relation-adapter';
 
-export interface DrawingAlignmentGuide {
-  axis: 'x' | 'y';
+export type { DrawingAlignmentGuide } from '../../features/drawing/public';
+
+type Target = {
+  target: DrawingAlignmentTarget;
+  bounds: DrawingBounds;
+  centerOnly?: boolean;
+  inset?: number;
+  points?: readonly DrawingPoint[];
+};
+type Candidate = {
+  target: Target;
+  sourceKind: DrawingAlignmentAnchor['kind'];
+  targetKind: DrawingAlignmentAnchor['kind'];
+  targetPoint?: DrawingPoint;
+};
+type Match = {
+  key: string;
+  delta: number;
   coordinate: number;
-  from: number;
-  to: number;
-  points: readonly DrawingPoint[];
-}
-
-type Target = { bounds: DrawingBounds; centerOnly?: boolean; inset?: number };
-type Match = { delta: number; coordinate: number; bounds: DrawingBounds; center: boolean };
+  center: boolean;
+  candidates: Candidate[];
+};
+type AxisCandidate = Match & { candidate: Candidate };
+type DomBounds = DrawingBounds & { alignmentTarget?: DrawingAlignmentTarget };
 const SNAP_DISTANCE = 6;
 const NEIGHBOR_DISTANCE = 96;
 
@@ -35,7 +64,7 @@ function getTargets(
   moving: readonly DrawingObject[],
   bounds: DrawingBounds,
   objects: readonly DrawingObject[],
-  domBounds: readonly DrawingBounds[],
+  domBounds: readonly DomBounds[],
   includeDistantShapes = false
 ): Target[] {
   const ids = new Set(moving.map((object) => object.id));
@@ -63,6 +92,7 @@ function getTargets(
       return [
         {
           bounds: containing.bounds,
+          target: { id: containing.object.id, kind: 'object', bounds: containing.bounds },
           centerOnly: containing.object.kind !== 'rectangle',
           inset: 8,
         },
@@ -74,74 +104,361 @@ function getTargets(
         ({ bounds: target }) =>
           includeDistantShapes || distance(bounds, target) <= NEIGHBOR_DISTANCE
       )
-      .map(({ bounds: target }) => ({ bounds: target })),
+      .map(({ object, bounds: target }) => ({
+        bounds: target,
+        target: { id: object.id, kind: 'object' as const, bounds: target },
+        ...(object.kind === 'arrow' ? { points: [object.start, object.end] } : {}),
+      })),
     ...domBounds
       .filter((target) => distance(bounds, target) <= NEIGHBOR_DISTANCE)
-      .map((target) => ({ bounds: target })),
+      .map((bounds) => ({
+        bounds,
+        target: bounds.alignmentTarget ?? {
+          id: `dom:${bounds.x}:${bounds.y}:${bounds.width}:${bounds.height}`,
+          kind: 'dom' as const,
+          bounds,
+          showBounds: true,
+        },
+      })),
   ];
 }
 
-function matchAxis(
+function isCenterCorrespondence(candidate: Candidate) {
+  return candidate.sourceKind === 'center' && candidate.targetKind === 'center';
+}
+
+function compareAxisCandidates(
+  a: AxisCandidate,
+  b: AxisCandidate,
+  previousIds: ReadonlySet<string>
+) {
+  const difference = Math.abs(a.delta) - Math.abs(b.delta);
+  if (Math.abs(difference) >= 0.001) return difference;
+  const center =
+    Number(isCenterCorrespondence(b.candidate)) - Number(isCenterCorrespondence(a.candidate));
+  if (Math.abs(a.delta - b.delta) < 0.001 && center) return center;
+  return (
+    Number(previousIds.has(b.candidate.target.target.id)) -
+      Number(previousIds.has(a.candidate.target.target.id)) ||
+    Number(b.center) - Number(a.center) ||
+    a.candidate.target.target.id.localeCompare(b.candidate.target.target.id) ||
+    a.coordinate - b.coordinate
+  );
+}
+
+type AxisValue = { coordinate: number; kind: DrawingAlignmentAnchor['kind']; point?: DrawingPoint };
+type AxisPreference = { guides?: readonly DrawingAlignmentGuide[]; key?: string };
+
+function targetAxisValues(target: Target, axis: 'x' | 'y', explicit: boolean): AxisValue[] {
+  if (explicit && target.points)
+    return target.points.map((point) => ({ coordinate: point[axis], kind: 'point', point }));
+  const size = axis === 'x' ? 'width' : 'height';
+  const inset = Math.min(target.inset ?? 0, target.bounds[size] / 2);
+  return [
+    { coordinate: target.bounds[axis] + inset, kind: 'edge' },
+    { coordinate: target.bounds[axis] + target.bounds[size] / 2, kind: 'center' },
+    { coordinate: target.bounds[axis] + target.bounds[size] - inset, kind: 'edge' },
+  ];
+}
+
+function axisCandidate(
+  target: Target,
+  axis: 'x' | 'y',
+  source: { value: number; index: number; explicit: boolean },
+  value: AxisValue
+): AxisCandidate | null {
+  const sourceKind = source.explicit ? 'point' : source.index === 1 ? 'center' : 'edge';
+  if (!source.explicit && (source.index === 1) !== (value.kind === 'center')) return null;
+  if (target.centerOnly && value.kind !== 'center') return null;
+  const delta = value.coordinate - source.value;
+  if (Math.abs(delta) > SNAP_DISTANCE) return null;
+  return {
+    key: JSON.stringify([
+      'point',
+      axis,
+      target.target.id,
+      sourceKind,
+      source.index,
+      value.kind,
+      value.coordinate,
+    ]),
+    delta,
+    coordinate: value.coordinate,
+    center: value.kind === 'center',
+    candidates: [],
+    candidate: {
+      target,
+      sourceKind,
+      targetKind: value.kind,
+      ...(value.point ? { targetPoint: value.point } : {}),
+    },
+  };
+}
+
+function collectAxisCandidates(
   bounds: DrawingBounds,
   targets: Target[],
   axis: 'x' | 'y',
   sourceAnchors?: readonly number[]
-): Match | null {
+) {
   const size = axis === 'x' ? 'width' : 'height';
   const anchors = sourceAnchors ?? [
     bounds[axis],
     bounds[axis] + bounds[size] / 2,
     bounds[axis] + bounds[size],
   ];
-  let best: Match | null = null;
+  const candidates: AxisCandidate[] = [];
   for (const target of targets) {
-    const inset = Math.min(target.inset ?? 0, target.bounds[size] / 2);
-    const values = [
-      target.bounds[axis] + inset,
-      target.bounds[axis] + target.bounds[size] / 2,
-      target.bounds[axis] + target.bounds[size] - inset,
-    ];
-    for (const [sourceIndex, anchor] of anchors.entries()) {
-      for (const [targetIndex, coordinate] of values.entries()) {
-        if ((sourceIndex === 1) !== (targetIndex === 1)) continue;
-        if (target.centerOnly && sourceIndex !== 1) continue;
-        const delta = coordinate - anchor;
-        if (Math.abs(delta) > SNAP_DISTANCE) continue;
-        const center = sourceIndex === 1;
-        if (
-          !best ||
-          Math.abs(delta) < Math.abs(best.delta) - 0.001 ||
-          (Math.abs(Math.abs(delta) - Math.abs(best.delta)) < 0.001 && center && !best.center)
-        ) {
-          best = { delta, coordinate, bounds: target.bounds, center };
-        }
+    const values = targetAxisValues(target, axis, !!sourceAnchors);
+    for (const [index, anchor] of anchors.entries()) {
+      for (const value of values) {
+        const candidate = axisCandidate(
+          target,
+          axis,
+          { value: anchor, index, explicit: !!sourceAnchors },
+          value
+        );
+        if (candidate) candidates.push(candidate);
       }
     }
   }
+  return candidates;
+}
+
+function comparePreferredAxis(
+  a: AxisCandidate,
+  b: AxisCandidate,
+  previousIds: ReadonlySet<string>,
+  key?: string
+) {
+  if (!key) return compareAxisCandidates(a, b, previousIds);
+  const distance = Math.abs(a.delta) - Math.abs(b.delta);
+  if (Math.abs(distance) >= 0.001) return distance;
+  const center =
+    Number(isCenterCorrespondence(b.candidate)) - Number(isCenterCorrespondence(a.candidate));
+  if (Math.abs(a.delta - b.delta) < 0.001 && center) return center;
+  return Number(b.key === key) - Number(a.key === key) || compareAxisCandidates(a, b, new Set());
+}
+
+function matchAxis(
+  bounds: DrawingBounds,
+  targets: Target[],
+  axis: 'x' | 'y',
+  sourceAnchors?: readonly number[],
+  preference: AxisPreference = {}
+): Match | null {
+  const candidates = collectAxisCandidates(bounds, targets, axis, sourceAnchors);
+  const previousIds = new Set(
+    (preference.guides ?? [])
+      .filter((guide) => guide.axis === axis)
+      .flatMap((guide) => guide.matches?.map((match) => match.target.id) ?? [])
+  );
+  candidates.sort((a, b) => comparePreferredAxis(a, b, previousIds, preference.key));
+  const best = candidates[0] ?? null;
+  if (best)
+    best.candidates = candidates
+      .filter(
+        (candidate) =>
+          Math.abs(candidate.coordinate - best.coordinate) < 1e-6 &&
+          Math.abs(candidate.delta - best.delta) < 1e-6
+      )
+      .map((candidate) => candidate.candidate);
   return best;
 }
 
-/** Resolves disposable alignment feedback for an already translated selection. */
-export function resolveDrawingMoveAlignment(args: {
+type SnapChoice = {
+  key: string;
+  delta: number;
+  point?: Match;
+  gap?: DrawingGapCandidate;
+  dimension?: DrawingDimensionCandidate;
+};
+
+function emptyFeedback(): DrawingSnapFeedback {
+  return { guides: [], relations: [], acceptedByAxis: {} };
+}
+
+function relationSource(
+  moving: readonly DrawingObject[],
+  bounds: DrawingBounds
+): DrawingRelationBox {
+  return { id: JSON.stringify(moving.map((object) => object.id).sort()), bounds };
+}
+
+function relationTargets(moving: readonly DrawingObject[], objects: readonly DrawingObject[]) {
+  const ids = new Set(moving.map((object) => object.id));
+  return objects
+    .filter((object) => !ids.has(object.id))
+    .map((object) => ({
+      id: object.id,
+      bounds: getDrawingObjectSelectionBounds(object),
+    }));
+}
+
+function chooseCorrection(choices: SnapChoice[], previous?: string): SnapChoice | null {
+  return (
+    choices
+      .filter((choice) => Math.abs(choice.delta) <= SNAP_DISTANCE)
+      .sort((a, b) => {
+        const distance = Math.abs(a.delta) - Math.abs(b.delta);
+        if (Math.abs(distance) >= 0.001) return distance;
+        const center = (choice: SnapChoice) =>
+          choice.point?.candidates.some(isCenterCorrespondence) ?? false;
+        const correspondence = Number(center(b)) - Number(center(a));
+        if (Math.abs(a.delta - b.delta) < 0.001 && correspondence) return correspondence;
+        return (
+          Number(b.key === previous) - Number(a.key === previous) ||
+          correspondence ||
+          a.key.localeCompare(b.key)
+        );
+      })[0] ?? null
+  );
+}
+
+function pointChoice(point: Match | null): SnapChoice[] {
+  return point ? [{ key: point.key, delta: point.delta, point }] : [];
+}
+
+type MoveAlignmentInput = {
   moving: readonly DrawingObject[];
   axis?: 'x' | 'y';
+  previousGuides?: readonly DrawingAlignmentGuide[];
+  previousFeedback?: DrawingSnapFeedback;
   objects: readonly DrawingObject[];
-  domBounds?: readonly DrawingBounds[];
-}): { delta: DrawingPoint; guides: DrawingAlignmentGuide[] } {
+  relationObjects?: readonly DrawingObject[];
+  domBounds?: readonly DomBounds[];
+};
+
+function axisPreference(
+  args: {
+    previousGuides?: readonly DrawingAlignmentGuide[];
+    previousFeedback?: DrawingSnapFeedback;
+  },
+  axis: 'x' | 'y'
+): AxisPreference {
+  const key = args.previousFeedback?.acceptedByAxis[axis];
+  return {
+    ...(args.previousGuides ? { guides: args.previousGuides } : {}),
+    ...(key ? { key } : {}),
+  };
+}
+
+function movePoint(
+  args: MoveAlignmentInput,
+  bounds: DrawingBounds,
+  targets: Target[],
+  axis: 'x' | 'y'
+) {
+  if (args.axis && args.axis !== axis) return null;
+  return matchAxis(bounds, targets, axis, undefined, axisPreference(args, axis));
+}
+
+function moveChoice(
+  args: MoveAlignmentInput,
+  point: Match | null,
+  gaps: readonly DrawingGapCandidate[],
+  axis: 'x' | 'y'
+) {
+  if (args.axis && args.axis !== axis) return null;
+  const candidates = gaps
+    .filter((gap) => gap.axis === axis)
+    .map((gap) => ({ key: gap.key, delta: gap.delta, gap }));
+  return chooseCorrection(
+    [...pointChoice(point), ...candidates],
+    args.previousFeedback?.acceptedByAxis[axis]
+  );
+}
+
+function verifyMoveRelations(
+  gaps: readonly DrawingGapCandidate[],
+  source: DrawingRelationBox,
+  references: readonly DrawingRelationBox[],
+  choices: { x: SnapChoice | null; y: SnapChoice | null }
+) {
+  const relations: DrawingSnapRelation[] = [];
+  for (const gap of gaps) {
+    const choice = choices[gap.axis];
+    if (!choice || Math.abs(gap.delta - choice.delta) > 1e-6) continue;
+    const relation = verifyDrawingGapCandidate({ candidate: gap, source, targets: references });
+    if (!relation && gap.key === choice.key) return null;
+    if (relation) relations.push(relation);
+  }
+  return relations;
+}
+
+function acceptedMoveGuides(
+  bounds: DrawingBounds,
+  targets: Target[],
+  choices: { x: SnapChoice | null; y: SnapChoice | null },
+  delta: DrawingPoint
+) {
+  const guides: DrawingAlignmentGuide[] = [];
+  for (const axis of ['x', 'y'] as const) {
+    const choice = choices[axis];
+    if (!choice) continue;
+    const groups: Match[] = [];
+    for (const candidate of collectAxisCandidates(bounds, targets, axis)) {
+      if (Math.abs(candidate.delta - choice.delta) > 1e-6) continue;
+      const group = groups.find(
+        (match) => Math.abs(match.coordinate - candidate.coordinate) < 1e-6
+      );
+      if (group) group.candidates.push(candidate.candidate);
+      else groups.push({ ...candidate, candidates: [candidate.candidate] });
+    }
+    const primary = choice.point?.coordinate ?? Infinity;
+    groups.sort(
+      (a, b) =>
+        Number(Math.abs(b.coordinate - primary) < 1e-6) -
+          Number(Math.abs(a.coordinate - primary) < 1e-6) || a.coordinate - b.coordinate
+    );
+    for (const group of groups) {
+      const x = axis === 'x' ? group : null,
+        y = axis === 'y' ? group : null;
+      guides.push(...getAlignmentGuides(bounds, x, y, delta));
+    }
+  }
+  return guides;
+}
+
+/** Resolves one disposable correction from the raw translated selection. */
+export function resolveDrawingMoveAlignment(
+  args: MoveAlignmentInput
+): DrawingSnapFeedback & { delta: DrawingPoint } {
+  const unchanged = { delta: { x: 0, y: 0 }, ...emptyFeedback() };
   const bounds = getDrawingSelectionBounds(args.moving);
-  if (!bounds) return { delta: { x: 0, y: 0 }, guides: [] };
+  if (!bounds) return unchanged;
   const targets = getTargets(args.moving, bounds, args.objects, args.domBounds ?? []);
-  const x = args.axis === 'y' ? null : matchAxis(bounds, targets, 'x');
-  const y = args.axis === 'x' ? null : matchAxis(bounds, targets, 'y');
+  const source = relationSource(args.moving, bounds);
+  const references = relationTargets(args.moving, args.relationObjects ?? args.objects);
+  const gaps = collectDrawingGapCandidates({ source, targets: references });
+  const points = {
+    x: movePoint(args, bounds, targets, 'x'),
+    y: movePoint(args, bounds, targets, 'y'),
+  };
+  const x = moveChoice(args, points.x, gaps, 'x'),
+    y = moveChoice(args, points.y, gaps, 'y');
   const delta = { x: x?.delta ?? 0, y: y?.delta ?? 0 };
-  return { delta, guides: getAlignmentGuides(bounds, x, y, delta) };
+  const finalSource = {
+    ...source,
+    bounds: { ...bounds, x: bounds.x + delta.x, y: bounds.y + delta.y },
+  };
+  const relations = verifyMoveRelations(gaps, finalSource, references, { x, y });
+  if (!relations) return unchanged;
+  const acceptedByAxis = { ...(x ? { x: x.key } : {}), ...(y ? { y: y.key } : {}) };
+  return {
+    delta,
+    relations,
+    acceptedByAxis,
+    guides: acceptedMoveGuides(bounds, targets, { x, y }, delta),
+  };
 }
 
 function getAlignmentGuides(
   bounds: DrawingBounds,
   x: Match | null,
   y: Match | null,
-  delta: DrawingPoint = { x: 0, y: 0 }
+  delta: DrawingPoint = { x: 0, y: 0 },
+  sourcePoint?: DrawingPoint
 ): DrawingAlignmentGuide[] {
   const guides: DrawingAlignmentGuide[] = [];
   for (const axis of ['x', 'y'] as const) {
@@ -149,23 +466,51 @@ function getAlignmentGuides(
     if (!match) continue;
     const perpendicular = axis === 'x' ? 'y' : 'x';
     const size = axis === 'x' ? 'height' : 'width';
+    const source = sourcePoint ?? {
+      x: bounds.x + delta.x + bounds.width / 2,
+      y: bounds.y + delta.y + bounds.height / 2,
+    };
+    const matches = match.candidates.map((candidate) => {
+      const target = candidate.target.bounds;
+      const anchor = candidate.targetPoint ?? {
+        x: axis === 'x' ? match.coordinate : target.x + target.width / 2,
+        y: axis === 'y' ? match.coordinate : target.y + target.height / 2,
+      };
+      return {
+        target: candidate.target.target,
+        source: { kind: candidate.sourceKind, point: { ...source, [axis]: match.coordinate } },
+        anchor: { kind: candidate.targetKind, point: anchor },
+      };
+    });
     guides.push({
       axis,
       coordinate: match.coordinate,
-      points: [bounds[perpendicular] + delta[perpendicular], match.bounds[perpendicular]].flatMap(
-        (start, index) => {
-          const length = index === 0 ? bounds[size] : match.bounds[size];
-          const anchors = match.center ? [start + length / 2] : [start, start + length];
-          return anchors.map((anchor) =>
-            axis === 'x' ? { x: match.coordinate, y: anchor } : { x: anchor, y: match.coordinate }
+      matches,
+      points: match.candidates.flatMap((candidate) => {
+        const starts = [
+          bounds[perpendicular] + delta[perpendicular],
+          candidate.target.bounds[perpendicular],
+        ];
+        return starts.flatMap((start, index) => {
+          const length = index === 0 ? bounds[size] : candidate.target.bounds[size];
+          return (
+            candidate.targetKind === 'center' ? [start + length / 2] : [start, start + length]
+          ).map((value) =>
+            axis === 'x' ? { x: match.coordinate, y: value } : { x: value, y: match.coordinate }
           );
-        }
-      ),
-      from: Math.min(bounds[perpendicular] + delta[perpendicular], match.bounds[perpendicular]) - 8,
+        });
+      }),
+      from:
+        Math.min(
+          bounds[perpendicular] + delta[perpendicular],
+          ...match.candidates.map((candidate) => candidate.target.bounds[perpendicular])
+        ) - 8,
       to:
         Math.max(
           bounds[perpendicular] + delta[perpendicular] + bounds[size],
-          match.bounds[perpendicular] + match.bounds[size]
+          ...match.candidates.map(
+            (candidate) => candidate.target.bounds[perpendicular] + candidate.target.bounds[size]
+          )
         ) + 8,
     });
   }
@@ -212,93 +557,242 @@ export function getDrawingResizeHandleGeometry(
   };
 }
 
-/** Aligns the grabbed handle through the canonical resizer, without translating its fixed anchor. */
-export function resolveDrawingResizeAlignment(args: {
+type ResizeAlignmentInput = {
   draft: ResizeDraft;
+  previousGuides?: readonly DrawingAlignmentGuide[];
+  previousFeedback?: DrawingSnapFeedback;
+  relationObjects?: readonly DrawingObject[];
   point: DrawingPoint;
   modifiers: { ctrlKey: boolean; shiftKey: boolean };
   objects: readonly DrawingObject[];
-  domBounds?: readonly DrawingBounds[];
-}): { object: DrawingObject; guides: DrawingAlignmentGuide[] } {
-  const { draft, point, modifiers } = args;
-  const unchanged = { object: draft.object, guides: [] };
-  if (
-    (draft.original.kind !== 'arrow' && (draft.handle === 'start' || draft.handle === 'end')) ||
-    (draft.original.kind === 'text' && draft.handle !== 'e' && draft.handle !== 'w') ||
-    (modifiers.ctrlKey &&
-      ['rectangle', 'ellipse', 'triangle', 'parallelogram'].includes(draft.original.kind) &&
-      (draft.handle === 'n' || draft.handle === 's'))
-  )
-    return unchanged;
-  const geometry = getDrawingResizeHandleGeometry(draft, point, modifiers.ctrlKey);
-  const bounds = getDrawingObjectSelectionBounds(draft.object);
-  const targets = getTargets([draft.object], bounds, args.objects, args.domBounds ?? [], true);
-  let x = matchAxis(bounds, targets, 'x', [geometry.current.x]);
-  let y = matchAxis(bounds, targets, 'y', [geometry.current.y]);
-  let delta: DrawingPoint;
-  if (geometry.x && geometry.y && !modifiers.shiftKey) {
-    delta = { x: x?.delta ?? 0, y: y?.delta ?? 0 };
-  } else {
-    const original = getDrawingObjectBounds(draft.original);
-    const fixedEndpoint =
-      draft.original.kind === 'arrow'
-        ? draft.original[draft.handle === 'start' ? 'end' : 'start']
-        : null;
-    const vector = fixedEndpoint
-      ? { x: geometry.current.x - fixedEndpoint.x, y: geometry.current.y - fixedEndpoint.y }
-      : transformDrawingObjectVector(
-          draft.original,
-          geometry.x && geometry.y
-            ? { x: geometry.x * original.width, y: geometry.y * original.height }
-            : { x: geometry.x ? 1 : 0, y: geometry.y ? 1 : 0 }
-        );
-    const length = Math.hypot(vector.x, vector.y);
-    if (length < 1e-6) return unchanged;
-    const direction = { x: vector.x / length, y: vector.y / length };
-    if (Math.abs(direction.x) <= 1e-6) x = null;
-    if (Math.abs(direction.y) <= 1e-6) y = null;
-    const corrections = [
-      x && Math.abs(direction.x) > 1e-6 ? x.delta / direction.x : null,
-      y && Math.abs(direction.y) > 1e-6 ? y.delta / direction.y : null,
-    ]
-      .filter((value): value is number => value !== null && Math.abs(value) <= SNAP_DISTANCE)
-      .sort((a, b) => Math.abs(a) - Math.abs(b));
-    const amount = corrections[0];
-    if (amount === undefined) return unchanged;
-    delta = { x: direction.x * amount, y: direction.y * amount };
+  domBounds?: readonly DomBounds[];
+};
+
+type ResizeContext = {
+  args: ResizeAlignmentInput;
+  geometry: ReturnType<typeof getDrawingResizeHandleGeometry>;
+  x: Match | null;
+  y: Match | null;
+  dimensions: ReturnType<typeof collectDrawingResizeDimensionChoices>;
+};
+type ResizeDecision = {
+  delta: DrawingPoint;
+  acceptedDimensions: DrawingDimensionCandidate[];
+  acceptedByAxis: DrawingSnapFeedback['acceptedByAxis'];
+};
+
+function unsupportedResize({ draft, modifiers }: ResizeAlignmentInput) {
+  if (draft.handle === 'start' || draft.handle === 'end') return draft.original.kind !== 'arrow';
+  if (draft.original.kind === 'text') return draft.handle !== 'e' && draft.handle !== 'w';
+  return (
+    modifiers.ctrlKey &&
+    ['rectangle', 'ellipse', 'triangle', 'parallelogram'].includes(draft.original.kind) &&
+    (draft.handle === 'n' || draft.handle === 's')
+  );
+}
+
+function independentResizeCorrection(context: ResizeContext): ResizeDecision {
+  const { args, x, y, dimensions } = context;
+  const localPoint = untransformDrawingObjectVector(args.draft.original, {
+    x: x?.delta ?? 0,
+    y: y?.delta ?? 0,
+  });
+  const local = { x: 0, y: 0 };
+  const acceptedDimensions: DrawingDimensionCandidate[] = [];
+  const acceptedByAxis: DrawingSnapFeedback['acceptedByAxis'] = {};
+  for (const axis of ['x', 'y'] as const) {
+    const point = axis === 'x' ? x : y;
+    const pointChoices = point ? [{ key: point.key, delta: localPoint[axis], point }] : [];
+    const dimension = axis === 'x' ? 'width' : 'height';
+    const choices = dimensions.dimensions
+      .filter((entry) => entry.candidate.dimension === dimension)
+      .map((entry) => ({
+        key: entry.candidate.key,
+        delta: entry.local[axis],
+        dimension: entry.candidate,
+      }));
+    const choice = chooseCorrection(
+      [...pointChoices, ...choices],
+      args.previousFeedback?.acceptedByAxis[axis]
+    );
+    local[axis] = choice?.delta ?? 0;
+    if (choice) acceptedByAxis[axis] = choice.key;
+    if (choice?.dimension) acceptedDimensions.push(choice.dimension);
   }
-  if (!x && !y) return unchanged;
+  return {
+    delta: transformDrawingObjectVector(args.draft.original, local),
+    acceptedDimensions,
+    acceptedByAxis,
+  };
+}
+
+function resizeDirection(draft: ResizeDraft, geometry: ResizeContext['geometry']) {
+  const original = getDrawingObjectBounds(draft.original);
+  const fixed =
+    draft.original.kind === 'arrow'
+      ? draft.original[draft.handle === 'start' ? 'end' : 'start']
+      : null;
+  const local =
+    geometry.x && geometry.y
+      ? { x: geometry.x * original.width, y: geometry.y * original.height }
+      : { x: geometry.x ? 1 : 0, y: geometry.y ? 1 : 0 };
+  const vector = fixed
+    ? { x: geometry.current.x - fixed.x, y: geometry.current.y - fixed.y }
+    : transformDrawingObjectVector(draft.original, local);
+  const length = Math.hypot(vector.x, vector.y);
+  return length < 1e-6 ? null : { x: vector.x / length, y: vector.y / length };
+}
+
+function scalarPointChoices(context: ResizeContext, direction: DrawingPoint): SnapChoice[] {
+  return (['x', 'y'] as const).flatMap((axis) => {
+    const point = context[axis];
+    return point && Math.abs(direction[axis]) > 1e-6
+      ? [{ key: point.key, delta: point.delta / direction[axis], point }]
+      : [];
+  });
+}
+
+function constrainedResizeCorrection(context: ResizeContext): ResizeDecision | null {
+  const { args, geometry, dimensions } = context;
+  const direction = resizeDirection(args.draft, geometry);
+  if (!direction) return null;
+  if (Math.abs(direction.x) <= 1e-6) context.x = null;
+  if (Math.abs(direction.y) <= 1e-6) context.y = null;
+  const choices: SnapChoice[] = [
+    ...scalarPointChoices(context, direction),
+    ...dimensions.dimensions.map((entry) => ({
+      key: entry.candidate.key,
+      delta: entry.correction.x * direction.x + entry.correction.y * direction.y,
+      dimension: entry.candidate,
+    })),
+  ];
+  const previous = args.previousFeedback?.acceptedByAxis;
+  const choice = chooseCorrection(choices, previous?.x ?? previous?.y);
+  if (!choice) return null;
+  return {
+    delta: { x: direction.x * choice.delta, y: direction.y * choice.delta },
+    acceptedDimensions: choice.dimension ? [choice.dimension] : [],
+    acceptedByAxis: {
+      ...(Math.abs(direction.x) > 1e-6 ? { x: choice.key } : {}),
+      ...(Math.abs(direction.y) > 1e-6 ? { y: choice.key } : {}),
+    },
+  };
+}
+
+function applyResizeCorrection(context: ResizeContext, delta: DrawingPoint) {
+  const {
+    args: { draft, modifiers },
+    geometry,
+    x,
+    y,
+  } = context;
   const adjusted = {
     x: draft.start.x + geometry.current.x + delta.x - geometry.original.x,
     y: draft.start.y + geometry.current.y + delta.y - geometry.original.y,
   };
   let object = resizeDrawingObject(draft, adjusted, modifiers);
-  let actual = getDrawingResizeHandleGeometry(
-    { ...draft, object },
-    adjusted,
-    modifiers.ctrlKey
-  ).current;
+  const actualHandle = () =>
+    getDrawingResizeHandleGeometry({ ...draft, object }, adjusted, modifiers.ctrlKey).current;
+  let actual = actualHandle();
   const freehand = draft.original.kind === 'pencil' || draft.original.kind === 'marker';
-  // The canonical freehand resizer scales samples, then rebuilds the stroke outline.
-  // Refine its pointer input to put the rebuilt active edge within half a CSS pixel.
+  // Preserve the established outline rebuild refinement only for freehand point snapping.
   for (let attempt = 0; freehand && attempt < 3; attempt += 1) {
     const correction = { x: x ? x.coordinate - actual.x : 0, y: y ? y.coordinate - actual.y : 0 };
     if (Math.abs(correction.x) <= 0.5 && Math.abs(correction.y) <= 0.5) break;
     adjusted.x += correction.x;
     adjusted.y += correction.y;
     object = resizeDrawingObject(draft, adjusted, modifiers);
-    actual = getDrawingResizeHandleGeometry(
-      { ...draft, object },
-      adjusted,
-      modifiers.ctrlKey
-    ).current;
+    actual = actualHandle();
   }
-  const tolerance = freehand ? 0.5 : 1e-6;
-  const acceptedX = x && Math.abs(actual.x - x.coordinate) <= tolerance ? x : null;
-  const acceptedY = y && Math.abs(actual.y - y.coordinate) <= tolerance ? y : null;
-  if (!acceptedX && !acceptedY) return unchanged;
+  return { object, actual, tolerance: freehand ? 0.5 : 1e-6 };
+}
+
+function acceptedResizePoint(match: Match | null, coordinate: number, tolerance: number) {
+  return match && Math.abs(coordinate - match.coordinate) <= tolerance ? match : null;
+}
+
+function verifyResizeDimensions(
+  context: ResizeContext,
+  candidates: readonly DrawingDimensionCandidate[],
+  object: DrawingObject
+) {
+  const relations: DrawingSnapRelation[] = [];
+  const source = measureDrawingRelationDimensions(object);
+  for (const candidate of candidates) {
+    const relation = verifyDrawingDimensionCandidate({
+      candidate,
+      source,
+      targets: context.dimensions.targets,
+    });
+    if (!relation) return null;
+    relations.push(relation);
+  }
+  return relations;
+}
+
+function primaryResizeKeysAccepted(
+  decision: ResizeDecision,
+  relations: readonly DrawingSnapRelation[],
+  x: Match | null,
+  y: Match | null
+) {
+  const keys = new Set([x?.key, y?.key, ...relations.map((relation) => relation.key)]);
+  return Object.values(decision.acceptedByAxis).every((key) => keys.has(key));
+}
+
+function verifyResizeFeedback(
+  context: ResizeContext,
+  decision: ResizeDecision,
+  applied: ReturnType<typeof applyResizeCorrection>
+): DrawingSnapFeedback | null {
+  const { object, actual, tolerance } = applied;
+  const x = acceptedResizePoint(context.x, actual.x, tolerance);
+  const y = acceptedResizePoint(context.y, actual.y, tolerance);
+  const relations = verifyResizeDimensions(context, decision.acceptedDimensions, object);
+  if (!relations || !primaryResizeKeysAccepted(decision, relations, x, y)) return null;
+  if (!x && !y && !relations.length) return null;
   return {
-    object,
-    guides: getAlignmentGuides(getDrawingObjectSelectionBounds(object), acceptedX, acceptedY),
+    relations,
+    acceptedByAxis: decision.acceptedByAxis,
+    guides: getAlignmentGuides(
+      getDrawingObjectSelectionBounds(object),
+      x,
+      y,
+      { x: 0, y: 0 },
+      actual
+    ),
   };
+}
+
+/** Applies one native correction, then verifies every accepted witness against its final geometry. */
+export function resolveDrawingResizeAlignment(
+  args: ResizeAlignmentInput
+): DrawingSnapFeedback & { object: DrawingObject } {
+  const { draft, point, modifiers } = args;
+  const unchanged = { object: draft.object, ...emptyFeedback() };
+  if (unsupportedResize(args)) return unchanged;
+  const geometry = getDrawingResizeHandleGeometry(draft, point, modifiers.ctrlKey);
+  const bounds = getDrawingObjectSelectionBounds(draft.object);
+  const targets = getTargets([draft.object], bounds, args.objects, args.domBounds ?? [], true);
+  const context: ResizeContext = {
+    args,
+    geometry,
+    x: matchAxis(bounds, targets, 'x', [geometry.current.x], axisPreference(args, 'x')),
+    y: matchAxis(bounds, targets, 'y', [geometry.current.y], axisPreference(args, 'y')),
+    dimensions: collectDrawingResizeDimensionChoices({
+      original: draft.original,
+      object: draft.object,
+      geometry,
+      modifiers,
+      objects: args.relationObjects ?? args.objects,
+    }),
+  };
+  const decision =
+    geometry.x && geometry.y && !modifiers.shiftKey
+      ? independentResizeCorrection(context)
+      : constrainedResizeCorrection(context);
+  if (!decision) return unchanged;
+  const applied = applyResizeCorrection(context, decision.delta);
+  const feedback = verifyResizeFeedback(context, decision, applied);
+  return feedback ? { object: applied.object, ...feedback } : unchanged;
 }

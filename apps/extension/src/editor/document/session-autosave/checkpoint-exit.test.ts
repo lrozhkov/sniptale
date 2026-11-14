@@ -20,7 +20,12 @@ function prepare(autosave: EditorSessionAutosaveService) {
   return autosave.prepareCheckpointExit(() => createDocument('latest'));
 }
 function saveAck(token = receipt(), revision = 1) {
-  return { revision, checkpointReceipt: token, documentAssetsByRuntimeUrl: new Map() };
+  return {
+    revision,
+    checkpointReceipt: token,
+    documentAssetsByVectorDefinitionId: new Map(),
+    documentAssetsByRuntimeUrl: new Map(),
+  };
 }
 function deferred<T>() {
   let resolve!: (value: T) => void;

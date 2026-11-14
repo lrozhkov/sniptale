@@ -118,6 +118,8 @@ function isScenarioSelectionSender(
   scenario: AIScenario
 ): boolean {
   if (classifySettingsPageSenderUrl(sender.url) === 'ordinary-settings-page') return true;
+  if (isImageEditorSenderUrl(sender.url))
+    return scenario === 'image-generation' || scenario === 'image-editing';
   if (isScenarioEditorSenderUrl(sender.url))
     return scenario === 'scenario-edit' || scenario === 'scenario-speech';
   if (isGallerySenderUrl(sender.url))

@@ -8,6 +8,7 @@ import {
   getDrawingShapePoints,
   hitTestDrawingDocument,
   hitTestDrawingObject,
+  isDrawingQuadStrictlyContained,
   replaceDrawingObjectBounds,
   translateDrawingObject,
   rotateDrawingObjectAround,
@@ -403,4 +404,92 @@ it('projects drawing points with translation, scale and skew', () => {
       }
     )
   ).toEqual({ x: 40, y: -6.5 });
+});
+
+it('selects a smaller lower layer through a fully enclosing upper layer', () => {
+  const lower: DrawingObject = {
+    id: 'lower',
+    kind: 'rectangle',
+    color: '#000',
+    fillColor: '#fff',
+    width: 4,
+    bounds: { x: 80, y: 80, width: 40, height: 40 },
+  };
+  const upper: DrawingObject = {
+    ...lower,
+    id: 'upper',
+    bounds: { x: 0, y: 0, width: 200, height: 200 },
+  };
+  expect(hitTestDrawingDocument([lower, upper], { x: 100, y: 100 })?.id).toBe('lower');
+  expect(hitTestDrawingDocument([lower, upper], { x: 25, y: 25 })?.id).toBe('upper');
+  expect(findDrawingObjectsIntersectingPath([lower, upper], [{ x: 100, y: 100 }])).toEqual([
+    lower,
+    upper,
+  ]);
+});
+
+it('preserves z-order for equal and non-nested hits after excluding enclosing layers', () => {
+  const bottom: DrawingObject = {
+    id: 'bottom',
+    kind: 'blur',
+    bounds: { x: 80, y: 80, width: 40, height: 40 },
+  };
+  const equal = { ...bottom, id: 'equal' };
+  const middle = { ...bottom, id: 'middle', bounds: { x: 100, y: 70, width: 50, height: 70 } };
+  const enclosing = { ...bottom, id: 'enclosing', bounds: { x: 0, y: 0, width: 200, height: 200 } };
+  expect(hitTestDrawingDocument([bottom, equal], { x: 100, y: 100 })?.id).toBe('equal');
+  expect(hitTestDrawingDocument([bottom, middle], { x: 110, y: 100 })?.id).toBe('middle');
+  expect(hitTestDrawingDocument([bottom, middle, enclosing], { x: 110, y: 100 })?.id).toBe(
+    'middle'
+  );
+});
+
+it('compares rotated bounds rather than their enlarged world bounding boxes', () => {
+  const outer: DrawingObject = {
+    id: 'outer',
+    kind: 'blur',
+    rotation: 45,
+    bounds: { x: 0, y: 0, width: 200, height: 20 },
+  };
+  const inner: DrawingObject = {
+    id: 'inner',
+    kind: 'blur',
+    rotation: 45,
+    bounds: { x: 80, y: 5, width: 40, height: 10 },
+  };
+  expect(hitTestDrawingDocument([inner, outer], { x: 100, y: 10 })?.id).toBe('inner');
+  const crossing: DrawingObject = {
+    ...inner,
+    id: 'crossing',
+    rotation: -45,
+    bounds: { x: 50, y: -40, width: 100, height: 100 },
+  };
+  expect(hitTestDrawingDocument([crossing, outer], { x: 100, y: 10 })?.id).toBe('outer');
+});
+
+it('detects strict quad containment including an inscribed diamond and degenerate bounds', () => {
+  const outer = [
+    { x: 0, y: 0 },
+    { x: 100, y: 0 },
+    { x: 100, y: 100 },
+    { x: 0, y: 100 },
+  ];
+  const diamond = [
+    { x: 50, y: 0 },
+    { x: 100, y: 50 },
+    { x: 50, y: 100 },
+    { x: 0, y: 50 },
+  ];
+  const line = [
+    { x: 20, y: 50 },
+    { x: 80, y: 50 },
+    { x: 80, y: 50 },
+    { x: 20, y: 50 },
+  ];
+  expect(isDrawingQuadStrictlyContained(diamond, outer)).toBe(true);
+  expect(isDrawingQuadStrictlyContained(outer, diamond)).toBe(false);
+  expect(isDrawingQuadStrictlyContained(outer, [...outer].reverse())).toBe(false);
+  expect(isDrawingQuadStrictlyContained(line, outer)).toBe(true);
+  expect(isDrawingQuadStrictlyContained(line, line)).toBe(false);
+  expect(isDrawingQuadStrictlyContained([], outer)).toBe(false);
 });

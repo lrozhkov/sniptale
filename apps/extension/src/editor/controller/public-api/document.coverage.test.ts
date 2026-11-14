@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   applySelectionSettingsMock: vi.fn(),
   previewSelectionSettingsMock: vi.fn(),
   buildDocumentMock: vi.fn(() => ({ id: 'exported' })),
+  blobToDataUrlMock: vi.fn(async (blob: Blob) => blob.text()),
   closeDocumentMock: vi.fn(),
   copyRenderedMock: vi.fn(async () => undefined),
   getSourceObjectMock: vi.fn(() => 'source-object'),
@@ -16,6 +17,8 @@ const mocks = vi.hoisted(() => ({
   loadEditorExportSettingsMock: vi.fn(async () => ({ imageFormat: 'png', imageQuality: 0.9 })),
   openImageMock: vi.fn(async () => undefined),
   redoMock: vi.fn(() => ({ id: 'redo' })),
+  flushHistoryMock: vi.fn(),
+  renderToBlobMock: vi.fn(async () => new Blob(['data-url'], { type: 'image/png' })),
   renderToDataUrlMock: vi.fn(() => 'data-url'),
   resolveMimeTypeMock: vi.fn(() => 'image/png'),
   storeGetStateMock: vi.fn(() => storeState),
@@ -32,8 +35,13 @@ vi.mock('../../state/useEditorStore', () => ({
 vi.mock('../document/export', () => ({
   buildEditorCanvasDocument: mocks.buildDocumentMock,
   copyEditorRenderedImage: mocks.copyRenderedMock,
+  renderEditorCanvasToBlob: mocks.renderToBlobMock,
   renderEditorCanvasToDataUrl: mocks.renderToDataUrlMock,
   resolveEditorImageMimeType: mocks.resolveMimeTypeMock,
+}));
+
+vi.mock('../../../platform/media-utils/data-url', () => ({
+  blobToDataUrl: mocks.blobToDataUrlMock,
 }));
 
 vi.mock('../document/lifecycle/close/run', () => ({
@@ -77,6 +85,7 @@ vi.mock('../public-actions/selection/objects/settings', async (importOriginal) =
 
 vi.mock('../history', () => ({
   createEditorSnapshotHistory: vi.fn(),
+  flushDeferredEditorHistory: mocks.flushHistoryMock,
   pushEditorSnapshotHistory: vi.fn(),
   readCurrentEditorSnapshot: vi.fn(() => null),
   redoEditorSnapshot: mocks.redoMock,
@@ -163,6 +172,10 @@ it('bridges document open, load, close, export, render, and copy flows', async (
   expect(renderEditorControllerToDataUrl(controller, { format: 'png', quality: 0.8 })).toBe(
     'data-url'
   );
+  expect(mocks.renderToDataUrlMock).toHaveBeenCalledWith(controller.canvas, {
+    format: 'png',
+    quality: 0.8,
+  });
   await copyRenderedEditorImageViaController(controller, {
     outputSize: { width: 640, height: 360 },
   });
@@ -182,11 +195,14 @@ it('bridges document open, load, close, export, render, and copy flows', async (
     dataUrl: 'data-url',
     mimeType: 'image/png',
   });
-  expect(mocks.renderToDataUrlMock).toHaveBeenCalledWith(controller.canvas, {
+  expect(mocks.renderToBlobMock).toHaveBeenCalledWith(controller.canvas, {
     format: 'png',
     outputSize: { height: 360, width: 640 },
     quality: 0.9,
   });
+  expect(mocks.blobToDataUrlMock).toHaveBeenCalledWith(
+    await mocks.renderToBlobMock.mock.results.at(-1)?.value
+  );
   expect(mocks.applySelectionSettingsMock).toHaveBeenCalledOnce();
   expect(mocks.previewSelectionSettingsMock).toHaveBeenCalledOnce();
 });
@@ -213,4 +229,5 @@ it('applies history documents only when a snapshot exists', async () => {
     { resetHistory: false, updateOriginal: false, preserveViewport: true }
   );
   expect(controller.applyDocument).toHaveBeenCalledTimes(2);
+  expect(mocks.flushHistoryMock).toHaveBeenCalledWith(controller.history);
 });

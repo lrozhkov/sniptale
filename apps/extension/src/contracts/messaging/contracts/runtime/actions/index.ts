@@ -1,3 +1,4 @@
+import { runtimeVectorCatalogContracts } from './vector-catalog';
 import { runtimeSimplifyContracts } from './simplify';
 import { runtimePageLaunchContracts } from './page-launch';
 import { runtimeQuickActionAppearanceContracts } from './quick-action-appearance';
@@ -11,6 +12,7 @@ import { runtimeActionPagePackageStagingContracts } from './page-package-staging
 import type { PartialRuntimeRegistry } from '../../runtime-message.registry.ts';
 
 export const runtimeActionMessageContracts = {
+  ...runtimeVectorCatalogContracts,
   ...runtimeSimplifyContracts,
   ...runtimePageLaunchContracts,
   ...runtimeQuickActionAppearanceContracts,

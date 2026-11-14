@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
+import { Canvas, Rect } from 'fabric';
+import { collectLayers } from '../../controller/document/layers';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { EditorLayerItem } from '../../../features/editor/document/types';
@@ -9,6 +11,7 @@ const controllerMocks = vi.hoisted(() => ({
   deleteSelection: vi.fn(),
   duplicateSelection: vi.fn(),
   selectLayer: vi.fn(),
+  rasterizeLayer: vi.fn(async () => true),
   toggleLayerLock: vi.fn(),
   toggleLayerVisibility: vi.fn(),
   withHistoryMuted: vi.fn((callback: () => void) => callback()),
@@ -45,7 +48,7 @@ vi.mock('../../chrome/ui', async (importOriginal) => ({
 import { LayerActionRail, LayerExpandedActions } from './actions';
 
 const expandedActionsCommandTestTitle =
-  'opens layer effects, restores rename, and routes duplicate and delete ' +
+  'opens image adjustments and routes duplicate and delete ' +
   'through muted single-layer selection';
 
 let container: HTMLDivElement | null = null;
@@ -76,7 +79,6 @@ function renderExpandedActions(args?: {
   visible?: boolean;
 }) {
   const onOpenLayerEffects = vi.fn();
-  const onRenameLayer = vi.fn();
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -90,13 +92,12 @@ function renderExpandedActions(args?: {
           isImmutable={args?.isImmutable ?? false}
           layer={(args?.layer ?? LAYER) as never}
           visible={args?.visible ?? true}
-          onRenameLayer={onRenameLayer}
           onOpenLayerEffects={onOpenLayerEffects}
         />
       </div>
     )
   );
-  return { onOpenLayerEffects, onRenameLayer };
+  return { onOpenLayerEffects };
 }
 
 function getButtons() {
@@ -110,10 +111,7 @@ function clickButtonTitle(title: string) {
 }
 
 function triggerExpandedActions() {
-  clickButtonTitle('editor.toolbar.layerEffectsAdjustments');
-  clickButtonTitle('editor.toolbar.layerEffectsTransformations');
-  clickButtonTitle('editor.toolbar.layerEffectsFilters');
-  clickButtonTitle('editor.toolbar.renameLayer');
+  clickButtonTitle('editor.toolbar.layerImageSettings');
   clickButtonTitle('editor.toolbar.duplicateLayer');
   clickButtonTitle('editor.toolbar.deleteLayer');
 }
@@ -200,7 +198,7 @@ describe('LayerActionRail', () => {
 
 describe('LayerExpandedActions command routing', () => {
   it(expandedActionsCommandTestTitle, () => {
-    const { onOpenLayerEffects, onRenameLayer } = renderExpandedActions();
+    const { onOpenLayerEffects } = renderExpandedActions();
 
     act(() => {
       triggerExpandedActions();
@@ -209,13 +207,8 @@ describe('LayerExpandedActions command routing', () => {
     expect(onOpenLayerEffects).toHaveBeenNthCalledWith(1, 'layer-1', 'adjustments', 'brightness', {
       focusViewport: false,
     });
-    expect(onOpenLayerEffects).toHaveBeenNthCalledWith(2, 'layer-1', 'transformations', null, {
-      focusViewport: false,
-    });
-    expect(onOpenLayerEffects).toHaveBeenNthCalledWith(3, 'layer-1', 'filters', 'blur', {
-      focusViewport: false,
-    });
-    expect(onRenameLayer).toHaveBeenCalledOnce();
+    expect(onOpenLayerEffects).toHaveBeenCalledOnce();
+    expect(container?.querySelector('button[title="editor.toolbar.renameLayer"]')).toBeNull();
     expect(controllerMocks.withHistoryMuted).toHaveBeenCalledTimes(2);
     expect(controllerMocks.selectLayer).toHaveBeenNthCalledWith(1, 'layer-1', {
       focusViewport: false,
@@ -233,7 +226,7 @@ describe('LayerExpandedActions enabled states', () => {
     const { onOpenLayerEffects } = renderExpandedActions({ autoNavigateSelectedLayer: true });
 
     act(() => {
-      clickButtonTitle('editor.toolbar.layerEffectsAdjustments');
+      clickButtonTitle('editor.toolbar.layerImageSettings');
     });
 
     expect(onOpenLayerEffects).toHaveBeenCalledWith('layer-1', 'adjustments', 'brightness', {
@@ -256,17 +249,14 @@ describe('LayerExpandedActions enabled states', () => {
 
 describe('LayerExpandedActions locked rows', () => {
   it('disables layer settings and mutations for locked layers', () => {
-    const { onOpenLayerEffects, onRenameLayer } = renderExpandedActions({
+    const { onOpenLayerEffects } = renderExpandedActions({
       layer: { ...LAYER, locked: true },
     });
 
     expect(
-      container?.querySelector('button[title="editor.toolbar.layerEffectsAdjustments"]')
+      container?.querySelector('button[title="editor.toolbar.layerImageSettings"]')
     ).toHaveProperty('disabled', true);
-    expect(container?.querySelector('button[title="editor.toolbar.renameLayer"]')).toHaveProperty(
-      'disabled',
-      true
-    );
+    expect(container?.querySelector('button[title="editor.toolbar.renameLayer"]')).toBeNull();
     expect(
       container?.querySelector('button[title="editor.toolbar.duplicateLayer"]')
     ).toHaveProperty('disabled', true);
@@ -280,7 +270,6 @@ describe('LayerExpandedActions locked rows', () => {
     });
 
     expect(onOpenLayerEffects).not.toHaveBeenCalled();
-    expect(onRenameLayer).not.toHaveBeenCalled();
     expect(controllerMocks.duplicateSelection).not.toHaveBeenCalled();
     expect(controllerMocks.deleteSelection).not.toHaveBeenCalled();
   });
@@ -310,4 +299,161 @@ describe('LayerExpandedActions source image commands', () => {
     });
     expect(controllerMocks.duplicateSelection).toHaveBeenCalledOnce();
   });
+});
+
+it('rasterizes a vector layer before opening adjustments and exposes only one image action', async () => {
+  const { onOpenLayerEffects } = renderExpandedActions({
+    layer: { ...LAYER, type: 'text', raster: false },
+  });
+  for (const title of [
+    'renameLayer',
+    'layerEffectsAdjustments',
+    'layerEffectsTransformations',
+    'layerEffectsFilters',
+  ])
+    expect(container?.querySelector(`button[title="editor.toolbar.${title}"]`)).toBeNull();
+  await act(async () => {
+    clickButtonTitle('editor.toolbar.layerRasterizeAndAdjust');
+  });
+  expect(controllerMocks.rasterizeLayer).toHaveBeenCalledWith('layer-1');
+  expect(controllerMocks.selectLayer).toHaveBeenCalledWith('layer-1', { focusViewport: false });
+  expect(onOpenLayerEffects).toHaveBeenCalledOnce();
+  expect(onOpenLayerEffects).toHaveBeenCalledWith('layer-1', 'adjustments', 'brightness', {
+    focusViewport: false,
+  });
+});
+it('waits for rasterization, rejects duplicate activation and keeps a failed conversion retryable', async () => {
+  let resolve!: (value: boolean) => void;
+  controllerMocks.rasterizeLayer.mockReturnValueOnce(
+    new Promise((done) => {
+      resolve = done;
+    })
+  );
+  const { onOpenLayerEffects } = renderExpandedActions({
+    layer: { ...LAYER, type: 'text', raster: false },
+  });
+  act(() => {
+    clickButtonTitle('editor.toolbar.layerRasterizeAndAdjust');
+    clickButtonTitle('editor.toolbar.layerRasterizeAndAdjust');
+  });
+  expect(controllerMocks.rasterizeLayer).toHaveBeenCalledOnce();
+  expect(onOpenLayerEffects).not.toHaveBeenCalled();
+  await act(async () => {
+    resolve(false);
+  });
+  expect(onOpenLayerEffects).not.toHaveBeenCalled();
+  expect(container?.querySelector('[role="alert"]')).not.toBeNull();
+  await act(async () => {
+    clickButtonTitle('editor.toolbar.layerRasterizeFailed');
+  });
+  expect(controllerMocks.rasterizeLayer).toHaveBeenCalledTimes(2);
+  expect(onOpenLayerEffects).toHaveBeenCalledOnce();
+});
+it('does not open corrections after the row is removed while conversion is pending', async () => {
+  let resolve!: (value: boolean) => void;
+  controllerMocks.rasterizeLayer.mockReturnValueOnce(
+    new Promise((done) => {
+      resolve = done;
+    })
+  );
+  const { onOpenLayerEffects } = renderExpandedActions({
+    layer: { ...LAYER, type: 'text', raster: false },
+  });
+  act(() => clickButtonTitle('editor.toolbar.layerRasterizeAndAdjust'));
+  act(() => root?.unmount());
+  root = null;
+  await act(async () => {
+    resolve(true);
+  });
+  expect(onOpenLayerEffects).not.toHaveBeenCalled();
+});
+it('does not move the inspector back to a vector row that was deselected during conversion', async () => {
+  let resolve!: (value: boolean) => void;
+  controllerMocks.rasterizeLayer.mockReturnValueOnce(
+    new Promise((done) => {
+      resolve = done;
+    })
+  );
+  const layer = { ...LAYER, type: 'text' as const, raster: false };
+  const { onOpenLayerEffects } = renderExpandedActions({ layer });
+  act(() => clickButtonTitle('editor.toolbar.layerRasterizeAndAdjust'));
+  act(() =>
+    root?.render(
+      <div className="group">
+        <LayerActionRail layer={{ ...layer, selected: false }} />
+        <LayerExpandedActions
+          autoNavigateSelectedLayer={false}
+          editingName={false}
+          isImmutable={false}
+          layer={{ ...layer, selected: false }}
+          visible
+          onOpenLayerEffects={onOpenLayerEffects}
+        />
+      </div>
+    )
+  );
+  await act(async () => {
+    resolve(true);
+  });
+  expect(onOpenLayerEffects).not.toHaveBeenCalled();
+});
+
+it.each([false, true])(
+  'keeps the action retryable when selection or opening fails before conversion (raster=%s)',
+  async (raster) => {
+    const { onOpenLayerEffects } = renderExpandedActions({
+      layer: { ...LAYER, raster, type: raster ? 'image' : 'text' },
+    });
+    if (raster)
+      onOpenLayerEffects.mockImplementationOnce(() => {
+        throw new Error('completion barrier failed');
+      });
+    else
+      controllerMocks.selectLayer.mockImplementationOnce(() => {
+        throw new Error('completion barrier failed');
+      });
+    await act(async () =>
+      clickButtonTitle(
+        raster ? 'editor.toolbar.layerImageSettings' : 'editor.toolbar.layerRasterizeAndAdjust'
+      )
+    );
+    expect(container?.querySelector('[role="alert"]')).not.toBeNull();
+    expect(
+      container?.querySelector<HTMLButtonElement>(
+        'button[title="editor.toolbar.layerRasterizeFailed"]'
+      )?.disabled
+    ).toBe(false);
+    expect(controllerMocks.rasterizeLayer).not.toHaveBeenCalled();
+    await act(async () => clickButtonTitle('editor.toolbar.layerRasterizeFailed'));
+    expect(onOpenLayerEffects).toHaveBeenCalledTimes(raster ? 2 : 1);
+  }
+);
+
+it('opens corrections directly for the actual collected managed image background', async () => {
+  const canvas = new Canvas(undefined, { width: 16, height: 16, renderOnAddRemove: false });
+  try {
+    const background = new Rect({ width: 16, height: 16 });
+    Object.assign(background, {
+      sniptaleType: 'background',
+      sniptaleRole: 'background',
+      sniptaleId: 'managed-image-background',
+      sniptaleBackgroundMode: 'image',
+      sniptaleLocked: false,
+    });
+    canvas.add(background);
+    canvas.setActiveObject(background);
+    const row = collectLayers(canvas).find((layer) => layer.id === background.sniptaleId)!;
+    const { onOpenLayerEffects } = renderExpandedActions({ layer: row });
+    await act(async () => clickButtonTitle('editor.toolbar.layerImageSettings'));
+    expect(onOpenLayerEffects).toHaveBeenCalledExactlyOnceWith(
+      row.id,
+      'adjustments',
+      'brightness',
+      { focusViewport: false }
+    );
+    expect(controllerMocks.rasterizeLayer).not.toHaveBeenCalled();
+    expect(controllerMocks.selectLayer).not.toHaveBeenCalled();
+  } finally {
+    await canvas.dispose();
+  }
 });

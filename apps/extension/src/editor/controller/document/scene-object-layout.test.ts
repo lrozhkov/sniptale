@@ -1,5 +1,11 @@
+// @vitest-environment jsdom
+
 import { beforeEach, expect, it, vi } from 'vitest';
 import { updateUserObjectLayout } from './scene-object-layout';
+import { Canvas, Textbox } from 'fabric';
+import { createEditorDrawingFabricObject } from '../../drawing/object/vector';
+import { readEditorDrawingObject } from '../../drawing/object/metadata';
+import type { SourceState } from '../../document/model/source-state';
 
 const mocks = vi.hoisted(() => ({
   isUserObject: vi.fn((object: { kind?: string }) => object.kind === 'user'),
@@ -169,5 +175,70 @@ it.each([undefined, Number.NaN, 0])(
         scaleY: 1,
       })
     );
+  }
+);
+
+it.each([
+  [true, 0],
+  [true, 30],
+  [false, 0],
+  [false, 30],
+] as const)(
+  'preserves wrapping=%s and rotation=%s during scene layout',
+  async (automatic, rotation) => {
+    const canvas = new Canvas(document.createElement('canvas'), { renderOnAddRemove: false });
+    const object = createEditorDrawingFabricObject(
+      {
+        id: 'scene-text',
+        kind: 'text',
+        text: 'Scene text',
+        color: '#111111',
+        backgroundColor: '#ff7f50',
+        fontSize: 24,
+        fontFamily: 'sans',
+        autoWidth: automatic,
+        wrapWidth: 240,
+        rotation,
+        bounds: { x: 30, y: 40, width: 200, height: 60 },
+      },
+      1
+    );
+    if (!(object instanceof Textbox)) throw new Error('Expected text');
+    canvas.add(object);
+    mocks.isUserObject.mockReturnValue(true);
+    const center = object.getCenterPoint();
+    const source: SourceState = {
+      ...createSourceState(),
+      id: 'source',
+      dataUrl: '',
+      name: null,
+      intrinsicWidth: 100,
+      intrinsicHeight: 50,
+      visible: true,
+      locked: true,
+    };
+    try {
+      updateUserObjectLayout({
+        canvas,
+        currentSource: source,
+        sourceSizeChanged: true,
+        layoutSource: { left: 40, top: 60, width: 200, height: 100 },
+      });
+      const drawing = readEditorDrawingObject(object);
+      expect(drawing).toMatchObject({ kind: 'text', fontSize: 48, autoWidth: automatic, rotation });
+      expect(object.scaleX).toBe(1);
+      expect(object.scaleY).toBe(1);
+      if (rotation) {
+        expect(object.getCenterPoint().x).toBeCloseTo(40 + (center.x - 10) * 2, 5);
+        expect(object.getCenterPoint().y).toBeCloseTo(60 + (center.y - 20) * 2, 5);
+      } else {
+        expect(object.left).toBeCloseTo(80, 5);
+        expect(object.top).toBeCloseTo(100, 5);
+      }
+      if (automatic) expect(object.sniptaleDrawingTextMaxWidth).toBe(480);
+    } finally {
+      await canvas.dispose();
+      mocks.isUserObject.mockImplementation((object) => object.kind === 'user');
+    }
   }
 );

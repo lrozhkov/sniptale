@@ -1,3 +1,4 @@
+import { EditorElementsPanel } from '../elements';
 import type {
   BrowserFrameState,
   EditorWorkspaceSettings,
@@ -61,6 +62,7 @@ export interface EditorInspectorContentSurfaceSectionsProps extends Omit<
 export function renderEditorInspectorContentSurfaceSections(
   props: EditorInspectorContentSurfaceSectionsProps
 ) {
+  if (props.inspector === 'elements') return <EditorElementsPanel />;
   if (props.inspector === 'layer-effects') {
     return (
       <EditorInspectorLayerEffectsPanel

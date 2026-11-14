@@ -882,3 +882,321 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
     expect(Number(await inputs.nth(1).inputValue())).toBe(beforeHeight);
   });
 }
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`layer scrollbar admits and releases gutter with reachable right controls ${name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await page.setViewportSize(size);
+    await openEditor(page, hostOrigin, 'en');
+    await page.locator('[data-ui="editor.floating.layers.mode.meta"]').click();
+    await page.locator('[data-ui="editor.technical-data.field-date"]').check();
+    await page
+      .getByRole('button', {
+        name: translate('editor.compact.technicalDataInsert', 'en'),
+        exact: true,
+      })
+      .click();
+    await page.locator('[data-ui="editor.floating.layers.mode.layers"]').click();
+    const list = page.locator('[data-ui="editor.layers.list-viewport"]');
+    const rows = list.locator(':scope > div');
+    const metrics = () =>
+      list.evaluate((element) => {
+        const style = getComputedStyle(element);
+        const row = element.firstElementChild!.getBoundingClientRect();
+        const box = element.getBoundingClientRect();
+        return {
+          overflow: element.scrollHeight > element.clientHeight,
+          gutter: style.scrollbarGutter,
+          rowWidth: row.width,
+          rightGap: box.left + element.clientLeft + element.clientWidth - row.right,
+          padding: style.paddingRight,
+          horizontalOverflow: element.scrollWidth - element.clientWidth,
+        };
+      });
+    await expect.poll(async () => (await metrics()).gutter).toBe('auto');
+    const before = await metrics();
+    expect(before.overflow).toBe(false);
+    const initialCount = await rows.count();
+    const duplicate = list
+      .getByRole('button', {
+        name: translate('editor.toolbar.duplicateLayer', 'en'),
+        exact: true,
+        disabled: false,
+      })
+      .first();
+    for (let count = initialCount; count < 17; count++) {
+      await rows.first().hover();
+      await duplicate.click();
+      await expect(rows).toHaveCount(count + 1);
+    }
+    await expect.poll(async () => (await metrics()).gutter).toBe('stable');
+    const overflow = await metrics();
+    expect(overflow.overflow).toBe(true);
+    expect(overflow.rowWidth).toBeLessThan(before.rowWidth);
+    expect(overflow.padding).toBe('12px');
+    expect(Math.abs(overflow.rightGap - 12)).toBeLessThanOrEqual(1);
+    expect(overflow.horizontalOverflow).toBeLessThanOrEqual(1);
+    const remove = list
+      .getByRole('button', {
+        name: translate('editor.toolbar.deleteLayer', 'en'),
+        exact: true,
+        disabled: false,
+      })
+      .first();
+    await rows.first().hover();
+    const lock = rows
+      .first()
+      .getByRole('button', { name: translate('editor.toolbar.lockLayer', 'en'), exact: true });
+    expect(
+      await lock.evaluate((button) => {
+        const box = button.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.right - 2, box.top + box.height / 2);
+        return hit === button || (hit !== null && button.contains(hit));
+      })
+    ).toBe(true);
+    await lock.click();
+    const unlock = rows
+      .first()
+      .getByRole('button', { name: translate('editor.toolbar.unlockLayer', 'en'), exact: true });
+    await expect(unlock).toBeVisible();
+    await unlock.click();
+    await expect(lock).toBeVisible();
+    await page.screenshot({ path: info.outputPath('layers-overflow.png'), fullPage: false });
+    for (let count = 17; count > initialCount; count--) {
+      await rows.first().hover();
+      await remove.click();
+      await expect(rows).toHaveCount(count - 1);
+    }
+    await expect.poll(async () => (await metrics()).gutter).toBe('auto');
+    const restored = await metrics();
+    expect(restored.overflow).toBe(false);
+    expect(restored.rowWidth).toBe(before.rowWidth);
+    expect(Math.abs(restored.rightGap - 12)).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: info.outputPath('layers-gutter-restored.png'), fullPage: false });
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`layer grip reorders selected rows through native pointer input ${name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await page.setViewportSize(size);
+    await openEditor(page, hostOrigin, 'en');
+    await page.locator('[data-ui="editor.floating.layers.mode.meta"]').click();
+    await page.locator('[data-ui="editor.technical-data.field-date"]').check();
+    await page
+      .getByRole('button', {
+        name: translate('editor.compact.technicalDataInsert', 'en'),
+        exact: true,
+      })
+      .click();
+    await page.locator('[data-ui="editor.floating.layers.mode.layers"]').click();
+    const list = page.locator('[data-ui="editor.layers.list-viewport"]');
+    const rows = list.locator(':scope > [data-layer-reorder-row]');
+    for (let count = await rows.count(); count < 4; count++) {
+      await rows.first().hover();
+      await rows
+        .first()
+        .getByRole('button', {
+          name: translate('editor.toolbar.duplicateLayer', 'en'),
+          exact: true,
+        })
+        .click();
+      await expect(rows).toHaveCount(count + 1);
+    }
+    await page.locator('[data-ui="editor.floating.layers.mode.frame"]').click();
+    await page.locator('[data-ui="editor.frame.background-mode"] button').nth(1).click();
+    await page.locator('[data-ui="editor.floating.layers.mode.layers"]').click();
+    await expect(rows).toHaveCount(5);
+    const order = () =>
+      rows.evaluateAll((elements) =>
+        elements.map((element) => element.getAttribute('data-layer-reorder-row'))
+      );
+    await rows.first().locator('button[draggable="false"]').nth(1).click();
+    const initial = await order();
+    const grip = rows.first().locator('[data-ui="editor.layers.drag-handle"]');
+    await expect(grip).toBeVisible();
+    const start = await grip.boundingBox();
+    const target = await rows.nth(2).boundingBox();
+    expect(start).not.toBeNull();
+    expect(target).not.toBeNull();
+    await page.mouse.move(start!.x + start!.width / 2, start!.y + start!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(start!.x + start!.width / 2, target!.y + target!.height - 3, {
+      steps: 8,
+    });
+    await expect(page.locator('html')).toHaveAttribute('data-editor-layer-dragging', '');
+    await page.screenshot({ path: info.outputPath('layer-reorder-active.png'), fullPage: false });
+    await page.mouse.up();
+    await expect.poll(order).toEqual([initial[1], initial[2], initial[0], initial[3], initial[4]]);
+    await expect(page.locator('html')).not.toHaveAttribute('data-editor-layer-dragging');
+    await rows.nth(0).locator('button[draggable="false"]').nth(1).click();
+    await rows
+      .nth(1)
+      .locator('button[draggable="false"]')
+      .nth(1)
+      .click({ modifiers: ['Control'] });
+    await expect(list.locator('[data-ui="editor.layers.drag-handle"]')).toHaveCount(2);
+    const groupStart = await rows
+      .first()
+      .locator('[data-ui="editor.layers.drag-handle"]')
+      .boundingBox();
+    const groupTarget = await rows.nth(2).boundingBox();
+    await page.mouse.move(
+      groupStart!.x + groupStart!.width / 2,
+      groupStart!.y + groupStart!.height / 2
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      groupStart!.x + groupStart!.width / 2,
+      groupTarget!.y + groupTarget!.height - 3,
+      { steps: 8 }
+    );
+    await page.mouse.up();
+    await expect.poll(order).toEqual(initial);
+    await expect(list.locator('[data-ui="editor.layers.drag-handle"]')).toHaveCount(2);
+    await page.screenshot({
+      path: info.outputPath('layer-block-reorder-applied.png'),
+      fullPage: false,
+    });
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`unselected vector drag selects enclosed layers before selected movement ${name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await page.setViewportSize(size);
+    await openEditor(page, hostOrigin, 'en');
+    await page.evaluate(async () => {
+      const harness = window.__sniptaleEditorHarness!;
+      const document = harness.exportDocument();
+      const canvas = JSON.parse(document.canvasJson);
+      canvas.objects.push(
+        {
+          type: 'Rect',
+          version: '7.4.0',
+          originX: 'left',
+          originY: 'top',
+          left: 99,
+          top: 99,
+          width: 500,
+          height: 250,
+          fill: '#efcccc',
+          strokeWidth: 2,
+          stroke: '#cc0000',
+          sniptaleDrawingJson: JSON.stringify({
+            version: 1,
+            object: {
+              id: 'gesture-target',
+              kind: 'rectangle',
+              color: '#cc0000',
+              fillColor: '#efcccc',
+              width: 2,
+              bounds: { x: 100, y: 100, width: 500, height: 250 },
+            },
+          }),
+          sniptaleId: 'gesture-target',
+          sniptaleType: 'shape',
+        },
+        {
+          type: 'Rect',
+          version: '7.4.0',
+          originX: 'left',
+          originY: 'top',
+          left: 219,
+          top: 179,
+          width: 30,
+          height: 30,
+          fill: '#cc0000',
+          strokeWidth: 2,
+          stroke: '#cc0000',
+          sniptaleDrawingJson: JSON.stringify({
+            version: 1,
+            object: {
+              id: 'gesture-enclosed',
+              kind: 'rectangle',
+              color: '#cc0000',
+              fillColor: '#cc0000',
+              width: 2,
+              bounds: { x: 220, y: 180, width: 30, height: 30 },
+            },
+          }),
+          sniptaleId: 'gesture-enclosed',
+          sniptaleType: 'shape',
+        }
+      );
+      await harness.loadDocument({ ...document, canvasJson: JSON.stringify(canvas) });
+      harness.clearSelection();
+    });
+    await page.locator('[data-ui="editor.floating.tool-rail.select"]').click();
+    const objects = () => page.evaluate(() => window.__sniptaleEditorHarness!.getCanvasObjects());
+    const point = async (x: number, y: number) =>
+      page.evaluate(
+        ({ x, y }) => {
+          const projection = window.__sniptaleEditorHarness!.getSceneProjection()!;
+          const [a, b, c, d, e, f] = projection.viewport;
+          return {
+            x:
+              projection.rect.left +
+              ((a! * x + c! * y + e!) * projection.rect.width) / projection.width,
+            y:
+              projection.rect.top +
+              ((b! * x + d! * y + f!) * projection.rect.height) / projection.height,
+          };
+        },
+        { x, y }
+      );
+    const historyBefore = await page.evaluate(
+      () => window.__sniptaleEditorHarness!.getInteractionState().historyIndex
+    );
+    const before = (await objects()).find((object) => object['sniptaleId'] === 'gesture-target')!;
+    const from = await point(160, 140),
+      to = await point(290, 240);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await expect
+      .poll(async () => (await objects()).filter((object) => object['active']))
+      .toEqual([]);
+    await page.mouse.move(to.x, to.y, { steps: 8 });
+    await page.screenshot({
+      path: info.outputPath('unselected-vector-marquee.png'),
+      fullPage: false,
+    });
+    await page.mouse.up();
+    await expect
+      .poll(async () =>
+        (await objects()).filter((object) => object['active']).map((object) => object['sniptaleId'])
+      )
+      .toEqual(['gesture-enclosed']);
+    expect(
+      (await objects()).find((object) => object['sniptaleId'] === 'gesture-target')
+    ).toMatchObject({ left: before['left'], top: before['top'] });
+    expect(
+      await page.evaluate(() => window.__sniptaleEditorHarness!.getInteractionState().historyIndex)
+    ).toBe(historyBefore);
+    await page.evaluate(() => window.__sniptaleEditorHarness!.clearSelection());
+    await page.mouse.click(from.x, from.y);
+    await expect
+      .poll(
+        async () =>
+          (await objects()).find((object) => object['sniptaleId'] === 'gesture-target')?.['active']
+      )
+      .toBe(true);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    const moved = await point(180, 150);
+    await page.mouse.move(moved.x, moved.y, { steps: 4 });
+    await page.mouse.up();
+    await expect
+      .poll(
+        async () =>
+          (await objects()).find((object) => object['sniptaleId'] === 'gesture-target')?.['left']
+      )
+      .toBeCloseTo(Number(before['left']) + 20, 0);
+  });
+}

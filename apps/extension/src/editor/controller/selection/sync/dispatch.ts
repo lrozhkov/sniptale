@@ -19,10 +19,18 @@ function syncDrawingSelection(object: FabricObject): void {
     return;
   }
   const store = useEditorStore.getState();
-  if (drawing.kind === 'simplify') {
+  if (drawing.kind === 'simplify' && drawing.settings.erase) {
+    store.updateSelectionDrawingToolSettings('blur', {
+      amount: drawing.blurAmount ?? 10,
+      clean: true,
+    });
+  } else if (drawing.kind === 'simplify') {
     store.updateSelectionDrawingToolSettings('simplify', drawing.settings);
   } else if (drawing.kind === 'blur') {
-    store.updateSelectionDrawingToolSettings('blur', { amount: drawing.amount ?? 10 });
+    store.updateSelectionDrawingToolSettings('blur', {
+      amount: drawing.amount ?? 10,
+      clean: false,
+    });
   } else if (drawing.kind === 'pencil') {
     store.updateSelectionDrawingToolSettings('pencil', {
       color: drawing.color,
@@ -66,6 +74,7 @@ export function syncSelectionToolSettingsFromObject(
     case 'transparent-base':
     case 'browser-frame':
     case 'frame-annotation':
+    case 'vector-element':
     case 'group':
       break;
     case 'source-image':

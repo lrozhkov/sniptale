@@ -1,5 +1,12 @@
 /** Execution operations currently consumed by product interfaces. */
-export type AIModelOperation = 'text' | 'transcription' | 'speech';
+export const AI_MODEL_OPERATIONS = [
+  'text',
+  'transcription',
+  'speech',
+  'image-generation',
+  'image-editing',
+] as const;
+export type AIModelOperation = (typeof AI_MODEL_OPERATIONS)[number];
 /** Known support differs from missing metadata. Never treat unknown as permission to send a new data class. */
 export type AISupport = 'supported' | 'unsupported' | 'unknown';
 export type AIModality = 'text' | 'image' | 'audio' | 'video' | 'file';
@@ -77,6 +84,8 @@ export const AI_PERSISTED_SCENARIOS = [
   'scenario-speech',
   'gallery-transcription',
   'video-transcription',
+  'image-generation',
+  'image-editing',
 ] as const;
 export const AI_SCENARIOS = [
   ...AI_PERSISTED_SCENARIOS,
@@ -222,7 +231,8 @@ export interface AIRememberScenarioSelectionInput {
 }
 
 /** Maps interface scenarios to operations without creating a second voice preference authority. */
-export function getAIScenarioOperation(scenario: AIScenario): 'text' | 'transcription' | 'speech' {
+export function getAIScenarioOperation(scenario: AIScenario): AIModelOperation {
+  if (scenario === 'image-generation' || scenario === 'image-editing') return scenario;
   if (
     scenario === 'voice-recognition' ||
     scenario === 'gallery-transcription' ||
@@ -324,7 +334,7 @@ export function isAIModelOperationObservations(
     isRecord(value) &&
     Object.entries(value).every(
       ([operation, entry]) =>
-        ['text', 'speech', 'transcription'].includes(operation) &&
+        AI_MODEL_OPERATIONS.some((value) => value === operation) &&
         isRecord(entry) &&
         Object.keys(entry).every((key) => key === 'generation' || key === 'observation') &&
         (entry['generation'] === undefined ||

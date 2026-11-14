@@ -53,6 +53,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.initDB.mockResolvedValue({ get: mocks.get, getAll: mocks.getAll });
   mocks.hydrate.mockImplementation(async () => ({
+    assetsByVectorDefinitionId: new Map(),
     assetsByRuntimeUrl: new Map([['blob:source', { assetId: 'image-1-source' }]]),
     document: createEditorDocumentFixture(),
     release: vi.fn(),
@@ -72,6 +73,7 @@ it('returns a valid workspace and treats a missing row as absent without warning
       ...entry,
       document: createEditorDocumentFixture(),
       documentAssetsByRuntimeUrl: expect.any(Map),
+      documentAssetsByVectorDefinitionId: expect.any(Map),
     })
   );
   await expect(recoverAndGetImageWorkspace('missing')).resolves.toBeUndefined();
@@ -120,4 +122,22 @@ it('replays a cold-runtime publication before the first workspace read', async (
 
   await expect(recoverAndGetImageWorkspace('image-1')).resolves.toBeUndefined();
   expect(order).toEqual(['recover', 'read']);
+});
+
+it('transfers hydrated vector refs and release ownership to the native workspace opener', async () => {
+  const entry = createWorkspace('vector-image', 10);
+  const refs = new Map([['definition-id', { assetId: 'vector-resource' }]]);
+  const release = vi.fn();
+  mocks.hydrate.mockResolvedValueOnce({
+    assetsByRuntimeUrl: new Map(),
+    assetsByVectorDefinitionId: refs,
+    document: createEditorDocumentFixture(),
+    release,
+  });
+  mocks.get.mockResolvedValueOnce(entry).mockResolvedValue({ assetId: 'vector-resource' });
+  const opened = await recoverAndGetImageWorkspace('vector-image');
+  expect(opened?.documentAssetsByVectorDefinitionId).toBe(refs);
+  expect(release).not.toHaveBeenCalled();
+  opened?.releaseDocumentAssets?.();
+  expect(release).toHaveBeenCalledOnce();
 });

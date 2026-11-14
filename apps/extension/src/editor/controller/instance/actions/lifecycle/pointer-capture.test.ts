@@ -76,7 +76,7 @@ it('leaves an existing Fabric target under Fabric document-level pointer ownersh
   detachEditorCanvasPointerCapture(canvas);
 });
 
-it('keeps the Fabric transform alive after capture loss and terminates it on pointer cancellation', () => {
+it('cancels an unexpectedly lost active capture and a later pointer cancellation', () => {
   const element = document.createElement('canvas');
   const captured = new Set<number>();
   element.setPointerCapture = vi.fn((pointerId) => captured.add(pointerId));
@@ -87,13 +87,15 @@ it('keeps the Fabric transform alive after capture loss and terminates it on poi
 
   attachEditorCanvasPointerCapture(canvas, terminate);
   element.dispatchEvent(pointerEvent('pointerdown', 4));
-  element.dispatchEvent(pointerEvent('lostpointercapture', 4));
+  element.dispatchEvent(pointerEvent('lostpointercapture', 99));
   expect(terminate).not.toHaveBeenCalled();
+  element.dispatchEvent(pointerEvent('lostpointercapture', 4));
+  expect(terminate).toHaveBeenCalledWith(expect.objectContaining({ pointerId: 4 }));
 
   element.dispatchEvent(pointerEvent('pointerdown', 5));
   element.dispatchEvent(pointerEvent('pointercancel', 5));
   expect(terminate).toHaveBeenCalledWith(expect.objectContaining({ pointerId: 5 }));
-  expect(terminate).toHaveBeenCalledOnce();
+  expect(terminate).toHaveBeenCalledTimes(2);
 
   detachEditorCanvasPointerCapture(canvas);
 });

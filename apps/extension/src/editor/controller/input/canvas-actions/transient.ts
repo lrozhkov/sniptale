@@ -1,3 +1,5 @@
+import { endEditorCanvasTransform } from './transform';
+import { EditorCanvas } from '../../../document/canvas-surface/render-region';
 import { cancelPendingEditorSimplify } from '../../../drawing/simplify-runtime';
 import type { Canvas, Rect } from 'fabric';
 import type { DrawSession } from '../../core/types';
@@ -9,6 +11,7 @@ interface CancelEditorTransientInteractionOptions {
   cropGuide: Rect | null;
   activeTool: string;
   preserveActiveTool?: boolean;
+  preserveSelection?: boolean;
   preservePendingSimplify?: boolean;
   clearCropSelection: () => void;
   switchToSelectTool: () => void;
@@ -35,7 +38,19 @@ export function cancelEditorTransientInteraction(
   let changed = options.preservePendingSimplify ? false : cancelPendingEditorSimplify(canvas);
   let nextDrawSession = drawSession;
 
+  if (canvas instanceof EditorCanvas && canvas.cancelSelectionMarquee()) {
+    syncRuntimeState();
+    return { changed: true, drawSession };
+  }
+
   if (cancelEditorDrawingArrowBend(canvas)) {
+    syncRuntimeState();
+    return { changed: true, drawSession };
+  }
+
+  if (canvas._currentTransform) {
+    endEditorCanvasTransform(canvas);
+    canvas.requestRenderAll();
     syncRuntimeState();
     return { changed: true, drawSession };
   }
@@ -47,7 +62,14 @@ export function cancelEditorTransientInteraction(
     }
     if (cropGuide) clearCropSelection();
     changed = true;
-  } else if (canvas.getActiveObjects().length > 0) {
+  } else if (
+    !changed &&
+    !options.preserveActiveTool &&
+    canvas instanceof EditorCanvas &&
+    canvas.exitSelectionGroup()
+  ) {
+    changed = true;
+  } else if (!options.preserveSelection && canvas.getActiveObjects().length > 0) {
     canvas.discardActiveObject();
     changed = true;
   } else if (activeTool !== 'select' && !options.preserveActiveTool) {

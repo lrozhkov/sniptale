@@ -1,8 +1,10 @@
+import { getEditorRasterRuntime } from '../../../raster-editing/runtime';
 import { cancelPendingEditorSimplify } from '../../../drawing/simplify-runtime';
 import type { EditorDocument } from '../../../../features/editor/document/types';
 import type { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
 import type { ApplyDocumentOptions } from '../../core/types';
 import {
+  flushDeferredEditorHistory,
   readCurrentEditorSnapshot,
   redoEditorSnapshot,
   resetEditorSnapshotHistory,
@@ -46,8 +48,17 @@ export async function undoEditorControllerSnapshot(
   controller: EditorDocumentHistoryController
 ): Promise<void> {
   return runEditorDocumentTransition(controller.canvas ?? controller.history, () =>
-    undoEditorControllerSnapshotInTurn(controller)
+    preserveRasterEditing(controller, () => undoEditorControllerSnapshotInTurn(controller))
   );
+}
+
+async function preserveRasterEditing(
+  controller: EditorDocumentHistoryController,
+  operation: () => Promise<void>
+): Promise<void> {
+  const runtime = getEditorRasterRuntime(controller.canvas);
+  if (runtime) await runtime.preserveEditingForHistory(operation);
+  else await operation();
 }
 
 async function undoEditorControllerSnapshotInTurn(
@@ -73,7 +84,7 @@ export async function redoEditorControllerSnapshot(
   controller: EditorDocumentHistoryController
 ): Promise<void> {
   return runEditorDocumentTransition(controller.canvas ?? controller.history, () =>
-    redoEditorControllerSnapshotInTurn(controller)
+    preserveRasterEditing(controller, () => redoEditorControllerSnapshotInTurn(controller))
   );
 }
 
@@ -144,6 +155,7 @@ export async function resetEditorControllerToOriginal(
   return runEditorDocumentTransition(controller.canvas ?? controller.history, async () => {
     flushActiveFrameAnnotationDraft();
     const history = controller.history;
+    flushDeferredEditorHistory(history);
     const previousIndex = history?.getState().index ?? 0;
     if (!history || previousIndex === 0) return;
     const previousDocument = readCurrentEditorSnapshot(history);
@@ -185,6 +197,7 @@ export async function restoreEditorControllerOriginalDocument(
 ): Promise<void> {
   return runEditorDocumentTransition(controller.canvas ?? controller.history, async () => {
     if (!isCurrent()) throw new Error('Editor document changed during restoration.');
+    flushDeferredEditorHistory(controller.history);
     flushActiveFrameAnnotationDraft();
     const previousDocument = readCurrentEditorSnapshot(controller.history);
     try {

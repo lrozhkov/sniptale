@@ -79,7 +79,11 @@ it('keeps pointerup capture admission through document history commit and its la
   autosave.setInteractionActive(true);
   autosave.scheduleAutosave(createDocument('intermediate'));
   await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
-  const ack = deferred<{ revision: number; documentAssetsByRuntimeUrl: Map<string, never> }>();
+  const ack = deferred<{
+    revision: number;
+    documentAssetsByVectorDefinitionId: Map<string, never>;
+    documentAssetsByRuntimeUrl: Map<string, never>;
+  }>();
   commitWorkspaceMock.mockReturnValueOnce(ack.promise);
   const target = document.createElement('canvas');
   document.body.append(target);
@@ -103,7 +107,11 @@ it('keeps pointerup capture admission through document history commit and its la
       expect.objectContaining({ document: createDocument('final') })
     );
     expect(release).not.toHaveBeenCalled();
-    ack.resolve({ revision: 2, documentAssetsByRuntimeUrl: new Map<string, never>() });
+    ack.resolve({
+      revision: 2,
+      documentAssetsByVectorDefinitionId: new Map<string, never>(),
+      documentAssetsByRuntimeUrl: new Map<string, never>(),
+    });
     await vi.advanceTimersByTimeAsync(0);
     expect(release).toHaveBeenCalledOnce();
     expect(autosave.getDurableRevision()).toBe(2);
@@ -120,14 +128,37 @@ it('retains failed final save admission through explicit retry', async () => {
   autosave.scheduleAutosave(createDocument('intermediate'));
   await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
   commitWorkspaceMock.mockRejectedValueOnce(new Error('Final write failed'));
-  autosave.scheduleAutosave(createDocument('final'));
+  const retained = {
+    ...createDocument('final'),
+    version: 3 as const,
+    canvasJson: JSON.stringify({
+      objects: [
+        {
+          sniptaleRasterOriginalData: 'data:image/png;base64,b3JpZ2luYWw=',
+          sniptaleRasterColorData: 'data:image/png;base64,Y29sb3I=',
+          sniptaleRasterVisibilityData: 'data:image/png;base64,dmlzaWJpbGl0eQ==',
+          sniptaleRasterKeyData: 'data:image/png;base64,a2V5',
+          sniptaleRasterState: {
+            version: 1,
+            width: 8,
+            height: 6,
+            crop: { x: 2, y: 1, width: 4, height: 3 },
+          },
+        },
+      ],
+    }),
+  };
+  autosave.scheduleAutosave(retained);
   autosave.setInteractionActive(false);
   await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
   expect(autosave.getLastWriteError()).toBeInstanceOf(Error);
   expect(autosave.hasUnsavedChanges()).toBe(true);
   expect(release).not.toHaveBeenCalled();
   expect(wakeCheckpoints).not.toHaveBeenCalled();
-  await autosave.saveNow(() => createDocument('final'));
+  await autosave.saveNow(() => retained);
+  expect(commitWorkspaceMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ document: retained })
+  );
   expect(autosave.getLastWriteError()).toBeNull();
   expect(release).toHaveBeenCalledOnce();
   await vi.advanceTimersByTimeAsync(0);
@@ -176,7 +207,11 @@ it.each(['replace', 'dispose'] as const)(
   }
 );
 it('holds an acquired lease through an in-flight native write after disposal', async () => {
-  const ack = deferred<{ revision: number; documentAssetsByRuntimeUrl: Map<string, never> }>();
+  const ack = deferred<{
+    revision: number;
+    documentAssetsByVectorDefinitionId: Map<string, never>;
+    documentAssetsByRuntimeUrl: Map<string, never>;
+  }>();
   commitWorkspaceMock.mockReturnValueOnce(ack.promise);
   const autosave = await session();
   autosave.setInteractionActive(true);
@@ -185,7 +220,11 @@ it('holds an acquired lease through an in-flight native write after disposal', a
   autosave.dispose();
   await vi.advanceTimersByTimeAsync(0);
   expect(release).not.toHaveBeenCalled();
-  ack.resolve({ revision: 1, documentAssetsByRuntimeUrl: new Map<string, never>() });
+  ack.resolve({
+    revision: 1,
+    documentAssetsByVectorDefinitionId: new Map<string, never>(),
+    documentAssetsByRuntimeUrl: new Map<string, never>(),
+  });
   await vi.advanceTimersByTimeAsync(0);
   expect(release).toHaveBeenCalledOnce();
 });
@@ -244,7 +283,11 @@ it('keeps a paused interaction with an intermediate native save protected until 
 it('releases an old context ACK without releasing its successor interaction', async () => {
   const firstRelease = vi.fn(async (): Promise<void> => undefined);
   acquire.mockResolvedValueOnce({ release: firstRelease });
-  const ack = deferred<{ revision: number; documentAssetsByRuntimeUrl: Map<string, never> }>();
+  const ack = deferred<{
+    revision: number;
+    documentAssetsByVectorDefinitionId: Map<string, never>;
+    documentAssetsByRuntimeUrl: Map<string, never>;
+  }>();
   commitWorkspaceMock.mockReturnValueOnce(ack.promise);
   const autosave = await session();
   autosave.setInteractionActive(true);
@@ -259,7 +302,11 @@ it('releases an old context ACK without releasing its successor interaction', as
   });
   autosave.setInteractionActive(true);
   autosave.scheduleAutosave(createDocument('replacement context'));
-  ack.resolve({ revision: 1, documentAssetsByRuntimeUrl: new Map<string, never>() });
+  ack.resolve({
+    revision: 1,
+    documentAssetsByVectorDefinitionId: new Map<string, never>(),
+    documentAssetsByRuntimeUrl: new Map<string, never>(),
+  });
   await vi.advanceTimersByTimeAsync(0);
   expect(firstRelease).toHaveBeenCalledOnce();
   expect(wakeCheckpoints).toHaveBeenCalledOnce();

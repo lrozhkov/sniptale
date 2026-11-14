@@ -12,6 +12,7 @@ import {
   DIAGNOSTICS_EVENTS_STORE,
   DIAGNOSTICS_META_STORE,
   EDITOR_CUSTOM_SHAPES_STORE,
+  EDITOR_VECTOR_LIBRARY_STORE,
   FRAME_ANNOTATION_RASTER_JOBS_STORE,
   IMAGE_WORKSPACES_STORE,
   VIDEO_WORKSPACES_STORE,
@@ -71,6 +72,11 @@ interface StoredSchemaContract {
 
 export const PERSISTENCE_DOMAIN_REGISTRY = [
   {
+    domainId: 'editorVectorLibrary',
+    schemaVersion: 1,
+    stores: [{ storeName: EDITOR_VECTOR_LIBRARY_STORE, dataClass: 'durable-authority' }],
+  },
+  {
     domainId: 'secretProtection',
     schemaVersion: 1,
     stores: [{ storeName: SECRET_PROTECTION_STORE, dataClass: 'durable-authority' }],
@@ -105,7 +111,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 34,
+    schemaVersion: 36,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
@@ -139,7 +145,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'scenarioProjects',
-    schemaVersion: 10,
+    schemaVersion: 12,
     stores: [
       { storeName: SCENARIO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_PROJECT_HISTORY_STORE, dataClass: 'durable-authority' },

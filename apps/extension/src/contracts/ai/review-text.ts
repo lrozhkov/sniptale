@@ -1,6 +1,6 @@
 import { isAIConnectionReason, type AIConnectionReason } from '../settings/ai-catalog';
 import { z } from 'zod';
-import { SHA256_DIGEST_PATTERN } from '@sniptale/runtime-contracts/protocol/digest';
+import { aiJobControlSchemas, aiJobRequestIdSchema, approvedAiStartSchema } from './job-command';
 
 export const REVIEW_TEXT_PORT_NAME = 'sniptale-gallery-review-text';
 export const REVIEW_TEXT_TIMEOUT_MS = 120_000;
@@ -196,7 +196,7 @@ export const REVIEW_TEXT_FAILURE_CODES = [
   'network-failed',
 ] as const;
 export type ReviewTextFailureCode = (typeof REVIEW_TEXT_FAILURE_CODES)[number];
-const requestId = z.string().uuid();
+const requestId = aiJobRequestIdSchema;
 const revision = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const reviewTextJobScopeSchema = z.union([
   z.object({ workspaceId: id, workspaceRevision: revision }).strict(),
@@ -218,24 +218,13 @@ export function isProjectReviewTextScope(
 ): scope is Extract<ReviewTextJobScope, { kind: 'project-text' }> {
   return 'kind' in scope;
 }
-const startSchema = z
-  .object({
-    type: z.literal('start'),
-    requestId,
-    modelId: id,
-    approvedProviderId: id,
-    approvedDestination: z.string().regex(SHA256_DIGEST_PATTERN),
-    approvedModelCode: id,
-    llmSessionToken: z.string().min(1).max(512),
+const startSchema = approvedAiStartSchema
+  .extend({
     context: reviewTextContextSchema,
     scope: reviewTextJobScopeSchema,
   })
   .strict();
-const clientSchema = z.discriminatedUnion('type', [
-  startSchema,
-  z.object({ type: z.literal('cancel'), requestId }).strict(),
-  z.object({ type: z.literal('keepalive'), requestId }).strict(),
-]);
+const clientSchema = z.discriminatedUnion('type', [startSchema, ...aiJobControlSchemas]);
 export type ReviewTextClientMessage = z.infer<typeof clientSchema>;
 export type ReviewTextStart = z.infer<typeof startSchema>;
 export function parseReviewTextClientMessage(value: unknown): ReviewTextClientMessage | null {

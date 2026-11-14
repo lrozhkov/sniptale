@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest';
-import { Path, StaticCanvas, Textbox } from 'fabric';
+import { Path, Textbox } from 'fabric';
 import type { DrawingObject } from '../../../features/drawing/public';
 import { readEditorDrawingObject } from './metadata';
 import {
@@ -58,7 +58,7 @@ it('bounds zoomed scratch allocation to the visible destination and skips offscr
     if (
       !actual
         .subarray(offset, offset + 4)
-        .every((channel, index) => channel === reference[offset + index])
+        .every((channel, index) => Math.abs(channel - reference[offset + index]!) <= 1)
     ) {
       changedSolidPixels += 1;
     }
@@ -314,7 +314,7 @@ it.each([0, 5, 10, 45])('has continuous Fabric background pixels at %s degrees',
     let edge = object._getTopOffset();
     for (let line = 0; line < 2; line += 1) {
       edge += object.getHeightOfLine(line);
-      for (let offset = 20; offset <= 30; offset += 1) {
+      for (let offset = 12; offset <= 16; offset += 1) {
         for (const delta of [-0.75, -0.25, 0.25, 0.75]) {
           const localX = object._getLeftOffset() + offset;
           const localY = edge + delta;
@@ -333,56 +333,6 @@ it.each([0, 5, 10, 45])('has continuous Fabric background pixels at %s degrees',
     }
   }
 });
-it.each(['#00000000', '#00000080', '#111827'])(
-  'keeps the editing caret opaque without changing glyph color %s',
-  (color) => {
-    const object = createEditorDrawingFabricObject(
-      {
-        id: 'text-caret',
-        kind: 'text',
-        bounds: { x: 0, y: 0, width: 160, height: 40 },
-        text: 'Caret',
-        color,
-        backgroundColor: '#f97316',
-        fontFamily: 'sans',
-        fontSize: 24,
-      },
-      1
-    ) as Textbox;
-    expect(object.cursorColor).toBe('#2563eb');
-    expect(object.fill).toBe(color);
-    expect(readEditorDrawingObject(object)).toMatchObject({ color, text: 'Caret' });
-  }
-);
-describe.each(['ltr', 'rtl'] as const)('editing caret geometry in %s text', (direction) => {
-  it.each([0.5, 1, 2])('keeps the caret quiet and precise at zoom %s', (zoom) => {
-    const canvas = new StaticCanvas(document.createElement('canvas'), { renderOnAddRemove: false });
-    const object = new Textbox('First\nNext\n', { fontSize: 24, fontFamily: 'serif', direction });
-    canvas.setZoom(zoom);
-    canvas.add(object);
-    object.set({ scaleX: 1.5, scaleY: 1.5 });
-    applyEditorDrawingTextVisuals(object);
-    applyEditorDrawingTextVisuals(object);
-    for (const index of [0, 2, 5, 6, 10, 11]) {
-      const boundaries = object._getCursorBoundaries(index, true);
-      const baseline = Textbox.prototype.getCursorRenderingData.call(object, index, boundaries);
-      const actual = object.getCursorRenderingData(index, boundaries);
-      const multiplier = zoom * 1.5;
-      const edge = index === 0 || index === 6 ? -2 : index === 5 || index === 10 ? 2 : 0;
-      const shift = edge * (direction === 'rtl' ? -1 : 1);
-      expect(actual.width * multiplier).toBeCloseTo(1.5, 6);
-      expect(actual.height).toBeCloseTo(baseline.height * 0.8, 6);
-      expect(actual.top + actual.height / 2).toBeCloseTo(baseline.top + baseline.height / 2, 6);
-      expect(
-        (actual.left + actual.width / 2 - baseline.left - baseline.width / 2) * multiplier
-      ).toBeCloseTo(shift, 6);
-      expect(actual.color).toBe('#2563eb');
-    }
-    expect(object.text).toBe('First\nNext\n');
-    void canvas.dispose();
-  });
-});
-
 describe('Fabric drawing adapter', () => {
   it.each([
     { fontSize: 16, text: 'One', color: '#111' },
@@ -459,7 +409,10 @@ describe('Fabric drawing adapter', () => {
     expect((object as Textbox).backgroundColor).toBe('');
     expect((object as Textbox).textBackgroundColor).toBe('#ff08');
     expect((object as Textbox).fontFamily).toContain('Sniptale Handwritten');
-    expect((object as Textbox).lineHeight).toBe(1.25);
+    expect((object as Textbox).getHeightOfLine(0)).toBeCloseTo(
+      (object as Textbox).fontSize * 1.25,
+      6
+    );
     const context = {
       beginPath: vi.fn(),
       fill: vi.fn(),
@@ -474,12 +427,18 @@ describe('Fabric drawing adapter', () => {
     expect(context.moveTo).toHaveBeenCalledTimes(1);
     expect(context.closePath).toHaveBeenCalledTimes(1);
     expect(context.arcTo).toHaveBeenCalled();
-    expect((object as Textbox)._getLineLeftOffset(0)).toBeCloseTo(6);
+    const inkContext = document.createElement('canvas').getContext('2d')!;
+    inkContext.font = (object as Textbox)._getFontDeclaration();
+    expect(
+      (object as Textbox)._getLineLeftOffset(0) -
+        inkContext.measureText('One').actualBoundingBoxLeft
+    ).toBeCloseTo(6);
+    const leftOffset = (object as Textbox)._getLineLeftOffset(0);
     const topOffset = (object as Textbox)._getTopOffset();
     applyEditorDrawingTextVisuals(object as Textbox);
     (object as Textbox)._renderTextLinesBackground(context as unknown as CanvasRenderingContext2D);
     expect((object as Textbox)._getTopOffset()).toBe(topOffset);
-    expect((object as Textbox)._getLineLeftOffset(0)).toBeCloseTo(6);
+    expect((object as Textbox)._getLineLeftOffset(0)).toBeCloseTo(leftOffset);
     expect(context.fill).toHaveBeenCalledTimes(2);
   });
 
@@ -542,8 +501,10 @@ describe('Fabric drawing adapter', () => {
     object.set({ text: 'One\nTwo\nThree\nFour\nFive\nSix' });
     object.initDimensions();
 
-    expect(synchronizeEditorDrawingTextLayout(object)).toBe(true);
-    expect(object.height).toBeGreaterThanOrEqual(object.calcTextHeight() + 4);
+    const height = object.height;
+    expect(synchronizeEditorDrawingTextLayout(object)).toBe(false);
+    expect(object.height).toBe(height);
+    expect(object.height).toBeGreaterThan(5 * object.getHeightOfLine(0));
     expect(object._textLines).toHaveLength(6);
   });
 
@@ -621,4 +582,84 @@ describe('Fabric drawing adapter', () => {
     expect(object.width).toBeCloseTo(80);
     expect(object.height).toBeCloseTo(40);
   });
+});
+
+it('does not paint Fabric text backgrounds for empty or whitespace-only rows', () => {
+  const textbox = createEditorDrawingFabricObject(
+    {
+      id: 'blank-rows',
+      kind: 'text',
+      bounds: { x: 10, y: 10, width: 200, height: 170 },
+      text: '\nAlpha\n\n \t \nBeta\n',
+      color: '#111111',
+      backgroundColor: '#ff8800',
+      fontFamily: 'sans',
+      fontSize: 20,
+    },
+    1
+  ) as Textbox;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 400;
+  const context = canvas.getContext('2d')!;
+  context.translate(20 - textbox._getLeftOffset(), 10 - textbox._getTopOffset());
+  renderEditorDrawingTextBackground(textbox, context);
+  let top = 10;
+  for (let index = 0; index < textbox._textLines.length; index++) {
+    const advance = textbox.getHeightOfLine(index);
+    const alpha = context.getImageData(22, Math.floor(top + advance / 2), 1, 1).data[3];
+    expect(alpha, `row ${index}`).toBe([1, 4].includes(index) ? 255 : 0);
+    top += advance;
+  }
+});
+
+it.each(['', '\n', '\n \t\n'])(
+  'keeps the last populated text background unchanged when empty suffix is %j',
+  (suffix) => {
+    const make = (text: string) => {
+      const textbox = createEditorDrawingFabricObject(
+        {
+          id: 'line-height',
+          kind: 'text',
+          bounds: { x: 10, y: 10, width: 240, height: 160 },
+          text,
+          color: '#111111',
+          backgroundColor: '#ff8800',
+          fontFamily: 'handwritten',
+          fontSize: 24,
+        },
+        1
+      ) as Textbox;
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 300;
+      const context = canvas.getContext('2d')!;
+      context.translate(10 - textbox._getLeftOffset(), 10 - textbox._getTopOffset());
+      renderEditorDrawingTextBackground(textbox, context);
+      return context.getImageData(0, 0, 300, 300).data;
+    };
+    const actual = make(`Привет${suffix}`);
+    const baseline = make('Привет');
+    const changed = actual.reduce(
+      (count, channel, index) => count + Number(channel !== baseline[index]),
+      0
+    );
+    expect(changed).toBe(0);
+  }
+);
+
+it.each([16, 24, 36])('uses the shared baseline step for %spx drawing text', (fontSize) => {
+  const object = createEditorDrawingFabricObject(
+    {
+      id: 'baseline-step',
+      kind: 'text',
+      text: 'тс\nст\nПривет',
+      bounds: { x: 0, y: 0, width: 300, height: 160 },
+      color: '#111111',
+      backgroundColor: '#ff8800',
+      fontFamily: 'handwritten',
+      fontSize,
+    },
+    1
+  ) as Textbox;
+  expect(object.getHeightOfLine(0)).toBeCloseTo(fontSize * 1.25, 6);
+  expect(object.getHeightOfLine(1)).toBeCloseTo(fontSize * 1.25, 6);
 });

@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   resolveDrawingLinearPoint,
+  type DrawingObject,
   updateCreatedDrawingObject,
 } from '../../features/drawing/public';
 import {
@@ -24,6 +25,40 @@ import {
   getDrawingBoundsCenter,
   rotateDrawingPoint,
 } from '../../features/drawing/public';
+
+it.each([
+  { bends: [{ x: 120, y: 120 }], point: { x: 132, y: 120 }, index: 0 },
+  {
+    bends: [
+      { x: 100, y: 100 },
+      { x: 110, y: 100 },
+    ],
+    point: { x: 107, y: 100 },
+    index: 1,
+  },
+])(
+  'grabs the nearest existing bend from an imprecise pointer instead of inserting',
+  ({ bends, point, index }) => {
+    const session = createDrawingSession({ onDocumentCommit: () => true });
+    session.commitObject({
+      id: 'protected-bend',
+      kind: 'arrow',
+      design: 'freehand',
+      start: { x: 20, y: 20 },
+      end: { x: 220, y: 20 },
+      bendPoints: bends,
+      color: '#000',
+      width: 2,
+      dynamicWidth: false,
+    });
+    session.setActiveTool('select');
+    session.setSelection(['protected-bend']);
+    const result = beginDrawingPointer({ point, snapshot: session.getSnapshot(), timestamp: 0 });
+    expect(result.draft?.kind).toBe('bend');
+    if (result.draft?.kind !== 'bend') throw new Error('Existing bend was not captured');
+    expect(result.draft.target).toEqual({ point: bends[index], index, insert: false });
+  }
+);
 
 it('rotates a multi-selection from fixed original geometry with one commit and no empty gesture', () => {
   const onDocumentCommit = vi.fn(() => true);
@@ -80,6 +115,54 @@ it('rotates a multi-selection from fixed original geometry with one commit and n
   expect(onDocumentCommit).toHaveBeenCalledOnce();
   expect(session.getSnapshot().selectedObjectIds).toEqual(['one', 'two']);
   expect(session.getSnapshot().document.objects[0]).toMatchObject({ rotation: 50 });
+});
+
+it.each([
+  { point: { x: 32, y: 20 }, handle: 'start' },
+  { point: { x: 208, y: 20 }, handle: 'end' },
+])(
+  'captures the existing arrow $handle endpoint from a twelve-pixel near miss',
+  ({ point, handle }) => {
+    const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
+      id: 'protected-endpoint',
+      kind: 'arrow',
+      design: 'freehand',
+      start: { x: 20, y: 20 },
+      end: { x: 220, y: 20 },
+      color: '#000',
+      width: 2,
+      dynamicWidth: false,
+    };
+    const session = createDrawingSession({ onDocumentCommit: () => true });
+    session.commitObject(arrow);
+    session.setActiveTool('select');
+    session.setSelection([arrow.id]);
+    expect(resolveDrawingResizeHandle(arrow, point)).toBe(handle);
+    const result = beginDrawingPointer({ point, snapshot: session.getSnapshot(), timestamp: 0 });
+    expect(result.draft).toMatchObject({ kind: 'resize', handle, original: arrow });
+  }
+);
+
+it('prefers a closer existing bend over a nearby arrow endpoint', () => {
+  const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
+    id: 'crowded-points',
+    kind: 'arrow',
+    design: 'freehand',
+    start: { x: 20, y: 20 },
+    end: { x: 220, y: 20 },
+    bendPoints: [{ x: 32, y: 20 }],
+    color: '#000',
+    width: 2,
+    dynamicWidth: false,
+  };
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.commitObject(arrow);
+  session.setActiveTool('select');
+  session.setSelection([arrow.id]);
+  const point = { x: 31, y: 20 };
+  expect(resolveDrawingResizeHandle(arrow, point)).toBeNull();
+  const result = beginDrawingPointer({ point, snapshot: session.getSnapshot(), timestamp: 0 });
+  expect(result.draft).toMatchObject({ kind: 'bend', target: { index: 0, insert: false } });
 });
 
 afterEach(() => {
@@ -484,7 +567,7 @@ it('resizes a text box by width only without scaling its font', () => {
   expect(narrowed).toMatchObject({ fontSize: 20, bounds: { x: 20, y: 30 } });
   expect(widened).toMatchObject({ fontSize: 20, bounds: { x: 20, y: 30 } });
   if (narrowed.kind !== 'text' || widened.kind !== 'text') throw new Error('Expected text');
-  expect(narrowed.bounds.width).toBeGreaterThanOrEqual(80);
+  expect(narrowed.bounds.width).toBe(23); // One fallback advance cell and the shared horizontal padding.
   expect(widened.bounds.width).toBeGreaterThan(640);
   expect(narrowed.bounds.height).toBeGreaterThan(widened.bounds.height);
 });
@@ -667,3 +750,65 @@ for (const tool of ['simplify', 'blur'] as const)
     expect(session.getSnapshot().document.objects).toHaveLength(1);
     session.dispose();
   });
+
+it('keeps a20px selected object body movable while side handles remain reachable', () => {
+  const object = {
+    id: 'small',
+    kind: 'rectangle' as const,
+    bounds: { x: 100, y: 100, width: 20, height: 20 },
+    color: '#000',
+    width: 2,
+  };
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.commitObject(object);
+  session.setActiveTool('select');
+  session.setSelection([object.id]);
+  expect(
+    beginDrawingPointer({
+      point: { x: 110, y: 110 },
+      snapshot: session.getSnapshot(),
+      timestamp: 1,
+    }).draft?.kind
+  ).toBe('move');
+  expect(resolveDrawingResizeHandle(object, { x: 120, y: 110 })).toBe('e');
+  expect(resolveDrawingResizeHandle(object, { x: 100, y: 100 })).toBe('nw');
+});
+
+it('keeps a short uniform arrow movable between its endpoint controls', () => {
+  const arrow = {
+    id: 'short',
+    kind: 'arrow' as const,
+    start: { x: 100, y: 100 },
+    end: { x: 120, y: 100 },
+    color: '#000',
+    width: 2,
+    dynamicWidth: false,
+    design: 'standard' as const,
+  };
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.commitObject(arrow);
+  session.setActiveTool('select');
+  session.setSelection([arrow.id]);
+  expect(
+    beginDrawingPointer({
+      point: { x: 110, y: 100 },
+      snapshot: session.getSnapshot(),
+      timestamp: 1,
+    }).draft?.kind
+  ).toBe('move');
+  expect(resolveDrawingResizeHandle(arrow, { x: 100, y: 100 })).toBe('start');
+  expect(resolveDrawingResizeHandle(arrow, { x: 120, y: 100 })).toBe('end');
+});
+
+it('places rotation at a fixed local top-right diagonal offset for single and multi selections', () => {
+  const object: DrawingObject = {
+    id: 'rotation-offset',
+    kind: 'rectangle',
+    bounds: { x: 100, y: 100, width: 100, height: 60 },
+    color: '#000',
+    width: 2,
+    rotation: 90,
+  };
+  expect(getDrawingRotationHandlePoint(object, 'rotate-ne')).toEqual({ x: 200, y: 200 });
+  expect(getDrawingMultiRotationHandlePoint(object.bounds)).toEqual({ x: 220, y: 80 });
+});

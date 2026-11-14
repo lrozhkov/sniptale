@@ -53,7 +53,7 @@ describe('settings route codec', () => {
       annotations: ['borders', 'callouts', 'numbering', 'tags'],
       'media-quality': ['image', 'video'],
       saving: ['settings', 'files', 'drafts', 'storage', 'templates', 'queue', 'connection'],
-      'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients', 'backgrounds'],
+      'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients', 'backgrounds', 'icons'],
       'ai-connections': ['integrations', 'chrome-ai'],
       'ai-prompts': ['templates', 'scenario-templates', 'prompts'],
       'native-app': ['connection'],
@@ -283,4 +283,12 @@ it('builds valid defaults from generic section-only navigation without carrying 
     expect(url.searchParams.has('queueFilter')).toBe(false);
     expect(url.searchParams.get('keep')).toBe('1');
   }
+});
+
+it('opens icon catalog management through the canonical Settings route', () => {
+  const route = { section: 'editor-resources', view: 'icons' } as const;
+  expect(resolveSettingsRoute(buildSettingsRouteUrl(BASE, route))).toMatchObject({
+    route,
+    shouldReplace: false,
+  });
 });

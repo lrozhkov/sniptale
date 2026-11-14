@@ -1,6 +1,7 @@
+import { isManagedBackgroundObject } from '../background/identity';
 import type { Canvas } from 'fabric';
-import { Group, type FabricObject } from 'fabric';
-import type { EditorLayerItem } from '../../../features/editor/document/types';
+import { FabricImage, Group, type FabricObject } from 'fabric';
+import type { EditorLayerChild, EditorLayerItem } from '../../../features/editor/document/types';
 import {
   createObjectLabel,
   getEditorObjectTypeLabel,
@@ -33,6 +34,34 @@ export function findObjectById(canvas: Canvas | null, id: string): FabricObject 
   return canvas?.getObjects?.().find((object) => object.sniptaleId === id);
 }
 
+/** Resolve content access without changing the object's position locks. */
+export function findRasterContentObject(canvas: Canvas | null, id: string): FabricObject | null {
+  const visit = (objects: FabricObject[], blocked: boolean): FabricObject | null => {
+    for (const object of objects) {
+      const hidden = blocked || object.visible === false;
+      if (object.sniptaleId === id) {
+        const supported =
+          (object instanceof FabricImage &&
+            (object.sniptaleType === 'image' || object.sniptaleType === 'source-image')) ||
+          (isManagedBackgroundObject(object) && object.sniptaleBackgroundMode === 'image');
+        const refused =
+          object.sniptaleContentLocked === true ||
+          (object.sniptaleLocked === true && object.sniptaleContentLocked !== false);
+        return supported && !hidden && !refused ? object : null;
+      }
+      if (object instanceof Group) {
+        const found = visit(
+          object.getObjects(),
+          hidden || object.sniptaleLocked === true || object.sniptaleContentLocked === true
+        );
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  return visit(canvas?.getObjects?.() ?? [], false);
+}
+
 export function getLayerObjects(canvas: Canvas | null): FabricObject[] {
   return (canvas?.getObjects?.() ?? []).filter(
     (object) => isUserObject(object) && !isBrowserFrameObject(object)
@@ -56,6 +85,30 @@ export function collectLayers(canvas: Canvas | null): EditorLayerItem[] {
     (canvas?.getActiveObjects?.() ?? []).map((object) => object.sniptaleId)
   );
   const selectedCount = activeIds.size;
+  const collectChildren = (group: Group): EditorLayerChild[] =>
+    group
+      .getObjects()
+      .slice()
+      .reverse()
+      .map((child) => {
+        const children =
+          child instanceof Group && child.sniptaleType === 'group'
+            ? collectChildren(child)
+            : undefined;
+        return {
+          effects: (child.sniptaleEffects ?? []).map((effect) => ({ ...effect })),
+          id: child.sniptaleId ?? crypto.randomUUID(),
+          name: child.sniptaleLabel ?? getEditorObjectTypeLabel(child.sniptaleType ?? 'image'),
+          type: child.sniptaleType ?? 'image',
+          typeLabel: getEditorObjectTypeLabel(child.sniptaleType ?? 'image'),
+          selected: Boolean(child.sniptaleId && activeIds.has(child.sniptaleId)),
+          locked: Boolean(group.sniptaleLocked || child.sniptaleLocked),
+          visible: group.visible !== false && child.visible !== false,
+          containsSelection:
+            children?.some((member) => member.selected || member.containsSelection) ?? false,
+          ...(children ? { groupChildren: children } : {}),
+        };
+      });
   return getLayerObjects(canvas)
     .slice()
     .reverse()
@@ -69,7 +122,10 @@ export function collectLayers(canvas: Canvas | null): EditorLayerItem[] {
       previewColor: resolveLayerPreviewColor(object),
       previewDataUrl: null,
       previewTransparent: isTransparentPreview(object),
-      raster: object.sniptaleType === 'image' || object.sniptaleType === 'source-image',
+      raster:
+        object.sniptaleType === 'image' ||
+        object.sniptaleType === 'source-image' ||
+        (isManagedBackgroundObject(object) && object.sniptaleBackgroundMode === 'image'),
       name:
         hasBrowserWindow && isSourceObject(object)
           ? getEditorObjectTypeLabel('browser-frame')
@@ -84,17 +140,10 @@ export function collectLayers(canvas: Canvas | null): EditorLayerItem[] {
       ...(object instanceof Group && object.sniptaleType === 'group'
         ? {
             groupSize: object.getObjects().length,
-            groupChildren: object
-              .getObjects()
-              .slice()
-              .reverse()
-              .map((child) => ({
-                id: child.sniptaleId ?? crypto.randomUUID(),
-                name:
-                  child.sniptaleLabel ?? getEditorObjectTypeLabel(child.sniptaleType ?? 'image'),
-                type: child.sniptaleType ?? 'image',
-                typeLabel: getEditorObjectTypeLabel(child.sniptaleType ?? 'image'),
-              })),
+            containsSelection: collectChildren(object).some(
+              (child) => child.selected || child.containsSelection
+            ),
+            groupChildren: collectChildren(object),
           }
         : {}),
       visible: object.visible !== false,

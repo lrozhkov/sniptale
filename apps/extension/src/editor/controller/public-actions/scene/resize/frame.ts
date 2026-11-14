@@ -113,7 +113,10 @@ export async function applyEditorFrameSceneSettings(
     currentSize.width !== targetSize.width ||
     currentSize.height !== targetSize.height;
   const background =
-    (backgroundChanged || !options.preview || options.quality === 'final') &&
+    (options.backgroundCandidate ||
+      backgroundChanged ||
+      !options.preview ||
+      options.quality === 'final') &&
     options.prepareBackground
       ? await options.prepareBackground(targetSize)
       : null;
@@ -136,6 +139,11 @@ export async function applyEditorFrameSceneSettings(
     nextHeader?.dispose();
     return false;
   }
+  if (background && !background.apply()) {
+    background.dispose();
+    nextHeader?.dispose();
+    return false;
+  }
   if (geometryChanged) {
     options.relayoutScene(frame, browserFrame, relayoutOptions);
     applyEditorViewportZoom(
@@ -145,7 +153,6 @@ export async function applyEditorFrameSceneSettings(
       options.viewportDevicePixelRatioBaseline
     );
   }
-  background?.apply();
   if (header && nextHeader) {
     nextHeader.set({ left: header.left, top: header.top });
     replaceBrowserFrameLayer(canvas, header, nextHeader);

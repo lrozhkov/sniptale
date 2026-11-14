@@ -1,3 +1,6 @@
+import { loadVideoSettings } from '../../../../composition/persistence/capture-settings';
+import { createVideoRecordingSurfaceSnapshot } from '../content-surface/snapshot';
+import { prepareVideoRecordingSurfaceCapture } from '../content-surface/runtime-state-sync';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   CaptureMode,
@@ -59,6 +62,13 @@ export async function finalizeRecordingStart(
     throw new Error('Recording start was cancelled before source dispatch');
   }
 
+  const restoreDrawingUi = await prepareVideoRecordingSurfaceCapture(context, async (lease) =>
+    createVideoRecordingSurfaceSnapshot(lease, await loadVideoSettings())
+  );
+  if (isVideoRecordingStartCancelled(context.tabId, context.captureMode)) {
+    await restoreDrawingUi();
+    throw new Error('Recording start was cancelled before source dispatch');
+  }
   const ready = waitForRecordingSourceAdmission(context);
   const observedReady = ready.catch(() => null);
   try {
@@ -74,11 +84,18 @@ export async function finalizeRecordingStart(
       ...(context.viewport === undefined ? {} : { viewport: context.viewport }),
     });
   } catch (error) {
+    await restoreDrawingUi().catch(() => undefined);
     cancelVideoSourceReadyWait(context.recordingId, error);
     await observedReady;
     throw error;
   }
-  const streamInstanceId = await ready;
+  let streamInstanceId: string;
+  try {
+    streamInstanceId = await ready;
+  } catch (error) {
+    await restoreDrawingUi().catch(() => undefined);
+    throw error;
+  }
   logger.debug('Raw recording source validated', {
     recordingId: context.recordingId,
     streamInstanceId,

@@ -261,8 +261,43 @@ export function parsePhysicalDeleteAssetOperation(
       ))
   )
     return null;
+  const vectorDefinitions = value['vectorDefinitions'];
+  if (
+    vectorDefinitions !== undefined &&
+    (!Array.isArray(vectorDefinitions) ||
+      !vectorDefinitions.every(
+        (entry: unknown) =>
+          isRecord(entry) &&
+          typeof entry['definitionId'] === 'string' &&
+          /^[a-f0-9]{64}$/u.test(entry['definitionId']) &&
+          typeof entry['expectedAssetId'] === 'string' &&
+          entry['expectedAssetId'].length > 0 &&
+          typeof entry['incarnation'] === 'string' &&
+          entry['incarnation'].length > 0 &&
+          Object.keys(entry).length === 3
+      ))
+  )
+    return null;
   return {
     assetIds,
+    ...(Array.isArray(vectorDefinitions)
+      ? {
+          vectorDefinitions: vectorDefinitions.flatMap((entry: unknown) =>
+            isRecord(entry) &&
+            typeof entry['definitionId'] === 'string' &&
+            typeof entry['expectedAssetId'] === 'string' &&
+            typeof entry['incarnation'] === 'string'
+              ? [
+                  {
+                    definitionId: entry['definitionId'],
+                    expectedAssetId: entry['expectedAssetId'],
+                    incarnation: entry['incarnation'],
+                  },
+                ]
+              : []
+          ),
+        }
+      : {}),
     ...(Array.isArray(privateSources)
       ? {
           privateSources: privateSources.flatMap((source: unknown) =>

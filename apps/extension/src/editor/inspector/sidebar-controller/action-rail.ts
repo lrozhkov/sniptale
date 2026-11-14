@@ -1,6 +1,6 @@
-import { createOutputFilename } from '../../../workflows/file-naming/index';
+import { toast } from '@sniptale/ui/product-feedback/toast-service';
+import { translate } from '../../../platform/i18n';
 import { createScreenshotFilename as generateFilename } from '../../../workflows/file-naming/index';
-import type { EditorDocument } from '../../../features/editor/document/types';
 import {
   createRuntimeMessagingTransport,
   type RuntimeMessagingTransport,
@@ -8,7 +8,11 @@ import {
 import { loadEditorExportSettings } from '../../persistence/export-settings';
 import { loadSettings } from '../../../composition/persistence/settings';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { openEditorImageFromFile, importEditorSessionFromFile } from '../../document/file-actions';
+import {
+  openEditorImageFromFile,
+  importEditorSessionFromFile,
+  exportEditorSession,
+} from '../../document/file-actions';
 import { readFileAsDataUrl } from '../../document/file-actions/file-reader';
 import type { ImageEditorController } from '../../controller';
 import { assertEditorRasterImageFileCanBeRead } from '../../document/file-actions/raster-intake';
@@ -28,23 +32,6 @@ function createEditorInspectorActionClient(
   return {
     sendRuntimeMessage: transport.sendRuntimeMessage,
   };
-}
-
-async function triggerSessionExport(document: EditorDocument) {
-  const filename = await createOutputFilename({
-    category: 'resources',
-    type: 'editor-session',
-    extension: 'json',
-  });
-  const blob = new Blob([JSON.stringify(document, null, 2)], {
-    type: 'application/json',
-  });
-  const url = URL.createObjectURL(blob);
-  const link = window.document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
 }
 
 async function saveRenderedEditorImage(
@@ -106,8 +93,12 @@ export function createEditorActionRailHandlers(
       });
     },
 
-    exportSession() {
-      return triggerSessionExport(controller.exportDocument());
+    async exportSession() {
+      try {
+        await exportEditorSession(controller);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : translate('common.states.error'));
+      }
     },
 
     async saveRenderedImage() {

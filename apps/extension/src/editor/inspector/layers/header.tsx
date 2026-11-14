@@ -1,10 +1,12 @@
 import React from 'react';
 import { ChevronDown, ChevronUp, Layers3, Minus, SquareMousePointer } from 'lucide-react';
 import { translate, useAppLocale } from '../../../platform/i18n';
-import type { EditorLayerItem } from '../../../features/editor/document/types';
+import type { EditorLayerChild, EditorLayerItem } from '../../../features/editor/document/types';
 import { getLayerIcon } from '../../chrome/tool-icons';
 import { EditorIconButton, cx } from '../../chrome/ui';
 import { LayerRow } from './row';
+import { useLayerPointerReorder } from './pointer-reorder';
+import { useEditorController } from '../../application/controller-context';
 import { LayerInsertImageControl } from './file-input';
 import { ACTIVE_LAYER_NAVIGATION_ICON_CLASS_NAME } from './header.constants';
 import {
@@ -14,22 +16,31 @@ import {
 } from './shared';
 import type { EditorLayerEffectsOpenHandler } from './types';
 
-const HEADER_FRAME_CLASS_NAME =
-  'flex h-14 w-full items-center justify-between px-2 pr-3 transition';
+const HEADER_FRAME_CLASS_NAME = 'flex h-14 w-full items-center justify-between px-3 transition';
 
 const HEADER_TOGGLE_BUTTON_CLASS_NAME =
   'inline-flex h-8 w-8 items-center justify-center rounded-[4px] ' +
   'text-[color:var(--sniptale-color-text-muted)] transition ' +
   'hover:bg-[color:var(--sniptale-color-surface-hover)] focus:outline-none ' +
   'focus-visible:ring-2 focus-visible:ring-[color:var(--sniptale-color-focus-ring)]';
-const LIST_VIEWPORT_BASE_CLASS_NAME = 'min-h-0 flex-1 space-y-1 pb-3 pt-2';
+const LIST_VIEWPORT_BASE_CLASS_NAME =
+  'min-h-0 flex-1 space-y-1 overflow-x-hidden py-3 [scrollbar-width:thin]';
+const GROUP_CHILD_BUTTON_CLASS_NAME =
+  'flex min-h-8 w-full items-center gap-1 rounded-[4px] px-1 text-left text-[13px] leading-[18px]';
+const GROUP_CHILD_FOCUS_CLASS_NAME =
+  'focus-visible:outline-none focus-visible:ring-2 ' +
+  'focus-visible:ring-[color:var(--sniptale-color-focus-ring)]';
+const GROUP_CHILD_SELECTED_CLASS_NAME =
+  'bg-[color:color-mix(in_srgb,var(--sniptale-color-canvas-selection)_12%,transparent)] ' +
+  'text-[color:var(--sniptale-color-canvas-selection)]';
+const GROUP_CHILD_IDLE_CLASS_NAME =
+  'text-[color:var(--sniptale-color-text-secondary)] ' +
+  'hover:bg-[color:var(--sniptale-color-surface-hover)]';
 
 type EditorInspectorLayersListProps = {
   layers: EditorLayerItem[];
-  dragOverLayerId: string | null;
   setDraggedLayerId: React.Dispatch<React.SetStateAction<string | null>>;
   setDragOverLayerId: React.Dispatch<React.SetStateAction<string | null>>;
-  onDrop: (targetLayerId: string) => void;
   autoNavigateSelectedLayer?: boolean;
   onOpenLayerEffects: EditorLayerEffectsOpenHandler;
   listRef?: React.Ref<HTMLDivElement>;
@@ -41,21 +52,13 @@ function getListViewportClassName(args: { reserveScrollbarGutter: boolean; scrol
   return cx(
     LIST_VIEWPORT_BASE_CLASS_NAME,
     args.scrollable ? 'overflow-y-auto' : 'overflow-y-hidden',
-    args.reserveScrollbarGutter
-      ? [
-          'pl-2 pr-0.5 [scrollbar-gutter:stable] ![scrollbar-width:auto] ![scrollbar-color:auto]',
-          '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5',
-          '[&::-webkit-scrollbar-track]:bg-transparent',
-          '[&::-webkit-scrollbar-thumb]:rounded-[3px]',
-          '[&::-webkit-scrollbar-thumb]:bg-[color:color-mix(in_srgb,var(--sniptale-color-text-muted)_28%,transparent)]',
-        ].join(' ')
-      : 'px-2'
+    args.reserveScrollbarGutter ? 'px-3 [scrollbar-gutter:stable]' : 'px-3'
   );
 }
 
 function EditorInspectorLayersHeaderTitle(props: { layerCount: number; streamlined: boolean }) {
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2 px-2 text-left">
+    <div className="flex min-w-0 flex-1 items-center gap-2 text-left">
       {props.streamlined ? null : (
         <span className={cx(PANEL_ICON_CLASS_NAME, PANEL_ICON_SURFACE_CLASS_NAME)}>
           <Layers3 size={17} strokeWidth={2} />
@@ -165,12 +168,58 @@ export function EditorInspectorLayersHeader({
   );
 }
 
+function GroupChildRows(props: { layers: EditorLayerChild[]; autoNavigateSelectedLayer: boolean }) {
+  const controller = useEditorController();
+  return (
+    <div
+      data-ui="editor.layers.group-children"
+      className="ml-4 border-l border-[color:var(--sniptale-color-border-soft)] pl-2"
+    >
+      {props.layers.map((child) => (
+        <div key={child.id}>
+          <button
+            type="button"
+            title={child.name}
+            aria-pressed={child.selected === true}
+            data-ui="editor.layers.group-child"
+            data-layer-id={child.id}
+            data-editor-layer-id={child.id}
+            data-parent-context={child.containsSelection || undefined}
+            className={cx(
+              GROUP_CHILD_BUTTON_CLASS_NAME,
+              GROUP_CHILD_FOCUS_CLASS_NAME,
+              child.selected ? GROUP_CHILD_SELECTED_CLASS_NAME : GROUP_CHILD_IDLE_CLASS_NAME
+            )}
+            onClick={(event) =>
+              controller.selectLayer(child.id, {
+                additive: event.ctrlKey || event.metaKey,
+                toggle: event.ctrlKey || event.metaKey,
+                range: event.shiftKey,
+                focusViewport: props.autoNavigateSelectedLayer,
+              })
+            }
+          >
+            <span aria-hidden="true" className="flex size-4 shrink-0 items-center justify-center">
+              {getLayerIcon(child.type)}
+            </span>
+            <span className="truncate">{child.name}</span>
+          </button>
+          {(child.selected || child.containsSelection) && child.groupChildren?.length ? (
+            <GroupChildRows
+              layers={child.groupChildren}
+              autoNavigateSelectedLayer={props.autoNavigateSelectedLayer}
+            />
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export const EditorInspectorLayersList = React.memo(function EditorInspectorLayersList({
   layers,
-  dragOverLayerId,
   setDraggedLayerId,
   setDragOverLayerId,
-  onDrop,
   autoNavigateSelectedLayer = false,
   onOpenLayerEffects,
   listRef,
@@ -178,6 +227,16 @@ export const EditorInspectorLayersList = React.memo(function EditorInspectorLaye
   scrollable = false,
 }: EditorInspectorLayersListProps) {
   const locale = useAppLocale();
+  const controller = useEditorController();
+  const onMove = React.useCallback(
+    (ids: readonly string[], beforeId: string | null) =>
+      controller.reorderLayerBlock(ids, beforeId),
+    [controller]
+  );
+  const reorder = useLayerPointerReorder({ layers, onMove, setDraggedLayerId, setDragOverLayerId });
+  const dragBlocked = layers.some(
+    (layer) => layer.selected && !layer.reorderable && (layer.immutable || layer.locked)
+  );
   return (
     <div
       ref={listRef}
@@ -185,42 +244,24 @@ export const EditorInspectorLayersList = React.memo(function EditorInspectorLaye
       className={getListViewportClassName({ reserveScrollbarGutter, scrollable })}
     >
       {layers.length > 0 ? (
-        layers.map((layer) => (
-          <div key={layer.id}>
+        reorder.layers.map((layer) => (
+          <div key={layer.id} data-layer-reorder-row={layer.id}>
             <LayerRow
               layer={layer}
               locale={locale}
-              dragOverLayerId={dragOverLayerId}
-              setDraggedLayerId={setDraggedLayerId}
-              setDragOverLayerId={setDragOverLayerId}
-              onDrop={onDrop}
+              draggedLayerId={
+                reorder.draggingIds.includes(layer.id) ? layer.id : reorder.draggingId
+              }
+              dragBlocked={dragBlocked}
+              onPointerStart={reorder.start}
               autoNavigateSelectedLayer={autoNavigateSelectedLayer}
               onOpenLayerEffects={onOpenLayerEffects}
             />
-            {layer.selected && layer.groupChildren?.length ? (
-              <div
-                data-ui="editor.layers.group-children"
-                className="ml-4 border-l border-[color:var(--sniptale-color-border-soft)] pl-2"
-              >
-                {layer.groupChildren.map((child) => (
-                  <div
-                    key={child.id}
-                    title={child.name}
-                    className={[
-                      'flex min-h-8 items-center gap-1 truncate px-1 text-[13px] leading-[18px]',
-                      'text-[color:var(--sniptale-color-text-secondary)]',
-                    ].join(' ')}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="flex size-4 shrink-0 items-center justify-center"
-                    >
-                      {getLayerIcon(child.type)}
-                    </span>
-                    <span className="truncate">{child.name}</span>
-                  </div>
-                ))}
-              </div>
+            {(layer.selected || layer.containsSelection) && layer.groupChildren?.length ? (
+              <GroupChildRows
+                layers={layer.groupChildren}
+                autoNavigateSelectedLayer={autoNavigateSelectedLayer}
+              />
             ) : null}
           </div>
         ))

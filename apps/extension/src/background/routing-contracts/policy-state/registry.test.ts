@@ -44,6 +44,7 @@ const EXPECTED_POLICY_STATE_IDS = [
   'surface-style-preset-mutation-queue',
   'sync-connection-erasure-exclusion',
   'tab-mode-runtime-state',
+  'vector-catalog-requests',
   'video-camera-recorder-grant',
   'video-capture-surface-sessions',
   'video-post-record-results',

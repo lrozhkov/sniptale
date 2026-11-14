@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
 import type { EditorTool } from '../../../features/editor/document/types';
 import { ContentToolbarDivider } from '@sniptale/ui/content-toolbar';
 import { CanvasToolButtons, type CanvasToolAction } from '@sniptale/ui/canvas-tools';
@@ -26,6 +26,11 @@ import { getDocumentRequiredTitle } from '../toolbar/section-helpers';
 import type { EditorToolbarContentProps } from '../toolbar/types';
 import { EditorFloatingToolHistoryControls } from './history-controls';
 import { DocumentAutosaveStatus } from './document-autosave-status';
+import { useEditorController } from '../../application/controller-context';
+import { EditorRasterTools } from './raster-tools';
+
+const subscribeWithoutRuntime = () => () => undefined;
+const snapshotWithoutRuntime = () => null;
 
 const TOOL_RAIL_STACK_CLASS_NAME = floatingChromeClassNames(
   'absolute left-1/2 top-3 z-40 flex items-start gap-3',
@@ -36,6 +41,32 @@ const TOOL_RAIL_STACK_CLASS_NAME = floatingChromeClassNames(
 const TOOL_RAIL_CLASS_NAME = floatingChromeClassNames(
   'flex-row overflow-visible -translate-x-1/2 max-[1439px]:!translate-none'
 );
+
+function usePixelAlignedToolRail() {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const toolbar = ref.current;
+    if (!toolbar) return;
+    let adjustment = 0;
+    const update = () => {
+      const baseLeft = toolbar.getBoundingClientRect().left - adjustment;
+      const ratio = window.devicePixelRatio;
+      adjustment = Math.round(baseLeft * ratio) / ratio - baseLeft;
+      // Tailwind centers with the individual translate property; keep that separate from this correction.
+      toolbar.style.transform = `translateX(${adjustment}px)`;
+    };
+    update();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+    observer?.observe(toolbar);
+    window.addEventListener('resize', update);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', update);
+      toolbar.style.removeProperty('transform');
+    };
+  }, []);
+  return ref;
+}
 
 const DRAWING_TOOL_ORDER: readonly EditorTool[] = [
   'pencil',
@@ -64,10 +95,18 @@ const EDITOR_TOOL_DESCRIPTOR_KIND_BY_TOOL = {
 
 type EditorFloatingToolRailProps = EditorToolbarContentProps & {
   leftDrawerOpen?: boolean;
+  onOpenRasterAdjustments?: (targetId: string) => void;
   onToggleActiveToolOptions?: (tool: EditorTool) => void;
 };
 
 export function EditorFloatingToolRail(props: EditorFloatingToolRailProps) {
+  const railRef = usePixelAlignedToolRail();
+  const controller = useEditorController();
+  const rasterRuntime = controller.getRasterRuntime();
+  const rasterSnapshot = useSyncExternalStore(
+    rasterRuntime?.subscribe ?? subscribeWithoutRuntime,
+    rasterRuntime?.getSnapshot ?? snapshotWithoutRuntime
+  );
   const annotationDefaults = useFrameAnnotationCreationDefaults();
   const creationKind = useEditorStore((state) => state.frameAnnotationCreationKind);
   const setCreationKind = useEditorStore((state) => state.setFrameAnnotationCreationKind);
@@ -97,34 +136,46 @@ export function EditorFloatingToolRail(props: EditorFloatingToolRailProps) {
   return (
     <div data-ui="editor.floating.tool-rail.stack" className={TOOL_RAIL_STACK_CLASS_NAME}>
       <FloatingChromeToolbar
+        ref={railRef}
         aria-label={translate('shared.ui.commandPaletteToolsSection')}
         className={TOOL_RAIL_CLASS_NAME}
         dataUi="editor.floating.tool-rail"
       >
-        <CanvasToolButtons actions={selectActions} dataUi="editor.floating.tool-rail" />
-        <ContentToolbarDivider dataUi="editor.floating.tool-rail.divider.before-drawing" />
-        <CanvasToolButtons actions={drawingActions} dataUi="editor.floating.tool-rail" />
-        <ContentToolbarDivider dataUi="editor.floating.tool-rail.divider.before-frame" />
-        <div className="contents">
-          <FrameAnnotationCreationControls
-            allowInactiveFrameMenu
-            context="content"
-            disabled={!props.hasImage}
-            frameActive={frameAnnotationActive}
-            allowElementPlacement={false}
-            standaloneTool={annotationModeActive ? creationKind : null}
-            onStandaloneCreationChange={(options) => {
-              props.onActivateTool(options ? 'frame-annotation' : 'select');
-              setCreationKind(options?.annotationKind ?? null);
-            }}
-            onFrameActiveChange={(active) => {
-              setCreationKind(null);
-              props.onActivateTool(active ? 'frame-annotation' : 'select');
-            }}
-            onChange={setFrameAnnotationCreationDefaults}
-            settings={annotationDefaults}
+        {rasterSnapshot?.editing && rasterRuntime ? (
+          <EditorRasterTools
+            runtime={rasterRuntime}
+            {...(props.onOpenRasterAdjustments
+              ? { onOpenAdjustments: props.onOpenRasterAdjustments }
+              : {})}
           />
-        </div>
+        ) : (
+          <>
+            <CanvasToolButtons actions={selectActions} dataUi="editor.floating.tool-rail" />
+            <ContentToolbarDivider dataUi="editor.floating.tool-rail.divider.before-drawing" />
+            <CanvasToolButtons actions={drawingActions} dataUi="editor.floating.tool-rail" />
+            <ContentToolbarDivider dataUi="editor.floating.tool-rail.divider.before-frame" />
+            <div className="contents">
+              <FrameAnnotationCreationControls
+                allowInactiveFrameMenu
+                context="content"
+                disabled={!props.hasImage}
+                frameActive={frameAnnotationActive}
+                allowElementPlacement={false}
+                standaloneTool={annotationModeActive ? creationKind : null}
+                onStandaloneCreationChange={(options) => {
+                  props.onActivateTool(options ? 'frame-annotation' : 'select');
+                  setCreationKind(options?.annotationKind ?? null);
+                }}
+                onFrameActiveChange={(active) => {
+                  setCreationKind(null);
+                  props.onActivateTool(active ? 'frame-annotation' : 'select');
+                }}
+                onChange={setFrameAnnotationCreationDefaults}
+                settings={annotationDefaults}
+              />
+            </div>
+          </>
+        )}
       </FloatingChromeToolbar>
       <EditorFloatingToolHistoryControls
         autosaveControl={<ImageHistoryAutosave hasImage={props.hasImage} />}

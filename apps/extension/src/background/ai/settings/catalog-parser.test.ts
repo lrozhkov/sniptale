@@ -2,6 +2,53 @@ import { describe, expect, it } from 'vitest';
 import { parseAICatalogPage } from './catalog-parser';
 
 describe('provider catalog metadata', () => {
+  it('admits declared image reference editing without granting masks or relying on model names', () => {
+    const page = parseAICatalogPage(
+      {
+        data: [
+          {
+            id: 'arbitrary-image',
+            architecture: { input_modalities: ['text', 'image'], output_modalities: ['image'] },
+            supported_parameters: ['input_references', 'aspect_ratio', 'n'],
+          },
+          {
+            id: 'image-edit-by-name',
+            architecture: { input_modalities: ['text', 'image'], output_modalities: ['image'] },
+          },
+          {
+            id: 'edit-only',
+            type: 'image-editing',
+            architecture: { input_modalities: ['text', 'image'], output_modalities: ['image'] },
+            supported_parameters: ['input_references'],
+          },
+          {
+            id: 'arbitrary-dialog',
+            architecture: {
+              input_modalities: ['text', 'image'],
+              output_modalities: ['text', 'image'],
+            },
+          },
+        ],
+      },
+      'openai',
+      1
+    );
+    expect(page.complete).toBe(true);
+    expect(page.models[0]?.facts.capabilities.operations).toEqual({
+      'image-generation': 'supported',
+      'image-editing': 'supported',
+    });
+    expect(page.models[0]?.facts.capabilities.features.mask).toBe('unknown');
+    expect(page.models[1]?.facts.capabilities.operations).toEqual({
+      'image-generation': 'supported',
+    });
+    expect(page.models[2]?.facts.capabilities.operations).toEqual({ 'image-editing': 'supported' });
+    expect(page.models[3]?.facts.capabilities.operations).toEqual({
+      text: 'supported',
+      'image-generation': 'supported',
+      'image-editing': 'supported',
+    });
+  });
   it('classifies NeuralDeep metadata without inferring capabilities from model names', () => {
     const page = parseAICatalogPage(
       {

@@ -388,3 +388,29 @@ it('validates optional header composition dimensions and retains legacy document
     ).toBe(false);
   }
 });
+
+it('admits logical 3 retained raster state and refuses malformed or mislabeled state', () => {
+  const object = {
+    sniptaleRasterState: {
+      version: 1,
+      width: 12,
+      height: 8,
+      crop: { x: 2, y: 1, width: 8, height: 6 },
+    },
+    sniptaleRasterOriginalData: TEST_IMAGE_DATA_URL,
+    sniptaleRasterVisibilityData: TEST_IMAGE_DATA_URL,
+  };
+  const document = {
+    ...createEditorDocumentFixture(),
+    canvasJson: JSON.stringify({ objects: [object] }),
+  };
+  expect(isEditorDocument({ ...document, version: 3 })).toBe(true);
+  expect(isEditorDocument(document)).toBe(false);
+  expect(
+    isEditorDocument({
+      ...document,
+      version: 3,
+      canvasJson: JSON.stringify({ objects: [{ ...object, sniptaleRasterOriginalData: null }] }),
+    })
+  ).toBe(false);
+});

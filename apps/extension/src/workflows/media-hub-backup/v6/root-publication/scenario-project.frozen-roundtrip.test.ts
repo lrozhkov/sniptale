@@ -1,3 +1,6 @@
+import { createEditorDocumentFixture } from '../../../../editor/document/page-session/document.test-support';
+import { createPersistedEditorDocumentFixture } from '../../../../composition/persistence/document-assets/test-support';
+import { encodePortableEditorDocument } from '../root-codecs/editor-document';
 import { encodePortableScenarioProjectEntry } from '../root-codecs/projects';
 import { expect, it, vi } from 'vitest';
 import { createGuideProject } from '../../../../features/scenario/project/public';
@@ -38,7 +41,13 @@ function installDatabase(rows: Map<string, Map<string, unknown>>) {
     put: async (value: Record<string, unknown>) => {
       const key = value['ownerKind']
         ? String([value['ownerKind'], value['ownerId'], value['role']])
-        : String(value['operationId'] ?? value['id'] ?? value['assetId'] ?? value['aggregateId']);
+        : String(
+            value['operationId'] ??
+              value['id'] ??
+              value['stepId'] ??
+              value['assetId'] ??
+              value['aggregateId']
+          );
       table(name).set(key, structuredClone(value));
       writes.push({ name, value: structuredClone(value) });
     },
@@ -232,3 +241,109 @@ it('aborts frozen resource and owner writes when the real archive checkpoint ref
   expect(rows.get('asset_owners')!.size).toBe(1);
   expect(rows.get('media_library')!.get(media.id)).toEqual(media);
 });
+
+it.each([false, true])(
+  'publishes the stored v5 scenario resource closure atomically, missing definition=%s',
+  async (missing) => {
+    const { args, ref, rows } = input('replace');
+    const vectorId = 'a'.repeat(64);
+    const canvasJson = JSON.stringify({
+      objects: [
+        {
+          type: 'Group',
+          objects: [],
+          sniptaleType: 'vector-element',
+          sniptaleVectorElement: {
+            version: 1,
+            definitionId: vectorId,
+            overrides: { colors: {}, strokeScale: 1 },
+          },
+        },
+      ],
+    });
+    const document = encodePortableEditorDocument({
+      document: {
+        ...createPersistedEditorDocumentFixture(createEditorDocumentFixture(), 'source'),
+        version: 5,
+        vectorDefinitions: { [vectorId]: { assetId: 'definition-source' } },
+        assets: [
+          { assetId: 'source', role: 'source-image' },
+          { assetId: 'definition-source', role: `vector:${vectorId}` },
+        ],
+        canvasJson,
+      },
+      objectsByAssetId: new Map([
+        ['source', 'image'],
+        ['definition-source', 'definition'],
+      ]),
+    });
+    const metadata = args.envelope.metadata;
+    if (typeof metadata !== 'object' || metadata === null || Array.isArray(metadata))
+      throw new Error('Missing metadata');
+    metadata['stepDocuments'] = [
+      {
+        projectId: 'scenario',
+        stepId: 'annotations',
+        createdAt: 1,
+        updatedAt: 1,
+        document: JSON.parse(JSON.stringify(document)),
+      },
+    ];
+    const entry = metadata['entry'];
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry))
+      throw new Error('Missing entry');
+    const project = entry['project'];
+    if (typeof project !== 'object' || project === null || Array.isArray(project))
+      throw new Error('Missing project');
+    const items = project['items'];
+    if (!Array.isArray(items)) throw new Error('Missing items');
+    const item = items[0];
+    if (typeof item !== 'object' || item === null || Array.isArray(item))
+      throw new Error('Missing step');
+    const blocks = item['blocks'];
+    if (
+      !Array.isArray(blocks) ||
+      typeof blocks[0] !== 'object' ||
+      blocks[0] === null ||
+      Array.isArray(blocks[0])
+    )
+      throw new Error('Missing image');
+    blocks[0]['editDocumentId'] = 'annotations';
+    const definitionRef = {
+      ...ref,
+      assetId: 'restored-definition',
+      mimeType: 'application/json',
+      location: { kind: 'opfs' as const, objectKey: 'objects/restored-definition' },
+    };
+    if (!missing) {
+      args.staged.push({ objectId: 'definition', ref: definitionRef });
+      args.journal.assetRefs.push(definitionRef);
+    }
+    rows.set('scenario_projects', new Map());
+    const before = structuredClone(rows);
+    if (missing) {
+      await expect(scenarioProjectRootPublisher.publish(args)).rejects.toThrow();
+      expect(rows).toEqual(before);
+      return;
+    }
+    const result = await scenarioProjectRootPublisher.publish(args);
+    expect(result.retainedAssetIds).toEqual(
+      expect.arrayContaining([ref.assetId, definitionRef.assetId])
+    );
+    const stored = rows.get('scenario_step_editor_documents')?.get('annotations');
+    expect(stored).toMatchObject({
+      projectId: 'scenario',
+      stepId: 'annotations',
+      document: {
+        version: 5,
+        vectorDefinitions: { [vectorId]: { assetId: definitionRef.assetId } },
+        canvasJson,
+      },
+    });
+    expect(
+      rows
+        .get('asset_owners')
+        ?.get(String(['scenario-editor-document', 'annotations', `vector:${vectorId}`]))
+    ).toMatchObject({ assetId: definitionRef.assetId });
+  }
+);

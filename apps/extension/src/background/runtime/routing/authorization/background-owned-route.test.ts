@@ -375,6 +375,35 @@ it.each([CONTENT_URL, 'chrome-extension://test/apps/extension/src/video-editor/i
 );
 
 it.each([
+  ['chrome-extension://test/apps/extension/src/editor/index.html', 41, 'image-generation', true],
+  ['chrome-extension://test/apps/extension/src/editor/index.html', 41, 'image-editing', true],
+  [
+    'chrome-extension://test/apps/extension/src/editor/index.html?embedded=1',
+    41,
+    'image-editing',
+    true,
+  ],
+  ['chrome-extension://test/apps/extension/src/editor/index.html', 41, 'page-edit', false],
+  ['https://example.test/page', 41, 'image-generation', false],
+  [
+    'chrome-extension://foreign/apps/extension/src/editor/index.html',
+    41,
+    'image-generation',
+    false,
+  ],
+  ['chrome-extension://test/apps/extension/src/gallery/index.html', 41, 'image-editing', false],
+  [
+    'chrome-extension://test/apps/extension/src/scenario-editor/index.html',
+    41,
+    'image-generation',
+    false,
+  ],
+  [
+    'chrome-extension://test/apps/extension/src/video-editor/index.html',
+    41,
+    'image-editing',
+    false,
+  ],
   ['https://example.test/page', 41, 'page-edit', true],
   ['https://example.test/page', 41, 'gallery-speech', false],
   [

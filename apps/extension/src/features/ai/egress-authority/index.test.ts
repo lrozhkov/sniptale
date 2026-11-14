@@ -5,6 +5,7 @@ import {
   canonicalizeScenarioEditorEgressPayload,
   createContentAiEgressAuthority,
   createReviewTextEgressAuthority,
+  createImageEditorEgressAuthority,
   createScenarioEditorEgressAuthority,
 } from './index';
 
@@ -154,4 +155,78 @@ it('binds project text consent to the exact placements document revision and des
     expect((await createReviewTextEgressAuthority(changed)).payloadHash).not.toBe(
       authority.payloadHash
     );
+});
+
+it('binds image approval to prompt, pixels, options, local snapshot and provider destination', async () => {
+  const input = {
+    context: {
+      version: 1,
+      intention: 'new-image',
+      prompt: 'A square',
+      images: [],
+      parameters: { variants: 1 },
+    },
+    scope: {
+      documentId: 'doc',
+      sessionId: 'fdd43bfc-2c5b-416e-91b2-d2c2cc820ac7',
+      snapshotId: 'fdd43bfc-2c5b-416e-91b2-d2c2cc820ac7',
+    },
+    modelId: 'model',
+    approvedProviderId: 'provider',
+    approvedModelCode: 'code',
+    approvedDestination: 'sha256:' + 'a'.repeat(64),
+  } satisfies Parameters<typeof createImageEditorEgressAuthority>[0];
+  const base = await createImageEditorEgressAuthority(input);
+  expect(base.purpose).toBe('image-editor');
+  for (const changed of [
+    { ...input, context: { ...input.context, prompt: 'A circle' } },
+    { ...input, context: { ...input.context, parameters: { variants: 2 } } },
+    { ...input, scope: { ...input.scope, snapshotId: '6a9f1ae5-8960-4126-b8dd-7802819cfaa9' } },
+    { ...input, modelId: 'other' },
+    { ...input, approvedProviderId: 'other' },
+    { ...input, approvedModelCode: 'other' },
+    { ...input, approvedDestination: 'sha256:' + 'b'.repeat(64) },
+  ])
+    expect((await createImageEditorEgressAuthority(changed)).payloadHash).not.toBe(
+      base.payloadHash
+    );
+});
+
+it('binds image edit-mask mode and presence to the paid-operation payload', async () => {
+  const image = {
+    dataUrl:
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAYAAAC56t6BAAAAFElEQVR4AWKS8Mj5D8JMDFAAZwAAAAD//238wugAAAAGSURBVAMATl0DnQxeRbkAAAAASUVORK5CYII=',
+    width: 2,
+    height: 3,
+  };
+  const input = {
+    context: {
+      version: 1,
+      intention: 'region',
+      prompt: 'Edit the selection',
+      images: [{ ...image, role: 'source' }],
+      parameters: { variants: 1 },
+      editRegion: { left: 0, top: 0, width: 1, height: 2 },
+    },
+    scope: {
+      documentId: 'doc',
+      sessionId: 'fdd43bfc-2c5b-416e-91b2-d2c2cc820ac7',
+      snapshotId: 'fdd43bfc-2c5b-416e-91b2-d2c2cc820ac7',
+    },
+    modelId: 'model',
+    approvedProviderId: 'provider',
+    approvedModelCode: 'code',
+    approvedDestination: 'sha256:' + 'a'.repeat(64),
+  } satisfies Parameters<typeof createImageEditorEgressAuthority>[0];
+  const base = await createImageEditorEgressAuthority(input);
+  const alpha = await createImageEditorEgressAuthority({
+    ...input,
+    context: { ...input.context, editMask: { mode: 'alpha', image } },
+  });
+  const reference = await createImageEditorEgressAuthority({
+    ...input,
+    context: { ...input.context, editMask: { mode: 'reference', image } },
+  });
+  expect(alpha.payloadHash).not.toBe(base.payloadHash);
+  expect(reference.payloadHash).not.toBe(alpha.payloadHash);
 });

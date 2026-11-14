@@ -338,17 +338,22 @@ export async function assertEditorManualResize(
 ) {
   const accepted = () => readAcceptedSimplify(editor);
   const controls = editor.locator('[data-ui="editor.canvas.selection-controls"]');
-  await expect(controls.locator('circle')).toHaveCount(8);
+  const handles = controls.locator('[data-ui="editor.canvas.selection-handle"]');
+  await expect(handles).toHaveCount(8);
   const editorMask = () =>
-    controls.locator('circle').evaluateAll((nodes) => {
-      const first = nodes[0]?.getBoundingClientRect(),
-        last = nodes[4]?.getBoundingClientRect();
+    handles.evaluateAll((nodes) => {
+      const first = nodes
+          .find((node) => node.getAttribute('data-control') === 'tl')
+          ?.getBoundingClientRect(),
+        last = nodes
+          .find((node) => node.getAttribute('data-control') === 'br')
+          ?.getBoundingClientRect();
       if (!first || !last || !first.width || !last.width) return null;
       const x = first.x + first.width / 2,
         y = first.y + first.height / 2;
       return { x, y, width: last.x + last.width / 2 - x, height: last.y + last.height / 2 - y };
     });
-  await expect(controls.locator('circle').first()).toBeVisible();
+  await expect(controls.locator('[data-control="tl"]')).toBeVisible();
   const before = await editorMask();
   if (!before) throw new Error('Editor selection corners missing');
   const scaledWidth = (await accepted())[0]?.['scaledWidth'];
@@ -391,7 +396,7 @@ export async function assertEditorManualResize(
     fullPage: false,
     animations: 'disabled',
   });
-  const east = await controls.locator('circle').nth(3).boundingBox();
+  const east = await controls.locator('[data-control="mr"]').boundingBox();
   if (!east) throw new Error('Editor east resize control missing');
   const handle = { x: east.x + east.width / 2, y: east.y + east.height / 2 };
   await editor.mouse.move(handle.x, handle.y);
@@ -408,7 +413,7 @@ export async function assertEditorManualResize(
     animations: 'disabled',
   });
   await editor.mouse.up();
-  await expect(controls.locator('circle')).toHaveCount(8);
+  await expect(handles).toHaveCount(8);
   await expect
     .poll(async () => (await editorMask())?.width ?? 0)
     .toBeGreaterThan(before.width + 110);

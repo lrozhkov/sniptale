@@ -1,4 +1,4 @@
-import type { Canvas, FabricObject } from 'fabric';
+import { Point, type Canvas, type FabricObject } from 'fabric';
 import { clamp } from '../../../document/model';
 import { getLayerObjects } from '../layers';
 import type { CanvasSize } from './types';
@@ -68,10 +68,17 @@ export function ensureEditorObjectReachable(
     return false;
   }
 
-  object.set({
-    left: (object.left ?? 0) + deltaX,
-    top: (object.top ?? 0) + deltaY,
-  });
+  if (object.parent) {
+    const position = object.getXY();
+    object.setXY(new Point(position.x + deltaX, position.y + deltaY));
+    object.parent.triggerLayout();
+    object.parent.getObjects().forEach((sibling) => sibling.setCoords());
+  } else {
+    object.set({
+      left: (object.left ?? 0) + deltaX,
+      top: (object.top ?? 0) + deltaY,
+    });
+  }
   object.setCoords();
   return true;
 }

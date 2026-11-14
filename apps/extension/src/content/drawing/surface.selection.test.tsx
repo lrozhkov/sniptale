@@ -2,7 +2,11 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createDrawingSession } from '../../features/drawing/public';
+import {
+  createDrawingSession,
+  transformDrawingObjectPoint,
+  type DrawingObject,
+} from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import { DrawingSurface } from './surface';
 import { DrawingBlurLayer } from './surface-visual-layers';
@@ -17,8 +21,11 @@ function createCanvasContextFixture(): CanvasRenderingContext2D {
     fill: vi.fn(),
     fillRect: vi.fn(),
     lineTo: vi.fn(),
+    measureText: vi.fn((text: string) => ({ width: text.length * 10 }) as TextMetrics),
     moveTo: vi.fn(),
     rect: vi.fn(),
+    roundRect: vi.fn(),
+    rotate: vi.fn(),
     restore: vi.fn(),
     save: vi.fn(),
     setLineDash: vi.fn(),
@@ -122,13 +129,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function pointer(type: string, x: number, y: number, shiftKey = false) {
+function pointer(type: string, x: number, y: number, shiftKey = false, ctrlKey = false) {
   const event = new MouseEvent(type, {
     bubbles: true,
     button: 0,
     clientX: x,
     clientY: y,
     shiftKey,
+    ctrlKey,
   });
   Object.defineProperties(event, {
     pointerId: { value: 1 },
@@ -136,6 +144,110 @@ function pointer(type: string, x: number, y: number, shiftKey = false) {
   });
   return event;
 }
+
+function mountCursorSurface(object: DrawingObject, selected = true) {
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.commitObject(object);
+  session.setActiveTool('select');
+  session.setSelection(selected ? [object.id] : []);
+  const controller: ContentDrawingController = {
+    session,
+    getPalette: () => ['#ef4444'],
+    applyPalette: vi.fn(),
+    getScrollRoot: () => ({ kind: 'viewport', element: null }),
+    prepareActivation: () => true,
+    registerInteractionFinalizer: vi.fn(),
+    finalizeInteraction: vi.fn(),
+  };
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
+  return { canvas: host.querySelector('canvas')!, root, session };
+}
+
+it.each([false, true])(
+  'shows body and handle cursors only for selected objects: %s',
+  (selected) => {
+    const { canvas, root, session } = mountCursorSurface(
+      { id: 'hover', kind: 'blur', bounds: { x: 100, y: 100, width: 200, height: 80 } },
+      selected
+    );
+    act(() => canvas.dispatchEvent(pointer('pointermove', 200, 140)));
+    expect(canvas.style.cursor).toBe(selected ? 'move' : 'default');
+    act(() => canvas.dispatchEvent(pointer('pointermove', 300, 180)));
+    expect(canvas.style.cursor).toBe(selected ? 'nwse-resize' : 'default');
+    expect(session.getSnapshot().selectedObjectIds).toEqual(selected ? ['hover'] : []);
+    act(() => root.unmount());
+  }
+);
+
+it.each([
+  { rotation: 0, skewX: 0, centered: false, before: 'nwse-resize', crossed: 'nesw-resize' },
+  { rotation: 90, skewX: 30, centered: false, before: 'nesw-resize', crossed: 'nwse-resize' },
+  { rotation: 0, skewX: 0, centered: true, before: 'nwse-resize', crossed: 'nesw-resize' },
+])('updates a captured corner cursor across its opposite edge: %j', (example) => {
+  const object: DrawingObject = {
+    id: 'crossed',
+    kind: 'rectangle',
+    color: '#ef4444',
+    width: 4,
+    bounds: { x: 200, y: 200, width: 300, height: 60 },
+    rotation: example.rotation,
+    skewX: example.skewX,
+  };
+  const { canvas, root, session } = mountCursorSurface(object);
+  const start = transformDrawingObjectPoint(object, { x: 500, y: 260 });
+  const crossed = transformDrawingObjectPoint(object, { x: 150, y: 280 });
+  act(() => canvas.dispatchEvent(pointer('pointermove', start.x, start.y)));
+  expect(canvas.style.cursor).toBe(example.before);
+  act(() => canvas.dispatchEvent(pointer('pointerdown', start.x, start.y)));
+  act(() =>
+    canvas.dispatchEvent(pointer('pointermove', crossed.x, crossed.y, false, example.centered))
+  );
+  expect(canvas.style.cursor).toBe(example.crossed);
+  expect(session.getSnapshot().document.objects[0]).toEqual(object);
+  act(() => canvas.dispatchEvent(pointer('pointerup', crossed.x, crossed.y)));
+  expect(canvas.style.cursor).toBe(example.crossed);
+  expect(session.getSnapshot().document.objects[0]).toMatchObject({
+    rotation: example.rotation,
+    skewX: example.skewX,
+    bounds: { width: example.centered ? 400 : 50, height: example.centered ? 100 : 80 },
+  });
+  act(() => root.unmount());
+});
+
+it('keeps a captured text move cursor outside the accepted object bounds', () => {
+  const { canvas, root } = mountCursorSurface({
+    id: 'moving-text',
+    kind: 'text',
+    backgroundColor: null,
+    color: '#111827',
+    fontSize: 20,
+    text: 'Move me',
+    bounds: { x: 100, y: 100, width: 200, height: 40 },
+  });
+  act(() => canvas.dispatchEvent(pointer('pointerdown', 180, 120)));
+  act(() => canvas.dispatchEvent(pointer('pointermove', 500, 400)));
+  expect(canvas.style.cursor).toBe('move');
+  act(() => canvas.dispatchEvent(pointer('pointercancel', 500, 400)));
+  expect(canvas.style.cursor).toBe('default');
+  act(() => root.unmount());
+});
+
+it('keeps the selection cursor during a marquee that reaches a candidate handle', () => {
+  const { canvas, root, session } = mountCursorSurface(
+    { id: 'candidate', kind: 'blur', bounds: { x: 100, y: 100, width: 200, height: 80 } },
+    false
+  );
+  act(() => canvas.dispatchEvent(pointer('pointerdown', 80, 80)));
+  act(() => canvas.dispatchEvent(pointer('pointermove', 300, 180)));
+  expect(session.getSnapshot().selectedObjectIds).toEqual(['candidate']);
+  expect(canvas.style.cursor).toBe('default');
+  act(() => canvas.dispatchEvent(pointer('pointerup', 300, 180)));
+  expect(canvas.style.cursor).toBe('nwse-resize');
+  act(() => root.unmount());
+});
 
 it('renders the selected blur strength and preserves legacy strength', () => {
   const session = createDrawingSession({ onDocumentCommit: () => true });
@@ -246,24 +358,24 @@ it('fades selected shape controls and hides the cursor only during its pointer d
   expect(chrome).not.toBeNull();
   expect(chrome?.style.pointerEvents).toBe('none');
 
-  act(() => canvas.dispatchEvent(pointer('pointerdown', 20, 30)));
+  act(() => canvas.dispatchEvent(pointer('pointerdown', 70, 70)));
   expect(canvas.style.cursor).not.toBe('none');
   expect(chrome?.style.opacity).toBe('1');
-  act(() => canvas.dispatchEvent(pointer('pointermove', 22, 31)));
+  act(() => canvas.dispatchEvent(pointer('pointermove', 72, 71)));
   expect(chrome?.style.opacity).toBe('1');
-  act(() => canvas.dispatchEvent(pointer('pointerup', 22, 31)));
+  act(() => canvas.dispatchEvent(pointer('pointerup', 72, 71)));
   expect(chrome?.style.opacity).toBe('1');
-  act(() => canvas.dispatchEvent(pointer('pointerdown', 22, 31)));
-  act(() => canvas.dispatchEvent(pointer('pointermove', 60, 70)));
+  act(() => canvas.dispatchEvent(pointer('pointerdown', 72, 71)));
+  act(() => canvas.dispatchEvent(pointer('pointermove', 110, 110)));
   expect(chrome?.style.opacity).toBe('0');
   expect(chrome?.style.transition).toContain('150ms');
   expect(canvas.style.cursor).toBe('none');
-  act(() => canvas.dispatchEvent(pointer('pointerup', 60, 70)));
+  act(() => canvas.dispatchEvent(pointer('pointerup', 110, 110)));
   expect(canvas.style.cursor).not.toBe('none');
   expect(chrome?.style.opacity).toBe('1');
   expect(chrome?.style.transition).toContain('50ms');
 
-  act(() => canvas.dispatchEvent(pointer('pointerdown', 60, 70)));
+  act(() => canvas.dispatchEvent(pointer('pointerdown', 110, 110)));
   act(() => window.dispatchEvent(new Event('blur')));
   expect(canvas.style.cursor).not.toBe('none');
   expect(chrome?.style.opacity).toBe('1');
@@ -307,3 +419,66 @@ it('keeps text resize controls and cursor visible during a pointer drag', () => 
   act(() => canvas.dispatchEvent(pointer('pointerup', 100, 50)));
   act(() => root.unmount());
 });
+
+it.each([false, true])(
+  'uses a Text-tool drag for marquee or selected movement, selected=%s',
+  (selected) => {
+    const onDocumentCommit = vi.fn(() => true);
+    const session = createDrawingSession({ onDocumentCommit });
+    session.commitObject({
+      backgroundColor: null,
+      bounds: { x: 20, y: 30, width: 180, height: 40 },
+      color: '#111827',
+      fontSize: 20,
+      id: 'draggable-text',
+      kind: 'text',
+      text: 'Drag me',
+    });
+    session.commitObject({
+      id: 'enclosed',
+      kind: 'blur',
+      bounds: { x: 60, y: 60, width: 10, height: 10 },
+    });
+    session.setActiveTool('text');
+    if (selected) session.select('draggable-text');
+    const before = session.getSnapshot();
+    onDocumentCommit.mockClear();
+    const controller: ContentDrawingController = {
+      session,
+      getPalette: () => ['#ef4444'],
+      applyPalette: vi.fn(),
+      getScrollRoot: () => ({ kind: 'viewport', element: null }),
+      prepareActivation: () => true,
+      registerInteractionFinalizer: vi.fn(),
+      finalizeInteraction: vi.fn(),
+    };
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
+    const canvas = host.querySelector('canvas')!;
+    act(() => canvas.dispatchEvent(pointer('pointerdown', 40, 40)));
+    expect(session.getSnapshot().selectedObjectIds).toEqual(selected ? ['draggable-text'] : []);
+    act(() => {
+      canvas.dispatchEvent(pointer('pointermove', 90, 80));
+      canvas.dispatchEvent(pointer('pointerup', 90, 80));
+      canvas.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true, clientX: 90, clientY: 80 })
+      );
+    });
+
+    if (selected) {
+      expect(session.getSnapshot().document.objects[0]).toMatchObject({
+        bounds: { x: 70, y: 70, width: 180, height: 40 },
+      });
+      expect(session.getSnapshot().selectedObjectIds).toEqual(['draggable-text']);
+      expect(onDocumentCommit).toHaveBeenCalledOnce();
+    } else {
+      expect(session.getSnapshot().selectedObjectIds).toEqual(['enclosed']);
+      expect(session.getSnapshot().document).toEqual(before.document);
+      expect(onDocumentCommit).not.toHaveBeenCalled();
+    }
+    expect(host.querySelector('[data-ui="content.drawing.text-input"]')).toBeNull();
+    act(() => root.unmount());
+  }
+);
