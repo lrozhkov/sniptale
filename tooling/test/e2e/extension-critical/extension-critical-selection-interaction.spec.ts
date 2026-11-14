@@ -1057,3 +1057,72 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await expect(page.locator('[data-ui="editor.canvas.parent-group-context"]')).toHaveCount(1);
   });
 }
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`selection cursor follows live handles across rotation and crossed sides ${name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const origin = await openEditor(page, hostOrigin, size, true);
+    const id = await rectangle(page, { x: origin.x + 60, y: origin.y + 30 }, 180, 100);
+    await page.evaluate(() => window.__sniptaleEditorHarness!.clearSelection());
+    const body = { x: origin.x + 150, y: origin.y + 80 };
+    const ink = page.locator('canvas.upper-canvas');
+    await page.mouse.move(body.x, body.y);
+    await expect(ink).toHaveCSS('cursor', 'default');
+    await page.mouse.click(body.x, body.y);
+    await expect(ink).toHaveCSS('cursor', 'move');
+    const before = await selectionGeometry(page);
+    await page.mouse.move(before.tl.x, before.tl.y);
+    await expect(ink).toHaveCSS('cursor', 'nwse-resize');
+    await page.mouse.move(before.tr.x, before.tr.y);
+    await expect(ink).toHaveCSS('cursor', 'nesw-resize');
+    const turn = await handle(page, 'mtr');
+    await page.mouse.move(turn.x, turn.y);
+    await expect(ink).toHaveCSS('cursor', 'grab');
+    const dx = turn.x - before.center.x,
+      dy = turn.y - before.center.y;
+    const radians = Math.PI / 4;
+    await page.mouse.down();
+    await page.mouse.move(
+      before.center.x + dx * Math.cos(radians) - dy * Math.sin(radians),
+      before.center.y + dx * Math.sin(radians) + dy * Math.cos(radians),
+      { steps: 8 }
+    );
+    await expect(ink).toHaveCSS('cursor', 'grabbing');
+    await page.mouse.up();
+    const rotated = await selectionGeometry(page);
+    await page.mouse.move(rotated.tl.x, rotated.tl.y);
+    await expect(ink).toHaveCSS('cursor', 'ns-resize');
+    const rotatedHistory = await history(page);
+    await page.keyboard.press('Control+z');
+    await expect.poll(() => history(page)).toBe(rotatedHistory - 1);
+    await selectLayer(page, id);
+    await expect
+      .poll(async () => maximumError(await selectionGeometry(page), before))
+      .toBeLessThanOrEqual(0.5);
+    const restored = await selectionGeometry(page);
+    expect(maximumError(restored, before)).toBeLessThanOrEqual(0.5);
+    await page.keyboard.down('Alt');
+    await page.mouse.move(restored.br.x, restored.br.y);
+    await page.mouse.down();
+    await page.mouse.move(restored.br.x - 4, restored.br.y - 2);
+    await page.mouse.move(restored.tl.x - 35, restored.br.y + 15, { steps: 8 });
+    await expect(ink).toHaveCSS('cursor', 'nesw-resize');
+    await page.screenshot({
+      path: info.outputPath('captured-crossed-corner-cursor.png'),
+      fullPage: false,
+    });
+    await page.mouse.up();
+    await page.keyboard.up('Alt');
+    await page.mouse.move(restored.tl.x - 35, restored.br.y + 15);
+    await expect(ink).toHaveCSS('cursor', 'nesw-resize');
+    const flipped = await selectionGeometry(page);
+    await page.mouse.move(flipped.tl.x, flipped.tl.y);
+    await expect(ink).toHaveCSS('cursor', 'nwse-resize');
+    await page.screenshot({
+      path: info.outputPath('reflected-visible-corner-cursor.png'),
+      fullPage: false,
+    });
+  });
+}

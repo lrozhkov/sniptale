@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { Canvas, Control, FabricObject } from 'fabric';
+import { Canvas, Control, FabricObject, Group, Rect } from 'fabric';
 import { expect, it, vi } from 'vitest';
 
 import { applyEditorObjectInteractionControls } from './interaction-controls/apply';
@@ -193,4 +193,84 @@ it('leaves custom control sets untouched after applying shared Fabric defaults',
     expect.objectContaining({ cornerStyle: 'circle', snapAngle: 15 })
   );
   expect(object.controls.tl.render).toBe(render);
+});
+
+it.each([false, true])(
+  'uses projected box axes for grouped skewed nonuniform controls (flip: %s)',
+  (flipX) => {
+    const canvas = new Canvas(document.createElement('canvas'));
+    const object = new Rect({ width: 600, height: 12, angle: 12, skewX: 28, flipX });
+    const group = new Group([object], { angle: 67, scaleX: 2, scaleY: 0.6, flipX: true });
+    canvas.add(group);
+    applyEditorObjectInteractionControls(object);
+    canvas.setActiveObject(object);
+    object.setCoords();
+    const coords = object.calcOCoords();
+    const x = coords['tr']!.subtract(coords['tl']!);
+    const y = coords['bl']!.subtract(coords['tl']!);
+    const axisX = x.scalarDivide(Math.hypot(x.x, x.y));
+    const axisY = y.scalarDivide(Math.hypot(y.x, y.y));
+    const cursors = ['ew-resize', 'nwse-resize', 'ns-resize', 'nesw-resize'];
+    for (const key of ['tl', 'tr', 'mr', 'mt']) {
+      const control = object.controls[key]!;
+      const direction = axisX.scalarMultiply(control.x).add(axisY.scalarMultiply(control.y));
+      const octant = Math.round(Math.atan2(direction.y, direction.x) / (Math.PI / 4));
+      expect(
+        control.cursorStyleHandler(new MouseEvent('mousemove'), control, object, coords[key]!)
+      ).toBe(cursors[((octant % 4) + 4) % 4]);
+    }
+    canvas.dispose();
+  }
+);
+
+it('refuses locked default rotation and patches handlers only once', () => {
+  const canvas = new Canvas(document.createElement('canvas'));
+  const object = new Rect({ width: 100, height: 80, lockRotation: true });
+  canvas.add(object);
+  applyEditorObjectInteractionControls(object);
+  const control = object.controls['mtr']!;
+  const action = control.actionHandler;
+  const down = control.mouseDownHandler;
+  applyEditorObjectInteractionControls(object);
+  expect(control.actionHandler).toBe(action);
+  expect(control.mouseDownHandler).toBe(down);
+  expect(
+    control.cursorStyleHandler(
+      new MouseEvent('mousemove'),
+      control,
+      object,
+      object.calcOCoords()['mtr']!
+    )
+  ).toBe('not-allowed');
+  object.set({ lockRotation: false });
+  expect(
+    control.cursorStyleHandler(
+      new MouseEvent('mousemove'),
+      control,
+      object,
+      object.calcOCoords()['mtr']!
+    )
+  ).toBe('grab');
+  canvas.dispose();
+});
+
+it.each([
+  ['ml', 'skewY', 'ns-resize'],
+  ['mt', 'skewX', 'ew-resize'],
+])('preserves the native alternate-action cursor on default %s controls', (key, action, cursor) => {
+  const canvas = new Canvas(document.createElement('canvas'), { altActionKey: 'altKey' });
+  const object = new Rect({ width: 120, height: 80 });
+  canvas.add(object);
+  applyEditorObjectInteractionControls(object);
+  const control = object.controls[key]!;
+  const event = new MouseEvent('mousemove', { altKey: true });
+  expect(control.getActionName(event, control, object)).toBe(action);
+  expect(control.cursorStyleHandler(event, control, object, object.calcOCoords()[key]!)).toBe(
+    cursor
+  );
+  object.set({ lockSkewingX: true, lockSkewingY: true });
+  expect(control.cursorStyleHandler(event, control, object, object.calcOCoords()[key]!)).toBe(
+    'not-allowed'
+  );
+  canvas.dispose();
 });

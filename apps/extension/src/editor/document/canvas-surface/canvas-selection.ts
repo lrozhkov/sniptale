@@ -101,6 +101,55 @@ export class EditorSelectionCanvas extends Canvas {
   override __onMouseMove(event: TPointerEvent): void {
     if (this._isMainEvent(event)) this.updateSelectionDistance(event);
     super.__onMouseMove(event);
+    const transform = this._currentTransform;
+    if (
+      !transform ||
+      !this._isMainEvent(event) ||
+      this.isDrawingMode ||
+      !this.selection ||
+      this.skipTargetFind
+    )
+      return;
+    const { target } = transform;
+    const captured = target.controls[transform.corner];
+    if (!captured || !(captured.actionName === 'scale' || transform.action?.startsWith('scale')))
+      return;
+    // Native transform moves do not refresh the cursor. Crossing an anchor swaps
+    // the visual resize handle while the native captured control remains fixed.
+    const x = captured.x * (target.flipX !== transform.original.flipX ? -1 : 1);
+    const y = captured.y * (target.flipY !== transform.original.flipY ? -1 : 1);
+    const entry = Object.entries(target.controls).find(
+      ([, control]) => control.x === x && control.y === y
+    );
+    const [key, control] = entry ?? [transform.corner, captured];
+    const coordinate = target.calcOCoords()[key];
+    if (coordinate) this.setCursor(control.cursorStyleHandler(event, control, target, coordinate));
+  }
+
+  override _setCursorFromEvent(event: TPointerEvent, target?: FabricObject): void {
+    if (
+      !this.selection ||
+      this.skipTargetFind ||
+      this.isDrawingMode ||
+      (target instanceof Textbox && target.isEditing)
+    ) {
+      super._setCursorFromEvent(event, target);
+      return;
+    }
+    const selected =
+      target && (target === this.getActiveObject() || this.getActiveObjects().includes(target));
+    if (!selected) {
+      this.setCursor(this.defaultCursor);
+      return;
+    }
+    const handle = target.findControl(this.getViewportPoint(event));
+    if (handle) {
+      this.setCursor(
+        handle.control.cursorStyleHandler(event, handle.control, target, handle.coord)
+      );
+      return;
+    }
+    this.setCursor('move');
   }
 
   override __onMouseUp(event: TPointerEvent): void {
@@ -134,6 +183,7 @@ export class EditorSelectionCanvas extends Canvas {
       if (next.length === 1) this.setActiveObject(next[0]!, event);
       else if (next.length > 1)
         this.setActiveObject(new ActiveSelection(next, { canvas: this }), event);
+      this._setCursorFromEvent(event, this.getActiveObject());
       this.requestRenderAll();
     } finally {
       this.selectionGesture = null;

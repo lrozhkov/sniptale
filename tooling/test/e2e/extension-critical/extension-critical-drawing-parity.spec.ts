@@ -1301,7 +1301,9 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await page.mouse.up();
         await scope.locator('[data-ui="content.toolbar.drawing.select"]').click();
         await page.mouse.click(center.x + 130, center.y + 90);
+        const ink = surface.locator('canvas.sniptale-drawing-canvas[tabindex="0"]');
         await page.mouse.move(center.x, center.y);
+        await expect(ink).toHaveCSS('cursor', 'default');
         await expect.poll(() => selectionChromeWidth(chrome)).toBeGreaterThan(0);
         await expect.poll(() => selectionChromeWidth(chrome)).toBeLessThan(60);
         await page.screenshot({
@@ -1309,6 +1311,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           fullPage: false,
         });
         await page.mouse.click(center.x, center.y);
+        await expect(ink).toHaveCSS('cursor', 'move');
         await expect.poll(() => selectionChromeWidth(chrome)).toBeGreaterThan(20);
         await expect.poll(() => selectionChromeWidth(chrome)).toBeLessThan(90);
         await page.screenshot({
@@ -1320,6 +1323,20 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await expect.poll(() => selectionChromeWidth(chrome)).toBeGreaterThan(190);
         await page.mouse.click(center.x + 90, center.y);
         await expect.poll(() => selectionChromeWidth(chrome)).toBeGreaterThan(140);
+        await page.mouse.move(center.x - 100, center.y - 80);
+        await expect(ink).toHaveCSS('cursor', 'nwse-resize');
+        await page.keyboard.down('Alt');
+        await page.mouse.down();
+        await page.mouse.move(center.x - 96, center.y - 78);
+        await page.mouse.move(center.x + 140, center.y - 110, { steps: 8 });
+        await expect(ink).toHaveCSS('cursor', 'nesw-resize');
+        await page.mouse.up();
+        await page.keyboard.up('Alt');
+        await expect(ink).toHaveCSS('cursor', 'nesw-resize');
+        await page.screenshot({
+          path: info.outputPath(`${mode}-crossed-corner-cursor.png`),
+          fullPage: false,
+        });
         if (mode === 'crop') await page.keyboard.press('Escape');
       } finally {
         await page.close();

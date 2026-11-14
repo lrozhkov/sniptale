@@ -1,6 +1,10 @@
 export * from './arrow';
 export * from './alignment';
-export { resolveDrawingToolCursor } from './cursors';
+export {
+  resolveDrawingToolCursor,
+  resolveDrawingResizeCursorFromAngle,
+  resolveDrawingResizeHandleCursor,
+} from './cursors';
 export * from './freehand';
 export * from './geometry';
 export * from './model';

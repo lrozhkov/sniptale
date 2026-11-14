@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { Canvas, FabricObject, Textbox, util, type Transform } from 'fabric';
+import { Canvas, FabricObject, Group, Textbox, util, type Transform } from 'fabric';
 import { expect, it } from 'vitest';
 import { createDrawingBoxControls, createDrawingTextControls } from './box';
 import { canonicalizeModifiedEditorDrawingSelection } from '../canonicalize';
@@ -223,7 +223,8 @@ it('keeps corner resize cursors diagonal on elongated drawings and follows rotat
 
   object.set({ angle: 0, flipX: true });
   object.setCoords();
-  expect(cursor('tl')).toBe('nesw-resize');
+  expect(object.calcOCoords()['tl']!.x).toBeLessThan(object.calcOCoords()['tr']!.x);
+  expect(cursor('tl')).toBe('nwse-resize');
 
   object.set({ lockScalingX: true });
   expect(cursor('tl')).toBe('not-allowed');
@@ -276,4 +277,26 @@ it('preserves aspect ratio and the opposite-side anchor for Shift side resize', 
   expect(object.scaleY).toBeCloseTo(object.scaleX, 4);
   expect(object.getPointByOrigin('left', 'center').x).toBeCloseTo(anchor.x, 4);
   expect(object.getPointByOrigin('left', 'center').y).toBeCloseTo(anchor.y, 4);
+});
+
+it('keeps text width cursors on their projected grouped axis and preserves scaling refusal', () => {
+  const canvas = new Canvas(document.createElement('canvas'));
+  const object = new Textbox('Width', { width: 180, fontSize: 24, flipX: true });
+  object.controls = createDrawingTextControls(object);
+  canvas.add(new Group([object], { angle: 90, scaleX: 2, scaleY: 0.5 }));
+  object.setCoords();
+  const control = object.controls['mr']!;
+  const cursor = () =>
+    control.cursorStyleHandler(
+      new MouseEvent('mousemove'),
+      control,
+      object,
+      object.calcOCoords()['mr']!
+    );
+  const coords = object.calcOCoords();
+  expect(coords['mr']!.x).toBeCloseTo(coords['ml']!.x);
+  expect(cursor()).toBe('ns-resize');
+  object.set({ lockScalingX: true });
+  expect(cursor()).toBe('not-allowed');
+  canvas.dispose();
 });

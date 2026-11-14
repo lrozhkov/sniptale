@@ -2,6 +2,9 @@ import { Point, util, type Control } from 'fabric';
 import { isDrawingControlCaptured } from '../../drawing/object/controls/chrome';
 import { renderCanvasSelectionHandle } from '../../../ui/drawing-tools/selection-chrome';
 
+import { createCornerCursorStyleHandler } from '../../drawing/object/controls/corner-cursor';
+
+const patchedEdgeCursors = new WeakSet<Control>();
 const EDITOR_EDGE_CONTROL_HIT_SIZE = 22;
 
 export const DEFAULT_EDGE_CONTROLS = ['mt', 'mr', 'mb', 'ml'] as const;
@@ -101,6 +104,10 @@ export function patchEdgeControl(
     return;
   }
 
+  if (!patchedEdgeCursors.has(control)) {
+    control.cursorStyleHandler = createCornerCursorStyleHandler(control.cursorStyleHandler);
+    patchedEdgeCursors.add(control);
+  }
   control.sizeX = EDITOR_EDGE_CONTROL_HIT_SIZE;
   control.sizeY = EDITOR_EDGE_CONTROL_HIT_SIZE;
   control.shouldActivate = createEdgeControlShouldActivate(key);

@@ -2,7 +2,11 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createDrawingSession } from '../../features/drawing/public';
+import {
+  createDrawingSession,
+  transformDrawingObjectPoint,
+  type DrawingObject,
+} from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import { DrawingSurface } from './surface';
 import { DrawingBlurLayer } from './surface-visual-layers';
@@ -21,6 +25,7 @@ function createCanvasContextFixture(): CanvasRenderingContext2D {
     moveTo: vi.fn(),
     rect: vi.fn(),
     roundRect: vi.fn(),
+    rotate: vi.fn(),
     restore: vi.fn(),
     save: vi.fn(),
     setLineDash: vi.fn(),
@@ -124,13 +129,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function pointer(type: string, x: number, y: number, shiftKey = false) {
+function pointer(type: string, x: number, y: number, shiftKey = false, ctrlKey = false) {
   const event = new MouseEvent(type, {
     bubbles: true,
     button: 0,
     clientX: x,
     clientY: y,
     shiftKey,
+    ctrlKey,
   });
   Object.defineProperties(event, {
     pointerId: { value: 1 },
@@ -138,6 +144,110 @@ function pointer(type: string, x: number, y: number, shiftKey = false) {
   });
   return event;
 }
+
+function mountCursorSurface(object: DrawingObject, selected = true) {
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.commitObject(object);
+  session.setActiveTool('select');
+  session.setSelection(selected ? [object.id] : []);
+  const controller: ContentDrawingController = {
+    session,
+    getPalette: () => ['#ef4444'],
+    applyPalette: vi.fn(),
+    getScrollRoot: () => ({ kind: 'viewport', element: null }),
+    prepareActivation: () => true,
+    registerInteractionFinalizer: vi.fn(),
+    finalizeInteraction: vi.fn(),
+  };
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
+  return { canvas: host.querySelector('canvas')!, root, session };
+}
+
+it.each([false, true])(
+  'shows body and handle cursors only for selected objects: %s',
+  (selected) => {
+    const { canvas, root, session } = mountCursorSurface(
+      { id: 'hover', kind: 'blur', bounds: { x: 100, y: 100, width: 200, height: 80 } },
+      selected
+    );
+    act(() => canvas.dispatchEvent(pointer('pointermove', 200, 140)));
+    expect(canvas.style.cursor).toBe(selected ? 'move' : 'default');
+    act(() => canvas.dispatchEvent(pointer('pointermove', 300, 180)));
+    expect(canvas.style.cursor).toBe(selected ? 'nwse-resize' : 'default');
+    expect(session.getSnapshot().selectedObjectIds).toEqual(selected ? ['hover'] : []);
+    act(() => root.unmount());
+  }
+);
+
+it.each([
+  { rotation: 0, skewX: 0, centered: false, before: 'nwse-resize', crossed: 'nesw-resize' },
+  { rotation: 90, skewX: 30, centered: false, before: 'nesw-resize', crossed: 'nwse-resize' },
+  { rotation: 0, skewX: 0, centered: true, before: 'nwse-resize', crossed: 'nesw-resize' },
+])('updates a captured corner cursor across its opposite edge: %j', (example) => {
+  const object: DrawingObject = {
+    id: 'crossed',
+    kind: 'rectangle',
+    color: '#ef4444',
+    width: 4,
+    bounds: { x: 200, y: 200, width: 300, height: 60 },
+    rotation: example.rotation,
+    skewX: example.skewX,
+  };
+  const { canvas, root, session } = mountCursorSurface(object);
+  const start = transformDrawingObjectPoint(object, { x: 500, y: 260 });
+  const crossed = transformDrawingObjectPoint(object, { x: 150, y: 280 });
+  act(() => canvas.dispatchEvent(pointer('pointermove', start.x, start.y)));
+  expect(canvas.style.cursor).toBe(example.before);
+  act(() => canvas.dispatchEvent(pointer('pointerdown', start.x, start.y)));
+  act(() =>
+    canvas.dispatchEvent(pointer('pointermove', crossed.x, crossed.y, false, example.centered))
+  );
+  expect(canvas.style.cursor).toBe(example.crossed);
+  expect(session.getSnapshot().document.objects[0]).toEqual(object);
+  act(() => canvas.dispatchEvent(pointer('pointerup', crossed.x, crossed.y)));
+  expect(canvas.style.cursor).toBe(example.crossed);
+  expect(session.getSnapshot().document.objects[0]).toMatchObject({
+    rotation: example.rotation,
+    skewX: example.skewX,
+    bounds: { width: example.centered ? 400 : 50, height: example.centered ? 100 : 80 },
+  });
+  act(() => root.unmount());
+});
+
+it('keeps a captured text move cursor outside the accepted object bounds', () => {
+  const { canvas, root } = mountCursorSurface({
+    id: 'moving-text',
+    kind: 'text',
+    backgroundColor: null,
+    color: '#111827',
+    fontSize: 20,
+    text: 'Move me',
+    bounds: { x: 100, y: 100, width: 200, height: 40 },
+  });
+  act(() => canvas.dispatchEvent(pointer('pointerdown', 180, 120)));
+  act(() => canvas.dispatchEvent(pointer('pointermove', 500, 400)));
+  expect(canvas.style.cursor).toBe('move');
+  act(() => canvas.dispatchEvent(pointer('pointercancel', 500, 400)));
+  expect(canvas.style.cursor).toBe('default');
+  act(() => root.unmount());
+});
+
+it('keeps the selection cursor during a marquee that reaches a candidate handle', () => {
+  const { canvas, root, session } = mountCursorSurface(
+    { id: 'candidate', kind: 'blur', bounds: { x: 100, y: 100, width: 200, height: 80 } },
+    false
+  );
+  act(() => canvas.dispatchEvent(pointer('pointerdown', 80, 80)));
+  act(() => canvas.dispatchEvent(pointer('pointermove', 300, 180)));
+  expect(session.getSnapshot().selectedObjectIds).toEqual(['candidate']);
+  expect(canvas.style.cursor).toBe('default');
+  act(() => canvas.dispatchEvent(pointer('pointerup', 300, 180)));
+  expect(canvas.style.cursor).toBe('nwse-resize');
+  act(() => root.unmount());
+});
 
 it('renders the selected blur strength and preserves legacy strength', () => {
   const session = createDrawingSession({ onDocumentCommit: () => true });

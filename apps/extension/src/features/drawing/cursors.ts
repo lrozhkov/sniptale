@@ -1,4 +1,11 @@
-import type { DrawingTool } from './model';
+import type { DrawingObject, DrawingPoint, DrawingTool } from './model';
+import {
+  getDrawingObjectBounds,
+  getDrawingBoundsCenter,
+  transformDrawingObjectVector,
+  untransformDrawingObjectVector,
+  type DrawingResizeHandle,
+} from './geometry';
 
 type CursorArt = { svg: string; x: number; y: number; size?: number };
 
@@ -105,4 +112,45 @@ export function resolveDrawingToolCursor(
     case 'shape':
       return 'crosshair';
   }
+}
+
+/** Selects a bidirectional resize cursor from its visible screen-space angle in degrees. */
+export function resolveDrawingResizeCursorFromAngle(angleDegrees: number): string {
+  const directions = ['ew-resize', 'nwse-resize', 'ns-resize', 'nesw-resize'] as const;
+  const index = ((Math.round(angleDegrees / 45) % 4) + 4) % 4;
+  return directions[index] ?? 'default';
+}
+
+/** Resolves a visible drawing handle, including a resize preview crossing its fixed anchor. */
+export function resolveDrawingResizeHandleCursor(
+  handle: DrawingResizeHandle,
+  object: DrawingObject,
+  gesture?: { original: DrawingObject; start: DrawingPoint; point: DrawingPoint }
+): string {
+  if (handle === 'start' || handle === 'end') return gesture ? 'grabbing' : 'grab';
+  let x = handle.includes('e') ? 1 : handle.includes('w') ? -1 : 0;
+  let y = handle.includes('s') ? 1 : handle.includes('n') ? -1 : 0;
+  if (gesture) {
+    const bounds = getDrawingObjectBounds(gesture.original);
+    const originalCenter = getDrawingBoundsCenter(bounds);
+    const center = getDrawingBoundsCenter(getDrawingObjectBounds(object));
+    const delta = untransformDrawingObjectVector(gesture.original, {
+      x: center.x - originalCenter.x,
+      y: center.y - originalCenter.y,
+    });
+    const centered = Math.abs(delta.x) + Math.abs(delta.y) < 1e-8;
+    const movement = centered
+      ? untransformDrawingObjectVector(gesture.original, {
+          x: gesture.point.x - gesture.start.x,
+          y: gesture.point.y - gesture.start.y,
+        })
+      : delta;
+    // Normalized bounds lose handle identity; the fixed anchor retains the crossed side.
+    if (x) x = Math.sign(movement.x + (x * bounds.width) / 2) || x;
+    if (y) y = Math.sign(movement.y + (y * bounds.height) / 2) || y;
+  }
+  const direction = transformDrawingObjectVector(object, { x, y });
+  return resolveDrawingResizeCursorFromAngle(
+    (Math.atan2(direction.y, direction.x) * 180) / Math.PI
+  );
 }

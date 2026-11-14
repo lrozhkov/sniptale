@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { RefObject } from 'react';
 import {
-  getDrawingObjectRotation,
   getDrawingSelectionBounds,
   hitTestDrawingDocument,
   removeDrawingArrowBendAtPoint,
+  resolveDrawingResizeHandleCursor,
   resolveDrawingToolCursor,
   type DrawingObject,
   type DrawingPoint,
-  type DrawingResizeHandle,
   type DrawingSessionSnapshot,
 } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
@@ -163,7 +162,13 @@ function resolveDrawingCanvasHoverCursor(args: {
   if (draft?.kind === 'bend') return draft.target.insert ? 'grabbing' : 'none';
   if (draft?.kind === 'rotate' || draft?.kind === 'rotate-selection') return 'grabbing';
   if (draft?.kind === 'resize')
-    return resolveDrawingResizeCursor(draft.handle, true, getDrawingObjectRotation(draft.original));
+    return resolveDrawingResizeHandleCursor(draft.handle, draft.object, {
+      original: draft.original,
+      start: draft.start,
+      point: args.point,
+    });
+  if (draft?.kind === 'move' || draft?.kind === 'move-selection') return 'move';
+  if (draft?.kind === 'marquee') return baseCursor;
   const selected =
     args.snapshot.selectedObjectIds.length === 1
       ? args.snapshot.document.objects.find(
@@ -191,36 +196,16 @@ function resolveDrawingCanvasHoverCursor(args: {
       return 'move';
   }
   const handle = selected ? resolveDrawingResizeHandle(selected, args.point) : null;
-  if (handle && selected)
-    return resolveDrawingResizeCursor(handle, false, getDrawingObjectRotation(selected));
+  if (handle && selected) return resolveDrawingResizeHandleCursor(handle, selected);
   if (args.pointer.hoverBendRef.current) return 'grab';
   if (
     args.snapshot.activeTool === 'select' &&
-    hitTestDrawingDocument(args.snapshot.document.objects, args.point)
+    args.snapshot.selectedObjectIds.includes(
+      hitTestDrawingDocument(args.snapshot.document.objects, args.point)?.id ?? ''
+    )
   )
     return 'move';
   return baseCursor;
-}
-
-function resolveDrawingResizeCursor(
-  handle: DrawingResizeHandle,
-  dragging: boolean,
-  rotation: number
-): string {
-  if (handle === 'start' || handle === 'end') return dragging ? 'grabbing' : 'grab';
-  const direction = {
-    n: -90,
-    ne: -45,
-    e: 0,
-    se: 45,
-    s: 90,
-    sw: 135,
-    w: 180,
-    nw: -135,
-  }[handle];
-  const cursors = ['ew-resize', 'nwse-resize', 'ns-resize', 'nesw-resize'] as const;
-  const index = ((Math.round((direction + rotation) / 45) % 4) + 4) % 4;
-  return cursors[index]!;
 }
 
 function isNonTextSelectionDrag(draft: PointerDraft | null): boolean {
@@ -232,6 +217,7 @@ function isNonTextSelectionDrag(draft: PointerDraft | null): boolean {
 
 function createDrawingPointerHandlers(args: {
   active: boolean;
+  controller: ContentDrawingController;
   serviceUiSuppressed?: boolean;
   pointer: DrawingPointerRuntime;
   root: PageScrollRoot;
@@ -309,9 +295,10 @@ function createDrawingPointerHandlers(args: {
       setSelectionDragHidden(false);
       event.currentTarget.style.cursor = resolveDrawingCanvasHoverCursor({
         active,
+        serviceUiSuppressed: args.serviceUiSuppressed ?? false,
         point: toDrawingScenePoint(event, root),
         pointer,
-        snapshot,
+        snapshot: args.controller.session.getSnapshot(),
       });
     },
     onPointerCancel: (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -322,6 +309,42 @@ function createDrawingPointerHandlers(args: {
       event.currentTarget.style.cursor = resolveDrawingCanvasCursor(active, snapshot);
     },
   };
+}
+
+function useSelectionDragVisibility(
+  active: boolean,
+  controller: ContentDrawingController,
+  canvasRef: RefObject<HTMLCanvasElement | null>
+) {
+  const selectionDragHiddenRef = useRef(false);
+  const [selectionDragHidden, setSelectionDragHiddenState] = useState(false);
+  const setSelectionDragHidden = (hidden: boolean) => {
+    selectionDragHiddenRef.current = hidden;
+    setSelectionDragHiddenState(hidden);
+  };
+  useEffect(() => {
+    const restore = () => {
+      if (!selectionDragHiddenRef.current) return;
+      selectionDragHiddenRef.current = false;
+      setSelectionDragHiddenState(false);
+      const canvas = canvasRef.current;
+      if (canvas)
+        canvas.style.cursor = resolveDrawingCanvasCursor(active, controller.session.getSnapshot());
+    };
+    window.addEventListener('pointerup', restore);
+    window.addEventListener('pointercancel', restore);
+    window.addEventListener('blur', restore);
+    const canvas = canvasRef.current;
+    canvas?.addEventListener('lostpointercapture', restore);
+    if (!active) restore();
+    return () => {
+      window.removeEventListener('pointerup', restore);
+      window.removeEventListener('pointercancel', restore);
+      window.removeEventListener('blur', restore);
+      canvas?.removeEventListener('lostpointercapture', restore);
+    };
+  }, [active, canvasRef, controller]);
+  return { selectionDragHidden, selectionDragHiddenRef, setSelectionDragHidden };
 }
 
 function DrawingCanvasLayer(props: {
@@ -338,39 +361,11 @@ function DrawingCanvasLayer(props: {
   textEditor: DrawingTextEditorRuntime;
 }) {
   const textGestureRef = useRef<TextPointerGesture>(null);
-  const selectionDragHiddenRef = useRef(false);
-  const [selectionDragHidden, setSelectionDragHiddenState] = useState(false);
-  const setSelectionDragHidden = (hidden: boolean) => {
-    selectionDragHiddenRef.current = hidden;
-    setSelectionDragHiddenState(hidden);
-  };
-  useEffect(() => {
-    const restore = () => {
-      if (!selectionDragHiddenRef.current) return;
-      selectionDragHiddenRef.current = false;
-      setSelectionDragHiddenState(false);
-      const canvas = props.canvasRef.current;
-      if (canvas)
-        canvas.style.cursor = resolveDrawingCanvasCursor(
-          props.active,
-          props.controller.session.getSnapshot()
-        );
-    };
-    window.addEventListener('pointerup', restore);
-    window.addEventListener('pointercancel', restore);
-    window.addEventListener('blur', restore);
-    const canvas = props.canvasRef.current;
-    canvas?.addEventListener('lostpointercapture', restore);
-    if (!props.active) restore();
-    return () => {
-      window.removeEventListener('pointerup', restore);
-      window.removeEventListener('pointercancel', restore);
-      window.removeEventListener('blur', restore);
-      canvas?.removeEventListener('lostpointercapture', restore);
-    };
-  }, [props.active, props.canvasRef, props.controller]);
+  const { selectionDragHidden, selectionDragHiddenRef, setSelectionDragHidden } =
+    useSelectionDragVisibility(props.active, props.controller, props.canvasRef);
   const pointerHandlers = createDrawingPointerHandlers({
     active: props.active,
+    controller: props.controller,
     serviceUiSuppressed: props.serviceUiSuppressed,
     pointer: props.pointer,
     root: props.root,

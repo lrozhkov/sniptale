@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { resolveDrawingToolCursor } from './cursors';
+import { resolveDrawingToolCursor, resolveDrawingResizeCursorFromAngle } from './cursors';
 
 it('uses distinct outlined eraser art with a contact hotspot', () => {
   const cursor = resolveDrawingToolCursor('eraser');
@@ -49,4 +49,27 @@ it('keeps the gesture origin clear while showing arrow direction and the blur re
   expect(resolveDrawingToolCursor('simplify')).toBe('crosshair');
   expect(resolveDrawingToolCursor('text')).toBe('text');
   expect(resolveDrawingToolCursor('select')).toBe('default');
+});
+
+it.each([
+  [0, 'ew-resize'],
+  [180, 'ew-resize'],
+  [360, 'ew-resize'],
+  [45, 'nwse-resize'],
+  [225, 'nwse-resize'],
+  [-135, 'nwse-resize'],
+  [90, 'ns-resize'],
+  [-90, 'ns-resize'],
+  [270, 'ns-resize'],
+  [135, 'nesw-resize'],
+  [-45, 'nesw-resize'],
+  [315, 'nesw-resize'],
+  [20, 'ew-resize'],
+  [25, 'nwse-resize'],
+  [65, 'nwse-resize'],
+  [70, 'ns-resize'],
+  [NaN, 'default'],
+  [Infinity, 'default'],
+] as const)('quantizes visible resize angle %s to %s', (angle, expected) => {
+  expect(resolveDrawingResizeCursorFromAngle(angle)).toBe(expected);
 });

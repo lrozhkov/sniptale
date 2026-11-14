@@ -123,10 +123,7 @@ function resolveBoxActionHandler(object: FabricObject, key: BoxControlKey) {
 function createBoxControl(object: FabricObject, key: BoxControlKey, x: number, y: number) {
   return new Control({
     actionHandler: resolveBoxActionHandler(object, key),
-    cursorStyleHandler:
-      key === 'tl' || key === 'tr' || key === 'br' || key === 'bl'
-        ? createCornerCursorStyleHandler(controlsUtils.scaleCursorStyleHandler)
-        : controlsUtils.scaleCursorStyleHandler,
+    cursorStyleHandler: createCornerCursorStyleHandler(controlsUtils.scaleCursorStyleHandler),
     render: renderDrawingBoxHandle as Control['render'],
     sizeX: DRAWING_BOX_CONTROL_SIZE,
     sizeY: DRAWING_BOX_CONTROL_SIZE,
