@@ -417,7 +417,9 @@ export interface VideoProject {
     | 50
     | 51
     | 52
-    | 53;
+    | 53
+    | 54;
+  sourceInteractionDocuments?: import('../source-interaction-documents').VideoProjectSourceInteractionDocument[];
   sourceVoiceoverDocuments?: VideoProjectSourceVoiceoverDocument[];
   sourceAudioDocuments?: VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];

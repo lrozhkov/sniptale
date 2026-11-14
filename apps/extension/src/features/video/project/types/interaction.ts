@@ -320,6 +320,13 @@ export type SourceNormalizedRecordingActionEvent = Pick<
 >;
 
 export type VideoProjectActionAnchor =
+  | {
+      kind: 'source';
+      assetId: string;
+      sourceInstanceId: string;
+      sourceEventId: string;
+      sourceTime: number;
+    }
   | { kind: 'project'; time: number }
   | {
       kind: 'recording-source';

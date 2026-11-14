@@ -1,3 +1,5 @@
+import { resolveReviewInteractions } from './interaction-timeline';
+import { recordingIdForProjectAsset } from '../project/source-interactions';
 import { preparedCursorTrajectorySourceWindow } from '../project/cursor-trajectory/project-window';
 import {
   recordingEventProjectActions,
@@ -135,7 +137,19 @@ export function projectActionFeedbackMarkers(
   );
   const markers = projectReviewTelemetry({ actionEvents, signals, cursorTrack }, duration).markers;
   applyRecordingEventMarkerFacts(project, group, markers);
-  return markers;
+  const authored = project.sourceInteractionDocuments?.find(
+    (document) =>
+      document.binding.sourceInstanceId === group.sourceInstanceId &&
+      recordingIdForProjectAsset(
+        project.assets.find((asset) => asset.id === document.binding.assetId)
+      ) === group.recordingId
+  );
+  return authored
+    ? resolveReviewInteractions(markers, authored.timeline, {
+        keyboard: authored.keyboardEnabled,
+        mouse: authored.mouseEnabled,
+      })
+    : markers;
 }
 /** Source facts distinguish unknown onsets from legacy attacks and retain exact cadence. */
 export function applyRecordingEventMarkerFacts(
@@ -162,24 +176,44 @@ export function buildProjectActionAudioPlan(
   const descriptors: ReviewActionAudioPlan['descriptors'][number][] = [];
   if (!getVideoProjectActionPresentation(project).enabled)
     return { duration: project.duration, descriptors };
-  for (const group of project.actionFeedback ?? []) {
-    const facts = projectActionFeedbackMarkers(project, group, false);
-    for (const { clips, segments } of getVideoProjectFeedbackRuns(project, group)) {
-      const plan = buildReviewActionAudioPlan({
+  const inputs = [
+    ...(project.actionFeedback ?? []).map((group) => {
+      const facts = projectActionFeedbackMarkers(project, group, false);
+      return {
+        identity: [group.recordingId, group.sourceInstanceId],
         markers: projectMarkers ? projectMarkers(facts, group) : facts,
         settings: group.settings,
+        runs: getVideoProjectFeedbackRuns(project, group),
+      };
+    }),
+    ...(project.sourceInteractionDocuments ?? []).flatMap((document) =>
+      document.feedback
+        ? [
+            {
+              identity: ['source', document.binding.assetId, document.binding.sourceInstanceId],
+              markers: resolveReviewInteractions([], document.timeline, {
+                keyboard: document.keyboardEnabled,
+                mouse: document.mouseEnabled,
+              }),
+              settings: document.feedback.settings,
+              runs: getVideoProjectFeedbackRuns(project, document.binding),
+            },
+          ]
+        : []
+    ),
+  ];
+  for (const input of inputs) {
+    for (const { clips, segments } of input.runs) {
+      const plan = buildReviewActionAudioPlan({
+        markers: input.markers,
+        settings: input.settings,
         segments,
         applied: true,
       });
       for (const descriptor of plan.descriptors)
         descriptors.push({
           ...descriptor,
-          id: JSON.stringify([
-            group.recordingId,
-            group.sourceInstanceId,
-            clips[0]!.id,
-            descriptor.id,
-          ]),
+          id: JSON.stringify([...input.identity, clips[0]!.id, descriptor.id]),
         });
     }
   }
@@ -269,7 +303,7 @@ export function evaluateProjectGestureFeedback(project: VideoProject, time: numb
 
 /** Source facts and timing are prepared together; random seeks retain no playback state. */
 function prepareProjectGestureFeedback(project: VideoProject) {
-  return (project.actionFeedback ?? []).flatMap((group) => {
+  const recorded = (project.actionFeedback ?? []).flatMap((group) => {
     const facts = projectActionFeedbackMarkers(project, group);
     const explicit = new Map((group.gestureStyles ?? []).map((style) => [style.id, style]));
     const defaults = getVideoProjectActionPresentation(project);
@@ -301,4 +335,18 @@ function prepareProjectGestureFeedback(project: VideoProject) {
       cues: scheduleReviewClicks(facts, styles, visualSegments),
     }));
   });
+  const authored = (project.sourceInteractionDocuments ?? []).flatMap((document) => {
+    if (!document.feedback) return [];
+    const facts = resolveReviewInteractions([], document.timeline, {
+      keyboard: document.keyboardEnabled,
+      mouse: document.mouseEnabled,
+    });
+    return getVideoProjectFeedbackRuns(project, document.binding).map(
+      ({ clips, visualSegments }) => ({
+        clips,
+        cues: scheduleReviewClicks(facts, document.feedback?.gestureStyles ?? [], visualSegments),
+      })
+    );
+  });
+  return [...recorded, ...authored];
 }

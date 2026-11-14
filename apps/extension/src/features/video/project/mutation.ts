@@ -161,6 +161,15 @@ function projectSchemaRequirement(
   patch: MutationPatch
 ): VideoProject['version'] {
   if (
+    (patch.actionEvents ?? project.actionEvents).some((event) => event.anchor.kind === 'source') ||
+    (patch.cursorFocusPath ?? project.cursorFocusPath)?.segments.some(
+      (segment) => segment.binding.kind === 'source'
+    )
+  )
+    return 54;
+  if ((patch.sourceInteractionDocuments ?? project.sourceInteractionDocuments) !== undefined)
+    return 54;
+  if (
     (patch.sourceVoiceoverDocuments ?? project.sourceVoiceoverDocuments)?.some(
       (document) => document.take.audioProcessing !== undefined
     )

@@ -1,3 +1,4 @@
+import { withProjectSourceCursorFocus } from '../source-interaction-documents';
 import { getClipSourceObservationTime, mapProjectTimeToSourcePoint } from '../timeline/source-time';
 import { resolvePreparedCursorTrajectoryPosition } from '../cursor-trajectory/project-window';
 import { getSourceTimedClipProjectOffset } from '../timeline/rate';
@@ -217,13 +218,14 @@ export function resolveProjectCursorFocus(
   for (const segment of path.segments) {
     let sourceTime = currentTime;
     let runId = 'project';
-    if (segment.binding.kind === 'recording-source') {
+    if (segment.binding.kind !== 'project') {
       const binding = segment.binding;
       const clip = project.clips.find(
         (item) =>
           item.type === 'VIDEO' &&
           (!sourceClipId || item.id === sourceClipId) &&
           (item.sourceInstanceId ?? item.id) === binding.sourceInstanceId &&
+          (binding.kind !== 'source' || item.assetId === binding.assetId) &&
           currentTime >= item.startTime &&
           currentTime < item.startTime + item.duration
       );
@@ -276,12 +278,16 @@ export function resolveProjectCursorFocusSamples(
         x: key.x * project.width,
         y: key.y * project.height,
         visible: true,
-        sourceAnchor: {
-          kind: 'recording-source' as const,
-          recordingId: binding.recordingId,
-          sourceClipId: clip.id,
-          sourceTime: key.time,
-        },
+        ...(binding.kind === 'recording-source'
+          ? {
+              sourceAnchor: {
+                kind: 'recording-source' as const,
+                recordingId: binding.recordingId,
+                sourceClipId: clip.id,
+                sourceTime: key.time,
+              },
+            }
+          : { timeBasis: 'project' as const }),
       }));
     })
     .sort((a, b) => a.time - b.time || a.id.localeCompare(b.id));
@@ -366,7 +372,7 @@ export function resolveProjectCursorFocusPath(
   let resolved = resolvedPaths.get(project);
   if (!resolved) {
     resolved = resolveAuthoredCursorFocusPath(
-      deriveProjectCursorFocusPath(project),
+      withProjectSourceCursorFocus(project, deriveProjectCursorFocusPath(project)),
       project.cursorFocusPath
     );
     resolvedPaths.set(project, resolved);
@@ -377,7 +383,7 @@ export function resolveProjectCursorFocusPath(
   )
     return resolved;
   return resolveAuthoredCursorFocusPath(
-    deriveProjectCursorFocusPath(project, retainedKeyId),
+    withProjectSourceCursorFocus(project, deriveProjectCursorFocusPath(project, retainedKeyId)),
     project.cursorFocusPath
   );
 }
@@ -578,9 +584,13 @@ export function projectCursorFocusKeyOccurrences(
   segment: CursorFocusSegment
 ) {
   const binding = segment.binding;
-  if (binding.kind !== 'recording-source') return [];
+  if (binding.kind === 'project') return [];
   return project.clips.flatMap((clip) => {
-    if (clip.type !== 'VIDEO' || (clip.sourceInstanceId ?? clip.id) !== binding.sourceInstanceId)
+    if (
+      clip.type !== 'VIDEO' ||
+      (clip.sourceInstanceId ?? clip.id) !== binding.sourceInstanceId ||
+      (binding.kind === 'source' && clip.assetId !== binding.assetId)
+    )
       return [];
     const first = clip.playbackWindow
       ? mapProjectTimeToSourcePoint([clip], clip.startTime, clip.id)?.sourceTime

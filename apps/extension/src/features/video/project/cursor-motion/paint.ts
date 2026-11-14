@@ -4,7 +4,7 @@ import { evaluateCursorMotion, type CursorMotion, type CursorMotionShape } from 
 type Raster = { canvas: HTMLCanvasElement | OffscreenCanvas; hotspot: readonly number[] };
 const cache = new Map<string, Raster>();
 /** Apple Cursor SVG paths (GPL-3.0): prepare artwork only when appearance changes. */
-function appleCursorRaster(
+export function appleCursorRaster(
   style: Pick<CursorMotion, 'shape' | 'color' | 'outline' | 'shadow'>
 ): Raster {
   const key = JSON.stringify(style);

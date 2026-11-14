@@ -67,6 +67,27 @@ export async function prepareRecordingEventsProject(
           Math.max(0, Math.floor((Math.min(first, last) - reach) * 1_000_000)),
           Math.min(Number.MAX_SAFE_INTEGER, Math.ceil((Math.max(first, last) + reach) * 1_000_000)),
         ]);
+        // A moved event can be outside the current decoder window; read only its retained source interval.
+        for (const document of project.sourceInteractionDocuments ?? []) {
+          if (
+            document.binding.assetId !== clip.assetId ||
+            document.binding.sourceInstanceId !== group.sourceInstanceId
+          )
+            continue;
+          for (const override of document.timeline.overrides) {
+            if (
+              !override.enabled ||
+              !override.sourceRange ||
+              override.end < Math.min(first, last) - reach ||
+              override.start > Math.max(first, last) + reach
+            )
+              continue;
+            ranges.push([
+              Math.max(0, Math.floor(override.sourceRange.start * 1_000_000)),
+              Math.min(Number.MAX_SAFE_INTEGER, Math.ceil(override.sourceRange.end * 1_000_000)),
+            ]);
+          }
+        }
       }
     ranges.sort((a, b) => a[0] - b[0]);
     const merged: [number, number][] = [];

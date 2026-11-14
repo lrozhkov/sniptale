@@ -137,6 +137,11 @@ export type VideoCompositionVisualLayer =
   | VideoCompositionLayerBase<VideoProjectShapeClip, 'shape'>;
 
 export interface VideoCompositionCursorState {
+  /** Admitted source-authored artwork; scale converts its 256px raster into composition pixels. */
+  artwork?: Pick<
+    import('../project/cursor-motion').CursorMotion,
+    'shape' | 'color' | 'outline' | 'shadow'
+  >;
   animationPreset: VideoProjectCursorTrack['skin']['animationPreset'];
   captureMode: VideoProjectCursorTrack['captureMode'];
   color: string;

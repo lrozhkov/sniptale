@@ -1,3 +1,7 @@
+import {
+  editProjectSourceInteraction,
+  deleteProjectSourceInteraction,
+} from '../../../features/video/project/source-interaction-authoring';
 import { resolveRecordingActionOccurrences } from '../operations/recording-events-selection';
 import { isMotionFocusArea } from '../../../features/video/project/motion/focus-area';
 import {
@@ -167,6 +171,13 @@ function createActionDetailsUpdater(set: VideoEditorStoreSet) {
     set((state) =>
       applyProjectUpdate(state, (project) => {
         if (isVideoProjectUtilityLaneLocked(project, 'actions')) return project;
+        const sourceEdit = editProjectSourceInteraction(project, actionEventId, patch);
+        if (sourceEdit)
+          return sourceEdit === project
+            ? project
+            : applyVideoProjectMutationPatch(project, {
+                sourceInteractionDocuments: sourceEdit.sourceInteractionDocuments!,
+              });
         const observed =
           state.selection.kind === VideoEditorSelectionKind.ACTION_OCCURRENCE &&
           state.selection.eventId === actionEventId
@@ -387,11 +398,15 @@ function createActionDeleter(set: VideoEditorStoreSet) {
         return {};
       }
 
-      const nextState = applyProjectUpdate(state, (project) =>
-        applyVideoProjectMutationPatch(project, {
-          actionEvents: project.actionEvents.filter((event) => event.id !== actionEventId),
-        })
-      );
+      const nextState = applyProjectUpdate(state, (project) => {
+        const sourceEdit = deleteProjectSourceInteraction(project, actionEventId);
+        return applyVideoProjectMutationPatch(
+          project,
+          sourceEdit
+            ? { sourceInteractionDocuments: sourceEdit.sourceInteractionDocuments! }
+            : { actionEvents: project.actionEvents.filter((event) => event.id !== actionEventId) }
+        );
+      });
 
       return {
         ...nextState,

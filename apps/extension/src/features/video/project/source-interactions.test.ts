@@ -136,3 +136,32 @@ it('still removes orphaned anchored samples when the source graph remains unchan
   expect(result.cursorTrack?.samples).toEqual([manual]);
   expect(project.cursorTrack?.samples).toHaveLength(2);
 });
+
+it('retains source input after cuts but removes only an explicitly deleted or rebound source', () => {
+  const { project, clip } = fixture();
+  const doc = {
+    id: 'source-input',
+    binding: { assetId: clip.assetId, sourceInstanceId: clip.sourceInstanceId! },
+    cursorMotions: [],
+    cursorEnabled: true,
+    keyboardEnabled: true,
+    mouseEnabled: true,
+    timeline: { presses: [], overrides: [] },
+  };
+  const before = { ...project, sourceInteractionDocuments: [doc] };
+  expect(
+    reconcileVideoProjectInteractionSources(before, { ...before, clips: [] })
+      .sourceInteractionDocuments
+  ).toEqual([doc]);
+  expect(
+    reconcileVideoProjectInteractionSources(before, { ...before, clips: [], assets: [] })
+      .sourceInteractionDocuments
+  ).toEqual([]);
+  expect(
+    reconcileVideoProjectInteractionSources(before, {
+      ...before,
+      clips: [{ ...clip, assetId: 'replacement' }],
+    }).sourceInteractionDocuments
+  ).toEqual([]);
+  expect(before.sourceInteractionDocuments).toEqual([doc]);
+});

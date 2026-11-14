@@ -218,7 +218,9 @@ function reconcileActionEvents(nextProject: VideoProject): VideoProjectActionEve
         (clip) =>
           clip.type === 'VIDEO' &&
           clip.sourceInstanceId === anchor.sourceInstanceId &&
-          isRecordingSourceTimedClip(nextProject, clip, anchor.recordingId)
+          (anchor.kind === 'source'
+            ? clip.assetId === anchor.assetId
+            : isRecordingSourceTimedClip(nextProject, clip, anchor.recordingId))
       )
     );
   });

@@ -1,4 +1,8 @@
 import {
+  parseVideoProjectSourceInteractionDocuments,
+  hasValidVideoProjectSourceInteractionReferences,
+} from '../source-interaction-documents';
+import {
   parseVideoProjectTransition,
   hasValidVideoProjectTransitionReferences,
 } from '../transition/contract';
@@ -198,8 +202,24 @@ function minimumMotionSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 53) &&
+    isBoundedNumber(version, 2, 54) &&
     Number.isInteger(version) &&
+    (version >= 54 || value['sourceInteractionDocuments'] === undefined) &&
+    (version >= 54 ||
+      !Array.isArray(value['actionEvents']) ||
+      value['actionEvents'].every(
+        (event: unknown) =>
+          !isRecord(event) || !isRecord(event['anchor']) || event['anchor']['kind'] !== 'source'
+      )) &&
+    (version >= 54 ||
+      !isRecord(value['cursorFocusPath']) ||
+      !Array.isArray(value['cursorFocusPath']['segments']) ||
+      value['cursorFocusPath']['segments'].every(
+        (segment: unknown) =>
+          !isRecord(segment) ||
+          !isRecord(segment['binding']) ||
+          segment['binding']['kind'] !== 'source'
+      )) &&
     (version >= 53 ||
       !Array.isArray(value['sourceVoiceoverDocuments']) ||
       value['sourceVoiceoverDocuments'].every(
@@ -328,6 +348,7 @@ function isHydratableProjectShape(value: unknown, effectMode: 'native' | 'metada
       parseVideoProjectSourceAudioDocuments(value['sourceAudioDocuments']) !== null) &&
     (value['sourceVoiceoverDocuments'] === undefined ||
       parseVideoProjectSourceVoiceoverDocuments(value['sourceVoiceoverDocuments']) !== null) &&
+    parseVideoProjectSourceInteractionDocuments(value['sourceInteractionDocuments']) !== null &&
     isString(value['name']) &&
     isProjectSource(value['source']) &&
     isNullable(value['baseRecordingId'], isString) &&
@@ -413,6 +434,19 @@ function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
               occurrence.clipId === region.targetAction.clipId
           ))
     ) &&
+    (project.cursorFocusPath?.segments ?? []).every((segment) => {
+      const binding = segment.binding;
+      return (
+        binding.kind !== 'source' ||
+        (project.assets.some((asset) => asset.id === binding.assetId) &&
+          project.clips.every(
+            (clip) =>
+              clip.type !== 'VIDEO' ||
+              clip.sourceInstanceId !== binding.sourceInstanceId ||
+              clip.assetId === binding.assetId
+          ))
+      );
+    }) &&
     hasValidInteractionAnchorReferences(project) &&
     hasValidVideoProjectCursorSourceObservations(project)
   );
@@ -445,7 +479,12 @@ function hasValidInteractionAnchorReferences(project: VideoProject): boolean {
   for (const event of project.actionEvents) {
     const anchor = event.anchor;
     if (anchor.kind === 'project') continue;
-    const key = JSON.stringify([anchor.recordingId, anchor.sourceInstanceId, anchor.sourceEventId]);
+    const key = JSON.stringify([
+      anchor.kind,
+      anchor.kind === 'source' ? anchor.assetId : anchor.recordingId,
+      anchor.sourceInstanceId,
+      anchor.sourceEventId,
+    ]);
     if (factKeys.has(key)) return false;
     factKeys.add(key);
     if (
@@ -453,6 +492,7 @@ function hasValidInteractionAnchorReferences(project: VideoProject): boolean {
         if (clip.type !== 'VIDEO' || clip.sourceInstanceId !== anchor.sourceInstanceId)
           return false;
         const asset = project.assets.find((item) => item.id === clip.assetId);
+        if (anchor.kind === 'source') return clip.assetId === anchor.assetId;
         return asset?.source.kind === 'recording'
           ? asset.source.recordingId === anchor.recordingId
           : asset?.source.kind === 'project-asset' &&
@@ -518,6 +558,7 @@ function hasValidReferences(project: VideoProject): boolean {
     hasValidEffectProjectReferences(project) &&
     hasValidVideoProjectSourceAudioReferences(project) &&
     hasValidVideoProjectSourceVoiceoverReferences(project) &&
+    hasValidVideoProjectSourceInteractionReferences(project) &&
     hasValidVideoProjectTextReferences(project) &&
     hasValidVideoProjectCommentReferences(project)
   );

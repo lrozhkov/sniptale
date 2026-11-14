@@ -672,6 +672,40 @@ async function convertedGalleryImageFixture(backgroundMode: 'active' | 'remember
     advanced: {
       ...opened.workspace.advanced,
       ui: { ...opened.workspace.advanced.ui, mode: 'advanced' },
+      cursorMotions: [
+        {
+          id: 'transferred-cursor',
+          start: 1,
+          end: 6,
+          enabled: true,
+          shape: 'pointer',
+          size: 44,
+          color: '#eeeeee',
+          outline: '#222222',
+          shadow: true,
+          easing: 'smooth',
+          points: [
+            { id: 'a', at: 0, x: 0.2, y: 0.3 },
+            { id: 'b', at: 1, x: 0.8, y: 0.7 },
+          ],
+        },
+      ],
+      interactionTimeline: {
+        presses: [
+          {
+            id: 'transferred-key',
+            family: 'keyboard',
+            start: 2,
+            end: 3,
+            label: 'Cmd+K',
+            keys: ['Cmd', 'K'],
+            button: 0,
+            x: 0.5,
+            y: 0.5,
+          },
+        ],
+        overrides: [],
+      },
       background:
         backgroundMode === 'active'
           ? {
@@ -771,6 +805,14 @@ it.each(['active', 'remembered'] as const)(
     for (const root of roots) {
       const saved = await getVideoProject(root.id);
       if (saved.status !== 'ready') throw new Error('Converted root did not reopen');
+      expect(saved.project.sourceInteractionDocuments).toEqual(root.sourceInteractionDocuments);
+      expect(saved.project.sourceInteractionDocuments?.[0]?.cursorMotions[0]?.id).toBe(
+        'transferred-cursor'
+      );
+      expect(saved.project.sourceInteractionDocuments?.[0]?.timeline.presses[0]?.keys).toEqual([
+        'Cmd',
+        'K',
+      ]);
       expect(saved.project.sceneBackground).toMatchObject(
         backgroundMode === 'active'
           ? { kind: 'image', assetId: 'native-background' }
@@ -815,6 +857,12 @@ it.each(['active', 'remembered'] as const)(
     }
     await expect(deleteVideoProject(roots[0]!.id)).resolves.toEqual([]);
     expect(fixture.rows.get('video_projects')!.has(roots[1]!.id)).toBe(true);
+    const reopened = await getVideoProject(roots[1]!.id);
+    if (reopened.status !== 'ready')
+      throw new Error('Remaining transferred project did not reopen');
+    expect(reopened.project.sourceInteractionDocuments).toEqual(
+      roots[1]!.sourceInteractionDocuments
+    );
     const assets = await import('../assets');
     const read = vi
       .spyOn(assets, 'readAssetFile')

@@ -1,3 +1,5 @@
+import { resolveProjectSourceInteractionDocument } from '../../project/source-interaction-documents';
+import { evaluateCursorMotion } from '../../project/cursor-motion';
 export type { ProjectCameraConflict } from './prepared-project-camera';
 import {
   preparedProjectCamera,
@@ -98,8 +100,13 @@ function projectCameraFrameAtTime(
   const renderedSample = rendered ? resolveCursorSample(project, time) : null;
   const nativeCursor = renderedSample?.sourceAnchor !== undefined;
   const sample = rendered ? renderedSample : resolveObservedCursorPosition(project, time, clipId);
-  const actual =
-    rendered && nativeCursor
+  const authoredSource = resolveProjectSourceInteractionDocument(project, time, clipId);
+  const authoredCursor = authoredSource?.document.cursorEnabled
+    ? evaluateCursorMotion(authoredSource.document.cursorMotions, authoredSource.sourceTime)
+    : null;
+  const actual = authoredCursor
+    ? { x: authoredCursor.x, y: authoredCursor.y }
+    : rendered && nativeCursor
       ? cursor && sample?.recordingPoint
         ? sample.recordingPoint
         : undefined
@@ -126,20 +133,22 @@ function projectCameraFrameAtTime(
     : held;
   if (!preferred && !actual) return null;
   const point = preferred ?? { ...actual!, segmentId: 'rendered' };
-  const actualClipId = sample?.sourceAnchor?.sourceClipId;
+  const actualClipId = authoredCursor
+    ? authoredSource?.clip.id
+    : sample?.sourceAnchor?.sourceClipId;
   const actualOwner = project.clips.find((clip) => clip.id === actualClipId);
   const sourceOwner =
     region.sourceBinding?.coordinateSpace === 'source-window' && actualOwner?.type === 'VIDEO'
       ? (actualOwner.sourceInstanceId ?? actualClipId)
       : actualClipId;
-  const sourceSegment = `${sourceOwner ?? 'canvas'}:${sample?.captureSegment ?? ''}`;
+  const sourceSegment = `${sourceOwner ?? 'canvas'}:${authoredCursor?.motion.id ?? sample?.captureSegment ?? ''}`;
   const observation = actual ? 'observed' : 'unobserved';
   const segmentId = `${point.segmentId}:${sourceSegment}:${observation}`;
   const binding: ProjectCameraSourceBinding = {
     ...('sourceClipId' in point && point.sourceClipId ? { focusClipId: point.sourceClipId } : {}),
-    ...((!rendered || nativeCursor) && actualClipId ? { actualClipId } : {}),
-    ...(rendered && !nativeCursor ? { renderedCursor: true } : {}),
-    ...(rendered && nativeCursor ? { sourceCursor: true } : {}),
+    ...((authoredCursor || !rendered || nativeCursor) && actualClipId ? { actualClipId } : {}),
+    ...(!authoredCursor && rendered && !nativeCursor ? { renderedCursor: true } : {}),
+    ...(!authoredCursor && rendered && nativeCursor ? { sourceCursor: true } : {}),
   };
   const authoredSegment = focus && path.segments.find((segment) => segment.id === focus.id);
   const frame: FollowCursorFrame = {
@@ -170,6 +179,12 @@ function retainClosingProjectFrames(
         (frame) => frame.time < time && bindings.get(frame.segmentId)?.actualClipId === clip.id
       );
       if (!previous) continue;
+      const authored = resolveProjectSourceInteractionDocument(project, previous.time, clip.id);
+      if (
+        authored?.document.cursorEnabled &&
+        evaluateCursorMotion(authored.document.cursorMotions, authored.sourceTime)
+      )
+        continue;
       const separate = project.cursorTrack?.captureMode === VideoCursorCaptureMode.SEPARATE;
       const sample = separate
         ? resolveCursorSample(project, time, clip.id, { includeSourceEnd: true })

@@ -36,8 +36,14 @@ function sourceInstances(project: VideoProject) {
 export function reconcileVideoProjectInteractionSources(
   previous: VideoProject,
   project: VideoProject
-): Partial<Pick<VideoProject, 'actionFeedback' | 'cursorFocusPath' | 'cursorTrack'>> {
+): Partial<
+  Pick<
+    VideoProject,
+    'actionFeedback' | 'cursorFocusPath' | 'cursorTrack' | 'sourceInteractionDocuments'
+  >
+> {
   if (
+    !project.sourceInteractionDocuments &&
     !project.actionFeedback &&
     !project.cursorFocusPath &&
     !project.cursorTrack?.sourceObservations?.length
@@ -50,7 +56,8 @@ export function reconcileVideoProjectInteractionSources(
     previous.clips === project.clips &&
     previous.cursorTrack === project.cursorTrack &&
     previous.actionFeedback === project.actionFeedback &&
-    previous.cursorFocusPath === project.cursorFocusPath
+    previous.cursorFocusPath === project.cursorFocusPath &&
+    previous.sourceInteractionDocuments === project.sourceInteractionDocuments
   )
     return {};
   const before = sourceInstances(previous),
@@ -61,6 +68,17 @@ export function reconcileVideoProjectInteractionSources(
       !after.instances.get(binding.sourceInstanceId)?.has(binding.recordingId)
     ) &&
     !(before.recordingIds.has(binding.recordingId) && !after.recordingIds.has(binding.recordingId));
+  const retainedSource = (binding: { assetId: string; sourceInstanceId: string }) =>
+    !(
+      previous.assets.some((asset) => asset.id === binding.assetId) &&
+      !project.assets.some((asset) => asset.id === binding.assetId)
+    ) &&
+    !project.clips.some(
+      (clip) =>
+        clip.type === 'VIDEO' &&
+        clip.sourceInstanceId === binding.sourceInstanceId &&
+        clip.assetId !== binding.assetId
+    );
   const groups = project.cursorTrack?.sourceObservations;
   const retainedGroups = groups?.filter(retained);
   let cursorTrack = project.cursorTrack;
@@ -75,6 +93,13 @@ export function reconcileVideoProjectInteractionSources(
     }
   }
   return {
+    ...(project.sourceInteractionDocuments
+      ? {
+          sourceInteractionDocuments: project.sourceInteractionDocuments.filter((doc) =>
+            retainedSource(doc.binding)
+          ),
+        }
+      : {}),
     ...(groups?.length && retainedGroups && cursorTrack ? { cursorTrack } : {}),
     ...(project.actionFeedback ? { actionFeedback: project.actionFeedback.filter(retained) } : {}),
     ...(project.cursorFocusPath
@@ -82,7 +107,11 @@ export function reconcileVideoProjectInteractionSources(
           cursorFocusPath: {
             ...project.cursorFocusPath,
             segments: project.cursorFocusPath.segments.filter(
-              (segment) => segment.binding.kind === 'project' || retained(segment.binding)
+              (segment) =>
+                segment.binding.kind === 'project' ||
+                (segment.binding.kind === 'source'
+                  ? retainedSource(segment.binding)
+                  : retained(segment.binding))
             ),
           },
         }

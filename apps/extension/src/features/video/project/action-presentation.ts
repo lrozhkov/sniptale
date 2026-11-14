@@ -160,7 +160,7 @@ function resolveEvent(
     duration,
     offset,
     point: override?.point ?? event.point,
-    pointSpace: event.anchor.kind === 'recording-source' ? 'source-normalized' : 'scene',
+    pointSpace: event.anchor.kind !== 'project' ? 'source-normalized' : 'scene',
     enabled: reason === null,
     reason,
     suppressedByOccurrence: null,
@@ -195,14 +195,14 @@ function resolveSourceClick(
   const event = occurrence.event,
     anchor = event.anchor;
   const run =
-    anchor.kind === 'recording-source'
+    anchor.kind !== 'project'
       ? getVideoProjectFeedbackRuns(project, anchor).find((item) =>
           item.clips.some((clip) => clip.id === occurrence.clipId)
         )
       : undefined;
   const clips = run?.clips ?? [];
   const window =
-    anchor.kind === 'recording-source' && run
+    anchor.kind !== 'project' && run
       ? reviewCueWindow(
           run.visualSegments,
           anchor.sourceTime,
@@ -318,13 +318,13 @@ function resolveSourceKey(
   const event = occurrence.event;
   const anchor = event.anchor;
   const run =
-    anchor.kind === 'recording-source'
+    anchor.kind !== 'project'
       ? getVideoProjectFeedbackRuns(project, anchor).find((item) =>
           item.clips.some((clip) => clip.id === occurrence.clipId)
         )
       : undefined;
   const window =
-    anchor.kind === 'recording-source' && run
+    anchor.kind !== 'project' && run
       ? reviewCueWindow(
           run.visualSegments,
           anchor.sourceTime,

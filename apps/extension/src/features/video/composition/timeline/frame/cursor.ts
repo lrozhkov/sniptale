@@ -1,3 +1,5 @@
+import { resolveProjectSourceInteractionDocument } from '../../../project/source-interaction-documents';
+import { evaluateCursorMotion } from '../../../project/cursor-motion';
 import { resolveProjectSourceCursorObservation } from '../../../project/cursor-focus-path/projection';
 import {
   hasCameraMediaAt,
@@ -177,6 +179,36 @@ export function resolveVideoCompositionCursor(
   _actions: VideoCompositionActionState[],
   sourceClipId?: string
 ): VideoCompositionCursorState | null {
+  const authored = resolveProjectSourceInteractionDocument(project, currentTime, sourceClipId);
+  const motion = authored?.document.cursorEnabled
+    ? evaluateCursorMotion(authored.document.cursorMotions, authored.sourceTime)
+    : null;
+  if (motion && authored) {
+    const mapping = resolveCursorSourcePointMapping(project, authored.clip.id, currentTime);
+    const point =
+      mapping &&
+      mapSourceNormalizedPointToVisualLayer({ ...mapping, point: { x: motion.x, y: motion.y } });
+    if (!mapping || !point) return null;
+    const content = getFittedMediaContentFrame(mapping);
+    return {
+      artwork: {
+        shape: motion.motion.shape,
+        color: motion.motion.color,
+        outline: motion.motion.outline,
+        shadow: motion.motion.shadow,
+      },
+      animationPreset: 'NONE',
+      captureMode: 'separate',
+      color: motion.motion.color,
+      preset: 'ARROW',
+      scale: (motion.motion.size * content.height) / mapping.sourceHeight / 256,
+      shadow: false,
+      time: currentTime,
+      visible: true,
+      x: point.x,
+      y: point.y,
+    };
+  }
   const cursorTrack = project.cursorTrack;
   if (!cursorTrack) {
     return null;

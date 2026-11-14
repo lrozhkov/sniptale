@@ -21,6 +21,17 @@ function point(value: unknown, controls = false): CursorFocusPoint | null {
 function binding(value: unknown): CursorFocusBinding | null {
   if (!isRecord(value)) return null;
   if (value['kind'] === 'project') return { kind: 'project' };
+  if (
+    value['kind'] === 'source' &&
+    identity(value['assetId']) &&
+    identity(value['sourceInstanceId']) &&
+    Object.keys(value).every((key) => ['kind', 'assetId', 'sourceInstanceId'].includes(key))
+  )
+    return {
+      kind: 'source',
+      assetId: value['assetId'],
+      sourceInstanceId: value['sourceInstanceId'],
+    };
   return value['kind'] === 'recording-source' &&
     identity(value['recordingId']) &&
     identity(value['sourceInstanceId'])
