@@ -17,7 +17,10 @@ interface DownloadProgress {
 interface DownloadDependencies {
   library: Pick<EditorVectorLibrary, 'readCatalog' | 'createCollection'>;
   downloads: ReturnType<typeof createEditorVectorDownloads>;
-  preparation: Pick<EditorVectorCatalogPreparation, 'collection' | 'prepareRemote'>;
+  preparation: Pick<
+    EditorVectorCatalogPreparation,
+    'collection' | 'refreshCollection' | 'prepareRemote'
+  >;
   isAlive(): boolean;
   currentSource(source: EditorVectorSourceToken): boolean;
   collectionName(prefix: string): string;
@@ -49,19 +52,14 @@ export class EditorVectorDownloadJob {
     attempt: Attempt,
     prefix: string,
     names: string[],
-    row: EditorVectorDownload | null,
-    starting = false
+    row: EditorVectorDownload | null
   ) {
     if (!this.current(attempt)) return;
     attempt.progress = {
       prefix,
-      accepted: Object.keys(row?.accepted ?? {}).length,
+      accepted: names.filter((name) => Object.hasOwn(row?.accepted ?? {}, name)).length,
       total: names.length,
-      status: starting
-        ? row?.status === 'ready'
-          ? 'ready'
-          : 'downloading'
-        : (row?.status ?? 'error'),
+      status: row?.status === 'ready' ? 'ready' : 'downloading',
     };
     this.dependencies.progress(attempt.progress);
   }
@@ -93,7 +91,7 @@ export class EditorVectorDownloadJob {
     if (!this.current(attempt)) return null;
     const row = await downloads.inspect(id);
     if (!this.current(attempt)) return null;
-    this.progress(attempt, prefix, names, row, true);
+    this.progress(attempt, prefix, names, row);
     return {
       token,
       names,
@@ -129,6 +127,23 @@ export class EditorVectorDownloadJob {
     if (!this.current(attempt)) return null;
     return (await this.dependencies.downloads.acceptBatch(token, entries)).state;
   }
+  /** Compare names only. Existing artwork bodies and user-owned local assets are not replaced. */
+  async check(prefix: string) {
+    if (!catalogName(prefix)) throw new Error('Invalid vector download prefix.');
+    const remote = await this.dependencies.preparation.refreshCollection(
+      prefix,
+      new AbortController().signal
+    );
+    const id = await collectionId(remote.source.sourceId, prefix);
+    const row = await this.dependencies.downloads.inspect(id);
+    if (!this.dependencies.isAlive() || !this.dependencies.currentSource(remote.source))
+      throw new Error('Superseded vector source.');
+    const names = new Set(remote.names);
+    return {
+      added: remote.names.filter((name) => !Object.hasOwn(row?.accepted ?? {}, name)).length,
+      removed: Object.keys(row?.accepted ?? {}).filter((name) => !names.has(name)).length,
+    };
+  }
   async start(prefix: string) {
     this.abort();
     const attempt: Attempt = { controller: new AbortController(), token: null, progress: null };
@@ -147,7 +162,13 @@ export class EditorVectorDownloadJob {
         if (!this.current(attempt)) return;
         this.progress(attempt, prefix, opened.names, row);
       }
-      if (this.current(attempt)) await this.dependencies.refresh();
+      if (this.current(attempt)) {
+        if (attempt.progress?.status === 'downloading') {
+          attempt.progress = { ...attempt.progress, status: 'partial' };
+          this.dependencies.progress(attempt.progress);
+        }
+        await this.dependencies.refresh();
+      }
     } catch (error) {
       if (!this.current(attempt)) return;
       if (attempt.progress)

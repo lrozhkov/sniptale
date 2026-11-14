@@ -116,6 +116,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       `the original and local library item ${viewport.name}`,
     async ({ page, hostOrigin }, info) => {
       await page.setViewportSize(viewport.size);
+      await page.context().route('https://api.iconify.design/**', (route) => route.abort());
       const dataUrl = await page.evaluate(() => {
         const canvas = document.createElement('canvas');
         canvas.width = 900;
@@ -148,14 +149,21 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         mimeType: 'image/svg+xml',
         buffer: Buffer.from(svg),
       });
-      await expect(ui(page, 'management')).toBeVisible();
-      await page.getByRole('button', { name: 'Back to elements', exact: true }).click();
-      const card = ui(page, 'card').filter({ hasText: 'clipboard-proof.svg' });
+      const destination = page.getByRole('dialog', {
+        name: 'Import into a user collection',
+        exact: true,
+      });
+      await expect(destination).toBeVisible();
+      await destination.getByRole('button', { name: 'Import', exact: true }).click();
+      await expect(destination).toBeHidden();
+      const card = page.getByRole('button', { name: 'clipboard-proof.svg', exact: true });
       await expect(card.locator('img')).toBeVisible();
       await card.click();
       await ui(page, 'add').click();
       await expect.poll(() => vectors(page).then((objects) => objects.length)).toBe(1);
       const originalId = (await vectors(page))[0]!['sniptaleId'];
+      const originalColors = await acceptedColors(page);
+      expect(originalColors).toEqual({ c0: '#202020' });
       const beforeCopy = await history(page);
       const center = await vectorCenter(page);
       await page.mouse.click(center.x, center.y, { button: 'right' });
@@ -173,7 +181,6 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         .click();
       await expect.poll(() => vectors(page).then((objects) => objects.length)).toBe(0);
       await page.locator('[data-ui="editor.floating.layers.mode.elements"]').click();
-      await page.getByText('My elements', { exact: true }).click();
       await card.click();
       await page.getByRole('button', { name: 'Remove from my elements', exact: true }).click();
       await expect(card).toHaveCount(0);
@@ -189,15 +196,10 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await expect.poll(() => vectors(page).then((objects) => objects.length)).toBe(1);
       expect((await vectors(page))[0]!['sniptaleId']).not.toBe(originalId);
       expect(await history(page)).toBe(beforePaste + 1);
-      expect(await acceptedColors(page)).toEqual({});
+      expect(await acceptedColors(page)).toEqual(originalColors);
       const pastedCenterBeforeHistory = await vectorCenter(page);
       await page
-        .locator('[data-ui="editor.floating.tool-properties.group.vector-palette"]')
-        .click();
-      await page
-        .locator(
-          '[data-ui="editor.floating.tool-properties.popover.vector-palette"] [data-ui="shared.ui.color-selector"]'
-        )
+        .locator('[data-ui="editor.vector.properties"] [data-ui="shared.ui.color-selector"]')
         .first()
         .getByRole('button', {
           name: translate('shared.ui.colorSelectorChooseColor', 'en'),
@@ -223,7 +225,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await focusVisibleCanvas(page);
       await page.keyboard.press('Control+z');
       await settledHistory(page, beforePaste + 1);
-      await expect.poll(() => acceptedColors(page)).toEqual({});
+      await expect.poll(() => acceptedColors(page)).toEqual(originalColors);
       await page.keyboard.press('Control+z');
       await settledHistory(page, beforePaste);
       await expect.poll(() => vectors(page).then((objects) => objects.length)).toBe(0);

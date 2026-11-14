@@ -882,3 +882,98 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
     expect(Number(await inputs.nth(1).inputValue())).toBe(beforeHeight);
   });
 }
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`layer scrollbar admits and releases gutter with reachable right controls ${name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await page.setViewportSize(size);
+    await openEditor(page, hostOrigin, 'en');
+    await page.locator('[data-ui="editor.floating.layers.mode.meta"]').click();
+    await page.locator('[data-ui="editor.technical-data.field-date"]').check();
+    await page
+      .getByRole('button', {
+        name: translate('editor.compact.technicalDataInsert', 'en'),
+        exact: true,
+      })
+      .click();
+    await page.locator('[data-ui="editor.floating.layers.mode.layers"]').click();
+    const list = page.locator('[data-ui="editor.layers.list-viewport"]');
+    const rows = list.locator(':scope > div');
+    const metrics = () =>
+      list.evaluate((element) => {
+        const style = getComputedStyle(element);
+        const row = element.firstElementChild!.getBoundingClientRect();
+        const box = element.getBoundingClientRect();
+        return {
+          overflow: element.scrollHeight > element.clientHeight,
+          gutter: style.scrollbarGutter,
+          rowWidth: row.width,
+          rightGap: box.left + element.clientLeft + element.clientWidth - row.right,
+          padding: style.paddingRight,
+          horizontalOverflow: element.scrollWidth - element.clientWidth,
+        };
+      });
+    await expect.poll(async () => (await metrics()).gutter).toBe('auto');
+    const before = await metrics();
+    expect(before.overflow).toBe(false);
+    const initialCount = await rows.count();
+    const duplicate = list
+      .getByRole('button', {
+        name: translate('editor.toolbar.duplicateLayer', 'en'),
+        exact: true,
+        disabled: false,
+      })
+      .first();
+    for (let count = initialCount; count < 17; count++) {
+      await rows.first().hover();
+      await duplicate.click();
+      await expect(rows).toHaveCount(count + 1);
+    }
+    await expect.poll(async () => (await metrics()).gutter).toBe('stable');
+    const overflow = await metrics();
+    expect(overflow.overflow).toBe(true);
+    expect(overflow.rowWidth).toBeLessThan(before.rowWidth);
+    expect(overflow.padding).toBe('12px');
+    expect(Math.abs(overflow.rightGap - 12)).toBeLessThanOrEqual(1);
+    expect(overflow.horizontalOverflow).toBeLessThanOrEqual(1);
+    const remove = list
+      .getByRole('button', {
+        name: translate('editor.toolbar.deleteLayer', 'en'),
+        exact: true,
+        disabled: false,
+      })
+      .first();
+    await rows.first().hover();
+    const lock = rows
+      .first()
+      .getByRole('button', { name: translate('editor.toolbar.lockLayer', 'en'), exact: true });
+    expect(
+      await lock.evaluate((button) => {
+        const box = button.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.right - 2, box.top + box.height / 2);
+        return hit === button || (hit !== null && button.contains(hit));
+      })
+    ).toBe(true);
+    await lock.click();
+    const unlock = rows
+      .first()
+      .getByRole('button', { name: translate('editor.toolbar.unlockLayer', 'en'), exact: true });
+    await expect(unlock).toBeVisible();
+    await unlock.click();
+    await expect(lock).toBeVisible();
+    await page.screenshot({ path: info.outputPath('layers-overflow.png'), fullPage: false });
+    for (let count = 17; count > initialCount; count--) {
+      await rows.first().hover();
+      await remove.click();
+      await expect(rows).toHaveCount(count - 1);
+    }
+    await expect.poll(async () => (await metrics()).gutter).toBe('auto');
+    const restored = await metrics();
+    expect(restored.overflow).toBe(false);
+    expect(restored.rowWidth).toBe(before.rowWidth);
+    expect(Math.abs(restored.rightGap - 12)).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: info.outputPath('layers-gutter-restored.png'), fullPage: false });
+  });
+}

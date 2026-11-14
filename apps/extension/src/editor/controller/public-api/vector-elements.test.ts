@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { exportEditorDocumentViaController } from './document/export';
-import { ActiveSelection, Canvas, FabricImage, Group } from 'fabric';
+import { ActiveSelection, Canvas, Color, FabricImage, Group, type FabricObject } from 'fabric';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createEditorVectorInstance } from '../../../features/editor/document/vector-element';
 import * as preparation from '../../objects/vector-elements/prepare';
@@ -11,6 +11,7 @@ import {
 import { useEditorStore } from '../../state/useEditorStore';
 import { CUSTOM_JSON_PROPS } from '../../document/model/custom-json-props';
 import { serializeEditorCanvasObject } from '../document/serialization';
+import { bindEditorVectorCanvas, prepareEditorVectorCanvasLoad } from '../document/vector-elements';
 import { createEditorVectorCommands, type EditorVectorCommandContext } from './vector-elements';
 
 const assetRef = {
@@ -484,3 +485,139 @@ it.each([false, true])(
     }
   }
 );
+
+function vectorPaintedLeaf(object: FabricObject): FabricObject {
+  if (object instanceof Group) {
+    for (const child of object.getObjects()) {
+      if (child instanceof Group) return vectorPaintedLeaf(child);
+      if (child.stroke) return child;
+    }
+  }
+  throw new Error('Missing painted vector leaf');
+}
+
+it(
+  'preserves insertion palette, alpha, opacity and stroke scale ' +
+    'through serialization and runtime restoration',
+  async () => {
+    const { canvas, controller } = fixture();
+    const definition = await preparation.prepareEditorVectorDefinition(svg, provenance);
+    const originalDefinition = structuredClone(definition);
+    const colors = { [definition.slots[0]!.id]: '#00ff0080' };
+    const publish = vi.fn(async () => assetRef);
+    const commands = createEditorVectorCommands(controller, { publish });
+    expect(
+      await commands.insertVectorElement(definition, { x: 75, y: 30 }, colors, {
+        opacity: 0.6,
+        strokeScale: 1.5,
+      })
+    ).toBe(true);
+    const object = canvas.getActiveObject();
+    if (!object) throw new Error('Missing inserted vector');
+    const instance = {
+      ...createEditorVectorInstance(definition.id),
+      overrides: { colors, strokeScale: 1.5 },
+    };
+    expect(object.sniptaleVectorElement).toEqual(instance);
+    expect(object.opacity).toBe(0.6);
+    const leaf = vectorPaintedLeaf(object);
+    expect(typeof leaf.fill).toBe('string');
+    expect(new Color(typeof leaf.fill === 'string' ? leaf.fill : '').toHexa()).toBe('00FF0080');
+    expect(leaf.strokeWidth).toBe(1.5);
+    const serialized = serializeEditorCanvasObject(object);
+    expect(serialized).toMatchObject({
+      opacity: 0.6,
+      sniptaleVectorElement: instance,
+      objects: [],
+    });
+    const prepared = await prepareEditorVectorCanvasLoad(
+      JSON.stringify({ version: '7.2.0', objects: [serialized] }),
+      { [definition.id]: definition }
+    );
+    const restored = fixture().canvas;
+    await restored.loadFromJSON(prepared.canvasJson);
+    await bindEditorVectorCanvas(restored, prepared.definitions);
+    const revived = restored.getObjects()[0];
+    if (!revived) throw new Error('Missing restored vector');
+    expect(revived.sniptaleVectorElement).toEqual(instance);
+    expect(revived.opacity).toBe(0.6);
+    expect(revived).toMatchObject({ left: 75, top: 30 });
+    const restoredLeaf = vectorPaintedLeaf(revived);
+    expect(new Color(typeof restoredLeaf.fill === 'string' ? restoredLeaf.fill : '').toHexa()).toBe(
+      '00FF0080'
+    );
+    expect(restoredLeaf.strokeWidth).toBe(1.5);
+    expect(restoredLeaf.stroke).toBe(leaf.stroke);
+    expect(definition).toEqual(originalDefinition);
+    expect(publish).toHaveBeenCalledExactlyOnceWith(definition);
+    expect(controller.commitHistory).toHaveBeenCalledOnce();
+  }
+);
+
+it('captures insertion style before awaits so caller mutation cannot change accepted artwork', async () => {
+  const { canvas, controller } = fixture();
+  const definition = await preparation.prepareEditorVectorDefinition(svg, provenance);
+  const slot = definition.slots[0]!.id;
+  const colors = { [slot]: '#00ff0080' };
+  const style = { opacity: 0.6, strokeScale: 1.5 };
+  let release: () => void = () => {
+    throw new Error('Publication has not started');
+  };
+  let reached: () => void = () => {};
+  const started = new Promise<void>((resolve) => {
+    reached = resolve;
+  });
+  const publish = vi.fn(
+    () =>
+      new Promise<typeof assetRef>((resolve) => {
+        release = () => resolve(assetRef);
+        reached();
+      })
+  );
+  const pending = createEditorVectorCommands(controller, { publish }).insertVectorElement(
+    definition,
+    undefined,
+    colors,
+    style
+  );
+  colors[slot] = '#ff0000';
+  style.opacity = 0.2;
+  style.strokeScale = 2;
+  await started;
+  colors[slot] = '#0000ff';
+  style.opacity = 0.1;
+  style.strokeScale = 3;
+  expect(canvas.getObjects()).toHaveLength(0);
+  expect(controller.commitHistory).not.toHaveBeenCalled();
+  release();
+  expect(await pending).toBe(true);
+  expect(canvas.getActiveObject()).toMatchObject({
+    opacity: 0.6,
+    sniptaleVectorElement: { overrides: { colors: { [slot]: '#00ff0080' }, strokeScale: 1.5 } },
+  });
+  expect(controller.commitHistory).toHaveBeenCalledOnce();
+});
+
+it.each([
+  ['negative opacity', { opacity: -0.1, strokeScale: 1 }, {}],
+  ['opacity above one', { opacity: 1.1, strokeScale: 1 }, {}],
+  ['nonfinite opacity', { opacity: Number.NaN, strokeScale: 1 }, {}],
+  ['stroke below minimum', { opacity: 1, strokeScale: 0 }, {}],
+  ['stroke above maximum', { opacity: 1, strokeScale: 101 }, {}],
+  ['nonfinite stroke', { opacity: 1, strokeScale: Number.POSITIVE_INFINITY }, {}],
+  ['invalid palette color', { opacity: 1, strokeScale: 1 }, { c0: 'url(https://unsafe.example/)' }],
+  ['unknown palette slot', { opacity: 1, strokeScale: 1 }, { missing: '#00ff00' }],
+] as const)('refuses %s before asset publication or history', async (_name, style, colors) => {
+  const { canvas, controller } = fixture();
+  const definition = await preparation.prepareEditorVectorDefinition(svg, provenance);
+  const publish = vi.fn(async () => assetRef);
+  const commands = createEditorVectorCommands(controller, { publish });
+  const insertion = commands.insertVectorElement(definition, undefined, colors, style);
+  if (Object.keys(colors).length)
+    await expect(insertion).rejects.toBeInstanceOf(preparation.EditorVectorValidationError);
+  else await expect(insertion).resolves.toBe(false);
+  expect(canvas.getObjects()).toHaveLength(0);
+  expect(controller.commitHistory).not.toHaveBeenCalled();
+  expect(controller.autosaveService?.adoptVectorAssets).not.toHaveBeenCalled();
+  expect(publish).not.toHaveBeenCalled();
+});

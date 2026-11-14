@@ -15,7 +15,7 @@ import { validateEditorVectorDefinition } from '../../objects/vector-elements/pr
 import {
   createEditorVectorCatalogClient,
   requestEditorVectorCatalogPermission,
-} from '../../vector-elements/catalog-client';
+} from '../../../workflows/vector-catalog/client';
 import { createEditorVectorLibrarySession, type EditorVectorLibrarySession } from './session';
 
 const Context = createContext<EditorVectorLibrarySession | null>(null);

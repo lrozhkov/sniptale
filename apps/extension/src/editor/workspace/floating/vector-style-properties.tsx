@@ -1,13 +1,14 @@
 import { Color, type Group } from 'fabric';
-import type { ReactNode } from 'react';
-import { Palette } from 'lucide-react';
+import { useRef, type ReactNode } from 'react';
+import { Droplet, Paintbrush } from 'lucide-react';
+import { ContentToolbarDivider } from '@sniptale/ui/content-toolbar';
 import { translate } from '../../../platform/i18n';
 import { CompactColorSelector } from '../../../ui/color-selector';
 import { NumericValueField } from '../../chrome/ui';
-import { CompactCommandToken } from '../../inspector/compact';
+import { InspectorSurface } from '../../../ui/compact-inspector-controls/layout';
+import './vector-tools.css';
 import type { EditorVectorDefinition } from '../../../features/editor/document/vector-element';
 import type { EditorVectorStyleTransaction } from './use-vector-style-transaction';
-import { ToolPropertiesButton } from './tool-properties-button';
 const message = (
   key: keyof (typeof import('../../../platform/i18n/catalogs/en.json'))['editor']['elements']
 ) => translate(`editor.elements.${key}`);
@@ -20,23 +21,36 @@ function concreteColor(value: string): string | null {
 
 function VectorParameter(props: {
   label: string;
+  icon: ReactNode;
   value: number;
   min: number;
   max: number;
   step: number;
   precision: number;
   unit: '%' | 'x';
+  onFocus(): void;
   onPreview(value: number): void;
   onCommit(value: number): void;
   onCancel(): void;
 }) {
   return (
-    <div
+    <InspectorSurface
+      title={props.label}
+      className="editor-vector-numeric flex h-7 w-[104px] shrink-0 items-center gap-1"
+      onFocusCapture={(event) => {
+        if (
+          !(event.relatedTarget instanceof Node) ||
+          !event.currentTarget.contains(event.relatedTarget)
+        )
+          props.onFocus();
+      }}
       onKeyDownCapture={(event) => {
         if (event.key === 'Escape') props.onCancel();
       }}
     >
+      {props.icon}
       <NumericValueField
+        className="min-w-0 flex-1"
         label={props.label}
         value={props.value}
         min={props.min}
@@ -48,29 +62,49 @@ function VectorParameter(props: {
         onPreviewValue={props.onPreview}
         onCommitValue={props.onCommit}
       />
-    </div>
+    </InspectorSurface>
   );
 }
-export function VectorProperty(props: {
-  id: string;
-  title: string;
-  trigger: ReactNode;
-  children: ReactNode;
-  active: string | null;
-  onToggle(id: string): void;
-  rich?: boolean;
+function VectorPaletteColor({
+  slot,
+  index,
+  first,
+  transaction,
+  compact = false,
+  onOpen,
+}: {
+  slot: EditorVectorDefinition['slots'][number];
+  index: number;
+  first: Group;
+  transaction: EditorVectorStyleTransaction;
+  compact?: boolean;
+  onOpen?(): void;
 }) {
+  const wasOpen = useRef(false);
   return (
-    <ToolPropertiesButton
-      active={props.active === props.id}
-      onToggle={props.onToggle}
-      group={{
-        id: props.id,
-        kind: 'effects',
-        title: props.title,
-        trigger: props.trigger,
-        width: props.rich ? 'rich' : 'simple',
-        content: props.children,
+    <CompactColorSelector
+      {...(compact ? { className: 'editor-vector-color shrink-0' } : {})}
+      label={message('paletteSlot').replace('{index}', String(index + 1))}
+      title={message('palette')}
+      value={first.sniptaleVectorElement?.overrides.colors[slot.id] ?? slot.originalColor}
+      allowTransparent={false}
+      paletteInPicker
+      triggerVariant="swatch"
+      onPreviewChange={(value) => {
+        const color = concreteColor(value);
+        if (color) transaction.preview({ colors: { [slot.id]: color } });
+      }}
+      onOpenChange={(open) => {
+        if (open && !wasOpen.current) {
+          onOpen?.();
+          transaction.prepare();
+        }
+        wasOpen.current = open;
+      }}
+      onPreviewReset={() => transaction.cancel()}
+      onChange={(value) => {
+        const color = concreteColor(value);
+        if (color) void transaction.commit({ colors: { [slot.id]: color } });
       }}
     />
   );
@@ -82,99 +116,73 @@ export function EditorVectorStyleProperties({
   same,
   opacity,
   strokeScale,
-  active,
-  toggle,
   transaction,
+  paletteKey,
+  onColorOpen,
+  onNumberFocus,
 }: {
   first: Group;
   definition: EditorVectorDefinition;
   same: boolean;
   opacity: number;
   strokeScale: number;
-  active: string | null;
-  toggle(id: string): void;
   transaction: EditorVectorStyleTransaction;
+  paletteKey: number;
+  onColorOpen(): void;
+  onNumberFocus(): void;
 }) {
   return (
     <>
-      {' '}
-      {same && definition.capabilities.palette ? (
-        <VectorProperty
-          id="vector-palette"
-          title={message('palette')}
-          trigger={<Palette size={16} />}
-          active={active}
-          onToggle={toggle}
-          rich
-        >
-          <div className="space-y-2">
+      {same && definition.capabilities.palette && definition.slots.length ? (
+        <>
+          <div
+            className="flex max-w-[min(224px,25vw)] shrink-0 items-center gap-1 overflow-x-auto [scrollbar-width:thin]"
+            aria-label={message('palette')}
+          >
             {definition.slots.map((slot, index) => (
-              <CompactColorSelector
-                key={slot.id}
-                label={message('paletteSlot').replace('{index}', String(index + 1))}
-                title={message('palette')}
-                value={first.sniptaleVectorElement?.overrides.colors[slot.id] ?? slot.originalColor}
-                allowTransparent={false}
-                paletteInPicker
-                triggerVariant="swatch"
-                onPreviewChange={(value) => {
-                  const color = concreteColor(value);
-                  if (color) transaction.preview({ colors: { [slot.id]: color } });
-                }}
-                onOpenChange={(open) => {
-                  if (open) transaction.prepare();
-                }}
-                onPreviewReset={() => transaction.cancel()}
-                onChange={(value) => {
-                  const color = concreteColor(value);
-                  if (color) void transaction.commit({ colors: { [slot.id]: color } });
-                }}
+              <VectorPaletteColor
+                key={`${paletteKey}:${slot.id}`}
+                slot={slot}
+                index={index}
+                first={first}
+                transaction={transaction}
+                compact
+                onOpen={onColorOpen}
               />
             ))}
           </div>
-        </VectorProperty>
+          <ContentToolbarDivider className="!my-0 !h-5" />
+        </>
       ) : null}
-      <VectorProperty
-        id="vector-opacity"
-        title={message('opacity')}
-        trigger={<CompactCommandToken>{Math.round(opacity * 100)}%</CompactCommandToken>}
-        active={active}
-        onToggle={toggle}
-      >
+      <VectorParameter
+        label={message('opacity')}
+        icon={<Droplet size={16} aria-hidden="true" className="shrink-0" />}
+        value={opacity * 100}
+        min={0}
+        max={100}
+        step={1}
+        precision={0}
+        unit="%"
+        onFocus={onNumberFocus}
+        onPreview={(value) => transaction.preview({ opacity: value / 100 })}
+        onCommit={(value) => void transaction.commit({ opacity: value / 100 })}
+        onCancel={transaction.cancel}
+      />
+      {same && definition.capabilities.strokeScale ? (
         <VectorParameter
-          label={message('opacity')}
-          value={opacity * 100}
-          min={0}
+          label={message('strokeScale')}
+          icon={<Paintbrush size={16} aria-hidden="true" className="shrink-0" />}
+          value={strokeScale}
+          min={0.01}
           max={100}
-          step={1}
-          precision={0}
-          unit="%"
-          onPreview={(value) => transaction.preview({ opacity: value / 100 })}
-          onCommit={(value) => void transaction.commit({ opacity: value / 100 })}
+          step={0.1}
+          precision={2}
+          unit="x"
+          onFocus={onNumberFocus}
+          onPreview={(value) => transaction.preview({ strokeScale: value })}
+          onCommit={(value) => void transaction.commit({ strokeScale: value })}
           onCancel={transaction.cancel}
         />
-      </VectorProperty>
-      {same && definition.capabilities.strokeScale ? (
-        <VectorProperty
-          id="vector-stroke"
-          title={message('strokeScale')}
-          trigger={<CompactCommandToken>{strokeScale.toFixed(2)}×</CompactCommandToken>}
-          active={active}
-          onToggle={toggle}
-        >
-          <VectorParameter
-            label={message('strokeScale')}
-            value={strokeScale}
-            min={0.01}
-            max={100}
-            step={0.1}
-            precision={2}
-            unit="x"
-            onPreview={(value) => transaction.preview({ strokeScale: value })}
-            onCommit={(value) => void transaction.commit({ strokeScale: value })}
-            onCancel={transaction.cancel}
-          />
-        </VectorProperty>
       ) : null}
     </>
   );

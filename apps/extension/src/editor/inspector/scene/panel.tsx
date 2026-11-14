@@ -39,13 +39,8 @@ export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps)
   return (
     <InspectorLayout>
       <div data-ui="editor.frame-panel" className="min-w-0">
-        <div className="sniptale-parameter-stack pt-2">
-          <EditorInspectorDetails
-            preferenceId="frame:background"
-            label={translate('editor.scene.backgroundSection')}
-            level="section"
-            initiallyOpen
-          >
+        <div className="sniptale-parameter-stack !gap-2">
+          <div className="sniptale-parameter-stack">
             <EditorInspectorFrameBackgroundModeControl
               frameDraft={props.frameDraft}
               lastFillModeRef={props.lastFillModeRef}
@@ -86,7 +81,7 @@ export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps)
                 )}
               </>
             )}
-          </EditorInspectorDetails>
+          </div>
           {!isFrameBackgroundNone(props.frameDraft) && (
             <>
               <EditorInspectorDetails
@@ -122,7 +117,7 @@ export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps)
           )}
         </div>
         {!isFrameBackgroundNone(props.frameDraft) && (
-          <div data-ui="editor.frame.actions" className="px-2 pb-2 pt-2">
+          <div data-ui="editor.frame.actions" className="px-2 pt-2">
             <FrameApplyButton
               disabled={isFrameBackgroundDefault(props.frameDraft)}
               onApplyFrame={() => props.setFrameDraft(resetFrameBackground)}

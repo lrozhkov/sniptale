@@ -118,18 +118,33 @@ export function createEditorVectorCommands(
 
   async function insertVectorElement(
     definitionValue: EditorVectorDefinition,
-    position?: { x: number; y: number }
+    position?: { x: number; y: number },
+    colors?: Readonly<Record<string, string>>,
+    style?: { opacity: number; strokeScale: number }
   ): Promise<boolean> {
+    const palette = { ...colors };
+    const opacity = style?.opacity ?? 1;
+    const strokeScale = style?.strokeScale ?? 1;
+    if (
+      !Number.isFinite(opacity) ||
+      opacity < 0 ||
+      opacity > 1 ||
+      !Number.isFinite(strokeScale) ||
+      strokeScale < 0.01 ||
+      strokeScale > 100
+    )
+      return false;
     const context = captureEditorVectorCommandContext(controller, position);
     if (!context) return false;
     const { canvas, source, current } = context;
     styles.cancelActive();
     const definition = await validateEditorVectorDefinition(definitionValue);
     if (!current()) return false;
-    const object = await createEditorVectorRuntime(
-      definition,
-      createEditorVectorInstance(definition.id)
-    );
+    const instance = createEditorVectorInstance(definition.id);
+    instance.overrides.colors = palette;
+    instance.overrides.strokeScale = strokeScale;
+    const object = await createEditorVectorRuntime(definition, instance);
+    object.set('opacity', opacity);
     let accepted = false;
     try {
       if (!current()) return false;

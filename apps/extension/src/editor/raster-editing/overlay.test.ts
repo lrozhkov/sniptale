@@ -167,3 +167,60 @@ it('updates the raster circle on its overlay without scheduling a scene render',
   render.mockRestore();
   await canvas.dispose();
 });
+
+it.each([1, 2, 4])(
+  'projects the cursor center and document diameter with constant stroke at zoom %s',
+  async (zoom) => {
+    const image = new FabricImage(bitmap('white'), { left: 0, top: 0 });
+    const canvas = new Canvas(undefined, {
+      width: 320,
+      height: 320,
+      renderOnAddRemove: false,
+      enableRetinaScaling: false,
+    });
+    canvas.add(image);
+    canvas.setViewportTransform([zoom, 0, 0, zoom, 9, 7]);
+    const overlay = createRasterOverlay(canvas);
+    try {
+      for (const sourceToScene of [
+        [2, 0, 0, 0.5, 20, 20],
+        [0, 2, -0.5, 0, 30, 20],
+        [-1.5, 0.4, 0.7, 0.6, 30, 20],
+      ] as const) {
+        const accepted = {
+          ...target(image),
+          geometry: { ...target(image).geometry, sourceToScene },
+        };
+        overlay.cursor?.(accepted, { x: 2, y: 2 }, 20);
+        const pixels = canvas.contextTop.getImageData(0, 0, 320, 320).data;
+        const xs: number[] = [],
+          ys: number[] = [];
+        for (let y = 0; y < 320; y++)
+          for (let x = 0; x < 320; x++)
+            if (pixels[(y * 320 + x) * 4 + 3]) {
+              xs.push(x);
+              ys.push(y);
+            }
+        const left = Math.min(...xs),
+          right = Math.max(...xs);
+        const top = Math.min(...ys),
+          bottom = Math.max(...ys);
+        const centerX = zoom * (2 * sourceToScene[0] + 2 * sourceToScene[2] + sourceToScene[4]) + 9;
+        const centerY = zoom * (2 * sourceToScene[1] + 2 * sourceToScene[3] + sourceToScene[5]) + 7;
+        expect(Math.abs((left + right + 1) / 2 - centerX)).toBeLessThanOrEqual(1);
+        expect(Math.abs((top + bottom + 1) / 2 - centerY)).toBeLessThanOrEqual(1);
+        expect(Math.abs(right - left + 1 - (20 * zoom + 3))).toBeLessThanOrEqual(1);
+        expect(Math.abs(bottom - top + 1 - (20 * zoom + 3))).toBeLessThanOrEqual(1);
+        // At the right equator the outline stays three screen pixels thick, plus antialiasing.
+        let ink = 0;
+        for (let x = Math.floor(centerX); x < 320; x++)
+          if (pixels[(Math.floor(centerY) * 320 + x) * 4 + 3]) ink++;
+        expect(ink).toBeGreaterThanOrEqual(3);
+        expect(ink).toBeLessThanOrEqual(5);
+      }
+    } finally {
+      overlay.dispose();
+      await canvas.dispose();
+    }
+  }
+);

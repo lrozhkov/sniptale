@@ -251,6 +251,8 @@ export async function openCatalogEditor(
 ): Promise<Page> {
   const page = await context.newPage();
   await page.setViewportSize(viewport);
+  await context.route('https://api.iconify.design/**', (route) => route.abort());
+  await context.addInitScript(() => localStorage.setItem('sniptale-locale-preference', 'en'));
   await page.goto(`chrome-extension://${extensionId}/apps/extension/src/editor/index.html`, {
     waitUntil: 'domcontentloaded',
   });
@@ -274,32 +276,90 @@ export async function openCatalogEditor(
   await expect(page.locator('[data-ui="editor.canvas.document-boundary"]')).toBeVisible();
   await page.locator('[data-ui="editor.floating.layers.mode.elements"]').click();
   await expect(page.locator('[data-ui="editor.elements.panel"]')).toBeVisible();
-  await page.locator('[data-ui="editor.elements.manage"]').click();
-  await expect(page.locator('[data-ui="editor.elements.enable-network"]')).toBeDisabled();
+  await waitCatalogEditorAutosave(page);
   return page;
 }
 
-/** Uses the actual product click and Chromium's native host permission decision. */
+/** Opens the global catalog owner through its supported Settings route. */
+export async function openCatalogSettings(page: Page): Promise<Page> {
+  const settings = await page.context().newPage();
+  await settings.setViewportSize(page.viewportSize() ?? { width: 1280, height: 560 });
+  await settings.goto(
+    new URL(
+      '/apps/extension/src/settings/index.html?section=editor-resources&view=icons',
+      page.url()
+    ).href
+  );
+  await expect(
+    settings.getByRole('textbox', { name: 'Catalog server', exact: true })
+  ).toBeEnabled();
+  return settings;
+}
+
+/** Uses Settings Save and Chromium's native host permission decision. */
 export async function enableCatalogSource(
   page: Page,
   baseUrl: string,
   decision: 'accept' | 'deny'
 ): Promise<void> {
-  await page.locator('[data-ui="editor.elements.source-url"]').fill(baseUrl);
-  await page.locator('[data-ui="editor.elements.consent"]').check();
-  await expect(page.locator('[data-ui="editor.elements.enable-network"]')).toBeEnabled();
-  await page.bringToFront();
-  await page.locator('[data-ui="editor.elements.enable-network"]').click();
+  const settings = await openCatalogSettings(page);
+  await settings.getByRole('textbox', { name: 'Catalog server', exact: true }).fill(baseUrl);
+  await settings.bringToFront();
+  await settings.getByRole('button', { name: 'Save', exact: true }).click();
   // The native browser-owned prompt does not expose a Playwright DOM target.
-  await page.waitForTimeout(250);
+  await settings.waitForTimeout(250);
   if (decision === 'accept') acceptOptionalExtensionPermissionPrompt();
   else denyOptionalExtensionPermissionPrompt();
+  if (decision === 'accept')
+    await expect
+      .poll(() => readCatalogLibrarySnapshot(settings).then((value) => value.baseUrl))
+      .toBe(baseUrl);
+  else
+    await expect(settings.getByRole('alert')).toContainText(
+      'Browser access to this server is required.'
+    );
+  await settings.close();
+  await page.reload();
+  await expect(page.locator('[data-ui="editor.canvas.document-boundary"]')).toBeVisible();
+  if (!(await page.locator('[data-ui="editor.elements.panel"]').isVisible()))
+    await page.locator('[data-ui="editor.floating.layers.mode.elements"]').click();
+  await expect(page.locator('[data-ui="editor.elements.panel"]')).toBeVisible();
+}
+
+export async function checkCatalogSource(page: Page): Promise<void> {
+  const settings = await openCatalogSettings(page);
+  await settings.getByRole('button', { name: 'Check', exact: true }).click();
+  await expect(settings.getByRole('status')).toContainText('Connection established');
+  await settings.close();
+}
+
+/** Reads durable progress independently of the inspector's icon-only actions. */
+export async function readCatalogDownloadProgress(page: Page) {
+  const snapshot = await readCatalogLibrarySnapshot(page);
+  return snapshot.acceptedRows.flatMap((text) => {
+    const row: unknown = JSON.parse(text);
+    if (typeof row !== 'object' || row === null || !('kind' in row) || row.kind !== 'download')
+      return [];
+    if (
+      !('accepted' in row) ||
+      typeof row.accepted !== 'object' ||
+      row.accepted === null ||
+      !('manifest' in row) ||
+      !Array.isArray(row.manifest) ||
+      !('status' in row)
+    )
+      throw new Error('Invalid durable vector download.');
+    return [
+      {
+        accepted: Object.keys(row.accepted).length,
+        total: row.manifest.length,
+        status: row.status,
+      },
+    ];
+  });
 }
 
 export async function searchCatalogFromUi(page: Page, query: string): Promise<void> {
-  const management = page.locator('[data-ui="editor.elements.management"]');
-  if (await management.isVisible())
-    await management.getByRole('button', { name: /Back|Назад/u }).click();
   const search = page
     .locator('[data-ui="editor.elements.panel"]')
     .getByRole('searchbox', { name: /Search|Поиск/u });

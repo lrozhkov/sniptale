@@ -1,3 +1,4 @@
+import { INSPECTOR_CONTENT_INSET_CLASS_NAME } from '../../inspector/chrome';
 import { EditorElementsPanel } from '../../inspector/elements';
 import { ImageAIInspector } from '../../ai/inspector';
 import { createImageEditorSession, type ImageEditorSession } from '../../ai/session';
@@ -146,8 +147,9 @@ function EditorFloatingLayersPanelBody(props: {
         props.scrollPositions.set(props.activeMode, event.currentTarget.scrollTop)
       }
       className={[
-        'min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-2',
-        '[scrollbar-gutter:stable_both-edges] [scrollbar-width:thin]',
+        'min-h-0 flex-1 overflow-x-hidden overflow-y-auto',
+        INSPECTOR_CONTENT_INSET_CLASS_NAME,
+        '[scrollbar-width:thin]',
       ].join(' ')}
     >
       {props.activeMode === 'ai' ? (

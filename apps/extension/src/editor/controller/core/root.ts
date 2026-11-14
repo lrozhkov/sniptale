@@ -53,9 +53,11 @@ export class ImageEditorController extends ImageEditorControllerSceneActions {
   /** Insert a published vector at a scene point, or at the visible document center. */
   insertVectorElement(
     definition: EditorVectorDefinition,
-    position?: { x: number; y: number }
+    position?: { x: number; y: number },
+    colors?: Readonly<Record<string, string>>,
+    style?: { opacity: number; strokeScale: number }
   ): Promise<boolean> {
-    return this.vectorCommands.insertVectorElement(definition, position);
+    return this.vectorCommands.insertVectorElement(definition, position, colors, style);
   }
 
   /** Prepare selected vector bindings once before a palette or opacity gesture. */

@@ -170,3 +170,86 @@ it('does not request fallback metadata after canceled artwork settles', async ()
   expect(f.catalog.collection).not.toHaveBeenCalled();
   expect(prepared).not.toHaveBeenCalled();
 });
+
+it(
+  'refreshes a cached manifest only on explicit checks, ' +
+    'coalesces checks and honors the five minute cooldown',
+  async () => {
+    const f = preparationFixture();
+    let now = 1_000;
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const signal = new AbortController().signal;
+    try {
+      f.catalog.collection = vi.fn(async () => ({
+        source: f.source,
+        data: { prefix: 'test', uncategorized: ['old'], info },
+      }));
+      expect((await f.preparation.collection('test', signal)).names).toEqual(['old']);
+      const entered = deferred<void>();
+      const release = deferred<void>();
+      f.catalog.collection = vi.fn(async () => {
+        entered.resolve();
+        await release.promise;
+        return { source: f.source, data: { prefix: 'test', uncategorized: ['new'], info } };
+      });
+      expect((await f.preparation.collection('test', signal)).names).toEqual(['old']);
+      expect(f.catalog.collection).not.toHaveBeenCalled();
+      const first = f.preparation.refreshCollection('test', signal);
+      await entered.promise;
+      const second = f.preparation.refreshCollection('test', signal);
+      release.resolve();
+      expect((await first).names).toEqual(['new']);
+      expect((await second).names).toEqual(['new']);
+      now += 5 * 60_000 - 1;
+      expect((await f.preparation.refreshCollection('test', signal)).names).toEqual(['new']);
+      expect(f.catalog.collection).toHaveBeenCalledOnce();
+      now += 1;
+      await f.preparation.refreshCollection('test', signal);
+      expect(f.catalog.collection).toHaveBeenCalledTimes(2);
+    } finally {
+      clock.mockRestore();
+      f.session.dispose();
+    }
+  }
+);
+
+it('does not mistake a concurrent cached manifest read for a fresh explicit check', async () => {
+  const f = preparationFixture();
+  const entered = deferred<void>();
+  const release = deferred<void>();
+  vi.mocked(f.cache.read).mockImplementation(async () => {
+    entered.resolve();
+    await release.promise;
+    return { prefix: 'test', uncategorized: ['old'], info };
+  });
+  f.catalog.collection = vi.fn(async () => ({
+    source: f.source,
+    data: { prefix: 'test', uncategorized: ['added'], info },
+  }));
+  const signal = new AbortController().signal;
+  const cached = f.preparation.collection('test', signal);
+  await entered.promise;
+  const fresh = f.preparation.refreshCollection('test', signal);
+  release.resolve();
+  expect((await cached).names).toEqual(['old']);
+  expect((await fresh).names).toEqual(['added']);
+  expect(f.catalog.collection).toHaveBeenCalledOnce();
+  f.session.dispose();
+});
+
+it('keeps an explicit failed manifest check under cooldown without retrying or publishing', async () => {
+  const f = preparationFixture();
+  f.catalog.collection = vi.fn(async () => {
+    throw new EditorVectorCatalogError('network-failed');
+  });
+  const signal = new AbortController().signal;
+  await expect(f.preparation.refreshCollection('test', signal)).rejects.toMatchObject({
+    code: 'network-failed',
+  });
+  await expect(f.preparation.refreshCollection('test', signal)).rejects.toMatchObject({
+    code: 'network-failed',
+  });
+  expect(f.catalog.collection).toHaveBeenCalledOnce();
+  expect(f.dependencies.downloads.begin).not.toHaveBeenCalled();
+  f.session.dispose();
+});

@@ -6,14 +6,25 @@ import type { RasterPresentation } from './session';
 import { rasterCropHandles } from './crop';
 
 type Cursor = { point: SourcePoint; diameter: number };
-function drawCursor(context: CanvasRenderingContext2D, matrix: TMat2D, cursor: Cursor) {
+function drawCursor(
+  context: CanvasRenderingContext2D,
+  matrix: TMat2D,
+  viewport: TMat2D,
+  cursor: Cursor
+) {
   context.save();
   try {
-    context.transform(...matrix);
+    const x = matrix[0] * cursor.point.x + matrix[2] * cursor.point.y + matrix[4];
+    const y = matrix[1] * cursor.point.x + matrix[3] * cursor.point.y + matrix[5];
+    // Project only the center through the layer; brush shape belongs to document space.
+    context.transform(viewport[0], viewport[1], viewport[2], viewport[3], x, y);
     context.setLineDash([]);
-    const scale = Math.max(Math.hypot(matrix[0], matrix[1]), Math.hypot(matrix[2], matrix[3]));
+    const scale = Math.max(
+      Math.hypot(viewport[0], viewport[1]),
+      Math.hypot(viewport[2], viewport[3])
+    );
     context.beginPath();
-    context.arc(cursor.point.x, cursor.point.y, cursor.diameter / 2, 0, Math.PI * 2);
+    context.arc(0, 0, cursor.diameter / 2, 0, Math.PI * 2);
     context.strokeStyle = '#111';
     context.lineWidth = 3 / scale;
     context.stroke();
@@ -224,7 +235,7 @@ export function createRasterOverlay(
       context.strokeStyle = '#fff';
       context.lineWidth = 1;
       context.setLineDash([4, 4]);
-      if (cursor) drawCursor(context, matrix, cursor);
+      if (cursor) drawCursor(context, matrix, canvas.viewportTransform, cursor);
       if (crop) drawCrop(context, matrix, crop, target.geometry);
       else {
         if (outline) drawSelection(context, matrix, outline);

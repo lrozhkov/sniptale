@@ -50,7 +50,9 @@ function persistedDownloads(f: ReturnType<typeof fixture>, names: string[]) {
         generation: (previous?.generation ?? 0) + 1,
         source: input.source ? { ...input.source } : null,
         manifest: [...input.manifest],
-        accepted: previous?.accepted ?? {},
+        accepted: Object.fromEntries(
+          Object.entries(previous?.accepted ?? {}).filter(([name]) => input.manifest.includes(name))
+        ),
         status: input.manifest.every((name) => Object.hasOwn(previous?.accepted ?? {}, name))
           ? ('ready' as const)
           : ('downloading' as const),
@@ -343,3 +345,45 @@ it('retains valid download siblings when one requested definition is refused', a
   });
   f.session.dispose();
 });
+
+it(
+  'explicit name checks preserve removed artwork ' +
+    'and download only additions into the existing collection',
+  async () => {
+    const f = fixture();
+    f.setSettings({ networkEnabled: true, disclosureAccepted: true });
+    const stored = persistedDownloads(f, ['old', 'kept']);
+    await f.session.refresh();
+    await f.session.downloadCollection('test');
+    const original = [...stored.rows.values()][0];
+    if (!original) throw new Error('Missing completed download.');
+    const oldDefinition = original.accepted['old'];
+    f.catalog.collection = vi.fn(async () => ({
+      source: f.source,
+      data: { prefix: 'test', uncategorized: ['kept', 'added'], info: { name: 'Test collection' } },
+    }));
+    vi.mocked(f.catalog.assets).mockClear();
+    vi.mocked(f.dependencies.downloads.begin).mockClear();
+    await expect(f.session.checkCollectionUpdates('test')).resolves.toEqual({
+      added: 1,
+      removed: 1,
+    });
+    expect(f.catalog.assets).not.toHaveBeenCalled();
+    expect(f.dependencies.downloads.begin).not.toHaveBeenCalled();
+    expect(stored.rows.get(original.collectionId)).toEqual(original);
+    await f.session.downloadCollection('test');
+    expect(f.library.createCollection).toHaveBeenCalledOnce();
+    expect(f.catalog.assets).toHaveBeenCalledExactlyOnceWith(
+      'test',
+      ['added'],
+      expect.any(AbortSignal)
+    );
+    expect(original.accepted['old']).toBe(oldDefinition);
+    expect(f.library.removeItem).not.toHaveBeenCalled();
+    expect(stored.rows.get(original.collectionId)?.accepted['kept']).toBe(
+      original.accepted['kept']
+    );
+    expect(stored.rows.get(original.collectionId)?.accepted).toHaveProperty('added');
+    f.session.dispose();
+  }
+);

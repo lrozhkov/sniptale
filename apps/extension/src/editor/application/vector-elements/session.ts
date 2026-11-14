@@ -18,7 +18,7 @@ import {
 } from '../../../features/editor/vector-catalog';
 import { EditorVectorCatalogPreparation } from './catalog-preparation';
 import { EditorVectorDownloadJob } from './download-job';
-import { authorizeEditorVectorSource } from './source-commands';
+import { activateDefaultEditorVectorSource, authorizeEditorVectorSource } from './source-commands';
 import { importEditorVectorFiles } from './import-commands';
 
 export interface EditorVectorCatalogPort {
@@ -48,7 +48,7 @@ export interface EditorVectorCatalogEntry {
   imported: boolean;
   issue: boolean;
 }
-export type EditorVectorLibraryTab = 'catalog' | 'favorites' | 'mine';
+export type EditorVectorLibraryTab = 'catalog' | 'favorites';
 export interface EditorVectorLibrarySnapshot {
   query: string;
   tab: EditorVectorLibraryTab;
@@ -186,7 +186,11 @@ class MountedVectorLibrarySession {
     );
   sourceToken = (): EditorVectorSourceToken => {
     const settings = this.state.settings;
-    if (!settings?.networkEnabled || !settings.disclosureAccepted)
+    if (
+      !settings?.networkEnabled ||
+      !settings.disclosureAccepted ||
+      settings.incarnation === 'unconfigured'
+    )
       throw new Error('Vector catalog is disabled.');
     return {
       sourceId: settings.baseUrl,
@@ -201,6 +205,8 @@ class MountedVectorLibrarySession {
   private localEntries(): EditorVectorCatalogEntry[] {
     const { local, collection, tab } = this.state;
     const ownedIds = new Set(local.members.map((member) => member.definitionId));
+    const importedGroup = collection.startsWith('imported:');
+    const importedPrefix = collection.startsWith('imported:prefix:') ? collection.slice(16) : null;
     const memberIds = collection.startsWith('local:')
       ? new Set(
           local.members
@@ -213,7 +219,10 @@ class MountedVectorLibrarySession {
       .filter(
         (item) =>
           (tab !== 'favorites' || item.favorite) &&
-          (tab !== 'mine' || item.imported || ownedIds.has(item.definitionId)) &&
+          (!importedGroup ||
+            (item.imported &&
+              !ownedIds.has(item.definitionId) &&
+              item.prefix === importedPrefix)) &&
           (!memberIds || memberIds.has(item.definitionId))
       )
       .map((item) => ({
@@ -269,7 +278,10 @@ class MountedVectorLibrarySession {
   refresh = async () => {
     try {
       const { library, downloads } = this.dependencies;
-      const [local, settings] = await Promise.all([library.readCatalog(), library.readSettings()]);
+      const [local, settings] = await Promise.all([
+        library.readCatalog(),
+        activateDefaultEditorVectorSource(library),
+      ]);
       if (this.disposed) return;
       const retained = await Promise.all(
         local.collections.map((collection) => downloads.inspect(collection.id))
@@ -288,13 +300,30 @@ class MountedVectorLibrarySession {
       this.failure(error, { status: 'error' });
     }
   };
+  private uniqueEntries(entries: EditorVectorCatalogEntry[]) {
+    const preparedIds = new Set<string>();
+    return entries.filter((entry) => {
+      const id = entry.definition?.id ?? (entry.local ? entry.key : null);
+      if (id === null) return true;
+      if (preparedIds.has(id)) return false;
+      preparedIds.add(id);
+      return true;
+    });
+  }
   private acceptPreview(key: string, definition: EditorVectorDefinition) {
     const item = this.state.local.items.find((row) => row.definitionId === definition.id);
-    this.emit({
-      entries: this.state.entries.map((row) =>
-        row.key === key ? { ...row, definition, favorite: item?.favorite ?? false } : row
-      ),
-    });
+    const entries = this.uniqueEntries(
+      this.state.entries.map((row) =>
+        row.key === key || (row.local && row.key === definition.id)
+          ? { ...row, definition, favorite: item?.favorite ?? false }
+          : row
+      )
+    );
+    const selectedKey =
+      this.state.selectedKey === key && !entries.some((row) => row.key === key)
+        ? (entries.find((row) => row.definition?.id === definition.id)?.key ?? null)
+        : this.state.selectedKey;
+    this.emit({ entries, selectedKey });
   }
   private refusedPreview(key: string) {
     this.emit({
@@ -316,6 +345,7 @@ class MountedVectorLibrarySession {
     if (
       tab !== 'catalog' ||
       collection.startsWith('local:') ||
+      collection.startsWith('imported:') ||
       !settings?.networkEnabled ||
       !settings.disclosureAccepted ||
       (!query && !collection.startsWith('remote:')) ||
@@ -335,22 +365,27 @@ class MountedVectorLibrarySession {
     append: boolean,
     hasMore = icons.length === 64
   ) {
-    const incoming: EditorVectorCatalogEntry[] = icons.map((id) => ({
-      key: id,
-      name: id.split(':')[1]!,
-      prefix: id.split(':')[0]!,
-      definition: this.preparation.definition(source, id),
-      favorite: false,
-      local: false,
-      imported: false,
-      issue: false,
-    }));
-    const entries = append
-      ? [
-          ...this.state.entries,
-          ...incoming.filter((entry) => !this.state.entries.some((row) => row.key === entry.key)),
-        ]
-      : incoming;
+    const incoming: EditorVectorCatalogEntry[] = icons.map((id) => {
+      const definition = this.preparation.definition(source, id);
+      const item = definition
+        ? this.state.local.items.find((row) => row.definitionId === definition.id)
+        : undefined;
+      return {
+        key: id,
+        name: id.split(':')[1]!,
+        prefix: id.split(':')[0]!,
+        definition,
+        favorite: item?.favorite ?? false,
+        local: false,
+        imported: false,
+        issue: false,
+      };
+    });
+    const retained = append ? this.state.entries : this.localEntries();
+    const entries = this.uniqueEntries([
+      ...retained,
+      ...incoming.filter((entry) => !retained.some((row) => row.key === entry.key)),
+    ]);
     this.emit({
       entries,
       status: 'ready',
@@ -502,17 +537,44 @@ class MountedVectorLibrarySession {
       this.emit({ busy: false });
     }
   };
-  importFiles = async (files: readonly File[], collectionId?: string) =>
+  importFiles = async (files: readonly File[], collectionId?: string, newCollectionName?: string) =>
     this.perform(async () => {
-      const completed = await importEditorVectorFiles(files, collectionId, {
-        library: this.dependencies.library,
-        isAlive: this.isAlive,
-        accepted: (definition) => {
-          this.definitions.set(definition.id, definition);
+      const result = await importEditorVectorFiles(
+        files,
+        collectionId,
+        {
+          library: this.dependencies.library,
+          isAlive: this.isAlive,
+          accepted: (definition) => {
+            this.definitions.set(definition.id, definition);
+          },
+          progress: (imports) => this.emit({ imports }),
         },
-        progress: (imports) => this.emit({ imports }),
-      });
-      if (completed) this.emit({ tab: 'mine' });
+        newCollectionName
+      );
+      if (result.completed && result.collectionId) {
+        const local = await this.dependencies.library.readCatalog();
+        if (!this.isAlive()) return;
+        const destination = local.collections.find((row) => row.id === result.collectionId);
+        if (!destination) {
+          this.emit({ local });
+          return;
+        }
+        this.cancelSearch();
+        this.expandedSearch = null;
+        this.emit({
+          local,
+          tab: 'catalog',
+          collection: `local:${destination.id}`,
+          query: '',
+          selectedKey: null,
+          entries: [],
+          scrollTop: 0,
+          visibleCount: 128,
+          hasMore: false,
+          remoteStart: 0,
+        });
+      }
     });
   favorite = async (entry: EditorVectorCatalogEntry) => {
     const definition = entry.definition;
@@ -525,15 +587,7 @@ class MountedVectorLibrarySession {
         await library.publish(definition, {
           kind: 'favorite',
           expectedItem: admission.expectedItem,
-          ...(this.state.settings
-            ? {
-                source: {
-                  sourceId: this.state.settings.baseUrl,
-                  incarnation: this.state.settings.incarnation,
-                  generation: this.state.settings.sourceGeneration,
-                },
-              }
-            : {}),
+          source: this.sourceToken(),
         });
       } else await library.setFavorite(definition.id, !entry.favorite);
     });
@@ -591,6 +645,7 @@ class MountedVectorLibrarySession {
   checkConnection = async () =>
     this.perform(async () => {
       this.admitNetwork();
+      this.sourceToken();
       await this.dependencies.catalog.check();
       this.emit({ connected: true });
       await this.loadCollections();
@@ -662,6 +717,7 @@ export function createEditorVectorLibrarySession(dependencies: SessionDependenci
     saveSettings: session.saveSettings,
     enableSource: session.enableSource,
     checkConnection: session.checkConnection,
+    checkCollectionUpdates: (prefix: string) => download.check(prefix),
     downloadCollection: (prefix: string) => download.start(prefix),
     cancelDownload: () => download.cancel(),
     clearCache: () =>

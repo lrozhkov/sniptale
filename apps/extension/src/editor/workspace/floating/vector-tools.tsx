@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Group } from 'fabric';
-import { FlipHorizontal2, FlipVertical2, RotateCcw } from 'lucide-react';
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { FlipHorizontal2, FlipVertical2 } from 'lucide-react';
+import { ContentToolbarButton, ContentToolbarDivider } from '@sniptale/ui/content-toolbar';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import { useEditorController } from '../../application/controller-context';
 import {
@@ -10,27 +10,29 @@ import {
 } from './use-vector-style-transaction';
 import { useEditorVectorSelection } from './vector-selection';
 import { EditorVectorStyleProperties } from './vector-style-properties';
-import { useEditorVectorPresets, EditorVectorPresetControls } from './vector-presets';
 const message = (
   key: keyof (typeof import('../../../platform/i18n/catalogs/en.json'))['editor']['elements']
 ) => translate(`editor.elements.${key}`);
 function VectorReflectionActions({
   first,
   transaction,
+  onBeforeApply,
 }: {
   first: Group;
   transaction: EditorVectorStyleTransaction;
+  onBeforeApply(): void;
 }) {
   const controller = useEditorController();
   return (
     <>
       <ContentToolbarButton
         tone="property"
+        className="!h-7 !min-h-7 !w-7 !min-w-7 !rounded !p-0"
         title={translate('editor.layerEffects.flipHorizontal')}
         aria-label={translate('editor.layerEffects.flipHorizontal')}
         dataUi="editor.vector.flip-horizontal"
         onClick={() => {
-          transaction.cancel();
+          onBeforeApply();
           if (first.sniptaleId)
             void controller
               .applyLayerTransformation(first.sniptaleId, 'flip-horizontal')
@@ -41,11 +43,12 @@ function VectorReflectionActions({
       </ContentToolbarButton>
       <ContentToolbarButton
         tone="property"
+        className="!h-7 !min-h-7 !w-7 !min-w-7 !rounded !p-0"
         title={translate('editor.layerEffects.flipVertical')}
         aria-label={translate('editor.layerEffects.flipVertical')}
         dataUi="editor.vector.flip-vertical"
         onClick={() => {
-          transaction.cancel();
+          onBeforeApply();
           if (first.sniptaleId)
             void controller
               .applyLayerTransformation(first.sniptaleId, 'flip-vertical')
@@ -58,7 +61,7 @@ function VectorReflectionActions({
   );
 }
 
-/** One disclosure lifetime owns accepted vector styling commands and picker cancellation. */
+/** Inline fields and color pickers share one accepted vector styling transaction. */
 export function EditorVectorProperties() {
   useAppLocale();
   const {
@@ -73,48 +76,19 @@ export function EditorVectorProperties() {
     strokeScale,
   } = useEditorVectorSelection();
   const transaction = useVectorStyleTransaction();
-  const presets = useEditorVectorPresets(first, definition, same, selectionKey, transaction);
   const rootRef = useRef<HTMLDivElement>(null);
   const cancel = useRef(transaction.cancel);
   cancel.current = transaction.cancel;
-  const [active, setActive] = useState<string | null>(null);
+  const [paletteKey, setPaletteKey] = useState(0);
   useEffect(() => {
     cancel.current();
-    setActive(null);
+    setPaletteKey((value) => value + 1);
     return () => cancel.current();
   }, [controller, selectionKey, historyIndex]);
-  useEffect(() => {
-    if (!active) return;
-    const outside = (event: globalThis.PointerEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node) || rootRef.current?.contains(target)) return;
-      const element = target instanceof Element ? target : target.parentElement;
-      if (element?.closest('[data-floating-ui-root="true"]')) return;
-      cancel.current();
-      setActive(null);
-    };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        cancel.current();
-        setActive(null);
-        rootRef.current
-          ?.querySelector<HTMLElement>(
-            `[data-ui="editor.floating.tool-properties.group.${active}"]`
-          )
-          ?.focus();
-      }
-    };
-    document.addEventListener('pointerdown', outside);
-    document.addEventListener('keydown', escape);
-    return () => {
-      document.removeEventListener('pointerdown', outside);
-      document.removeEventListener('keydown', escape);
-    };
-  }, [active]);
   if (!first || !definition) return null;
-  const toggle = (id: string) => {
+  const closeProperties = () => {
     transaction.cancel();
-    setActive((current) => (current === id ? null : id));
+    setPaletteKey((value) => value + 1);
   };
   return (
     <div
@@ -131,25 +105,19 @@ export function EditorVectorProperties() {
         same={same}
         opacity={transaction.draft.opacity ?? opacity}
         strokeScale={transaction.draft.strokeScale ?? strokeScale}
-        active={active}
-        toggle={toggle}
         transaction={transaction}
+        paletteKey={paletteKey}
+        onColorOpen={transaction.cancel}
+        onNumberFocus={closeProperties}
       />
+      {objects.length === 1 || same ? <ContentToolbarDivider className="!my-0 !h-5" /> : null}
       {objects.length === 1 ? (
-        <VectorReflectionActions first={first} transaction={transaction} />
+        <VectorReflectionActions
+          first={first}
+          transaction={transaction}
+          onBeforeApply={closeProperties}
+        />
       ) : null}
-      {same ? (
-        <ContentToolbarButton
-          tone="property"
-          title={message('reset')}
-          aria-label={message('reset')}
-          dataUi="editor.vector.reset"
-          onClick={() => void transaction.commit({ reset: true })}
-        >
-          <RotateCcw size={16} />
-        </ContentToolbarButton>
-      ) : null}
-      {same ? <EditorVectorPresetControls model={presets} active={active} toggle={toggle} /> : null}
       {transaction.error ? (
         <span role="alert" className="max-w-48 text-xs text-[var(--sniptale-color-danger)]">
           {message('operationFailed')}

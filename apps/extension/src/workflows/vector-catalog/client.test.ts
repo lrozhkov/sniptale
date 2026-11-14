@@ -1,10 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import type { EditorVectorSettings } from '../../composition/persistence/vector-elements';
 import { isCatalogCommand, type CatalogResponse } from '../../features/editor/vector-catalog';
-import {
-  createEditorVectorCatalogClient,
-  requestEditorVectorCatalogPermission,
-} from './catalog-client';
+import { createEditorVectorCatalogClient, requestEditorVectorCatalogPermission } from './client';
 const settings: EditorVectorSettings = {
   key: 'settings',
   kind: 'settings',

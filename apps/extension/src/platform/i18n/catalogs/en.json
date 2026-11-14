@@ -587,7 +587,7 @@
       "storageDrafts": "Storage and drafts",
       "drafts": "Drafts",
       "annotations": "Frames and annotations",
-      "editorResources": "Palettes and styles",
+      "editorResources": "Editor resources",
       "aiConnections": "Connections and models",
       "aiPrompts": "Prompts and templates",
       "accessData": "Access and data",
@@ -604,7 +604,7 @@
         "storageDrafts": "Manage local storage, retention periods, and drafts.",
         "drafts": "Manage working copies, Trash, and retention periods.",
         "annotations": "Configure frames, callouts, numbering, and annotation tags.",
-        "editorResources": "Manage editor palettes, styles, gradients, and backgrounds.",
+        "editorResources": "Manage editor palettes, styles, backgrounds and the icon catalog.",
         "aiConnections": "Connect AI providers and choose the available models.",
         "aiPrompts": "Configure system prompts and reusable templates.",
         "voiceInput": "Test and configure voice input for annotations and editors.",
@@ -639,7 +639,8 @@
         "telemetry": "Action history",
         "permissions": "Permissions",
         "privacy": "Privacy",
-        "secretProtection": "Secret protection"
+        "secretProtection": "Secret protection",
+        "icons": "Icons"
       },
       "documentTitle": "Sniptale — Settings",
       "appearance": "Interface",
@@ -842,6 +843,31 @@
           "radial": "Radial",
           "conic": "Conic"
         }
+      },
+      "icons": {
+        "source": "Catalog server",
+        "network": "Online catalog",
+        "networkDescription": "Search text and requested icon names are sent to the selected catalog server. Imported icons and favorites remain available offline.",
+        "check": "Check",
+        "checked": "Connection established",
+        "cache": "Catalog cache",
+        "cacheUsage": "{entries} entries · {used} of {budget}",
+        "clearCache": "Clear cache",
+        "collections": "Local collections",
+        "newCollection": "Collection name",
+        "create": "Create collection",
+        "rename": "Rename collection",
+        "presets": "Installed packs",
+        "emptyCollections": "No local collections yet.",
+        "emptyPresets": "No installed packs yet.",
+        "saveFailed": "Could not save changes. Try again.",
+        "loadFailed": "Could not load catalog settings. Try again.",
+        "permissionDenied": "Browser access to this server is required.",
+        "sourceChanged": "Settings changed in another window. The current settings have been loaded.",
+        "connectionFailed": "The catalog server is unavailable. Try again later.",
+        "rateLimited": "The server asked to wait {seconds} seconds.",
+        "retry": "Try again",
+        "connection": "Connection"
       }
     },
     "aiProviders": {
@@ -3964,9 +3990,9 @@
       "cursor": "Cursor"
     },
     "elements": {
-      "title": "Elements",
+      "title": "Icon catalog",
       "subtitle": "Local vectors and Iconify collections",
-      "search": "Search elements",
+      "search": "Search icons",
       "catalog": "Catalog",
       "favorites": "Favorites",
       "mine": "My elements",
@@ -4062,7 +4088,28 @@
       "errorUnauthorized": "The catalog request was not authorized. Reopen the editor and try again.",
       "errorBusy": "Another catalog operation is still finishing. Try again shortly.",
       "copyLayers": "Copy vector layers",
-      "pasteLayers": "Paste vector layers"
+      "pasteLayers": "Paste vector layers",
+      "searchCollections": "Search collections",
+      "openIconSettings": "Catalog settings",
+      "appearance": "Icon appearance",
+      "previewBackground": "Preview background",
+      "iconInk": "Icon color",
+      "applyAppearance": "Apply",
+      "lightPreset": "Light",
+      "darkPreset": "Dark",
+      "collectionRemovedNames": "Removed from catalog: {count}; kept locally",
+      "checkCollectionUpdates": "Check for new icons",
+      "collectionNamesCurrent": "No new icons",
+      "collectionAdditions": "New icons: {count}",
+      "collectionDownloaded": "Collection downloaded",
+      "lightTheme": "Light icon theme",
+      "darkTheme": "Dark icon theme",
+      "favoritesOnly": "Favorites only",
+      "importDestinationTitle": "Import into a user collection",
+      "newImportCollection": "New collection",
+      "importConfirm": "Import",
+      "importNameInvalid": "Enter a collection name (1–120 characters).",
+      "importedSvgCollection": "Imported SVGs"
     }
   },
   "exportModal": {

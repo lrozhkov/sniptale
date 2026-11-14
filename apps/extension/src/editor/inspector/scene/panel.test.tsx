@@ -267,7 +267,7 @@ it('shows blur only for image or gradient backgrounds', async () => {
   expect(container?.querySelector('[data-testid="background-blur-section"]')).toBeNull();
 });
 
-it('hides reset in None and keeps three open groups with placement in Composition', async () => {
+it('hides reset in None and keeps background controls outside two open composition and image groups', async () => {
   const { props } = createPanelProps();
   const { disableFrameBackground } = await import('./background/settings');
   await renderUi(
@@ -283,7 +283,20 @@ it('hides reset in None and keeps three open groups with placement in Compositio
   const groups = Array.from(
     container?.querySelectorAll<HTMLDetailsElement>('details[data-level=section]') ?? []
   );
-  expect(groups).toHaveLength(3);
+  expect(groups).toHaveLength(2);
+  expect(groups.map((group) => group.querySelector('summary')?.textContent)).toEqual([
+    translate('editor.scene.placementSection'),
+    translate('editor.compact.image'),
+  ]);
+  for (const selector of [
+    '[data-testid="mode-buttons"]',
+    '[data-testid="background-fill-section"]',
+  ]) {
+    const control = container?.querySelector(selector);
+    expect(control).not.toBeNull();
+    expect(control?.closest('details')).toBeNull();
+    expect(control?.closest('[hidden]')).toBeNull();
+  }
   expect(groups.every((group) => group.open)).toBe(true);
   expect(container?.textContent).not.toContain(translate('editor.scene.backgroundAdvanced'));
 });

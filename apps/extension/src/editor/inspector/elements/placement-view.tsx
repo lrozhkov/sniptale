@@ -8,8 +8,9 @@ import { useEditorController } from '../../application/controller-context';
 import { useEditorVectorLibrarySession } from '../../application/vector-elements/context';
 import type { EditorVectorCatalogEntry } from '../../application/vector-elements/session';
 import { beginEditorVectorPlacement, type EditorVectorPlacementGhost } from './placement';
+import { getEditorVectorPresentation, type EditorIconAppearance } from './presentation';
 
-export function useElementsPlacement() {
+export function useElementsPlacement(appearance: boolean | EditorIconAppearance = false) {
   const session = useEditorVectorLibrarySession(),
     controller = useEditorController();
   const [inserting, setInserting] = useState(false),
@@ -32,7 +33,12 @@ export function useElementsPlacement() {
     setInserting(true);
     setError(false);
     try {
-      const accepted = await controller.insertVectorElement(definition);
+      const accepted = await controller.insertVectorElement(
+        definition,
+        undefined,
+        getEditorVectorPresentation(definition, appearance).colors,
+        getEditorVectorPresentation(definition, appearance)
+      );
       if (accepted) await session.used(definition);
       else if (mounted.current && controller.canvas === canvas && controller.source === source)
         setError(true);
@@ -54,6 +60,7 @@ export function useElementsPlacement() {
     cancelPlacement.current = beginEditorVectorPlacement({
       event: event.nativeEvent,
       definition,
+      presentation: getEditorVectorPresentation(definition, appearance),
       controller,
       boundary,
       onGhost: setGhost,
@@ -77,7 +84,7 @@ export function EditorElementsPlacementGhost({
   return ghost
     ? createPortal(
         <img
-          src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(ghost.definition.svg)}`}
+          src={ghost.presentation.previewUrl}
           alt=""
           data-ui="editor.elements.placement-ghost"
           data-theme={theme ?? undefined}

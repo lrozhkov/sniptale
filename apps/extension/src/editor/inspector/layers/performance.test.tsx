@@ -119,6 +119,14 @@ function render(
 }
 
 beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+    }
+  );
   controller = createImageEditorController();
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -132,6 +140,7 @@ afterEach(async () => {
   useEditorStore.getState().resetDocumentState();
   await setLocalePreference('en');
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 it('skips unchanged row work across panel rerenders and calls the latest committed effects handler', () => {

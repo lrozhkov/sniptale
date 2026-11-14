@@ -64,7 +64,7 @@ function buildLayerMutationButtons(
         ),
       danger: true,
       disabled: !props.canDelete,
-      icon: <Trash2 size={13} strokeWidth={2} className="text-[var(--sniptale-color-danger)]" />,
+      icon: <Trash2 size={13} strokeWidth={2} />,
     },
   ];
 }

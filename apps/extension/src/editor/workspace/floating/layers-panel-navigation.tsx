@@ -1,15 +1,7 @@
 import pencilAiIcon from '@iconify-icons/tabler/pencil-ai';
+import iconsIcon from '@iconify-icons/tabler/icons';
 import { Icon } from '@iconify/react';
-import {
-  AppWindow,
-  ChevronDown,
-  Crop,
-  Info,
-  Layers3,
-  Scaling,
-  Shapes,
-  Wallpaper,
-} from 'lucide-react';
+import { AppWindow, ChevronDown, Crop, Info, Layers3, Scaling, Wallpaper } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { translate } from '../../../platform/i18n';
 import type { EditorInspector } from '../../state/types';
@@ -51,7 +43,7 @@ const modes: ReadonlyArray<{
   },
   {
     id: 'elements',
-    icon: <Shapes size={16} strokeWidth={2} />,
+    icon: <Icon ssr aria-hidden="true" icon={iconsIcon} width={16} height={16} />,
     label: () => translate('editor.elements.title'),
   },
   {

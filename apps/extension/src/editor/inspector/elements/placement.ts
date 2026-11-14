@@ -1,4 +1,5 @@
 import type { EditorVectorDefinition } from '../../../features/editor/document/vector-element';
+import { getEditorVectorPresentation, type EditorVectorPresentation } from './presentation';
 
 interface PlacementCanvas {
   getScenePoint(event: MouseEvent): { x: number; y: number };
@@ -9,19 +10,23 @@ interface EditorVectorPlacementTarget {
   layerMutationToken: number;
   insertVectorElement(
     definition: EditorVectorDefinition,
-    point: { x: number; y: number }
+    point: { x: number; y: number },
+    colors?: Readonly<Record<string, string>>,
+    style?: { opacity: number; strokeScale: number }
   ): Promise<boolean>;
 }
 export interface EditorVectorPlacementGhost {
   x: number;
   y: number;
   definition: EditorVectorDefinition;
+  presentation: EditorVectorPresentation;
 }
 
 /** A prepared card owns one pointer lifetime; canceled or stale placement never inserts. */
 export function beginEditorVectorPlacement(options: {
   event: Pick<PointerEvent, 'button' | 'pointerId' | 'clientX' | 'clientY'>;
   definition: EditorVectorDefinition;
+  presentation?: EditorVectorPresentation;
   controller: EditorVectorPlacementTarget;
   boundary: HTMLElement;
   onGhost(ghost: EditorVectorPlacementGhost | null): void;
@@ -29,6 +34,7 @@ export function beginEditorVectorPlacement(options: {
   onFailure(): void;
 }): () => void {
   const { event, controller, boundary, definition } = options;
+  const presentation = options.presentation ?? getEditorVectorPresentation(definition);
   const canvas = controller.canvas,
     source = controller.source,
     token = controller.layerMutationToken;
@@ -69,7 +75,7 @@ export function beginEditorVectorPlacement(options: {
       return;
     moved = true;
     pointer.preventDefault();
-    options.onGhost({ x: pointer.clientX, y: pointer.clientY, definition });
+    options.onGhost({ x: pointer.clientX, y: pointer.clientY, definition, presentation });
   }
   function up(pointer: PointerEvent) {
     if (pointer.pointerId !== event.pointerId || closed) return;
@@ -104,7 +110,7 @@ export function beginEditorVectorPlacement(options: {
     const point = canvas!.getScenePoint(pointer);
     if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
     void controller
-      .insertVectorElement(definition, point)
+      .insertVectorElement(definition, point, presentation.colors, presentation)
       .then((accepted) => {
         if (accepted) options.onInserted();
       })

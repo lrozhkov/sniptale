@@ -65,7 +65,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 
 | Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
 | --- | --- | --- | --- |
-| `apps/extension/src/editor/raster-editing/brush.ts` | https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/klecks/brushes/eraser-brush.ts | `9aa231d02d555a3a13976a22ad74ce0f2f24c0e98e8e741c3f78971206dbb007` | `6b624bb84dcbc6346625edcedefb55e6250bab0114c4061330bcfc6b08802b89` |
+| `apps/extension/src/editor/raster-editing/brush.ts` | https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/klecks/brushes/eraser-brush.ts | `9aa231d02d555a3a13976a22ad74ce0f2f24c0e98e8e741c3f78971206dbb007` | `9e44f82752bfcdc8ef3dc0783194b116c7cb8c7831c8757c00ca13579954ed93` |
 | `apps/extension/src/editor/raster-editing/vendor/bezier-line.ts` | https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/bb/math/line.ts | `6336d91fcc70507bb67765310b7bbb3d6e77bbb316e0c0ff9fb443444c6815d0` | `52cf50f07c10807a44b8b3b36a1738f0e5ee9b96a9bc1e1a4e7fe21efa7b6568` |
 | `apps/extension/src/editor/raster-editing/vendor/flood-fill.ts` | https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/klecks/image-operations/flood-fill.ts | `c571c4fbc0ff4f4f1df1aedd01af02aadabc7226af187d1001fd26487875a5c0` | `c6ddb53f4aaee036d8395d948db7f66ad1d0b12c614270aa2fc625dceaa8941c` |
 

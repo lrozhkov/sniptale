@@ -1,10 +1,16 @@
+import { INSPECTOR_CONTENT_INLINE_INSET_CLASS_NAME } from '../chrome';
+import type { EditorIconAppearance } from './presentation';
 import { useEffect, useState, type RefObject, type PointerEvent, type UIEvent } from 'react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type {
   EditorVectorCatalogEntry,
   EditorVectorLibraryTab,
 } from '../../application/vector-elements/session';
-import { EditorElementsGrid, editorVectorErrorMessage } from './catalog';
+import {
+  EditorElementsGrid,
+  editorVectorErrorMessage,
+  editorVectorCollectionName,
+} from './catalog';
 import {
   useEditorVectorLibrarySession,
   useEditorVectorLibrarySnapshot,
@@ -98,23 +104,23 @@ export function EditorElementsResults({
   resultsRef,
   scrollRootRef,
   whole,
-  dark,
+  appearance,
   error,
   onClearError,
   onAdd,
   onPointerDown,
-  onManage,
+  onOpenSettings,
   onScroll,
 }: {
   resultsRef: RefObject<HTMLDivElement | null>;
   scrollRootRef: RefObject<HTMLDivElement | null>;
   whole: boolean;
-  dark: boolean;
+  appearance: EditorIconAppearance;
   error: boolean;
   onClearError(): void;
   onAdd(entry: EditorVectorCatalogEntry): Promise<void>;
   onPointerDown(event: PointerEvent<HTMLButtonElement>, entry: EditorVectorCatalogEntry): void;
-  onManage(): void;
+  onOpenSettings?(): void;
   onScroll(event: UIEvent<HTMLDivElement>): void;
 }) {
   const session = useEditorVectorLibrarySession(),
@@ -179,8 +185,8 @@ export function EditorElementsResults({
       ref={resultsRef}
       className={
         whole
-          ? 'min-h-16 flex-none overflow-visible px-2 pb-2'
-          : 'min-h-0 flex-1 overflow-y-auto px-2 pb-2 [scrollbar-width:thin]'
+          ? `min-h-16 flex-none overflow-visible ${INSPECTOR_CONTENT_INLINE_INSET_CLASS_NAME} pb-3`
+          : `min-h-0 flex-1 overflow-y-auto ${INSPECTOR_CONTENT_INLINE_INSET_CLASS_NAME} pb-3 [scrollbar-width:thin]`
       }
       data-ui="editor.elements.results"
       onScroll={onScroll}
@@ -204,12 +210,14 @@ export function EditorElementsResults({
       <EditorElementsGrid
         entries={state.entries.slice(0, state.visibleCount)}
         selectedKey={state.selectedKey}
-        dark={dark}
+        appearance={appearance}
         onSelect={(entry) => session.select(entry.key)}
         onAdd={(entry) => void onAdd(entry)}
-        onFavorite={(entry) => {
-          void session.favorite(entry);
-        }}
+        collectionNames={
+          new Map(
+            state.entries.map((entry) => [entry.key, editorVectorCollectionName(entry, state)])
+          )
+        }
         onPointerDown={onPointerDown}
       />
       <ElementResultsPagination
@@ -227,13 +235,14 @@ export function EditorElementsResults({
         query={state.query}
       />
       {!state.settings?.networkEnabled ? (
-        <button
-          type="button"
-          className="p-2 text-left text-xs leading-5 text-[var(--sniptale-color-text-secondary)] underline"
-          onClick={() => onManage()}
-        >
+        <p className="p-2 text-xs leading-5 text-[var(--sniptale-color-text-secondary)]">
           {message('networkDisabled')}
-        </button>
+          {onOpenSettings ? (
+            <button type="button" className="ml-1 underline" onClick={onOpenSettings}>
+              {message('openIconSettings')}
+            </button>
+          ) : null}
+        </p>
       ) : null}
     </div>
   );

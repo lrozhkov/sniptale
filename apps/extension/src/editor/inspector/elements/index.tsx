@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { useAppLocale } from '../../../platform/i18n';
+import { useAppLocale, translate } from '../../../platform/i18n';
+import { openSettingsPage } from '../../../platform/navigation/extension-pages';
 import {
   EditorVectorLibraryProvider,
   useEditorVectorLibrarySession,
   useEditorVectorLibrarySnapshot,
   useOptionalEditorVectorLibrarySession,
 } from '../../application/vector-elements/context';
-import { EditorElementsManagement } from './management';
+import { EditorIconAppearancePanel } from './appearance-panel';
+import { createEditorIconAppearance } from './presentation';
 import { useElementsScrollLayout } from './use-scroll-layout';
 import { useElementsPlacement, EditorElementsPlacementGhost } from './placement-view';
 import { EditorElementsControls, EditorElementsSelected } from './catalog-controls';
@@ -16,24 +18,25 @@ function EditorElementsContent() {
   useAppLocale();
   const session = useEditorVectorLibrarySession(),
     state = useEditorVectorLibrarySnapshot();
-  const [manage, setManage] = useState(false),
-    [dark, setDark] = useState(false),
-    [importCollection, setImportCollection] = useState('');
-  const layout = useElementsScrollLayout(manage, state.entries.length, state, (top) =>
+  const [appearance, setAppearance] = useState(() =>
+    createEditorIconAppearance(
+      typeof document !== 'undefined' && document.documentElement.dataset['theme'] === 'dark'
+    )
+  );
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const layout = useElementsScrollLayout(false, state.entries.length, state, (top) =>
     session.setScroll(top)
   );
-  const placement = useElementsPlacement();
-  const mounted = useRef(true);
+  const placement = useElementsPlacement(appearance);
   useEffect(() => {
-    mounted.current = true;
-    void session.refresh();
-    return () => {
-      mounted.current = false;
-    };
+    const refresh = () => void session.refresh();
+    refresh();
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
   }, [session]);
   const collectionSource = useRef<string | null>(null);
   useEffect(() => {
-    if (!state.settings?.networkEnabled) return;
+    if (!state.settings?.networkEnabled || state.tab !== 'catalog') return;
     const source = JSON.stringify([
       state.settings.baseUrl,
       state.settings.incarnation,
@@ -48,11 +51,10 @@ function EditorElementsContent() {
     state.settings?.incarnation,
     state.settings?.sourceGeneration,
     state.settings?.networkEnabled,
+    state.tab,
   ]);
-  const openManagement = () => {
-    if (mounted.current) setManage(true);
-  };
-  if (manage) return <EditorElementsManagement onBack={() => setManage(false)} />;
+  const openSettings = () =>
+    void openSettingsPage({ route: { section: 'editor-resources', view: 'icons' } });
   return (
     <div
       ref={layout.panel}
@@ -65,24 +67,35 @@ function EditorElementsContent() {
       data-ui="editor.elements.panel"
       onScroll={layout.onPanelScroll}
     >
-      <EditorElementsControls
-        headerRef={layout.header}
-        dark={dark}
-        onDarkChange={setDark}
-        onManage={openManagement}
-        importCollection={importCollection}
-        setImportCollection={setImportCollection}
-      />
+      <div ref={layout.header} className="shrink-0">
+        <EditorElementsControls
+          headerRef={null}
+          appearanceOpen={appearanceOpen}
+          onAppearance={() => setAppearanceOpen((open) => !open)}
+        />
+        {state.imports.length ? (
+          <p
+            role="status"
+            className="px-3 pb-3 text-xs text-[var(--sniptale-color-text-secondary)]"
+          >
+            {translate('editor.elements.accepted')}:{' '}
+            {state.imports.reduce((sum, row) => sum + row.accepted, 0)}
+            {' · '}
+            {translate('editor.elements.declined')}:{' '}
+            {state.imports.reduce((sum, row) => sum + row.declined, 0)}
+          </p>
+        ) : null}
+      </div>
       <EditorElementsResults
         resultsRef={layout.results}
         scrollRootRef={layout.whole ? layout.panel : layout.results}
         whole={layout.whole}
-        dark={dark}
+        appearance={appearance}
         error={placement.error}
         onClearError={placement.clearError}
         onAdd={placement.add}
         onPointerDown={placement.beginPlacement}
-        onManage={openManagement}
+        onOpenSettings={openSettings}
         onScroll={layout.onResultsScroll}
       />
       <EditorElementsSelected
@@ -90,6 +103,22 @@ function EditorElementsContent() {
         inserting={placement.inserting}
         onAdd={placement.add}
       />
+      {appearanceOpen ? (
+        <EditorIconAppearancePanel
+          anchor={layout.panel}
+          value={appearance}
+          definition={
+            state.entries.find((entry) => entry.key === state.selectedKey)?.definition ??
+            state.entries.find((entry) => entry.definition)?.definition ??
+            undefined
+          }
+          onClose={() => setAppearanceOpen(false)}
+          onApply={(value) => {
+            setAppearance(value);
+            setAppearanceOpen(false);
+          }}
+        />
+      ) : null}
       <EditorElementsPlacementGhost ghost={placement.ghost} anchor={layout.panel.current} />
     </div>
   );

@@ -55,6 +55,7 @@ function EnabledNumericRangeScrub(props: NumericRangeScrubProps) {
       <NumericRangeTrack />
       <NumericRangeInput
         label={props.label}
+        valueText={props.value === null ? undefined : String(props.value)}
         descriptionId={props.descriptionId}
         outOfScale={props.outOfScale}
         onFocusChange={setFocused}
@@ -130,6 +131,7 @@ function NumericRangeTrack() {
 }
 
 function NumericRangeInput(props: {
+  valueText: string | undefined;
   descriptionId?: string | undefined;
   outOfScale?: boolean | undefined;
   onFocusChange: (focused: boolean) => void;
@@ -168,6 +170,7 @@ function NumericRangeInput(props: {
   return (
     <input
       aria-label={`${props.label} range`}
+      aria-valuetext={props.valueText}
       aria-describedby={props.descriptionId}
       data-out-of-scale={props.outOfScale ? 'true' : undefined}
       type="range"

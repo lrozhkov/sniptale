@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLayerPanelHeight } from './height';
 import { useLayerPanelState } from './state';
 import type { EditorInspectorLayersPanelProps } from './types';
@@ -22,6 +22,21 @@ export function useLayerPanelView(args: EditorInspectorLayersPanelProps) {
       ? {}
       : { maxExpandedHeightRatio: args.maxExpandedHeightRatio }),
   });
+  const [listOverflows, setListOverflows] = useState(false);
+  const rowIdentities = args.layers.map((layer) => layer.id).join(':');
+  useLayoutEffect(() => {
+    const list = height.listRef.current;
+    if (!list || !state.expanded) {
+      setListOverflows(false);
+      return;
+    }
+    const measure = () => setListOverflows(list.scrollHeight > list.clientHeight);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    for (const row of Array.from(list.children)) observer.observe(row);
+    return () => observer.disconnect();
+  }, [height.listRef, state.expanded, rowIdentities]);
   const { initialScrollOffset, onScrollOffsetChange } = args;
   useLayoutEffect(() => {
     const list = height.listRef.current;
@@ -54,7 +69,7 @@ export function useLayerPanelView(args: EditorInspectorLayersPanelProps) {
     },
     layout: {
       expandedHeight: height.expandedHeight,
-      reserveScrollbarGutter: true,
+      reserveScrollbarGutter: listOverflows,
       scrollable: args.fillContainer || height.scrollable,
     },
     refs: {

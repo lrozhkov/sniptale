@@ -16,15 +16,15 @@ import {
 } from './shared';
 import type { EditorLayerEffectsOpenHandler } from './types';
 
-const HEADER_FRAME_CLASS_NAME =
-  'flex h-14 w-full items-center justify-between px-2 pr-3 transition';
+const HEADER_FRAME_CLASS_NAME = 'flex h-14 w-full items-center justify-between px-3 transition';
 
 const HEADER_TOGGLE_BUTTON_CLASS_NAME =
   'inline-flex h-8 w-8 items-center justify-center rounded-[4px] ' +
   'text-[color:var(--sniptale-color-text-muted)] transition ' +
   'hover:bg-[color:var(--sniptale-color-surface-hover)] focus:outline-none ' +
   'focus-visible:ring-2 focus-visible:ring-[color:var(--sniptale-color-focus-ring)]';
-const LIST_VIEWPORT_BASE_CLASS_NAME = 'min-h-0 flex-1 space-y-1 pb-3 pt-2';
+const LIST_VIEWPORT_BASE_CLASS_NAME =
+  'min-h-0 flex-1 space-y-1 overflow-x-hidden py-3 [scrollbar-width:thin]';
 const GROUP_CHILD_BUTTON_CLASS_NAME =
   'flex min-h-8 w-full items-center gap-1 rounded-[4px] px-1 text-left text-[13px] leading-[18px]';
 const GROUP_CHILD_FOCUS_CLASS_NAME =
@@ -52,21 +52,13 @@ function getListViewportClassName(args: { reserveScrollbarGutter: boolean; scrol
   return cx(
     LIST_VIEWPORT_BASE_CLASS_NAME,
     args.scrollable ? 'overflow-y-auto' : 'overflow-y-hidden',
-    args.reserveScrollbarGutter
-      ? [
-          'pl-2 pr-0.5 [scrollbar-gutter:stable] ![scrollbar-width:auto] ![scrollbar-color:auto]',
-          '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5',
-          '[&::-webkit-scrollbar-track]:bg-transparent',
-          '[&::-webkit-scrollbar-thumb]:rounded-[3px]',
-          '[&::-webkit-scrollbar-thumb]:bg-[color:color-mix(in_srgb,var(--sniptale-color-text-muted)_28%,transparent)]',
-        ].join(' ')
-      : 'px-2'
+    args.reserveScrollbarGutter ? 'px-3 [scrollbar-gutter:stable]' : 'px-3'
   );
 }
 
 function EditorInspectorLayersHeaderTitle(props: { layerCount: number; streamlined: boolean }) {
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2 px-2 text-left">
+    <div className="flex min-w-0 flex-1 items-center gap-2 text-left">
       {props.streamlined ? null : (
         <span className={cx(PANEL_ICON_CLASS_NAME, PANEL_ICON_SURFACE_CLASS_NAME)}>
           <Layers3 size={17} strokeWidth={2} />

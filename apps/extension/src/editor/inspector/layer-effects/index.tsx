@@ -25,7 +25,7 @@ const LAYER_EFFECT_CATEGORIES: EditorLayerEffectCategory[] = [
   'filters',
 ];
 
-const EDITOR_INSPECTOR_SECTION_CLASS_NAME = 'py-3 first:pt-0 last:pb-0 focus:outline-none';
+const EDITOR_INSPECTOR_SECTION_CLASS_NAME = 'py-2 first:pt-0 last:pb-0 focus:outline-none';
 
 function LayerEffectsCategoryRow(props: {
   activeLayer: EditorLayerEffectsTarget;

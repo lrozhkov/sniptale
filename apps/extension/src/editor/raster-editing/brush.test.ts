@@ -21,22 +21,65 @@ function fixture(width = 40, height = 20) {
   return { planes, geometry, diameter: 4, hardness: 1, mode: 'erase' as const };
 }
 
-it('stamps a click immediately with source-pixel diameter independent of scene transforms', () => {
-  const options = fixture();
-  const transformed = {
+const affineTransforms: readonly RasterSourceGeometry['sourceToScene'][] = [
+  [1, 0, 0, 1, 0, 0],
+  [2, 0, 0, 0.5, 400, 50],
+  [0, 2, -0.5, 0, 400, 50],
+  [1.4, 0.8, 0.6, 0.9, 400, 50],
+  [-1.5, 0.4, 0.7, 0.6, 400, 50],
+];
+
+it.each(['paint', 'erase', 'restore'] as const)(
+  'keeps a %s click circular in document pixels under scale, rotation, skew and flip',
+  (mode) => {
+    for (const sourceToScene of affineTransforms) {
+      const options = fixture(100, 100);
+      const before = { ...options.planes, visibility: new Uint8Array(10_000).fill(80) };
+      const common = {
+        ...options,
+        planes: before,
+        diameter: 20,
+        geometry: { ...options.geometry, sourceToScene },
+      };
+      const stroke = createRasterBrushStroke(
+        mode === 'paint'
+          ? { ...common, mode, color: [255, 0, 0, 255], opacity: 1 }
+          : { ...common, mode }
+      );
+      const first = stroke.add({ x: 50.5, y: 50.5 });
+      expect(first.pixels).toEqual(composeRasterRegion(first.planes, first.dirtyBounds!));
+      const result = stroke.finish();
+      const [a, b, c, d] = sourceToScene;
+      // Source sampling can straddle the document-space circle by one projected pixel.
+      const tolerance = Math.max(Math.hypot(a, b), Math.hypot(c, d));
+      for (let y = 0; y < 100; y++) {
+        for (let x = 0; x < 100; x++) {
+          const distance = Math.hypot(a * (x - 50) + c * (y - 50), b * (x - 50) + d * (y - 50));
+          const strength = result.coverage[y * 100 + x]!;
+          if (distance < 10 - tolerance) expect(strength).toBe(255);
+          if (distance > 10 + tolerance) expect(strength).toBe(0);
+        }
+      }
+      if (mode !== 'paint')
+        expect(result.planes).toEqual(
+          paintRasterVisibility(before, result.coverage, mode === 'restore')
+        );
+      expect(before.visibility.every((value) => value === 80)).toBe(true);
+      expect(before.color.every((value) => value === 255)).toBe(true);
+    }
+  }
+);
+
+it('keeps an expanded document-space stroke connected between distant source samples', () => {
+  const options = fixture(100, 100);
+  const stroke = createRasterBrushStroke({
     ...options,
-    geometry: { ...options.geometry, sourceToScene: [0, 3, -0.5, 1, 400, 50] as const },
-  };
-  const stroke = createRasterBrushStroke(options);
-  const first = stroke.add({ x: 12.5, y: 10.5 });
-  expect(first.coverage[10 * 40 + 12]).toBe(255);
-  expect(first.coverage[10 * 40 + 15]).toBe(0);
-  const final = stroke.finish();
-  const second = createRasterBrushStroke(transformed);
-  second.add({ x: 12.5, y: 10.5 });
-  expect(second.finish().coverage).toEqual(final.coverage);
-  expect(final.planes).toEqual(paintRasterVisibility(options.planes, final.coverage, false));
-  expect(first.pixels).toEqual(composeRasterRegion(first.planes, first.dirtyBounds!));
+    diameter: 4,
+    geometry: { ...options.geometry, sourceToScene: [8, 0, 0, 0.5, 0, 0] },
+  });
+  stroke.add({ x: 10.5, y: 50.5 });
+  const result = stroke.finish({ x: 80.5, y: 50.5 });
+  for (let x = 10; x <= 80; x++) expect(result.coverage[50 * 100 + x]).toBeGreaterThan(0);
 });
 
 it('fills a fast long stroke with no gaps and freezes its final endpoint synchronously', () => {

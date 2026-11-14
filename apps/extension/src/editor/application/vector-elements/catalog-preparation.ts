@@ -22,6 +22,7 @@ interface ArtworkEntry {
 interface Metadata {
   source: EditorVectorSourceToken;
   data: unknown;
+  fresh?: boolean;
 }
 interface CatalogPort {
   collections(signal?: AbortSignal): Promise<Metadata>;
@@ -70,6 +71,10 @@ function visibleNames(value: unknown): string[] {
 /** Owns advisory catalog preparation; the mounted session issues every view lifetime. */
 export class EditorVectorCatalogPreparation {
   private readonly metadataRequests = new Map<string, Promise<Metadata>>();
+  private readonly freshManifests = new Map<
+    string,
+    { until: number; request: Promise<Metadata> }
+  >();
   private readonly manifestFailures = new Map<string, { until: number; error: unknown }>();
   private attributionSource = '';
   private readonly attribution = new Map<string, unknown>();
@@ -120,7 +125,8 @@ export class EditorVectorCatalogPreparation {
   private async readMetadata(
     operation: Extract<CatalogOperation, 'search' | 'collections' | 'collection'>,
     id: string,
-    load: () => Promise<Metadata>
+    load: () => Promise<Metadata>,
+    fresh = false
   ) {
     const { cache, currentSource, isAlive, admitNetwork } = this.dependencies;
     const source = this.dependencies.source();
@@ -129,31 +135,35 @@ export class EditorVectorCatalogPreparation {
       operation === 'search' ? 'search' : 'collections',
       `${operation}:${id}`
     );
-    const cached = await cache.read(key);
+    const cached = fresh ? null : await cache.read(key);
     if (!currentSource(source) || !isAlive()) throw new Error('Superseded vector source.');
     if (isCatalogData(operation, cached)) {
       await cache.touch(key);
-      return { source, data: cached };
+      return { source, data: cached, fresh: false };
     }
     admitNetwork();
     const result = await load();
     if (!currentSource(result.source) || !isAlive() || !isCatalogData(operation, result.data))
       throw new Error('Invalid vector catalog response.');
     await cache.put(key, result.data, result.source);
-    return result;
+    return { ...result, fresh: true };
   }
   async metadata(
     operation: Extract<CatalogOperation, 'search' | 'collections' | 'collection'>,
     id: string,
-    load: () => Promise<Metadata>
-  ) {
+    load: () => Promise<Metadata>,
+    fresh = false
+  ): Promise<Metadata> {
     if (operation === 'search') return this.readMetadata(operation, id, load);
     const key = `${this.sourceKey(this.dependencies.source())}:${operation}:${id}`;
     const failure = this.manifestFailures.get(key);
     if (failure && failure.until > Date.now()) throw failure.error;
     const pending = this.metadataRequests.get(key);
-    if (pending) return pending;
-    const request = this.readMetadata(operation, id, load)
+    if (pending) {
+      const result = await pending;
+      return fresh && !result.fresh ? this.metadata(operation, id, load, true) : result;
+    }
+    const request = this.readMetadata(operation, id, load, fresh)
       .catch((error: unknown) => {
         if (
           operation === 'collection' &&
@@ -190,6 +200,31 @@ export class EditorVectorCatalogPreparation {
         prefix,
         name: isRecord(info) && typeof info['name'] === 'string' ? info['name'] : prefix,
       }));
+  }
+  /** Explicit manifest checks are coalesced and limited to one request per source/prefix in five minutes. */
+  async refreshCollection(prefix: string, signal: AbortSignal) {
+    if (signal.aborted) throw new EditorVectorCatalogError('canceled');
+    const source = this.dependencies.source();
+    const key = `${this.sourceKey(source)}:${prefix}`;
+    const previous = this.freshManifests.get(key);
+    let request = previous?.until && previous.until > Date.now() ? previous.request : null;
+    if (!request) {
+      request = this.metadata(
+        'collection',
+        prefix,
+        () => this.dependencies.catalog.collection(prefix),
+        true
+      );
+      if (this.freshManifests.size >= 32)
+        this.freshManifests.delete(this.freshManifests.keys().next().value!);
+      this.freshManifests.set(key, { until: Date.now() + 5 * 60_000, request });
+    }
+    const result = await request;
+    if (signal.aborted) throw new EditorVectorCatalogError('canceled');
+    if (!this.dependencies.currentSource(result.source) || !this.dependencies.isAlive())
+      throw new EditorVectorCatalogError('source-changed');
+    if (isRecord(result.data)) this.remember(result.source, { [prefix]: result.data['info'] });
+    return { ...result, names: visibleNames(result.data) };
   }
   async collection(prefix: string, signal: AbortSignal) {
     if (signal.aborted) throw new EditorVectorCatalogError('canceled');

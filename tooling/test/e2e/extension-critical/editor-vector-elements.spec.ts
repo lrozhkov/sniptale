@@ -4,7 +4,7 @@ import { isEditorVectorInstance } from '../../../../apps/extension/src/features/
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { expect, test } from '../support/extension-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
-import { EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
+import { EDITOR_HARNESS_PATH, SETTINGS_HARNESS_PATH } from '../extension-critical.helpers';
 
 test.use({ actionTimeout: 10_000 });
 
@@ -24,8 +24,6 @@ const iconSet = {
   },
 };
 const ui = (page: Page, suffix: string) => page.locator(`[data-ui="editor.elements.${suffix}"]`);
-const property = (page: Page, suffix: string) =>
-  page.locator(`[data-ui="editor.floating.tool-properties.group.vector-${suffix}"]`);
 const history = (page: Page) =>
   page.evaluate(() => window.__sniptaleEditorHarness!.getInteractionState().historyIndex);
 const rendered = (page: Page) => page.evaluate(() => window.__sniptaleEditorHarness!.renderImage());
@@ -64,6 +62,11 @@ async function openFixture(
   viewport: { width: number; height: number }
 ) {
   await page.setViewportSize(viewport);
+  await page.context().route('https://api.iconify.design/**', async (route) => {
+    if (new URL(route.request().url()).pathname === '/collections')
+      await route.fulfill({ json: { proof: { name: 'Proof metadata', total: 0 } } });
+    else await route.abort();
+  });
   const dataUrl = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 900;
@@ -131,14 +134,14 @@ async function importFiles(page: Page, mixed = false) {
         ]
       : []),
   ]);
-  await expect(ui(page, 'management')).toBeVisible();
-  await expect(ui(page, 'management')).toContainText('palette-proof.svg');
-  if (mixed) {
-    await expect(ui(page, 'management')).toContainText('unsafe-proof.svg');
-    await expect(ui(page, 'management')).toContainText('proof-icons.json');
-    await expect(ui(page, 'management')).toContainText('Declined: 1');
-  }
-  await page.getByRole('button', { name: 'Back to elements', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Import into a user collection', exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(ui(page, 'card')).toHaveCount(0);
+  await dialog
+    .getByRole('textbox', { name: 'Collection name', exact: true })
+    .fill('Proof collection');
+  await dialog.getByRole('button', { name: 'Import', exact: true }).click();
+  await expect(dialog).toBeHidden();
   await expect(ui(page, 'card')).toHaveCount(mixed ? 3 : 1);
   await expect(ui(page, 'card').locator('img')).toHaveCount(mixed ? 3 : 1);
 }
@@ -149,18 +152,15 @@ async function choose(page: Page, trigger: Locator, option: string) {
 }
 
 async function addPalette(page: Page) {
-  await ui(page, 'card').filter({ hasText: 'palette-proof.svg' }).click();
+  await page.getByRole('button', { name: 'palette-proof.svg', exact: true }).click();
   await ui(page, 'add').click();
   await expect.poll(() => vectorObjects(page).then((objects) => objects.length)).toBe(1);
   await expect(page.locator('[data-ui="editor.vector.properties"]')).toBeVisible();
 }
 
 async function colorPicker(page: Page, value: string) {
-  if ((await property(page, 'palette').getAttribute('aria-expanded')) !== 'true')
-    await property(page, 'palette').click();
   await page
-    .locator('[data-ui="editor.floating.tool-properties.popover.vector-palette"]')
-    .locator('[data-ui="shared.ui.color-selector"]')
+    .locator('[data-ui="editor.vector.properties"] [data-ui="shared.ui.color-selector"]')
     .first()
     .getByRole('button', {
       name: translate('shared.ui.colorSelectorChooseColor', 'en'),
@@ -233,20 +233,6 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     context,
   }, info) => {
     await openFixture(page, hostOrigin, viewport.size);
-    await ui(page, 'manage').click();
-    await page
-      .getByRole('textbox', { name: 'Collection name', exact: true })
-      .fill('Proof collection');
-    await page.getByRole('button', { name: 'Create collection', exact: true }).click();
-    await expect(
-      page.getByRole('textbox', { name: 'Collection name', exact: true }).nth(1)
-    ).toHaveValue('Proof collection');
-    await page.getByRole('button', { name: 'Back to elements', exact: true }).click();
-    await choose(
-      page,
-      page.getByRole('button', { name: 'Import into collection', exact: true }),
-      'Proof collection'
-    );
     const baseline = await history(page);
     await importFiles(page, true);
     expect(await vectorObjects(page)).toHaveLength(0);
@@ -254,23 +240,18 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     await addPalette(page);
     await expect.poll(() => history(page)).toBe(baseline + 1);
     const selected = (await vectorObjects(page))[0]!['sniptaleId'];
-    await ui(page, 'card').filter({ hasText: 'mono-proof.svg' }).click();
+    await page.getByRole('button', { name: 'mono-proof.svg', exact: true }).click();
     expect((await vectorObjects(page)).find((object) => object['active'])?.['sniptaleId']).toBe(
       selected
     );
-    await ui(page, 'card').filter({ hasText: 'mono-proof.svg' }).press('Enter');
+    await page.getByRole('button', { name: 'mono-proof.svg', exact: true }).press('Enter');
     await expect.poll(() => vectorObjects(page).then((objects) => objects.length)).toBe(2);
     const state = await vectorState(page);
     expect(state.version).toBe(4);
     expect(state.definitions).toHaveLength(2);
-    const paletteItem = ui(page, 'grid')
-      .getByRole('listitem')
-      .filter({ hasText: 'palette-proof.svg' });
-    await paletteItem.locator('[data-ui="editor.elements.favorite"]').click();
-    await expect(paletteItem.locator('[data-ui="editor.elements.favorite"]')).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
+    await page.getByRole('button', { name: 'palette-proof.svg', exact: true }).click();
+    await ui(page, 'favorite').click();
+    await expect(ui(page, 'favorite')).toHaveAttribute('aria-pressed', 'true');
     await noHorizontalScroll(page);
     await page.screenshot({ path: info.outputPath('local-imports-selected.png'), fullPage: false });
     await saved(page);
@@ -279,10 +260,23 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     await expect.poll(() => vectorState(page)).toEqual(state);
     await expect.poll(() => vectorObjects(page).then((objects) => objects.length)).toBe(2);
     await page.locator('[data-ui="editor.floating.layers.mode.elements"]').click();
-    await page.getByRole('button', { name: 'Favorites', exact: true }).click();
+    await ui(page, 'favorites-only').click();
     await expect(ui(page, 'card')).toHaveCount(1);
     await choose(page, ui(page, 'collection'), 'Proof collection');
     await expect(ui(page, 'card')).toHaveCount(1);
+    const settings = await context.newPage();
+    await settings.addInitScript(() => {
+      window.__sniptaleHarnessBootstrap = {
+        storage: { 'sniptale-locale-preference': 'en' },
+        preserveMediaLibrary: true,
+      };
+      localStorage.setItem('sniptale-locale-preference', 'en');
+    });
+    await settings.goto(
+      `${hostOrigin}${SETTINGS_HARNESS_PATH}?section=editor-resources&view=icons`
+    );
+    await expect(settings.getByRole('button', { name: 'Clear cache', exact: true })).toBeEnabled();
+    await page.bringToFront();
     await context.setOffline(true);
     try {
       await ui(page, 'card').first().click();
@@ -291,9 +285,10 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await expect.poll(() => vectorObjects(page).then((objects) => objects.length)).toBe(3);
       const offlineDocument = await vectorState(page);
       const offlineImage = await rendered(page);
-      await ui(page, 'manage').click();
-      await ui(page, 'clear-cache').click();
-      await page.getByRole('button', { name: 'Back to elements', exact: true }).click();
+      await settings.getByRole('button', { name: 'Clear cache', exact: true }).click();
+      await expect(
+        settings.getByRole('button', { name: 'Clear cache', exact: true })
+      ).toBeDisabled();
       await expect(ui(page, 'card')).toHaveCount(1);
       expect(await vectorState(page)).toEqual(offlineDocument);
       expect(await rendered(page)).toBe(offlineImage);
@@ -303,6 +298,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       });
     } finally {
       await context.setOffline(false);
+      await settings.close();
     }
   });
 
@@ -351,7 +347,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     await page.screenshot({ path: info.outputPath('drag-drop-exact-point.png'), fullPage: false });
   });
 
-  test(`vector palette preview commit cancel reset Undo Redo and saved preset ${viewport.name}`, async ({
+  test(`vector palette opacity stroke preview commit cancel Undo Redo and saved appearance ${viewport.name}`, async ({
     page,
     hostOrigin,
   }, info) => {
@@ -381,40 +377,57 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       changedImage = await rendered(page);
     expect(changed.objects[0]?.sniptaleVectorElement?.overrides.colors).toEqual({ c0: '#8040ff' });
     expect(changedImage).not.toBe(originalImage);
-    await property(page, 'presets').click();
-    await page.getByRole('textbox', { name: 'Preset name', exact: true }).fill('Proof palette');
-    await page.locator('[data-ui="editor.vector.save-preset"]').click();
-    await expect(page.getByRole('textbox', { name: 'Preset name', exact: true })).toHaveValue('');
+    const properties = page.locator('[data-ui="editor.vector.properties"]');
+    const opacity = properties.getByRole('textbox', { name: 'Opacity', exact: true });
+    await opacity.fill('60');
+    expect(await vectorState(page)).toEqual(changed);
     expect(await history(page)).toBe(baseline + 1);
-    await page.locator('[data-ui="editor.vector.reset"]').click();
+    await opacity.press('Enter');
     await expect.poll(() => history(page)).toBe(baseline + 2);
-    expect((await vectorState(page)).objects[0]?.sniptaleVectorElement?.overrides.colors).toEqual(
-      {}
+    const stroke = properties.getByRole('textbox', { name: 'Stroke scale', exact: true });
+    await stroke.fill('1.5');
+    await stroke.press('Enter');
+    await expect.poll(() => history(page)).toBe(baseline + 3);
+    const accepted = await vectorState(page);
+    const acceptedImage = await rendered(page);
+    expect(accepted.definitions).toEqual(original.definitions);
+    expect(accepted.objects[0]?.sniptaleVectorElement.overrides).toMatchObject({
+      colors: { c0: '#8040ff' },
+      strokeScale: 1.5,
+    });
+    expect(accepted.objects[0]?.['opacity']).toBe(0.6);
+    await page.locator('[data-ui="editor.floating.tool-rail.history.undo"]').click();
+    await expect.poll(() => history(page)).toBe(baseline + 2);
+    expect((await vectorState(page)).objects[0]?.sniptaleVectorElement.overrides.strokeScale).toBe(
+      1
     );
     await page.locator('[data-ui="editor.floating.tool-rail.history.undo"]').click();
     await expect.poll(() => vectorState(page)).toEqual(changed);
     expect(await rendered(page)).toBe(changedImage);
-    await page.locator('[data-ui="editor.floating.tool-rail.history.redo"]').click();
-    await expect.poll(() => rendered(page)).toBe(originalImage);
-    const resetState = await vectorState(page);
+    await page.locator('[data-ui="editor.floating.tool-rail.history.undo"]').click();
+    await expect.poll(() => vectorState(page)).toEqual(original);
+    expect(await rendered(page)).toBe(originalImage);
+    for (let index = 0; index < 3; index++) {
+      await page.locator('[data-ui="editor.floating.tool-rail.history.redo"]').click();
+      await expect.poll(() => history(page)).toBe(baseline + index + 1);
+    }
+    await expect.poll(() => vectorState(page)).toEqual(accepted);
+    expect(await rendered(page)).toBe(acceptedImage);
     await saved(page);
     await page.reload();
     await ready(page);
-    await page.locator('[data-ui="editor.floating.layers.mode.elements"]').click();
-    await page.getByRole('button', { name: 'My elements', exact: true }).click();
-    await expect.poll(() => vectorState(page)).toEqual(resetState);
+    await expect.poll(() => vectorState(page)).toEqual(accepted);
     expect(await vectorObjects(page)).toHaveLength(1);
-    expect(await rendered(page)).toBe(originalImage);
+    expect(await rendered(page)).toBe(acceptedImage);
     const restoredCenter = await vectorClientCenter(page);
     await page.mouse.click(restoredCenter.x, restoredCenter.y);
-    await expect(page.locator('[data-ui="editor.vector.properties"]')).toBeVisible();
-    await property(page, 'presets').click();
-    await choose(
-      page,
-      page.getByRole('button', { name: 'Presets for this element', exact: true }),
-      'Proof palette'
+    await expect(properties).toBeVisible();
+    await expect(properties.getByRole('textbox', { name: 'Opacity', exact: true })).toHaveValue(
+      '60'
     );
-    await expect.poll(() => rendered(page)).toBe(changedImage);
+    await expect(
+      properties.getByRole('textbox', { name: 'Stroke scale', exact: true })
+    ).toHaveValue('1.5');
     await noHorizontalScroll(page);
     await page.screenshot({
       path: info.outputPath('persisted-palette-applied.png'),

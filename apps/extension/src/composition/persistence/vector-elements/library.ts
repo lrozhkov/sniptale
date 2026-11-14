@@ -206,6 +206,20 @@ async function removePreset(id: string, incarnation: string): Promise<void> {
   });
 }
 
+/** Metadata commands share the library's existing transaction and revision owners. */
+export function createEditorVectorLibraryMetadata() {
+  return {
+    readCatalog,
+    readSettings: readEditorVectorSettings,
+    updateSettings,
+    createCollection,
+    renameCollection,
+    removeCollection,
+    removePreset,
+  };
+}
+export type EditorVectorLibraryMetadata = ReturnType<typeof createEditorVectorLibraryMetadata>;
+
 /** Library commands own native commit, cancellation fencing and coarse backing retention. */
 export function createEditorVectorLibrary(dependencies: {
   validateDefinition(value: unknown): Promise<EditorVectorDefinition>;

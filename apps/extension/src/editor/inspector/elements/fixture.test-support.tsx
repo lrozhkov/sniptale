@@ -10,7 +10,8 @@ const fixture = vi.hoisted(() => ({
     setQuery: vi.fn(),
     setFilter: vi.fn(),
     searchNow: vi.fn(async () => {}),
-    importFiles: vi.fn(async () => {}),
+    importFiles: vi.fn(async () => true),
+    favorite: vi.fn(async () => true),
     removeItem: vi.fn(async () => true),
     createCollection: vi.fn(async () => true),
     renameCollection: vi.fn(async () => true),
@@ -61,6 +62,26 @@ export function setupElements() {
     fixture.api.createCollection.mockResolvedValue(true);
     fixture.controller.insertVectorElement.mockResolvedValue(true);
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+      configurable: true,
+      writable: true,
+      value() {},
+    });
+    Object.defineProperty(HTMLDialogElement.prototype, 'close', {
+      configurable: true,
+      writable: true,
+      value() {},
+    });
+    vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementation(function (
+      this: HTMLDialogElement
+    ) {
+      this.open = true;
+    });
+    vi.spyOn(HTMLDialogElement.prototype, 'close').mockImplementation(function (
+      this: HTMLDialogElement
+    ) {
+      this.open = false;
+    });
     const definition = await prepareEditorVectorDefinition(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h10v10z"/></svg>',
       {
@@ -75,7 +96,7 @@ export function setupElements() {
     );
     fixture.state = {
       query: '',
-      tab: 'mine',
+      tab: 'catalog',
       collection: '',
       selectedKey: null,
       entries: [

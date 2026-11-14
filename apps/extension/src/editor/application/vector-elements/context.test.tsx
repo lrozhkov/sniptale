@@ -16,7 +16,7 @@ vi.mock('../../../composition/persistence/vector-elements', () => ({
   createEditorVectorDownloads: vi.fn(() => ({})),
   createEditorVectorCache: vi.fn(() => ({})),
 }));
-vi.mock('../../vector-elements/catalog-client', () => ({
+vi.mock('../../../workflows/vector-catalog/client', () => ({
   createEditorVectorCatalogClient: vi.fn(() => ({})),
   requestEditorVectorCatalogPermission: vi.fn(),
 }));

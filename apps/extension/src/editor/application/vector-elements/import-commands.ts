@@ -7,13 +7,34 @@ import {
 import { prepareEditorVectorDefinition } from '../../objects/vector-elements/prepare';
 
 interface ImportDependencies {
-  library: Pick<EditorVectorLibrary, 'captureAdmission' | 'importDefinition'>;
+  library: Pick<EditorVectorLibrary, 'captureAdmission' | 'importDefinition' | 'createCollection'>;
   isAlive(): boolean;
   accepted(definition: EditorVectorDefinition): void;
   progress(rows: { name: string; accepted: number; declined: number }[]): void;
 }
 type Admission = Awaited<ReturnType<EditorVectorLibrary['captureAdmission']>>;
-async function importIconify(text: string, admission: Admission, dependencies: ImportDependencies) {
+type ImportDestination = () => Promise<Admission | null>;
+async function publishImport(
+  definition: EditorVectorDefinition,
+  name: string,
+  destination: ImportDestination,
+  dependencies: ImportDependencies
+) {
+  if (!dependencies.isAlive()) return false;
+  const admission = await destination();
+  if (!admission?.collection || !dependencies.isAlive()) return false;
+  await dependencies.library.importDefinition(definition, {
+    collection: admission.collection,
+    name,
+  });
+  if (dependencies.isAlive()) dependencies.accepted(definition);
+  return true;
+}
+async function importIconify(
+  text: string,
+  destination: ImportDestination,
+  dependencies: ImportDependencies
+) {
   const input: unknown = JSON.parse(text);
   const set = parseEditorIconifySet(input);
   let accepted = 0,
@@ -22,11 +43,7 @@ async function importIconify(text: string, admission: Admission, dependencies: I
     if (!dependencies.isAlive()) break;
     try {
       const definition = await prepareEditorIconifyDefinition(set, name, 'local');
-      await dependencies.library.importDefinition(definition, {
-        ...(admission.collection ? { collection: admission.collection } : {}),
-        name,
-      });
-      dependencies.accepted(definition);
+      if (!(await publishImport(definition, name, destination, dependencies))) break;
       accepted++;
     } catch {
       declined++;
@@ -34,11 +51,15 @@ async function importIconify(text: string, admission: Admission, dependencies: I
   }
   return { accepted, declined };
 }
-async function importFile(file: File, admission: Admission, dependencies: ImportDependencies) {
+async function importFile(
+  file: File,
+  destination: ImportDestination,
+  dependencies: ImportDependencies
+) {
   if (file.size > 32 * 1024 * 1024) throw new Error('Vector import budget.');
   const text = await file.text();
   if (file.name.toLowerCase().endsWith('.json'))
-    return importIconify(text, admission, dependencies);
+    return importIconify(text, destination, dependencies);
   const definition = await prepareEditorVectorDefinition(text, {
     sourceId: 'local',
     prefix: null,
@@ -48,29 +69,52 @@ async function importFile(file: File, admission: Admission, dependencies: Import
     license: null,
     licenseUrl: null,
   });
-  await dependencies.library.importDefinition(definition, {
-    ...(admission.collection ? { collection: admission.collection } : {}),
-    name: file.name,
-  });
-  dependencies.accepted(definition);
-  return { accepted: 1, declined: 0 };
+  const accepted = await publishImport(definition, file.name, destination, dependencies);
+  return { accepted: accepted ? 1 : 0, declined: 0 };
 }
-/** Publishes valid siblings independently while preserving one captured collection admission. */
+/** Retains one destination token for the batch; a deleted destination is never recreated. */
 export async function importEditorVectorFiles(
   files: readonly File[],
   collectionId: string | undefined,
-  dependencies: ImportDependencies
+  dependencies: ImportDependencies,
+  newCollectionName?: string
 ) {
-  const admission = await dependencies.library.captureAdmission(undefined, collectionId);
+  if (!files.length || !dependencies.isAlive()) return { completed: false, collectionId: null };
+  let destinationId = collectionId ?? null;
+  let admission: Promise<Admission | null> | undefined = collectionId
+    ? dependencies.library.captureAdmission(undefined, collectionId)
+    : undefined;
+  if (admission) await admission;
+  const destination: ImportDestination = () => {
+    if (!admission)
+      admission = (async () => {
+        if (!dependencies.isAlive()) return null;
+        const fallbackName =
+          files[0]!.name
+            .replace(/\.[^.]+$/u, '')
+            .trim()
+            .slice(0, 120) || 'SVG';
+        const collection = await dependencies.library.createCollection({
+          id: crypto.randomUUID(),
+          name: newCollectionName?.trim() || fallbackName,
+        });
+        destinationId = collection.id;
+        return {
+          expectedItem: null,
+          collection: { id: collection.id, incarnation: collection.incarnation },
+        };
+      })();
+    return admission;
+  };
   const rows: { name: string; accepted: number; declined: number }[] = [];
   for (const file of files) {
-    if (!dependencies.isAlive()) return false;
+    if (!dependencies.isAlive()) return { completed: false, collectionId: destinationId };
     try {
-      rows.push({ name: file.name, ...(await importFile(file, admission, dependencies)) });
+      rows.push({ name: file.name, ...(await importFile(file, destination, dependencies)) });
     } catch {
       rows.push({ name: file.name, accepted: 0, declined: 1 });
     }
     dependencies.progress([...rows]);
   }
-  return true;
+  return { completed: dependencies.isAlive(), collectionId: destinationId };
 }

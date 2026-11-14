@@ -76,7 +76,7 @@ beforeEach(async () => {
   );
   mocks.snapshot = {
     query: '',
-    tab: 'mine',
+    tab: 'catalog',
     collection: '',
     selectedKey: null,
     entries: [
@@ -330,6 +330,8 @@ describe('Elements inspector interaction', () => {
     expect(mocks.controller.insertVectorElement).toHaveBeenCalledOnce();
   });
   it('keeps favorite activation separate from insertion', async () => {
+    if (!mocks.snapshot) throw new Error('fixture');
+    mocks.snapshot.selectedKey = mocks.snapshot.entries[0]!.key;
     await renderPanel();
     act(() => button('editor.elements.favorite').click());
     expect(mocks.api.favorite).toHaveBeenCalledOnce();
@@ -361,7 +363,11 @@ describe('Elements inspector interaction', () => {
     ) {
       const name = this.dataset['ui'];
       if (name === 'editor.elements.panel') return new DOMRect(0, 0, 350, available);
-      if (name === 'editor.elements.header') return new DOMRect(0, 0, 350, 152);
+      if (
+        name === 'editor.elements.header' ||
+        this.firstElementChild?.getAttribute('data-ui') === 'editor.elements.header'
+      )
+        return new DOMRect(0, 0, 350, 152);
       if (name === 'editor.elements.footer') return new DOMRect(0, 0, 350, 45);
       if (name === 'editor.elements.card') return new DOMRect(0, 0, 80, 64);
       return original.call(this);
@@ -427,8 +433,8 @@ describe('Elements inspector interaction', () => {
     await renderPanel();
     expect(results.scrollTop).toBe(109);
     expect(writes).not.toHaveBeenCalled();
-    await act(async () => button('editor.elements.manage').click());
-    await act(async () => button('editor.elements.back').click());
+    await act(async () => root.render(null));
+    await renderPanel();
     const restored = host.querySelector<HTMLDivElement>('[data-ui="editor.elements.results"]');
     expect(restored).not.toBe(results);
     expect(restored?.scrollTop).toBe(109);
@@ -488,15 +494,11 @@ describe('Elements inspector interaction', () => {
   it('exposes source identity on card focus and displays cache usage or an explicit unknown state', async () => {
     await renderPanel();
     const card = host.querySelector<HTMLButtonElement>('[data-ui="editor.elements.card"]');
-    const descriptionId = card?.getAttribute('aria-describedby');
-    expect(descriptionId).toBeTruthy();
     act(() => card?.focus());
     expect(document.activeElement).toBe(card);
-    expect(descriptionId && document.getElementById(descriptionId)?.textContent).toBe('local');
     expect(card?.getAttribute('aria-label')).toBe('Imported element');
-    await renderPanel();
-    expect(card?.getAttribute('aria-describedby')).toBe(descriptionId);
-    expect(card?.title).toContain('local');
+    expect(card?.title).toContain('Imported element');
+    expect(card?.title).not.toContain('https://');
     await act(async () => root.render(<EditorElementsManagement onBack={() => {}} />));
     expect(host.querySelector('[data-ui="editor.elements.cache-usage"]')?.textContent).toContain(
       'editor.elements.cacheUsageUnknown'
@@ -536,4 +538,179 @@ describe('Elements inspector interaction', () => {
     expect(list?.textContent).toContain('Custom');
     expect(list?.querySelector('a')).toBeNull();
   });
+});
+
+function pageButton(name: string) {
+  const node = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
+    (node) => node.getAttribute('aria-label') === name || node.textContent === name
+  );
+  if (!node) throw new Error(`Missing ${name}`);
+  return node;
+}
+async function appearanceClick(name: string) {
+  await act(async () => pageButton(name).click());
+}
+async function appearanceNumber(name: string, value: string) {
+  const field = document.querySelector<HTMLInputElement>(`input[aria-label="${name}"]`);
+  if (!field) throw new Error(`Missing ${name}`);
+  await act(async () => field.focus());
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, value);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await act(async () =>
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  );
+}
+describe('catalog accepted appearance', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+  });
+  it('keeps appearance draft private, cancels with Escape and restores trigger focus', async () => {
+    await renderPanel();
+    const original = host.querySelector('img')?.getAttribute('src');
+    const trigger = button('editor.elements.appearance');
+    act(() => trigger.focus());
+    await appearanceClick('editor.elements.appearance');
+    expect(trigger.getAttribute('aria-pressed')).toBe('true');
+    await appearanceClick('editor.elements.darkPreset');
+    await appearanceNumber('editor.elements.opacity', '60');
+    expect(pageButton('editor.elements.darkPreset').getAttribute('aria-pressed')).toBe('false');
+    expect(host.querySelector('img')?.getAttribute('src')).toBe(original);
+    expect(mocks.controller.insertVectorElement).not.toHaveBeenCalled();
+    await act(async () =>
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
+      )
+    );
+    expect(document.querySelector('[data-ui="editor.elements.appearance"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute('aria-pressed')).toBe('false');
+    expect(host.querySelector('img')?.getAttribute('src')).toBe(original);
+  });
+  it.each(['light', 'dark', 'custom'])(
+    'uses the accepted %s preview for Add, Enter and drag without changing the definition',
+    async (preset) => {
+      if (!mocks.snapshot) throw new Error('fixture');
+      mocks.snapshot.selectedKey = mocks.snapshot.entries[0]!.key;
+      const definition = mocks.snapshot.entries[0]!.definition!;
+      const original = JSON.stringify(definition);
+      await renderPanel();
+      await appearanceClick('editor.elements.appearance');
+      await appearanceClick(`editor.elements.${preset === 'light' ? 'lightPreset' : 'darkPreset'}`);
+      if (preset === 'custom') await appearanceNumber('editor.elements.opacity', '60');
+      await appearanceClick('editor.elements.applyAppearance');
+      const image = host.querySelector('img');
+      const previewUrl = image?.getAttribute('src');
+      expect(previewUrl).toBeTruthy();
+      const opacity = preset === 'custom' ? 0.6 : 1;
+      const colors = { c0: preset === 'light' ? '#202020' : '#f5f5f5' };
+      await appearanceClick('editor.elements.add');
+      const card = host.querySelector<HTMLButtonElement>('[data-ui="editor.elements.card"]')!;
+      await act(async () =>
+        card.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      );
+      const boundary = document.createElement('div');
+      boundary.dataset['ui'] = 'editor.canvas.document-boundary';
+      document.body.append(boundary);
+      vi.spyOn(boundary, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 80, 400, 300));
+      Object.defineProperty(document, 'elementFromPoint', {
+        configurable: true,
+        value: () => boundary,
+      });
+      Object.assign(mocks.controller.canvas, { getScenePoint: () => ({ x: 70, y: 50 }) });
+      const pointer = (type: string, x: number, y: number) => {
+        const event = new MouseEvent(type, { button: 0, clientX: x, clientY: y, bubbles: true });
+        Object.defineProperty(event, 'pointerId', { value: 1 });
+        return event;
+      };
+      try {
+        await act(async () => {
+          card.dispatchEvent(pointer('pointerdown', 20, 20));
+          document.dispatchEvent(pointer('pointermove', 240, 180));
+        });
+        expect(
+          document.querySelector('[data-ui="editor.elements.placement-ghost"]')?.getAttribute('src')
+        ).toBe(previewUrl);
+        await act(async () => document.dispatchEvent(pointer('pointerup', 240, 180)));
+        expect(mocks.controller.insertVectorElement).toHaveBeenCalledTimes(3);
+        const presentation = expect.objectContaining({
+          colors,
+          opacity,
+          strokeScale: 1,
+          previewUrl,
+        });
+        expect(mocks.controller.insertVectorElement).toHaveBeenNthCalledWith(
+          1,
+          definition,
+          undefined,
+          colors,
+          presentation
+        );
+        expect(mocks.controller.insertVectorElement).toHaveBeenNthCalledWith(
+          2,
+          definition,
+          undefined,
+          colors,
+          presentation
+        );
+        expect(mocks.controller.insertVectorElement).toHaveBeenNthCalledWith(
+          3,
+          definition,
+          { x: 70, y: 50 },
+          colors,
+          presentation
+        );
+        expect(JSON.stringify(definition)).toBe(original);
+      } finally {
+        boundary.remove();
+      }
+    }
+  );
+});
+
+it('exposes the actual stroke multiplier to assistive technology while using a logarithmic slider', async () => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+  if (!mocks.snapshot) throw new Error('fixture');
+  const definition = await prepareEditorVectorDefinition(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h10v10z" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+    {
+      sourceId: 'local',
+      prefix: null,
+      name: null,
+      author: null,
+      authorUrl: null,
+      license: null,
+      licenseUrl: null,
+    }
+  );
+  mocks.snapshot.entries[0]!.definition = definition;
+  await renderPanel();
+  await appearanceClick('editor.elements.appearance');
+  const range = document.querySelector<HTMLInputElement>(
+    'input[aria-label="editor.elements.strokeScale range"]'
+  );
+  if (!range) throw new Error('Missing stroke range');
+  expect(range.value).toBe('50');
+  expect(range.getAttribute('aria-valuetext')).toBe('1');
+  await appearanceNumber('editor.elements.strokeScale', '100');
+  expect(range.value).toBe('100');
+  expect(range.getAttribute('aria-valuetext')).toBe('100');
+  await appearanceNumber('editor.elements.strokeScale', '0.01');
+  expect(range.value).toBe('0');
+  expect(range.getAttribute('aria-valuetext')).toBe('0.01');
 });

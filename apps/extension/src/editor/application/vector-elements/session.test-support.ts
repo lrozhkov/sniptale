@@ -6,6 +6,8 @@ import {
 import type {
   EditorVectorLibrary,
   EditorVectorItem,
+  EditorVectorCollection,
+  EditorVectorMember,
   EditorVectorSettings,
 } from '../../../composition/persistence/vector-elements';
 import {
@@ -34,6 +36,8 @@ export function fixture() {
   };
   const definitions = new Map<string, EditorVectorDefinition>();
   const items = new Map<string, EditorVectorItem>();
+  const collections = new Map<string, EditorVectorCollection>();
+  const members = new Map<string, EditorVectorMember>();
   const ref = {
     assetId: 'asset',
     createdAt: 1,
@@ -45,8 +49,8 @@ export function fixture() {
   const library: EditorVectorLibrary = {
     readCatalog: vi.fn(async () => ({
       items: [...items.values()],
-      collections: [],
-      members: [],
+      collections: [...collections.values()],
+      members: [...members.values()],
       presets: [],
     })),
     readSettings: vi.fn(async () => settings),
@@ -55,9 +59,32 @@ export function fixture() {
       if (!value) throw new Error('missing');
       return value;
     }),
-    captureAdmission: vi.fn(async () => ({ expectedItem: null })),
+    captureAdmission: vi.fn(async (_id, collectionId) => {
+      const collection = collectionId ? collections.get(collectionId) : undefined;
+      if (collectionId && !collection) throw new Error('Missing collection.');
+      return {
+        expectedItem: null,
+        ...(collection
+          ? { collection: { id: collection.id, incarnation: collection.incarnation } }
+          : {}),
+      };
+    }),
     importDefinition: vi.fn(async (value, options = {}) => {
       if (!isEditorVectorDefinition(value)) throw new Error('invalid');
+      if (options.collection) {
+        const collection = collections.get(options.collection.id);
+        if (!collection || collection.incarnation !== options.collection.incarnation)
+          throw new Error('Superseded collection.');
+        const key = `member:${collection.id}:${value.id}`;
+        members.set(key, {
+          key,
+          kind: 'member',
+          collectionId: collection.id,
+          collectionIncarnation: collection.incarnation,
+          definitionId: value.id,
+          name: options.name ?? null,
+        });
+      }
       definitions.set(value.id, value);
       items.set(value.id, {
         key: `item:${value.id}`,
@@ -89,7 +116,18 @@ export function fixture() {
     setFavorite: vi.fn<EditorVectorLibrary['setFavorite']>(),
     markUsed: vi.fn<EditorVectorLibrary['markUsed']>(),
     removeItem: vi.fn<EditorVectorLibrary['removeItem']>(),
-    createCollection: vi.fn<EditorVectorLibrary['createCollection']>(),
+    createCollection: vi.fn(async (input) => {
+      const row: EditorVectorCollection = {
+        ...input,
+        key: `collection:${input.id}`,
+        kind: 'collection',
+        incarnation: crypto.randomUUID(),
+        revision: 0,
+        deleted: false,
+      };
+      collections.set(row.id, row);
+      return row;
+    }),
     renameCollection: vi.fn<EditorVectorLibrary['renameCollection']>(),
     removeCollection: vi.fn<EditorVectorLibrary['removeCollection']>(),
     savePreset: vi.fn<EditorVectorLibrary['savePreset']>(),
@@ -146,6 +184,8 @@ export function fixture() {
     requestPermission,
     definitions,
     items,
+    collections,
+    members,
     source,
     cache,
     dependencies,
@@ -156,7 +196,7 @@ export function fixture() {
 }
 export function file(name: string, text: string) {
   const value = new File([text], name);
-  Object.defineProperty(value, 'text', { value: async () => text });
+  Object.defineProperty(value, 'text', { value: async () => text, configurable: true });
   return value;
 }
 export const svg =
@@ -164,9 +204,12 @@ export const svg =
 
 export async function reveal(session: EditorVectorLibrarySession) {
   session.setVisibleEntries(session.getSnapshot().entries.map((entry) => entry.key));
-  await vi.waitFor(() => {
-    expectPrepared(session);
-  });
+  await vi.waitFor(
+    () => {
+      expectPrepared(session);
+    },
+    { timeout: 5_000 }
+  );
 }
 function expectPrepared(session: EditorVectorLibrarySession) {
   if (session.getSnapshot().entries.some((entry) => !entry.definition && !entry.issue))

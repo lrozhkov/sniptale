@@ -1,10 +1,13 @@
-import { Star, TriangleAlert } from 'lucide-react';
+import { TriangleAlert } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
-import { EditorIconButton } from '../../chrome/ui';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import type { EditorVectorProvenance } from '../../../features/editor/document/vector-element';
-import type { EditorVectorCatalogEntry } from '../../application/vector-elements/session';
-import { useId, type PointerEvent } from 'react';
+import type {
+  EditorVectorCatalogEntry,
+  EditorVectorLibrarySnapshot,
+} from '../../application/vector-elements/session';
+import { type PointerEvent } from 'react';
+import { getEditorVectorPresentation, type EditorIconAppearance } from './presentation';
 
 export function EditorVectorSourceNotice({
   provenance,
@@ -69,27 +72,41 @@ export function EditorVectorSourceNotice({
   );
 }
 
-/** Preview markup has completed the same profile validation used by insertion. */
-function editorVectorPreviewUrl(entry: EditorVectorCatalogEntry): string | undefined {
-  return entry.definition
-    ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(entry.definition.svg)}`
-    : undefined;
+/** Resolves display metadata without exposing provider addresses in catalog hints. */
+export function editorVectorCollectionName(
+  entry: EditorVectorCatalogEntry,
+  state: Pick<EditorVectorLibrarySnapshot, 'remoteCollections' | 'local'>
+): string {
+  const collection = state.local.collections.find((candidate) =>
+    state.local.members.some(
+      (member) =>
+        member.definitionId === entry.key &&
+        member.collectionId === candidate.id &&
+        member.collectionIncarnation === candidate.incarnation
+    )
+  );
+  return (
+    collection?.name ??
+    state.remoteCollections.find((candidate) => candidate.prefix === entry.prefix)?.name ??
+    entry.prefix ??
+    ''
+  );
 }
+
 export function EditorElementsGrid(props: {
   entries: EditorVectorCatalogEntry[];
   selectedKey: string | null;
-  dark: boolean;
+  appearance: EditorIconAppearance;
   onSelect(entry: EditorVectorCatalogEntry): void;
   onAdd(entry: EditorVectorCatalogEntry): void;
-  onFavorite(entry: EditorVectorCatalogEntry): void;
+  collectionNames?: ReadonlyMap<string, string>;
   onPointerDown(event: PointerEvent<HTMLButtonElement>, entry: EditorVectorCatalogEntry): void;
 }) {
-  const sourceDescriptionId = useId();
   return (
     <div
       role="list"
       aria-label={translate('editor.elements.title')}
-      className="grid grid-cols-4 gap-2"
+      className="grid grid-cols-6 gap-1.5"
       data-ui="editor.elements.grid"
     >
       {props.entries.map((entry) => (
@@ -97,19 +114,15 @@ export function EditorElementsGrid(props: {
           <button
             type="button"
             aria-label={entry.prefix ? `${entry.prefix}:${entry.name}` : entry.name}
-            aria-describedby={
-              entry.definition?.provenance.sourceId
-                ? `${sourceDescriptionId}-${encodeURIComponent(entry.key)}`
-                : undefined
-            }
             aria-pressed={props.selectedKey === entry.key}
-            title={
-              `${entry.prefix ? `${entry.prefix}:` : ''}${entry.name}` +
-              (entry.definition ? ` · ${entry.definition.provenance.sourceId}` : '')
-            }
+            title={[entry.name, props.collectionNames?.get(entry.key) ?? entry.prefix]
+              .filter(Boolean)
+              .join(' · ')}
             className={[
-              'flex h-16 w-full min-w-0 flex-col items-center justify-center gap-1',
-              'rounded-[4px] border p-1 text-xs hover:bg-[var(--sniptale-color-surface-hover)]',
+              'flex aspect-square w-full min-w-0 items-center justify-center',
+              'rounded-[4px] border p-1 text-xs focus-visible:outline focus-visible:outline-2',
+              'focus-visible:outline-[var(--sniptale-color-accent)]',
+              'hover:bg-[var(--sniptale-color-surface-hover)]',
               props.selectedKey === entry.key
                 ? 'border-[var(--sniptale-color-accent)]'
                 : 'border-transparent',
@@ -128,15 +141,15 @@ export function EditorElementsGrid(props: {
             }}
           >
             <span
-              className="flex h-9 w-full items-center justify-center rounded-[4px]"
-              style={{ backgroundColor: props.dark ? '#292929' : '#ffffff' }}
+              className="flex h-full w-full items-center justify-center rounded-[4px]"
+              style={{ backgroundColor: props.appearance.background }}
             >
               {entry.definition ? (
                 <img
-                  src={editorVectorPreviewUrl(entry)}
+                  src={getEditorVectorPresentation(entry.definition, props.appearance).previewUrl}
                   alt=""
                   draggable={false}
-                  className="h-8 w-8 object-contain"
+                  className="h-7 w-7 max-h-full max-w-full object-contain"
                 />
               ) : entry.issue ? (
                 <TriangleAlert aria-label={translate('editor.elements.refused')} size={18} />
@@ -147,33 +160,7 @@ export function EditorElementsGrid(props: {
                 />
               )}
             </span>
-            <span className="w-full truncate text-[var(--sniptale-color-text-secondary)]">
-              {entry.name}
-            </span>
           </button>
-          {entry.definition?.provenance.sourceId ? (
-            <span
-              id={`${sourceDescriptionId}-${encodeURIComponent(entry.key)}`}
-              className="sr-only"
-            >
-              {entry.definition.provenance.sourceId}
-            </span>
-          ) : null}
-          <EditorIconButton
-            className="!absolute right-0 top-0 !h-6 !w-6"
-            disabled={!entry.definition}
-            title={translate(
-              entry.favorite ? 'editor.elements.unfavorite' : 'editor.elements.favorite'
-            )}
-            aria-label={translate(
-              entry.favorite ? 'editor.elements.unfavorite' : 'editor.elements.favorite'
-            )}
-            aria-pressed={entry.favorite}
-            data-ui="editor.elements.favorite"
-            onClick={() => props.onFavorite(entry)}
-          >
-            <Star size={12} fill={entry.favorite ? 'currentColor' : 'none'} />
-          </EditorIconButton>
         </div>
       ))}
     </div>

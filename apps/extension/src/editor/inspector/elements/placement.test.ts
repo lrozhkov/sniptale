@@ -81,10 +81,15 @@ describe('prepared vector placement', () => {
     document.dispatchEvent(pointer('pointermove', 240, 180));
     document.dispatchEvent(pointer('pointerup', 240, 180));
     await Promise.resolve();
-    expect(f.controller.insertVectorElement).toHaveBeenCalledExactlyOnceWith(f.definition, {
-      x: 70,
-      y: 50,
-    });
+    expect(f.controller.insertVectorElement).toHaveBeenCalledExactlyOnceWith(
+      f.definition,
+      {
+        x: 70,
+        y: 50,
+      },
+      expect.any(Object),
+      expect.objectContaining({ opacity: 1, strokeScale: 1 })
+    );
     expect(f.onInserted).toHaveBeenCalledOnce();
     expect(f.onGhost).toHaveBeenLastCalledWith(null);
     document.dispatchEvent(pointer('pointerup', 260, 190));

@@ -20,8 +20,8 @@ const defaultEditorVectorSettings = (): EditorVectorSettings => ({
   incarnation: 'unconfigured',
   revision: 0,
   baseUrl: DEFAULT_EDITOR_VECTOR_SOURCE,
-  networkEnabled: false,
-  disclosureAccepted: false,
+  networkEnabled: true,
+  disclosureAccepted: true,
   sourceGeneration: 0,
 });
 

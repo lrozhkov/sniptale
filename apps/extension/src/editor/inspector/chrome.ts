@@ -58,3 +58,7 @@ export const INSPECTOR_STATUS_BADGE_SUCCESS_CLASS_NAME =
   INSPECTOR_STATUS_BADGE_BASE_CLASS_NAME +
   ' bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_48%,var(--sniptale-color-surface-panel)_52%)] ' +
   'text-[color:var(--sniptale-color-accent-emphasis)]';
+
+/** The mode viewport owns the perimeter; canonical rows own their internal 8px inset. */
+export const INSPECTOR_CONTENT_INSET_CLASS_NAME = 'p-3';
+export const INSPECTOR_CONTENT_INLINE_INSET_CLASS_NAME = 'px-3';

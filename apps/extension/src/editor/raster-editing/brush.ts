@@ -26,7 +26,7 @@ export interface RasterBrushPreview {
   readonly pixels: Uint8ClampedArray | null;
 }
 
-/** Source-pixel diameter and independent hardness. Accepted input planes remain immutable. */
+/** Document-pixel diameter and independent hardness. Accepted input planes remain immutable. */
 type RasterBrushOptions = {
   readonly planes: RasterPixelData;
   readonly geometry: RasterSourceGeometry;
@@ -82,20 +82,181 @@ function validateBrushOptions(options: RasterBrushOptions): number {
   return count;
 }
 
-/** Adapted Klecks Bezier spacing/finalization with local soft coverage and visibility planes. */
-export function createRasterBrushStroke(options: RasterBrushOptions): RasterBrushStroke {
-  const count = validateBrushOptions(options);
-  const { planes, geometry, diameter, hardness, mode } = options;
+function prepareBrushGeometry(geometry: RasterSourceGeometry, diameter: number) {
+  const [a, b, c, d, e, f] = geometry.sourceToScene;
+  const determinant = a * d - b * c;
+  if (
+    !geometry.sourceToScene.every(Number.isFinite) ||
+    !Number.isFinite(determinant) ||
+    determinant === 0
+  )
+    throw new RangeError('Brush transform must be finite and invertible');
+  const radius = diameter / 2;
+  const pixelEdge = 0.5 * Math.max(Math.hypot(a, b), Math.hypot(c, d));
+  const extentX = ((radius + pixelEdge) * Math.hypot(d, c)) / Math.abs(determinant);
+  const extentY = ((radius + pixelEdge) * Math.hypot(b, a)) / Math.abs(determinant);
+  const toSource = (point: SourcePoint): SourcePoint => ({
+    x: (d * point.x - c * point.y) / determinant,
+    y: (a * point.y - b * point.x) / determinant,
+  });
+  let limits =
+    geometry.sourceClip ??
+    (!geometry.periodic ? { x: 0, y: 0, width: geometry.width, height: geometry.height } : null);
+  if (!limits && geometry.sceneClip) {
+    const clip = geometry.sceneClip;
+    const corners = [
+      { x: clip.x - e, y: clip.y - f },
+      { x: clip.x + clip.width - e, y: clip.y - f },
+      { x: clip.x - e, y: clip.y + clip.height - f },
+      { x: clip.x + clip.width - e, y: clip.y + clip.height - f },
+    ].map(toSource);
+    const x = Math.min(...corners.map((point) => point.x)),
+      y = Math.min(...corners.map((point) => point.y));
+    limits = {
+      x,
+      y,
+      width: Math.max(...corners.map((point) => point.x)) - x,
+      height: Math.max(...corners.map((point) => point.y)) - y,
+    };
+  }
+  return { radius, pixelEdge, extentX, extentY, toSource, limits };
+}
+
+function brushPixelStrength(
+  options: RasterBrushOptions,
+  metric: ReturnType<typeof prepareBrushGeometry>,
+  point: SourcePoint,
+  x: number,
+  y: number
+): number {
+  const { geometry, hardness } = options;
+  const [a, b, c, d, e, f] = geometry.sourceToScene;
+  const { radius, pixelEdge } = metric;
+  const dx = x + 0.5 - point.x,
+    dy = y + 0.5 - point.y;
+  const distance = Math.hypot(a * dx + c * dy, b * dx + d * dy);
+  const edge = Math.min(1, Math.max(0, (radius + pixelEdge - distance) / (2 * pixelEdge)));
+  if (edge === 0) return 0;
+  const softness = radius * (1 - hardness);
+  const t = softness > 0 ? Math.min(1, Math.max(0, (radius - distance) / softness)) : 1;
+  const strength = Math.round(255 * edge * t * t * (3 - 2 * t));
+  if (strength === 0) return 0;
+  if (geometry.sourceClip && !contains(geometry.sourceClip, x + 0.5, y + 0.5)) return 0;
+  if (
+    geometry.sceneClip &&
+    !contains(
+      geometry.sceneClip,
+      a * (x + 0.5) + c * (y + 0.5) + e,
+      b * (x + 0.5) + d * (y + 0.5) + f
+    )
+  )
+    return 0;
+  return strength;
+}
+
+function applyBrushCoverage(
+  options: RasterBrushOptions,
+  draft: RasterPixelData & { visibility: Uint8Array },
+  index: number,
+  strength: number
+): void {
+  const { planes, mode } = options;
+  const { color, visibility, key } = draft;
+  const paint = options.mode === 'paint' ? options.color : null;
+  const opacity = options.mode === 'paint' ? options.opacity : 1;
+  const fraction = strength / 255;
+  if (paint) {
+    paintRasterColorPixel(planes, index, color, paint, fraction * opacity);
+    visibility[index] = 255;
+    if (key) key[index * 4 + 3] = 0;
+  } else {
+    const old = planes.visibility?.[index] ?? 255;
+    visibility[index] = Math.round(
+      mode === 'restore' ? old + (255 - old) * fraction : old * (1 - fraction)
+    );
+    if (mode === 'restore' && key !== null && planes.key !== null)
+      key[index * 4 + 3] = Math.round(planes.key[index * 4 + 3]! * (1 - fraction));
+  }
+}
+
+function stampRasterBrush(
+  options: RasterBrushOptions,
+  draft: RasterPixelData & { visibility: Uint8Array },
+  coverage: Uint8Array,
+  metric: ReturnType<typeof prepareBrushGeometry>,
+  point: SourcePoint
+): PixelBounds | null {
+  const { planes, geometry } = options;
   const paint = options.mode === 'paint' ? options.color : null;
   const opacity = options.mode === 'paint' ? options.opacity : 1;
   const selection = options.selection ?? null;
+  const { extentX, extentY, limits } = metric;
+  let left = Infinity,
+    top = Infinity,
+    right = -Infinity,
+    bottom = -Infinity;
+  if (opacity === 0 || paint?.[3] === 0) return null;
+  const x0 = Math.max(Math.floor(point.x - extentX), limits ? Math.floor(limits.x) : -Infinity);
+  const x1 = Math.min(
+    Math.ceil(point.x + extentX),
+    limits ? Math.ceil(limits.x + limits.width) - 1 : Infinity
+  );
+  const y0 = Math.max(Math.floor(point.y - extentY), limits ? Math.floor(limits.y) : -Infinity);
+  const y1 = Math.min(
+    Math.ceil(point.y + extentY),
+    limits ? Math.ceil(limits.y + limits.height) - 1 : Infinity
+  );
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const strength = brushPixelStrength(options, metric, point, x, y);
+      if (strength === 0) continue;
+      const px = geometry.periodic
+        ? geometry.crop.x +
+          ((((x - geometry.crop.x) % geometry.crop.width) + geometry.crop.width) %
+            geometry.crop.width)
+        : x;
+      const py = geometry.periodic
+        ? geometry.crop.y +
+          ((((y - geometry.crop.y) % geometry.crop.height) + geometry.crop.height) %
+            geometry.crop.height)
+        : y;
+      if (
+        px < 0 ||
+        py < 0 ||
+        px >= planes.width ||
+        py >= planes.height ||
+        !contains(geometry.crop, px + 0.5, py + 0.5)
+      )
+        continue;
+      const index = py * planes.width + px;
+      if ((selection !== null && !selection[index]) || strength <= coverage[index]!) continue;
+      // Each pixel derives from accepted planes and cumulative coverage, never from a prior preview.
+      coverage[index] = strength;
+      applyBrushCoverage(options, draft, index, strength);
+      left = Math.min(left, px);
+      top = Math.min(top, py);
+      right = Math.max(right, px + 1);
+      bottom = Math.max(bottom, py + 1);
+    }
+  }
+  return Number.isFinite(left)
+    ? { x: left, y: top, width: right - left, height: bottom - top }
+    : null;
+}
+
+/** Adapted Klecks Bezier spacing/finalization with local soft coverage and visibility planes. */
+export function createRasterBrushStroke(options: RasterBrushOptions): RasterBrushStroke {
+  const count = validateBrushOptions(options);
+  const { planes, geometry, diameter, mode } = options;
   const coverage = new Uint8Array(count);
   const visibility = planes.visibility?.slice() ?? new Uint8Array(count).fill(255);
   const key = mode === 'restore' || mode === 'paint' ? (planes.key?.slice() ?? null) : planes.key;
   const color = mode === 'paint' ? planes.color.slice() : planes.color;
-  const draft: RasterPixelData = { ...planes, color, visibility, key };
+  const draft = { ...planes, color, visibility, key };
   const line = new BezierLine();
-  const radius = diameter / 2;
+  const [a, b, c, d] = geometry.sourceToScene;
+  const metric = prepareBrushGeometry(geometry, diameter);
+  const { toSource } = metric;
   const spacing = Math.max(0.25, diameter * 0.1);
   let last: SourcePoint | null = null;
   let strokeBounds: PixelBounds | null = null;
@@ -106,72 +267,12 @@ export function createRasterBrushStroke(options: RasterBrushOptions): RasterBrus
   let closed = false;
 
   function stamp(point: SourcePoint): void {
-    if (opacity === 0 || paint?.[3] === 0) return;
-    const [a, b, c, d, e, f] = geometry.sourceToScene;
-    for (let y = Math.floor(point.y - radius - 0.5); y <= Math.ceil(point.y + radius + 0.5); y++) {
-      for (
-        let x = Math.floor(point.x - radius - 0.5);
-        x <= Math.ceil(point.x + radius + 0.5);
-        x++
-      ) {
-        const distance = Math.hypot(x + 0.5 - point.x, y + 0.5 - point.y);
-        const edge = Math.min(1, Math.max(0, radius + 0.5 - distance));
-        if (edge === 0) continue;
-        const softness = radius * (1 - hardness);
-        const t = softness > 0 ? Math.min(1, Math.max(0, (radius - distance) / softness)) : 1;
-        const strength = Math.round(255 * edge * t * t * (3 - 2 * t));
-        if (strength === 0) continue;
-        if (geometry.sourceClip && !contains(geometry.sourceClip, x + 0.5, y + 0.5)) continue;
-        if (
-          geometry.sceneClip &&
-          !contains(
-            geometry.sceneClip,
-            a * (x + 0.5) + c * (y + 0.5) + e,
-            b * (x + 0.5) + d * (y + 0.5) + f
-          )
-        )
-          continue;
-        const px = geometry.periodic
-          ? geometry.crop.x +
-            ((((x - geometry.crop.x) % geometry.crop.width) + geometry.crop.width) %
-              geometry.crop.width)
-          : x;
-        const py = geometry.periodic
-          ? geometry.crop.y +
-            ((((y - geometry.crop.y) % geometry.crop.height) + geometry.crop.height) %
-              geometry.crop.height)
-          : y;
-        if (
-          px < 0 ||
-          py < 0 ||
-          px >= planes.width ||
-          py >= planes.height ||
-          !contains(geometry.crop, px + 0.5, py + 0.5)
-        )
-          continue;
-        const index = py * planes.width + px;
-        if ((selection !== null && !selection[index]) || strength <= coverage[index]!) continue;
-        // Each pixel derives from accepted planes and cumulative coverage, never from a prior preview.
-        coverage[index] = strength;
-        const fraction = strength / 255;
-        if (paint) {
-          paintRasterColorPixel(planes, index, color, paint, fraction * opacity);
-          visibility[index] = 255;
-          if (key) key[index * 4 + 3] = 0;
-        } else {
-          const old = planes.visibility?.[index] ?? 255;
-          visibility[index] = Math.round(
-            mode === 'restore' ? old + (255 - old) * fraction : old * (1 - fraction)
-          );
-          if (mode === 'restore' && key !== null && planes.key !== null)
-            key[index * 4 + 3] = Math.round(planes.key[index * 4 + 3]! * (1 - fraction));
-        }
-        left = Math.min(left, px);
-        top = Math.min(top, py);
-        right = Math.max(right, px + 1);
-        bottom = Math.max(bottom, py + 1);
-      }
-    }
+    const changed = stampRasterBrush(options, draft, coverage, metric, point);
+    if (!changed) return;
+    left = Math.min(left, changed.x);
+    top = Math.min(top, changed.y);
+    right = Math.max(right, changed.x + changed.width);
+    bottom = Math.max(bottom, changed.y + changed.height);
   }
 
   function preview(): RasterBrushPreview {
@@ -199,7 +300,9 @@ export function createRasterBrushStroke(options: RasterBrushOptions): RasterBrus
   function append(point: SourcePoint): void {
     assertSourcePoint(point);
     if (!last) stamp(point);
-    line.add(point.x, point.y, spacing, stamp);
+    line.add(a * point.x + c * point.y, b * point.x + d * point.y, spacing, (scene) =>
+      stamp(toSource(scene))
+    );
     last = { ...point };
   }
 
@@ -212,7 +315,7 @@ export function createRasterBrushStroke(options: RasterBrushOptions): RasterBrus
     finish(point) {
       if (closed) throw new Error('Brush stroke is closed');
       if (point) append(point);
-      line.addFinal(spacing, stamp);
+      line.addFinal(spacing, (scene) => stamp(toSource(scene)));
       if (last) stamp(last);
       closed = true;
       return preview();

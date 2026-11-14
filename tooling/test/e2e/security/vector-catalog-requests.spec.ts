@@ -81,15 +81,19 @@ async function proveSearchBudget(page: Page, source: Source): Promise<void> {
   expect(source.maxActiveArtwork).toBeLessThanOrEqual(2);
   const beforeSelection = source.requests.length;
   await cards(page).last().click();
+  const details = page.getByRole('button', { name: 'Source and license', exact: true });
+  if ((await details.getAttribute('aria-expanded')) !== 'true') await details.click();
   await expect(page.locator('[data-ui="editor.elements.source-notice"]')).toContainText('MIT');
-  await page.locator('[data-ui="editor.elements.preview-background"]').click();
+  await page.locator('[data-ui="editor.elements.appearance-trigger"]').click();
+  await page.getByRole('button', { name: 'Dark', exact: true }).click();
+  await page.getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(cards(page).last().locator('img')).toBeVisible();
   expect(source.requests).toHaveLength(beforeSelection);
   expect(requestCount(source, 'collection')).toBe(0);
 }
 
 async function proveCollectionReuse(page: Page, source: Source): Promise<void> {
-  const search = page.getByRole('searchbox', { name: 'Search elements', exact: true });
+  const search = page.getByRole('searchbox', { name: 'Search icons', exact: true });
   await search.fill('');
   await search.press('Enter');
   await page.getByRole('button', { name: 'Filter collections', exact: true }).click();
@@ -101,6 +105,8 @@ async function proveCollectionReuse(page: Page, source: Source): Promise<void> {
   await waitForEligiblePreviews(page);
   expect(requestCount(source, 'collection')).toBe(1);
   await cards(page).last().click();
+  const details = page.getByRole('button', { name: 'Source and license', exact: true });
+  if ((await details.getAttribute('aria-expanded')) !== 'true') await details.click();
   await expect(page.locator('[data-ui="editor.elements.source-notice"]')).toContainText('MIT');
 }
 
@@ -119,7 +125,6 @@ for (const viewport of [
       });
       const page = await openCatalogEditor(launched.context, launched.extensionId, viewport);
       await enableCatalogSource(page, source.baseUrl, 'accept');
-      await expect(page.locator('[data-ui="editor.elements.check-source"]')).toBeEnabled();
       await expect.poll(() => requestCount(source, 'collections')).toBe(1);
       await proveSearchBudget(page, source);
       await proveCollectionReuse(page, source);

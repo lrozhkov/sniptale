@@ -16,7 +16,7 @@ import {
   type CatalogRequest,
   type EditorVectorSourceToken,
 } from '../../features/editor/vector-catalog';
-import { executeVectorCatalogRequest } from '../../workflows/vector-catalog/transport';
+import { executeVectorCatalogRequest } from './transport';
 
 interface EditorVectorCatalogClient {
   collections(signal?: AbortSignal): Promise<CatalogResult<'collections'>>;

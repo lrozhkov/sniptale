@@ -98,10 +98,10 @@ it('refuses delayed favorite after item removal and recreation without changing 
   await reader.release();
 });
 
-it('source settings default to opt-out and reject stale publication after source changes', async () => {
+it('source settings default to enabled and reject stale publication after source changes', async () => {
   const library = service();
   const original = await readEditorVectorSettings();
-  expect(original).toMatchObject({ networkEnabled: false, disclosureAccepted: false, revision: 0 });
+  expect(original).toMatchObject({ networkEnabled: true, disclosureAccepted: true, revision: 0 });
   const enabled = await library.updateSettings(
     { networkEnabled: true, disclosureAccepted: true },
     original
@@ -227,9 +227,9 @@ it('renames a collection without changing membership and refuses invalid or supe
 it('refuses unaccepted network access and unsafe source URLs without changing stored settings', async () => {
   const library = service();
   const original = await readEditorVectorSettings();
-  await expect(library.updateSettings({ networkEnabled: true }, original)).rejects.toThrow(
-    'acceptance'
-  );
+  await expect(
+    library.updateSettings({ networkEnabled: true, disclosureAccepted: false }, original)
+  ).rejects.toThrow('acceptance');
   for (const baseUrl of ['http://example.test/', 'https://user:password@example.test/']) {
     await expect(library.updateSettings({ baseUrl }, original)).rejects.toThrow('HTTPS');
     expect(await readEditorVectorSettings()).toEqual(original);

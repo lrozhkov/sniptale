@@ -1,4 +1,7 @@
 import { translate, type TranslationKey } from '../../../platform/i18n';
+import { Icon } from '@iconify/react';
+import iconsIcon from '@iconify-icons/tabler/icons';
+import type { ComponentType } from 'react';
 import {
   FolderOpen,
   Globe,
@@ -8,26 +11,29 @@ import {
   Move,
   Palette,
   Scaling,
-  Shapes,
   SlidersHorizontal,
   Sparkles,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import type { EditorLayerEffectCategory } from '../../../features/editor/document/effects';
 import type { EditorInspector } from '../../state/types';
 import { createInspectorMeta, type EditorInspectorMeta } from './shared';
 
 const ICON_PROPS = { size: 18, strokeWidth: 2 } as const;
+type InspectorGlyph = ComponentType<{ size?: number; strokeWidth?: number }>;
+
+function CatalogIcon({ size = 18 }: { size?: number }) {
+  return <Icon ssr aria-hidden="true" icon={iconsIcon} width={size} height={size} />;
+}
 
 interface TranslatedInspectorDescriptor {
-  Icon: LucideIcon;
+  Icon: InspectorGlyph;
   subtitleKey: TranslationKey;
   titleKey: TranslationKey;
 }
 
 const staticInspectorDescriptors = {
   elements: {
-    Icon: Shapes,
+    Icon: CatalogIcon,
     subtitleKey: 'editor.elements.subtitle',
     titleKey: 'editor.elements.title',
   },
@@ -101,7 +107,7 @@ const defaultLayerEffectsDescriptor = {
   titleKey: 'editor.toolbar.layerEffectsTitle',
 } satisfies Pick<TranslatedInspectorDescriptor, 'Icon' | 'subtitleKey' | 'titleKey'>;
 
-function renderIcon(Icon: LucideIcon) {
+function renderIcon(Icon: InspectorGlyph) {
   return <Icon {...ICON_PROPS} />;
 }
 

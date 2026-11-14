@@ -205,7 +205,7 @@ it('grows below the cap without enabling list scrolling and only scrolls after h
   renderExpandedPanel(['layer-1']);
 
   expect(getPanelFrame()?.style.height).toBe('157px');
-  expectLastListViewport({ reserveScrollbarGutter: true, scrollable: false });
+  expectLastListViewport({ reserveScrollbarGutter: false, scrollable: false });
 
   setMediumLayerMetrics();
   renderExpandedPanel(['layer-1', 'layer-2']);
