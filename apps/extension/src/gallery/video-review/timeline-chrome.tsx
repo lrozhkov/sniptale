@@ -224,6 +224,7 @@ export function ReviewToolbar(props: {
   return (
     <div ref={toolbar} data-ui="gallery.videoReview.toolbar" className="review-timeline-toolbar">
       <div data-toolbar-side="leading" className="flex min-w-0 items-center">
+        {props.modeControl}
         {props.tools}
       </div>
       <div data-toolbar-transport className="flex shrink-0 items-center justify-center gap-2">
@@ -301,7 +302,6 @@ export function ReviewToolbar(props: {
           <>
             <ReviewToolbarSeparator />
             {props.inspectorControls}
-            {props.modeControl}
             <ReviewButton
               data-ui="gallery.videoReview.openExport"
               label={translate('gallery.videoReview.exportSection')}

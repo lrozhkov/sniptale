@@ -249,6 +249,15 @@ function reviewContentCommands(
         }
         return { ...content, actionAudio: next };
       }),
+    setInteractionTimeline: (
+      update: (
+        current: NonNullable<QuickEditAdvancedContent['interactionTimeline']>
+      ) => NonNullable<QuickEditAdvancedContent['interactionTimeline']>
+    ) =>
+      stage((content) => ({
+        ...content,
+        interactionTimeline: update(content.interactionTimeline ?? { presses: [], overrides: [] }),
+      })),
     setKeyAnimations: (
       update: (
         current: NonNullable<QuickEditAdvancedContent['keyAnimations']>

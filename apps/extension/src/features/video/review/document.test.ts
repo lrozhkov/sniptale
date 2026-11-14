@@ -101,7 +101,7 @@ it('preserves authored cursor keys and handles in the accepted baseline and ever
 });
 
 it.each(['advancedContent', 'annotation', 'canvasComment', 'edit'] as const)(
-  'traverses the before-value once while applying a %s operation',
+  'does not repeatedly serialize the before-value while applying a %s operation',
   (target) => {
     const document = replayReviewHistory([], 0, source);
     let operation: ReviewOperation;
@@ -141,8 +141,13 @@ it.each(['advancedContent', 'annotation', 'canvasComment', 'edit'] as const)(
     const stringify = vi.spyOn(JSON, 'stringify');
     try {
       applyReviewOperation(document, operation, source);
-      expect(stringify.mock.calls.filter(([value]) => value === operation.before)).toHaveLength(1);
-      expect(stringify).toHaveBeenCalledTimes(3);
+      if (target === 'advancedContent') expect(stringify).not.toHaveBeenCalled();
+      else {
+        expect(stringify.mock.calls.filter(([value]) => value === operation.before)).toHaveLength(
+          1
+        );
+        expect(stringify).toHaveBeenCalledTimes(3);
+      }
     } finally {
       stringify.mockRestore();
     }
@@ -571,4 +576,44 @@ it('keeps unrelated text on the voiceover source positions after a video Cut', a
   expect(
     projectReviewTextFragment(fragment, buildReviewTimeMap(source.duration, result.edits)).ranges
   ).toEqual([{ start: 6, end: 8 }]);
+});
+
+it('retains authored interaction timing in a replay baseline and through Undo and Redo', () => {
+  const baseline = createQuickEditAdvancedContent();
+  baseline.interactionTimeline = {
+    presses: [
+      {
+        id: 'authored',
+        family: 'keyboard',
+        start: 1,
+        end: 2,
+        label: 'Cmd+K',
+        keys: ['Cmd', 'K'],
+        button: 0,
+        x: 0.5,
+        y: 0.5,
+      },
+    ],
+    overrides: [
+      {
+        ref: { kind: 'signal', id: 'typing' },
+        start: 5,
+        end: 6,
+        enabled: true,
+        sourceRange: { start: 1, end: 2 },
+      },
+    ],
+  };
+  const retained = reviewAdvancedContentBaseline(baseline);
+  expect(retained.interactionTimeline).toEqual(baseline.interactionTimeline);
+  const after = { ...retained, interactionTimeline: { presses: [], overrides: [] } };
+  const history: ReviewOperation[] = [
+    { id: 'clear', at: 1, target: 'advancedContent', before: retained, after },
+  ];
+  expect(
+    replayReviewHistory(history, 0, source, retained).advancedContent.interactionTimeline
+  ).toEqual(baseline.interactionTimeline);
+  expect(
+    replayReviewHistory(history, 1, source, retained).advancedContent.interactionTimeline
+  ).toEqual(after.interactionTimeline);
 });

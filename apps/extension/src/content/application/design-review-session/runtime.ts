@@ -15,6 +15,11 @@ import type { ContentPrivilegedActionIntentSource } from '../privileged-action-i
 import { ReviewSessionPersistence } from './persistence';
 export type { ReviewSessionEntry, ReviewSessionPreview } from './controller';
 
+function previewContentSignature(record: BrowserDomAnnotationRecord): string {
+  const { comment: _comment, ...visual } = record;
+  return JSON.stringify(visual);
+}
+
 interface RuntimePorts {
   request(message: DesignReviewSessionRequest): Promise<DesignReviewSessionReply>;
   connected?(): boolean;
@@ -103,7 +108,7 @@ class ReviewSessionRuntimeOwner {
     if (!this.controller.restore(payload)) return false;
     if (rememberPreviews)
       for (const entry of this.controller.document.entries)
-        if (entry.preview) this.captured.set(entry.id, JSON.stringify(entry.record));
+        if (entry.preview) this.captured.set(entry.id, previewContentSignature(entry.record));
     return true;
   }
   private applyAdmission(kind: 'open' | 'resume' | 'reconnect', adopted: boolean) {
@@ -361,12 +366,13 @@ class ReviewSessionRuntimeOwner {
       for (const entry of [...this.controller.document.entries]) {
         if (entry.record.evidence.pageUrl !== page) continue;
         const signature = JSON.stringify(entry.record);
-        if (this.captured.get(entry.id) === signature) continue;
+        const visualSignature = previewContentSignature(entry.record);
+        if (this.captured.get(entry.id) === visualSignature) continue;
         try {
           const preview = await this.ports.capture(entry, source);
           if (this.disposed || this.ports.pageUrl() !== page) return;
           if (preview && this.controller.setPreview(entry.id, signature, preview)) {
-            this.captured.set(entry.id, signature);
+            this.captured.set(entry.id, visualSignature);
             this.publish();
             await this.persistence.persist();
           }

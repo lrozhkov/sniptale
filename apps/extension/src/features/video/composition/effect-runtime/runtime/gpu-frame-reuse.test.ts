@@ -388,7 +388,7 @@ it('does not share cancellation between simultaneous requests for the same canon
 it('keeps identical Lottie hold pixels while rendering the authored entrance and exit', async () => {
   const f = fixture();
   const animationSource = readFileSync(
-    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
   const document = parseRuntimeAnimationDocument(JSON.parse(animationSource));

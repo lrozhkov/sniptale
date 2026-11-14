@@ -1,0 +1,3 @@
+Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
+Static weight instances with renamed Sniptale family names. Original copyright and OFL records are retained. Font bytes are embedded in self-contained animation packages.
+Source: https://github.com/google/fonts/tree/main/ofl/jetbrainsmono

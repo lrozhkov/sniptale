@@ -7,11 +7,5 @@
   "copyright": "Copyright 2019 The Golos Text Project Authors (https://github.com/googlefonts/golos-text)",
   "license": "OFL-1.1",
   "packaging": "Embedded base64 in self-contained Lottie animation packages; font bytes unchanged",
-  "documents": [
-    "animations/lower-third.sniptale-animation.json",
-    "animations/callout.sniptale-animation.json",
-    "animations/chapters.sniptale-animation.json",
-    "animations/title.sniptale-animation.json",
-    "animations/frame.sniptale-animation.json"
-  ]
+  "documents": ["animations/frame.sniptale-animation.json"]
 }

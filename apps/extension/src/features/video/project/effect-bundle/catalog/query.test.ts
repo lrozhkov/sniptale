@@ -3,7 +3,7 @@ import { expect, it, vi } from 'vitest';
 import type { EffectBundleCatalogEntry } from './index';
 import { getEffectCatalogThemes, queryEffectCatalog } from './query';
 const source = readFileSync(
-  'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+  'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
   'utf8'
 );
 const catalog: EffectBundleCatalogEntry = {

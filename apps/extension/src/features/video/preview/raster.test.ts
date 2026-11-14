@@ -53,7 +53,7 @@ it('fits unsnapped CSS geometry with DPR applied once and capped at two', () => 
   expect(resolveQuickPreviewRasterSize({ ...base, dpr: 3 })).toEqual({ width: 1920, height: 1080 });
   expect(resolveQuickPreviewRasterSize({ ...base, css: { width: 801.5, height: 600 } })).toEqual({
     width: 802,
-    height: 450,
+    height: 451,
   });
   expect(
     resolveQuickPreviewRasterSize({
@@ -62,6 +62,19 @@ it('fits unsnapped CSS geometry with DPR applied once and capped at two', () => 
       css: { width: 900, height: 600 },
     })
   ).toEqual({ width: 338, height: 600 });
+});
+
+it('keeps odd display pixel dimensions without a second CSS resample', () => {
+  for (const paused of [false, true]) {
+    expect(
+      resolveQuickPreviewRasterSize({
+        ...base,
+        canonical: { width: 1904, height: 1072 },
+        css: { width: 1373, height: 773 },
+        paused,
+      })
+    ).toEqual({ width: 1373, height: 773 });
+  }
 });
 
 it('ignores display size and DPR for named rasters', () => {

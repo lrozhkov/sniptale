@@ -11,7 +11,7 @@ import type { VideoProjectMetadataEntry } from './contracts';
 
 function metadataEntry(): VideoProjectMetadataEntry {
   const source = readFileSync(
-    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
   const validated = parseAnimationTemplateSource(source);

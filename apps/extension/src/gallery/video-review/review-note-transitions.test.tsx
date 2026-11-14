@@ -418,7 +418,12 @@ it.each(['success', 'cancel', 'failure'] as const)(
       expect(fixture.button('exportVideo').disabled).toBe(false);
       await fixture.click('exportVideo');
       expect(fixture.button('play').disabled).toBe(true);
-      expect(fixture.button('advancedEditing').disabled).toBe(true);
+      await fixture.click('moreActions');
+      const exit = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(
+        (item) => item.textContent === 'gallery.videoReview.returnBasicMode'
+      )!;
+      expect(exit.disabled).toBe(true);
+      await fixture.click('moreActions');
       const calls = vi.mocked(HTMLMediaElement.prototype.play).mock.calls.length;
       await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' })));
       expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(calls);
@@ -432,7 +437,7 @@ it.each(['success', 'cancel', 'failure'] as const)(
       if (outcome === 'cancel') await fixture.click('cancelExport');
       await act(async () => finish());
       expect(fixture.button('play').disabled).toBe(false);
-      expect(fixture.button('advancedEditing').disabled).toBe(false);
+      expect(fixture.button('moreActions').disabled).toBe(false);
       expect(fixture.button('exportVideo').disabled).toBe(false);
       expect(fixture.host.textContent?.includes('gallery.videoReview.exportFailed')).toBe(
         outcome === 'failure'
@@ -460,7 +465,6 @@ it.each(['toolbar', 'shortcut'] as const)(
       await act(async () =>
         fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
       );
-      await fixture.click('telemetry');
       await fixture.selectRulerRange(1, 3);
       expect(
         fixture.host.querySelector(

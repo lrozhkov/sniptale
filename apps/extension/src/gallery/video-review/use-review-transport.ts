@@ -27,6 +27,10 @@ export function useReviewTransport(args: {
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
   actionAudio?: readonly ReviewActionAudioSetting[];
+  interactionTimeline?:
+    | import('../../features/video/review/interaction-types').ReviewInteractionTimeline
+    | undefined;
+  interactionEnabled?: { keyboard?: boolean; mouse?: boolean };
   actionsApplied?: boolean;
   onSeek(value: number): void;
   boundaries(): readonly number[] | undefined;
@@ -78,9 +82,13 @@ export function useReviewTransport(args: {
   const actionPlan = useMemo(
     () =>
       buildReviewActionAudioPlan({
-        markers: args.resource.telemetry
-          ? projectReviewTelemetry(args.resource.telemetry, source.duration).markers
-          : [],
+        markers: projectReviewTelemetry(
+          args.resource.telemetry ?? { actionEvents: [], signals: [], cursorTrack: null },
+          source.duration,
+          false,
+          args.interactionTimeline,
+          args.interactionEnabled
+        ).markers,
         settings: args.actionAudio ?? [],
         segments: timeline.timeMap.getSegments(),
         applied: args.actionsApplied === true,
@@ -88,6 +96,8 @@ export function useReviewTransport(args: {
     [
       args.resource.telemetry,
       source.duration,
+      args.interactionTimeline,
+      args.interactionEnabled,
       args.actionAudio,
       args.actionsApplied,
       timeline.timeMap,
@@ -102,9 +112,19 @@ export function useReviewTransport(args: {
             edits: args.edits,
             settings: args.actionAudio ?? [],
             applied: args.actionsApplied === true,
+            interactionTimeline: args.interactionTimeline,
+            interactionEnabled: args.interactionEnabled,
           }
         : null,
-    [args.resource.historyProject, source, args.edits, args.actionAudio, args.actionsApplied]
+    [
+      args.resource.historyProject,
+      source,
+      args.edits,
+      args.actionAudio,
+      args.actionsApplied,
+      args.interactionTimeline,
+      args.interactionEnabled,
+    ]
   );
   const [recordingAudio, setRecordingAudio] = useState<{
     request: typeof recordingAudioRequest;

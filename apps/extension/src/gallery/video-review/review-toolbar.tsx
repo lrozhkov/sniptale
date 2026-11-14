@@ -28,8 +28,6 @@ import type { ReviewMediaIndex } from '../../workflows/video-review/media-index'
 import {
   MousePointer2,
   StickyNote,
-  SlidersHorizontal,
-  Activity,
   Settings2,
   ZoomIn,
   ScanEye,
@@ -268,7 +266,7 @@ export function ReviewTrackControls(props: {
 }) {
   const advanced = props.advanced;
   const features = resolveQuickEditEffectiveFeatures(advanced);
-  if (features.mode !== 'advanced' && !props.density) return null;
+  if (features.mode !== 'advanced') return null;
   return (
     <fieldset
       disabled={props.busy}
@@ -279,15 +277,6 @@ export function ReviewTrackControls(props: {
         <div className="flex w-7 shrink-0 items-center justify-center">
           <ReviewTrackHeightButton {...props.density} />
         </div>
-      ) : null}
-      {features.mode === 'basic' ? (
-        <ReviewHistoryTrackControl
-          advanced={props.advanced}
-          telemetryAvailable={props.telemetryAvailable}
-          setTrackVisibility={props.setTrackVisibility}
-          busy={props.busy}
-          compact
-        />
       ) : null}
       {features.mode === 'advanced' ? (
         <>
@@ -302,29 +291,6 @@ export function ReviewTrackControls(props: {
         </>
       ) : null}
     </fieldset>
-  );
-}
-
-/** Basic-mode history visibility lives in the compact lane settings row. */
-function ReviewHistoryTrackControl(
-  props: Pick<ToolbarProps, 'advanced' | 'busy' | 'telemetryAvailable' | 'setTrackVisibility'> & {
-    compact?: boolean;
-  }
-) {
-  if (!props.telemetryAvailable) return null;
-  const buttonClassName = props.compact ? reviewCompactTrackButtonClassName : plain;
-  return (
-    <ReviewButton
-      label={translate('gallery.videoReview.telemetry')}
-      toolbarPriority={4}
-      toolbarLabel={props.compact ? undefined : translate('gallery.videoReview.telemetry')}
-      aria-pressed={props.advanced.ui.tracks.actions}
-      disabled={props.busy}
-      className={`${buttonClassName} ${props.compact ? '!h-6 !min-h-6 !w-6 !px-1' : ''}`}
-      onClick={() => props.setTrackVisibility('actions', !props.advanced.ui.tracks.actions)}
-    >
-      <Activity size={props.compact ? 14 : 16} aria-hidden="true" />
-    </ReviewButton>
   );
 }
 
@@ -505,18 +471,6 @@ export function ReviewInspectorToolbarNavigation(props: {
       >
         <StickyNote size={16} aria-hidden="true" />
       </ReviewButton>
-      {props.advanced ? (
-        <ReviewButton
-          label={translate('gallery.videoReview.scene')}
-          toolbarLabel={translate('gallery.videoReview.scene')}
-          className={reviewIconButtonClassName}
-          aria-pressed={navigation.shown === 'scene'}
-          disabled={props.busy}
-          onClick={() => navigation.setSection('scene')}
-        >
-          <SlidersHorizontal size={16} aria-hidden="true" />
-        </ReviewButton>
-      ) : null}
     </>
   );
 }

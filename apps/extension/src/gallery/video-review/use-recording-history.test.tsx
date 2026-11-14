@@ -282,3 +282,35 @@ it('keeps strict archived history readable through rounded media EOF, End and se
     pause.mockRestore();
   }
 });
+
+it('replaces the bounded reader when authored timing changes and ignores the old pending result', async () => {
+  const old = reader(),
+    next = reader();
+  const pending = Promise.withResolvers<Prepared>();
+  old.read.mockReturnValueOnce(pending.promise);
+  io.create.mockReturnValueOnce(old).mockReturnValueOnce(next);
+  await act(async () => root.render(<Probe time={10} />));
+  const interactionTimeline = {
+    presses: [],
+    overrides: [
+      {
+        ref: { kind: 'action' as const, id: 'key' },
+        start: 10,
+        end: 11,
+        enabled: true,
+        sourceRange: { start: 1, end: 2 },
+      },
+    ],
+  };
+  await act(async () => root.render(<Probe time={10} options={{ interactionTimeline }} />));
+  expect(old.dispose).toHaveBeenCalledOnce();
+  expect(io.create.mock.calls[1]?.[3]).toMatchObject({ interactionTimeline });
+  const accepted = value.telemetry;
+  await act(async () =>
+    pending.resolve(
+      prepared(0, [{ ref: { kind: 'action', id: 'stale' }, eventType: 'KEY', start: 0, end: 1 }])
+    )
+  );
+  expect(value.telemetry).toBe(accepted);
+  expect(projectReviewTelemetry(value.telemetry!, 20).markers).toEqual([]);
+});

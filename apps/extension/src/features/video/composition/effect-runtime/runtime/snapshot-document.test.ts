@@ -4,7 +4,7 @@ import * as animationTemplate from '@sniptale/runtime-contracts/animation-templa
 import { parseEffectRuntimeSnapshotDocument } from './snapshot-document';
 
 const source = readFileSync(
-  'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+  'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
   'utf8'
 );
 

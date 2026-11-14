@@ -57,11 +57,11 @@ export function useReviewTrackSelection(input: {
     if (!input.selectable[next] || input.blocked) return;
     (input.beforeAction ?? ((action) => action()))(() => {
       const current = latest.current;
+      // Admission owns the busy gate; its pending UI state can outlive the completed save callback.
       if (
         current.sourceId !== input.sourceId ||
         current.mode !== input.mode ||
-        !current.selectable[next] ||
-        current.blocked
+        !current.selectable[next]
       )
         return;
       if (next !== track) {

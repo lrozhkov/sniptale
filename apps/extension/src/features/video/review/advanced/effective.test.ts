@@ -135,7 +135,7 @@ it('keeps track visibility independent of mode and suppresses effects in basic m
   });
   expect(basic).toMatchObject({
     mode: 'basic',
-    actionsTrackVisible: true,
+    actionsTrackVisible: false,
     zoomTrackVisible: false,
     audioTrackVisible: false,
     overlaysVisible: false,
@@ -557,7 +557,7 @@ it('suppresses action presentations independently of their visible lane and keep
   state.ui.tracks.actions = false;
   expect(resolveQuickEditEffectiveFeatures(state)).toMatchObject({
     actionsApplied: false,
-    actionsTrackVisible: false,
+    actionsTrackVisible: true,
   });
   state.ui.tracks.actions = true;
   state.ui.mode = 'basic';

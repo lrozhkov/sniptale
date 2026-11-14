@@ -151,7 +151,7 @@ it('blocks history and destructive shortcuts while the export controls are disab
     await fixture.click('exportSection');
     expect(fixture.button('cancelExport').disabled).toBe(false);
     expect(fixture.button('undo').disabled).toBe(true);
-    for (const label of ['advancedEditing', 'trackSettings'])
+    for (const label of ['trackSettings'])
       expect(fixture.button(label).matches(':disabled')).toBe(true);
     integration.history.mockClear();
     integration.commit.mockClear();

@@ -3,11 +3,8 @@ import { createGlTransitionSelection } from '../../../features/video/project/tra
 import { parseGlPresetCatalogEntry } from './gl-presets';
 import { importAnimationArtifactBytes } from '../../../features/video/project/effect-bundle/lottie-profile';
 import { createAnimationCatalogEntry } from './catalog-builder';
-import { resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { parseBuiltinEffectIndex } from '../../../features/video/project/effect-bundle/catalog/builtin-index';
-import { createBuiltinEffectResources } from './builtin';
-import { resolveCatalogDocument } from '../../../features/video/project/effect-bundle/catalog/resolution';
 import { readFileSync } from 'node:fs';
 
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
@@ -50,24 +47,34 @@ export async function createRetainedTitleCatalogEntry(): Promise<unknown> {
   };
 }
 
-let animationIndex: ReturnType<typeof buildVideoEffectIndex> | undefined;
-/** Uses the shipped self-contained Lottie fixture; no import persistence or user data is involved. */
+/** Builds an imported historical fixture independently of the current shipped catalog. */
 export async function readValidAnimationCatalog(): Promise<EffectBundleCatalogEntry> {
-  const root = resolve('apps/extension/public/video-effects');
-  animationIndex ??= buildVideoEffectIndex(root);
-  const index = await animationIndex;
-  const catalog = await createBuiltinEffectResources(async (path) =>
-    path === 'index.json'
-      ? new TextEncoder().encode(JSON.stringify(index))
-      : new Uint8Array(readFileSync(resolve(root, path)))
-  ).load();
-  return resolveCatalogDocument(catalog, 'sniptale-callout');
+  const entry = await readValidAnimationSourceEntry();
+  return {
+    ...entry,
+    version: String(entry.version),
+    label: { en: entry.label.en, ru: entry.label.ru ?? entry.label.en },
+    description: {
+      en: entry.description?.en ?? '',
+      ru: entry.description?.ru ?? entry.description?.en ?? '',
+    },
+    assets: [],
+    enabled: true,
+    documents: entry.documents.map((document) => ({
+      ...document,
+      schemaVersion: 'sniptale.animation.v1',
+      kind: 'standalone',
+      assets: [],
+    })),
+  };
 }
 
 export async function readValidAnimationSourceEntry() {
   const artifact = await importAnimationArtifactBytes(
     new Uint8Array(
-      readFileSync('apps/extension/public/video-effects/animations/callout.sniptale-animation.json')
+      readFileSync(
+        'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
+      )
     )
   );
   if (!artifact.ok) throw Error(JSON.stringify(artifact.diagnostics));

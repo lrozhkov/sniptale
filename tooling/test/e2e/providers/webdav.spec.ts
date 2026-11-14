@@ -251,7 +251,7 @@ for (const viewport of [
     test.setTimeout(180_000);
     const sender = await openProvider(lab, info, 'portable-source');
     const animationBytes = readFileSync(
-      'apps/extension/public/video-effects/animations/callout.sniptale-animation.json'
+      'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
     );
     const sent = await sender.page.evaluate(async (effectBundleBytes) => {
       const seed = await window.webdavTransferHarness.portable.source({ effectBundleBytes });

@@ -130,7 +130,19 @@ function stubReviewSession(integration: EditorFixtureIntegration, history: Revie
       telemetry: {
         captureMode: 'tab',
         viewport: { width: 320, height: 180 },
-        actionEvents: [],
+        actionEvents: [
+          {
+            id: 'mouse-press',
+            kind: 'SCROLL',
+            time: 2,
+            duration: 1,
+            label: '',
+            point: null,
+            preset: 'NONE',
+            recordingPoint: { x: 0.5, y: 0.5 },
+            data: { button: 0 },
+          },
+        ],
         cursorTrack: null,
         signals: [
           { id: 'idle', kind: 'cursor-idle', startTime: 2, endTime: 3, point: null, data: {} },
@@ -260,7 +272,48 @@ export function createEditorFixture(
     if (!node) throw new Error(`Missing ${key}`);
     return node;
   };
-  const click = async (key: string) => act(async () => button(key).click());
+  const click = async (key: string) => {
+    if (
+      key === 'advancedEditing' &&
+      !host.querySelector('[aria-label="gallery.videoReview.advancedEditing"]')
+    ) {
+      await act(async () => button('moreActions').click());
+      const exit = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(
+        (item) => item.textContent === 'gallery.videoReview.returnBasicMode'
+      );
+      if (!exit) throw new Error('Missing simple-mode menu action');
+      await act(async () => exit.click());
+      return;
+    }
+    if (key === 'scene') {
+      await act(async () =>
+        host
+          .querySelector<HTMLButtonElement>(
+            '[data-review-header-track="source"] [data-review-track-select]'
+          )!
+          .click()
+      );
+      const settings = host.querySelector<HTMLButtonElement>('[data-lane-tab="settings"]');
+      if (!settings) throw new Error('Missing source settings after track navigation');
+      await act(async () => settings.click());
+      return;
+    }
+    if (key === 'telemetry') {
+      const basic = host.querySelector<HTMLButtonElement>(
+        '[aria-label="gallery.videoReview.advancedEditing"]'
+      );
+      if (basic) await act(async () => basic.click());
+      await act(async () =>
+        host
+          .querySelector<HTMLButtonElement>(
+            '[data-review-header-track="mouse"] [data-review-track-select]'
+          )!
+          .click()
+      );
+      return;
+    }
+    await act(async () => button(key).click());
+  };
   const fill = async (value: string) =>
     act(async () => {
       const field = host.querySelector('textarea')!;

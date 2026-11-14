@@ -44,7 +44,7 @@ afterEach(() => vi.clearAllMocks());
 it('shows one row per document, routes toggles independently and keeps disabled effects recoverable', async () => {
   const accepted = parseAnimationTemplateSource(
     readFileSync(
-      'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+      'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
       'utf8'
     )
   );

@@ -17,14 +17,15 @@ function roundEven(value: number): number {
   return Math.max(2, Math.round(value / 2) * 2);
 }
 
-function capRaster(width: number, height: number): Size {
+function capRaster(width: number, height: number, even = true): Size {
   const scale = Math.min(
     1,
     MAX_DIMENSION / Math.max(width, height),
     Math.sqrt(MAX_PIXELS / (width * height))
   );
-  const quantize =
-    scale < 1 ? (value: number) => Math.max(2, Math.floor(value / 2) * 2) : roundEven;
+  const step = even ? 2 : 1;
+  const quantize = (value: number) =>
+    Math.max(2, (scale < 1 ? Math.floor(value / step) : Math.round(value / step)) * step);
   return { width: quantize(width * scale), height: quantize(height * scale) };
 }
 
@@ -61,5 +62,10 @@ export function resolveQuickPreviewRasterSize(args: {
       ? Math.min(css.width / canonical.width, css.height / canonical.height) * Math.min(dpr, 2)
       : HEIGHTS[args.rasterPreset] / canonical.height;
   if (args.paused && args.pausedQuality === 'detailed') scale = Math.max(1, scale);
-  return capRaster(roundEven(canonical.width * scale), roundEven(canonical.height * scale));
+  // Current preview follows display pixels; even encoder dimensions would add a CSS resample.
+  return capRaster(
+    canonical.width * scale,
+    canonical.height * scale,
+    args.rasterPreset !== 'current'
+  );
 }

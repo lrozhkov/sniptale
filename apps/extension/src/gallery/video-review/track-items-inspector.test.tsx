@@ -114,7 +114,7 @@ it('navigates source and authored rows, filters, pages and removes through the a
     await act(async () =>
       host.querySelector<HTMLButtonElement>('.review-track-items-open')!.click()
     );
-    expect(section).toHaveBeenLastCalledWith('project');
+    expect(section).toHaveBeenLastCalledWith('track');
     toggle(0);
     await click('trackItemsDeleteSelected');
     expect(documentState.edits).toEqual([]);

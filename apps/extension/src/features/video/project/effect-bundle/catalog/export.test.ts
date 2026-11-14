@@ -16,7 +16,10 @@ async function fixture(names = ['callout', 'title']) {
     const result = await importAnimationArtifactBytes(
       new Uint8Array(
         readFileSync(
-          `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`
+          name === 'callout'
+            ? 'apps/extension/src/features/video/project/effect-bundle/' +
+                'fixtures/retained/callout.sniptale-animation.json'
+            : `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`
         )
       )
     );

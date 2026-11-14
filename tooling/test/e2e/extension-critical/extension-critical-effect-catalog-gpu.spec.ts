@@ -17,7 +17,10 @@ const examples = [
     title: `E2E e2e-${name}`,
     file: fileURLToPath(
       new URL(
-        `../../../../apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
+        name === 'callout'
+          ? '../../../../apps/extension/src/features/video/project/effect-bundle/' +
+              'fixtures/retained/callout.sniptale-animation.json'
+          : `../../../../apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
         import.meta.url
       )
     ),

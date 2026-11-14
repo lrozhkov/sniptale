@@ -129,7 +129,7 @@ async function dragRange(
 
 async function selectTrack(
   host: HTMLElement,
-  track: 'source' | 'zoom' | 'originalAudio' | 'actions'
+  track: 'source' | 'zoom' | 'originalAudio' | 'mouse'
 ) {
   await act(async () =>
     host
@@ -309,7 +309,7 @@ it('keeps Volume unavailable without source audio and drops the tool on leaving 
     );
     await audible.click('advancedEditing');
     expect(audible.host.querySelector('[data-history-family="cursor"]')).toBeNull();
-    await selectTrack(audible.host, 'actions');
+    await selectTrack(audible.host, 'mouse');
     await selectTrack(audible.host, 'originalAudio');
     await audible.click('originalAudioRange');
     expect(audible.button('originalAudioRange').getAttribute('aria-pressed')).toBe('true');

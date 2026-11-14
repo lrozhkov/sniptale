@@ -1,3 +1,6 @@
+import { createReviewPresentationMain } from '../../../../apps/extension/src/workflows/video-review/presentation-main';
+import { resolveQuickEditEffectiveState } from '../../../../apps/extension/src/features/video/review/advanced/effective';
+import retainedCalloutSource from '../../../../apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json?raw';
 import { createQuickEditBorder } from '../../../../apps/extension/src/features/video/project/scene/focus-appearance';
 import {
   createReviewAnnotationGeometry,
@@ -7,11 +10,17 @@ import { createQuickEditZoomRegion } from '../../../../apps/extension/src/featur
 import { quickEditSpatialTargetCamera } from '../../../../apps/extension/src/features/video/review/advanced/spatial';
 import { DEFAULT_CAMERA_PERSPECTIVE as DEFAULT_QUICK_EDIT_PERSPECTIVE } from '../../../../apps/extension/src/features/video/project/motion/spatial';
 import { validateAnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
-import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
+import {
+  parseEffectControlValues,
+  resolveEffectControlDefault,
+} from '@sniptale/runtime-contracts/effect-controls';
 import { sha256 as hashSha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import type { ReviewAnnotationEffectSnapshot } from '../../../../apps/extension/src/features/video/review/annotation-effects/types';
-import { initializeReviewAnnotationEffectAnchors } from '../../../../apps/extension/src/features/video/review/annotation-effects/layout';
+import {
+  initializeReviewAnnotationEffectAnchors,
+  resolveReviewAnnotationEffectControls,
+} from '../../../../apps/extension/src/features/video/review/annotation-effects/layout';
 import { createReviewPreviewRenderer } from '../../../../apps/extension/src/workflows/video-review/render-preview';
 import { createPreviewRenderResources } from '../../../../apps/extension/src/workflows/video-review/preview-render-resources';
 import {
@@ -30,7 +39,6 @@ import {
 } from '../../../../apps/extension/src/features/video/review/advanced/scene';
 import { createReviewSpatialRenderer } from '../../../../apps/extension/src/features/video/composition/canvas/spatial-renderer';
 import { drawReviewSceneFrame } from '../../../../apps/extension/src/workflows/video-review/scene-frame';
-import { drawReviewSceneOverlays } from '../../../../apps/extension/src/workflows/video-review/render-scene-overlays';
 import {
   ALL_FORMATS,
   BlobSource,
@@ -57,7 +65,10 @@ const names = ['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners'
 async function definitions() {
   return Promise.all(
     names.map(async (name) => {
-      const response = await fetch(`/video-effects/animations/${name}.sniptale-animation.json`);
+      const response =
+        name === 'callout'
+          ? new Response(retainedCalloutSource)
+          : await fetch(`/video-effects/animations/${name}.sniptale-animation.json`);
       if (!response.ok) throw new Error('Builtin source unavailable');
       const source = await response.text();
       const raw: unknown = JSON.parse(source);
@@ -121,18 +132,17 @@ function fixture(
             height: document.animation.h / sourceSize.height,
             rotation: 0,
           };
+          // The retained package bounds tipX to1000; a0.9 plane anchor mapped to1497.6.
+          // Keep a far external tip one authored increment inside that declared bound.
+          const handleControls =
+            document.id === 'sniptale-callout' ? { ...controls, tipX: 999, tipY: -300 } : controls;
           const anchors = initializeReviewAnnotationEffectAnchors(
             document,
             transform,
-            controls,
+            handleControls,
             bounds
           );
-          if (document.id === 'sniptale-callout' && anchors)
-            for (const anchor of Object.values(anchors)) {
-              anchor.x = 0.9;
-              anchor.y = 0.05;
-            }
-          return {
+          const instance = {
             id: `native-${index}`,
             snapshotId: snapshot.id,
             enabled: true,
@@ -151,6 +161,14 @@ function fixture(
             ),
             ...(anchors ? { anchors } : {}),
           };
+          if (
+            !parseEffectControlValues(
+              document,
+              resolveReviewAnnotationEffectControls(document, instance, bounds)
+            )
+          )
+            throw new Error(`Annotation probe controls are invalid: ${document.id}`);
+          return instance;
         }),
       },
     },
@@ -283,10 +301,19 @@ export async function performanceProbe() {
   return results;
 }
 
-/** Compare prepared preview with the existing export scene/overlay painters and a plain-frame witness. */
+/** Compare preview with the production offline export consumer and an independent plain-frame witness. */
 export async function parityProbe(combinedBorders = false) {
   const defs = await definitions();
-  const sample = source();
+  const signal = new AbortController().signal;
+  const file = await encodedSource({ size: sourceSize, duration: 12, fps: 2, pattern: true });
+  const index = await inspectReviewMedia(file, signal);
+  const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
+  const track = await input.getPrimaryVideoTrack();
+  if (!track) {
+    input.dispose();
+    throw new Error('Parity source video unavailable');
+  }
+  const sink = new VideoSampleSink(track);
   const size = { width: 960, height: 540 };
   const results = [];
   const cases = (['content', 'viewport'] as const).flatMap((plane) =>
@@ -294,188 +321,223 @@ export async function parityProbe(combinedBorders = false) {
       (['keep', 'cut-speed'] as const).map((clock) => ({ plane, camera, clock }))
     )
   );
-  for (const { plane, camera: cameraKind, clock } of cases) {
-    const scene = fixture(defs, 6, size, plane);
-    if (cameraKind !== 'flat')
-      scene.zoomRegions = [
-        {
-          id: 'native-camera',
-          start: 0,
-          end: 8,
-          transform: { scale: 1.35, centerX: 0.58, centerY: 0.43 },
-          enter: { type: 'none', duration: 0 },
-          exit: { type: 'none', duration: 0 },
-          ...(cameraKind === 'spatial'
-            ? {
-                perspective: {
-                  enabled: true,
-                  rotateX: 12,
-                  rotateY: -18,
-                  rotateZ: 5,
-                  strength: 0.7,
-                },
-              }
-            : {}),
-        },
-      ];
-    if (combinedBorders) {
-      scene.zoomRegions = [
-        ...scene.zoomRegions,
-        ...(['solid', 'dashed', 'dotted'] as const).map((style, index) => ({
-          ...createQuickEditZoomRegion({ id: `combined-${style}`, at: 0, duration: 8, endMax: 8 }),
-          enter: {
-            type: style === 'solid' ? ('linear' as const) : ('none' as const),
-            duration: style === 'solid' ? 4 : 0,
+  try {
+    for (const { plane, camera: cameraKind, clock } of cases) {
+      const scene = fixture(defs, 6, size, plane);
+      if (cameraKind !== 'flat')
+        scene.zoomRegions = [
+          {
+            id: 'native-camera',
+            start: 0,
+            end: 8,
+            transform: { scale: 1.35, centerX: 0.58, centerY: 0.43 },
+            enter: { type: 'none', duration: 0 },
+            exit: { type: 'none', duration: 0 },
+            ...(cameraKind === 'spatial'
+              ? {
+                  perspective: {
+                    enabled: true,
+                    rotateX: 12,
+                    rotateY: -18,
+                    rotateZ: 5,
+                    strength: 0.7,
+                  },
+                }
+              : {}),
           },
-          exit: { type: 'none' as const, duration: 0 },
-          border: {
-            ...createQuickEditBorder(),
-            style,
-            reveal: 'draw' as const,
-            loop: true,
-            segmentPercent: 35,
-            color: '#ff880080',
-            area: { x: 0.2 + index * 0.06, y: 0.15 + index * 0.06, width: 0.4, height: 0.4 },
-          },
-        })),
-      ];
-    }
-    if (clock === 'cut-speed')
-      scene.annotationEffects!.segments = [
-        { sourceStart: 0, sourceEnd: 2, resultStart: 0, resultEnd: 2, kind: 'keep', rate: 1 },
-        { sourceStart: 2, sourceEnd: 4, resultStart: 2, resultEnd: 2, kind: 'cut', rate: 1 },
-        { sourceStart: 4, sourceEnd: 8, resultStart: 2, resultEnd: 4, kind: 'speed', rate: 2 },
-        { sourceStart: 8, sourceEnd: 12, resultStart: 4, resultEnd: 8, kind: 'keep', rate: 1 },
-      ];
-    const resultTime = 2.5,
-      sourceTime = clock === 'keep' ? resultTime : 5;
-    const camera = evaluateQuickEditCameraAtTime(scene.zoomRegions, resultTime);
-    const owner = managed(scene, size);
-    const renderer = createReviewPreviewRenderer({
-      resources: owner.resources,
-      allocation: owner.allocation,
-    });
-    let annotations: Awaited<ReturnType<typeof createReviewAnnotationRenderer>> | undefined;
-    let spatial: ReturnType<typeof createReviewSpatialRenderer> | undefined;
-    try {
-      const signal = new AbortController().signal;
-      const prepared = await renderer.prepare(scene, { canonical: size, backing: size }, signal);
-      owner.admit(prepared);
-      const actual = await renderer.render(prepared, {
-        generation: 1,
-        source: sample,
-        sourceTime,
-        resultTime,
-        fps: 30,
-      });
-      const actualCopy = surface(size);
-      actualCopy.getContext('2d')!.drawImage(actual.canvas, 0, 0);
-      actual.release();
-      renderer.dispose();
-      const expected = surface(size),
-        plain = surface(size);
-      const layout = computeQuickEditSceneLayout({
-        source: sourceSize,
-        canvas: size,
-        output: size,
-        background: scene.background,
-        camera,
-      });
-      if (layout.spatial) spatial = createReviewSpatialRenderer(undefined, owner.resources);
-      const frame = {
-        canvas: expected,
-        layout,
-        background: scene.background,
-        image: null,
-        headerImage: null,
-        sample,
-        sourceTime,
-        resultTime,
-        cameraScale: camera.scale,
-        sceneScale: 1,
-        deferComments: true,
-        comments: [],
-        resources: owner.resources,
+        ];
+      if (combinedBorders) {
+        scene.zoomRegions = [
+          ...scene.zoomRegions,
+          ...(['solid', 'dashed', 'dotted'] as const).map((style, index) => ({
+            ...createQuickEditZoomRegion({
+              id: `combined-${style}`,
+              at: 0,
+              duration: 8,
+              endMax: 8,
+            }),
+            enter: {
+              type: style === 'solid' ? ('linear' as const) : ('none' as const),
+              duration: style === 'solid' ? 4 : 0,
+            },
+            exit: { type: 'none' as const, duration: 0 },
+            border: {
+              ...createQuickEditBorder(),
+              style,
+              reveal: 'draw' as const,
+              loop: true,
+              segmentPercent: 35,
+              color: '#ff880080',
+              area: { x: 0.2 + index * 0.06, y: 0.15 + index * 0.06, width: 0.4, height: 0.4 },
+            },
+          })),
+        ];
+      }
+      if (clock === 'cut-speed')
+        scene.annotationEffects!.segments = [
+          { sourceStart: 0, sourceEnd: 2, resultStart: 0, resultEnd: 2, kind: 'keep', rate: 1 },
+          { sourceStart: 2, sourceEnd: 4, resultStart: 2, resultEnd: 2, kind: 'cut', rate: 1 },
+          { sourceStart: 4, sourceEnd: 8, resultStart: 2, resultEnd: 4, kind: 'speed', rate: 2 },
+          { sourceStart: 8, sourceEnd: 12, resultStart: 4, resultEnd: 8, kind: 'keep', rate: 1 },
+        ];
+      const resultTime = 2.5,
+        sourceTime = clock === 'keep' ? resultTime : 5;
+      const camera = evaluateQuickEditCameraAtTime(scene.zoomRegions, resultTime);
+      const decoded = await sink.getSample(sourceTime);
+      if (!decoded) throw new Error('Parity decoded frame unavailable');
+      const sample = {
+        timestamp: decoded.timestamp,
+        backing: sourceSize,
+        draw: decoded.draw.bind(decoded),
       };
-      drawReviewSceneFrame(expected.getContext('2d')!, { ...frame, spatialRenderer: spatial });
-      drawReviewSceneFrame(plain.getContext('2d')!, {
-        ...frame,
-        canvas: plain,
-        spatialRenderer: spatial,
+      const owner = managed(scene, size);
+      const renderer = createReviewPreviewRenderer({
+        resources: owner.resources,
+        allocation: owner.allocation,
       });
-      annotations = await createReviewAnnotationRenderer(
-        { ...scene.annotationEffects!, planes: { content: sourceSize, viewport: size } },
-        {
+      let exportedMain: Awaited<ReturnType<typeof createReviewPresentationMain>> | undefined;
+      let spatial: ReturnType<typeof createReviewSpatialRenderer> | undefined;
+      try {
+        const signal = new AbortController().signal;
+        const prepared = await renderer.prepare(scene, { canonical: size, backing: size }, signal);
+        owner.admit(prepared);
+        const actual = await renderer.render(prepared, {
+          generation: 1,
+          source: sample,
+          sourceTime,
+          resultTime,
+          fps: 30,
+        });
+        const actualCopy = surface(size);
+        actualCopy.getContext('2d')!.drawImage(actual.canvas, 0, 0);
+        actual.release();
+        renderer.dispose();
+        const expected = surface(size),
+          plain = surface(size);
+        const layout = computeQuickEditSceneLayout({
+          source: sourceSize,
+          canvas: size,
+          output: size,
+          background: scene.background,
+          camera,
+        });
+        if (layout.spatial) spatial = createReviewSpatialRenderer(undefined, owner.resources);
+        const frame = {
+          canvas: expected,
+          layout,
+          background: scene.background,
+          image: null,
+          headerImage: null,
+          sample,
+          sourceTime,
+          resultTime,
+          cameraScale: camera.scale,
+          sceneScale: 1,
+          deferComments: true,
+          comments: [],
           resources: owner.resources,
+        };
+        drawReviewSceneFrame(plain.getContext('2d')!, {
+          ...frame,
+          canvas: plain,
+          spatialRenderer: spatial,
+        });
+        const advanced = createQuickEditAdvancedState();
+        advanced.ui.mode = 'advanced';
+        advanced.ui.tracks.zoom = true;
+        advanced.canvas = size;
+        advanced.background = scene.background;
+        advanced.zoom = {
+          ...advanced.zoom,
+          enabled: scene.zoomRegions.length > 0,
+          regions: scene.zoomRegions,
+        };
+        advanced.annotationEffects = scene.annotationEffects!.lane;
+        const edits: ReviewEdit[] =
+          clock === 'keep'
+            ? []
+            : [
+                { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+                {
+                  id: 'speed',
+                  kind: 'speed',
+                  start: 4,
+                  end: 8,
+                  requestedStart: 4,
+                  requestedEnd: 8,
+                  rate: 2,
+                  audio: 'speed',
+                },
+              ];
+        const effective = resolveQuickEditEffectiveState(advanced);
+        if (effective.zoomApplied !== scene.zoomRegions.length > 0)
+          throw new Error('Parity camera gate does not match the scene.');
+        exportedMain = await createReviewPresentationMain({
+          file,
+          index,
+          edits,
+          effective,
+          fragmentOffset: 0,
+          dimensions: { canonical: size, backing: size },
+          captionTimeMap: scene.annotationEffects!.segments,
+          effectSnapshots: scene.annotationEffects!.snapshots,
+          fps: 30,
           readAsset: async () => null,
           signal,
-        }
-      );
-      const batch = await annotations.render(
-        resultTime,
-        {
-          content: {
-            width: layout.videoTransform.width / sourceSize.width,
-            height: layout.videoTransform.height / sourceSize.height,
-          },
-          viewport: { width: 1, height: 1 },
-        },
-        30,
-        signal
-      );
-      try {
-        drawReviewSceneOverlays({
-          scene: frame,
-          renderer: spatial,
-          context: expected.getContext('2d')!,
-          canvas: expected,
-          spotlightScratch: null,
-          regions: scene.zoomRegions,
-          globalResultTime: resultTime,
-          cameraScale: camera.scale,
-          sourceWidth: sourceSize.width,
-          annotationFrames: batch.entries,
         });
+        const exported = await exportedMain.renderAtTime(resultTime);
+        try {
+          expected.getContext('2d')!.drawImage(exported.canvas, 0, 0);
+        } finally {
+          exported.release();
+        }
+        const parity = compare(actualCopy, expected),
+          witness = compare(expected, plain);
+        const row = document.createElement('div');
+        row.style.cssText =
+          'display:grid;grid-template-columns:repeat(3,320px);gap:8px;margin:8px 0';
+        const caption = document.createElement('span');
+        caption.style.gridColumn = '1 / -1';
+        caption.textContent = `${plane} ${cameraKind} ${clock}: plain / export / preview`;
+        row.append(caption);
+        for (const canvas of [plain, expected, actualCopy]) {
+          const copy = surface(size);
+          copy.getContext('2d')!.drawImage(canvas, 0, 0);
+          copy.style.width = '320px';
+          row.append(copy);
+        }
+        document.body.append(row);
+        results.push({ plane, camera: cameraKind, clock, parity, witness });
       } finally {
-        batch.release();
+        decoded.close();
+        exportedMain?.dispose();
+        spatial?.dispose();
+        renderer.dispose();
+        owner.resources.dispose();
       }
-      const parity = compare(actualCopy, expected),
-        witness = compare(expected, plain);
-      const row = document.createElement('div');
-      row.style.cssText = 'display:grid;grid-template-columns:repeat(3,320px);gap:8px;margin:8px 0';
-      const caption = document.createElement('span');
-      caption.style.gridColumn = '1 / -1';
-      caption.textContent = `${plane} ${cameraKind} ${clock}: plain / export / preview`;
-      row.append(caption);
-      for (const canvas of [plain, expected, actualCopy]) {
-        const copy = surface(size);
-        copy.getContext('2d')!.drawImage(canvas, 0, 0);
-        copy.style.width = '320px';
-        row.append(copy);
-      }
-      document.body.append(row);
-      results.push({ plane, camera: cameraKind, clock, parity, witness });
-    } finally {
-      annotations?.dispose();
-      spatial?.dispose();
-      renderer.dispose();
-      owner.resources.dispose();
     }
+    return results;
+  } finally {
+    input.dispose();
   }
-  return results;
 }
 
-async function encodedSource() {
+async function encodedSource(
+  options: { size?: Size; duration?: number; fps?: number; pattern?: boolean } = {}
+) {
   const target = new BufferTarget();
   const output = new Output({ target, format: new WebMOutputFormat() });
   const video = new VideoSampleSource({ codec: 'vp8', bitrate: 1_000_000 });
-  output.addVideoTrack(video, { frameRate: 30 });
-  const canvas = surface({ width: 160, height: 90 });
+  const fps = options.fps ?? 30;
+  const size = options.size ?? { width: 160, height: 90 };
+  output.addVideoTrack(video, { frameRate: fps });
+  const canvas = surface(size);
   canvas.getContext('2d')!.fillStyle = '#12394a';
-  canvas.getContext('2d')!.fillRect(0, 0, 160, 90);
+  canvas.getContext('2d')!.fillRect(0, 0, size.width, size.height);
+  if (options.pattern) source().draw(canvas.getContext('2d')!, 0, 0, size.width, size.height);
   await output.start();
-  for (let frame = 0; frame < 120; frame++) {
-    const sample = new VideoSample(canvas, { timestamp: frame / 30, duration: 1 / 30 });
+  for (let frame = 0; frame < fps * (options.duration ?? 4); frame++) {
+    const sample = new VideoSample(canvas, { timestamp: frame / fps, duration: 1 / fps });
     try {
       await video.add(sample);
     } finally {
@@ -499,6 +561,7 @@ function annotationExportScene(
   }
   const advanced = createQuickEditAdvancedState();
   advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.zoom = true;
   advanced.canvas = size;
   advanced.annotationEffects = scene.annotationEffects!.lane;
 

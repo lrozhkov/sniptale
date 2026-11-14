@@ -48,7 +48,9 @@ function createSnapshot(name?: string) {
   if (!neutral) throw new Error('Invalid neutral animation fixture');
   const source = name
     ? readFileSync(
-        `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
+        name === 'callout'
+          ? 'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
+          : `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
         'utf8'
       )
     : JSON.stringify(neutral);

@@ -257,3 +257,29 @@ it('preserves the original event stream descriptor without materializing its fac
   expect(reopened?.actionEvents).toEqual([]);
   expect(reopened?.actionFeedback?.[0]?.signals).toEqual([]);
 });
+
+it('refuses conversion of unmapped authored interactions instead of silently dropping them', () => {
+  const input = fixture();
+  input.document.advancedContent.interactionTimeline = {
+    presses: [
+      {
+        id: 'authored',
+        family: 'keyboard',
+        start: 1,
+        end: 2,
+        label: 'Cmd+K',
+        keys: ['Cmd', 'K'],
+        button: 0,
+        x: 0.5,
+        y: 0.5,
+      },
+    ],
+    overrides: [],
+  };
+  const before = structuredClone(input.document);
+  expect(planReviewProjectConversion(input)).toMatchObject({
+    status: 'blocked',
+    issues: [{ kind: 'unmapped-content', field: 'interactionTimeline' }],
+  });
+  expect(input.document).toEqual(before);
+});

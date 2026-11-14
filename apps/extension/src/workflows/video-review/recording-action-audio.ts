@@ -1,3 +1,8 @@
+import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry-types';
+import { readReviewInteractionArchiveMarkers } from './recording-review';
+import { resolveReviewInteractions } from '../../features/video/review/interaction-timeline';
+import type { ReviewInteractionTimeline } from '../../features/video/review/interaction-types';
+import { buildReviewTimeMap, type ReviewTimeSegment } from '../../features/video/review/timeline';
 import { planReviewProjectConversion } from '../../features/video/review/project-conversion';
 import {
   createQuickEditAdvancedState,
@@ -27,9 +32,16 @@ const SAMPLE_TAIL_SECONDS = Math.max(
 /** A job owns stable global admission and bounded event readers for later cue windows. */
 export function createRecordingProjectActionAudioSource(
   project: VideoProject,
-  dependencies = { createRenderer: createRecordingEventsRenderer }
+  dependencies = { createRenderer: createRecordingEventsRenderer },
+  reviewProjection?: {
+    sourceProject: VideoProject;
+    segments: readonly ReviewTimeSegment[];
+    interactionTimeline?: ReviewInteractionTimeline | undefined;
+    interactionEnabled?: { keyboard?: boolean; mouse?: boolean; actions?: boolean } | undefined;
+  }
 ) {
   project = structuredClone(project);
+  reviewProjection = reviewProjection ? structuredClone(reviewProjection) : undefined;
   const lifetime = new AbortController();
   const renderer = dependencies.createRenderer();
   const generations = new Map<string, string>();
@@ -50,14 +62,57 @@ export function createRecordingProjectActionAudioSource(
       signal
     );
     signal.throwIfAborted();
-    for (const source of recordingEventProjectSources(prepared)) {
+    const relocated: {
+      markers: ReviewTelemetryMarker[];
+      sources: ReturnType<typeof recordingEventProjectSources>;
+    } = { markers: [], sources: [...recordingEventProjectSources(prepared)] };
+    if (reviewProjection) {
+      for (const segment of reviewProjection.segments) {
+        if (
+          segment.kind === 'cut' ||
+          segment.resultEnd < range.start ||
+          segment.resultStart > range.end
+        )
+          continue;
+        const sourceTime = (value: number) =>
+          segment.sourceStart + (value - segment.resultStart) * segment.rate;
+        const extra = await readReviewInteractionArchiveMarkers(
+          reviewProjection.sourceProject,
+          owner,
+          reviewProjection.interactionTimeline,
+          {
+            start: sourceTime(Math.max(segment.resultStart, range.start - SAMPLE_TAIL_SECONDS)),
+            end: sourceTime(Math.min(segment.resultEnd, range.end)),
+          },
+          signal
+        );
+        relocated.markers.push(...extra.markers);
+        relocated.sources.push(...extra.sources);
+      }
+    }
+    for (const source of relocated.sources) {
       const key = JSON.stringify([source.recordingId, source.eventStreamId]);
       const previous = generations.get(key);
       if (previous !== undefined && previous !== source.writerGeneration)
         throw new Error('Recording action audio source changed.');
       generations.set(key, source.writerGeneration);
     }
-    return buildProjectActionAudioPlan(prepared);
+    const projection = reviewProjection;
+    return buildProjectActionAudioPlan(
+      prepared,
+      projection
+        ? (facts) => {
+            const markers = new Map(
+              [...facts, ...relocated.markers].map((marker) => [JSON.stringify(marker.ref), marker])
+            );
+            return resolveReviewInteractions(
+              [...markers.values()],
+              projection.interactionTimeline,
+              projection.interactionEnabled
+            );
+          }
+        : undefined
+    );
   };
   return {
     duration: project.duration,
@@ -132,6 +187,8 @@ export function createReviewRecordingActionAudioSource(
     edits: readonly ReviewEdit[];
     settings: readonly ReviewActionAudioSetting[];
     applied: boolean;
+    interactionTimeline?: ReviewInteractionTimeline | undefined;
+    interactionEnabled?: { keyboard?: boolean; mouse?: boolean; actions?: boolean } | undefined;
   },
   dependencies = { createRenderer: createRecordingEventsRenderer }
 ) {
@@ -161,5 +218,10 @@ export function createReviewRecordingActionAudioSource(
   });
   if (result.status !== 'prepared')
     throw new Error('Recording action audio conversion failed.', { cause: result.issues });
-  return createRecordingProjectActionAudioSource(result.project, dependencies);
+  return createRecordingProjectActionAudioSource(result.project, dependencies, {
+    sourceProject: args.project,
+    segments: buildReviewTimeMap(args.source.duration, args.edits),
+    interactionTimeline: args.interactionTimeline,
+    interactionEnabled: args.interactionEnabled,
+  });
 }

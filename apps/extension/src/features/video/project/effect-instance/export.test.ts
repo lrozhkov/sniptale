@@ -15,7 +15,9 @@ import { resolveEffectObjectControls } from './layout';
 
 async function fixtureProject() {
   const imported = await importAnimationArtifactBytes(
-    readFileSync('apps/extension/public/video-effects/animations/callout.sniptale-animation.json')
+    readFileSync(
+      'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
+    )
   );
   if (!imported.ok) throw new Error('Invalid shipped animation fixture.');
   const entry = imported.documents[0]!,

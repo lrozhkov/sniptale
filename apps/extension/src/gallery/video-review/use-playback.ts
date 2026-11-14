@@ -5,7 +5,7 @@ import {
   type ReviewPlaybackRange,
 } from './playback-range';
 import { originalAudioGainAt } from '../../features/video/review/advanced/original-audio';
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { startTransition, useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { useReviewPlaybackRecovery } from './use-playback-recovery';
 import type { ReviewEdit } from '../../features/video/review/types';
 import type { QuickEditOriginalAudio } from '../../features/video/review/advanced/types';
@@ -105,7 +105,8 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
         !Number.isFinite(value)
       )
         return;
-      publishTime(value);
+      // Observed playback time must yield to frame preparation and direct editor commands.
+      startTransition(() => publishTime(value));
     },
     [publishTime]
   );

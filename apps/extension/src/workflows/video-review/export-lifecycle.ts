@@ -332,9 +332,13 @@ async function prepareReviewExport(args: ReviewExportInput, deps: typeof persist
   const renderSettings = advanced.ui.mode === 'advanced' ? args.renderSettings : undefined;
   const fullMap = buildReviewTimeMap(index.duration, document.edits);
   const actionPlan = buildReviewActionAudioPlan({
-    markers: original.telemetry
-      ? projectReviewTelemetry(original.telemetry, index.duration).markers
-      : [],
+    markers: projectReviewTelemetry(
+      original.telemetry ?? { actionEvents: [], signals: [], cursorTrack: null },
+      index.duration,
+      false,
+      advanced.interactionTimeline,
+      advanced.ui.tracks
+    ).markers,
     settings: advanced.actionAudio ?? [],
     segments: fullMap,
     applied: resolveQuickEditEffectiveFeatures(advanced).actionsApplied,
@@ -363,6 +367,8 @@ async function prepareReviewExport(args: ReviewExportInput, deps: typeof persist
           edits: document.edits,
           settings: advanced.actionAudio,
           applied: true,
+          interactionTimeline: advanced.interactionTimeline,
+          interactionEnabled: advanced.ui.tracks,
         }
       : null;
   const actionAudioPresent =
@@ -759,10 +765,15 @@ function reviewExportPresentations(
   duration: number,
   edits: Parameters<typeof buildReviewTimeMap>[1]
 ) {
-  const markers =
-    resolveQuickEditEffectiveFeatures(advanced).actionsApplied && telemetry
-      ? projectReviewTelemetry(telemetry, duration).markers
-      : [];
+  const markers = resolveQuickEditEffectiveFeatures(advanced).actionsApplied
+    ? projectReviewTelemetry(
+        telemetry ?? { actionEvents: [], signals: [], cursorTrack: null },
+        duration,
+        false,
+        advanced.interactionTimeline,
+        advanced.ui.tracks
+      ).markers
+    : [];
   const segments = buildReviewTimeMap(duration, edits);
   return {
     keyCues: scheduleReviewKeys(markers, advanced.keyAnimations ?? [], segments),

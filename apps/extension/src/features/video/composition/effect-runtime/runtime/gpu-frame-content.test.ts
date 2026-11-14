@@ -8,7 +8,9 @@ function fixture(name = 'callout'): AnimationTemplate {
   const document = parseRuntimeAnimationDocument(
     JSON.parse(
       readFileSync(
-        `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
+        name === 'callout'
+          ? 'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
+          : `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
         'utf8'
       )
     )
@@ -33,13 +35,19 @@ function transform(document: AnimationTemplate): Record<string, unknown> {
   return value;
 }
 
-it.each(['callout', 'arrow', 'title', 'lower-third'])(
-  'retains actual entrance and exit frames in %s',
+it('retains actual entrance and exit frames in the retained opacity-only callout', () => {
+  const key = createEffectRuntimeGpuContentKey(fixture());
+  expect([0, 1, 7, 8, 9, 30, 75, 79, 80, 81, 89].map(key)).toEqual([
+    0, 1, 7, 8, 8, 8, 8, 8, 80, 81, 89,
+  ]);
+});
+
+it.each(['arrow', 'title', 'lower-third'])(
+  'keeps distinct canonical frames for the authored motion in %s',
   (name) => {
     const key = createEffectRuntimeGpuContentKey(fixture(name));
-    expect([0, 1, 7, 8, 9, 30, 75, 79, 80, 81, 89].map(key)).toEqual([
-      0, 1, 7, 8, 8, 8, 8, 8, 80, 81, 89,
-    ]);
+    const frames = [0, 1, 7, 8, 9, 30, 75, 79, 80, 81, 89];
+    expect(frames.map(key)).toEqual(frames);
   }
 );
 

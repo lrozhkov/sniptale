@@ -388,6 +388,22 @@ it.each(['success', 'failure'] as const)(
     const { args, deps } = fixture();
     const original = await deps.loadVideoReviewSource();
     args.snapshot.workspace.advanced.ui.mode = 'advanced';
+    args.snapshot.workspace.advanced.interactionTimeline = {
+      presses: [
+        {
+          id: 'authored',
+          family: 'mouse',
+          start: 1.5,
+          end: 1.7,
+          label: 'Click',
+          button: 0,
+          x: 0.5,
+          y: 0.5,
+        },
+      ],
+      overrides: [],
+    };
+    args.snapshot.workspace.advanced.ui.tracks.keyboard = false;
     args.snapshot.workspace.advanced.actionAudio = [
       {
         ref: { kind: 'action', id: 'click' },
@@ -441,6 +457,10 @@ it.each(['success', 'failure'] as const)(
       expect(output.entries).toEqual([]);
       expect(source.dispose).toHaveBeenCalledOnce();
       expect(samples.dispose).toHaveBeenCalledOnce();
+      expect(create.mock.calls[0]![0]).toMatchObject({
+        interactionTimeline: args.snapshot.workspace.advanced.interactionTimeline,
+        interactionEnabled: { keyboard: false },
+      });
       expect(create.mock.calls[0]![0].edits).toEqual([
         expect.objectContaining({ kind: 'cut', start: 2, end: 4 }),
       ]);

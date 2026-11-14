@@ -57,7 +57,7 @@ function renderTimeline(overrides: Partial<Parameters<typeof ReviewTimeline>[0]>
 
 type PlaneEvent = { type: string; x: number; button?: number };
 
-it('keeps the archived history row and timeline height budget across empty window refreshes', () => {
+it('keeps independent event rows and the timeline height budget across empty archive windows', () => {
   const { host } = renderTimeline({
     sourceId: 'recording-a',
     cursorArchiveAvailable: true,
@@ -69,11 +69,13 @@ it('keeps the archived history row and timeline height budget across empty windo
     .style.height;
   renderTimeline({ sourceId: 'recording-a', cursorArchiveAvailable: true });
   expect(timeline.className).toBe(budget);
-  expect(host.querySelector('[data-ui="gallery.videoReview.historyTrack"]')).not.toBeNull();
+  expect(host.querySelector('[data-ui="gallery.videoReview.historyTrack"]')).toBeNull();
+  expect(host.querySelector('[data-review-track="mouse"]')).not.toBeNull();
+  expect(host.querySelector('[data-review-track="keyboard"]')).not.toBeNull();
   expect(
     host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.historyStrip"]')!.style.height
   ).toBe(height);
-  expect(host.querySelectorAll('[data-history-family]')).toHaveLength(1);
+  expect(host.querySelectorAll('[data-history-family]')).toHaveLength(2);
   expect(host.querySelector('[data-history-family="cursor"]')).toBeNull();
   renderTimeline({ sourceId: 'recording-b', cursorArchiveAvailable: false });
   expect(host.querySelector('[data-ui="gallery.videoReview.historyTrack"]')).toBeNull();
@@ -798,12 +800,13 @@ it('reports the actual visible source range after zoom and horizontal scroll', (
   });
   expect(onHistoryRange).toHaveBeenLastCalledWith({ start: 25, end: 75 });
 });
-it('keeps an archived cursor row available without inventing motion markers', () => {
+it('keeps the archived technical cursor hidden without inventing motion markers', () => {
   const { host } = renderTimeline({ markers: [], cursorArchiveAvailable: true });
-  expect(
-    host.querySelector('[data-ui="gallery.videoReview.archivedCursorHistory"]')?.textContent
-  ).toBe('gallery.videoReview.recordingCursorArchived');
-  expect(host.querySelector('[data-ui="gallery.videoReview.historyTrack"]')).not.toBeNull();
+  expect(host.querySelector('[data-ui="gallery.videoReview.archivedCursorHistory"]')).toBeNull();
+  expect(host.querySelector('[data-history-family="cursor"]')).toBeNull();
+  expect(host.querySelector('[data-ui="gallery.videoReview.historyTrack"]')).toBeNull();
+  expect(host.querySelector('[data-review-track="mouse"]')).not.toBeNull();
+  expect(host.querySelector('[data-review-track="keyboard"]')).not.toBeNull();
 });
 
 it('does not rebuild animation membership on playhead ticks and refreshes changed effects', async () => {

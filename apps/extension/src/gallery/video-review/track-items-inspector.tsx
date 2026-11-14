@@ -96,7 +96,7 @@ export function ReviewTrackItemsInspector(props: {
       state.video.current?.pause();
       state.seek(row.start, false);
       state.setActiveSelection(row.selection);
-      navigation.setSection(row.selection.kind === 'none' ? 'project' : 'selected');
+      navigation.setSection(row.selection.kind === 'none' ? 'track' : 'selected');
       // Selection renders before the scroll target is inspected; no synthetic click mutates the item.
       requestAnimationFrame(() => {
         if (!row.timelineKey) return;

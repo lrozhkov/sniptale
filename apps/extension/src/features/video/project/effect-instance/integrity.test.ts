@@ -12,7 +12,7 @@ function hashText(source: string) {
 }
 function fixtureProject(): VideoProject {
   const source = readFileSync(
-    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
   const parsed = parseAnimationTemplateSource(source);

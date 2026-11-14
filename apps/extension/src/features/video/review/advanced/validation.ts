@@ -1,3 +1,5 @@
+import { parseReviewInteractionTimeline } from '../interaction-timeline';
+
 import { parseAudioProcessing } from '@sniptale/runtime-contracts/audio-effects';
 import { parseSourceImageFilterStack } from '../../../image-filters/contract';
 import { parseCursorMotions } from '../../project/cursor-motion';
@@ -112,7 +114,7 @@ function parseTrackVisibility(value: unknown): QuickEditTrackVisibility | null {
     typeof value['actions'] !== 'boolean' ||
     typeof value['zoom'] !== 'boolean' ||
     typeof value['audio'] !== 'boolean' ||
-    ['text', 'originalAudio', 'voiceover', 'music', 'cursorMotion'].some(
+    ['text', 'originalAudio', 'voiceover', 'music', 'cursorMotion', 'keyboard', 'mouse'].some(
       (key) => value[key] !== undefined && typeof value[key] !== 'boolean'
     ) ||
     (value['webcam'] !== undefined && typeof value['webcam'] !== 'boolean') ||
@@ -127,6 +129,8 @@ function parseTrackVisibility(value: unknown): QuickEditTrackVisibility | null {
     ...(typeof value['voiceover'] === 'boolean' ? { voiceover: value['voiceover'] } : {}),
     ...(typeof value['music'] === 'boolean' ? { music: value['music'] } : {}),
     ...(typeof value['cursorMotion'] === 'boolean' ? { cursorMotion: value['cursorMotion'] } : {}),
+    ...(typeof value['keyboard'] === 'boolean' ? { keyboard: value['keyboard'] } : {}),
+    ...(typeof value['mouse'] === 'boolean' ? { mouse: value['mouse'] } : {}),
     actions: value['actions'],
     zoom: value['zoom'],
     audio: value['audio'],
@@ -608,6 +612,12 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
       [...audio.voiceover, ...audio.music].some((clip) => clip.audioProcessing !== undefined))
   )
     return null;
+  const interactionTimeline = parseReviewInteractionTimeline(raw['interactionTimeline']);
+  if (
+    interactionTimeline === null ||
+    (interactionTimeline && !supportsAdvancedSchema(raw['schemaVersion'], 32))
+  )
+    return null;
   const actionsEnabled = raw['actionsEnabled'];
   if (actionsEnabled !== undefined && typeof actionsEnabled !== 'boolean') return null;
   const keyAnimations = parseReviewKeyAnimations(raw['keyAnimations']);
@@ -669,6 +679,7 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
     ...(captions ? { captions } : {}),
     ...(annotationEffects ? { annotationEffects } : {}),
     ...(actionsEnabled === undefined ? {} : { actionsEnabled }),
+    ...(interactionTimeline ? { interactionTimeline } : {}),
     ...(keyAnimations ? { keyAnimations } : {}),
     ...(clickAnimations ? { clickAnimations } : {}),
     ...(actionAudio ? { actionAudio } : {}),
@@ -738,7 +749,7 @@ function supportsAdvancedSchema(version: unknown, firstHistorical: number): bool
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
     [
       2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
-      27, 28, 29, 30,
+      27, 28, 29, 30, 31,
     ].some((known) => known >= firstHistorical && version === known)
   );
 }

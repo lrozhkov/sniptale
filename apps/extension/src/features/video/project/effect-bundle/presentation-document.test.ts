@@ -6,7 +6,7 @@ import { expect, it } from 'vitest';
 import { readEffectPresentationDocument } from './presentation-document';
 
 const source = readFileSync(
-  'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+  'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
   'utf8'
 );
 
@@ -35,7 +35,18 @@ it('does not retain oversized sources', () => {
 
 it('ships admitted annotation controls with localized units, names and intentional widgets', () => {
   const annotations = manifest.documents;
-  expect(annotations).toHaveLength(7);
+  expect(annotations.map((entry) => entry.id).sort()).toEqual([
+    'interview-center',
+    'interview-rule',
+    'interview-tag',
+    'sniptale-arrow',
+    'sniptale-chapters',
+    'sniptale-corners',
+    'sniptale-frame',
+    'sniptale-leader-labels',
+    'sniptale-lower-third',
+    'sniptale-title',
+  ]);
   for (const entry of annotations) {
     const source = readFileSync(`apps/extension/public/video-effects/${entry.path}`, 'utf8');
     expect(Buffer.byteLength(source)).toBe(entry.byteLength);
@@ -58,7 +69,7 @@ it('ships admitted annotation controls with localized units, names and intention
   }
 });
 
-it.each(['sniptale-title', 'sniptale-callout'])(
+it.each(['sniptale-title', 'sniptale-leader-labels'])(
   'keeps optional nested icons absent when they add no accurate distinction in %s',
   (id) => {
     const entry = manifest.documents.find((entry) => entry.id === id)!;

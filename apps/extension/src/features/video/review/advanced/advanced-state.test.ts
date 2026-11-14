@@ -1,3 +1,5 @@
+import { withReviewTrackEnabled } from './track-controls';
+import { resolveQuickEditEffectiveFeatures } from './effective';
 import { createSourceImageFilter } from '../../../image-filters/contract';
 import { replayReviewHistory } from '../document';
 import { describe, expect, it } from 'vitest';
@@ -729,5 +731,36 @@ it('refuses unsupported source filters and declared historical versions without 
   for (const schemaVersion of [1, 2, 29])
     expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion })).toBeNull();
   const older = { ...createQuickEditAdvancedContent(), schemaVersion: 29 };
-  expect(loadQuickEditAdvancedContentState(older)?.schemaVersion).toBe(31);
+  expect(loadQuickEditAdvancedContentState(older)?.schemaVersion).toBe(32);
+});
+
+it.each(['keyboard', 'mouse'] as const)(
+  'restores legacy disabled actions through the %s lane alone',
+  (family) => {
+    const state = createQuickEditAdvancedState();
+    state.ui.mode = 'advanced';
+    state.ui.tracks.actions = false;
+    state.actionsEnabled = false;
+    delete state.ui.tracks.keyboard;
+    delete state.ui.tracks.mouse;
+    const next = withReviewTrackEnabled(state, family, true);
+    expect(next.actionsEnabled).toBe(true);
+    expect(next.ui.tracks[family]).toBe(true);
+    expect(resolveQuickEditEffectiveFeatures(next).actionsApplied).toBe(true);
+    expect(next.ui.tracks[family === 'keyboard' ? 'mouse' : 'keyboard']).toBe(false);
+    expect(state.actionsEnabled).toBe(false);
+  }
+);
+
+it('does not revive the other explicitly enabled family when restoring a legacy master', () => {
+  const state = createQuickEditAdvancedState();
+  state.ui.mode = 'advanced';
+  state.ui.tracks = { ...state.ui.tracks, actions: true, keyboard: true, mouse: true };
+  state.actionsEnabled = false;
+  const next = withReviewTrackEnabled(state, 'keyboard', true);
+  expect(next.ui.tracks.keyboard).toBe(true);
+  expect(next.ui.tracks.mouse).toBe(false);
+  expect(next.actionsEnabled).toBe(true);
+  const muted = withReviewTrackEnabled(next, 'keyboard', false);
+  expect(resolveQuickEditEffectiveFeatures(muted).actionsApplied).toBe(false);
 });

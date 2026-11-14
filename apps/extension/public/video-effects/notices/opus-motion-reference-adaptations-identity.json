@@ -1,0 +1,54 @@
+{
+  "id": "opus-motion-reference-adaptations",
+  "sources": [
+    {
+      "path": "apps/extension/public/video-effects/animations/lower-third.sniptale-animation.json",
+      "sha256": "0b23846279cf41b337b736409832c7ceefe02a7db4a11c88b294c19f62165ada",
+      "sourceUrl": "https://github.com/GovinduSasanka/opus-motion-library",
+      "sourceSha256": "7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff"
+    },
+    {
+      "path": "apps/extension/public/video-effects/animations/chapters.sniptale-animation.json",
+      "sha256": "9176438d26bf430e0765fe3ff037d83637c2c409f79b0e4f8e4df79ef3f676c5",
+      "sourceUrl": "https://github.com/GovinduSasanka/opus-motion-library",
+      "sourceSha256": "7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff"
+    },
+    {
+      "path": "apps/extension/public/video-effects/animations/title.sniptale-animation.json",
+      "sha256": "aab7218def19c9e193d290e7d09d5fb7d283bd851386f5193cce9cb6f60c5379",
+      "sourceUrl": "https://github.com/GovinduSasanka/opus-motion-library",
+      "sourceSha256": "7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff"
+    },
+    {
+      "path": "apps/extension/public/video-effects/animations/arrow.sniptale-animation.json",
+      "sha256": "e043da3ec8123dc47414ebf2c9bf164273dc62634b5fef1b2e0ba34bc7d90d72",
+      "sourceUrl": "https://github.com/GovinduSasanka/opus-motion-library",
+      "sourceSha256": "c2cb9e7c430c51666be1bdb15e0afed1a5be8fd6085dbf3ca5d9a50f847ae4a6"
+    },
+    {
+      "path": "apps/extension/public/video-effects/animations/interview-tag.sniptale-animation.json",
+      "sha256": "920a42184c73c91720b18b9bdc018e9408432fee00c2ed79a2ca15432c0a39d8",
+      "sourceUrl": "https://github.com/GovinduSasanka/opus-motion-library",
+      "sourceSha256": "7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff"
+    },
+    {
+      "path": "apps/extension/public/video-effects/animations/interview-rule.sniptale-animation.json",
+      "sha256": "742c23ea7cad5ec5ffe5d5983f235e505825a21322e634fb045a927e4167ade3",
+      "sourceUrl": "https://github.com/GovinduSasanka/opus-motion-library",
+      "sourceSha256": "7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff"
+    },
+    {
+      "path": "apps/extension/public/video-effects/animations/interview-center.sniptale-animation.json",
+      "sha256": "f3c4f8594026a678028c179f3afdef6325773cf3f102c44a7196461ccdafeb09",
+      "sourceUrl": "https://github.com/GovinduSasanka/opus-motion-library",
+      "sourceSha256": "7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff"
+    },
+    {
+      "path": "apps/extension/public/video-effects/animations/leader-labels.sniptale-animation.json",
+      "sha256": "c7c904870f7e9d41d3d2cc3e999dc3f9fa40ec5c71784499ccedd798b98861dc",
+      "sourceUrl": "https://github.com/GovinduSasanka/opus-motion-library",
+      "sourceSha256": "e09eee6432facf8f5cfa08719a4acb36e0abe807624ec1a810658ade0718f9fd"
+    }
+  ],
+  "modifications": "Adapted reference choreography and layouts to local parameterized Lottie animation packages. No Remotion runtime is included."
+}

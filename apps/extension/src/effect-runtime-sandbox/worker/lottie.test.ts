@@ -371,7 +371,9 @@ it.each(['callout', 'arrow'])(
   async (name) => {
     const accepted = parseAnimationTemplateSource(
       readFileSync(
-        `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
+        name === 'callout'
+          ? 'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
+          : `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
         'utf8'
       )
     );

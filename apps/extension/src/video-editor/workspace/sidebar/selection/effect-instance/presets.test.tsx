@@ -57,7 +57,7 @@ vi.mock('../shared/controls', async (original) => ({
   ),
 }));
 const source = readFileSync(
-  'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+  'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
   'utf8'
 );
 const accepted = parseAnimationTemplateSource(source);
@@ -229,7 +229,9 @@ it.each(['callout', 'frame', 'arrow'])(
   async (fixture) => {
     const parsed = parseAnimationTemplateSource(
       readFileSync(
-        `apps/extension/public/video-effects/animations/${fixture}.sniptale-animation.json`,
+        fixture === 'callout'
+          ? 'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
+          : `apps/extension/public/video-effects/animations/${fixture}.sniptale-animation.json`,
         'utf8'
       )
     );

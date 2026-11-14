@@ -393,7 +393,7 @@ it('offers four direct focus types, retains the choice, and preserves admission 
   }
 });
 
-it('keeps one global density control available in both editing modes without toggling tracks', async () => {
+it('shows the density control only in advanced mode without toggling tracks', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   document.body.appendChild(host);
@@ -420,7 +420,11 @@ it('keeps one global density control available in both editing modes without tog
         const buttons = host.querySelectorAll<HTMLButtonElement>(
           `[aria-label="${translate('gallery.videoReview.compactTrackHeight')}"]`
         );
-        expect(buttons).toHaveLength(1);
+        expect(buttons).toHaveLength(mode === 'advanced' ? 1 : 0);
+        if (mode === 'basic') {
+          expect(host.querySelector('[data-ui="gallery.videoReview.trackControls"]')).toBeNull();
+          continue;
+        }
         expect(buttons[0]!.title).toBe(
           translate(
             compact
@@ -432,7 +436,7 @@ it('keeps one global density control available in both editing modes without tog
         await act(async () => buttons[0]!.click());
       }
     }
-    expect(onToggle).toHaveBeenCalledTimes(4);
+    expect(onToggle).toHaveBeenCalledTimes(2);
     expect(setTrackVisibility).not.toHaveBeenCalled();
   } finally {
     await act(async () => root.unmount());

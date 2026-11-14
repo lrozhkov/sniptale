@@ -1,3 +1,4 @@
+import { createReviewInteractionEditor } from './interaction-editor';
 import { useReviewCursorMotions } from './cursor-motion-editor';
 import { useReviewRecordingHistory } from './use-recording-history';
 import {
@@ -96,19 +97,37 @@ export function useReviewEditorState(resource: LoadedReview) {
     () =>
       scheduleReviewClicks(
         wiring.projected.markers,
-        actionsApplied ? (advanced.clickAnimations ?? []) : [],
+        actionsApplied && (advanced.ui.tracks.mouse ?? advanced.ui.tracks.actions) !== false
+          ? (advanced.clickAnimations ?? [])
+          : [],
         core.timeline.timeMap.getSegments()
       ),
-    [wiring.projected.markers, actionsApplied, advanced.clickAnimations, core.timeline.timeMap]
+    [
+      wiring.projected.markers,
+      actionsApplied,
+      advanced.clickAnimations,
+      advanced.ui.tracks.mouse,
+      advanced.ui.tracks.actions,
+      core.timeline.timeMap,
+    ]
   );
   const keyCues = useMemo(
     () =>
       scheduleReviewKeys(
         wiring.projected.markers,
-        actionsApplied ? (advanced.keyAnimations ?? []) : [],
+        actionsApplied && (advanced.ui.tracks.keyboard ?? advanced.ui.tracks.actions) !== false
+          ? (advanced.keyAnimations ?? [])
+          : [],
         core.timeline.timeMap.getSegments()
       ),
-    [wiring.projected.markers, actionsApplied, advanced.keyAnimations, core.timeline.timeMap]
+    [
+      wiring.projected.markers,
+      actionsApplied,
+      advanced.keyAnimations,
+      advanced.ui.tracks.keyboard,
+      advanced.ui.tracks.actions,
+      core.timeline.timeMap,
+    ]
   );
   const state = assembleReviewEditorState(core, wiring);
   const cursorMotion = useReviewCursorMotions({
@@ -123,7 +142,11 @@ export function useReviewEditorState(resource: LoadedReview) {
     canStart: state.canStart,
     setMessage: state.setMessage,
   });
-  return { ...state, cursorMotion, clickCues, keyCues };
+  const interactionEditor = createReviewInteractionEditor({
+    ...state,
+    duration: source.duration,
+  });
+  return { ...state, interactionEditor, cursorMotion, clickCues, keyCues };
 }
 
 /** Combines session state with the timeline transport and editing controls. */
@@ -138,6 +161,7 @@ function useReviewEditorCore(resource: LoadedReview) {
     ) * Math.max(1, ...timeline.timeline.timeMap.getSegments().map((segment) => segment.rate));
   const previewHistory = useReviewRecordingHistory(resource, timeline.time, base.activeSelection, {
     reach,
+    interactionTimeline: base.advanced.interactionTimeline,
   });
   const [visibleHistory, setVisibleHistory] = useState<{
     project: LoadedReview['historyProject'];
@@ -164,7 +188,11 @@ function useReviewEditorCore(resource: LoadedReview) {
     resource,
     (historyRange.start + historyRange.end) / 2,
     base.activeSelection,
-    { range: historyRange, includeCursor: false }
+    {
+      range: historyRange,
+      includeCursor: false,
+      interactionTimeline: base.advanced.interactionTimeline,
+    }
   );
   const history = {
     ...previewHistory,
@@ -472,6 +500,8 @@ function useReviewEditorTimeline(
     voiceover: features.voiceover,
     music: features.music,
     ...(advanced.actionAudio ? { actionAudio: advanced.actionAudio } : {}),
+    interactionTimeline: advanced.interactionTimeline,
+    interactionEnabled: advanced.ui.tracks,
     actionsApplied: features.actionsApplied,
     onSeek: (next) => {
       if (selection.kind === 'point') setSelection({ kind: 'point', time: next });
@@ -623,6 +653,7 @@ function reviewAdvancedControls(
     setTrackVisibility: advancedState.setTrackVisibility,
     setOverlaysVisible: advancedState.setOverlaysVisible,
     setWorkspaceColor: advancedState.setWorkspaceColor,
+    setInteractionTimeline: advancedState.setInteractionTimeline,
     setKeyAnimations: advancedState.setKeyAnimations,
     setActionAudio: advancedState.setActionAudio,
     setActionsEnabled: advancedState.setActionsEnabled,

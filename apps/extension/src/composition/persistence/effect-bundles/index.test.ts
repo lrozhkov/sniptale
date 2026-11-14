@@ -222,7 +222,7 @@ describe('DB55 source-only animation catalog command lifetime', () => {
     async () => {
       const input = await importAnimationArtifactBytes(
         readFileSync(
-          'apps/extension/public/video-effects/animations/callout.sniptale-animation.json'
+          'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
         )
       );
       if (!input.ok) throw new Error('Expected valid shipped animation.');

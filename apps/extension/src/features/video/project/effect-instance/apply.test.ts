@@ -141,7 +141,7 @@ async function createRawCatalog(source: string): Promise<EffectBundleCatalogEntr
 }
 function readFixture(): string {
   return readFileSync(
-    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
 }

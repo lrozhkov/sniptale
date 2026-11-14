@@ -1,6 +1,6 @@
 import { reviewCursorMotionShapeTitleKeys } from './track-items';
 import { useRef, useState, type PointerEvent } from 'react';
-import { MousePointer2, Plus, Trash2, Copy, Flag, CirclePlus, Eye, EyeOff } from 'lucide-react';
+import { MousePointer2, Trash2, Copy, Flag, CirclePlus, Eye, EyeOff } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import {
   CURSOR_MOTION_SHAPES,
@@ -15,11 +15,17 @@ import {
   ReviewButton,
   ReviewInterval,
   reviewTextButtonClassName,
+  reviewIconButtonClassName,
   reviewDeleteButtonClassName,
   reviewTimelineResizeHandleClassName,
   reviewTrackStatusButtonClassName,
 } from './controls';
-import { ReviewTrackRow, ReviewTrackCuts, ReviewTrackVisibilityButton } from './track-row';
+import {
+  ReviewTrackRow,
+  ReviewTrackCuts,
+  ReviewTrackVisibilityButton,
+  reviewTrackMetrics,
+} from './track-row';
 import type { ReviewTrackProjection } from './track-projection';
 import { ReviewInspectorSections, reviewInspectorActions } from './inspector-sections';
 import { ColorField, SegmentedRow, ToggleField } from '../../ui/compact-inspector-controls';
@@ -211,9 +217,11 @@ export function ReviewCursorMotionTrack({
   editor,
   busy,
   projection,
+  compact = false,
 }: {
   editor: ReviewCursorMotionEditor;
   busy: boolean;
+  compact?: boolean;
   projection: ReviewTrackProjection;
 }) {
   return (
@@ -236,14 +244,15 @@ export function ReviewCursorMotionTrack({
       }
     >
       <div
-        className="relative h-10 rounded bg-[var(--sniptale-color-surface-hover)]"
+        className="relative rounded bg-[var(--sniptale-color-surface-hover)]"
+        style={{ height: reviewTrackMetrics(compact).step }}
         data-ui="gallery.videoReview.cursorMotionTrack"
         onDoubleClick={(e) => {
           if (e.target === e.currentTarget && !busy) editor.add();
         }}
       >
         {editor.motions.map((m) => (
-          <CursorMotionPill key={m.id} motion={m} editor={editor} busy={busy} />
+          <CursorMotionPill key={m.id} motion={m} editor={editor} busy={busy} compact={compact} />
         ))}
         <ReviewTrackCuts projection={projection} />
       </div>
@@ -254,10 +263,12 @@ function CursorMotionPill({
   motion: m,
   editor,
   busy,
+  compact,
 }: {
   motion: CursorMotion;
   editor: ReviewCursorMotionEditor;
   busy: boolean;
+  compact: boolean;
 }) {
   const snap = useReviewTimelineSnap();
   const [draft, setDraft] = useState<{ start: number; end: number }>();
@@ -303,13 +314,15 @@ function CursorMotionPill({
       data-review-snap-start={m.start}
       data-review-snap-end={m.end}
       className={[
-        'review-timeline-item absolute inset-y-1 touch-none select-none rounded border px-3 text-xs',
+        'review-timeline-item review-interaction-item absolute touch-none select-none rounded border px-3 text-xs',
         selected
           ? 'review-timeline-item-selected border-[var(--sniptale-color-accent)]'
           : 'border-[var(--sniptale-color-border-soft)]',
-        'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-primary)]',
+        'text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
       style={{
+        top: reviewTrackMetrics(compact).inset,
+        height: reviewTrackMetrics(compact).body,
         left: `${(range.start / editor.duration) * 100}%`,
         width: `${((range.end - range.start) / editor.duration) * 100}%`,
       }}
@@ -568,12 +581,12 @@ export function ReviewCursorMotionAdd({
   return (
     <ReviewButton
       label={translate('gallery.videoReview.cursorMotionAdd')}
+      toolbarLabel={translate('gallery.videoReview.cursorMotionAdd')}
       disabled={busy}
       onClick={editor.add}
-      className={reviewTextButtonClassName}
+      className={reviewIconButtonClassName}
     >
-      <Plus size={15} />
-      <span>{translate('gallery.videoReview.cursorMotionAdd')}</span>
+      <MousePointer2 size={16} aria-hidden="true" />
     </ReviewButton>
   );
 }

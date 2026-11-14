@@ -286,3 +286,87 @@ it('projects Quick Edit cuts and speed into the shared archive audio source with
   expect(owners[0]!.prepare.mock.calls[0]![0].actionFeedback![0]!.signals).toEqual([]);
   source!.dispose();
 });
+
+it('projects relocated archived cadence, authored sounds and independent lane gates in bounded windows', async () => {
+  const data = fixture([2_000_000, 2_500_000]);
+  const input = {
+    project: {
+      ...data.project,
+      actionFeedback: data.project.actionFeedback!.map((group) => ({ ...group, settings: [] })),
+    },
+    source: { width: 640, height: 360, duration: 61, mimeType: 'video/webm', size: 100 },
+    edits: [],
+    applied: true,
+    settings: [
+      ...data.project.actionFeedback![0]!.settings,
+      {
+        ref: { kind: 'action' as const, id: 'authored' },
+        enabled: true,
+        presetId: 'mouse-classic-v1' as const,
+        includeRepeats: false,
+        volume: 0.5,
+        offset: 0,
+      },
+    ],
+    interactionTimeline: {
+      presses: [
+        {
+          id: 'authored',
+          family: 'mouse' as const,
+          start: 20,
+          end: 20.2,
+          label: 'Click',
+          button: 0,
+          x: 0.5,
+          y: 0.5,
+        },
+      ],
+      overrides: [
+        {
+          ref: { kind: 'signal' as const, id: 'typing' },
+          start: 40,
+          end: 41,
+          enabled: true,
+          sourceRange: { start: 2, end: 2.5 },
+        },
+      ],
+    },
+    interactionEnabled: { keyboard: true, mouse: true },
+  };
+  const before = structuredClone(data.project);
+  const source = createReviewRecordingActionAudioSource(input, {
+    createRenderer: data.createRenderer,
+  })!;
+  try {
+    expect(
+      cues(await source.readWindow({ start: 39, end: 42 }), { start: 39, end: 42 }).map(
+        (cue) => cue.start
+      )
+    ).toEqual([40, 41]);
+    expect(
+      cues(await source.readWindow({ start: 19, end: 21 }), { start: 19, end: 21 }).map(
+        (cue) => cue.start
+      )
+    ).toEqual([20]);
+    expect((await source.admit()).firstCueTime).toBe(20);
+    expect(data.project).toEqual(before);
+  } finally {
+    source.dispose();
+  }
+  const muted = createReviewRecordingActionAudioSource(
+    { ...input, interactionEnabled: { keyboard: false, mouse: true } },
+    { createRenderer: data.createRenderer }
+  )!;
+  try {
+    expect(cues(await muted.readWindow({ start: 39, end: 42 }), { start: 39, end: 42 })).toEqual(
+      []
+    );
+    expect(
+      cues(await muted.readWindow({ start: 19, end: 21 }), { start: 19, end: 21 }).map(
+        (cue) => cue.start
+      )
+    ).toEqual([20]);
+  } finally {
+    muted.dispose();
+  }
+});

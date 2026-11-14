@@ -225,7 +225,12 @@ function ReviewEditor({
               onPreviewRendererStatus={previewSettings.setRendererStatus}
               resource={resource}
               state={state}
-              sceneActive={navigation.shown === 'scene'}
+              sceneActive={
+                features.mode === 'advanced' &&
+                navigation.shown === 'track' &&
+                trackNavigation.track === 'source' &&
+                trackNavigation.tab === 'settings'
+              }
             />
           </div>
           <ReviewInspectorBinding
@@ -235,6 +240,8 @@ function ReviewEditor({
             }}
             backLabel={trackNavigation.backLabel}
             inspectorTrack={trackNavigation.track}
+            trackTab={trackNavigation.tab}
+            onTrackTab={trackNavigation.setTab}
             onRenameProject={projectCommands.rename}
             recording={
               voiceover.recording ? <ReviewVoiceoverLayer voiceover={voiceover} /> : undefined
@@ -266,6 +273,8 @@ function ReviewEditor({
           >
             {panelsEnabled ? <ReviewPanelResizeHandle resize={panels.timelineResize} /> : null}
             <ReviewTimelineBinding
+              interactionEditor={state.interactionEditor}
+              onInteractionAdded={() => navigation.setSection('selected')}
               cursorMotion={state.cursorMotion}
               onOpenProject={trackNavigation.openProject}
               onOpenTrack={trackNavigation.openTrack}
@@ -302,6 +311,9 @@ function ReviewEditor({
               }
               utilityControls={
                 <ReviewKeyboardHelp
+                  onBasicMode={
+                    features.mode === 'advanced' ? () => state.setMode('basic') : undefined
+                  }
                   busy={busy || editing.exporter.phase !== 'idle'}
                   onNewProject={projectCommands.newProject}
                   onBackup={() => void state.run(() => backupReview(state, canvasComments))}

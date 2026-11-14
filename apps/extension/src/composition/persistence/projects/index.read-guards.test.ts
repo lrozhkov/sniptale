@@ -166,7 +166,7 @@ it('keeps hydratable persisted video projects visible before export-ready valida
 
 it('lists project metadata but refuses a corrupt EffectV1 snapshot when opening it', async () => {
   const source = readFileSync(
-    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
   const document = JSON.parse(source) as { id: string };

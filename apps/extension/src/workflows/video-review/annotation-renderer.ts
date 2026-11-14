@@ -1,5 +1,8 @@
 import { createEffectRuntimeGpuFrameReuse } from '../../features/video/composition/effect-runtime/runtime/gpu-frame-reuse';
-import { animationRuntimeDuration } from '../../contracts/effect-runtime/animation';
+import {
+  animationRuntimeDuration,
+  effectRuntimeFrameIndex,
+} from '../../contracts/effect-runtime/animation';
 import type { GpuPreviewLayer } from '../../features/video/composition/canvas/gpu-preview';
 import { prepareEffectRuntimeGpuFramePlans } from '../../features/video/composition/effect-runtime/runtime/gpu-driver';
 import { createEffectRuntimeGpuFrameLedger } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
@@ -104,7 +107,7 @@ export function planReviewAnnotationFrame(args: {
     duration: animationRuntimeDuration(document),
     effectInstanceId: instance.id,
     fps: args.fps,
-    frameIndex: Math.max(0, Math.floor(clock.time * args.fps)),
+    frameIndex: effectRuntimeFrameIndex(clock.time, args.fps),
     kind: 'standalone',
     progress: clock.progress,
     time: clock.time,

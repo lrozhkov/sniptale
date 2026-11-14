@@ -46,10 +46,19 @@ type Session = ReturnType<
 >;
 
 /** Project recorded observations together with their capture coverage for both history views. */
-function projectHistory(telemetry: LoadedReview['telemetry'], duration: number) {
+function projectHistory(
+  telemetry: LoadedReview['telemetry'],
+  duration: number,
+  interactionTimeline: QuickEditAdvancedState['interactionTimeline']
+) {
   const history = telemetry
-    ? projectReviewTelemetry(telemetry, duration, true)
-    : { markers: [], warnings: 0 };
+    ? projectReviewTelemetry(telemetry, duration, true, interactionTimeline)
+    : projectReviewTelemetry(
+        { actionEvents: [], signals: [], cursorTrack: null },
+        duration,
+        true,
+        interactionTimeline
+      );
   return { ...history, captureCapabilities: telemetry?.capabilities ?? null };
 }
 
@@ -89,8 +98,8 @@ export function useReviewEditorWiring(args: {
   const annotationToolCancellation = useRef<(() => void) | null>(null);
   const cancelAnnotationTool = () => annotationToolCancellation.current?.();
   const projected = useMemo(
-    () => projectHistory(args.telemetry, args.sourceDuration),
-    [args.telemetry, args.sourceDuration]
+    () => projectHistory(args.telemetry, args.sourceDuration, args.advanced.interactionTimeline),
+    [args.telemetry, args.sourceDuration, args.advanced.interactionTimeline]
   );
   const comments = useReviewCommentActions({
     composer: args.composer,
@@ -172,6 +181,23 @@ export function useReviewEditorWiring(args: {
     deleteCanvas: (id) => {
       const comment = args.document.canvasComments.find((item) => item.id === id);
       if (comment) void canvasComments.onDelete(comment);
+    },
+    deleteTelemetry: (marker) => {
+      if (
+        marker.ref.kind !== 'action' ||
+        !args.advanced.interactionTimeline?.presses.some((press) => press.id === marker.ref.id)
+      )
+        return;
+      args.advancedState.setInteractionTimeline((current) => ({
+        ...current,
+        overrides: [
+          ...current.overrides.filter(
+            (p) => p.ref.kind !== marker.ref.kind || p.ref.id !== marker.ref.id
+          ),
+          { ref: marker.ref, start: marker.start, end: marker.end, enabled: false },
+        ],
+      }));
+      args.setActiveSelection({ kind: 'none' });
     },
     deleteAnnotationEffect: args.annotationEffects.remove,
     deleteText: (id) => text.remove([id]),

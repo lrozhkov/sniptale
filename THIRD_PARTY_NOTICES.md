@@ -83,16 +83,110 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Notice text: [`apps/extension/public/video-effects/fonts/NOTICE.txt`](apps/extension/public/video-effects/fonts/NOTICE.txt)
 - Notice SHA-256: `7fc56df9fae16e89186f10c2104828777864f552e187319bcfd17b56b212379f`
 - Provenance record: [`apps/extension/public/video-effects/fonts/identity.json`](apps/extension/public/video-effects/fonts/identity.json)
-- Provenance SHA-256: `a70b698451327b25a6c7c9ae52cb9b059a098b7c80e3a94998e39b3fcbe4e01f`
+- Provenance SHA-256: `05b6d0ea0e29856142c3c4ddb75f6e2f1a7628283aabd29ae5ac8c8f0ae61516`
 - Local changes: The font bytes do not change. Sniptale animation files embed the bytes as base64. The OFL license applies to the font bytes.
 
 | Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
 | --- | --- | --- | --- |
-| `apps/extension/public/video-effects/animations/callout.sniptale-animation.json` | https://github.com/googlefonts/golos-text | `17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063` | `7638aac7a193c14792950668081a780685c2995a12206e4b446c5c600ef17cce` |
-| `apps/extension/public/video-effects/animations/chapters.sniptale-animation.json` | https://github.com/googlefonts/golos-text | `17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063` | `e2147d13b77e5e5d67ef738d8a7518e3b72d07bd4c1d573011b14817e9705d01` |
 | `apps/extension/public/video-effects/animations/frame.sniptale-animation.json` | https://github.com/googlefonts/golos-text | `17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063` | `d4a52d535d3fc657ca5387b8ec97bcfdde6e8dae2b8e0e8f29871477c18a42a3` |
-| `apps/extension/public/video-effects/animations/lower-third.sniptale-animation.json` | https://github.com/googlefonts/golos-text | `17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063` | `9021a55d065bd9f0be93387ac2f1f8a58cbf18a9b670bd1e72d6cb5b77c7f845` |
-| `apps/extension/public/video-effects/animations/title.sniptale-animation.json` | https://github.com/googlefonts/golos-text | `17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063` | `547f8ef191b5c52fc780c993f773cefbfd52028c26d29f01e1590e392de20abc` |
+| `apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json` | https://github.com/googlefonts/golos-text | `17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063` | `7638aac7a193c14792950668081a780685c2995a12206e4b446c5c600ef17cce` |
+
+## caveat renamed static Lottie fonts
+
+- Attribution: Copyright 2014 The Caveat Project Authors (https://github.com/googlefonts/caveat)
+- Source: https://github.com/google/fonts/tree/main/ofl/caveat
+- License: `OFL-1.1`
+- License text: [`apps/extension/public/video-effects/notices/opus-caveat-OFL.txt`](apps/extension/public/video-effects/notices/opus-caveat-OFL.txt)
+- License SHA-256: `1f9d81d094273d82f3898a1ee8b598a717d050ecbf5ff7bede105b704880157b`
+- Notice text: [`apps/extension/public/video-effects/notices/opus-motion-caveat-NOTICE.txt`](apps/extension/public/video-effects/notices/opus-motion-caveat-NOTICE.txt)
+- Notice SHA-256: `99a057d0f23008fbe33306d351bcfdd0531faba792cf4c359e0fd57177b3fb76`
+- Provenance record: [`apps/extension/public/video-effects/notices/opus-fonts.json`](apps/extension/public/video-effects/notices/opus-fonts.json)
+- Provenance SHA-256: `7e02012daa470663268b9263498ade0b75196f8918e962e5e3fd21c61798ed61`
+- Local changes: Static weight instances with renamed Sniptale family names. Original copyright and OFL records are retained. Font bytes are embedded in self-contained animation packages.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/public/video-effects/animations/arrow.sniptale-animation.json` | https://github.com/google/fonts/tree/main/ofl/caveat | `0bdb6b660482d31531b3945849fba5916b3ef8695da7024a9e6b9ee3c4157988` | `8d7662b65baa97e0407219b121691e793a72dcb7b98d07fb38c08eded2cd13cd` |
+
+## cormorantgaramond renamed static Lottie fonts
+
+- Attribution: Copyright 2015 the Cormorant Project Authors (github.com/CatharsisFonts/Cormorant)
+- Source: https://github.com/google/fonts/tree/main/ofl/cormorantgaramond
+- License: `OFL-1.1`
+- License text: [`apps/extension/public/video-effects/notices/opus-cormorantgaramond-OFL.txt`](apps/extension/public/video-effects/notices/opus-cormorantgaramond-OFL.txt)
+- License SHA-256: `60700d351cac4650c51f3f9db318d2a420f8b45052dba2715eb5fec41f0f6956`
+- Notice text: [`apps/extension/public/video-effects/notices/opus-motion-cormorantgaramond-NOTICE.txt`](apps/extension/public/video-effects/notices/opus-motion-cormorantgaramond-NOTICE.txt)
+- Notice SHA-256: `4f2bb3f7a4ed021b51826eb1f609da6504afad0411df3bc98e6b4d6dea2f2c13`
+- Provenance record: [`apps/extension/public/video-effects/notices/opus-fonts.json`](apps/extension/public/video-effects/notices/opus-fonts.json)
+- Provenance SHA-256: `7e02012daa470663268b9263498ade0b75196f8918e962e5e3fd21c61798ed61`
+- Local changes: Static weight instances with renamed Sniptale family names. Original copyright and OFL records are retained. Font bytes are embedded in self-contained animation packages.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/public/video-effects/animations/interview-center.sniptale-animation.json` | https://github.com/google/fonts/tree/main/ofl/cormorantgaramond | `b20b7d9626dd956b2c5e558692ad328b1f19e3275e2782db4fa07670d83f35e0` | `4a5cbfe04c12fab3543faa7a7d5cc9720d72957e28b0f6cad73fc4cdea92a7be` |
+
+## inter renamed static Lottie fonts
+
+- Attribution: Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter)
+- Source: https://github.com/google/fonts/tree/main/ofl/inter
+- License: `OFL-1.1`
+- License text: [`apps/extension/public/video-effects/notices/opus-inter-OFL.txt`](apps/extension/public/video-effects/notices/opus-inter-OFL.txt)
+- License SHA-256: `5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57`
+- Notice text: [`apps/extension/public/video-effects/notices/opus-motion-inter-NOTICE.txt`](apps/extension/public/video-effects/notices/opus-motion-inter-NOTICE.txt)
+- Notice SHA-256: `99a1068548bd4ee27a8f80de4c358d00ecc590312d54cdf2112b656fb8e28beb`
+- Provenance record: [`apps/extension/public/video-effects/notices/opus-fonts.json`](apps/extension/public/video-effects/notices/opus-fonts.json)
+- Provenance SHA-256: `7e02012daa470663268b9263498ade0b75196f8918e962e5e3fd21c61798ed61`
+- Local changes: Static weight instances with renamed Sniptale family names. Original copyright and OFL records are retained. Font bytes are embedded in self-contained animation packages.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/public/video-effects/animations/chapters.sniptale-animation.json` | https://github.com/google/fonts/tree/main/ofl/inter | `29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031` | `a3e0a09b9f3b8480f1ffbe292996bb6d834dce7b6de8405049511b864414cea7` |
+| `apps/extension/public/video-effects/animations/interview-center.sniptale-animation.json` | https://github.com/google/fonts/tree/main/ofl/inter | `29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031` | `4a5cbfe04c12fab3543faa7a7d5cc9720d72957e28b0f6cad73fc4cdea92a7be` |
+| `apps/extension/public/video-effects/animations/interview-rule.sniptale-animation.json` | https://github.com/google/fonts/tree/main/ofl/inter | `29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031` | `e2451fec7f6b7b4e045ff89f7f6eed80cf5fa28884254c281f1d6e883a90bec5` |
+| `apps/extension/public/video-effects/animations/interview-tag.sniptale-animation.json` | https://github.com/google/fonts/tree/main/ofl/inter | `29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031` | `7b91ef1e0b0bb3d21852ef0b11277a21398afd577d758382d4995eab0383114d` |
+| `apps/extension/public/video-effects/animations/lower-third.sniptale-animation.json` | https://github.com/google/fonts/tree/main/ofl/inter | `29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031` | `4b25c244870d368632e9390c9c33dad1a619f448920d59857a15fce60803aab1` |
+| `apps/extension/public/video-effects/animations/title.sniptale-animation.json` | https://github.com/google/fonts/tree/main/ofl/inter | `29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031` | `ef5c2089af74d188e9d723ff043f0409b07db7218ad9c88452b9ff3ac0f09d40` |
+
+## jetbrainsmono renamed static Lottie fonts
+
+- Attribution: Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
+- Source: https://github.com/google/fonts/tree/main/ofl/jetbrainsmono
+- License: `OFL-1.1`
+- License text: [`apps/extension/public/video-effects/notices/opus-jetbrainsmono-OFL.txt`](apps/extension/public/video-effects/notices/opus-jetbrainsmono-OFL.txt)
+- License SHA-256: `b2fe5e8987594e9ffd1d2ca52a2f5d73eb8335243893c5d6254b5ad69269591d`
+- Notice text: [`apps/extension/public/video-effects/notices/opus-motion-jetbrainsmono-NOTICE.txt`](apps/extension/public/video-effects/notices/opus-motion-jetbrainsmono-NOTICE.txt)
+- Notice SHA-256: `1e1a008f557f30a3a1b603f87883da443db9e1449f120eebffae9cd8b3b1ae4a`
+- Provenance record: [`apps/extension/public/video-effects/notices/opus-fonts.json`](apps/extension/public/video-effects/notices/opus-fonts.json)
+- Provenance SHA-256: `7e02012daa470663268b9263498ade0b75196f8918e962e5e3fd21c61798ed61`
+- Local changes: Static weight instances with renamed Sniptale family names. Original copyright and OFL records are retained. Font bytes are embedded in self-contained animation packages.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/public/video-effects/animations/leader-labels.sniptale-animation.json` | https://github.com/google/fonts/tree/main/ofl/jetbrainsmono | `48715a42ec242c21e9f02692891e147d022299a52e48d5e413e1a942193ffeda` | `d36fbf97defb0bcf8b9a560355228dcd6db4afbb3fa0d5277811da65e75f71eb` |
+
+## Opus Motion animation adaptations
+
+- Attribution: Copyright (c) 2026 Govindu Sasanka
+- Source: https://github.com/GovinduSasanka/opus-motion-library
+- License: `MIT`
+- License text: [`apps/extension/public/video-effects/notices/opus-motion.txt`](apps/extension/public/video-effects/notices/opus-motion.txt)
+- License SHA-256: `277a332d935ce9bd36be0f77d591e6698c328086443c7b7722e7def769a38ca2`
+- Notice text: [`apps/extension/public/video-effects/notices/opus-motion-reference-adaptations-NOTICE.txt`](apps/extension/public/video-effects/notices/opus-motion-reference-adaptations-NOTICE.txt)
+- Notice SHA-256: `0b726c8b6de3e0b005f773036c75476b27e55c27358500e436e6a21789446059`
+- Provenance record: [`apps/extension/public/video-effects/notices/opus-motion-reference-adaptations-identity.json`](apps/extension/public/video-effects/notices/opus-motion-reference-adaptations-identity.json)
+- Provenance SHA-256: `c89b641a89acdbfef9355392558db7fe0b783ed98617ae2b1fcbdf82eb04ce98`
+- Local changes: Adapted reference choreography and layouts to local parameterized Lottie animation packages. No Remotion runtime is included.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/public/video-effects/animations/arrow.sniptale-animation.json` | https://github.com/GovinduSasanka/opus-motion-library | `c2cb9e7c430c51666be1bdb15e0afed1a5be8fd6085dbf3ca5d9a50f847ae4a6` | `8d7662b65baa97e0407219b121691e793a72dcb7b98d07fb38c08eded2cd13cd` |
+| `apps/extension/public/video-effects/animations/chapters.sniptale-animation.json` | https://github.com/GovinduSasanka/opus-motion-library | `7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff` | `a3e0a09b9f3b8480f1ffbe292996bb6d834dce7b6de8405049511b864414cea7` |
+| `apps/extension/public/video-effects/animations/interview-center.sniptale-animation.json` | https://github.com/GovinduSasanka/opus-motion-library | `7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff` | `4a5cbfe04c12fab3543faa7a7d5cc9720d72957e28b0f6cad73fc4cdea92a7be` |
+| `apps/extension/public/video-effects/animations/interview-rule.sniptale-animation.json` | https://github.com/GovinduSasanka/opus-motion-library | `7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff` | `e2451fec7f6b7b4e045ff89f7f6eed80cf5fa28884254c281f1d6e883a90bec5` |
+| `apps/extension/public/video-effects/animations/interview-tag.sniptale-animation.json` | https://github.com/GovinduSasanka/opus-motion-library | `7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff` | `7b91ef1e0b0bb3d21852ef0b11277a21398afd577d758382d4995eab0383114d` |
+| `apps/extension/public/video-effects/animations/leader-labels.sniptale-animation.json` | https://github.com/GovinduSasanka/opus-motion-library | `e09eee6432facf8f5cfa08719a4acb36e0abe807624ec1a810658ade0718f9fd` | `d36fbf97defb0bcf8b9a560355228dcd6db4afbb3fa0d5277811da65e75f71eb` |
+| `apps/extension/public/video-effects/animations/lower-third.sniptale-animation.json` | https://github.com/GovinduSasanka/opus-motion-library | `7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff` | `4b25c244870d368632e9390c9c33dad1a619f448920d59857a15fce60803aab1` |
+| `apps/extension/public/video-effects/animations/title.sniptale-animation.json` | https://github.com/GovinduSasanka/opus-motion-library | `7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff` | `ef5c2089af74d188e9d723ff043f0409b07db7218ad9c88452b9ff3ac0f09d40` |
 
 ## Pixi Filters source image kernels v6.1.5
 

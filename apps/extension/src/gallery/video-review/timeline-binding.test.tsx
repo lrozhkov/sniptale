@@ -1,3 +1,9 @@
+import { inspectVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
+import {
+  reviewAdvancedContentBaseline,
+  createReviewAdvancedContentOperation,
+} from '../../features/video/review/document';
+import { withReviewTrackEnabled } from '../../features/video/review/advanced/track-controls';
 // @vitest-environment jsdom
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -60,6 +66,16 @@ vi.mock('./timeline', () => ({
   ReviewTimeline: (props: Parameters<typeof import('./timeline').ReviewTimeline>[0]) => (
     <>
       {props.tools}
+      {(['keyboard', 'mouse'] as const).map((family) => (
+        <button
+          key={family}
+          data-test-family={family}
+          aria-pressed={family === 'keyboard' ? props.keyboardEnabled : props.mouseEnabled}
+          onClick={() => props.onToggleFamily?.(family)}
+        >
+          {family}
+        </button>
+      ))}
       {props.annotationEffectsTrack}
       {props.zoomTrack}
       {Object.entries(props.audioTracks ?? {}).map(([key, lane]) => (
@@ -75,7 +91,7 @@ vi.mock('../../workflows/video-review/media-index', async (original) => ({
   }),
 }));
 
-function resource(id: string, zoom = false): LoadedReview {
+function resource(id: string, zoom = false, legacyActionsDisabled = false): LoadedReview {
   const source = readFileSync(
     'apps/extension/public/video-effects/animations/title.sniptale-animation.json',
     'utf8'
@@ -95,6 +111,12 @@ function resource(id: string, zoom = false): LoadedReview {
   };
   const advanced = createQuickEditAdvancedState();
   advanced.ui.mode = 'advanced';
+  if (legacyActionsDisabled) {
+    advanced.ui.tracks.actions = false;
+    advanced.actionsEnabled = false;
+    delete advanced.ui.tracks.keyboard;
+    delete advanced.ui.tracks.mouse;
+  }
   advanced.ui.tracks.zoom = zoom;
   advanced.zoom.enabled = zoom;
   advanced.annotationEffects = { enabled: true, instances: [instance] };
@@ -835,3 +857,66 @@ it('admits track changes and falls back after disabling or replacing the source'
     vi.unstubAllGlobals();
   }
 });
+
+it.each(['keyboard', 'mouse'] as const)(
+  'first %s eye click restores a retained disabled lane and Undo',
+  async (family) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+    const loaded = resource(`legacy-${family}`, false, true);
+    const before = reviewAdvancedContentBaseline(loaded.snapshot.workspace.advanced);
+    const after = reviewAdvancedContentBaseline(
+      withReviewTrackEnabled(loaded.snapshot.workspace.advanced, family, true)
+    );
+    const operation = createReviewAdvancedContentOperation({
+      id: 'restore-family',
+      at: 2,
+      before,
+      after,
+    });
+    expect(
+      inspectVideoWorkspace({ ...loaded.snapshot.workspace, history: [operation], cursor: 1 })
+        .failure
+    ).toBeNull();
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    let current: ReturnType<typeof useReviewEditorState> | undefined;
+    const button = () => host.querySelector<HTMLButtonElement>(`[data-test-family="${family}"]`)!;
+    try {
+      await act(async () =>
+        root.render(
+          <BindingHarness
+            loaded={loaded}
+            onState={(state) => {
+              current = state;
+            }}
+          />
+        )
+      );
+      expect(button().getAttribute('aria-pressed')).toBe('false');
+      await act(async () => {
+        button().click();
+        await current!.flushAdvanced();
+      });
+      expect(button().getAttribute('aria-pressed')).toBe('true');
+      expect(current!.advanced.actionsEnabled).toBe(true);
+      expect(current!.advanced.ui.tracks[family === 'keyboard' ? 'mouse' : 'keyboard']).toBe(false);
+      await act(async () => current!.flushAdvanced());
+      await act(async () => loaded.session.history('undo'));
+      expect(button().getAttribute('aria-pressed')).toBe('false');
+      await act(async () => loaded.session.history('redo'));
+      expect(button().getAttribute('aria-pressed')).toBe('true');
+    } finally {
+      await act(async () => root.unmount());
+      await loaded.session.dispose();
+      vi.unstubAllGlobals();
+    }
+  }
+);

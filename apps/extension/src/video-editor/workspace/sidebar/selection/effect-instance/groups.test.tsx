@@ -24,7 +24,7 @@ it('preserves an off-scene handle coordinate when committing its existing value'
   const { parseAnimationTemplateSource } =
     await import('@sniptale/runtime-contracts/animation-template');
   const source = readFileSync(
-    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
   const parsed = parseAnimationTemplateSource(source);
@@ -105,7 +105,7 @@ it('renders promoted advanced controls without a duplicate disclosure', async ()
   const { parseAnimationTemplateSource } =
     await import('@sniptale/runtime-contracts/animation-template');
   const fixtureSource = readFileSync(
-    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
   const document = JSON.parse(fixtureSource);
@@ -173,7 +173,7 @@ it('keeps standalone annotation disclosures independent', async () => {
   const project = createEmptyVideoProject('Nested effects');
   const { readFileSync } = await import('node:fs');
   const source = readFileSync(
-    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
   project.effectSnapshots = [
@@ -237,7 +237,7 @@ it.each(['move', 'sparkles'] as const)(
       await import('@sniptale/runtime-contracts/animation-template');
     const value = JSON.parse(
       readFileSync(
-        'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+        'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
         'utf8'
       )
     );

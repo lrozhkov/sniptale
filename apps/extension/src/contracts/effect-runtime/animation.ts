@@ -18,6 +18,14 @@ export function animationRuntimeDuration(document: AnimationTemplate): number {
   return (document.animation.op - document.animation.ip) / document.animation.fr;
 }
 
+/** Stabilize integer boundaries within eight arithmetic ULPs, without rounding real subframes. */
+export function effectRuntimeFrameIndex(time: number, fps: number): number {
+  const frame = time * fps;
+  const integer = Math.round(frame);
+  const tolerance = Number.EPSILON * Math.max(1, Math.abs(frame)) * 8;
+  return Math.max(0, Math.floor(Math.abs(frame - integer) <= tolerance ? integer : frame));
+}
+
 /** dotLottie takes a frame relative to ip; its core applies the source in-point. */
 export function animationRuntimeFrameIndex(
   animation: Pick<AnimationTemplate['animation'], 'fr' | 'ip' | 'op'>,
@@ -25,7 +33,7 @@ export function animationRuntimeFrameIndex(
 ): number {
   return Math.min(
     Math.max(0, Math.ceil(animation.op - animation.ip) - 1),
-    Math.max(0, Math.floor(time * animation.fr))
+    effectRuntimeFrameIndex(time, animation.fr)
   );
 }
 

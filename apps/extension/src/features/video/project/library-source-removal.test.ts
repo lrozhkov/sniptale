@@ -709,7 +709,7 @@ it('purges confirmed source-attached effect hosts but retains viewport hosts and
   if (removedClip.type !== 'VIDEO') throw new Error('Expected video');
   removedClip.sourceInstanceId = 'attached-placement';
   const text = readFileSync(
-    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
   const { parseAnimationTemplateSource } =

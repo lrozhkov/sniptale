@@ -152,7 +152,13 @@ export function applyRecordingEventMarkerFacts(
     }
 }
 /** Both standalone audio consumers use the same source facts and complete retained instance maps. */
-export function buildProjectActionAudioPlan(project: VideoProject): ReviewActionAudioPlan {
+export function buildProjectActionAudioPlan(
+  project: VideoProject,
+  projectMarkers?: (
+    facts: ReviewTelemetryMarker[],
+    group: VideoProjectActionFeedback
+  ) => readonly ReviewTelemetryMarker[]
+): ReviewActionAudioPlan {
   const descriptors: ReviewActionAudioPlan['descriptors'][number][] = [];
   if (!getVideoProjectActionPresentation(project).enabled)
     return { duration: project.duration, descriptors };
@@ -160,7 +166,7 @@ export function buildProjectActionAudioPlan(project: VideoProject): ReviewAction
     const facts = projectActionFeedbackMarkers(project, group, false);
     for (const { clips, segments } of getVideoProjectFeedbackRuns(project, group)) {
       const plan = buildReviewActionAudioPlan({
-        markers: facts,
+        markers: projectMarkers ? projectMarkers(facts, group) : facts,
         settings: group.settings,
         segments,
         applied: true,

@@ -20,7 +20,7 @@ export type { QuickEditVoiceoverAnchor } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 31;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 32;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -28,6 +28,8 @@ export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
 export type QuickEditTrack =
   | 'source'
   | 'actions'
+  | 'keyboard'
+  | 'mouse'
   | 'cursorMotion'
   | 'zoom'
   | 'text'
@@ -43,6 +45,8 @@ export interface QuickEditTrackVisibility {
   originalAudio?: boolean;
   voiceover?: boolean;
   music?: boolean;
+  keyboard?: boolean;
+  mouse?: boolean;
   actions: boolean;
   webcam?: boolean;
   annotationEffects?: boolean;
@@ -283,6 +287,7 @@ export interface QuickEditAdvancedContent {
   annotationEffects?: import('../annotation-effects/types').ReviewAnnotationEffects;
   /** Missing on older projects means enabled. */
   actionsEnabled?: boolean;
+  interactionTimeline?: import('../interaction-types').ReviewInteractionTimeline;
   keyAnimations?: import('../../project/action-feedback/key-animation').ReviewKeyAnimation[];
   clickAnimations?: import('../../project/action-feedback/types').ReviewClickAnimation[];
   actionAudio?: import('../../project/action-feedback/types').ReviewActionAudioSetting[];

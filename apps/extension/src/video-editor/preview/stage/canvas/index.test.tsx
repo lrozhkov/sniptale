@@ -39,7 +39,7 @@ function fixture(): PreviewStageCanvasProps {
     dimensions: { width: 320, height: 180 },
   });
   const source = readFileSync(
-    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
   const accepted = parseAnimationTemplateSource(source);

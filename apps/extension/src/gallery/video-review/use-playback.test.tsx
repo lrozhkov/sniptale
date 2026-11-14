@@ -840,3 +840,27 @@ it('keeps a refused audio seek paused and ignores a preparation result after unm
     throw error;
   }
 });
+
+it('keeps urgent seek and pause ahead of a pending presented-time transition', () => {
+  const test = playbackHarness();
+  try {
+    test.update({ edits: [] });
+    const node = test.hook.video.current!;
+    Object.defineProperty(node, 'paused', { configurable: true, value: false });
+    act(() => test.hook.setPresentationActive('source', true));
+    act(() => {
+      test.hook.onPresentedTime('source', 3);
+      test.hook.seek(7, false);
+    });
+    expect(test.hook.time).toBe(7);
+    expect(node.currentTime).toBe(7);
+    Object.defineProperty(node, 'paused', { configurable: true, value: true });
+    act(() => {
+      node.dispatchEvent(new Event('pause'));
+      test.hook.onPresentedTime('source', 4);
+    });
+    expect(test.hook.time).toBe(7);
+  } finally {
+    test.dispose();
+  }
+});

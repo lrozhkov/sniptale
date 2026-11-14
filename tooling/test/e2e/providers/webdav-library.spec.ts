@@ -334,7 +334,7 @@ for (const viewport of [
     test.setTimeout(300_000);
     const source = await openProvider(lab, info, 'library-source', false, build, { viewport });
     const animationBytes = readFileSync(
-      'apps/extension/public/video-effects/animations/callout.sniptale-animation.json'
+      'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
     );
     let target: Provider | null = null;
     try {

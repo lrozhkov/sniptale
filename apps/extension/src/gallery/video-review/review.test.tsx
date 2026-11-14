@@ -195,7 +195,7 @@ it('integrates selection, recoverable text, drawing, history and report actions 
     await click('telemetry');
     const capturedAction = Array.from(
       host.querySelectorAll<HTMLButtonElement>('.review-history-row button')
-    ).find((button) => button.textContent?.includes('gallery.videoReview.eventCursorIdle'))!;
+    ).find((button) => button.textContent?.includes('gallery.videoReview.eventScroll'))!;
     expect(capturedAction).not.toBeNull();
     await act(async () => capturedAction.click());
     expect(host.querySelector('textarea')).toBeNull();
@@ -640,7 +640,8 @@ it('toggles the persisted advanced mode and restores it after reopening the edit
     expect(button('advancedEditing').getAttribute('aria-pressed')).toBe('false');
     expect(document.querySelector('[aria-label="gallery.videoReview.zoomTrack"]')).toBeNull();
     await click('advancedEditing');
-    expect(button('advancedEditing').getAttribute('aria-pressed')).toBe('true');
+    expect(host.querySelector('[aria-label="gallery.videoReview.advancedEditing"]')).toBeNull();
+    expect(button('moreActions')).not.toBeNull();
     expect(button('trackSettings').getAttribute('aria-pressed')).toBe('false');
     expect(host.querySelector('[data-review-track="zoom"]')).not.toBeNull();
     await act(async () => new Promise((resolve) => setTimeout(resolve, 1100)));
@@ -800,54 +801,61 @@ it('connects Scene presentation controls to the real session and suppresses them
   }
 });
 
-it.each(['basic', 'advanced'] as const)(
-  'hides and restores the actual action-history lane from its %s control',
-  async (mode) => {
-    const fixture = createEditorFixture(integration);
-    try {
-      await act(async () =>
-        fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
-      );
-      if (mode === 'advanced') await fixture.click('advancedEditing');
-      const lane = () => fixture.host.querySelector('[data-ui="gallery.videoReview.historyTrack"]');
-      expect(lane()).not.toBeNull();
-      const toggleHistory = async () => {
-        if (mode === 'basic') return fixture.click('telemetry');
-        await fixture.click('trackSettings');
-        const toggle = fixture.host.querySelector<HTMLButtonElement>(
-          '[data-review-header-track="actions"] [role="switch"]'
-        );
-        expect(toggle).not.toBeNull();
-        await act(async () => toggle!.click());
-        await fixture.click('trackSettings');
-      };
-      await toggleHistory();
-      expect(lane(), 'Disabled action history must remove its actual timeline row').toBeNull();
-      await toggleHistory();
-      expect(lane()).not.toBeNull();
-      if (mode === 'advanced') {
-        const applied = () =>
-          resolveQuickEditEffectiveFeatures({
-            ...fixture.snapshot.workspace.advanced,
-            ...committedEditorFixtureProjection(fixture.snapshot).document.advancedContent,
-          }).actionsApplied;
-        await fixture.click('undo');
-        expect(lane()).not.toBeNull();
-        expect(
-          fixture.host
-            .querySelector('[data-review-track="actions"]')
-            ?.getAttribute('data-review-track-muted')
-        ).toBe('true');
-        expect(applied()).toBe(false);
-        await fixture.click('redo');
-        expect(lane()).not.toBeNull();
-        expect(applied()).toBe(true);
-      }
-    } finally {
-      await fixture.cleanup();
-    }
+it('keeps event lanes basic-hidden and controls them independently in advanced settings', async () => {
+  const fixture = createEditorFixture(integration);
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    for (const track of ['keyboard', 'mouse', 'cursorMotion', 'zoom'])
+      expect(fixture.host.querySelector(`[data-review-header-track="${track}"]`)).toBeNull();
+    expect(fixture.host.querySelector('[data-ui="gallery.videoReview.historyTrack"]')).toBeNull();
+    expect(
+      fixture.host.querySelector('[aria-label="gallery.videoReview.compactTrackHeight"]')
+    ).toBeNull();
+    await fixture.click('advancedEditing');
+    const eye = (track: string) =>
+      fixture.host.querySelector<HTMLButtonElement>(
+        `[data-review-header-track="${track}"] [aria-label="gallery.videoReview.historyEffectsEnabled"]`
+      )!;
+    expect(eye('keyboard').getAttribute('aria-pressed')).toBe('true');
+    expect(eye('mouse').getAttribute('aria-pressed')).toBe('true');
+    await act(async () => eye('mouse').click());
+    expect(fixture.host.querySelector('[data-review-track="mouse"]')).toBeNull();
+    expect(eye('keyboard').getAttribute('aria-pressed')).toBe('true');
+    await act(async () => eye('keyboard').click());
+    await fixture.click('trackSettings');
+    const master = (track: string) =>
+      fixture.host.querySelector<HTMLButtonElement>(
+        `[data-review-header-track="${track}"] [role="switch"]`
+      )!;
+    expect(master('mouse').getAttribute('aria-checked')).toBe('false');
+    expect(master('keyboard').getAttribute('aria-checked')).toBe('false');
+    const applied = () =>
+      resolveQuickEditEffectiveFeatures({
+        ...fixture.snapshot.workspace.advanced,
+        ...committedEditorFixtureProjection(fixture.snapshot).document.advancedContent,
+      }).actionsApplied;
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 1100)));
+    expect(applied()).toBe(false);
+    expect(fixture.snapshot.workspace.advanced.ui.tracks).toMatchObject({
+      keyboard: false,
+      mouse: false,
+    });
+    await act(async () => master('mouse').click());
+    await fixture.click('trackSettings');
+    expect(fixture.host.querySelector('[data-review-track="mouse"]')).not.toBeNull();
+    expect(fixture.host.querySelector('[data-review-track="keyboard"]')).toBeNull();
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 1100)));
+    expect(applied()).toBe(true);
+    expect(fixture.snapshot.workspace.advanced.ui.tracks).toMatchObject({
+      keyboard: false,
+      mouse: true,
+    });
+  } finally {
+    await fixture.cleanup();
   }
-);
+});
 
 it('lists every lane with aligned settings, retains unavailable streams off, and preserves Notes', async () => {
   const fixture = createEditorFixture(integration);
@@ -861,20 +869,18 @@ it('lists every lane with aligned settings, retains unavailable streams off, and
       fixture.host.querySelector(`[data-review-header-track="${track}"]`);
     for (const track of [
       'source',
-      'actions',
+      'keyboard',
+      'mouse',
       'zoom',
       'text',
       'annotationEffects',
-      'webcam',
       'originalAudio',
       'voiceover',
       'music',
     ]) {
       expect(row(track), track).not.toBeNull();
     }
-    const webcam = row('webcam')!.querySelector<HTMLButtonElement>('[role="switch"]')!;
-    expect(webcam.disabled).toBe(true);
-    expect(webcam.getAttribute('aria-checked')).toBe('false');
+    expect(row('webcam')).toBeNull();
     const source = row('source')!.querySelector<HTMLButtonElement>('[role="switch"]')!;
     expect(source.disabled).toBe(true);
     expect(source.getAttribute('aria-checked')).toBe('true');

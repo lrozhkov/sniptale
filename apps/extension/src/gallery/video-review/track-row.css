@@ -278,3 +278,13 @@
   left: 50%;
   transform: translateX(-50%);
 }
+
+/* Cursor motion and authored/recorded presses share a quiet, theme-aware plate. */
+.review-interaction-item {
+  --review-interaction-item-background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-panel) 94%,
+    var(--sniptale-color-text-secondary)
+  );
+  background: var(--review-interaction-item-background);
+}

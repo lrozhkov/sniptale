@@ -1,4 +1,8 @@
 // @vitest-environment jsdom
+import { createVideoProjectFromRecording } from '../../features/video/project/factories/creation';
+import * as recordingAudio from '../../workflows/video-review/recording-action-audio';
+import eventsFixture from '../../features/video/project/recording-events/fixtures.json';
+import { isRecordingEventsDescriptor } from '../../features/video/project/recording-events/records';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -31,7 +35,13 @@ afterEach(async () => {
   vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
-function mount(silent = false) {
+type TransportInput = Parameters<typeof useReviewTransport>[0];
+function mount(
+  silent = false,
+  archive?: Pick<TransportInput, 'interactionTimeline' | 'interactionEnabled' | 'actionAudio'> & {
+    project: NonNullable<TransportInput['resource']['historyProject']>;
+  }
+) {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   bridge.preparePlayback.mockResolvedValue(true);
   bridge.video.current = document.createElement('video');
@@ -39,6 +49,7 @@ function mount(silent = false) {
   const session = createVideoReviewSession(snapshot);
   const root = createRoot(document.createElement('div'));
   const failure = vi.fn();
+  const edits: TransportInput['edits'] = [];
   let hook!: ReturnType<typeof useReviewTransport>;
   function Probe() {
     hook = useReviewTransport({
@@ -50,8 +61,9 @@ function mount(silent = false) {
         session,
         url: 'blob:source',
         telemetry: null,
+        ...(archive ? { historyProject: archive.project } : {}),
       },
-      edits: [],
+      edits,
       originalAudio: workspace.advanced.audio.original,
       voiceover: [],
       music: [],
@@ -59,6 +71,14 @@ function mount(silent = false) {
       boundaries: () => undefined,
       onTransportFailure: failure,
       silent,
+      ...(archive
+        ? {
+            actionsApplied: true,
+            interactionTimeline: archive.interactionTimeline,
+            interactionEnabled: archive.interactionEnabled,
+            actionAudio: archive.actionAudio,
+          }
+        : {}),
     });
     return null;
   }
@@ -100,4 +120,56 @@ it('does not prepare audible playback for a silent preview', async () => {
   await act(async () => mounted.get().play());
   expect(bridge.preparePlayback).not.toHaveBeenCalled();
   expect(bridge.play).toHaveBeenCalledOnce();
+});
+
+it('passes authored timing and independent lane gates to the owned archive sound source', async () => {
+  if (!isRecordingEventsDescriptor(eventsFixture.descriptor)) throw new Error('Invalid fixture');
+  const source = {
+    duration: workspace.source.duration,
+    admit: vi.fn(async () => ({ maxVoices: 0, busGain: 1, sampleIds: [], firstCueTime: null })),
+    readWindow: vi.fn(async () => ({ duration: workspace.source.duration, descriptors: [] })),
+    dispose: vi.fn(),
+  };
+  const create = vi
+    .spyOn(recordingAudio, 'createReviewRecordingActionAudioSource')
+    .mockReturnValue(source);
+  const interactionTimeline = {
+    presses: [
+      {
+        id: 'authored',
+        family: 'mouse' as const,
+        start: 1,
+        end: 1.2,
+        label: 'Click',
+        button: 0,
+        x: 0.5,
+        y: 0.5,
+      },
+    ],
+    overrides: [],
+  };
+  try {
+    mount(false, {
+      project: createVideoProjectFromRecording({
+        ...workspace.source,
+        recordingId: eventsFixture.recordingId,
+        filename: 'source.webm',
+        recordingEvents: eventsFixture.descriptor,
+      }),
+      interactionTimeline,
+      interactionEnabled: { keyboard: false, mouse: true },
+      actionAudio: [],
+    });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        interactionTimeline,
+        interactionEnabled: { keyboard: false, mouse: true },
+      })
+    );
+    await cleanup?.();
+    cleanup = undefined;
+    expect(source.dispose).toHaveBeenCalledOnce();
+  } finally {
+    create.mockRestore();
+  }
 });

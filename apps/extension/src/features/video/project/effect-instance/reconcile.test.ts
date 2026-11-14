@@ -22,7 +22,9 @@ function createProjectWithEffects(): VideoProject {
   project.tracks.push(track);
   const definitions = ['title', 'frame'].map((name) => {
     const source = readFileSync(
-      `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
+      name === 'callout'
+        ? 'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
+        : `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
       'utf8'
     );
     const parsed = parseAnimationTemplateSource(source);
@@ -125,9 +127,14 @@ describe('animation project mutation reconciliation', () => {
     expect(reconciled.transitions![0]!.duration).toBeCloseTo(0.7);
     expect(reconciled.effectInstances).toEqual(project.effectInstances);
     expect(isHydratableVideoProject(reconciled)).toBe(true);
-    const [plan] = resolveEffectRuntimeFramePlans(reconciled, 4.65);
-    expect(plan?.effectInstanceId).toBe('other');
-    expect(plan?.progress).toBeCloseTo(0.65 / 3);
+    const plans = resolveEffectRuntimeFramePlans(reconciled, 4.65);
+    expect(plans.map((plan) => plan.effectInstanceId)).toEqual(['scene', 'other']);
+    for (const plan of plans) {
+      const instance = project.effectInstances!.find(
+        (entry) => entry.id === plan.effectInstanceId
+      )!;
+      expect(plan.progress).toBeCloseTo((4.65 - instance.startTime) / instance.duration);
+    }
     expect(project).toEqual(original);
   });
   it('prunes a deleted annotation host and its unreferenced snapshot atomically', () => {

@@ -1,5 +1,32 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'review-authored-interaction-ui',
+    productionFile: 'apps/extension/src/gallery/video-review/interaction-editor.tsx',
+    reason:
+      'Mounted authoring flows cover press creation, timing, copy, deletion and journal recovery.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/review-selection.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/use-advanced-content.test.tsx',
+      'apps/extension/src/gallery/video-review/action-properties.test.tsx',
+      'apps/extension/src/gallery/video-review/timeline-telemetry.test.tsx',
+      'apps/extension/src/gallery/video-review/keyboard-chord.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-track-inspector-navigation',
+    productionFile: 'apps/extension/src/gallery/video-review/track-workspace.tsx',
+    reason:
+      'Inspector and mounted editor suites cover lane tabs, selection, mode, Back and pending-note admission.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/review.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/timeline-track-selection.test.tsx',
+    ],
+  },
+  {
     owner: 'review-history-row-presentation',
     reason: 'History rows preserve selection, navigation and displayed action details.',
     testFiles: [

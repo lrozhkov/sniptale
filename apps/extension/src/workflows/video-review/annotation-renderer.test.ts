@@ -37,7 +37,9 @@ async function fixture(names = ['title']) {
   const instances: ReviewAnnotationScene['lane']['instances'] = [];
   for (const name of names) {
     const source = readFileSync(
-      `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
+      name === 'callout'
+        ? 'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
+        : `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
       'utf8'
     );
     const document = readReviewAnnotationEffectDocument(source)!;
@@ -169,11 +171,14 @@ it('renders six real definitions in order through the standalone driver and clos
     'viewport',
   ]);
   for (const [request] of f.executor.renderFrame.mock.calls) {
+    const snapshot = f.scene.snapshots.find((item) => item.id === request.snapshotId)!;
+    const document = readReviewAnnotationEffectDocument(snapshot.source)!;
+    const duration = animationRuntimeDuration(document);
     expect(request).toMatchObject({
-      duration: 3,
+      duration,
       progress: 0.5,
-      time: 1.5,
-      frameIndex: 45,
+      time: duration / 2,
+      frameIndex: duration * 15,
       inputFrames: {},
     });
     expect((await request.materializeImmutablePayloads()).documentSource).toContain(
@@ -210,7 +215,10 @@ it('keeps the full main animation clock after cuts/speed and does not restart at
   ]);
   const renderer = await createReviewAnnotationRenderer(f.scene, f.deps);
   const frame = await renderer.render(5.5, density, 30, f.deps.signal);
-  expect(f.executor.renderFrame.mock.calls[0]![0].time).toBeCloseTo(7 / 3);
+  const duration = animationRuntimeDuration(
+    readReviewAnnotationEffectDocument(f.scene.snapshots[0]!.source)!
+  );
+  expect(f.executor.renderFrame.mock.calls[0]![0].time).toBeCloseTo((duration * 7) / 9);
   expect(f.executor.renderFrame.mock.calls[0]![0].progress).toBeCloseTo(7 / 9);
   frame.release();
   renderer.dispose();

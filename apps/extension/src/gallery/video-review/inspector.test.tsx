@@ -248,6 +248,7 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
     await act(async () => render(false, 'comments'));
     expect(host.querySelector('[aria-label="gallery.videoReview.inspector"]')).toBeNull();
     await act(async () => render(true, 'settings:none:'));
+    await act(async () => currentNavigation.setSection('scene'));
     expect(host.querySelector('[data-ui="gallery.videoReview.exportFooter"]')).toBeNull();
     expect(host.textContent).toContain('Scene controls');
     expect(host.querySelector('[aria-label="gallery.app.selectionBackup"]')).toBeNull();
@@ -513,7 +514,7 @@ it.each([true, false])(
       act(() => navigation.setSection('speech'));
       settingsAvailable = !advanced;
       act(() => root.render(<Harness />));
-      expect(host.querySelector('output')?.textContent).toBe(advanced ? 'comments' : 'scene');
+      expect(host.querySelector('output')?.textContent).toBe(advanced ? 'project' : 'track');
     } finally {
       act(() => root.unmount());
       vi.unstubAllGlobals();

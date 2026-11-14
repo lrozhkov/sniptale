@@ -1,3 +1,4 @@
+import { effectRuntimeFrameIndex } from './animation';
 import { expect, it } from 'vitest';
 import {
   animationRuntimeDuration,
@@ -95,3 +96,14 @@ it.each([
     expect(animationRuntimeFrameIndex(animation, time)).toBe(expected);
   }
 );
+
+it('stabilizes equivalent composed clocks at integer boundaries without swallowing subframes', () => {
+  const frame = 100;
+  const time = frame / 30;
+  expect(effectRuntimeFrameIndex(time, 30)).toBe(frame);
+  expect(effectRuntimeFrameIndex(time - Number.EPSILON * time, 30)).toBe(frame);
+  expect(effectRuntimeFrameIndex(time + Number.EPSILON * time, 30)).toBe(frame);
+  expect(effectRuntimeFrameIndex(time - 1e-12, 30)).toBe(frame - 1);
+  expect(effectRuntimeFrameIndex(time - 0.25 / 30, 30)).toBe(frame - 1);
+  expect(effectRuntimeFrameIndex(-1, 30)).toBe(0);
+});

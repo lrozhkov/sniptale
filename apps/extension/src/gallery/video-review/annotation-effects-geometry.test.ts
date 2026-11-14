@@ -37,7 +37,9 @@ const transform = { x: 0.3, y: 0.3, width: 0.3, height: 0.2, rotation: 0.15 };
 function builtin(name: string) {
   const raw: unknown = JSON.parse(
     readFileSync(
-      `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
+      name === 'callout'
+        ? 'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
+        : `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
       'utf8'
     )
   );

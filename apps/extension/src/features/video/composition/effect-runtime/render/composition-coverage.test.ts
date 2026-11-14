@@ -3,7 +3,7 @@ import { expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 const source = readFileSync(
-  'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+  'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
   'utf8'
 );
 const hash = createHash('sha256').update(source).digest('hex');

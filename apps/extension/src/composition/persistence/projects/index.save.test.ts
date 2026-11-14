@@ -1098,7 +1098,7 @@ it('saves and reopens a real admitted animation with maximum document and catalo
   const { getVideoProject } = await import('./index');
   const document = JSON.parse(
     readFileSync(
-      'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+      'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
       'utf8'
     )
   );

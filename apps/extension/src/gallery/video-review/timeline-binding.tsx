@@ -1,3 +1,5 @@
+import { reviewTrackEnabled } from '../../features/video/review/advanced/track-controls';
+import { ReviewInteractionAdd } from './interaction-editor';
 import type { ReviewCursorMotionEditor } from './cursor-motion-editor';
 import { ReviewCursorMotionTrack, ReviewCursorMotionAdd } from './cursor-motion-editor';
 import { ReviewTimelineMagnets } from './timeline-magnets';
@@ -63,6 +65,8 @@ type Editing = ReturnType<typeof useReviewEdits>;
 type Exporter = ReturnType<typeof useReviewExport>;
 
 type TimelineBindingProps = {
+  interactionEditor?: import('./interaction-editor').ReviewInteractionEditor;
+  onInteractionAdded?(): void;
   cursorMotion?: ReviewCursorMotionEditor;
   onHistoryRange?: ((range: { start: number; end: number }) => void) | undefined;
   cursorArchiveAvailable?: boolean | undefined;
@@ -306,6 +310,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
           cursorMotionTrack={
             features.mode === 'advanced' && props.cursorMotion ? (
               <ReviewCursorMotionTrack
+                compact={compact}
                 editor={props.cursorMotion}
                 busy={blocked}
                 projection={projection}
@@ -370,13 +375,15 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
           utilityControls={props.utilityControls}
           inspectorControls={props.inspectorControls}
           modeControl={
-            <ReviewModeControl
-              advanced={props.advanced}
-              busy={blocked}
-              setMode={(mode) =>
-                (props.beforeAction ?? ((action) => action()))(() => props.setMode(mode))
-              }
-            />
+            features.mode === 'basic' ? (
+              <ReviewModeControl
+                advanced={props.advanced}
+                busy={blocked}
+                setMode={(mode) =>
+                  (props.beforeAction ?? ((action) => action()))(() => props.setMode(mode))
+                }
+              />
+            ) : null
           }
           expandedTools={props.editing.mode === 'speed'}
           busy={blocked}
@@ -387,8 +394,38 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
               selectedTrack={selectedTrack}
               trackHasActions={selectable[selectedTrack]}
               trackTools={
-                selectedTrack === 'cursorMotion' && props.cursorMotion ? (
-                  <ReviewCursorMotionAdd editor={props.cursorMotion} busy={blocked} />
+                (selectedTrack === 'keyboard' || selectedTrack === 'mouse') &&
+                props.interactionEditor ? (
+                  <ReviewInteractionAdd
+                    editor={props.interactionEditor}
+                    family={selectedTrack}
+                    range={
+                      props.playbackRange
+                        ? { kind: 'range', ...props.playbackRange }
+                        : props.selection.kind === 'range' && !props.selectedObject
+                          ? props.selection
+                          : undefined
+                    }
+                    onAdded={() => props.onInteractionAdded?.()}
+                  />
+                ) : selectedTrack === 'cursorMotion' && props.cursorMotion ? (
+                  <>
+                    <ReviewCursorMotionAdd editor={props.cursorMotion} busy={blocked} />
+                    {props.interactionEditor ? (
+                      <>
+                        <ReviewInteractionAdd
+                          editor={props.interactionEditor}
+                          family="mouse"
+                          onAdded={() => props.onInteractionAdded?.()}
+                        />
+                        <ReviewInteractionAdd
+                          editor={props.interactionEditor}
+                          family="keyboard"
+                          onAdded={() => props.onInteractionAdded?.()}
+                        />
+                      </>
+                    ) : null}
+                  </>
                 ) : ['text', 'voiceover', 'music'].includes(selectedTrack) ? (
                   creation.tools
                 ) : undefined
@@ -420,7 +457,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
             />
           }
           webcamTrack={
-            features.mode === 'advanced' && props.webcam ? (
+            props.webcam && features.webcamTrackVisible ? (
               <ReviewWebcamTrack
                 compact={compact}
                 editor={props.webcam}
@@ -496,8 +533,9 @@ function reviewSelectableTracks(
   return {
     source: true,
     cursorMotion: features.mode === 'advanced' && !!props.cursorMotion,
-    actions:
-      features.actionsTrackVisible && (!!props.markers.length || !!props.onAddCursorFocusKey),
+    actions: false,
+    keyboard: features.actionsTrackVisible,
+    mouse: features.actionsTrackVisible,
     zoom: features.zoomTrackVisible,
     originalAudio:
       features.originalAudioTrackVisible &&
@@ -896,7 +934,14 @@ function reviewTimelineAudioTrack(
 }
 
 function reviewTimelineHistoryBinding(props: TimelineBindingProps) {
+  const enabled = (family: 'keyboard' | 'mouse') =>
+    props.advanced.actionsEnabled !== false && reviewTrackEnabled(props.advanced.ui, family);
   return {
+    interactionEditor: props.interactionEditor,
+    keyboardEnabled: enabled('keyboard'),
+    mouseEnabled: enabled('mouse'),
+    onToggleFamily: (family: 'keyboard' | 'mouse') =>
+      props.setTrackVisibility(family, !enabled(family)),
     actionsEnabled: props.advanced.actionsEnabled !== false,
     onToggleActions: props.onToggleActions,
     keyAnimations: props.advanced.keyAnimations,
@@ -934,7 +979,8 @@ function reviewTrackCommands(
     activate: (track: QuickEditTrack) => {
       if (track === 'text') props.onOpenText?.();
       else if (track === 'originalAudio') props.onOpenSpeech?.();
-      else if (track === 'actions') props.onOpenHistory?.();
+      else if (track === 'actions' || track === 'keyboard' || track === 'mouse')
+        props.onOpenHistory?.();
       else if (props.onOpenTrack) props.onOpenTrack(track);
       else if (track === 'webcam') props.webcam?.select({ kind: 'webcam' });
       else props.onOpenProject?.();

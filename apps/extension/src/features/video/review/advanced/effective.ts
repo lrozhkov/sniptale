@@ -61,14 +61,14 @@ export function resolveQuickEditEffectiveFeatures(
   const advanced = state.ui.mode === 'advanced';
   return {
     mode: state.ui.mode,
-    actionsTrackVisible: state.ui.tracks.actions,
+    actionsTrackVisible: advanced,
     zoomTrackVisible: advanced && state.ui.tracks.zoom,
     audioTrackVisible: advanced && state.ui.tracks.audio,
     textTrackVisible: advanced && reviewTrackEnabled(state.ui, 'text'),
     originalAudioTrackVisible: reviewTrackEnabled(state.ui, 'originalAudio'),
     voiceoverTrackVisible: advanced && reviewTrackEnabled(state.ui, 'voiceover'),
     musicTrackVisible: advanced && reviewTrackEnabled(state.ui, 'music'),
-    webcamTrackVisible: advanced && !!state.webcam && state.ui.tracks.webcam !== false,
+    webcamTrackVisible: !!state.webcam && state.ui.tracks.webcam !== false,
     webcamApplied: advanced && !!state.webcam?.enabled && state.ui.tracks.webcam !== false,
     annotationEffectsTrackVisible: advanced && state.ui.tracks.annotationEffects !== false,
     annotationEffectsApplied:
@@ -86,7 +86,10 @@ export function resolveQuickEditEffectiveFeatures(
       !!state.captions?.enabled &&
       !!state.text?.fragments.some((fragment) => fragment.showInVideo && fragment.text.trim()),
     presentationApplied: advanced && hasPresentationEffects(state),
-    actionsApplied: advanced && state.ui.tracks.actions && state.actionsEnabled !== false,
+    actionsApplied:
+      advanced &&
+      state.actionsEnabled !== false &&
+      (reviewTrackEnabled(state.ui, 'keyboard') || reviewTrackEnabled(state.ui, 'mouse')),
     overlaysVisible: advanced && state.ui.overlaysVisible,
     zoomApplied: advanced && state.ui.tracks.zoom && state.zoom.enabled,
     backgroundApplied: advanced && state.background.enabled,

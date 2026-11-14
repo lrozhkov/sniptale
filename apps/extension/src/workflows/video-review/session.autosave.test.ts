@@ -72,7 +72,7 @@ afterEach(() => vi.useRealTimers());
 async function annotationFixture(suffix = '') {
   const fixture = setup();
   const source = readFileSync(
-    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   ).replace('"sniptale-callout"', `"sniptale-callout${suffix}"`);
   const effect = readReviewAnnotationEffectDocument(source)!;
@@ -556,4 +556,62 @@ it('keeps annotation admission usable while its lane master is off', async () =>
     1
   );
   expect(session.getSnapshot().snapshot.workspace.advanced.ui.tracks.annotationEffects).toBe(false);
+});
+
+it('retains authored presses and timing overrides through Undo, failed Save retry and reopen', async () => {
+  const { session, deps } = setup();
+  session.setAutosaveEnabled(false);
+  const before = session.getSnapshot().document.advancedContent;
+  const interactionTimeline = {
+    presses: [
+      {
+        id: 'authored-key',
+        family: 'keyboard' as const,
+        start: 1,
+        end: 2,
+        label: 'Cmd+K',
+        keys: ['Cmd', 'K'],
+        button: 0,
+        x: 0.5,
+        y: 0.5,
+      },
+    ],
+    overrides: [
+      { ref: { kind: 'action' as const, id: 'recorded-click' }, start: 2, end: 3, enabled: false },
+    ],
+  };
+  try {
+    await session.commit({
+      id: 'press-change',
+      at: 1,
+      target: 'advancedContent',
+      before,
+      after: { ...before, interactionTimeline },
+    });
+    await session.history('undo');
+    expect(session.getSnapshot().document.advancedContent.interactionTimeline).toBeUndefined();
+    await session.history('redo');
+    expect(session.getSnapshot().document.advancedContent.interactionTimeline).toEqual(
+      interactionTimeline
+    );
+    deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(new Error('Storage unavailable'));
+    await expect(session.saveBuffered()).rejects.toThrow('Storage unavailable');
+    expect(session.getSnapshot().document.advancedContent.interactionTimeline).toEqual(
+      interactionTimeline
+    );
+    await session.saveBuffered();
+    const stored = await deps.readVideoWorkspace();
+    expect(stored.workspace.history).toHaveLength(1);
+    const reopened = createVideoReviewSession(JSON.parse(JSON.stringify(stored)), deps);
+    reopened.setAutosaveEnabled(false);
+    try {
+      expect(reopened.getSnapshot().document.advancedContent.interactionTimeline).toEqual(
+        interactionTimeline
+      );
+    } finally {
+      await reopened.dispose();
+    }
+  } finally {
+    await session.dispose();
+  }
 });

@@ -614,32 +614,24 @@ it('clears the hover guide even when a camera child intercepts pointer movement'
   expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')).toBeNull();
 });
 
-it('keeps action-history header controls as filtering and applying-effects toggles', () => {
-  const marker = {
-    ref: { kind: 'action' as const, id: 'click' },
-    eventType: 'CLICK',
-    start: 0.5,
-    end: 0.5,
-  };
+it('keeps independent event visibility controls without the removed animation filter', () => {
   const toggle = vi.fn();
   const { host } = renderTimeline({
-    markers: [marker],
-    actionsEnabled: false,
-    onToggleActions: toggle,
+    keyboardEnabled: true,
+    mouseEnabled: false,
+    onToggleFamily: toggle,
   });
-  const controls = ['historyAnimatedOnly', 'historyEffectsEnabled'].map((key) =>
-    host.querySelector<HTMLButtonElement>(`[aria-label="gallery.videoReview.${key}"]`)!
-  );
-  expect(controls.every(Boolean)).toBe(true);
+  expect(host.querySelector('[aria-label="gallery.videoReview.historyAnimatedOnly"]')).toBeNull();
   expect(host.querySelector('[aria-label="gallery.videoReview.historyOpen"]')).toBeNull();
-  expect(
-    controls[0]!.compareDocumentPosition(controls[1]!) & Node.DOCUMENT_POSITION_FOLLOWING
-  ).toBeTruthy();
-  expect(controls[1]!.getAttribute('aria-pressed')).toBe('false');
-  expect(controls[1]!.className).toContain('aria-[pressed=false]');
-  expect(controls[1]!.querySelector('svg')?.classList.contains('lucide-eye-off')).toBe(true);
-  act(() => controls[1]!.click());
-  expect(toggle).toHaveBeenCalledOnce();
+  const button = (family: string) =>
+    host.querySelector<HTMLButtonElement>(
+      `[data-review-header-track="${family}"] [aria-label="gallery.videoReview.historyEffectsEnabled"]`
+    )!;
+  expect(button('keyboard').getAttribute('aria-pressed')).toBe('true');
+  expect(button('mouse').getAttribute('aria-pressed')).toBe('false');
+  expect(button('mouse').querySelector('svg')?.classList.contains('lucide-eye-off')).toBe(true);
+  act(() => button('mouse').click());
+  expect(toggle).toHaveBeenCalledExactlyOnceWith('mouse');
 });
 
 it('offers the annotation placement cursor only when ready and reveals its active lane', () => {

@@ -42,8 +42,8 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
     : props.selectionLabel
       ? 'selected'
       : props.settingsAvailable
-        ? 'scene'
-        : 'comments';
+        ? 'track'
+        : 'project';
   const [context, updateContext] = useState<
     'selected' | 'export' | 'history' | 'speech' | 'text' | null
   >(props.selectionLabel ? 'selected' : null);
@@ -142,7 +142,7 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
           ((current === 'history' ||
             ((current === 'speech' || current === 'text') && !modeChanged)) &&
             props.contextSelection?.kind === 'none') ||
-          (!modeChanged && contextSection === 'scene' && current === 'comments')
+          (!modeChanged && contextSection === 'track' && current === 'comments')
             ? current
             : contextSection))
     );
@@ -160,8 +160,8 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
   const shown =
     section === 'selected' && !props.selectionLabel
       ? props.settingsAvailable
-        ? 'scene'
-        : 'comments'
+        ? 'track'
+        : 'project'
       : (section === 'scene' || section === 'text') && !props.settingsAvailable
         ? 'comments'
         : section;
@@ -233,6 +233,10 @@ export function useReviewInspectorTrackNavigation(props: {
   select(value: ReviewSelection): void;
 }) {
   const [inspectorTrack, setTrack] = useState<QuickEditTrack>('source');
+  const [tabs, setTabs] = useState<Partial<Record<QuickEditTrack, 'list' | 'settings'>>>({});
+  const tab = tabs[inspectorTrack] ?? 'list';
+  const setTab = (value: 'list' | 'settings') =>
+    props.beforeAction(() => setTabs((current) => ({ ...current, [inspectorTrack]: value })));
   const navigation = props.navigation;
   const resetSelection = () => {
     props.cancelAnnotation.current?.();
@@ -245,14 +249,18 @@ export function useReviewInspectorTrackNavigation(props: {
   const openProject = () =>
     props.beforeAction(() => {
       resetSelection();
-      navigation.setSection('project');
+      setTrack('source');
+      setTabs((current) => ({ ...current, source: 'settings' }));
+      navigation.setSection('track');
     });
   const trackSection =
     inspectorTrack === 'originalAudio'
       ? 'speech'
       : inspectorTrack === 'text'
         ? 'text'
-        : inspectorTrack === 'actions'
+        : inspectorTrack === 'actions' ||
+            inspectorTrack === 'keyboard' ||
+            inspectorTrack === 'mouse'
           ? 'history'
           : 'track';
   const atTrackRoot = navigation.shown === trackSection;
@@ -262,10 +270,8 @@ export function useReviewInspectorTrackNavigation(props: {
   const backToTrack = () =>
     props.beforeAction(() => {
       resetSelection();
-      if (atTrackRoot) navigation.setSection('project');
-      else {
-        navigation.setSection(trackSection);
-      }
+      setTabs((current) => ({ ...current, [inspectorTrack]: 'list' }));
+      navigation.setSection(trackSection);
     });
   const openTrack = (track: QuickEditTrack) =>
     props.beforeAction(() => {
@@ -273,5 +279,14 @@ export function useReviewInspectorTrackNavigation(props: {
       resetSelection();
       navigation.setSection('track');
     });
-  return { track: inspectorTrack, setTrack, openTrack, back: backToTrack, backLabel, openProject };
+  return {
+    track: inspectorTrack,
+    tab,
+    setTab,
+    setTrack,
+    openTrack,
+    back: backToTrack,
+    backLabel,
+    openProject,
+  };
 }

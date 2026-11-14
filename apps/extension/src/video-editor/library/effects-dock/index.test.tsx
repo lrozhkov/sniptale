@@ -356,7 +356,7 @@ it('opens the picker, ignores its cancellation and resets it after a selected pa
 it('presents the imported document label instead of its internal identifier', () => {
   const catalog = createCatalog();
   catalog.documents[1]!.source = readFileSync(
-    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
   const document = JSON.parse(catalog.documents[1]!.source!);
@@ -372,7 +372,7 @@ it('presents the imported document label instead of its internal identifier', ()
 it('filters document names and restores the catalog after an empty search', () => {
   const catalog = createCatalog();
   catalog.documents[1]!.source = readFileSync(
-    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
   const document = JSON.parse(catalog.documents[1]!.source!);

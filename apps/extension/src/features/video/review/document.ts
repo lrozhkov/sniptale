@@ -45,6 +45,7 @@ export function reviewAdvancedContentBaseline(state: {
   keyAnimations?: QuickEditAdvancedContent['keyAnimations'];
   clickAnimations?: QuickEditAdvancedContent['clickAnimations'];
   actionAudio?: QuickEditAdvancedContent['actionAudio'];
+  interactionTimeline?: QuickEditAdvancedContent['interactionTimeline'];
   cursorFocusPath?: QuickEditAdvancedContent['cursorFocusPath'];
   cursorMotions?: QuickEditAdvancedContent['cursorMotions'];
   cursorMotionEnabled?: boolean;
@@ -68,6 +69,7 @@ export function reviewAdvancedContentBaseline(state: {
     ...(state.keyAnimations ? { keyAnimations: state.keyAnimations } : {}),
     ...(state.clickAnimations ? { clickAnimations: state.clickAnimations } : {}),
     ...(state.actionAudio ? { actionAudio: state.actionAudio } : {}),
+    ...(state.interactionTimeline ? { interactionTimeline: state.interactionTimeline } : {}),
     ...(state.cursorFocusPath ? { cursorFocusPath: state.cursorFocusPath } : {}),
     ...(state.cursorMotions ? { cursorMotions: state.cursorMotions } : {}),
     ...(state.cursorMotionEnabled === undefined
@@ -108,12 +110,10 @@ function replaceAdvancedContent(
   before: QuickEditAdvancedContent,
   after: QuickEditAdvancedContent
 ): QuickEditAdvancedContent {
-  const currentJson = JSON.stringify(current);
-  const beforeJson = JSON.stringify(before);
-  if (currentJson !== beforeJson) {
+  if (!equalAdvancedContentValue(current, before)) {
     throw new ReviewHistoryError('before-mismatch');
   }
-  if (beforeJson === JSON.stringify(after)) {
+  if (equalAdvancedContentValue(before, after)) {
     throw new ReviewHistoryError('no-change');
   }
   return after;

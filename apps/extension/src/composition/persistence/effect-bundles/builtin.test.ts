@@ -106,7 +106,7 @@ it('retains embedded resources in project snapshots independently of the install
   const catalog = await createBuiltinEffectResources(read).load();
   const project = await applyEffectCatalogDocument({
     catalog,
-    documentId: 'sniptale-callout',
+    documentId: 'sniptale-leader-labels',
     instanceId: 'builtin-resource',
     project: createEmptyVideoProject('offline'),
     startTime: 0,
@@ -114,7 +114,7 @@ it('retains embedded resources in project snapshots independently of the install
   });
   const retained = JSON.stringify(project);
   expect(retained).toContain('builtin:');
-  expect(retained).toContain('17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063');
+  expect(retained).toContain('929b0c4c13cffa9fff0a42cc5f014eb0c051a1cb8e212ca88b356d44c09ecb31');
   expect(project.effectSnapshots![0]!.assets).toEqual([]);
   available = false;
   expect(JSON.stringify(project)).toBe(retained);

@@ -68,7 +68,7 @@ it(
             : await readFile(resolve(root, path))
         )
     ).load();
-    const selected = await resolveCatalogDocument(catalog, 'sniptale-callout');
+    const selected = await resolveCatalogDocument(catalog, 'sniptale-leader-labels');
     const source = selected.documents[0]!.source!;
     const session = createVideoReviewSession(stored, deps);
     session.setAutosaveEnabled(false);
@@ -76,7 +76,7 @@ it(
       await applyReviewAnnotationCatalogDocument({
         session,
         catalog,
-        documentId: 'sniptale-callout',
+        documentId: 'sniptale-leader-labels',
         instanceId: 'animation-1',
         start: 2,
         locale: 'ru',

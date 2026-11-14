@@ -96,7 +96,7 @@ let failRead = false;
 const save = vi.fn();
 function setup() {
   const text = readFileSync(
-    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   );
   const advanced = createQuickEditAdvancedState();
@@ -297,6 +297,7 @@ it('routes rare commands into one More menu in Basic and Advanced without perman
         translate('videoEditor.app.newProjectAction'),
         translate('gallery.keyboard.title'),
         translate('gallery.app.selectionBackup'),
+        ...(mode === 'advanced' ? [translate('gallery.videoReview.returnBasicMode')] : []),
       ]
     );
     await act(async () => trigger.click());

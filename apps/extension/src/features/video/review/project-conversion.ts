@@ -122,6 +122,11 @@ export function planReviewProjectConversion(args: {
   if (!document) return blocked({ kind: 'invalid-document' });
   if (document.advancedContent.cursorMotions?.length)
     return blocked({ kind: 'unmapped-content', field: 'cursorMotions' });
+  if (
+    document.advancedContent.interactionTimeline?.presses.length ||
+    document.advancedContent.interactionTimeline?.overrides.length
+  )
+    return blocked({ kind: 'unmapped-content', field: 'interactionTimeline' });
   const advanced = loadQuickEditAdvancedState({ ...document.advancedContent, ui: args.ui });
   if (!advanced) return blocked({ kind: 'invalid-document', field: 'ui' });
   const application = resolveQuickEditEffectiveFeatures(advanced);
@@ -559,6 +564,7 @@ function pendingContent(): ReviewProjectConversionIssue[] {
     text: false,
     captions: false,
     actionsEnabled: false,
+    interactionTimeline: false,
     zoom: false,
     background: false,
     audio: false,

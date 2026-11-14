@@ -120,6 +120,7 @@ export function ReviewAdvancedPanels(input: ReviewAdvancedPanelsProps) {
 
 /** Scene controls are independent of the selected zoom and its property panel. */
 export function ReviewSceneProperties(props: {
+  track?: import('../../features/video/review/advanced/types').QuickEditTrack;
   cropPreview?: { file: File; time: number } | undefined;
   cursorPath?: ReactNode;
   focus?: { advanced: QuickEditAdvancedState; time: number } | undefined;
@@ -276,6 +277,13 @@ export function ReviewSceneProperties(props: {
                     content: (
                       <ReviewSceneAudio
                         audio={props.audio}
+                        lane={
+                          props.track === 'voiceover' || props.track === 'music'
+                            ? props.track
+                            : props.track === 'originalAudio'
+                              ? 'original'
+                              : undefined
+                        }
                         hasOriginalAudio={props.hasOriginalAudio}
                         onOriginal={props.onOriginalVolume}
                         onLaneVolume={props.onLaneVolume}
@@ -294,7 +302,29 @@ export function ReviewSceneProperties(props: {
                   },
                 ]
               : []),
-          ]}
+          ].filter(
+            (section) =>
+              !props.track ||
+              (props.track === 'source'
+                ? [
+                    'source-filters',
+                    'canvas',
+                    'window-header',
+                    'background',
+                    'presentation',
+                    'watermark',
+                  ]
+                : props.track === 'cursorMotion'
+                  ? ['cursor-path']
+                  : props.track === 'text'
+                    ? ['captions']
+                    : props.track === 'voiceover' ||
+                        props.track === 'music' ||
+                        props.track === 'originalAudio'
+                      ? ['audio']
+                      : []
+              ).includes(section.id)
+          )}
         />
       </fieldset>
     </>

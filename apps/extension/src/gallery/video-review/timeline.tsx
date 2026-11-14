@@ -1,21 +1,21 @@
+import { Keyboard, Mouse } from 'lucide-react';
+import { reviewInteractionFamily } from '../../features/video/review/interaction-timeline';
+
 import { ReviewTrackVisibilityButton } from './track-row';
 import { ReviewTimelinePanes } from './timeline-panes';
 import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import type { RecordingTelemetryCapabilities } from '../../features/video/project/types';
-import { Fragment, useCallback, useEffect, useState, useMemo } from 'react';
+import { Fragment, useCallback, useEffect, useMemo } from 'react';
 import { REVIEW_TRACK_ORDER } from './track-order';
 import type { QuickEditTrack } from '../../features/video/review/advanced/types';
-import {
-  ReviewButton,
-  reviewIconButtonClassName,
-  reviewTrackStatusButtonClassName,
-} from './controls';
+import { reviewTrackStatusButtonClassName } from './controls';
 import type { ReviewClickAnimation } from '../../features/video/review/advanced/click-animation';
 import { ReviewPlaybackRangeOverlay, useReviewRulerRange } from './ruler-range';
 import type { ReviewPlaybackRange } from './playback-range';
 import type { ReviewBeforeAction } from './note-transitions';
-import { Activity, Filter, Eye, EyeOff } from 'lucide-react';
-import { ReviewTrackRow } from './track-row';
+import { Eye, EyeOff } from 'lucide-react';
+import { ReviewTrackRow, ReviewTrackCuts, reviewTrackMetrics } from './track-row';
+import { createTrackProjection } from './track-projection';
 import { ReviewPlayhead, ReviewRulerRow, ReviewToolbar } from './timeline-chrome';
 import { ReviewSourceLane } from './timeline-selection';
 import type { ReactNode, CSSProperties } from 'react';
@@ -37,6 +37,10 @@ type TimelineProps = ReviewCursorTimelineInteractions & {
   onHistoryRange?: ((range: { start: number; end: number }) => void) | undefined;
   cursorArchiveAvailable?: boolean | undefined;
   sourceId?: string | undefined;
+  interactionEditor?: import('./interaction-editor').ReviewInteractionEditor | undefined;
+  keyboardEnabled?: boolean | undefined;
+  mouseEnabled?: boolean | undefined;
+  onToggleFamily?(family: 'keyboard' | 'mouse'): void;
   actionsEnabled?: boolean | undefined;
   onToggleActions?: (() => void) | undefined;
   keyAnimations?:
@@ -156,7 +160,8 @@ export function ReviewTimeline(props: TimelineProps) {
     boundaries: props.boundaries,
   });
   const rows: Partial<Record<QuickEditTrack, ReactNode>> = {
-    actions: <ReviewTimelineEvents {...props} width={width} zoom={zoom} />,
+    keyboard: <ReviewTimelineEvents {...props} family="keyboard" width={width} zoom={zoom} />,
+    mouse: <ReviewTimelineEvents {...props} family="mouse" width={width} zoom={zoom} />,
     source: (
       <ReviewSourceLane
         {...props}
@@ -317,94 +322,57 @@ function reviewTimelineHeightClass(
     : 'max-h-[min(42dvh,calc(100dvh-420px))]';
 }
 
-/** Telemetry row presentation is independent of ruler gestures and transport. */
+/** Independent semantic rows retain the compact capture-event presentation. */
 function ReviewTimelineEvents(
-  props: Pick<
-    TimelineProps,
-    | 'markers'
-    | 'captureCapabilities'
-    | 'actionsTrackVisible'
-    | 'cursorFocusKeys'
-    | 'selectedCursorFocusId'
-    | 'onCursorFocusKey'
-    | 'onNavigateCursorFocus'
-    | 'onMoveCursorFocus'
-    | 'playing'
-    | 'onAddCursorFocusKey'
-    | 'duration'
-    | 'time'
-    | 'selectedTelemetryRef'
-    | 'onMarker'
-    | 'actionsEnabled'
-    | 'onToggleActions'
-    | 'keyAnimations'
-    | 'clickAnimations'
-    | 'cursorArchiveAvailable'
-    | 'sourceId'
-  > & { width: number; zoom: number }
+  props: TimelineProps & { family: 'keyboard' | 'mouse'; width: number; zoom: number }
 ) {
-  const [animatedOnly, setAnimatedOnly] = useState(false);
   const animated = useMemo(
     () =>
       new Set([
-        ...(props.clickAnimations ?? [])
-          .filter((item) => item.effect !== 'off')
-          .map((item) => item.id),
-        ...(props.keyAnimations ?? []).filter((item) => item.enabled).map((item) => item.id),
+        ...(props.clickAnimations ?? []).filter((p) => p.effect !== 'off').map((p) => p.id),
+        ...(props.keyAnimations ?? []).filter((p) => p.enabled).map((p) => p.id),
       ]),
     [props.clickAnimations, props.keyAnimations]
   );
   const markers = useMemo(
-    () =>
-      animatedOnly
-        ? props.markers.filter(
-            (marker) => marker.ref.kind === 'action' && animated.has(marker.ref.id)
-          )
-        : props.markers,
-    [animatedOnly, props.markers, animated]
+    () => props.markers.filter((m) => reviewInteractionFamily(m) === props.family),
+    [props.markers, props.family]
   );
-  return props.actionsTrackVisible !== false &&
-    (props.markers.length || props.onAddCursorFocusKey || props.cursorArchiveAvailable) ? (
+  if (props.actionsTrackVisible === false) return null;
+  const enabled =
+    props.family === 'keyboard' ? props.keyboardEnabled !== false : props.mouseEnabled !== false;
+  return (
     <ReviewTrackRow
-      track="actions"
-      muted={props.actionsEnabled === false}
-      label={translate('gallery.videoReview.telemetry')}
-      icon={<Activity size={14} aria-hidden="true" />}
+      track={props.family}
+      muted={!enabled}
+      label={translate(
+        props.family === 'keyboard'
+          ? 'gallery.videoReview.historyKeyboard'
+          : 'gallery.videoReview.historyMouse'
+      )}
+      icon={props.family === 'keyboard' ? <Keyboard size={14} /> : <Mouse size={14} />}
       controls={
         <>
-          <ReviewButton
-            label={translate('gallery.videoReview.historyAnimatedOnly')}
-            className={reviewIconButtonClassName}
-            aria-pressed={animatedOnly}
-            onClick={() => setAnimatedOnly((value) => !value)}
+          <ReviewTrackVisibilityButton
+            track={props.family}
+            label={translate('gallery.videoReview.historyEffectsEnabled')}
+            className={reviewTrackStatusButtonClassName}
+            aria-pressed={enabled}
+            onClick={() => props.onToggleFamily?.(props.family)}
           >
-            <Filter size={14} aria-hidden="true" />
-          </ReviewButton>
-          {props.onToggleActions ? (
-            <ReviewTrackVisibilityButton
-              track={'actions'}
-              label={translate('gallery.videoReview.historyEffectsEnabled')}
-              className={reviewTrackStatusButtonClassName}
-              aria-pressed={props.actionsEnabled !== false}
-              onClick={props.onToggleActions}
-            >
-              {props.actionsEnabled === false ? <EyeOff size={14} /> : <Eye size={14} />}
-            </ReviewTrackVisibilityButton>
-          ) : null}
+            {enabled ? <Eye size={14} /> : <EyeOff size={14} />}
+          </ReviewTrackVisibilityButton>
         </>
       }
     >
-      <div className="min-h-7" data-ui="gallery.videoReview.historyTrack">
-        {props.cursorArchiveAvailable ? (
-          <div
-            data-ui="gallery.videoReview.archivedCursorHistory"
-            className="text-xs text-[var(--sniptale-color-text-secondary)]"
-          >
-            {translate('gallery.videoReview.recordingCursorArchived')}
-          </div>
-        ) : null}
+      <div
+        className="relative rounded bg-[var(--sniptale-color-surface-hover)]"
+        style={{ height: reviewTrackMetrics(true).step }}
+        data-ui={`gallery.videoReview.${props.family}Track`}
+      >
         <ReviewTelemetryStrip
-          cursorArchiveAvailable={props.cursorArchiveAvailable}
+          family={props.family}
+          interactionEditor={props.interactionEditor}
           sourceId={props.sourceId}
           captureCapabilities={props.captureCapabilities}
           markers={markers}
@@ -413,23 +381,11 @@ function ReviewTimelineEvents(
           time={props.time}
           width={props.width}
           zoom={props.zoom}
-          {...(props.selectedTelemetryRef
-            ? { selectedTelemetryRef: props.selectedTelemetryRef }
-            : {})}
+          selectedTelemetryRef={props.selectedTelemetryRef}
           onMarker={props.onMarker}
-          {...(props.cursorFocusKeys ? { cursorFocusKeys: props.cursorFocusKeys } : {})}
-          {...(props.selectedCursorFocusId
-            ? { selectedCursorFocusId: props.selectedCursorFocusId }
-            : {})}
-          {...(props.onCursorFocusKey ? { onCursorFocusKey: props.onCursorFocusKey } : {})}
-          playing={props.playing}
-          {...(props.onNavigateCursorFocus
-            ? { onNavigateCursorFocus: props.onNavigateCursorFocus }
-            : {})}
-          {...(props.onMoveCursorFocus ? { onMoveCursorFocus: props.onMoveCursorFocus } : {})}
-          {...(props.onAddCursorFocusKey ? { onAddCursorFocusKey: props.onAddCursorFocusKey } : {})}
         />
+        <ReviewTrackCuts projection={createTrackProjection(props.duration, props.edits ?? [])} />
       </div>
     </ReviewTrackRow>
-  ) : null;
+  );
 }

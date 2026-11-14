@@ -5,7 +5,7 @@ import { reviewAnnotationPresetId } from './annotation-effects-presets';
 
 const document = readReviewAnnotationEffectDocument(
   readFileSync(
-    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
     'utf8'
   )
 );

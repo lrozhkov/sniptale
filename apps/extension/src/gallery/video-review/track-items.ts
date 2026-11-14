@@ -33,6 +33,8 @@ export const reviewCursorMotionShapeTitleKeys = {
 export const reviewTrackTitleKeys = {
   source: 'gallery.videoReview.sourceVideo',
   actions: 'gallery.videoReview.telemetry',
+  keyboard: 'gallery.videoReview.historyKeyboard',
+  mouse: 'gallery.videoReview.historyMouse',
   zoom: 'gallery.videoReview.zoomTrack',
   cursorMotion: 'gallery.videoReview.cursorMotionTrack',
   originalAudio: 'gallery.videoReview.audioOriginal',

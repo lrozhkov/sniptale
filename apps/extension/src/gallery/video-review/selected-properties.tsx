@@ -79,6 +79,7 @@ type SelectedPropertiesProps = {
   editing: ReturnType<typeof useReviewEdits> & { exporter: ReturnType<typeof useReviewExport> };
   zoom: ReturnType<typeof useReviewZoomEditor>;
   busy: boolean;
+  interactionEditor?: import('./interaction-editor').ReviewInteractionEditor | undefined;
   markers: readonly ReviewTelemetryMarker[];
   onOpenHistory?(): void;
   onActionAudio?: Parameters<typeof ReviewActionProperties>[0]['onActionAudio'];
@@ -231,6 +232,7 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
           />
         ) : selection.kind === 'telemetry' ? (
           <ReviewActionProperties
+            interactionEditor={props.interactionEditor}
             marker={marker}
             actionAudio={advanced.actionAudio}
             onActionAudio={props.onActionAudio}

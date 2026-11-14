@@ -12,7 +12,7 @@ import { VideoTrackKind, type VideoProject } from '../../../features/video/proje
 export async function createLargeEffectProject(): Promise<VideoProject> {
   const value = JSON.parse(
     readFileSync(
-      'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+      'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
       'utf8'
     )
   );

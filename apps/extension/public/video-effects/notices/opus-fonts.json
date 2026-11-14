@@ -1,0 +1,94 @@
+{
+  "license": "OFL-1.1",
+  "processing": "Static named instances, renamed Sniptale families; copyright/license name records retained.",
+  "sources": [
+    {
+      "family": "inter",
+      "sourceUrl": "https://github.com/google/fonts/tree/main/ofl/inter"
+    },
+    {
+      "family": "caveat",
+      "sourceUrl": "https://github.com/google/fonts/tree/main/ofl/caveat"
+    },
+    {
+      "family": "cormorantgaramond",
+      "sourceUrl": "https://github.com/google/fonts/tree/main/ofl/cormorantgaramond"
+    },
+    {
+      "family": "jetbrainsmono",
+      "sourceUrl": "https://github.com/google/fonts/tree/main/ofl/jetbrainsmono"
+    }
+  ],
+  "fonts": [
+    {
+      "family": "inter",
+      "weight": 400,
+      "fontFamily": "SniptaleInter400",
+      "file": "SniptaleInter400.ttf",
+      "byteLength": 341352,
+      "sha256": "cef825ddea3e182a6b2a23fdc43c73f1e4f2caf63083b3e4f804f0e33e45e36c",
+      "sourceFile": "inter-Inter[opsz,wght].ttf",
+      "sourceSha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
+    },
+    {
+      "family": "inter",
+      "weight": 600,
+      "fontFamily": "SniptaleInter600",
+      "file": "SniptaleInter600.ttf",
+      "byteLength": 342616,
+      "sha256": "4beb3f682961db785d25e3079e62a5e944881c35799b989c036dc31e33af34c3",
+      "sourceFile": "inter-Inter[opsz,wght].ttf",
+      "sourceSha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
+    },
+    {
+      "family": "inter",
+      "weight": 800,
+      "fontFamily": "SniptaleInter800",
+      "file": "SniptaleInter800.ttf",
+      "byteLength": 343920,
+      "sha256": "17b1b0fe42779224bf48767613efa6134754de764edf3816a9ff9e9a15d802cc",
+      "sourceFile": "inter-Inter[opsz,wght].ttf",
+      "sourceSha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
+    },
+    {
+      "family": "caveat",
+      "weight": 700,
+      "fontFamily": "SniptaleCaveat700",
+      "file": "SniptaleCaveat700.ttf",
+      "byteLength": 266456,
+      "sha256": "3161c98a36d6691c00b56ac7fdc08cdc3a6f1ca38315d09e37e972ec48a07965",
+      "sourceFile": "caveat-Caveat[wght].ttf",
+      "sourceSha256": "0bdb6b660482d31531b3945849fba5916b3ef8695da7024a9e6b9ee3c4157988"
+    },
+    {
+      "family": "cormorantgaramond",
+      "weight": 700,
+      "fontFamily": "SniptaleCormorantgaramond700",
+      "file": "SniptaleCormorantgaramond700.ttf",
+      "byteLength": 773084,
+      "sha256": "9d97ecdf4f5b105d81d9f67de9bae1347c88deadf562b343cd6bf30ef36782ed",
+      "sourceFile": "cormorantgaramond-CormorantGaramond[wght].ttf",
+      "sourceSha256": "b20b7d9626dd956b2c5e558692ad328b1f19e3275e2782db4fa07670d83f35e0"
+    },
+    {
+      "family": "jetbrainsmono",
+      "weight": 400,
+      "fontFamily": "SniptaleJetbrainsmono400",
+      "file": "SniptaleJetbrainsmono400.ttf",
+      "byteLength": 115112,
+      "sha256": "b089d46d6b8e446feb807b160d341196629e3b983e07149fa16ecac5bdce67a6",
+      "sourceFile": "jetbrainsmono-JetBrainsMono[wght].ttf",
+      "sourceSha256": "48715a42ec242c21e9f02692891e147d022299a52e48d5e413e1a942193ffeda"
+    },
+    {
+      "family": "jetbrainsmono",
+      "weight": 700,
+      "fontFamily": "SniptaleJetbrainsmono700",
+      "file": "SniptaleJetbrainsmono700.ttf",
+      "byteLength": 115068,
+      "sha256": "929b0c4c13cffa9fff0a42cc5f014eb0c051a1cb8e212ca88b356d44c09ecb31",
+      "sourceFile": "jetbrainsmono-JetBrainsMono[wght].ttf",
+      "sourceSha256": "48715a42ec242c21e9f02692891e147d022299a52e48d5e413e1a942193ffeda"
+    }
+  ]
+}

@@ -3,7 +3,8 @@ import type { QuickEditTrack } from '../../features/video/review/advanced/types'
 
 /** View order has no effect on composition, history, or persisted project content. */
 export const REVIEW_TRACK_ORDER: readonly QuickEditTrack[] = [
-  'actions',
+  'keyboard',
+  'mouse',
   'source',
   'webcam',
   'zoom',

@@ -135,12 +135,23 @@ async function importedAnimation(): Promise<EffectBundleCatalogEntry> {
   return { ...catalog, packId: 'imported-animation' };
 }
 
-it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners'])(
+it.each([
+  'sniptale-lower-third',
+  'sniptale-title',
+  'sniptale-chapters',
+  'sniptale-leader-labels',
+  'sniptale-frame',
+  'sniptale-corners',
+  'sniptale-arrow',
+  'interview-tag',
+  'interview-rule',
+  'interview-center',
+])(
   'applies the actual lazy %s builtin with declared controls, fixed anchors and one local history operation',
   async (name) => {
     const fixture = setup();
     const catalog = await builtins.load();
-    const choice = catalog.documents.find((entry) => entry.id === `sniptale-${name}`)!;
+    const choice = catalog.documents.find((entry) => entry.id === name)!;
     const id = await applyReviewAnnotationCatalogDocument(
       { ...fixture.args, catalog, documentId: choice.id },
       fixture.deps

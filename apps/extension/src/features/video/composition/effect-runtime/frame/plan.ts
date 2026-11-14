@@ -1,5 +1,8 @@
 import { resolveAnimationObjectRenderBounds } from '@sniptale/runtime-contracts/animation-template';
-import { animationRuntimeDuration } from '../../../../../contracts/effect-runtime/animation';
+import {
+  animationRuntimeDuration,
+  effectRuntimeFrameIndex,
+} from '../../../../../contracts/effect-runtime/animation';
 import { resolveEffectObjectControls } from '../../../project/effect-instance/layout';
 import {
   isEffectInstanceSourceRangeValid,
@@ -95,7 +98,7 @@ export function resolveEffectRuntimeFramePlans(
       duration,
       effectInstanceId: instance.id,
       fps: project.fps,
-      frameIndex: Math.max(0, Math.floor(timing.effectTime * project.fps)),
+      frameIndex: effectRuntimeFrameIndex(timing.effectTime, project.fps),
       kind: 'standalone',
       progress: timing.progress,
       snapshotId: snapshot.id,

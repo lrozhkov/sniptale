@@ -1,26 +1,18 @@
 import { writeFile } from 'node:fs/promises';
-import { build } from 'esbuild';
+import { bundleQuickReviewAnnotationProbe } from '../support/quick-review-annotation-bundle';
 import { expect, test } from '@playwright/test';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 
 for (const combinedBorders of [false, true]) {
   test(
-    'native EffectV1 annotations match export painters in both attachment planes ' +
+    'native EffectV1 annotations match the offline export compositor in both attachment planes ' +
       `(borders=${combinedBorders})`,
     async ({ page }, info) => {
       test.setTimeout(120_000);
-      const bundle = await build({
-        entryPoints: ['tooling/test/e2e/support/quick-review-annotation-render-probe.ts'],
-        bundle: true,
-        format: 'esm',
-        platform: 'browser',
-        write: false,
-        loader: { '.svg': 'text', '.woff2': 'dataurl', '.bin': 'dataurl' },
-        define: { 'process.env.NODE_ENV': '"production"' },
-      });
       const host = await startHostServer();
       try {
+        const bundle = await bundleQuickReviewAnnotationProbe(host.origin);
         await applyHarnessBootstrap(page, {});
         await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
         await page.locator('[data-ui="gallery.page.root"]').waitFor();
@@ -31,6 +23,12 @@ for (const combinedBorders of [false, true]) {
               const module: typeof import('../support/quick-review-annotation-render-probe') =
                 await import(url);
               return await module.parityProbe(combinedBorders);
+            } catch (error) {
+              if (error instanceof Error && 'failures' in error)
+                throw new Error(`${error.message}: ${JSON.stringify(error.failures)}`, {
+                  cause: error,
+                });
+              throw error;
             } finally {
               URL.revokeObjectURL(url);
             }
@@ -66,17 +64,9 @@ for (const converted of [false, true]) {
       `(converted=${converted})`,
     async ({ page }, info) => {
       test.setTimeout(120_000);
-      const bundle = await build({
-        entryPoints: ['tooling/test/e2e/support/quick-review-annotation-render-probe.ts'],
-        bundle: true,
-        format: 'esm',
-        platform: 'browser',
-        write: false,
-        loader: { '.svg': 'text', '.woff2': 'dataurl', '.bin': 'dataurl' },
-        define: { 'process.env.NODE_ENV': '"production"' },
-      });
       const host = await startHostServer();
       try {
+        const bundle = await bundleQuickReviewAnnotationProbe(host.origin);
         await applyHarnessBootstrap(page, {});
         await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
         await page.locator('[data-ui="gallery.page.root"]').waitFor();
@@ -87,6 +77,12 @@ for (const converted of [false, true]) {
               const module: typeof import('../support/quick-review-annotation-render-probe') =
                 await import(url);
               return await module.exportProbe(converted);
+            } catch (error) {
+              if (error instanceof Error && 'failures' in error)
+                throw new Error(`${error.message}: ${JSON.stringify(error.failures)}`, {
+                  cause: error,
+                });
+              throw error;
             } finally {
               URL.revokeObjectURL(url);
             }

@@ -50,7 +50,10 @@ export function ReviewInspector(props: {
   filename: string;
   project?: ReactNode;
   trackItems?: ReactNode;
+  trackWorkspace?: ReactNode;
+  trackHeader?: ReactNode;
   trackTitle?: string;
+  historyTitle?: string | undefined;
   onProject?: (() => void) | undefined;
   backLabel?: string | undefined;
   onRenameProject?: ((name: string) => Promise<void>) | undefined;
@@ -132,16 +135,36 @@ export function ReviewInspector(props: {
             />
             <ReviewInspectorStatus {...props} />
           </div>
-          <div
-            inert={!!props.recording}
-            hidden={recordingShown || shown !== 'history'}
-            className="review-history-host min-h-0 flex-1"
-          >
-            <ReviewInspectorPresentation value={presentation} section="history">
-              {props.actionHistory}
-            </ReviewInspectorPresentation>
-          </div>
-          {props.trackItems ? (
+          {props.trackWorkspace ? (
+            <div
+              inert={!!props.recording}
+              hidden={
+                recordingShown || !['track', 'history', 'speech', 'text', 'project'].includes(shown)
+              }
+              style={{
+                display:
+                  recordingShown ||
+                  !['track', 'history', 'speech', 'text', 'project'].includes(shown)
+                    ? 'none'
+                    : undefined,
+              }}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              {props.trackWorkspace}
+            </div>
+          ) : null}
+          {!props.trackWorkspace ? (
+            <div
+              inert={!!props.recording}
+              hidden={recordingShown || shown !== 'history'}
+              className="review-history-host min-h-0 flex-1"
+            >
+              <ReviewInspectorPresentation value={presentation} section="history">
+                {props.actionHistory}
+              </ReviewInspectorPresentation>
+            </div>
+          ) : null}
+          {!props.trackWorkspace && props.trackItems ? (
             <div
               inert={!!props.recording}
               hidden={recordingShown || (shown !== 'track' && shown !== 'speech')}
@@ -155,6 +178,8 @@ export function ReviewInspector(props: {
             inert={!!props.recording}
             hidden={
               recordingShown ||
+              (!!props.trackWorkspace &&
+                ['track', 'history', 'speech', 'text', 'project'].includes(shown)) ||
               shown === 'history' ||
               (!!props.trackItems && (shown === 'track' || shown === 'speech'))
             }
@@ -425,7 +450,10 @@ function ReviewInspectorHeader(
 ) {
   return (
     <header className="flex shrink-0 items-center gap-1">
-      {props.section !== 'project' ? (
+      {!(
+        ['track', 'speech', 'text', 'history', 'project'].includes(props.section) &&
+        props.trackHeader
+      ) && props.section !== 'project' ? (
         <ContentToolbarButton
           type="button"
           tone="utility"
@@ -438,17 +466,26 @@ function ReviewInspectorHeader(
           <ArrowLeft size={16} aria-hidden="true" />
         </ContentToolbarButton>
       ) : null}
-      <div className="min-w-0 flex-1">
-        <h2 ref={props.hintOwner.title} className="truncate text-sm font-semibold">
-          {props.section === 'track'
-            ? props.trackTitle
-            : props.section === 'selected'
-              ? props.selectionLabel
-              : translate(inspectorSectionLabels[props.section])}
-        </h2>
-      </div>
+      {['track', 'speech', 'text', 'history', 'project'].includes(props.section) &&
+      props.trackHeader ? (
+        <div className="min-w-0 flex-1">{props.trackHeader}</div>
+      ) : (
+        <div className="min-w-0 flex-1">
+          <h2 ref={props.hintOwner.title} className="truncate text-sm font-semibold">
+            {['track', 'speech', 'text', 'history'].includes(props.section) && props.trackTitle
+              ? props.trackTitle
+              : props.section === 'history' && props.historyTitle
+                ? props.historyTitle
+                : props.section === 'track'
+                  ? props.trackTitle
+                  : props.section === 'selected'
+                    ? props.selectionLabel
+                    : translate(inspectorSectionLabels[props.section])}
+          </h2>
+        </div>
+      )}
       {props.section === 'scene' ||
-      props.section === 'speech' ||
+      (props.section === 'speech' && !props.trackHeader) ||
       (props.section === 'selected' && props.selectionHasSections === true) ? (
         <ContentToolbarButton
           type="button"
