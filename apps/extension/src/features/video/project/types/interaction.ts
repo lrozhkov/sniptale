@@ -396,6 +396,10 @@ export interface VideoProjectMotionArea {
 }
 
 export interface VideoProjectMotionRegion {
+  /** Independent spatial effect; it never occupies or moves the zoom camera. */
+  effect?: '3d';
+  spatialMotion?: import('../motion/spatial').CameraSpatialMotion;
+
   /** Active border mode retains the dormant camera configuration in this interval. */
   border?: import('../scene/focus-appearance').QuickEditBorder;
   /** Window geometry belongs to the bound clip, while viewport geometry ignores the camera. */

@@ -1,3 +1,4 @@
+import { verifyRuntimeAnimationSource } from '../../../contracts/effect-runtime/animation';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { expect, it } from 'vitest';
@@ -335,4 +336,17 @@ it('moves the cursor without rewriting sources and appends only baseline, operat
   expect(writes[0]?.value).not.toHaveProperty('effectSnapshots');
   expect(writes[1]?.value).toHaveProperty('effectSnapshots');
   expect(writes[2]?.value).not.toHaveProperty('effectSnapshots');
+});
+
+it('retains snapshot closure checks when immutable source metadata is already verified', async () => {
+  const value = workspace(1),
+    retained = value.effectSnapshots![0]!;
+  expect(await verifyRuntimeAnimationSource(retained.source, retained.sha256)).not.toBeNull();
+  expect(inspectVideoWorkspace(value).failure).toBeNull();
+  const before = structuredClone(value);
+  const operation = value.history[0]!;
+  if (operation.target !== 'advancedContent') throw new Error('Missing authored content');
+  operation.after.annotationEffects!.instances[0]!.controls['undeclared-control'] = 123;
+  expect(inspectVideoWorkspace(value).failure).not.toBeNull();
+  expect(value.effectSnapshots).toEqual(before.effectSnapshots);
 });

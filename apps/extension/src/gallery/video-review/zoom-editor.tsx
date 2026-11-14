@@ -59,7 +59,7 @@ function fitsActiveWindow(
   );
 }
 
-export type ReviewFocusType = 'zoom' | 'spotlight' | 'border' | 'lens';
+export type ReviewFocusType = 'zoom' | 'spotlight' | 'border' | 'lens' | '3d';
 
 /** Disposable insertion choice does not alter the stored camera. */
 export function withReviewFocusType(
@@ -71,10 +71,28 @@ export function withReviewFocusType(
     (type === 'lens' && region.spotlight?.effect === 'magnify')
   )
     return region;
-  const { spotlight, border, ...camera } = region;
+  const { spotlight, border, effect: _effect, spatialMotion: _motion, ...camera } = region;
+  if (type === '3d')
+    return {
+      ...camera,
+      effect: '3d',
+      cursorComposition: { mode: 'off', amount: 0.5, smoothness: 0.6 },
+      followCursor: false,
+      transform: { scale: 1, centerX: 0.5, centerY: 0.5 },
+      perspective: region.perspective ?? {
+        enabled: true,
+        rotateX: -12,
+        rotateY: 18,
+        rotateZ: 0,
+        strength: 0.5,
+      },
+      ...(region.spatialMotion ? { spatialMotion: region.spatialMotion } : {}),
+      enter: { type: 'ease-in-out', duration: 0.5 },
+      exit: { type: 'ease-in-out', duration: 0.5 },
+    };
   const area = spotlight ?? border;
   return type === 'zoom'
-    ? camera
+    ? { ...camera, cursorComposition: { ...camera.cursorComposition!, mode: 'off' } }
     : type === 'spotlight' || type === 'lens'
       ? {
           ...camera,
@@ -556,14 +574,6 @@ export function useReviewZoomEditor(args: ZoomEditorArgs) {
     revision: focusRevision,
     commitDrag,
     selected,
-    canConvertToZoom: (region: QuickEditZoomRegion) =>
-      fitsActiveWindow(
-        args.zoom,
-        withReviewFocusType(region, 'zoom'),
-        region.start,
-        region.end,
-        region.dormant ? args.timeMap : undefined
-      ),
     preview,
     previewRegion,
     previewChanges: { read: previewChanges.read, subscribe: previewChanges.subscribe },

@@ -107,7 +107,7 @@ it('retains audio snapshots in schema 31 without silently admitting them in hist
     { ...base.audio, music: [clip] },
   ]) {
     const content = { ...base, audio };
-    expect(content.schemaVersion).toBe(32);
+    expect(content.schemaVersion).toBe(33);
     expect(loadQuickEditAdvancedContentState(JSON.parse(JSON.stringify(content)))).toEqual(content);
     expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion: 31 })).toEqual(content);
     expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion: 30 })).toBeNull();

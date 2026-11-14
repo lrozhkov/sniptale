@@ -1,3 +1,4 @@
+import { SpatialMotionFields } from '../../ui/focus-appearance/spatial';
 import { BorderAppearanceFields } from '../../ui/focus-appearance/border';
 import { ReviewCameraFollowSettings } from './cursor-path-editor';
 import {
@@ -21,7 +22,6 @@ import {
   ReviewInspectorColumns,
 } from './inspector-sections';
 import { quickEditFocusType } from '../../features/video/review/advanced/focus-layout';
-import { withReviewFocusType, type ReviewFocusType as FocusType } from './zoom-editor';
 import { ReviewBorderAnimation } from './border-inspector';
 import {
   SpotlightAppearanceFields,
@@ -124,7 +124,6 @@ export function ReviewZoomInspector(props: {
   spatialPreview?: QuickEditZoomRegion;
   cutSuppressed?: boolean;
   conflictSuppressed?: boolean;
-  zoomConversionBlocked?: boolean;
   onPreview?(patch: QuickEditZoomRegionPatch | null): void;
   onChange(patch: QuickEditZoomRegionPatch): void;
   onReset(): void;
@@ -133,7 +132,7 @@ export function ReviewZoomInspector(props: {
   preview?: ReactNode;
 }) {
   const { region, onChange } = props;
-  const [tool, onTool] = useState<SpatialTool>('position');
+  const [tool, onTool] = useState<SpatialTool>(region.effect === '3d' ? 'tilt' : 'position');
   const [resetTarget, setResetTarget] = useState<HTMLDivElement | null>(null);
   const map = useContext(ReviewIntervalMap);
   const sourceRange = region.sourceAnchor ?? (map ? reviewFocusSourceRange(region, map) : null);
@@ -162,7 +161,11 @@ export function ReviewZoomInspector(props: {
             className="rounded border border-[var(--sniptale-color-border-soft)]
               bg-[var(--sniptale-color-surface-hover)] p-2 text-xs text-[var(--sniptale-color-text-secondary)]"
           >
-            {translate('gallery.videoReview.focusOverlapConflict')}
+            {translate(
+              region.effect === '3d'
+                ? 'gallery.videoReview.focus3dConflict'
+                : 'gallery.videoReview.focusOverlapConflict'
+            )}
           </p>
         ) : null}
         {props.cutSuppressed ? (
@@ -182,12 +185,7 @@ export function ReviewZoomInspector(props: {
               content: (
                 <ReviewInspectorColumns>
                   <div className="min-w-0 space-y-2">
-                    <ReviewFocusType
-                      region={region}
-                      onChange={onChange}
-                      blocked={props.zoomConversionBlocked ?? false}
-                    />
-                    {!region.border && !region.spotlight ? (
+                    {!region.border && !region.spotlight && region.effect !== '3d' ? (
                       <CameraFollowTargetControls
                         following={following}
                         cursorAvailable={cursorAvailable}
@@ -196,7 +194,9 @@ export function ReviewZoomInspector(props: {
                           onChange({
                             followCursor,
                             ...(followCursor && !region.cursorComposition
-                              ? { cursorComposition: { ...DEFAULT_CURSOR_COMPOSITION } }
+                              ? {
+                                  cursorComposition: { ...DEFAULT_CURSOR_COMPOSITION, mode: 'off' },
+                                }
                               : {}),
                           })
                         }
@@ -214,7 +214,7 @@ export function ReviewZoomInspector(props: {
                       onChange={onChange}
                       onPreview={props.onPreview}
                     />
-                    {!region.border && !region.spotlight && following ? (
+                    {!region.border && !region.spotlight && region.effect !== '3d' && following ? (
                       <ReviewDetails
                         preferenceId="gallery.videoReview.cameraFollowPolicy"
                         label={translate('videoEditor.sidebar.inspectorMoreDetails')}
@@ -236,7 +236,10 @@ export function ReviewZoomInspector(props: {
                         />
                       </ReviewDetails>
                     ) : null}
-                    {props.preview && !region.border && !region.spotlight ? (
+                    {props.preview &&
+                    !region.border &&
+                    !region.spotlight &&
+                    region.effect !== '3d' ? (
                       <div ref={setResetTarget} />
                     ) : null}
                   </div>
@@ -290,6 +293,41 @@ type FocusParameterProps = {
 /** Selected focus kind and disposable tool choose their precise parameter surface. */
 function ReviewFocusParameters(props: FocusParameterProps) {
   const { region, onChange } = props;
+  if (region.effect === '3d')
+    return (
+      <>
+        <CameraCompositionControls
+          value={region.cursorComposition}
+          previewValue={props.previewRegion?.cursorComposition}
+          onChange={(cursorComposition) => onChange({ cursorComposition })}
+          onPreview={(cursorComposition) =>
+            props.onPreview?.(cursorComposition ? { cursorComposition } : null)
+          }
+        />
+        {region.cursorComposition?.mode && region.cursorComposition.mode !== 'off' ? null : (
+          <>
+            <ReviewSpatialInspector
+              {...props}
+              tool={props.tool === 'position' ? 'tilt' : props.tool}
+            />
+            <ReviewDetails
+              preferenceId="gallery.videoReview.spatialMotion"
+              label={translate('gallery.videoReview.spatialMotion')}
+              initiallyOpen
+            >
+              <SpatialMotionFields
+                perspective={region.perspective}
+                value={region.spatialMotion}
+                onChange={(spatialMotion) => onChange({ spatialMotion })}
+                onPreview={(spatialMotion) =>
+                  props.onPreview?.(spatialMotion ? { spatialMotion } : null)
+                }
+              />
+            </ReviewDetails>
+          </>
+        )}
+      </>
+    );
   if (region.border)
     return (
       <BorderAppearanceFields
@@ -350,30 +388,7 @@ function ReviewFocusParameters(props: FocusParameterProps) {
         />
       </>
     );
-  if (props.followCursor)
-    return (
-      <>
-        <ReviewZoomPositionFields {...props} />
-        <CameraCompositionControls
-          value={region.cursorComposition}
-          previewValue={props.previewRegion?.cursorComposition}
-          onPreview={(cursorComposition) =>
-            props.onPreview?.(cursorComposition ? { cursorComposition } : null)
-          }
-          onChange={(cursorComposition) => onChange({ cursorComposition })}
-        />
-      </>
-    );
-  if (props.tool === 'position') return <ReviewZoomPositionFields {...props} />;
-  return (
-    <ReviewSpatialInspector
-      tool={props.tool}
-      region={region}
-      previewRegion={props.previewRegion}
-      onChange={onChange}
-      onPreview={props.onPreview}
-    />
-  );
+  return <ReviewZoomPositionFields {...props} />;
 }
 
 /** Position edits share the existing transient transaction with the preview. */
@@ -620,53 +635,6 @@ export function ReviewZoomLinkInspector(props: {
           ),
         ]}
       />
-    </div>
-  );
-}
-
-/** Direct Focus type choice preserves the active configuration and camera. */
-function ReviewFocusType({
-  region,
-  onChange,
-  blocked,
-}: {
-  blocked: boolean;
-  region: QuickEditZoomRegion;
-  onChange(patch: QuickEditZoomRegionPatch): void;
-}) {
-  return (
-    <div className="min-w-0" data-ui="gallery.videoReview.focusType">
-      <SegmentedRow<FocusType>
-        label={translate('gallery.videoReview.focusType')}
-        layout="stacked"
-        columns={4}
-        ariaLabel={translate('gallery.videoReview.focusType')}
-        value={quickEditFocusType(region)}
-        options={[
-          {
-            value: 'zoom',
-            label: translate('gallery.videoReview.zoomRegionLabel'),
-            disabled: blocked,
-          },
-          { value: 'spotlight', label: translate('gallery.videoReview.focusSpotlight') },
-          { value: 'lens', label: translate('gallery.videoReview.focusLens') },
-          { value: 'border', label: translate('gallery.videoReview.focusBorder') },
-        ]}
-        onChange={(type) => {
-          if (type === quickEditFocusType(region) || (type === 'zoom' && blocked)) return;
-          const next = withReviewFocusType(region, type);
-          onChange({
-            spotlight: next.spotlight ?? null,
-            border: next.border ?? null,
-            ...(type === 'border' ? { enter: next.enter, exit: next.exit } : {}),
-          });
-        }}
-      />
-      {blocked ? (
-        <p role="status" className="w-full text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('gallery.videoReview.focusZoomConflict')}
-        </p>
-      ) : null}
     </div>
   );
 }

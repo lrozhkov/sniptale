@@ -6,6 +6,7 @@ import {
   parseRuntimeAnimationDocument,
   parseRuntimeAnimationFrame,
   verifyRuntimeAnimationSource,
+  readVerifiedRuntimeAnimationSource,
 } from './animation';
 
 function template() {
@@ -106,4 +107,24 @@ it('stabilizes equivalent composed clocks at integer boundaries without swallowi
   expect(effectRuntimeFrameIndex(time - 1e-12, 30)).toBe(frame - 1);
   expect(effectRuntimeFrameIndex(time - 0.25 / 30, 30)).toBe(frame - 1);
   expect(effectRuntimeFrameIndex(-1, 30)).toBe(0);
+});
+
+it('reuses only exact immutable verified bytes and honors cancellation on cache hits', async () => {
+  const source = JSON.stringify(template()),
+    sha = await digest(source);
+  const first = await verifyRuntimeAnimationSource(source, sha);
+  expect(first).not.toBeNull();
+  expect(await verifyRuntimeAnimationSource(source, sha)).toBe(first);
+  expect(readVerifiedRuntimeAnimationSource(source, sha)).toBe(first);
+  expect(Object.isFrozen(first)).toBe(true);
+  expect(Object.isFrozen(first!.animation.layers)).toBe(true);
+  expect(() => first!.animation.layers.push({})).toThrow();
+  const changed = source + ' ';
+  expect(readVerifiedRuntimeAnimationSource(changed, sha)).toBeNull();
+  expect(await verifyRuntimeAnimationSource(changed, sha)).toBeNull();
+  const controller = new AbortController();
+  controller.abort();
+  await expect(verifyRuntimeAnimationSource(source, sha, controller.signal)).rejects.toMatchObject({
+    name: 'AbortError',
+  });
 });

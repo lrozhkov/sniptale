@@ -39,6 +39,7 @@ export function compileProjectCameraBundle(
     if (!orientations.some((item) => item.key === key))
       orientations.push({ key, plan: resolveProjectCursorOrientation(view, region) });
     if (
+      region.effect === '3d' ||
       region.focusMode !== VideoMotionFocusMode.CURSOR ||
       cameras.some((item) => item.key === key)
     )
@@ -46,14 +47,16 @@ export function compileProjectCameraBundle(
     cameras.push(snapshotProjectCameraPlan(view, region, output));
   };
   if (isVideoProjectUtilityLaneVisible(project, 'camera')) {
-    for (const region of (project.motionRegions ?? []).filter(isCameraMotionRegion)) {
+    for (const region of (project.motionRegions ?? []).filter(
+      (region) => isCameraMotionRegion(region) || region.effect === '3d'
+    )) {
       collect(project, region);
       const clip = project.clips.find((item) => item.id === region.sourceBinding?.clipId);
       if (!clip) continue;
       const playback = resolveMotionSourcePlayback(project, clip.startTime, clip.id);
       if (playback)
         for (const sourceRegion of (playback.geometryProject.motionRegions ?? []).filter(
-          isCameraMotionRegion
+          (region) => isCameraMotionRegion(region) || region.effect === '3d'
         ))
           collect(playback.geometryProject, sourceRegion);
     }

@@ -272,6 +272,14 @@ function useReviewEditorCore(resource: LoadedReview) {
       !base.composer.getCurrent().annotation &&
       base.advanced.ui.mode === 'advanced',
   });
+  const features = useMemo(
+    () =>
+      resolveQuickEditEffectiveState(base.advanced, {
+        facts: previewHistory.telemetry,
+        source: resource.source,
+      }),
+    [base.advanced, previewHistory.telemetry, resource.source]
+  );
   presentationPending.current = presentation.pending;
   const annotationEffects = useReviewAnnotationEffects({
     session: base.session,
@@ -299,10 +307,7 @@ function useReviewEditorCore(resource: LoadedReview) {
     historyTelemetry,
     setHistoryRange,
     cursorArchiveAvailable: !!resource.telemetry?.cursorTrajectory?.totalSamples,
-    features: resolveQuickEditEffectiveState(base.advanced, {
-      facts: previewHistory.telemetry,
-      source: resource.source,
-    }),
+    features,
     performAction: async (action: () => Promise<boolean>) => {
       await annotationEffects.flush();
       return await base.performAction(action);
@@ -480,6 +485,7 @@ function useReviewEditorTimeline(
     onTime,
     playing,
     setPlaying,
+    playheadClock,
     setPresentationActive,
     onPresentedTime,
     seek,
@@ -556,6 +562,7 @@ function useReviewEditorTimeline(
     navigationRevision,
     playing,
     setPlaying,
+    playheadClock,
     setPresentationActive,
     onPresentedTime,
     seek,

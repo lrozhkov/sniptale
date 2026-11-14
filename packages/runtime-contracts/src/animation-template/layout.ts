@@ -1,3 +1,4 @@
+import { attachedAnimationBounds } from './attached-bounds.js';
 import type { AnimationTemplate } from './types.js';
 /** Font measurement uses the accepted resource in the sandbox, never a browser fallback font. */
 export type AnimationTextMeasure = (text: string, fontSize: number) => number;
@@ -126,6 +127,13 @@ export function resolveAnimationObjectRenderBounds(
     y = Math.min(y, py - padding);
     right = Math.max(right, px + padding);
     bottom = Math.max(bottom, py + padding);
+  }
+  const attached = attachedAnimationBounds(template, controls);
+  if (attached) {
+    x = Math.min(x, Math.floor(attached.x) - 2);
+    y = Math.min(y, Math.floor(attached.y) - 2);
+    right = Math.max(right, Math.ceil(attached.right) + 2);
+    bottom = Math.max(bottom, Math.ceil(attached.bottom) + 2);
   }
   return { x, y, width: right - x, height: bottom - y };
 }

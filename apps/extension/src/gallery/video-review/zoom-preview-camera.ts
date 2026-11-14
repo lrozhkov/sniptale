@@ -1,3 +1,4 @@
+import { cameraSpatialMotionPose } from '../../features/video/project/motion/spatial';
 import { useEffect, useMemo, useState } from 'react';
 import { resolveQuickEditFocusLink } from '../../features/video/review/advanced/focus-layout';
 
@@ -256,7 +257,7 @@ function resolvePreviewCamera(props: ZoomCameraScene) {
       time < region.end
   );
   const target = quickEditCropCamera(
-    quickEditSpatialTargetCamera(effective ?? props.region, time),
+    quickEditSpatialTargetCamera(cameraSpatialMotionPose(effective ?? props.region, 0.5), time),
     props
   );
   return effective?.cursorFocus?.path.mode === 'follow'

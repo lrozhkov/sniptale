@@ -124,9 +124,11 @@ export function reviewTrackItems(args: {
             ? 'gallery.videoReview.focusBorder'
             : type === 'lens'
               ? 'gallery.videoReview.focusLens'
-              : type === 'spotlight'
-                ? 'gallery.videoReview.focusSpotlight'
-                : 'gallery.videoReview.zoomRegionLabel'
+              : type === '3d'
+                ? 'gallery.videoReview.focus3d'
+                : type === 'spotlight'
+                  ? 'gallery.videoReview.focusSpotlight'
+                  : 'gallery.videoReview.zoomRegionLabel'
         ),
         detail: type === 'zoom' ? `${number(region.transform.scale)}×` : '',
         selection: { kind: 'zoom' as const, id: region.id },
@@ -139,7 +141,9 @@ export function reviewTrackItems(args: {
   if (track === 'annotationEffects')
     rows = (content.annotationEffects?.instances ?? []).map((item) => {
       const snapshot = args.snapshots.find((snapshot) => snapshot.id === item.snapshotId);
-      const definition = snapshot ? readReviewAnnotationEffectDocument(snapshot.source) : null;
+      const definition = snapshot
+        ? readReviewAnnotationEffectDocument(snapshot.source, snapshot.sha256)
+        : null;
       return {
         id: item.id,
         start: item.start,

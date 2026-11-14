@@ -1848,6 +1848,7 @@ it('prepares annotation descriptors after output and releases the marker before 
       independent: true,
     }),
     warmUpcomingGpu,
+    setGeometryPreview: vi.fn(),
     maximumInFlight: 1,
     cancelWarm: vi.fn(),
     counters: () => ({ liveDecodedRasterBytes: 0, liveRasterResources: 0 }),

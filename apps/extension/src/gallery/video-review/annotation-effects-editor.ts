@@ -1,8 +1,10 @@
+import { transformReviewAnnotationAnchors } from '../../features/video/review/annotation-effects/layout';
 import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
 import type { EffectBundleCatalogEntry } from '../../features/video/project/effect-bundle/catalog';
 import type {
   ReviewAnnotationEffect,
   ReviewAnnotationEffects,
+  ReviewAnnotationEffectTransform,
 } from '../../features/video/review/annotation-effects/types';
 import {
   parseReviewAnnotationEffects,
@@ -17,6 +19,11 @@ import {
 import type { createVideoReviewSession } from '../../workflows/video-review/session';
 import type { ReviewBeforeAction } from './note-transitions';
 import type { ReviewAnnotationGeometry } from './annotation-effects-geometry';
+
+/** A transient move updates only stage consumers; the session still owns commit and Undo. */
+export interface ReviewAnnotationMovement {
+  subscribe(listener: (instance: ReviewAnnotationEffect | null) => boolean | void): () => void;
+}
 
 type Session = ReturnType<typeof createVideoReviewSession>;
 type Patch = Partial<Omit<ReviewAnnotationEffect, 'id' | 'snapshotId' | 'order'>>;
@@ -78,6 +85,27 @@ export function useReviewAnnotationEffects(
   const mounted = useRef(true);
   const operation = useRef<AbortController | null>(null);
   const draft = useRef<Gesture | null>(null);
+  const [, updateBodyGeometry] = useState(0);
+  const bodyMeasurements = useRef(
+    new Map<string, { x: number; y: number; width: number; height: number }>()
+  ).current;
+  const movementListeners = useRef(
+    new Set<(instance: ReviewAnnotationEffect | null) => boolean | void>()
+  );
+  const movement = useRef<ReviewAnnotationMovement>({
+    subscribe(listener) {
+      movementListeners.current.add(listener);
+      return () => {
+        movementListeners.current.delete(listener);
+      };
+    },
+  }).current;
+  const notifyMovement = useCallback((instance: ReviewAnnotationEffect | null) => {
+    let accepted = false;
+    for (const listener of movementListeners.current)
+      if (listener(instance) === true) accepted = true;
+    return accepted;
+  }, []);
   const completion = useRef<Promise<boolean> | null>(null);
   const failedChoice = useRef<Choice | null>(null);
   const [geometry, updateGeometry] = useState<ReviewAnnotationGeometry | null>(null);
@@ -95,10 +123,12 @@ export function useReviewAnnotationEffects(
   const [failure, setFailure] = useState<Failure | null>(null);
   useEffect(() => {
     mounted.current = true;
+    notifyMovement(null);
     draft.current = null;
     failedChoice.current = null;
     setGesture(null);
     setGeometry(null);
+    bodyMeasurements.clear();
     setPending(false);
     setFailure(null);
     const protect = (event: BeforeUnloadEvent) => {
@@ -117,7 +147,7 @@ export function useReviewAnnotationEffects(
       draft.current = null;
       completion.current = null;
     };
-  }, [args.session, setGeometry]);
+  }, [args.session, setGeometry, notifyMovement, bodyMeasurements]);
   const active = (owner: typeof args, controller: AbortController) =>
     mounted.current && latest.current.session === owner.session && !controller.signal.aborted;
   const currentLane = () => args.session.getSnapshot().document.advancedContent.annotationEffects;
@@ -128,7 +158,10 @@ export function useReviewAnnotationEffects(
     const documents = new Map(
       (workspace.effectSnapshots ?? [])
         .filter((snapshot) => needed.has(snapshot.id))
-        .map((snapshot) => [snapshot.id, readReviewAnnotationEffectDocument(snapshot.source)])
+        .map((snapshot) => [
+          snapshot.id,
+          readReviewAnnotationEffectDocument(snapshot.source, snapshot.sha256),
+        ])
     );
     return (
       parsed &&
@@ -205,6 +238,7 @@ export function useReviewAnnotationEffects(
       controller.signal.throwIfAborted();
     });
   const cancelGesture = () => {
+    notifyMovement(null);
     draft.current = null;
     setGesture(null);
   };
@@ -245,6 +279,18 @@ export function useReviewAnnotationEffects(
       }
     }).then(() => createdId);
   };
+  const applyPatch = (item: ReviewAnnotationEffect, patch: Patch): ReviewAnnotationEffect => {
+    const plane = reportedGeometry.current?.[item.attachment];
+    return {
+      ...item,
+      ...structuredClone(patch),
+      ...(patch.transform && !patch.anchors && plane && item.anchors
+        ? {
+            anchors: transformReviewAnnotationAnchors(item, patch.transform, plane) ?? item.anchors,
+          }
+        : {}),
+    };
+  };
   const change = (id: string, patch: Patch) => {
     if (draft.current) return;
     void mutate(
@@ -252,7 +298,7 @@ export function useReviewAnnotationEffects(
         lane && {
           ...lane,
           instances: lane.instances.map((item) =>
-            item.id === id ? { ...item, ...structuredClone(patch) } : item
+            item.id === id ? applyPatch(item, patch) : item
           ),
         }
     );
@@ -279,8 +325,24 @@ export function useReviewAnnotationEffects(
     if (committed && draft.current === value) cancelGesture();
     return committed;
   };
+  const previewPlacement = (patch: Patch) => {
+    const value = draft.current;
+    if (!value || value.session !== args.session) return false;
+    const parsed = parseReviewAnnotationEffects({
+      enabled: true,
+      instances: [applyPatch(value.before, patch)],
+    })?.instances[0];
+    if (!parsed || !notifyMovement(parsed)) return false;
+    draft.current = { ...value, after: parsed };
+    return true;
+  };
   return {
     geometry,
+    bodyMeasurements,
+    refreshBodyGeometry: () => updateBodyGeometry((value) => value + 1),
+    movement,
+    previewMovement: (transform: ReviewAnnotationEffectTransform) =>
+      previewPlacement({ transform }),
     gestureId: gesture?.session === args.session ? gesture.before.id : null,
     setGeometry,
     pending,
@@ -346,9 +408,16 @@ export function useReviewAnnotationEffects(
       return true;
     },
     previewGesture: (patch: Patch) => {
+      if (
+        (patch.transform || patch.anchors) &&
+        Object.keys(patch).every((key) => key === 'transform' || key === 'anchors') &&
+        previewPlacement(patch)
+      )
+        return;
+      notifyMovement(null);
       const value = draft.current;
       if (!value || value.session !== args.session) return;
-      const next = { ...value, after: { ...value.before, ...structuredClone(patch) } };
+      const next = { ...value, after: applyPatch(value.before, patch) };
       draft.current = next;
       setGesture(next);
     },

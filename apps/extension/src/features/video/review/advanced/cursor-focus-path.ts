@@ -446,6 +446,20 @@ export function reviewCursorSpatialSettings(
   time: number,
   base = false
 ): QuickEditZoomRegion {
+  if (
+    region.effect === '3d' &&
+    region.cursorComposition?.mode !== undefined &&
+    region.cursorComposition.mode !== 'off' &&
+    !hasCursorComposition(region.cursorComposition)
+  ) {
+    const {
+      perspective: _perspective,
+      depthOfField: _depth,
+      spatialMotion: _motion,
+      ...flat
+    } = region;
+    return flat;
+  }
   const plan = resolveReviewCursorOrientation(region);
   if (!region.cursorFocus || !region.cursorComposition) return region;
   const { perspective: _perspective, depthOfField: _depth, ...retained } = region;

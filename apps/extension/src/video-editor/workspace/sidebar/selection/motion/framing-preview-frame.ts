@@ -1,3 +1,5 @@
+import { projectCursorSpatialSettings } from '../../../../../features/video/composition/motion/cursor-orientation';
+import { cameraSpatialMotionPose } from '../../../../../features/video/project/motion/spatial';
 import type { GpuPreviewOutput } from '../../../../../features/video/composition/canvas/preview-presentation';
 import { createPreviewPresentationSession } from '../../../../../features/video/composition/canvas/preview-presentation';
 
@@ -243,7 +245,21 @@ export function resolveFramingRenderCamera(
     ? undefined
     : region.focusMode === VideoMotionFocusMode.CURSOR && region.cursorComposition !== undefined
       ? cursorViewport?.spatial
-      : evaluateMotionSpatial(project, null, region, 1);
+      : evaluateMotionSpatial(
+          project,
+          null,
+          cameraSpatialMotionPose(
+            region.effect === '3d'
+              ? projectCursorSpatialSettings(
+                  project,
+                  region,
+                  region.startTime + region.duration / 2
+                )
+              : region,
+            region.effect === '3d' && region.cursorComposition?.mode !== 'off' ? 0 : 0.5
+          ),
+          1
+        );
   return {
     ...(spatial ? { spatial } : {}),
     viewportX: view.left,

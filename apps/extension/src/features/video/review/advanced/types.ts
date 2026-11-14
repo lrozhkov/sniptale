@@ -20,7 +20,7 @@ export type { QuickEditVoiceoverAnchor } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 32;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 33;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -103,6 +103,12 @@ export interface QuickEditCameraTransform {
  * matching the shared ReviewTimeMap coordinate domain.
  */
 export interface QuickEditZoomRegion {
+  /** Independent spatial effect; it never occupies or moves the zoom camera. */
+  effect?: '3d';
+  /** Derived source clock for a cut/rate slice; storage admission drops this field. */
+  spatialClock?: { offset: number; rate: number; duration: number };
+  spatialMotion?: import('../../project/motion/spatial').CameraSpatialMotion;
+
   cameraFollow?: import('../../project/camera/cursor-policy').CameraFollowSettings;
   /** Explicit local camera policy; absence inherits the scene cursor-focus mode. */
   followCursor?: boolean;

@@ -42,19 +42,60 @@ export function parseRuntimeAnimationDocument(value: unknown): AnimationTemplate
   return result.ok ? result.template : null;
 }
 
+const verifiedPackages = new WeakMap<AnimationTemplate, { source: string; digest: string }>();
+const verifiedIndex = new Map<string, WeakRef<AnimationTemplate>>();
+const MAX_VERIFIED_IDENTITIES = 512;
+
+/** Reuse only a completely verified, immutable package with exactly the same source bytes. */
+export function readVerifiedRuntimeAnimationSource(
+  source: unknown,
+  digest: string
+): AnimationTemplate | null {
+  if (typeof source !== 'string' || !isEffectRuntimeImmutableId(digest)) return null;
+  const document = verifiedIndex.get(digest)?.deref();
+  if (!document) {
+    verifiedIndex.delete(digest);
+    return null;
+  }
+  const proof = verifiedPackages.get(document);
+  return proof?.source === source && proof.digest === digest ? document : null;
+}
+function freezeVerifiedPackage(value: unknown): void {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return;
+  for (const child of Object.values(value)) freezeVerifiedPackage(child);
+  Object.freeze(value);
+}
+
 /** Verify all package-local bytes before any image or font decoder can observe them. */
 export async function verifyRuntimeAnimationSource(
   source: unknown,
-  expectedSha256: string
+  expectedSha256: string,
+  signal?: AbortSignal
 ): Promise<AnimationTemplate | null> {
+  signal?.throwIfAborted();
+  const retained = readVerifiedRuntimeAnimationSource(source, expectedSha256);
+  if (retained) return retained;
   if (typeof source !== 'string' || !isEffectRuntimeImmutableId(expectedSha256)) return null;
   const result = parseAnimationTemplateSource(source);
   if (!result.ok) return null;
   const bytes = new TextEncoder().encode(source);
   if (bytes.byteLength > ANIMATION_TEMPLATE_LIMITS.jsonBytes) return null;
   if (bytesToHex(sha256(bytes)) !== expectedSha256) return null;
-  for (const resource of result.template.resources)
+  for (const resource of result.template.resources) {
+    signal?.throwIfAborted();
     if (!(await verifyAnimationResource(resource))) return null;
+  }
+  signal?.throwIfAborted();
+  const completed = readVerifiedRuntimeAnimationSource(source, expectedSha256);
+  if (completed) return completed;
+  freezeVerifiedPackage(result.template);
+  verifiedPackages.set(result.template, { source, digest: expectedSha256 });
+  if (!verifiedIndex.has(expectedSha256) && verifiedIndex.size >= MAX_VERIFIED_IDENTITIES) {
+    const oldest = verifiedIndex.keys().next().value;
+    if (oldest !== undefined) verifiedIndex.delete(oldest);
+  }
+  // Only weak document references and bounded digest metadata survive an owner's disposal.
+  verifiedIndex.set(expectedSha256, new WeakRef(result.template));
   return result.template;
 }
 

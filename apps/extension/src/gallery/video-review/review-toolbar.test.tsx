@@ -302,7 +302,7 @@ it('keeps track settings quiet while preserving active and focus states', async 
   }
 });
 
-it('offers four direct focus types, retains the choice, and preserves admission and busy guards', async () => {
+it('offers five direct focus types, retains the choice, and preserves admission and busy guards', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   const root = createRoot(host);
@@ -310,7 +310,7 @@ it('offers four direct focus types, retains the choice, and preserves admission 
   advanced.ui.mode = 'advanced';
   advanced.ui.tracks.zoom = true;
   let admitted = true;
-  let type: 'zoom' | 'spotlight' | 'lens' | 'border' = 'zoom';
+  let type: 'zoom' | 'spotlight' | 'lens' | 'border' | '3d' = 'zoom';
   const onToggle = vi.fn((next: typeof type) => {
     type = next;
   });
@@ -348,7 +348,13 @@ it('offers four direct focus types, retains the choice, and preserves admission 
         />
       )
     );
-  const options = ['zoomRegionLabel', 'focusSpotlight', 'focusLens', 'focusBorder'] as const;
+  const options = [
+    'zoomRegionLabel',
+    'focusSpotlight',
+    'focusLens',
+    'focus3d',
+    'focusBorder',
+  ] as const;
   const button = (key: (typeof options)[number]) =>
     host.querySelector<HTMLButtonElement>(
       `[aria-label="${translate(`gallery.videoReview.${key}`)}"]`
@@ -356,7 +362,7 @@ it('offers four direct focus types, retains the choice, and preserves admission 
   try {
     await render();
     expect(host.querySelectorAll('[data-ui="gallery.videoReview.focusTools"] button')).toHaveLength(
-      4
+      5
     );
     expect(
       host.querySelector(`[aria-label="${translate('gallery.videoReview.focusType')}"]`)
@@ -364,20 +370,20 @@ it('offers four direct focus types, retains the choice, and preserves admission 
     for (const [index, key] of options.entries()) {
       await act(async () => button(key).click());
       expect(onToggle).toHaveBeenLastCalledWith(
-        (['zoom', 'spotlight', 'lens', 'border'] as const)[index]
+        (['zoom', 'spotlight', 'lens', '3d', 'border'] as const)[index]
       );
       await render(true);
       expect(button(key).getAttribute('aria-pressed')).toBe('true');
     }
     admitted = false;
     await act(async () => button('zoomRegionLabel').click());
-    expect(onToggle).toHaveBeenCalledTimes(4);
-    expect(beforeAction).toHaveBeenCalledTimes(5);
+    expect(onToggle).toHaveBeenCalledTimes(5);
+    expect(beforeAction).toHaveBeenCalledTimes(6);
     admitted = true;
     await render(true, true);
     expect(button('focusLens').disabled).toBe(true);
     await act(async () => button('focusLens').click());
-    expect(onToggle).toHaveBeenCalledTimes(4);
+    expect(onToggle).toHaveBeenCalledTimes(5);
     await render(true);
     await act(async () =>
       host

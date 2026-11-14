@@ -236,7 +236,8 @@ it('overlaps two supported annotation preparations and preserves authored order'
   });
   await vi.waitFor(() => expect(f.requests).toHaveLength(2));
   await f.complete(1);
-  expect(f.requests).toHaveLength(2);
+  await vi.waitFor(() => expect(f.requests).toHaveLength(3));
+  expect(f.requests[2]!.command.sequenceId).toBe(2);
   await f.complete(0);
   await vi.waitFor(() => expect(f.requests).toHaveLength(4));
   await f.complete(3);

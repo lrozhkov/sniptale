@@ -56,64 +56,6 @@ function useFocusEditing({ motionRegion, panel }: FocusProps) {
   };
 }
 
-export function MotionEffectModeField({ motionRegion, panel }: FocusProps) {
-  const kind = motionRegion.border
-    ? 'border'
-    : motionRegion.spotlight?.effect === 'magnify'
-      ? 'lens'
-      : motionRegion.spotlight
-        ? 'spotlight'
-        : 'camera';
-  return (
-    <SegmentedRow<'camera' | 'border' | 'spotlight' | 'lens'>
-      columns={4}
-      layout="stacked"
-      label={translate('gallery.videoReview.focusType')}
-      ariaLabel={translate('gallery.videoReview.focusType')}
-      value={kind}
-      options={[
-        { value: 'camera', label: translate('gallery.videoReview.zoomRegionLabel') },
-        { value: 'border', label: translate('gallery.videoReview.focusBorder') },
-        { value: 'spotlight', label: translate('gallery.videoReview.focusSpotlight') },
-        { value: 'lens', label: translate('gallery.videoReview.focusLens') },
-      ]}
-      onChange={(mode) => {
-        if (mode === kind) return;
-        const focusEdit: MotionFocusEdit =
-          mode === 'camera'
-            ? {
-                kind: kind === 'spotlight' || kind === 'lens' ? 'spotlight' : 'border',
-                enabled: false,
-              }
-            : mode === 'border'
-              ? { kind: 'border', enabled: true }
-              : {
-                  kind: 'spotlight',
-                  enabled: true,
-                  settings:
-                    mode === 'lens'
-                      ? {
-                          effect: 'magnify',
-                          magnification: motionRegion.spotlight?.magnification ?? 2,
-                          lensOptics: motionRegion.spotlight?.lensOptics ?? 'flat',
-                          lensShape: motionRegion.spotlight?.lensShape ?? 'circle',
-                          ...(motionRegion.border
-                            ? {
-                                area: motionRegion.border.area,
-                                roundness: motionRegion.border.roundness,
-                              }
-                            : {}),
-                        }
-                      : { effect: 'dim' },
-                };
-        panel.onUpdateMotionRegion(motionRegion.id, {
-          focusEdit,
-        });
-      }}
-    />
-  );
-}
-
 export function MotionFocusFields(props: FocusProps) {
   const editing = useFocusEditing(props);
   const { motionRegion } = props;

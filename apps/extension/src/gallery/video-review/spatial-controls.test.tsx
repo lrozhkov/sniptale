@@ -118,7 +118,8 @@ it('makes all tools available without enabling authored effects or resetting the
     onReset = vi.fn();
   view.render(
     <ReviewSpatialToolbar
-      tool="position"
+      effect="3d"
+      tool="tilt"
       axis="both"
       disabled={false}
       onTool={onTool}
@@ -133,9 +134,9 @@ it('makes all tools available without enabling authored effects or resetting the
   }
   expect(onTool.mock.calls).toEqual([['tilt'], ['rotation'], ['focus']]);
   onTool.mockClear();
-  expect(button(view.host, 'spatialToolPosition').disabled).toBe(false);
-  expect(button(view.host, 'spatialToolPosition').type).toBe('button');
-  expect(button(view.host, 'spatialToolPosition').getAttribute('aria-pressed')).toBe('true');
+  expect(
+    view.host.querySelector('[aria-label="gallery.videoReview.spatialToolPosition"]')
+  ).toBeNull();
   view.render(
     <ReviewSpatialToolbar
       tool="position"
@@ -146,8 +147,9 @@ it('makes all tools available without enabling authored effects or resetting the
       onReset={onReset}
     />
   );
-  act(() => button(view.host, 'spatialToolTilt').click());
-  expect(onTool).toHaveBeenCalledExactlyOnceWith('tilt');
+  act(() => button(view.host, 'spatialToolPosition').click());
+  expect(onTool).toHaveBeenCalledExactlyOnceWith('position');
+  expect(view.host.querySelector('[aria-label="gallery.videoReview.spatialToolTilt"]')).toBeNull();
   expect(onReset).not.toHaveBeenCalled();
   expect(onAxis).not.toHaveBeenCalled();
 });

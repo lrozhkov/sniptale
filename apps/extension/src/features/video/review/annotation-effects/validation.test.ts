@@ -19,7 +19,12 @@ import type { ReviewAnnotationEffect } from './types';
 const hash = 'a'.repeat(64);
 function source(name: string) {
   return readFileSync(
-    resolve('apps/extension/public/video-effects/animations', `${name}.sniptale-animation.json`),
+    name === 'callout'
+      ? 'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
+      : resolve(
+          'apps/extension/public/video-effects/animations',
+          `${name}.sniptale-animation.json`
+        ),
     'utf8'
   );
 }

@@ -4,27 +4,20 @@ import { parseReviewKeyAnimations } from './action-feedback/key-animation';
 import type { VideoProjectActionFeedback } from './action-feedback/types';
 import { recordingIdForProjectAsset } from './source-interactions';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import { parseCursorMotions, withCursorMotionPath, type CursorMotion } from './cursor-motion';
+import { parseCursorMotions, withCursorMotionPath } from './cursor-motion';
 import {
   parseReviewInteractionTimeline,
   resolveReviewInteractions,
 } from '../review/interaction-timeline';
-import type { ReviewInteractionTimeline } from '../review/interaction-types';
-import type { VideoProject, VideoProjectVideoClip } from './types';
+import type {
+  VideoProject,
+  VideoProjectVideoClip,
+  VideoProjectSourceInteractionDocument,
+} from './types';
 import { getVideoClipSourceTime } from './timeline/rate';
 
-/** Source-clock authoring stays independent from immutable capture facts and current clip placements. */
-export interface VideoProjectSourceInteractionDocument {
-  id: string;
-  binding: { assetId: string; sourceInstanceId: string };
-  cursorMotions: CursorMotion[];
-  cursorEnabled: boolean;
-  timeline: ReviewInteractionTimeline;
-  keyboardEnabled: boolean;
-  mouseEnabled: boolean;
-  actionOverrides?: VideoProjectActionFeedback['actionOverrides'];
-  feedback?: Pick<VideoProjectActionFeedback, 'settings' | 'gestureStyles' | 'keyStyles'>;
-}
+export type { VideoProjectSourceInteractionDocument } from './types/model';
+
 const identity = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0 && value.length <= 256 && value.trim() === value;
 const fields = new Set([

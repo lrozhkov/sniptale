@@ -859,3 +859,71 @@ it('requires audio encoding for active original processing and preserves packet-
     resolveQuickEditExportPlan({ document, advanced, audioProcessingAvailable: true })
   ).toMatchObject({ audio: 'copy' });
 });
+
+it('prepares cursor observations for independent 3D while zoom following remains disabled', async () => {
+  const { createQuickEditZoomRegion } = await import('./zoom');
+  const { evaluateQuickEditCameraAtTime } = await import('./scene');
+  const state = createQuickEditAdvancedState();
+  state.ui.mode = 'advanced';
+  state.ui.tracks.zoom = true;
+  state.cursorFocusPath = {
+    version: 1,
+    mode: 'fixed',
+    smoothing: 0,
+    sensitivity: 0.5,
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'cursor',
+        binding: { kind: 'project' },
+        start: 0,
+        end: 4,
+        keys: [
+          {
+            id: 'left',
+            time: 0,
+            x: 0.1,
+            y: 0.5,
+            anchor: 'manual',
+            authored: true,
+            interpolation: 'linear',
+          },
+          {
+            id: 'right',
+            time: 4,
+            x: 0.9,
+            y: 0.5,
+            anchor: 'manual',
+            authored: true,
+            interpolation: 'linear',
+          },
+        ],
+      },
+    ],
+  };
+  state.zoom = {
+    enabled: true,
+    regions: [
+      {
+        ...createQuickEditZoomRegion({ id: '3d', at: 0, duration: 4 }),
+        effect: '3d',
+        followCursor: false,
+        cursorComposition: { mode: 'orbit', amount: 0.5, smoothness: 0 },
+      },
+    ],
+  };
+  const effective = resolveQuickEditEffectiveState(state);
+  expect(effective.zoomRegions[0]?.cursorFocus).toBeDefined();
+  const left = evaluateQuickEditCameraAtTime(effective.zoomRegions, 1),
+    right = evaluateQuickEditCameraAtTime(effective.zoomRegions, 3);
+  expect(left.scale).toBe(1);
+  expect(right.scale).toBe(1);
+  expect(left.spatial?.rotation).toBeDefined();
+  expect(left.spatial?.rotation).not.toEqual(right.spatial?.rotation);
+  const zero = {
+    ...effective.zoomRegions[0]!,
+    cursorComposition: { mode: 'orbit' as const, amount: 0, smoothness: 0 },
+    perspective: { enabled: true, rotateX: 20, rotateY: 30, rotateZ: 0, strength: 1 },
+  };
+  expect(evaluateQuickEditCameraAtTime([zero], 2).spatial).toBeUndefined();
+});

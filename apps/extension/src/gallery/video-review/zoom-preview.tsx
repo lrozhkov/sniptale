@@ -1,3 +1,4 @@
+import { hasCursorComposition } from '../../features/video/project/motion/spatial';
 import { ReviewPreviewRendererContext } from './use-preview-preferences';
 import { zoomPreviewGpuProjection, type ZoomPreviewGpuInput } from './zoom-preview-gpu';
 import {
@@ -79,7 +80,11 @@ function resolvePreviewInteraction(
   status: ReturnType<typeof useZoomPreviewFrame>['status']
 ) {
   const positionInteractive =
-    !props.disabled && !props.playback && status === 'ready' && !props.cursorFollowing;
+    !props.disabled &&
+    !props.playback &&
+    status === 'ready' &&
+    !props.cursorFollowing &&
+    !(props.region.effect === '3d' && hasCursorComposition(props.region.cursorComposition));
   return {
     positionInteractive,
     spatialInteractive:
@@ -211,6 +216,8 @@ function PreparedZoomPreview(
     region.start,
     region.end,
     region.transform,
+    region.effect,
+    region.spatialMotion,
     region.perspective,
     region.depthOfField,
     region.cursorComposition,
@@ -448,8 +455,11 @@ function ZoomPreviewTools({
   edit: NonNullable<ZoomPreviewProps['spatialEdit']>;
   interactive: boolean;
 }) {
+  if (edit.region.effect === '3d' && hasCursorComposition(edit.region.cursorComposition))
+    return null;
   return (
     <ReviewSpatialToolbar
+      effect={edit.region.effect}
       tool={controls.tool}
       axis={controls.axis}
       disabled={!interactive}
@@ -475,14 +485,23 @@ function usePreviewToolSelection(props: ZoomPreviewProps) {
   const { region } = props;
   const overlay = !!(region.spotlight || region.border);
   const unavailable = !props.spatialEdit || overlay || props.cursorFollowing;
-  const tool = unavailable ? 'position' : selectedTool;
-  const view = overlay
-    ? 'area'
-    : props.cursorFollowing
-      ? followView
-      : tool === 'position'
-        ? zoomView
-        : 'result';
+  const tool: SpatialTool = unavailable
+    ? 'position'
+    : region.effect === '3d'
+      ? selectedTool === 'position'
+        ? 'tilt'
+        : selectedTool
+      : 'position';
+  const view =
+    region.effect === '3d' && hasCursorComposition(region.cursorComposition)
+      ? 'result'
+      : overlay
+        ? 'area'
+        : props.cursorFollowing
+          ? followView
+          : tool === 'position'
+            ? zoomView
+            : 'result';
   return {
     tool,
     axis,

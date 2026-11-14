@@ -65,6 +65,7 @@ type Editing = ReturnType<typeof useReviewEdits>;
 type Exporter = ReturnType<typeof useReviewExport>;
 
 type TimelineBindingProps = {
+  onHoverIntent?: ((starting: boolean) => void) | undefined;
   onHoverTime?: ((time: number | null) => void) | undefined;
   interactionEditor?: import('./interaction-editor').ReviewInteractionEditor;
   onInteractionAdded?(): void;
@@ -140,7 +141,7 @@ type TimelineBindingProps = {
   onClearSelection(): void;
   selectedObject: boolean;
   onComment(annotation: ReviewAnnotation): void;
-  onSeek(value: number): void;
+  onSeek(value: number, snap?: boolean): void;
   onPlay(): void;
   onOpenHistory?(): void;
   onOpenExport(): void;
@@ -306,6 +307,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       >
         <ReviewTimeline
           onHoverTime={props.onHoverTime}
+          onHoverIntent={props.onHoverIntent}
           onHistoryRange={props.onHistoryRange}
           cursorArchiveAvailable={props.cursorArchiveAvailable}
           trackOrder={trackOrder.order}

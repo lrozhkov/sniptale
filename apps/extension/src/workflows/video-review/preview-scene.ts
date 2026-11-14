@@ -224,6 +224,9 @@ export function reviewPreviewPreparationKey(
           ? {
               annotationEffects: {
                 ...annotationEffects,
+                snapshots: annotationEffects.snapshots.map(
+                  ({ source: _source, ...metadata }) => metadata
+                ),
                 lane: {
                   ...annotationEffects.lane,
                   instances: annotationEffects.lane.instances.map(

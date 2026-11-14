@@ -1,4 +1,4 @@
-import * as presentationDocuments from '../../../project/effect-bundle/presentation-document';
+import * as runtimeAnimation from '../../../../../contracts/effect-runtime/animation';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { parseEffectControlValues } from '@sniptale/runtime-contracts/effect-controls';
@@ -445,13 +445,13 @@ it('keeps identical Lottie hold pixels while rendering the authored entrance and
 });
 
 it('retains one admitted immutable document per cached source and re-admits changed sources or context', async () => {
-  const read = vi.spyOn(presentationDocuments, 'readEffectPresentationDocument');
+  const read = vi.spyOn(runtimeAnimation, 'verifyRuntimeAnimationSource');
   const f = fixture();
   const sourcesRead = () => read.mock.calls.map(([value]) => value);
   try {
     const first = frame(await f.prepare());
     first.dispose();
-    // Cold admission reads the signature and the runtime request; cache hits read neither.
+    // Initial admission verifies metadata and payload. Hits verify neither; payload transfer remains guarded.
     expect(sourcesRead()).toEqual([source, source]);
     const moved = frame(await f.prepare(plan(0.01)));
     moved.dispose();

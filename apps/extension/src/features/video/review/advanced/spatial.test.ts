@@ -344,3 +344,91 @@ it('starts an independent Gallery response at the exact source cut without antic
   expect(evaluateCursorOrientation(plan, 2).y).toBeCloseTo(-22, 9);
   expect(evaluateCursorOrientation(plan, 3.99).y).toBeCloseTo(-22, 9);
 });
+
+it('composes independent 3D over zoom framing and suppresses a later overlapping spatial region', async () => {
+  const { resolveQuickEditActiveFocusRegions } = await import('./focus-layout');
+  const zoom = createQuickEditZoomRegion({ id: 'framing', at: 0, duration: 8 });
+  const spatial = {
+    ...createQuickEditZoomRegion({ id: 'spatial', at: 1, duration: 5 }),
+    effect: '3d' as const,
+    perspective: { ...DEFAULT_QUICK_EDIT_PERSPECTIVE, enabled: true, rotateY: 25 },
+  };
+  const duplicate = {
+    ...spatial,
+    id: 'duplicate',
+    start: 2,
+    end: 7,
+    perspective: { ...spatial.perspective, rotateY: -40 },
+  };
+  const regions = [zoom, spatial, duplicate];
+  expect(resolveQuickEditActiveFocusRegions(regions).map((r) => r.id)).toEqual([
+    'framing',
+    'spatial',
+  ]);
+  const frame = evaluateQuickEditCameraAtTime(regions, 3);
+  expect(frame.scale).toBe(evaluateQuickEditCameraAtTime([zoom], 3).scale);
+  expect(frame.spatial?.rotation).toEqual(
+    evaluateQuickEditCameraAtTime([spatial], 3).spatial?.rotation
+  );
+  expect(evaluateQuickEditCameraAtTime(regions, 6.5).spatial).toBeUndefined();
+  expect(regions[2]).toBe(duplicate);
+});
+
+it('links spatial poses through a simultaneous zoom and preserves the drift clock', () => {
+  const a = {
+    ...createQuickEditZoomRegion({ id: '3d-a', at: 0, duration: 2 }),
+    effect: '3d' as const,
+    perspective: { ...DEFAULT_QUICK_EDIT_PERSPECTIVE, enabled: true, rotateY: 30 },
+    spatialMotion: {
+      enabled: true,
+      easing: 'linear' as const,
+      end: { ...DEFAULT_QUICK_EDIT_PERSPECTIVE, enabled: true, rotateY: 10 },
+    },
+    linkTo: '3d-b',
+  };
+  const { linkTo: _link, spatialMotion: _motion, ...retained } = a;
+  const b = {
+    ...retained,
+    id: '3d-b',
+    start: 4,
+    end: 6,
+    perspective: { ...a.perspective, rotateY: -20 },
+  };
+  const zoom = createQuickEditZoomRegion({ id: 'zoom', at: 0, duration: 6 });
+  const frame = evaluateQuickEditCameraAtTime([a, zoom, b], 3);
+  expect(frame.scale).toBe(zoom.transform.scale);
+  expect(frame.spatial).toBeDefined();
+  expect(frame.spatial?.rotation).not.toEqual(
+    evaluateQuickEditCameraAtTime([a, zoom], 3).spatial?.rotation
+  );
+});
+
+it('retains the spatial motion clock across source cuts and rate projection', async () => {
+  const { projectReviewFocus } = await import('../focus-edits');
+  const { cameraSpatialMotionPose } = await import('../../project/motion/spatial');
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'flight', at: 0, duration: 6 }),
+    effect: '3d' as const,
+    sourceAnchor: { start: 0, end: 6 },
+    perspective: { ...DEFAULT_QUICK_EDIT_PERSPECTIVE, enabled: true, rotateY: 30 },
+    spatialMotion: {
+      enabled: true,
+      easing: 'linear' as const,
+      end: { ...DEFAULT_QUICK_EDIT_PERSPECTIVE, enabled: true, rotateY: -30 },
+    },
+    enter: { type: 'none' as const, duration: 0 },
+    exit: { type: 'none' as const, duration: 0 },
+  };
+  const projected = projectReviewFocus(
+    [region],
+    [
+      { kind: 'keep', sourceStart: 0, sourceEnd: 2, resultStart: 0, resultEnd: 2, rate: 1 },
+      { kind: 'cut', sourceStart: 2, sourceEnd: 4, resultStart: 2, resultEnd: 2, rate: 1 },
+      { kind: 'speed', sourceStart: 4, sourceEnd: 6, resultStart: 2, resultEnd: 3, rate: 2 },
+    ]
+  );
+  const expected = interpolateQuickEditSpatial(null, cameraSpatialMotionPose(region, 5 / 6), 1);
+  expect(evaluateQuickEditCameraAtTime(projected, 2.5).spatial?.rotation).toEqual(
+    expected.rotation
+  );
+});

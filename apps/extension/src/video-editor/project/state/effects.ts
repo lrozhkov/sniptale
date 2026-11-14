@@ -587,6 +587,7 @@ function mergeMotionRegionProperties(
     perspective: _perspective,
     depthOfField: _depth,
     spatialReference: _reference,
+    spatialMotion: _motion,
     ...withoutSpatial
   } = transition ?? region;
   let updated = {
@@ -595,6 +596,7 @@ function mergeMotionRegionProperties(
     ...(spatial?.perspective ? { perspective: spatial.perspective } : {}),
     ...(spatial?.depthOfField ? { depthOfField: spatial.depthOfField } : {}),
     ...(spatial?.spatialReference ? { spatialReference: spatial.spatialReference } : {}),
+    ...(spatial?.spatialMotion ? { spatialMotion: spatial.spatialMotion } : {}),
     ...properties,
     ...(phases ? { motionBlur: phases } : {}),
   };
@@ -655,9 +657,11 @@ function updateMotionRegionSource(
   } else if (sourceClipId !== undefined && sourceClipId !== region.sourceBinding?.clipId) {
     const bindingRegion =
       focusEdit?.enabled === true
-        ? focusEdit.kind === 'spotlight'
-          ? { ...updated, spotlight: updated.spotlight ?? createQuickEditSpotlight() }
-          : { ...updated, border: updated.border ?? createQuickEditBorder() }
+        ? focusEdit.kind === '3d'
+          ? { ...updated, effect: '3d' as const }
+          : focusEdit.kind === 'spotlight'
+            ? { ...updated, spotlight: updated.spotlight ?? createQuickEditSpotlight() }
+            : { ...updated, border: updated.border ?? createQuickEditBorder() }
         : updated;
     const source = getMotionBindingCandidates(project, bindingRegion).find(
       (item) => item.id === sourceClipId

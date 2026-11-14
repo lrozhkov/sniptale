@@ -151,6 +151,7 @@ export function useStagePresentation(
     preferences: props.preview?.preferences ?? DEFAULT_QUICK_PREVIEW_PREFERENCES,
     playing: props.preview?.playing ?? false,
     interacting: interacting || !!props.preview?.interacting,
+    annotationMovement: props.annotationEditing?.editor.movement,
     annotationGesture: props.annotationEditing?.editor.lane?.instances.find(
       (entry) => entry.id === props.annotationEditing?.editor.gestureId
     ),

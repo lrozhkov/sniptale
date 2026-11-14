@@ -1,3 +1,4 @@
+import type { ReviewAnnotationMovement } from './annotation-effects-editor';
 import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
 import type {
   PreviewRendererStatus,
@@ -41,6 +42,7 @@ export interface PresentationInput {
   interacting?: boolean;
   /** Committed baseline of the one annotation being edited by the active pointer gesture. */
   annotationGesture?: ReviewAnnotationEffect | undefined;
+  annotationMovement?: ReviewAnnotationMovement | undefined;
   /** A paused inspector draft retains the displayed frame while its smaller preview renders. */
   deferFrames?: boolean;
   visible?: boolean;
@@ -71,6 +73,7 @@ export interface ReviewPreviewPresentationStatus {
 }
 
 export type Description = {
+  annotationMove?: { instance: ReviewAnnotationEffect; baseline: Scene } | undefined;
   interactionKey?: PreviewSceneKey | undefined;
   renderer?: VideoPreviewRenderer;
   scene: Scene;

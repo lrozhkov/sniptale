@@ -143,7 +143,7 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
             props.instances.some((instance) => instance.snapshotId === snapshot.id)
           )
           .map((snapshot) => {
-            const document = readReviewAnnotationEffectDocument(snapshot.source);
+            const document = readReviewAnnotationEffectDocument(snapshot.source, snapshot.sha256);
             return [
               snapshot.id,
               document?.label[locale] ??

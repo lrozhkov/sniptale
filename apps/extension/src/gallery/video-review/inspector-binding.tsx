@@ -838,6 +838,7 @@ function ReviewSelectionBinding({
         editor={state.annotationEffects}
         id={state.activeSelection.id}
         source={snapshot?.source}
+        sourceDigest={snapshot?.sha256}
         duration={resource.source.duration}
         busy={state.busy || state.editing.exporter.phase !== 'idle'}
       />

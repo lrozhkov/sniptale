@@ -477,7 +477,7 @@ export function planReviewProjectConversion(args: {
         binding: { kind: 'source', assetId: asset.id, sourceInstanceId: timeline.sourceInstanceId },
       })),
     };
-    project.version = 54;
+    if (project.version < 54) project.version = 54;
   }
   project.cursorTrack = materializeVideoProjectCursorSourceObservations(project);
   if (document.advancedContent.cursorFocusPath && recordingId) {

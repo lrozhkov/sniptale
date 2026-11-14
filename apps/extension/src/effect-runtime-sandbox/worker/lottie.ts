@@ -263,6 +263,7 @@ export async function createLottieFrameRenderer(template: AnimationTemplate) {
   let player: DotLottie | null = null;
   let disposed = false;
   let revision: string | null = null;
+  let viewportRevision: string | null = null;
   return {
     async render(request: {
       time: number;
@@ -478,28 +479,40 @@ export async function createLottieFrameRenderer(template: AnimationTemplate) {
         }
         player = candidate;
         revision = nextRevision;
+        viewportRevision = null;
       }
       if (!player) throw new Error('Lottie animation is unavailable.');
       if (canvas.width !== request.width || canvas.height !== request.height) {
         canvas.width = request.width;
         canvas.height = request.height;
         player.resize();
+        viewportRevision = null;
       }
-      if (
-        !player.setViewport(0, 0, request.width, request.height) ||
-        !player.setTransform([
-          request.width / bounds.width,
-          0,
-          0,
-          0,
-          request.height / bounds.height,
-          0,
-          0,
-          0,
-          1,
-        ])
-      )
-        throw new Error('Lottie viewport geometry is unavailable.');
+      const nextViewport = JSON.stringify([
+        request.width,
+        request.height,
+        bounds.width,
+        bounds.height,
+      ]);
+      // setTransform renders immediately in dotLottie; unchanged geometry must not repaint the old frame.
+      if (viewportRevision !== nextViewport) {
+        if (
+          !player.setViewport(0, 0, request.width, request.height) ||
+          !player.setTransform([
+            request.width / bounds.width,
+            0,
+            0,
+            0,
+            request.height / bounds.height,
+            0,
+            0,
+            0,
+            1,
+          ])
+        )
+          throw new Error('Lottie viewport geometry is unavailable.');
+        viewportRevision = nextViewport;
+      }
       // dotLottie uses a frame index relative to ip; the core applies the source in-point.
       player.setFrame(animationRuntimeFrameIndex({ fr, ip, op }, request.time));
       signal.throwIfAborted();

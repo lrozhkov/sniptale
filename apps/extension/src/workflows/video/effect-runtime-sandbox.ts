@@ -39,6 +39,7 @@ export function createEffectRuntimeSandboxExecutor(
   let frameReuseContext = {};
   let disposed = false;
   let foregroundUsed = false;
+  let foregroundPending = 0;
   type WarmSession = {
     manager: EffectRuntimeSandboxSessionManager;
     pending: number;
@@ -46,6 +47,7 @@ export function createEffectRuntimeSandboxExecutor(
     closed: boolean;
     retired: boolean;
     adopted: boolean;
+    canAdopt?: () => boolean;
   };
   let standby: WarmSession | undefined;
   const retire = (warm: WarmSession | undefined) => {
@@ -55,22 +57,38 @@ export function createEffectRuntimeSandboxExecutor(
     warm.manager.dispose();
   };
   const foreground = () => {
-    if (!foregroundUsed && !disposed) {
-      foregroundUsed = true;
+    if (!disposed) {
       const warm = standby;
-      if (warm?.ready && !warm.pending && !warm.retired) {
-        standby = undefined;
-        warm.adopted = true;
-        manager.dispose();
-        manager = warm.manager;
-        // Before the first foreground request, the owned standby is the same admitted content session.
-        observedFrameContext = manager.gpuFrameReuseContext;
-      } else retire(warm);
+      const eligible = warm && (!foregroundUsed || warm.canAdopt?.());
+      if (eligible && foregroundPending === 0) {
+        if (warm.ready && !warm.pending && !warm.retired) {
+          standby = undefined;
+          warm.adopted = true;
+          manager.dispose();
+          manager = warm.manager;
+          // Completed pixels and immutable metadata belong to the parent, not the replaced worker.
+          observedFrameContext = manager.gpuFrameReuseContext;
+        } else retire(warm);
+      }
+      foregroundUsed = true;
     }
     return manager;
   };
-  const createWarmExecutor = (): EffectRuntimeSandboxExecutor | undefined => {
-    if (disposed || foregroundUsed || (standby && !standby.closed)) return undefined;
+  const runForeground = async <T>(
+    run: (owner: EffectRuntimeSandboxSessionManager) => Promise<T>
+  ): Promise<T> => {
+    const owner = foreground();
+    foregroundPending++;
+    try {
+      return await run(owner);
+    } finally {
+      foregroundPending--;
+    }
+  };
+  const createWarmExecutor = (
+    canAdopt?: () => boolean
+  ): EffectRuntimeSandboxExecutor | undefined => {
+    if (disposed || (foregroundUsed && !canAdopt) || (standby && !standby.closed)) return undefined;
     retire(standby);
     const warm: WarmSession = {
       manager: createManager(),
@@ -79,6 +97,7 @@ export function createEffectRuntimeSandboxExecutor(
       closed: false,
       retired: false,
       adopted: false,
+      ...(canAdopt ? { canAdopt } : {}),
     };
     standby = warm;
     warm.manager.preload();
@@ -148,10 +167,10 @@ export function createEffectRuntimeSandboxExecutor(
             if (!disposed) manager.preload();
           },
           prepareGpuFrame: (request: EffectRuntimeRenderCommand, signal?: AbortSignal) =>
-            foreground().prepareGpuFrame(request, signal),
+            runForeground((owner) => owner.prepareGpuFrame(request, signal)),
         }
       : {}),
-    renderFrame: (request) => foreground().renderFrame(request),
+    renderFrame: (request) => runForeground((owner) => owner.renderFrame(request)),
   };
 }
 

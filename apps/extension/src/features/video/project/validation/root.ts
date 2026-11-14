@@ -171,6 +171,7 @@ function minimumClipSchemaVersion(value: unknown): number {
 /** Minimum schema for motion fields. Shape admission remains with the motion parser. */
 function minimumMotionSchemaVersion(value: unknown): number {
   if (!isRecord(value)) return 2;
+  if (value['effect'] !== undefined || value['spatialMotion'] !== undefined) return 55;
   if (value['cursorComposition'] !== undefined) return 51;
   if (requiresExtendedBorderSchema(value['border'])) return 48;
   if (value['spotlightTarget'] === 'source-scene') return 39;
@@ -202,7 +203,7 @@ function minimumMotionSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 54) &&
+    isBoundedNumber(version, 2, 55) &&
     Number.isInteger(version) &&
     (version >= 54 || value['sourceInteractionDocuments'] === undefined) &&
     (version >= 54 ||

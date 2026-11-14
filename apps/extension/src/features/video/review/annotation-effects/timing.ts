@@ -57,14 +57,23 @@ export function resolveUpcomingReviewAnnotationEffectSlice<
 >(
   instances: readonly T[],
   segments: readonly ReviewTimeSegment[],
-  resultTime: number
+  resultTime: number,
+  lookaheadSeconds = 1
 ): { instance: T; start: number; end: number } | null {
-  if (!Number.isFinite(resultTime)) return null;
+  if (
+    !Number.isFinite(resultTime) ||
+    !Number.isFinite(lookaheadSeconds) ||
+    lookaheadSeconds <= 0 ||
+    lookaheadSeconds > 2
+  )
+    return null;
   const candidates = instances
     .filter((instance) => instance.enabled)
     .flatMap((instance) =>
       projectReviewAnnotationEffect(instance, segments)
-        .slices.filter((slice) => slice.start > resultTime && slice.start <= resultTime + 1)
+        .slices.filter(
+          (slice) => slice.start > resultTime && slice.start <= resultTime + lookaheadSeconds
+        )
         .map(({ start, end }) => ({ instance, start, end }))
     );
   candidates.sort(

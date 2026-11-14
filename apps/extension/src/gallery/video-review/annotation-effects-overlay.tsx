@@ -1,3 +1,6 @@
+import { measureReviewAnnotationBody } from '../../workflows/video-review/annotation-body-bounds';
+import { createEffectRuntimeSandboxExecutor } from '../../workflows/video/effect-runtime-sandbox';
+import { resolveReviewAnnotationEffectControls } from '../../features/video/review/annotation-effects/layout';
 import { animationRuntimeDuration } from '../../contracts/effect-runtime/animation';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -25,6 +28,8 @@ import { projectQuickEditPoint } from '../../features/video/composition/motion/s
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import {
   reviewAnnotationBodyGeometry,
+  setReviewAnnotationBodyBounds,
+  reviewAnnotationBodyMeasurementKey,
   previewReviewAnnotationDrag,
   reviewAnnotationPlanePoint,
   type ReviewAnnotationGeometry,
@@ -57,7 +62,7 @@ type Drag = {
   geometry: ReviewAnnotationGeometry;
   start: Point;
   point: Point;
-  kind: 'move' | 'resize' | 'rotate' | { anchor: string };
+  kind: Parameters<typeof previewReviewAnnotationDrag>[0]['kind'];
   node: SVGSVGElement;
   pointerId: number;
   admission: ReturnType<typeof deferReviewGesture> | null;
@@ -97,18 +102,119 @@ export function ReviewAnnotationOverlay({
   const latest = useRef(binding);
   latest.current = binding;
   const drag = useRef<Drag | null>(null);
+  const [movement, setMovement] = useState<ReviewAnnotationEffect | null>(null);
+  const channel = binding.editor.movement;
+  useEffect(
+    () =>
+      channel?.subscribe((value) => {
+        setMovement(value);
+      }),
+    [channel]
+  );
   const [guides, setGuides] = useState<AnnotationMagnetGuide[]>([]);
   const previewLatest = useRef<(current: Drag) => void>(() => undefined);
-  const documents = useMemo(
-    () =>
-      new Map(
-        binding.snapshots.map((snapshot) => [
-          snapshot.id,
-          readReviewAnnotationEffectDocument(snapshot.source),
-        ])
-      ),
-    [binding.snapshots]
+  const parsedDocuments = useRef(
+    new Map<string, { source: string; document: AnimationTemplate | null }>()
   );
+  const documents = useMemo(() => {
+    const result = new Map<string, AnimationTemplate | null>();
+    for (const snapshot of binding.snapshots) {
+      let cached = parsedDocuments.current.get(snapshot.id);
+      if (!cached || cached.source !== snapshot.source) {
+        cached = {
+          source: snapshot.source,
+          document: readReviewAnnotationEffectDocument(snapshot.source, snapshot.sha256),
+        };
+        parsedDocuments.current.set(snapshot.id, cached);
+      }
+      result.set(snapshot.id, cached.document);
+    }
+    for (const id of parsedDocuments.current.keys())
+      if (!result.has(id)) parsedDocuments.current.delete(id);
+    return result;
+  }, [binding.snapshots]);
+  const [, refreshBody] = useState(0);
+  const bodyCache = useRef(binding.editor.bodyMeasurements);
+  const selectedBody = binding.editor.previewLane?.instances.find(
+    (item) => item.id === binding.selectedId
+  );
+  const bodyDocument = selectedBody && documents.get(selectedBody.snapshotId);
+  const bodyControls =
+    selectedBody && bodyDocument
+      ? resolveReviewAnnotationEffectControls(
+          bodyDocument,
+          selectedBody,
+          geometry[selectedBody.attachment]
+        )
+      : null;
+  const bodyKey =
+    selectedBody && bodyControls
+      ? reviewAnnotationBodyMeasurementKey(selectedBody, bodyControls)
+      : null;
+  const cachedBody = bodyKey ? bodyCache.current.get(bodyKey) : undefined;
+  if (selectedBody && bodyDocument && cachedBody)
+    setReviewAnnotationBodyBounds(bodyDocument, selectedBody.id, cachedBody);
+  const bodyId = selectedBody?.id;
+  const bodyGesture = binding.editor.gestureId;
+  const bodyRequest = useRef({
+    instance: selectedBody,
+    document: bodyDocument,
+    controls: bodyControls,
+    key: bodyKey,
+    snapshot: binding.snapshots.find((item) => item.id === selectedBody?.snapshotId),
+  });
+  bodyRequest.current = {
+    instance: selectedBody,
+    document: bodyDocument,
+    controls: bodyControls,
+    key: bodyKey,
+    snapshot: binding.snapshots.find((item) => item.id === selectedBody?.snapshotId),
+  };
+  useEffect(() => {
+    // Content key, immutable document, identity and gesture phase own this asynchronous measurement.
+    // Root rerenders must not abort/restart it merely because their binding objects changed.
+    const { instance, document, controls, key, snapshot } = bodyRequest.current;
+    if (
+      !instance ||
+      !document ||
+      !controls ||
+      !key ||
+      bodyGesture ||
+      typeof OffscreenCanvas === 'undefined'
+    )
+      return;
+    const cached = bodyCache.current.get(key);
+    if (cached) {
+      setReviewAnnotationBodyBounds(document, instance.id, cached);
+      refreshBody((value) => value + 1);
+      return;
+    }
+    if (!snapshot) return;
+    const controller = new AbortController();
+    const executor = createEffectRuntimeSandboxExecutor({ compositionBackend: 'gpu-preview' });
+    void measureReviewAnnotationBody({
+      executor,
+      snapshot,
+      document,
+      controls,
+      signal: controller.signal,
+    })
+      .then((bounds) => {
+        if (!bounds || controller.signal.aborted) return;
+        if (bodyCache.current.size >= 32) bodyCache.current.clear();
+        bodyCache.current.set(key, bounds);
+        setReviewAnnotationBodyBounds(document, instance.id, bounds);
+        refreshBody((value) => value + 1);
+        latest.current.editor.refreshBodyGeometry();
+      })
+      .catch(() => undefined)
+      .finally(() => executor.dispose());
+    return () => {
+      controller.abort();
+      executor.dispose();
+    };
+  }, [bodyDocument, bodyKey, bodyId, bodyGesture]);
+
   const cancel = () => {
     const current = drag.current;
     drag.current = null;
@@ -161,7 +267,11 @@ export function ReviewAnnotationOverlay({
       setGuides(snapped.guides);
       patch.transform = snapped.transform;
     }
-    if (patch) latest.current.editor.previewGesture(patch);
+    if (patch) {
+      const editor = latest.current.editor;
+      if (!(patch.transform && editor.previewMovement?.(patch.transform)))
+        editor.previewGesture(patch);
+    }
   };
   previewLatest.current = preview;
   const begin = (
@@ -247,9 +357,10 @@ export function ReviewAnnotationOverlay({
       y: start.y + (event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0),
     };
     if (kind === 'rotate') {
-      const plane = geometry[instance.attachment];
-      const cx = (instance.transform.x + instance.transform.width / 2) * plane.width,
-        cy = (instance.transform.y + instance.transform.height / 2) * plane.height;
+      const center = reviewAnnotationBodyGeometry(instance, document, geometry)?.center;
+      if (!center) return;
+      const cx = center.x,
+        cy = center.y;
       const angle =
         ((event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -step : step) * Math.PI) / 180;
       const dx = start.x - cx,
@@ -388,7 +499,8 @@ export function ReviewAnnotationOverlay({
           />
         ))}
       </g>
-      {binding.editor.previewLane?.instances.map((instance) => {
+      {binding.editor.previewLane?.instances.map((entry) => {
+        const instance = movement?.id === entry.id ? movement : entry;
         const document = documents.get(instance.snapshotId);
         if (
           !document ||
@@ -402,32 +514,71 @@ export function ReviewAnnotationOverlay({
         const body = reviewAnnotationBodyGeometry(instance, document, geometry);
         if (!body) return null;
         const selected = binding.selectedId === instance.id;
-        const resize = body.corners[2];
         const top = body.corners[0],
           right = body.corners[1];
         const rotate =
           top && right ? { x: (top.x + right.x) / 2, y: (top.y + right.y) / 2 - ry * 4 } : null;
         const label = resolveEffectLocaleText(document.label, locale);
-        const handle = (point: Point, kind: Drag['kind'], name: string, key: string) => (
-          <ellipse
-            key={key}
-            data-handle={key}
-            role="button"
-            tabIndex={binding.busy ? -1 : 0}
-            aria-label={name}
-            aria-disabled={binding.busy || binding.editor.pending}
-            cx={point.x}
-            cy={point.y}
-            rx={rx}
-            ry={ry}
-            fill="var(--sniptale-color-surface-panel)"
-            stroke="var(--sniptale-color-accent)"
-            vectorEffect="non-scaling-stroke"
-            className="pointer-events-auto"
-            onPointerDown={(event) => begin(event, instance, document, kind)}
-            onKeyDown={(event) => keyboard(event, instance, document, kind, point)}
-          />
-        );
+        const handle = (point: Point, kind: Drag['kind'], name: string, key: string) => {
+          const resizing = kind === 'resize' || (typeof kind === 'object' && 'resize' in kind);
+          const anchor = typeof kind === 'object' && 'anchor' in kind;
+          let display = point;
+          if (resizing) {
+            const center = {
+              x: body.corners.reduce((sum, p) => sum + p.x, 0) / 4,
+              y: body.corners.reduce((sum, p) => sum + p.y, 0) / 4,
+            };
+            const dx = ((point.x - center.x) * size.width) / geometry.viewport.width;
+            const dy = ((point.y - center.y) * size.height) / geometry.viewport.height;
+            const length = Math.hypot(dx, dy);
+            if (length > 0)
+              display = {
+                x: point.x + ((dx / length) * 6 * geometry.viewport.width) / size.width,
+                y: point.y + ((dy / length) * 6 * geometry.viewport.height) / size.height,
+              };
+          }
+          const Tag = resizing ? 'rect' : 'ellipse';
+          return (
+            <Tag
+              key={key}
+              data-handle={key}
+              role="button"
+              tabIndex={binding.busy ? -1 : 0}
+              aria-label={name}
+              aria-disabled={binding.busy || binding.editor.pending}
+              {...(resizing
+                ? {
+                    x: display.x - rx * 0.8,
+                    y: display.y - ry * 0.8,
+                    width: rx * 1.6,
+                    height: ry * 1.6,
+                  }
+                : { cx: display.x, cy: display.y })}
+              rx={resizing ? rx / 5 : rx}
+              ry={resizing ? ry / 5 : ry}
+              fill={anchor ? 'var(--sniptale-color-accent)' : 'var(--sniptale-color-surface-panel)'}
+              stroke={
+                anchor ? 'var(--sniptale-color-surface-panel)' : 'var(--sniptale-color-accent)'
+              }
+              vectorEffect="non-scaling-stroke"
+              className="pointer-events-auto"
+              style={{
+                cursor:
+                  kind === 'rotate'
+                    ? 'grab'
+                    : anchor
+                      ? 'move'
+                      : typeof kind === 'object' && (kind.resize === 1 || kind.resize === 3)
+                        ? 'nesw-resize'
+                        : 'nwse-resize',
+              }}
+              onPointerDown={(event) => begin(event, instance, document, kind)}
+              onKeyDown={(event) => keyboard(event, instance, document, kind, display)}
+            >
+              <title>{name}</title>
+            </Tag>
+          );
+        };
         return (
           <g
             key={instance.id}
@@ -449,7 +600,7 @@ export function ReviewAnnotationOverlay({
               stroke={selected ? 'var(--sniptale-color-accent)' : 'transparent'}
               strokeWidth={1.5}
               vectorEffect="non-scaling-stroke"
-              className="pointer-events-auto"
+              className="pointer-events-auto cursor-move"
               onPointerDown={(event) => begin(event, instance, document, 'move')}
               onKeyDown={(event) => {
                 const point = body.corners[0];
@@ -457,8 +608,32 @@ export function ReviewAnnotationOverlay({
               }}
             />
             {selected &&
-              resize &&
-              handle(resize, 'resize', translate('gallery.videoReview.annotationResize'), 'resize')}
+              body.corners.map((point, index) => {
+                if (index === 2)
+                  return handle(
+                    point,
+                    'resize',
+                    translate('gallery.videoReview.annotationResize'),
+                    'resize'
+                  );
+                if (index !== 0 && index !== 1 && index !== 3) return null;
+                return handle(
+                  point,
+                  { resize: index },
+                  translate('gallery.videoReview.annotationResize'),
+                  `resize-${index}`
+                );
+              })}
+            {selected && rotate && top && right ? (
+              <line
+                x1={(top.x + right.x) / 2}
+                y1={(top.y + right.y) / 2}
+                x2={rotate.x}
+                y2={rotate.y}
+                stroke="var(--sniptale-color-accent)"
+                vectorEffect="non-scaling-stroke"
+              />
+            ) : null}
             {selected &&
               rotate &&
               handle(rotate, 'rotate', translate('gallery.videoReview.annotationRotate'), 'rotate')}

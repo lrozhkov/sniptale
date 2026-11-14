@@ -432,7 +432,7 @@ it('adds empty capture and native revision stores without rewriting version 39 r
   expect(
     PERSISTENCE_DOMAIN_REGISTRY.find((domain) => domain.domainId === 'videoProjects')
   ).toMatchObject({
-    schemaVersion: 12,
+    schemaVersion: 13,
     stores: expect.arrayContaining([
       { storeName: 'video_project_revisions', dataClass: 'durable-authority' },
     ]),

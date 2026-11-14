@@ -1,3 +1,4 @@
+import { ReviewPlaybackPresentationClockContext } from './playback-presentation-clock';
 import { useReviewLiveSeek } from './use-live-seek';
 import { Magnet, ScanLine } from 'lucide-react';
 import { ReviewButton, reviewIconButtonClassName } from './controls';
@@ -37,7 +38,7 @@ import { ReviewLoadStatus, reviewErrorMessage } from './feedback';
 import { ReviewDialog } from './review-dialog';
 import { ReviewHistoryControls } from './timeline-chrome';
 import { reviewSelectionLabel } from './selected-properties';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { translate, useAppLocale, usePageLocaleMetadata } from '../../platform/i18n';
 import { useReviewWaveforms } from './audio-waveform';
 import { ReviewTimelineBinding } from './timeline-binding';
@@ -171,6 +172,15 @@ function ReviewEditor({
     previewSettings.raster,
     state.playing || state.busy || state.editing.exporter.phase !== 'idle' || !editorReady
   );
+  const reportPresentedTime = state.onPresentedTime;
+  const reportHoverPresentedTime = liveSeek.onPresentedTime;
+  const onLiveSeekPresented = useCallback(
+    (identity: string, time: number) => {
+      reportPresentedTime(identity, time);
+      if (identity === resource.url) reportHoverPresentedTime(time);
+    },
+    [reportPresentedTime, resource.url, reportHoverPresentedTime]
+  );
   const { onImportAudioFile, voiceover } = useReviewAudioWiring(state);
   const navigationState = useReviewEditorNavigation(state, voiceover.recording);
   const { navigation, requestExport, historyCommands, trackNavigation } = navigationState;
@@ -216,205 +226,216 @@ function ReviewEditor({
       visible={navigation.shown === 'selected' && !voiceover.recording}
       disabled={busy || editing.exporter.phase !== 'idle'}
     >
-      <ReviewPreviewRendererContext.Provider value={previewPreferences.preferences.renderer}>
-        <ReviewEditorPresentationDialog preview={joinPreview} />
-        <div
-          ref={panels.container}
-          data-ui="gallery.videoReview.workspace"
-          style={{
-            ...workspaceColor.style,
-            gridTemplateColumns: `minmax(0,1fr) ${panels.inspectorWidth}px`,
-            gridTemplateRows: `minmax(0,1fr) ${timelineRow}`,
-          }}
-          className="grid h-full min-h-0 min-w-[1254px]"
-        >
-          <div className="contents" inert={voiceover.recording}>
-            <ReviewPreviewBinding
-              annotationMagnetEnabled={annotationMagnetEnabled}
-              previewOverlay={
-                <canvas
-                  ref={liveSeek.canvas}
-                  hidden={!liveSeek.visible}
-                  data-ui="gallery.videoReview.liveSeekFrame"
-                  data-time={liveSeek.time ?? undefined}
-                  className="pointer-events-none absolute inset-0 z-30 h-full w-full"
-                />
+      <ReviewPlaybackPresentationClockContext.Provider value={state.playheadClock}>
+        <ReviewPreviewRendererContext.Provider value={previewPreferences.preferences.renderer}>
+          <ReviewEditorPresentationDialog preview={joinPreview} />
+          <div
+            ref={panels.container}
+            data-ui="gallery.videoReview.workspace"
+            style={{
+              ...workspaceColor.style,
+              gridTemplateColumns: `minmax(0,1fr) ${panels.inspectorWidth}px`,
+              gridTemplateRows: `minmax(0,1fr) ${timelineRow}`,
+            }}
+            className="grid h-full min-h-0 min-w-[1254px]"
+          >
+            <div className="contents" inert={voiceover.recording}>
+              <ReviewPreviewBinding
+                annotationMagnetEnabled={annotationMagnetEnabled}
+                previewOverlay={
+                  <canvas
+                    ref={liveSeek.canvas}
+                    hidden={!liveSeek.visible}
+                    data-ui="gallery.videoReview.liveSeekFrame"
+                    data-time={liveSeek.time ?? undefined}
+                    className="pointer-events-none absolute inset-0 z-30 h-full w-full"
+                  />
+                }
+                onOpenPreviewSettings={navigation.openPreview}
+                previewPreferences={previewPreferences.preferences}
+                onPreviewRaster={previewSettings.setRaster}
+                onPreviewRendererStatus={previewSettings.setRendererStatus}
+                resource={resource}
+                state={{ ...state, onPresentedTime: onLiveSeekPresented }}
+                sceneActive={
+                  features.mode === 'advanced' &&
+                  navigation.shown === 'track' &&
+                  trackNavigation.track === 'source' &&
+                  trackNavigation.tab === 'settings'
+                }
+              />
+            </div>
+            <ReviewInspectorBinding
+              onProject={() => {
+                if (voiceover.recording) voiceover.requestClose.current?.();
+                else trackNavigation.back();
+              }}
+              backLabel={trackNavigation.backLabel}
+              inspectorTrack={trackNavigation.track}
+              trackTab={trackNavigation.tab}
+              onTrackTab={trackNavigation.setTab}
+              onRenameProject={projectCommands.rename}
+              recording={
+                voiceover.recording ? <ReviewVoiceoverLayer voiceover={voiceover} /> : undefined
               }
-              onOpenPreviewSettings={navigation.openPreview}
-              previewPreferences={previewPreferences.preferences}
-              onPreviewRaster={previewSettings.setRaster}
-              onPreviewRendererStatus={previewSettings.setRendererStatus}
+              onJoinPreview={onJoinPreview ?? joinPreview.open}
+              preview={previewSettings.inspector}
+              navigation={navigation}
+              resizeHandle={
+                panelsEnabled ? <ReviewPanelResizeHandle resize={panels.inspector} /> : null
+              }
+              fullHeight={fullHeight || voiceover.recording}
+              onToggleHeight={() => setFullHeight((value) => !value)}
               resource={resource}
               state={state}
-              sceneActive={
-                features.mode === 'advanced' &&
-                navigation.shown === 'track' &&
-                trackNavigation.track === 'source' &&
-                trackNavigation.tab === 'settings'
-              }
-            />
-          </div>
-          <ReviewInspectorBinding
-            onProject={() => {
-              if (voiceover.recording) voiceover.requestClose.current?.();
-              else trackNavigation.back();
-            }}
-            backLabel={trackNavigation.backLabel}
-            inspectorTrack={trackNavigation.track}
-            trackTab={trackNavigation.tab}
-            onTrackTab={trackNavigation.setTab}
-            onRenameProject={projectCommands.rename}
-            recording={
-              voiceover.recording ? <ReviewVoiceoverLayer voiceover={voiceover} /> : undefined
-            }
-            onJoinPreview={onJoinPreview ?? joinPreview.open}
-            preview={previewSettings.inspector}
-            navigation={navigation}
-            resizeHandle={
-              panelsEnabled ? <ReviewPanelResizeHandle resize={panels.inspector} /> : null
-            }
-            fullHeight={fullHeight || voiceover.recording}
-            onToggleHeight={() => setFullHeight((value) => !value)}
-            resource={resource}
-            state={state}
-            canvasComments={canvasComments}
-            audio={audio}
-            onBack={onBack}
-            onClose={onClose}
-          />
-          <div
-            inert={voiceover.recording}
-            ref={panels.timeline}
-            className={
-              `relative ${voiceover.recording ? 'opacity-50' : ''} ` +
-              (fullHeight || voiceover.recording
-                ? 'col-start-1 row-start-2 min-h-0 min-w-0'
-                : 'col-span-full min-h-0 min-w-0')
-            }
-          >
-            {panelsEnabled ? <ReviewPanelResizeHandle resize={panels.timelineResize} /> : null}
-            <ReviewTimelineBinding
-              onHoverTime={liveSeek.hover}
-              interactionEditor={state.interactionEditor}
-              onInteractionAdded={() => navigation.setSection('selected')}
-              cursorMotion={state.cursorMotion}
-              onOpenProject={trackNavigation.openProject}
-              onOpenTrack={trackNavigation.openTrack}
-              onTrackChange={trackNavigation.setTrack}
-              onHistoryRange={state.setHistoryRange}
-              cursorArchiveAvailable={state.cursorArchiveAvailable}
-              annotationEffects={state.annotationEffects}
-              annotationToolCancellation={state.annotationToolCancellation}
-              effectSnapshots={state.snapshot.snapshot.workspace.effectSnapshots ?? []}
-              annotationSourceId={state.snapshot.snapshot.workspace.sourceAssetId}
-              {...reviewTimelineTextCommands(state)}
-              {...reviewTimelineInspectorCommands({
-                video: state.video,
-                select: state.setActiveSelection,
-                navigation,
-                selectedTextId: state.text.selectedId,
-                selection: state.activeSelection,
-                requestExport,
-              })}
-              webcam={state.webcam}
-              fillHeight={panels.timelineHeight !== null}
-              playbackRange={state.playbackRange}
-              onPlaybackRange={state.setPlaybackRange}
-              zoomAnchor={state.zoomAnchor}
-              beforeAction={state.beforeAction}
-              onAddNote={() => state.add()}
-              historyControls={<ReviewHistoryControlBinding state={state} />}
-              inspectorControls={
-                <ReviewInspectorToolbarNavigation
-                  navigation={navigation}
-                  advanced={features.mode === 'advanced'}
-                  busy={busy || editing.exporter.phase !== 'idle'}
-                />
-              }
-              utilityControls={
-                <>
-                  {features.mode === 'advanced' && (
-                    <ReviewButton
-                      label={translate('gallery.videoReview.annotationMagnet')}
-                      title={translate('gallery.videoReview.annotationMagnetHint')}
-                      className={reviewIconButtonClassName}
-                      aria-pressed={annotationMagnetEnabled}
-                      data-ui="gallery.videoReview.annotationMagnetToggle"
-                      onClick={() => setAnnotationMagnetEnabled(!annotationMagnetEnabled)}
-                    >
-                      <Magnet size={16} aria-hidden="true" />
-                    </ReviewButton>
-                  )}
-                  <ReviewButton
-                    label={translate('gallery.videoReview.liveSeek')}
-                    className={reviewIconButtonClassName}
-                    aria-pressed={liveSeek.enabled}
-                    disabled={!liveSeek.available || busy || editing.exporter.phase !== 'idle'}
-                    data-ui="gallery.videoReview.liveSeekToggle"
-                    onClick={() => liveSeek.setEnabled(!liveSeek.enabled)}
-                  >
-                    <ScanLine size={16} aria-hidden="true" />
-                  </ReviewButton>
-                  <ReviewKeyboardHelp
-                    onBasicMode={
-                      features.mode === 'advanced' ? () => state.setMode('basic') : undefined
-                    }
-                    busy={busy || editing.exporter.phase !== 'idle'}
-                    onNewProject={projectCommands.newProject}
-                    onBackup={() => void state.run(() => backupReview(state, canvasComments))}
-                  />
-                </>
-              }
-              editing={editing}
-              edits={snapshot.document.edits}
-              annotations={snapshot.document.annotations}
-              source={state.source}
-              busy={busy}
-              composerBusy={!!composer.before}
-              selection={state.selection}
-              setSelection={state.setSelection}
-              advanced={advanced}
-              resultDuration={state.timeline.resultDuration}
-              outputTime={state.timeline.outputTime}
-              toOutputTime={state.timeline.toOutputTime}
-              onCutPlacement={() =>
-                state.setMessage(translate('gallery.videoReview.placementOnCut'))
-              }
-              onToggleActions={
-                advanced.ui.mode === 'advanced'
-                  ? () =>
-                      state.beforeAction(() =>
-                        state.setActionsEnabled(advanced.actionsEnabled === false)
-                      )
-                  : undefined
-              }
-              setTrackVisibility={state.setTrackVisibility}
-              setMode={state.setMode}
-              telemetryAvailable={state.projected.markers.length > 0}
-              time={state.time}
-              playing={state.playing}
-              navigationRevision={state.navigationRevision}
-              markers={state.projected.markers}
-              captureCapabilities={state.projected.captureCapabilities}
-              zoom={zoom}
+              canvasComments={canvasComments}
               audio={audio}
-              audioState={advanced.audio}
-              waveforms={waveforms}
-              onImportAudioFile={(...args) => state.beforeAction(() => onImportAudioFile(...args))}
-              onRecordVoiceover={() => state.beforeAction(voiceover.open)}
-              onOpenMusic={music.open}
-              onClearSelection={() => state.setActiveSelection({ kind: 'none' })}
-              selectedObject={state.activeSelection.kind !== 'none'}
-              cursorFocusKeys={state.cursorFocusKeys}
-              {...historyCommands}
-              onComment={state.selectComment}
-              onSeek={state.seek}
-              onPlay={() => state.beforeAction(state.play)}
+              onBack={onBack}
+              onClose={onClose}
             />
+            <div
+              inert={voiceover.recording}
+              ref={panels.timeline}
+              className={
+                `relative ${voiceover.recording ? 'opacity-50' : ''} ` +
+                (fullHeight || voiceover.recording
+                  ? 'col-start-1 row-start-2 min-h-0 min-w-0'
+                  : 'col-span-full min-h-0 min-w-0')
+              }
+            >
+              {panelsEnabled ? <ReviewPanelResizeHandle resize={panels.timelineResize} /> : null}
+              <ReviewTimelineBinding
+                onHoverTime={liveSeek.hover}
+                onHoverIntent={(starting) => {
+                  if (starting) liveSeek.hold();
+                  else liveSeek.finishIntent(() => state.video.current?.currentTime);
+                }}
+                interactionEditor={state.interactionEditor}
+                onInteractionAdded={() => navigation.setSection('selected')}
+                cursorMotion={state.cursorMotion}
+                onOpenProject={trackNavigation.openProject}
+                onOpenTrack={trackNavigation.openTrack}
+                onTrackChange={trackNavigation.setTrack}
+                onHistoryRange={state.setHistoryRange}
+                cursorArchiveAvailable={state.cursorArchiveAvailable}
+                annotationEffects={state.annotationEffects}
+                annotationToolCancellation={state.annotationToolCancellation}
+                effectSnapshots={state.snapshot.snapshot.workspace.effectSnapshots ?? []}
+                annotationSourceId={state.snapshot.snapshot.workspace.sourceAssetId}
+                {...reviewTimelineTextCommands(state)}
+                {...reviewTimelineInspectorCommands({
+                  video: state.video,
+                  select: state.setActiveSelection,
+                  navigation,
+                  selectedTextId: state.text.selectedId,
+                  selection: state.activeSelection,
+                  requestExport,
+                })}
+                webcam={state.webcam}
+                fillHeight={panels.timelineHeight !== null}
+                playbackRange={state.playbackRange}
+                onPlaybackRange={state.setPlaybackRange}
+                zoomAnchor={state.zoomAnchor}
+                beforeAction={state.beforeAction}
+                onAddNote={() => state.add()}
+                historyControls={<ReviewHistoryControlBinding state={state} />}
+                inspectorControls={
+                  <ReviewInspectorToolbarNavigation
+                    navigation={navigation}
+                    advanced={features.mode === 'advanced'}
+                    busy={busy || editing.exporter.phase !== 'idle'}
+                  />
+                }
+                utilityControls={
+                  <>
+                    {features.mode === 'advanced' && (
+                      <ReviewButton
+                        label={translate('gallery.videoReview.annotationMagnet')}
+                        title={translate('gallery.videoReview.annotationMagnetHint')}
+                        className={reviewIconButtonClassName}
+                        aria-pressed={annotationMagnetEnabled}
+                        data-ui="gallery.videoReview.annotationMagnetToggle"
+                        onClick={() => setAnnotationMagnetEnabled(!annotationMagnetEnabled)}
+                      >
+                        <Magnet size={16} aria-hidden="true" />
+                      </ReviewButton>
+                    )}
+                    <ReviewButton
+                      label={translate('gallery.videoReview.liveSeek')}
+                      className={reviewIconButtonClassName}
+                      aria-pressed={liveSeek.enabled}
+                      disabled={!liveSeek.available || busy || editing.exporter.phase !== 'idle'}
+                      data-ui="gallery.videoReview.liveSeekToggle"
+                      onClick={() => liveSeek.setEnabled(!liveSeek.enabled)}
+                    >
+                      <ScanLine size={16} aria-hidden="true" />
+                    </ReviewButton>
+                    <ReviewKeyboardHelp
+                      onBasicMode={
+                        features.mode === 'advanced' ? () => state.setMode('basic') : undefined
+                      }
+                      busy={busy || editing.exporter.phase !== 'idle'}
+                      onNewProject={projectCommands.newProject}
+                      onBackup={() => void state.run(() => backupReview(state, canvasComments))}
+                    />
+                  </>
+                }
+                editing={editing}
+                edits={snapshot.document.edits}
+                annotations={snapshot.document.annotations}
+                source={state.source}
+                busy={busy}
+                composerBusy={!!composer.before}
+                selection={state.selection}
+                setSelection={state.setSelection}
+                advanced={advanced}
+                resultDuration={state.timeline.resultDuration}
+                outputTime={state.timeline.outputTime}
+                toOutputTime={state.timeline.toOutputTime}
+                onCutPlacement={() =>
+                  state.setMessage(translate('gallery.videoReview.placementOnCut'))
+                }
+                onToggleActions={
+                  advanced.ui.mode === 'advanced'
+                    ? () =>
+                        state.beforeAction(() =>
+                          state.setActionsEnabled(advanced.actionsEnabled === false)
+                        )
+                    : undefined
+                }
+                setTrackVisibility={state.setTrackVisibility}
+                setMode={state.setMode}
+                telemetryAvailable={state.projected.markers.length > 0}
+                time={state.time}
+                playing={state.playing}
+                navigationRevision={state.navigationRevision}
+                markers={state.projected.markers}
+                captureCapabilities={state.projected.captureCapabilities}
+                zoom={zoom}
+                audio={audio}
+                audioState={advanced.audio}
+                waveforms={waveforms}
+                onImportAudioFile={(...args) =>
+                  state.beforeAction(() => onImportAudioFile(...args))
+                }
+                onRecordVoiceover={() => state.beforeAction(voiceover.open)}
+                onOpenMusic={music.open}
+                onClearSelection={() => state.setActiveSelection({ kind: 'none' })}
+                selectedObject={state.activeSelection.kind !== 'none'}
+                cursorFocusKeys={state.cursorFocusKeys}
+                {...historyCommands}
+                onComment={state.selectComment}
+                onSeek={(time, snap) => {
+                  state.seek(time, snap);
+                  liveSeek.commit(state.video.current?.currentTime ?? time);
+                }}
+                onPlay={() => state.beforeAction(state.play)}
+              />
+            </div>
           </div>
-        </div>
-        {music.drawer && <AudioLibraryPicker {...music.drawer} />}
-      </ReviewPreviewRendererContext.Provider>
+          {music.drawer && <AudioLibraryPicker {...music.drawer} />}
+        </ReviewPreviewRendererContext.Provider>
+      </ReviewPlaybackPresentationClockContext.Provider>
     </ReviewSelectionActionsSurface>
   );
 }

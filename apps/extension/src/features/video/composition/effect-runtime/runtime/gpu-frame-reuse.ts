@@ -4,7 +4,6 @@ import {
   parseRuntimeAnimationFrame,
   verifyRuntimeAnimationSource,
 } from '../../../../../contracts/effect-runtime/animation';
-import { readEffectPresentationDocument } from '../../../project/effect-bundle/presentation-document';
 import { createEffectRuntimeGpuContentKey } from './gpu-frame-content';
 import { prepareEffectRuntimeGpuFramePlans } from './gpu-driver';
 import { EFFECT_RUNTIME_RESOURCE_LIMITS, assertEffectRasterDimensions } from './resource-limits';
@@ -28,6 +27,10 @@ type Entry = {
 /** Own completed Lottie pixels independently of frame placement, requests and GPU readers. */
 export function createEffectRuntimeGpuFrameReuse() {
   const entries = new Map<string, Entry>();
+  const documents = new Map<
+    string,
+    { source: string; digest: string; document: AnimationTemplate }
+  >();
   const contentKeys = new WeakMap<
     AnimationTemplate,
     ReturnType<typeof createEffectRuntimeGpuContentKey>
@@ -53,6 +56,7 @@ export function createEffectRuntimeGpuFrameReuse() {
   };
   const clear = () => {
     for (const id of entries.keys()) retire(id);
+    documents.clear();
   };
   const borrow = (entry: Entry, plan: EffectRuntimeFramePlan): EffectRuntimeGpuPreparedFrame => {
     entry.readers++;
@@ -93,19 +97,32 @@ export function createEffectRuntimeGpuFrameReuse() {
       },
     };
   };
-  const signature = async (plan: EffectRuntimeFramePlan): Promise<Signature | null> => {
+  const signature = async (
+    plan: EffectRuntimeFramePlan,
+    admitted?: NonNullable<Preparation['documents']>
+  ): Promise<Signature | null> => {
     if (
       plan.kind !== 'standalone' ||
       (plan.target.kind !== 'scene' && plan.target.kind !== 'clip') ||
       plan.assets.length
     )
       return null;
-    const previous = entries.get(plan.effectInstanceId);
-    const sameSource =
-      previous?.source === plan.documentSource && previous.digest === plan.documentSha256;
-    const document = sameSource
-      ? previous.document
-      : readEffectPresentationDocument(plan.documentSource).document;
+    let prepared = documents.get(plan.effectInstanceId);
+    if (prepared?.source !== plan.documentSource || prepared.digest !== plan.documentSha256) {
+      const verified = admitted?.get(plan.effectInstanceId);
+      if (
+        verified &&
+        (verified.source !== plan.documentSource || verified.sha256 !== plan.documentSha256)
+      )
+        throw new Error('EFFECT_RUNTIME_ANIMATION_SOURCE_REJECTED');
+      const document =
+        verified?.document ??
+        (await verifyRuntimeAnimationSource(plan.documentSource, plan.documentSha256));
+      if (!document || disposed || lifetime.signal.aborted) return null;
+      prepared = { source: plan.documentSource, digest: plan.documentSha256, document };
+      documents.set(plan.effectInstanceId, prepared);
+    }
+    const document = prepared.document;
     if (
       !document ||
       !parseRuntimeAnimationFrame(
@@ -122,11 +139,6 @@ export function createEffectRuntimeGpuFrameReuse() {
         },
         document
       )
-    )
-      return null;
-    if (
-      !sameSource &&
-      !(await verifyRuntimeAnimationSource(plan.documentSource, plan.documentSha256))
     )
       return null;
     assertEffectRasterDimensions(plan.renderDimensions.width, plan.renderDimensions.height);
@@ -166,6 +178,8 @@ export function createEffectRuntimeGpuFrameReuse() {
         executor = args.executor;
         context = nextContext;
       }
+      const active = new Set(args.plans.map((plan) => plan.effectInstanceId));
+      for (const id of documents.keys()) if (!active.has(id)) documents.delete(id);
       const views = new Map<string, EffectRuntimeGpuPreparedFrame>();
       const signatures = new Map<string, Signature | null>();
       const missing: EffectRuntimeFramePlan[] = [];
@@ -179,7 +193,7 @@ export function createEffectRuntimeGpuFrameReuse() {
       };
       try {
         for (const plan of args.plans) {
-          const key = await signature(plan);
+          const key = await signature(plan, args.documents);
           checkContext();
           signatures.set(plan.effectInstanceId, key);
           const entry = entries.get(plan.effectInstanceId);
@@ -191,7 +205,21 @@ export function createEffectRuntimeGpuFrameReuse() {
           // Old GPU readers keep their leases; unused completed pixels do not consume miss headroom.
           for (const plan of missing) retire(plan.effectInstanceId);
           for (const [id, entry] of entries) if (!entry.readers) retire(id);
-          fresh = await prepareEffectRuntimeGpuFramePlans({ ...args, plans: missing, signal });
+          fresh = await prepareEffectRuntimeGpuFramePlans({
+            ...args,
+            plans: missing,
+            signal,
+            documents: new Map(
+              [...documents].map(([id, value]) => [
+                id,
+                {
+                  source: value.source,
+                  sha256: value.digest,
+                  document: value.document,
+                },
+              ])
+            ),
+          });
           checkContext();
           for (const plan of missing) {
             const frame = fresh.get(plan.effectInstanceId);

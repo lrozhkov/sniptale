@@ -72,6 +72,15 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
     (marker: ReviewTelemetryMarker) => markerCommand.current(marker),
     []
   );
+  const editorCommand = useRef(props.interactionEditor);
+  useLayoutEffect(() => {
+    editorCommand.current = props.interactionEditor;
+  }, [props.interactionEditor]);
+  const update = useCallback<NonNullable<TelemetryStripProps['interactionEditor']>['update']>(
+    (...args) => editorCommand.current?.update(...args),
+    []
+  );
+  const editable = !!props.interactionEditor;
   const [settled, setSettled] = useState({ width: props.width, zoom: props.zoom });
   useEffect(() => {
     const timer = setTimeout(() => setSettled({ width: props.width, zoom: props.zoom }), 250);
@@ -163,7 +172,8 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
                     selectedTelemetryRef: props.selectedTelemetryRef,
                     animatedIds: props.animatedIds,
                     onMarker,
-                    interactionEditor: props.interactionEditor,
+                    editable,
+                    update,
                     duration: props.duration,
                   }}
                   ratio={ratio}
@@ -178,7 +188,8 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
       layout,
       ratio,
       coverageId,
-      props.interactionEditor,
+      editable,
+      update,
       props.duration,
       props.captureCapabilities,
       props.selectedTelemetryRef,
@@ -326,7 +337,8 @@ function ReviewHistoryItem({
     selectedTelemetryRef: TelemetryStripProps['selectedTelemetryRef'];
     animatedIds: TelemetryStripProps['animatedIds'];
     onMarker: TelemetryStripProps['onMarker'];
-    interactionEditor: TelemetryStripProps['interactionEditor'];
+    editable: boolean;
+    update: NonNullable<TelemetryStripProps['interactionEditor']>['update'];
     duration: number;
   };
   ratio: number;
@@ -346,7 +358,7 @@ function ReviewHistoryItem({
   useReviewDragEscape(drag, () => setDraft(undefined));
   const snap = useReviewTimelineSnap();
   const down = (event: import('react').PointerEvent<HTMLButtonElement>) => {
-    if (event.button !== 0 || !props.interactionEditor || item.members.length > 1) return;
+    if (event.button !== 0 || !props.editable || item.members.length > 1) return;
     event.stopPropagation();
     skipClick.current = false;
     props.onMarker(marker);
@@ -447,7 +459,7 @@ function ReviewHistoryItem({
         delete event.currentTarget.dataset['reviewDragging'];
         if (event.currentTarget.hasPointerCapture(event.pointerId))
           event.currentTarget.releasePointerCapture(event.pointerId);
-        if (d?.after) props.interactionEditor?.update(marker, d.after.start, d.after.end);
+        if (d?.after) props.update(marker, d.after.start, d.after.end);
         setDraft(undefined);
       }}
       onLostPointerCapture={() => {
@@ -503,7 +515,7 @@ function ReviewHistoryItem({
         opacity: cursorLine && marker.eventType === 'cursor-gap' ? 0.4 : 1,
       }}
     >
-      {props.interactionEditor ? (
+      {props.editable ? (
         <>
           <span data-press-edge="start" className={`${reviewTimelineResizeHandleClassName} left-0`}>
             <span className="h-2.5 w-px bg-current" />

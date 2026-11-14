@@ -1,3 +1,4 @@
+import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
 import { hasMagnificationDemand } from '../../features/video/composition/export-enhancement/prepared-source';
 import { hasSourceImageFilters } from '../../features/image-filters/contract';
 import { createGlTransitionCanvas } from '../../features/video/composition/canvas/gl-transition';
@@ -1244,6 +1245,7 @@ export function createReviewPreviewRenderer(args: {
       if (disposed) throw new Error('Preview renderer is disposed.');
       captionRefresh?.abort();
       captionRefresh = null;
+      current?.assets.annotations?.setGeometryPreview?.(null);
       const scene = activeReviewPreviewScene(sourceScene);
       validSize(scene.source);
       validSize(dimensions.canonical);
@@ -1265,7 +1267,12 @@ export function createReviewPreviewRenderer(args: {
         return lease(current.prepared, current.assets, signal);
       }
       const assetsKey = reviewPreviewPreparationKey(scene, dimensions, needsSpatialRenderer(scene));
-      if (current?.preparationKey === assetsKey) {
+      const beforeSources = current?.prepared.scene.annotationEffects?.snapshots ?? [];
+      const nextSources = scene.annotationEffects?.snapshots ?? [];
+      const sameSources =
+        beforeSources.length === nextSources.length &&
+        beforeSources.every((snapshot, index) => snapshot.source === nextSources[index]?.source);
+      if (current?.preparationKey === assetsKey && sameSources) {
         const captured = current;
         const prepared = {
           generation: ++generation,
@@ -1431,6 +1438,69 @@ export function createReviewPreviewRenderer(args: {
         controller.signal.removeEventListener('abort', releaseAssets);
         signal.removeEventListener('abort', abort);
       }
+    },
+    /** Complete geometry edits retain admitted scene assets; content changes use normal preparation. */
+    prepareAnnotationMove(
+      baseline: Scene,
+      instance: ReviewAnnotationEffect,
+      dimensions: Dimensions,
+      signal: AbortSignal
+    ): Prepared | null {
+      signal.throwIfAborted();
+      if (
+        disposed ||
+        !current ||
+        preparedSource !== baseline ||
+        current.assets.renderer !== 'gpu' ||
+        current.assets.retired ||
+        current.prepared.dimensions.backing.width !== dimensions.backing.width ||
+        current.prepared.dimensions.backing.height !== dimensions.backing.height
+      )
+        return null;
+      const annotations = current.prepared.scene.annotationEffects;
+      const previous = annotations?.lane.instances.find((entry) => entry.id === instance.id);
+      if (!previous || !annotations) return null;
+      const { transform: _oldTransform, anchors: oldAnchors, ...oldContent } = previous;
+      const { transform, anchors, ...content } = instance;
+      const anchorIds = Object.keys(oldAnchors ?? {});
+      const matchingAnchors =
+        anchorIds.length === Object.keys(anchors ?? {}).length &&
+        anchorIds.every((id) => anchors?.[id] !== undefined);
+      if (
+        !matchingAnchors ||
+        JSON.stringify(oldContent) !== JSON.stringify(content) ||
+        !Object.values(transform).every(Number.isFinite) ||
+        transform.width <= 0 ||
+        transform.height <= 0
+      )
+        return null;
+      const rasterBaseline = baseline.annotationEffects?.lane.instances.find(
+        (entry) => entry.id === instance.id
+      );
+      if (!rasterBaseline) return null;
+      current.assets.annotations?.setGeometryPreview?.(rasterBaseline);
+      const prepared = {
+        ...current.prepared,
+        generation: ++generation,
+        scene: {
+          ...current.prepared.scene,
+          annotationEffects: {
+            ...annotations,
+            lane: {
+              ...annotations.lane,
+              instances: annotations.lane.instances.map((entry) =>
+                entry.id === instance.id ? { ...instance, transform: { ...transform } } : entry
+              ),
+            },
+          },
+        },
+      };
+      current = {
+        ...current,
+        prepared,
+        key: { ...current.key, context: `annotation-move:${generation}` },
+      };
+      return lease(prepared, current.assets, signal);
     },
     /** Admit decoded captures before their owner reserves or paints the next frame. */
     admit(prepared: Prepared, frame: Frame) {

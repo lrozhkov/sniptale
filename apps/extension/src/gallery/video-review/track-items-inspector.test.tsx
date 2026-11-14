@@ -6,9 +6,13 @@ import { ReviewTrackItemsInspector } from './track-items-inspector';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import type { QuickEditTrack } from '../../features/video/review/advanced/types';
+const renderProbe = vi.hoisted(() => ({ inactiveLabels: 0 }));
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
-  translate: (key: string) => key,
+  translate: (key: string) => {
+    if (key === 'gallery.videoReview.trackItemInactive') renderProbe.inactiveLabels++;
+    return key;
+  },
 }));
 
 it('navigates source and authored rows, filters, pages and removes through the accepted session', async () => {
@@ -78,6 +82,19 @@ it('navigates source and authored rows, filters, pages and removes through the a
   try {
     render('zoom');
     expect(host.querySelectorAll('[data-track-item]')).toHaveLength(50);
+    const renderedLabels = renderProbe.inactiveLabels;
+    expect(renderedLabels).toBeGreaterThan(0);
+    const currentSeek = vi.fn();
+    props.state = { ...props.state, seek: currentSeek };
+    render('zoom');
+    expect(renderProbe.inactiveLabels).toBe(renderedLabels);
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('.review-track-items-open')!.click()
+    );
+    expect(currentSeek).toHaveBeenCalledWith(0, false);
+    props.state = { ...props.state, seek };
+    render('zoom');
+
     await click('trackItemsMore');
     expect(host.querySelectorAll('[data-track-item]')).toHaveLength(55);
     await act(async () =>

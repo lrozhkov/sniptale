@@ -1,3 +1,4 @@
+import { hasCursorComposition } from '../../project/motion/spatial';
 import { isCameraMotionRegion } from '../../project/motion/normalization';
 import { projectMotionSourcePhases } from '../../project/motion/source-binding';
 import { isVideoProjectUtilityLaneVisible } from '../../project/utility-lanes';
@@ -185,9 +186,10 @@ export function projectRequiresPreparedCamera(project: VideoProject): boolean {
     !dynamic &&
     !!projectMotionSourcePhases(project).motionRegions?.some(
       (region) =>
-        isCameraMotionRegion(region) &&
+        (isCameraMotionRegion(region) || region.effect === '3d') &&
         !region.sourceBinding?.dormant &&
-        region.focusMode === 'CURSOR' &&
+        (region.focusMode === 'CURSOR' ||
+          (region.effect === '3d' && hasCursorComposition(region.cursorComposition))) &&
         region.duration > 0
     )
   );

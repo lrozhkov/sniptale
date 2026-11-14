@@ -18,7 +18,7 @@ export function createWorkspaceTimelineInsertionActions(
   >,
   projectUpdaters: {
     addActionEvent: (preset: VideoProjectActionPreset) => void;
-    addMotionRegion: (startTime?: number) => void;
+    addMotionRegion: (startTime?: number, effect?: '3d') => void;
     enableCursorTrack: () => void;
   }
 ) {

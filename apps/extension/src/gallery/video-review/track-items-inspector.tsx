@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useLayoutEffect } from 'react';
+import { useCallback, useMemo, useState, useRef, useLayoutEffect } from 'react';
 import { ArrowUpRight, Search, Trash2, X } from 'lucide-react';
 import { translate, useAppLocale } from '../../platform/i18n';
 import type { QuickEditTrack } from '../../features/video/review/advanced/types';
@@ -68,15 +68,25 @@ export function ReviewTrackItemsInspector(props: {
       locale,
     ]
   );
-  const available = new Set(rows.filter((row) => row.removable).map((row) => row.id));
-  const checked = selected.filter((id) => available.has(id));
-  const needle = query.trim().toLocaleLowerCase(locale);
-  const filtered = rows.filter((row) =>
-    `${row.label} ${row.detail} ${reviewTimeLabel(row.start)}`
-      .toLocaleLowerCase(locale)
-      .includes(needle)
+  const available = useMemo(
+    () => new Set(rows.filter((row) => row.removable).map((row) => row.id)),
+    [rows]
   );
-  const matching = filtered.filter((row) => row.removable).map((row) => row.id);
+  const checked = useMemo(() => selected.filter((id) => available.has(id)), [selected, available]);
+  const needle = query.trim().toLocaleLowerCase(locale);
+  const filtered = useMemo(
+    () =>
+      rows.filter((row) =>
+        `${row.label} ${row.detail} ${reviewTimeLabel(row.start)}`
+          .toLocaleLowerCase(locale)
+          .includes(needle)
+      ),
+    [rows, needle, locale]
+  );
+  const matching = useMemo(
+    () => filtered.filter((row) => row.removable).map((row) => row.id),
+    [filtered]
+  );
   const count = matching.filter((id) => checked.includes(id)).length;
   const disabled =
     state.busy ||
@@ -84,9 +94,6 @@ export function ReviewTrackItemsInspector(props: {
     pending ||
     state.annotationEffects.pending ||
     !!state.annotationEffects.gestureId;
-  const active = (row: ReviewTrackItem) =>
-    row.selection.kind !== 'none' &&
-    JSON.stringify(row.selection) === JSON.stringify(state.activeSelection);
   useLayoutEffect(() => {
     if (navigation.shown !== 'track' && navigation.shown !== 'speech') return;
     list.current?.querySelector<HTMLElement>('[data-active]')?.scrollIntoView({ block: 'nearest' });
@@ -109,6 +116,16 @@ export function ReviewTrackItemsInspector(props: {
         target?.scrollIntoView({ block: 'nearest', inline: 'center' });
       });
     });
+  const openCommand = useRef(open);
+  useLayoutEffect(() => {
+    openCommand.current = open;
+  });
+  const openRow = useCallback((row: ReviewTrackItem) => openCommand.current(row), []);
+  const toggleRow = useCallback((id: string, value: boolean) => {
+    setSelected((current) =>
+      value ? [...new Set([...current, id])] : current.filter((key) => key !== id)
+    );
+  }, []);
   const remove = async () => {
     if (disabled || !checked.length || !state.canStart()) return;
     const ids = new Set(checked);
@@ -148,6 +165,56 @@ export function ReviewTrackItemsInspector(props: {
       setPending(false);
     }
   };
+  const activeSelection = state.activeSelection;
+  const itemRows = useMemo(
+    () =>
+      filtered.slice(0, limit).map((row) => (
+        <li
+          key={row.id}
+          className="review-history-row"
+          data-active={
+            (row.selection.kind !== 'none' &&
+              JSON.stringify(row.selection) === JSON.stringify(activeSelection)) ||
+            undefined
+          }
+          data-selected={checked.includes(row.id) || undefined}
+          data-track-item={row.id}
+        >
+          {row.removable ? (
+            <HistoryCheckbox
+              label={[selectLabel, row.label, reviewTimeLabel(row.start)].join(' ')}
+              checked={checked.includes(row.id)}
+              onChange={(value) => toggleRow(row.id, value)}
+            />
+          ) : (
+            <span className="w-4 shrink-0" aria-hidden="true" />
+          )}
+          <button type="button" className="review-track-items-open" onClick={() => openRow(row)}>
+            <span className="review-history-target block truncate" title={row.label}>
+              {row.label}
+            </span>
+            <span className="review-track-items-meta">
+              <span className="shrink-0 tabular-nums">
+                {reviewTimeLabel(row.start)}
+                {row.end > row.start ? ` – ${reviewTimeLabel(row.end)}` : ''}
+              </span>
+              {row.detail ? <span className="truncate">{row.detail}</span> : null}
+            </span>
+            {row.inactive ? (
+              <span className="text-xs text-[var(--sniptale-color-text-secondary)]">
+                {translate('gallery.videoReview.trackItemInactive')}
+              </span>
+            ) : null}
+          </button>
+          <ArrowUpRight
+            size={13}
+            aria-hidden="true"
+            className="shrink-0 text-[var(--sniptale-color-text-secondary)]"
+          />
+        </li>
+      )),
+    [filtered, limit, checked, activeSelection, selectLabel, openRow, toggleRow]
+  );
   return (
     <fieldset
       disabled={disabled}
@@ -210,49 +277,7 @@ export function ReviewTrackItemsInspector(props: {
         className="review-track-items-results"
         aria-label={translate('gallery.videoReview.trackItemsList')}
       >
-        {filtered.slice(0, limit).map((row) => (
-          <li
-            key={row.id}
-            className="review-history-row"
-            data-active={active(row) || undefined}
-            data-selected={checked.includes(row.id) || undefined}
-            data-track-item={row.id}
-          >
-            {row.removable ? (
-              <HistoryCheckbox
-                label={[selectLabel, row.label, reviewTimeLabel(row.start)].join(' ')}
-                checked={checked.includes(row.id)}
-                onChange={(value) =>
-                  setSelected(value ? [...checked, row.id] : checked.filter((id) => id !== row.id))
-                }
-              />
-            ) : (
-              <span className="w-4 shrink-0" aria-hidden="true" />
-            )}
-            <button type="button" className="review-track-items-open" onClick={() => open(row)}>
-              <span className="review-history-target block truncate" title={row.label}>
-                {row.label}
-              </span>
-              <span className="review-track-items-meta">
-                <span className="shrink-0 tabular-nums">
-                  {reviewTimeLabel(row.start)}
-                  {row.end > row.start ? ` – ${reviewTimeLabel(row.end)}` : ''}
-                </span>
-                {row.detail ? <span className="truncate">{row.detail}</span> : null}
-              </span>
-              {row.inactive ? (
-                <span className="text-xs text-[var(--sniptale-color-text-secondary)]">
-                  {translate('gallery.videoReview.trackItemInactive')}
-                </span>
-              ) : null}
-            </button>
-            <ArrowUpRight
-              size={13}
-              aria-hidden="true"
-              className="shrink-0 text-[var(--sniptale-color-text-secondary)]"
-            />
-          </li>
-        ))}
+        {itemRows}
         {!filtered.length ? (
           <li
             className="px-2 py-4 text-xs text-[var(--sniptale-color-text-secondary)]"

@@ -1,3 +1,4 @@
+import { hasCursorComposition } from '../../project/motion/spatial';
 import { hasSourceImageFilters } from '../../../image-filters/contract';
 import { withCursorMotionPath } from '../../project/cursor-motion';
 import { reviewTrackEnabled } from './track-controls';
@@ -194,8 +195,10 @@ function resolveCursorRegions(
   const advanced = state.ui.mode === 'advanced';
   const needsCursor =
     features.zoomApplied &&
-    state.zoom.regions.some(
-      (region) => region.followCursor ?? state.cursorFocusPath?.mode === 'follow'
+    state.zoom.regions.some((region) =>
+      region.effect === '3d'
+        ? hasCursorComposition(region.cursorComposition)
+        : (region.followCursor ?? state.cursorFocusPath?.mode === 'follow')
     );
   const key = JSON.stringify({
     needsCursor,
@@ -315,7 +318,9 @@ function createCursorRegionProjection(
     }
     const region = input;
     const result: QuickEditZoomRegion =
-      (region.followCursor ?? cursorPath?.mode === 'follow') && cursorPath
+      (region.effect === '3d'
+        ? hasCursorComposition(region.cursorComposition)
+        : (region.followCursor ?? cursorPath?.mode === 'follow')) && cursorPath
         ? {
             ...region,
             cursorFocus: {

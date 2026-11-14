@@ -34,6 +34,7 @@ import { reviewTimeLabel } from './controls';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 
 type TimelineProps = ReviewCursorTimelineInteractions & {
+  onHoverIntent?: ((starting: boolean) => void) | undefined;
   onHoverTime?: ((time: number | null) => void) | undefined;
   onHistoryRange?: ((range: { start: number; end: number }) => void) | undefined;
   cursorArchiveAvailable?: boolean | undefined;
@@ -236,8 +237,10 @@ export function ReviewTimeline(props: TimelineProps) {
               } as CSSProperties
             }
             onPointerDownCapture={(event) => {
-              if (event.target instanceof Node && event.currentTarget.contains(event.target))
+              if (event.target instanceof Node && event.currentTarget.contains(event.target)) {
+                if (event.button === 0) props.onHoverIntent?.(true);
                 hover.clear();
+              }
             }}
             onPointerDown={plane.onPointerDown}
             onPointerMoveCapture={(event) => {
@@ -257,10 +260,12 @@ export function ReviewTimeline(props: TimelineProps) {
             }}
             onPointerUp={(event) => {
               plane.onPointerUp(event);
+              props.onHoverIntent?.(false);
               hover.clear();
             }}
             onPointerCancel={() => {
               plane.onPointerCancel();
+              props.onHoverIntent?.(false);
               hover.clear();
             }}
             onPointerLeave={hover.clear}

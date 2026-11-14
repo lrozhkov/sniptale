@@ -34,6 +34,10 @@ const density = { content: { width: 0.5, height: 0.5 }, viewport: { width: 0.5, 
 async function fixture(names = ['title']) {
   const plane = { width: 1920, height: 1080 };
   const snapshots: ReviewAnnotationEffectSnapshot[] = [];
+  const documents = new Map<
+    string,
+    NonNullable<ReturnType<typeof readReviewAnnotationEffectDocument>>
+  >();
   const instances: ReviewAnnotationScene['lane']['instances'] = [];
   for (const name of names) {
     const source = readFileSync(
@@ -55,6 +59,7 @@ async function fixture(names = ['title']) {
       assets: [],
     };
     snapshots.push(snapshot);
+    documents.set(snapshot.id, document);
     const layout = document.objectLayout;
     const transform = {
       x: 0.2,
@@ -144,7 +149,7 @@ async function fixture(names = ['title']) {
     signal: new AbortController().signal,
     createExecutor: vi.fn(() => executor),
   };
-  return { scene, deps, executor, success, bitmaps, managed: () => managed };
+  return { scene, deps, executor, success, bitmaps, documents, managed: () => managed };
 }
 
 it('renders six real definitions in order through the standalone driver and closes outputs', async () => {
@@ -172,7 +177,7 @@ it('renders six real definitions in order through the standalone driver and clos
   ]);
   for (const [request] of f.executor.renderFrame.mock.calls) {
     const snapshot = f.scene.snapshots.find((item) => item.id === request.snapshotId)!;
-    const document = readReviewAnnotationEffectDocument(snapshot.source)!;
+    const document = f.documents.get(snapshot.id)!;
     const duration = animationRuntimeDuration(document);
     expect(request).toMatchObject({
       duration,

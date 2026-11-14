@@ -1,3 +1,4 @@
+import { parseCameraSpatialMotion } from '../../project/motion/spatial';
 import { parseReviewInteractionTimeline } from '../interaction-timeline';
 
 import { parseAudioProcessing } from '@sniptale/runtime-contracts/audio-effects';
@@ -243,6 +244,14 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   if (cameraFollow === null) return null;
   const cursorComposition = parseCursorCompositionSettings(value['cursorComposition']);
   if (cursorComposition === null) return null;
+  if (value['effect'] !== undefined && value['effect'] !== '3d') return null;
+  if (
+    value['effect'] === '3d' &&
+    (value['border'] !== undefined || value['spotlight'] !== undefined)
+  )
+    return null;
+  const spatialMotion = parseCameraSpatialMotion(value['spatialMotion']);
+  if (spatialMotion === null || (spatialMotion && value['effect'] !== '3d')) return null;
   const perspective = parseQuickEditPerspective(value['perspective']);
   const depthOfField = parseQuickEditDepth(value['depthOfField']);
   if (perspective === null || depthOfField === null) return null;
@@ -283,6 +292,8 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
     ...(cameraFollow ? { cameraFollow } : {}),
     ...(typeof value['followCursor'] === 'boolean' ? { followCursor: value['followCursor'] } : {}),
     ...(cursorComposition ? { cursorComposition } : {}),
+    ...(value['effect'] === '3d' ? { effect: '3d' as const } : {}),
+    ...(spatialMotion ? { spatialMotion } : {}),
     ...(perspective ? { perspective } : {}),
     ...(depthOfField ? { depthOfField } : {}),
     ...(motionBlur ? { motionBlur } : {}),
@@ -582,6 +593,11 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
   if (raw['webcam'] !== undefined && !supportsAdvancedSchema(raw['schemaVersion'], 3)) return null;
   const zoom = parseZoomState(raw['zoom'], supportsAdvancedSchema(raw['schemaVersion'], 3));
   if (
+    zoom?.regions.some((r) => r.effect === '3d') &&
+    !supportsAdvancedSchema(raw['schemaVersion'], 33)
+  )
+    return null;
+  if (
     zoom?.regions.some((region) => requiresExtendedBorderSchema(region.border)) &&
     !supportsAdvancedSchema(raw['schemaVersion'], 26)
   )
@@ -749,7 +765,7 @@ function supportsAdvancedSchema(version: unknown, firstHistorical: number): bool
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
     [
       2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
-      27, 28, 29, 30, 31,
+      27, 28, 29, 30, 31, 32,
     ].some((known) => known >= firstHistorical && version === known)
   );
 }

@@ -1,19 +1,23 @@
 import type { QuickEditZoomRegion } from './types';
 
 /** The sole discriminator for the retained focus collection. */
-export function quickEditFocusType(region: Pick<QuickEditZoomRegion, 'spotlight' | 'border'>) {
-  return region.border
-    ? 'border'
-    : region.spotlight?.effect === 'magnify'
-      ? 'lens'
-      : region.spotlight
-        ? 'spotlight'
-        : 'zoom';
+export function quickEditFocusType(
+  region: Pick<QuickEditZoomRegion, 'effect' | 'spotlight' | 'border'>
+) {
+  return region.effect === '3d'
+    ? '3d'
+    : region.border
+      ? 'border'
+      : region.spotlight?.effect === 'magnify'
+        ? 'lens'
+        : region.spotlight
+          ? 'spotlight'
+          : 'zoom';
 }
 
 /** Authored intervals continue reserving source frames when a cut hides them. */
 function quickEditFocusInterval(region: QuickEditZoomRegion) {
-  return region.sourceAnchor ?? region;
+  return region.spatialClock ? region : (region.sourceAnchor ?? region);
 }
 
 /** Resolve compatible neighbors without crossing any active focus interval. */
@@ -37,6 +41,8 @@ export function resolveQuickEditFocusLink(
         !region.dormant &&
         region.id !== source.id &&
         region.id !== target.id &&
+        ((source.effect !== '3d' && region.effect !== '3d') ||
+          (source.effect === '3d' && region.effect === '3d')) &&
         ((interval(region).start < b.start && interval(region).end > a.end) ||
           (interval(region).end === a.end &&
             quickEditFocusType(region) === quickEditFocusType(source) &&
@@ -70,10 +76,36 @@ export function quickEditFocusConflicts(
 export function resolveQuickEditActiveFocusRegions(
   regions: readonly QuickEditZoomRegion[]
 ): QuickEditZoomRegion[] {
-  const accepted = regions.filter((region) => !region.dormant && !region.overlapPolicy);
+  const spatial: QuickEditZoomRegion[] = [];
+  for (const region of regions) {
+    if (region.dormant || region.effect !== '3d') continue;
+    const a = quickEditFocusInterval(region);
+    if (
+      spatial.some((other) => {
+        const b = quickEditFocusInterval(other);
+        const link = resolveQuickEditFocusLink(regions, other.id, { sourceTime: true });
+        return (
+          a.start < (link ? quickEditFocusInterval(link.target).start : b.end) && a.end > b.start
+        );
+      })
+    )
+      continue;
+    spatial.push(region);
+  }
+  const accepted = regions.filter(
+    (region) =>
+      !region.dormant &&
+      !region.overlapPolicy &&
+      (region.effect !== '3d' || spatial.includes(region))
+  );
   const ids = new Set(accepted.map((region) => region.id));
   for (const region of regions) {
-    if (region.dormant || !region.overlapPolicy) continue;
+    if (
+      region.dormant ||
+      !region.overlapPolicy ||
+      (region.effect === '3d' && !spatial.includes(region))
+    )
+      continue;
     const { overlapPolicy: _policy, ...candidate } = region;
     if (quickEditFocusConflicts(accepted, candidate)) continue;
     accepted.push(candidate);

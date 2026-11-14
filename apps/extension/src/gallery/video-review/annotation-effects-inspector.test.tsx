@@ -11,9 +11,15 @@ import {
 } from '@sniptale/runtime-contracts/effect-controls';
 import { getCurrentLocale, translate } from '../../platform/i18n';
 import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
-import { initializeReviewAnnotationEffectAnchors } from '../../features/video/review/annotation-effects/layout';
+import {
+  initializeReviewAnnotationEffectAnchors,
+  resolveReviewAnnotationEffectControls,
+} from '../../features/video/review/annotation-effects/layout';
 import { readReviewAnnotationEffectDocument } from '../../features/video/review/annotation-effects/validation';
-import { createReviewAnnotationGeometry } from './annotation-effects-geometry';
+import {
+  createReviewAnnotationGeometry,
+  reviewAnnotationBodyMeasurementKey,
+} from './annotation-effects-geometry';
 import type { useReviewAnnotationEffects } from './annotation-effects-editor';
 import { ReviewAnnotationInspector } from './annotation-effects-inspector';
 
@@ -77,6 +83,10 @@ function fixture(name: string) {
     remove: vi.fn(),
     duplicate: vi.fn(),
     beginGesture: vi.fn(() => true),
+    bodyMeasurements: new Map(),
+    refreshBodyGeometry: vi.fn(),
+    movement: { subscribe: vi.fn(() => () => undefined) },
+    previewMovement: vi.fn(() => false),
     previewGesture: vi.fn(),
     cancelGesture: vi.fn(),
     commitGesture: vi.fn(async () => true),
@@ -543,4 +553,23 @@ it('keeps a custom group from repeating the host placement icon', () => {
   render(value, source);
   expect(host.querySelectorAll('summary svg.lucide-move')).toHaveLength(1);
   expect(host.querySelector('[data-effect-control-group="tracing"] input')).not.toBeNull();
+});
+
+it('uses measured visible bounds even when inspector metadata is a different parsed document', () => {
+  const value = fixture('frame');
+  const controls = resolveReviewAnnotationEffectControls(
+    value.document,
+    value.instance,
+    geometry.content
+  );
+  const key = reviewAnnotationBodyMeasurementKey(value.instance, controls);
+  value.editor.bodyMeasurements.set(key, {
+    x: value.document.animation.w / 4,
+    y: value.document.animation.h / 4,
+    width: value.document.animation.w / 2,
+    height: value.document.animation.h / 2,
+  });
+  render(value);
+  expect(Number(input(translate('gallery.videoReview.annotationWidth')).value)).toBeCloseTo(20, 6);
+  expect(Number(input(translate('gallery.videoReview.annotationHeight')).value)).toBeCloseTo(10, 6);
 });

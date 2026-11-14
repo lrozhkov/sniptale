@@ -139,7 +139,8 @@ export async function createReviewAnnotationRenderer(
     signal: AbortSignal;
     createExecutor?: () => EffectRuntimeSandboxExecutor;
     createWarmExecutor?: (
-      primary?: EffectRuntimeSandboxExecutor
+      primary?: EffectRuntimeSandboxExecutor,
+      canAdopt?: () => boolean
     ) => EffectRuntimeSandboxExecutor | undefined;
   }
 ) {
@@ -168,6 +169,12 @@ export async function createReviewAnnotationRenderer(
   let executor: EffectRuntimeSandboxExecutor | undefined;
   let disposed = false;
   let active = false;
+  let foregroundTime = -Infinity;
+  let geometryPreview: ReviewAnnotationEffect | null = null;
+  const warmLookaheadSeconds = 2;
+  let preparedCohort:
+    | { key: string; executor: EffectRuntimeSandboxExecutor; context: object | undefined }
+    | undefined;
   const releases = new Set<() => void>();
   let warm:
     | {
@@ -259,11 +266,78 @@ export async function createReviewAnnotationRenderer(
           density: density[instance.attachment],
           fps,
         });
-        return planned
-          ? [{ ...planned, plan: { ...planned.plan, assets: definition.assets } }]
-          : [];
+        if (!planned) return [];
+        const frozen = geometryPreview?.id === instance.id ? geometryPreview : null;
+        const renderDimensions = frozen
+          ? {
+              width: Math.max(
+                1,
+                Math.ceil(
+                  frozen.transform.width *
+                    current.planes[instance.attachment].width *
+                    planned.bitmapBounds.width *
+                    density[instance.attachment].width
+                )
+              ),
+              height: Math.max(
+                1,
+                Math.ceil(
+                  frozen.transform.height *
+                    current.planes[instance.attachment].height *
+                    planned.bitmapBounds.height *
+                    density[instance.attachment].height
+                )
+              ),
+            }
+          : planned.plan.renderDimensions;
+        return [
+          { ...planned, plan: { ...planned.plan, renderDimensions, assets: definition.assets } },
+        ];
       });
   };
+  const documentsFor = (entries: ReturnType<typeof describe>) =>
+    new Map(
+      entries.map((entry) => {
+        const definition = definitions.get(entry.instance.snapshotId);
+        if (!definition) throw new Error('Annotation snapshot is unavailable.');
+        return [
+          entry.instance.id,
+          {
+            source: definition.snapshot.source,
+            sha256: definition.snapshot.sha256,
+            document: definition.document,
+          },
+        ];
+      })
+    );
+  const cohortKey = (entries: ReturnType<typeof describe>) =>
+    JSON.stringify(
+      [...entries]
+        .sort((a, b) => a.instance.id.localeCompare(b.instance.id))
+        .map((entry) => [
+          entry.instance.id,
+          entry.plan.documentSha256,
+          entry.plan.controls,
+          entry.plan.dimensions,
+          entry.plan.renderDimensions,
+          entry.plan.bitmapBounds,
+          entry.instance.attachment,
+        ])
+    );
+  const warmCohort = (
+    args: {
+      instances?: readonly ReviewAnnotationEffect[];
+      densityAt(time: number): Record<Plane, Size>;
+      fps: number;
+    },
+    entry: ReturnType<typeof describe>[number],
+    time: number
+  ) => [
+    entry,
+    ...describe(time, args.densityAt(time), args.fps, args.instances)
+      .filter((candidate) => candidate.instance.id !== entry.instance.id)
+      .slice(0, 3),
+  ];
   type WarmGpuPreparation = {
     time: number;
     fps: number;
@@ -304,23 +378,12 @@ export async function createReviewAnnotationRenderer(
       deps.resources.bytes('annotation-warm-plan-resources', bytes)
     );
     try {
-      const cohort = [entry];
-      if (flight.executor.maximumWarmFrames === 4 && captured) {
-        const segments = captured.segments;
-        const instances = (args.instances ?? captured.lane.instances).filter((instance) =>
-          projectReviewAnnotationEffect(instance, segments).slices.some(
-            (slice) => slice.start >= flight.start && slice.start <= time
-          )
-        );
-        cohort.push(
-          ...describe(time, args.densityAt(time), args.fps, instances)
-            .filter((candidate) => candidate.instance.id !== entry.instance.id)
-            .slice(0, 3)
-        );
-      }
+      const cohort =
+        flight.executor.maximumWarmFrames === 4 ? warmCohort(args, entry, time) : [entry];
       const frames = await prepareEffectRuntimeGpuFramePlans({
         executor: flight.executor,
         plans: cohort.map((candidate) => candidate.plan),
+        documents: documentsFor(cohort),
         ledger,
         signal: flight.controller.signal,
       });
@@ -372,13 +435,14 @@ export async function createReviewAnnotationRenderer(
           unchanged &&
           attempted &&
           args.time < attempted.start &&
-          attempted.start <= args.time + 1
+          attempted.start <= args.time + warmLookaheadSeconds
         )
           return;
         const next = resolveUpcomingReviewAnnotationEffectSlice(
           instances,
           captured.segments,
-          args.time
+          args.time,
+          warmLookaheadSeconds
         );
         if (!next || !(args.fps > 0) || !Number.isFinite(args.fps)) {
           cancelWarm();
@@ -415,7 +479,18 @@ export async function createReviewAnnotationRenderer(
           fps: args.fps,
           start: next.start,
         };
-        const isolated = deps.createWarmExecutor(executor);
+        if (
+          executor &&
+          preparedCohort?.executor === executor &&
+          preparedCohort.context === executor.gpuFrameReuseContext &&
+          preparedCohort.key === cohortKey(warmCohort(args, entry, time))
+        )
+          return;
+        const attempt = attempted;
+        const isolated = deps.createWarmExecutor(
+          executor,
+          () => !disposed && attempted === attempt && foregroundTime >= next.start
+        );
         if (!isolated?.prepareGpuFrame) {
           if (!isolated) attempted = undefined;
           isolated?.dispose();
@@ -439,6 +514,10 @@ export async function createReviewAnnotationRenderer(
       return executor?.prepareGpuFrame && executor.maximumGpuFramesInFlight === 2 ? 2 : 1;
     },
     describe,
+    /** Freeze only texture sampling density during a complete geometry gesture, never image placement. */
+    setGeometryPreview(instance: ReviewAnnotationEffect | null) {
+      geometryPreview = instance;
+    },
     counters: ledger.snapshot,
     dispose,
     async prepareGpu(
@@ -449,6 +528,7 @@ export async function createReviewAnnotationRenderer(
       instances?: readonly ReviewAnnotationEffect[]
     ) {
       signal.throwIfAborted();
+      foregroundTime = time;
       const planned = describe(time, density, fps, instances);
       if (warm && time >= warm.start) cancelWarm();
       executor ??= (deps.createExecutor ?? createEffectRuntimeSandboxExecutor)();
@@ -467,9 +547,16 @@ export async function createReviewAnnotationRenderer(
       const frames = await gpuFrameReuse.prepare({
         executor,
         plans: planned.map((entry) => entry.plan),
+        documents: documentsFor(planned),
         ledger: gpuLedger,
         signal,
       });
+      if (planned.length)
+        preparedCohort = {
+          key: cohortKey(planned),
+          executor,
+          context: executor.gpuFrameReuseContext,
+        };
       let released = false;
       const release = () => {
         if (released) return;

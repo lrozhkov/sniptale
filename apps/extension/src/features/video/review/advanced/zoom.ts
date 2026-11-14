@@ -1,3 +1,4 @@
+import { parseCameraSpatialMotion } from '../../project/motion/spatial';
 import {
   type QuickEditBorder,
   type QuickEditSpotlight,
@@ -91,6 +92,8 @@ export function createQuickEditZoomRegion(args: {
 }
 
 export type QuickEditZoomRegionPatch = {
+  effect?: '3d' | null;
+  spatialMotion?: QuickEditZoomRegion['spatialMotion'] | null;
   cameraFollow?: QuickEditZoomRegion['cameraFollow'] | null;
   followCursor?: boolean;
   cursorComposition?: QuickEditZoomRegion['cursorComposition'];
@@ -117,6 +120,7 @@ export function updateQuickEditZoomRegion(
   patch: QuickEditZoomRegionPatch
 ): QuickEditZoomRegion[] {
   if (
+    (patch.spatialMotion !== null && parseCameraSpatialMotion(patch.spatialMotion) === null) ||
     parseCursorCompositionSettings(patch.cursorComposition) === null ||
     parseQuickEditPerspective(patch.perspective) === null ||
     parseQuickEditDepth(patch.depthOfField) === null
@@ -128,6 +132,8 @@ export function updateQuickEditZoomRegion(
     if (region.id !== id) return region;
     const timing = changesPhases ? fitQuickEditZoomTransitions(region) : region;
     const {
+      effect: previousEffect,
+      spatialMotion: previousMotion,
       linkTo: previousLink,
       spotlight: previousSpotlight,
       border: previousBorder,
@@ -149,6 +155,12 @@ export function updateQuickEditZoomRegion(
       patch.cameraFollow === undefined ? previousCameraFollow : patch.cameraFollow;
     const updated = {
       ...rest,
+      ...((patch.effect === undefined ? previousEffect : patch.effect)
+        ? { effect: '3d' as const }
+        : {}),
+      ...((patch.spatialMotion === undefined ? previousMotion : patch.spatialMotion)
+        ? { spatialMotion: patch.spatialMotion ?? previousMotion! }
+        : {}),
       ...(cameraFollow ? { cameraFollow } : {}),
       ...(patch.followCursor === undefined ? {} : { followCursor: patch.followCursor }),
       ...(patch.cursorComposition ? { cursorComposition: patch.cursorComposition } : {}),

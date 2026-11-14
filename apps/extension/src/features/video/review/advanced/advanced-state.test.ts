@@ -731,7 +731,7 @@ it('refuses unsupported source filters and declared historical versions without 
   for (const schemaVersion of [1, 2, 29])
     expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion })).toBeNull();
   const older = { ...createQuickEditAdvancedContent(), schemaVersion: 29 };
-  expect(loadQuickEditAdvancedContentState(older)?.schemaVersion).toBe(32);
+  expect(loadQuickEditAdvancedContentState(older)?.schemaVersion).toBe(33);
 });
 
 it.each(['keyboard', 'mouse'] as const)(

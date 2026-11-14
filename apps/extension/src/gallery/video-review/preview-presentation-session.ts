@@ -1,3 +1,4 @@
+import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
 import { canCoalescePresentationInteraction } from './preview-presentation-state';
 import type { VideoPreviewRenderer } from '../../features/video/preview/preferences';
 import { prepareReviewCameraPlans } from '../../features/video/review/advanced/camera-plan-preparation';
@@ -73,6 +74,9 @@ export function createManualPresentationOwner(
 
 /** One mounted lifetime owns renderer, publication, camera and scheduler teardown. */
 class ManualPresentationSession {
+  private requestGeneration = 0;
+  private movementBase: Description | null = null;
+  private movementInstance: ReviewAnnotationEffect | null = null;
   private diagnostics = createReviewExportDiagnostics({ destination: 'preview', route: 'render' });
   private diagnosed = false;
   private disposed = false;
@@ -185,9 +189,9 @@ class ManualPresentationSession {
         ),
       ...(this.rendererPreference === 'gpu'
         ? {
-            annotationWarmExecutor: (primary) =>
+            annotationWarmExecutor: (primary, canAdopt) =>
               this.playing
-                ? (primary?.createWarmExecutor?.() ??
+                ? (primary?.createWarmExecutor?.(canAdopt) ??
                   createEffectRuntimeSandboxExecutor({ compositionBackend: 'gpu-scene-plan' }))
                 : undefined,
           }
@@ -256,19 +260,40 @@ class ManualPresentationSession {
     if (transition && (!transition.frames || !transition.lease?.active))
       throw new PendingPresentation();
     const current = request.scene;
-    const prepared = await reviewExportPhase(signal, 'prepare', () =>
-      this.renderer.prepare(
-        current.scene.captions && current.scene.webcam
-          ? {
-              ...current.scene,
-              webcamDuration:
-                this.cameraState.phase === 'ready' ? this.cameraState.duration : undefined,
-            }
-          : current.scene,
+    const moved = request.scene.annotationMove;
+    let retained =
+      moved &&
+      this.renderer.prepareAnnotationMove(
+        moved.baseline,
+        moved.instance,
         current.dimensions,
         signal
-      )
-    );
+      );
+    if (moved && !retained && this.rendererPreference === 'gpu') {
+      const baseline = await this.renderer.prepare(moved.baseline, current.dimensions, signal);
+      baseline.release();
+      retained = this.renderer.prepareAnnotationMove(
+        moved.baseline,
+        moved.instance,
+        current.dimensions,
+        signal
+      );
+    }
+    const prepared =
+      retained ??
+      (await reviewExportPhase(signal, 'prepare', () =>
+        this.renderer.prepare(
+          current.scene.captions && current.scene.webcam
+            ? {
+                ...current.scene,
+                webcamDuration:
+                  this.cameraState.phase === 'ready' ? this.cameraState.duration : undefined,
+              }
+            : current.scene,
+          current.dimensions,
+          signal
+        )
+      ));
     this.admission.replaceAssets(prepared.allocationAssets);
     return { value: prepared, release: () => prepared.release() };
   };
@@ -631,7 +656,88 @@ class ManualPresentationSession {
     return this.admission.retainEndpoints(bytes);
   }
 
+  moveAnnotation(instance: ReviewAnnotationEffect): boolean {
+    const input = this.latest().input;
+    const baseline = this.movementBase ?? this.current;
+    if (
+      this.disposed ||
+      this.playing ||
+      input.playing ||
+      this.rendererPreference !== 'gpu' ||
+      !input.annotationGesture ||
+      input.annotationGesture.id !== instance.id ||
+      !baseline?.interactionKey ||
+      this.contextLost
+    )
+      return false;
+    const annotations = baseline.scene.annotationEffects;
+    if (!annotations?.lane.instances.some((entry) => entry.id === instance.id)) return false;
+    this.movementBase = baseline;
+    this.movementInstance = instance;
+    const scene = {
+      ...baseline.scene,
+      annotationEffects: {
+        ...annotations,
+        lane: {
+          ...annotations.lane,
+          instances: annotations.lane.instances.map((entry) =>
+            entry.id === instance.id ? instance : entry
+          ),
+        },
+      },
+    };
+    this.update(
+      { ...baseline, scene, annotationMove: { baseline: baseline.scene, instance } },
+      this.requestGeneration + 1,
+      true
+    );
+    return true;
+  }
+
+  endAnnotationMovement() {
+    if (!this.movementBase) return;
+    this.movementBase = null;
+    this.movementInstance = null;
+    this.scheduler.invalidate();
+  }
+
   update(description: Description, generation: number, interacting: boolean, active = true) {
+    generation = this.requestGeneration = Math.max(this.requestGeneration + 1, generation);
+    interacting = interacting || !!this.latest().input.annotationGesture;
+    if (!description.annotationMove) {
+      const baseline = this.movementBase,
+        instance = this.movementInstance;
+      const input = this.latest().input;
+      if (
+        active &&
+        baseline &&
+        instance &&
+        input.annotationGesture?.id === instance.id &&
+        canCoalescePresentationInteraction(baseline, description) &&
+        description.scene.annotationEffects
+      ) {
+        const annotations = description.scene.annotationEffects;
+        description = {
+          ...description,
+          scene: {
+            ...description.scene,
+            annotationEffects: {
+              ...annotations,
+              lane: {
+                ...annotations.lane,
+                instances: annotations.lane.instances.map((entry) =>
+                  entry.id === instance.id ? instance : entry
+                ),
+              },
+            },
+          },
+          annotationMove: { baseline: baseline.scene, instance },
+        };
+      } else {
+        this.movementBase = null;
+        this.movementInstance = null;
+      }
+    }
     if (
       this.current !== description ||
       this.sequence !== generation ||

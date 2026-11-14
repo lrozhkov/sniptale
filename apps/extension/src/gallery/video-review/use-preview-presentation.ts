@@ -153,6 +153,17 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
     }
     owner.current?.update(current.description, current.generation, !!interacting, active);
   }, [active, owner, key, interacting, reportPresentation]);
+  useEffect(
+    () =>
+      input.annotationMovement?.subscribe((instance) => {
+        if (!instance) {
+          owner.current?.endAnnotationMovement();
+          return false;
+        }
+        return owner.current?.moveAnnotation(instance) ?? false;
+      }),
+    [input.annotationMovement, owner]
+  );
   useEffect(() => {
     owner.current?.ready();
   }, [owner, cut.current, camera.ready, camera.phase]);

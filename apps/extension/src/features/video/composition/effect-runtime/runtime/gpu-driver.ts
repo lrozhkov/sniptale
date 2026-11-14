@@ -1,3 +1,4 @@
+import type { AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
 import type { EffectRuntimeSandboxExecutor } from '../../../../../contracts/effect-runtime/types';
 import { collectEffectRuntimeResultBitmaps } from '../../../../../contracts/effect-runtime/retry-inputs';
 import { buildEffectRuntimeGpuPlan } from '../render/gpu-plan';
@@ -11,6 +12,7 @@ import type { EffectRuntimeFramePlan, EffectRuntimeGpuPreparedFrame } from './ty
 /** Prepare independent annotations; every returned raster has one owner and explicit GPU borrows. */
 export async function prepareEffectRuntimeGpuFramePlans(args: {
   executor: EffectRuntimeSandboxExecutor;
+  documents?: ReadonlyMap<string, { source: string; sha256: string; document: AnimationTemplate }>;
   plans: readonly EffectRuntimeFramePlan[];
   ledger: ReturnType<typeof createEffectRuntimeGpuFrameLedger>;
   signal?: AbortSignal;
@@ -31,7 +33,9 @@ export async function prepareEffectRuntimeGpuFramePlans(args: {
         (plan.target.kind !== 'scene' && plan.target.kind !== 'clip')
       )
         throw new Error('EFFECT_RUNTIME_GPU_DEPENDENT_PLAN_UNSUPPORTED');
+      const verifiedDocument = args.documents?.get(plan.effectInstanceId);
       const command = await createEffectRuntimeRenderMessage({
+        ...(verifiedDocument ? { verifiedDocument } : {}),
         plan,
         inputFrames: {},
         requestId: crypto.randomUUID(),
@@ -91,19 +95,37 @@ export async function prepareEffectRuntimeGpuFramePlans(args: {
       }
     };
     const capacity = args.executor.maximumConcurrentPreparationRequests === 2 ? 2 : 1;
-    for (let offset = 0; offset < args.plans.length; offset += capacity) {
-      args.signal?.throwIfAborted();
-      const results = await Promise.allSettled(
-        args.plans
-          .slice(offset, offset + capacity)
-          .map((plan, index) => prepareFrame(plan, offset + index))
-      );
-      for (const result of results)
-        if (result.status === 'fulfilled') frames.set(result.value.effectInstanceId, result.value);
-      const failure = results.find((result) => result.status === 'rejected');
-      if (failure) throw failure.reason;
-    }
-    return frames;
+    let next = 0;
+    let failed = false;
+    let failure: unknown;
+    const run = async () => {
+      while (!failed) {
+        try {
+          args.signal?.throwIfAborted();
+          const sequenceId = next++;
+          const plan = args.plans[sequenceId];
+          if (!plan) return;
+          const frame = await prepareFrame(plan, sequenceId);
+          frames.set(frame.effectInstanceId, frame);
+        } catch (error) {
+          if (!failed) {
+            failed = true;
+            failure = error;
+          }
+        }
+      }
+    };
+    // Refill a free slot immediately; a slow sibling must not hold the next independent request.
+    // Both lanes drain before failure cleanup can release their owned resources.
+    await Promise.all(Array.from({ length: Math.min(capacity, args.plans.length) }, run));
+    if (failed) throw failure;
+    return new Map(
+      args.plans.map((plan) => {
+        const frame = frames.get(plan.effectInstanceId);
+        if (!frame) throw new Error('EFFECT_RUNTIME_GPU_FRAME_MISSING');
+        return [plan.effectInstanceId, frame];
+      })
+    );
   } catch (error) {
     for (const frame of frames.values()) frame.dispose();
     throw error;

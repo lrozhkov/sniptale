@@ -19,6 +19,11 @@ const captionOwner = vi.hoisted(() => ({
   draw: vi.fn(),
   assertExportable: vi.fn(),
 }));
+// Exercise the admitted fallback stages; the shared backend has dedicated owner proof.
+vi.mock('../../../shared-composition', () => ({
+  renderSharedProjectComposition: vi.fn(async () => false),
+}));
+
 vi.mock('../../../../../workflows/video-review/project-captions', () => ({
   createVideoProjectCaptionRenderer: () => ({ prepare: captionOwner.prepare, clear: vi.fn() }),
 }));

@@ -10,8 +10,8 @@ import {
   effectControlRootIcon,
 } from '../../ui/effect-control-presentation/icons';
 import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
-import { useMemo, useRef, type KeyboardEvent } from 'react';
-import { Clock3, Copy, Move, LayoutTemplate, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { Clock3, Copy, Move, LayoutTemplate, Trash2, Link2 } from 'lucide-react';
 import { type AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
 import {
   applyEffectControlPreset,
@@ -43,6 +43,10 @@ import { ReviewInspectorSections, reviewInspectorActions } from './inspector-sec
 import {
   changeReviewAnnotationBoundControl,
   convertReviewAnnotationAttachment,
+  changeReviewAnnotationBodyTransform,
+  reviewAnnotationBodyGeometry,
+  reviewAnnotationBodyMeasurementKey,
+  setReviewAnnotationBodyBounds,
 } from './annotation-effects-geometry';
 import type { useReviewAnnotationEffects } from './annotation-effects-editor';
 import {
@@ -58,6 +62,7 @@ type Props = {
   editor: Editor;
   id: string;
   source: string | undefined;
+  sourceDigest?: string | undefined;
   duration: number;
   busy: boolean;
 };
@@ -66,10 +71,19 @@ type Props = {
 export function ReviewAnnotationInspector(props: Props) {
   const locale = useAppLocale();
   const document = useMemo(
-    () => (props.source ? readReviewAnnotationEffectDocument(props.source) : null),
-    [props.source]
+    () =>
+      props.source ? readReviewAnnotationEffectDocument(props.source, props.sourceDigest) : null,
+    [props.source, props.sourceDigest]
   );
-  const instance = props.editor.previewLane?.instances.find((item) => item.id === props.id);
+  const [placement, setPlacement] = useState<ReviewAnnotationEffect | null>(null);
+  useEffect(() => props.editor.movement.subscribe(setPlacement), [props.editor.movement]);
+  useEffect(() => {
+    if (!props.editor.gestureId) setPlacement(null);
+  }, [props.editor.gestureId, props.editor.lane]);
+  const instance =
+    placement?.id === props.id
+      ? placement
+      : props.editor.previewLane?.instances.find((item) => item.id === props.id);
   if (!instance) return null;
   if (!document)
     return <div role="alert">{translate('gallery.videoReview.annotationSourceMissing')}</div>;
@@ -130,24 +144,28 @@ function AnnotationParameters(
   const converted = geometry
     ? convertReviewAnnotationAttachment(instance, opposite, geometry)
     : null;
+  const measured = editor.bodyMeasurements.get(
+    reviewAnnotationBodyMeasurementKey(instance, values)
+  );
+  if (measured) setReviewAnnotationBodyBounds(document, instance.id, measured);
   const transform = instance.transform;
-  const dimension = (axis: 'width' | 'height', value: number): Patch => {
-    const next = value / 100;
-    const plane = geometry?.[instance.attachment];
-    const layout = document.animation;
-    if (plane) {
-      return {
-        transform: {
-          ...transform,
-          width:
-            axis === 'width' ? next : (next * plane.height * layout.w) / (plane.width * layout.h),
-          height:
-            axis === 'height' ? next : (next * plane.width * layout.h) / (plane.height * layout.w),
-        },
-      };
-    }
-    return { transform: { ...transform, [axis]: next } };
-  };
+  const body = geometry ? reviewAnnotationBodyGeometry(instance, document, geometry) : null;
+  const plane = geometry?.[instance.attachment];
+  const place = (change: Parameters<typeof changeReviewAnnotationBodyTransform>[3]): Patch => ({
+    transform: geometry
+      ? changeReviewAnnotationBodyTransform(instance, document, geometry, change)
+      : { ...transform, ...change },
+  });
+  const position =
+    body && plane
+      ? {
+          x: body.origin.x / plane.width,
+          y: body.origin.y / plane.height,
+          width: body.size.width / plane.width,
+          height: body.size.height / plane.height,
+        }
+      : transform;
+
   const sections = [
     {
       id: 'timing',
@@ -225,8 +243,8 @@ function AnnotationParameters(
           {number(
             'x',
             translate('gallery.videoReview.annotationX'),
-            transform.x * 100,
-            (x) => ({ transform: { ...transform, x: x / 100 } }),
+            position.x * 100,
+            (x) => place({ x: x / 100 }),
             -1600,
             1600,
             '%'
@@ -234,17 +252,21 @@ function AnnotationParameters(
           {number(
             'y',
             translate('gallery.videoReview.annotationY'),
-            transform.y * 100,
-            (y) => ({ transform: { ...transform, y: y / 100 } }),
+            position.y * 100,
+            (y) => place({ y: y / 100 }),
             -1600,
             1600,
             '%'
           )}
+          <p className="flex items-center gap-1.5 text-xs text-[var(--sniptale-color-text-secondary)]">
+            <Link2 size={12} aria-hidden="true" />
+            {translate('gallery.videoReview.annotationScaleHint')}
+          </p>
           {number(
             'width',
             translate('gallery.videoReview.annotationWidth'),
-            transform.width * 100,
-            (width) => dimension('width', width),
+            position.width * 100,
+            (width) => place({ width: width / 100 }),
             0.01,
             1600,
             '%'
@@ -252,8 +274,8 @@ function AnnotationParameters(
           {number(
             'height',
             translate('gallery.videoReview.annotationHeight'),
-            transform.height * 100,
-            (height) => dimension('height', height),
+            position.height * 100,
+            (height) => place({ height: height / 100 }),
             0.01,
             1600,
             '%'
@@ -262,7 +284,7 @@ function AnnotationParameters(
             'rotation',
             translate('gallery.videoReview.annotationRotation'),
             (transform.rotation * 180) / Math.PI,
-            (rotation) => ({ transform: { ...transform, rotation: (rotation * Math.PI) / 180 } }),
+            (rotation) => place({ rotation: (rotation * Math.PI) / 180 }),
             -360,
             360,
             'deg'

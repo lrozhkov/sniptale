@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   createReviewPresentationMain,
   type ReviewPresentationMainInput,
@@ -126,6 +126,25 @@ export function useReviewLiveSeek(
     anchor: number;
     time: number;
   } | null>(null);
+  const shown = useRef<typeof presented>(null);
+  const mainFrame = useRef<{ resource: LiveSeekResource; time: number } | null>(null);
+  const handoff = useRef<{
+    frame: NonNullable<typeof presented>;
+    target: number | null;
+    resource: LiveSeekResource;
+  } | null>(null);
+  const latest = useRef({ time: state.time, enabled, blocked, resource });
+  latest.current = { time: state.time, enabled, blocked, resource };
+  const dismiss = useCallback(() => {
+    if (handoff.current) return;
+    setPresented(null);
+    shown.current = null;
+  }, []);
+  const cancelHandoff = useCallback(() => {
+    handoff.current = null;
+    shown.current = null;
+    setPresented(null);
+  }, []);
   const { advanced, snapshot, source, exporter, keyCues, clickCues } = state;
   const edits = snapshot.document.edits;
   const map = useMemo(() => createReviewTimeMap(source.duration, edits), [source.duration, edits]);
@@ -188,9 +207,9 @@ export function useReviewLiveSeek(
     clickCues,
   ]);
   useEffect(() => {
-    setPresented(null);
+    if (!handoff.current) dismiss();
     if (!enabled || blocked || !input) return;
-    const anchor = state.time;
+    const anchor = latest.current.time;
     const owner = createReviewLiveSeekQueue(
       async (signal) => {
         const history =
@@ -228,6 +247,7 @@ export function useReviewLiveSeek(
         }
       },
       (frame, time) => {
+        if (handoff.current || anchor !== latest.current.time) return;
         const node = canvas.current;
         const context = node?.getContext('2d');
         if (!node || !context) return;
@@ -235,21 +255,41 @@ export function useReviewLiveSeek(
         if (node.height !== frame.canvas.height) node.height = frame.canvas.height;
         context.clearRect(0, 0, node.width, node.height);
         context.drawImage(frame.canvas, 0, 0);
-        setPresented({ input, anchor, time });
+        shown.current = { input, anchor, time };
+        setPresented(shown.current);
       },
-      () => setPresented(null)
+      dismiss
     );
     queue.current = owner;
-    const leave = () => owner.request(null);
+    const leave = () => {
+      cancelHandoff();
+      owner.request(null);
+    };
     window.addEventListener('blur', leave);
     return () => {
       window.removeEventListener('blur', leave);
       if (queue.current === owner) queue.current = null;
       owner.dispose();
     };
-  }, [input, enabled, blocked, state.time, resource, source, advanced, edits]);
+  }, [
+    input,
+    enabled,
+    blocked,
+    state.time,
+    resource,
+    source,
+    advanced,
+    edits,
+    dismiss,
+    cancelHandoff,
+  ]);
+  useLayoutEffect(() => {
+    if (!enabled || blocked || (handoff.current && handoff.current.resource !== resource))
+      cancelHandoff();
+  }, [enabled, blocked, resource, cancelHandoff]);
   const hover = useCallback(
     (time: number | null) => {
+      if (handoff.current && time !== null) return;
       const result = time === null ? null : map.sourceToTimeline(time);
       const end = map.getDuration();
       queue.current?.request(
@@ -260,20 +300,70 @@ export function useReviewLiveSeek(
     },
     [map]
   );
-  const clear = useCallback(() => queue.current?.request(null), []);
+  const clear = useCallback(() => {
+    cancelHandoff();
+    queue.current?.request(null);
+  }, [cancelHandoff]);
+  const hold = useCallback(() => {
+    if (handoff.current) return;
+    const frame = shown.current;
+    const current = latest.current;
+    if (!frame || !current.enabled || current.blocked || frame.anchor !== current.time) return;
+    handoff.current = { frame, target: null, resource: current.resource };
+    queue.current?.request(null);
+    setPresented(frame);
+  }, []);
+  const commit = useCallback(
+    (time: number) => {
+      const pending = handoff.current;
+      if (!pending) return;
+      pending.target = time;
+      const ready = mainFrame.current;
+      if (ready?.resource === pending.resource && Math.abs(ready.time - time) <= 0.000002)
+        cancelHandoff();
+    },
+    [cancelHandoff]
+  );
+  const finishIntent = useCallback(
+    (readTime: () => number | undefined) => {
+      const pending = handoff.current;
+      if (!pending || pending.target !== null) return;
+      // Track selection and seeking can be separate handlers of the same pointer event.
+      queueMicrotask(() => {
+        if (handoff.current !== pending || pending.target !== null) return;
+        const time = readTime();
+        if (time !== undefined && Math.abs(time - pending.frame.anchor) > 0.000002) commit(time);
+        else cancelHandoff();
+      });
+    },
+    [cancelHandoff, commit]
+  );
+  const onPresentedTime = useCallback(
+    (time: number) => {
+      mainFrame.current = { resource: latest.current.resource, time };
+      const target = handoff.current?.target;
+      if (target !== null && target !== undefined && Math.abs(time - target) <= 0.000002)
+        cancelHandoff();
+    },
+    [cancelHandoff]
+  );
   return {
     enabled,
     setEnabled,
     canvas,
     hover,
     clear,
+    hold,
+    commit,
+    finishIntent,
+    onPresentedTime,
     available: exporter.index !== null && raster !== null,
     visible:
       !!presented &&
       enabled &&
       !blocked &&
-      presented.input === input &&
-      presented.anchor === state.time,
+      ((handoff.current?.frame === presented && handoff.current.resource === resource) ||
+        (presented.input === input && presented.anchor === state.time)),
     time: presented?.time ?? null,
   };
 }

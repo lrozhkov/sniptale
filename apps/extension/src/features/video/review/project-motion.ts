@@ -19,6 +19,7 @@ export function planReviewProjectMotion(
   applied: boolean
 ): VideoProject | null {
   if (!content.zoom.regions.length) return project;
+  if (content.zoom.regions.some((r) => r.effect === '3d')) project = { ...project, version: 55 };
   if (content.zoom.regions.some((region) => region.border && region.spotlight)) return null;
   const clips = project.clips.filter(
     (clip): clip is VideoProjectVideoClip =>
@@ -31,7 +32,7 @@ export function planReviewProjectMotion(
   );
   // Unresolved source placements keep their existing dormant bindings; conflicting copies do not render.
   const authored = content.zoom.regions.filter(
-    (region) => region.dormant || activeIds.has(region.id)
+    (region) => region.effect === '3d' || region.dormant || activeIds.has(region.id)
   );
   const regions: VideoProjectMotionRegion[] = [];
   const groups = new Map<string, VideoProjectMotionRegion[]>();
@@ -150,6 +151,8 @@ function mappedRegion(
     ...(region.cursorComposition
       ? { cursorComposition: structuredClone(region.cursorComposition) }
       : {}),
+    ...(region.effect ? { effect: region.effect } : {}),
+    ...(region.spatialMotion ? { spatialMotion: structuredClone(region.spatialMotion) } : {}),
     ...(region.perspective ? { perspective: structuredClone(region.perspective) } : {}),
     ...(region.depthOfField ? { depthOfField: structuredClone(region.depthOfField) } : {}),
     ...(region.motionBlur ? { motionBlur: structuredClone(region.motionBlur) } : {}),

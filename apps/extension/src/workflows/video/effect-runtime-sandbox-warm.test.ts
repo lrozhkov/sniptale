@@ -185,3 +185,63 @@ it('rejects late advisory commands after foreground adoption without retiring it
   primary.dispose();
   expect(io.managers[1]!.dispose).toHaveBeenCalledOnce();
 });
+
+it('adopts a completed later cohort only after the caller opens its boundary gate', async () => {
+  const primary = createEffectRuntimeSandboxExecutor({ compositionBackend: 'gpu-scene' });
+  const request = createSandboxRenderRequest();
+  let activate = false;
+  const release = (result: EffectRuntimeSceneResult) => {
+    if (result.kind === 'frame') result.bitmap.close();
+  };
+  try {
+    release(await primary.prepareGpuFrame!(request));
+    const warm = primary.createWarmExecutor!(() => activate);
+    if (!warm) throw new Error('Later preparation requires an isolated child.');
+    release(await warm.prepareGpuFrame!(request));
+    warm.dispose();
+    release(await primary.prepareGpuFrame!(request));
+    expect(io.managers[0]!.prepareGpuFrame).toHaveBeenCalledTimes(2);
+    expect(io.managers[0]!.dispose).not.toHaveBeenCalled();
+    activate = true;
+    release(await primary.prepareGpuFrame!(request));
+    expect(io.managers[0]!.dispose).toHaveBeenCalledOnce();
+    expect(io.managers[1]!.prepareGpuFrame).toHaveBeenCalledTimes(2);
+  } finally {
+    primary.dispose();
+  }
+  expect(io.managers[1]!.dispose).toHaveBeenCalledOnce();
+});
+
+it('does not replace a manager while a foreground request still owns it', async () => {
+  const primary = createEffectRuntimeSandboxExecutor({ compositionBackend: 'gpu-scene' });
+  const request = createSandboxRenderRequest();
+  const inFlight = deferred();
+  io.managers[0]!.prepareGpuFrame.mockReturnValueOnce(inFlight.promise);
+  const completion = frame(request);
+  let drained = false;
+  const first = primary.prepareGpuFrame!(request);
+  const warm = primary.createWarmExecutor!(() => true);
+  if (!warm) throw new Error('Later preparation unavailable.');
+  const release = (result: EffectRuntimeSceneResult) => {
+    if (result.kind === 'frame') result.bitmap.close();
+  };
+  try {
+    release(await warm.prepareGpuFrame!(request));
+    warm.dispose();
+    release(await primary.prepareGpuFrame!({ ...request, requestId: 'while-pending' }));
+    expect(io.managers[0]!.dispose).not.toHaveBeenCalled();
+    expect(io.managers[0]!.prepareGpuFrame).toHaveBeenCalledTimes(2);
+    inFlight.resolve(completion);
+    release(await first);
+    drained = true;
+    release(await primary.prepareGpuFrame!({ ...request, requestId: 'after-drain' }));
+    expect(io.managers[0]!.dispose).toHaveBeenCalledOnce();
+    expect(io.managers[1]!.prepareGpuFrame).toHaveBeenCalledTimes(2);
+  } finally {
+    if (!drained) {
+      inFlight.resolve(completion);
+      release(await first);
+    }
+    primary.dispose();
+  }
+});

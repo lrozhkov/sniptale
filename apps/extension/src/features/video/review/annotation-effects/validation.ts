@@ -1,8 +1,11 @@
+import {
+  readVerifiedRuntimeAnimationSource,
+  verifyRuntimeAnimationSource,
+} from '../../../../contracts/effect-runtime/animation';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import {
   parseAnimationTemplateSource,
-  verifyAnimationResource,
   type AnimationTemplate,
 } from '@sniptale/runtime-contracts/animation-template';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -145,7 +148,12 @@ export function parseReviewAnnotationEffects(raw: unknown): ReviewAnnotationEffe
 }
 
 /** Each animation snapshot owns its complete checked local package. */
-export function readReviewAnnotationEffectDocument(source: string): AnimationTemplate | null {
+export function readReviewAnnotationEffectDocument(
+  source: string,
+  digest?: string
+): AnimationTemplate | null {
+  const verified = digest ? readVerifiedRuntimeAnimationSource(source, digest) : null;
+  if (verified) return verified;
   const result = parseAnimationTemplateSource(source);
   return result.ok ? result.template : null;
 }
@@ -168,7 +176,7 @@ function parseSnapshot(raw: unknown): ReviewAnnotationEffectSnapshot | null {
     return null;
   const sourceBytes = new TextEncoder().encode(raw['source']).byteLength;
   if (sourceBytes !== raw['retainedByteLength']) return null;
-  const document = readReviewAnnotationEffectDocument(raw['source']);
+  const document = readReviewAnnotationEffectDocument(raw['source'], raw['sha256']);
   if (!document || document.id !== raw['documentId']) return null;
   return {
     id: raw['id'],
@@ -272,17 +280,17 @@ export async function verifyReviewAnnotationEffectSnapshot(
   signal.throwIfAborted();
   const snapshot = parseReviewAnnotationEffectSnapshots([raw])?.[0];
   if (!snapshot) throw new ReviewAnnotationEffectUnavailableError('invalid');
-  const sourceHash = bytesToHex(sha256(new TextEncoder().encode(snapshot.source)));
-  signal.throwIfAborted();
-  if (sourceHash !== snapshot.sha256)
-    throw new ReviewAnnotationEffectUnavailableError('source-integrity');
-  const document = readReviewAnnotationEffectDocument(snapshot.source);
-  if (!document) throw new ReviewAnnotationEffectUnavailableError('invalid');
-  for (const resource of document.resources) {
+  const verified = readVerifiedRuntimeAnimationSource(snapshot.source, snapshot.sha256);
+  if (!verified) {
+    const sourceHash = bytesToHex(sha256(new TextEncoder().encode(snapshot.source)));
     signal.throwIfAborted();
-    if (!(await verifyAnimationResource(resource)))
-      throw new ReviewAnnotationEffectUnavailableError('resource-integrity');
+    if (sourceHash !== snapshot.sha256)
+      throw new ReviewAnnotationEffectUnavailableError('source-integrity');
   }
+  const document = await verifyRuntimeAnimationSource(snapshot.source, snapshot.sha256, signal);
+  signal.throwIfAborted();
+  // Structural parsing already succeeded above; failed full admission means resource integrity failed.
+  if (!document) throw new ReviewAnnotationEffectUnavailableError('resource-integrity');
   const assets: (ReviewAnnotationEffectAsset & { blob: Blob })[] = [];
   signal.throwIfAborted();
   return {

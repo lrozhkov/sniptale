@@ -1,3 +1,4 @@
+import { parseCameraSpatialMotion } from '../motion/spatial';
 import { isMotionFocusArea } from '../motion/focus-area';
 import { isCursorTrajectoryDescriptor } from '../cursor-trajectory/records';
 import { parseQuickEditBorder, parseQuickEditSpotlight } from '../scene/focus-appearance';
@@ -296,6 +297,12 @@ export function isMotionRegion(value: unknown): boolean {
   const phaseTransitions = parseMotionPhaseTransitions(value['phaseTransitions']);
   return (
     phaseTransitions !== null &&
+    (value['effect'] === undefined ||
+      (value['effect'] === '3d' &&
+        value['border'] === undefined &&
+        value['spotlight'] === undefined)) &&
+    parseCameraSpatialMotion(value['spatialMotion']) !== null &&
+    (value['spatialMotion'] === undefined || value['effect'] === '3d') &&
     (!isRecord(value['sourceBinding']) ||
       value['sourceBinding']['dormant'] !== true ||
       value['duration'] === 0) &&

@@ -242,7 +242,7 @@ it('restores nested disclosure choices after another object and a fresh editor m
   expect(host.querySelector('details')!.open).toBe(true);
 });
 
-it('disables dormant Spotlight conversion when revival would overlap an active Zoom', async () => {
+it('keeps dormant focus unchanged without offering type conversion', async () => {
   const { createQuickEditSpotlight } =
     await import('../../features/video/project/scene/focus-appearance');
   const advanced = createQuickEditAdvancedState();
@@ -266,12 +266,9 @@ it('disables dormant Spotlight conversion when revival would overlap an active Z
     return <ReviewAdvancedPanels advanced={advanced} zoom={zoom} />;
   }
   act(() => root.render(<DormantHarness />));
-  const zoomButton = host.querySelector<HTMLButtonElement>(
-    '[data-ui="gallery.videoReview.focusType"] button[title="gallery.videoReview.zoomRegionLabel"]'
-  )!;
-  expect(zoomButton.disabled).toBe(true);
-  expect(host.textContent).toContain('gallery.videoReview.focusZoomConflict');
-  act(() => zoomButton.click());
+  expect(host.querySelector('[data-ui="gallery.videoReview.focusType"]')).toBeNull();
+  expect(advanced.zoom.regions[0]!.dormant).toBe(true);
+  expect(advanced.zoom.regions[1]!.id).toBe('camera');
   expect(setZoom).not.toHaveBeenCalled();
 });
 
@@ -394,6 +391,8 @@ function mountSpatialDraftPanel(name = 'perspectiveX') {
   initial.ui.mode = 'advanced';
   const region = {
     ...createQuickEditZoomRegion({ id: 'spatial-draft', at: 1, duration: 2, endMax: 10 }),
+    effect: '3d' as const,
+    cursorComposition: { mode: 'off' as const, amount: 0.5, smoothness: 0.6 },
     perspective: { enabled: true, rotateX: 10, rotateY: 20, rotateZ: 30, strength: 0.5 },
     depthOfField: {
       enabled: true,

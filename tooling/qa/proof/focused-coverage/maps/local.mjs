@@ -1,5 +1,46 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'review-presented-clock',
+    productionFile: 'apps/extension/src/gallery/video-review/playback-presentation-clock.ts',
+    reason:
+      'Transport validation and mounted readouts cover presented time, pause, seek and stale commits.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/use-playback.test.tsx',
+      'apps/extension/src/gallery/video-review/timeline-chrome.test.tsx',
+      'apps/extension/src/gallery/video-review/stage-presentation.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-project-motion-conversion',
+    productionFile: 'apps/extension/src/features/video/review/project-motion.ts',
+    reason:
+      'Camera conversion covers independent 3D, source bindings, transitions, cursor orientation and scene settings.',
+    testFiles: [
+      'apps/extension/src/features/video/review/project-conversion.motion.test.ts',
+      'apps/extension/src/features/video/review/project-conversion.camera.test.ts',
+      'apps/extension/src/features/video/review/project-conversion.cursor.test.ts',
+      'apps/extension/src/features/video/review/project-conversion.scene.test.ts',
+      'apps/extension/src/features/video/review/project-conversion.test.ts',
+    ],
+  },
+  {
+    owner: 'review-workspace-source-admission',
+    productionFile: 'apps/extension/src/composition/persistence/review-workspaces/parser.ts',
+    reason:
+      'Workspace admission checks baseline, redo, canonical append, asset closure, embedded sources and portable restore.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/review-workspaces/parser.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store-incremental.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store-annotation-retention.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/annotation-effects.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/asset-refs.operations.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/asset-refs.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/backup-restore-authored-content.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/focus-compatibility.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/backup-restore.test.ts',
+    ],
+  },
+  {
     owner: 'review-authored-interaction-ui',
     productionFile: 'apps/extension/src/gallery/video-review/interaction-editor.tsx',
     reason:

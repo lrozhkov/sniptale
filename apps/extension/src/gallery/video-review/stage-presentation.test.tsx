@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, useLayoutEffect, useState } from 'react';
+import { act, Profiler, startTransition, useState } from 'react';
 import { ReviewStage } from './stage';
 import { reviewPresentedGeometry } from '../../workflows/video-review/gpu-preview-geometry';
 import { createRoot } from 'react-dom/client';
@@ -215,35 +215,39 @@ it('batches the exact published stage geometry and root display clock and reject
   });
   function Harness() {
     const [time, setTime] = useState(0);
-    useLayoutEffect(() => {
-      commits.push({ time, transform: host.querySelector('video')!.style.transform });
-    });
     return (
-      <ReviewStage
-        source={source}
-        url="blob:source"
-        video={{ current: null }}
-        drawing={false}
-        region={undefined}
-        scene={{ background, camera: { scale: 1, centerX: 0.5, centerY: 0.5 } }}
-        preview={{
-          playing: true,
-          preferences: {
-            renderer: 'gpu',
-            rasterPreset: 'current',
-            frameRate: 'current',
-            pausedQuality: 'same',
-            showFrameRate: false,
-          },
-          sourceToResult: (value) => value,
-          onPresentedTime: (_source, value) => setTime(value),
-        }}
-        onRegion={vi.fn()}
-        onReady={vi.fn()}
-        onTime={vi.fn()}
-        onPlaying={vi.fn()}
-        onError={vi.fn()}
-      />
+      <Profiler
+        id="stage"
+        onRender={() =>
+          commits.push({ time, transform: host.querySelector('video')!.style.transform })
+        }
+      >
+        <ReviewStage
+          source={source}
+          url="blob:source"
+          video={{ current: null }}
+          drawing={false}
+          region={undefined}
+          scene={{ background, camera: { scale: 1, centerX: 0.5, centerY: 0.5 } }}
+          preview={{
+            playing: true,
+            preferences: {
+              renderer: 'gpu',
+              rasterPreset: 'current',
+              frameRate: 'current',
+              pausedQuality: 'same',
+              showFrameRate: false,
+            },
+            sourceToResult: (value) => value,
+            onPresentedTime: (_source, value) => startTransition(() => setTime(value)),
+          }}
+          onRegion={vi.fn()}
+          onReady={vi.fn()}
+          onTime={vi.fn()}
+          onPlaying={vi.fn()}
+          onError={vi.fn()}
+        />
+      </Profiler>
     );
   }
   try {

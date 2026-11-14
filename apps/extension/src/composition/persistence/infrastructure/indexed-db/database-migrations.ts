@@ -1005,6 +1005,29 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
     ],
     diagnostic: 'Audio processing project stores are unavailable.',
   }),
+  contractOnlyMigration({
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 35, to: 36 },
+      { domainId: 'videoProjects', from: 12, to: 13 },
+    ],
+    fromDatabaseVersion: 57,
+    toDatabaseVersion: 58,
+    stores: [
+      VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_HISTORY_STORE,
+      VIDEO_WORKSPACE_DRAFTS_STORE,
+      VIDEO_PROJECTS_STORE,
+      VIDEO_PROJECT_REVISIONS_STORE,
+    ],
+    validationStores: [
+      VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_HISTORY_STORE,
+      VIDEO_WORKSPACE_DRAFTS_STORE,
+      VIDEO_PROJECTS_STORE,
+      VIDEO_PROJECT_REVISIONS_STORE,
+    ],
+    diagnostic: 'Spatial focus project stores are unavailable.',
+  }),
 ];
 
 function projectPrototypeAnimationPreferences(value: unknown) {

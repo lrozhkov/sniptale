@@ -1,5 +1,6 @@
 import type { ReviewInspectorNavigation } from './inspector-navigation';
 import type { ReactNode } from 'react';
+import { Box } from 'lucide-react';
 import { ReviewTrackHeightButton } from './track-row';
 import { reviewOriginalAudioPlacementIssue } from './range-placement';
 import type { ReviewFocusType } from './zoom-editor';
@@ -308,6 +309,7 @@ function ReviewFocusToolControl({
     { type: 'zoom', label: 'gallery.videoReview.zoomRegionLabel', icon: ZoomIn },
     { type: 'spotlight', label: 'gallery.videoReview.focusSpotlight', icon: ScanEye },
     { type: 'lens', label: 'gallery.videoReview.focusLens', icon: Search },
+    { type: '3d', label: 'gallery.videoReview.focus3d', icon: Box },
     { type: 'border', label: 'gallery.videoReview.focusBorder', icon: RectangleHorizontal },
   ] as const;
   return (

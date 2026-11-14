@@ -635,3 +635,30 @@ it.each([
     expect(update).not.toHaveBeenCalled();
   }
 );
+
+it('retains recorded event content when only playback time and editor commands change', () => {
+  const markers = [{ ...marker('action', 'click', 1), eventType: 'CLICK' }];
+  const update = vi.fn();
+  const advanced = createQuickEditAdvancedState();
+  const editor = () => ({
+    ...createReviewInteractionEditor({
+      advanced,
+      duration: 10,
+      time: 0,
+      beforeAction: (action) => action(),
+      canStart: () => true,
+      setActiveSelection: vi.fn(),
+      seek: vi.fn(),
+      setMode: vi.fn(),
+      setInteractionTimeline: vi.fn(),
+      setKeyAnimations: vi.fn(),
+      setClickAnimations: vi.fn(),
+    }),
+    update,
+  });
+  const base = { markers, duration: 10, width: 1000, zoom: 1, onMarker: vi.fn() };
+  act(() => root.render(<ReviewTelemetryStrip {...base} time={0} interactionEditor={editor()} />));
+  const translations = localeProbe.translations;
+  act(() => root.render(<ReviewTelemetryStrip {...base} time={1} interactionEditor={editor()} />));
+  expect(localeProbe.translations).toBe(translations);
+});

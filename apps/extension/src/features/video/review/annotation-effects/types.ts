@@ -17,7 +17,7 @@ export interface ReviewAnnotationEffect {
   attachment: 'content' | 'viewport';
   transform: ReviewAnnotationEffectTransform;
   controls: Record<string, string | number>;
-  /** Fixed anchors in the same canonical plane as the body; moving the body keeps these points. */
+  /** Canonical scene anchors; whole-object transforms carry them, while handle edits remain independent. */
   anchors?: Record<string, { x: number; y: number }>;
   order: number;
 }

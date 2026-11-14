@@ -53,7 +53,15 @@ import {
   type ReviewStageFocusPicker,
 } from './stage-focus';
 import { ReviewSpotlightOverlay } from './spotlight-overlay';
-import { useCallback, useEffect, useRef, useState, type RefObject, type ReactNode } from 'react';
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+  type ReactNode,
+} from 'react';
 import { projectVideoRegion } from '../../features/video/review/geometry';
 import type {
   CanvasComment,
@@ -212,14 +220,19 @@ export function ReviewStage(props: ReviewStageProps) {
   const receiveGeometry = useCallback(
     (geometry: ReviewPresentedGeometry | null, sourceTime?: number, sourceIdentity?: string) => {
       if (sourceIdentity !== undefined && sourceIdentity !== props.url) return;
-      setReceipt((previous) =>
-        previous?.source === props.url && previous.geometry === geometry
-          ? previous
-          : { source: props.url, geometry }
-      );
-      if (geometry && sourceTime !== undefined) onPresentedTime?.(props.url, sourceTime);
+      const publish = () => {
+        setReceipt((previous) =>
+          previous?.source === props.url && previous.geometry === geometry
+            ? previous
+            : { source: props.url, geometry }
+        );
+        if (sourceTime !== undefined) onPresentedTime?.(props.url, sourceTime);
+      };
+      // One displayed frame must not cause separate urgent geometry and deferred clock commits.
+      if (props.preview?.playing) startTransition(publish);
+      else publish();
     },
-    [props.url, onPresentedTime]
+    [props.url, props.preview?.playing, onPresentedTime]
   );
   const presented = receipt?.source === props.url ? receipt.geometry : null;
   const representedProps =
@@ -266,6 +279,47 @@ export function ReviewStage(props: ReviewStageProps) {
     size,
     receiveGeometry
   );
+  useEffect(() => {
+    const video = props.video.current;
+    if (presentation.active || !video || !onPresentedTime) return;
+    let frame: number | null = null;
+    let paint: number | null = null;
+    const cancel = () => {
+      if (frame !== null) video.cancelVideoFrameCallback(frame);
+      if (paint !== null) cancelAnimationFrame(paint);
+      frame = null;
+      paint = null;
+    };
+    const seeking = () => {
+      cancel();
+      const target = video.currentTime;
+      if (typeof video.requestVideoFrameCallback !== 'function') return;
+      const presented = () => {
+        frame = null;
+        if (video.currentTime !== target) return;
+        if (video.seeking) frame = video.requestVideoFrameCallback(presented);
+        else onPresentedTime(props.url, target);
+      };
+      frame = video.requestVideoFrameCallback(presented);
+    };
+    const seeked = () => {
+      if (typeof video.requestVideoFrameCallback === 'function') return;
+      const target = video.currentTime;
+      paint = requestAnimationFrame(() => {
+        paint = requestAnimationFrame(() => {
+          paint = null;
+          if (!video.seeking && video.currentTime === target) onPresentedTime(props.url, target);
+        });
+      });
+    };
+    video.addEventListener('seeking', seeking);
+    video.addEventListener('seeked', seeked);
+    return () => {
+      cancel();
+      video.removeEventListener('seeking', seeking);
+      video.removeEventListener('seeked', seeked);
+    };
+  }, [presentation.active, props.video, props.url, onPresentedTime]);
   const manual = presentation.active && presentation.status.actualRaster !== null;
   const { header, motion, projection, windowProjection, plane, projected } =
     useStageInteractionGeometry(

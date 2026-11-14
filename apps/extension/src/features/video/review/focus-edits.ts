@@ -125,12 +125,21 @@ export function projectReviewFocus(
     const spans = projectSourceFocusPhases(
       { sourceStart: anchor.start, sourceEnd: anchor.end, enter: region.enter, exit: region.exit },
       sourceSpans,
-      { splitAtRates: !!region.border }
+      { splitAtRates: !!region.border || region.effect === '3d' }
     );
     return spans.map((span, index) => {
       const { linkTo: _linkTo, linkEasing: _linkEasing, ...withoutLink } = region;
       return {
         ...withoutLink,
+        ...(region.effect === '3d'
+          ? {
+              spatialClock: {
+                offset: span.sourceStart - anchor.start,
+                rate: span.rate,
+                duration: anchor.end - anchor.start,
+              },
+            }
+          : {}),
         ...(region.border
           ? {
               borderClock: {

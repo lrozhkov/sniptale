@@ -50,8 +50,19 @@ export function resolveReviewAnnotationEffectControls(
       x: anchor.x * plane.width,
       y: anchor.y * plane.height,
     });
-    controls[handle.xControl] = point.x;
-    controls[handle.yControl] = point.y;
+    // Old editor versions could persist scene anchors outside the template's numeric domain.
+    // Bound their derived runtime values without rewriting the stored scene coordinates.
+    for (const [id, value] of [
+      [handle.xControl, point.x],
+      [handle.yControl, point.y],
+    ] as const) {
+      const rounded = Math.round(value * 1e10) / 1e10;
+      const control = document.controls.find((control) => control.id === id);
+      controls[id] =
+        control?.kind === 'number'
+          ? Math.max(control.min ?? -Infinity, Math.min(control.max ?? Infinity, rounded))
+          : rounded;
+    }
   }
   return controls;
 }
@@ -209,4 +220,47 @@ function flattenMappedAnnotationBody(
   const width = Math.hypot(u.x, u.y),
     height = Math.hypot(v.x, v.y);
   return normalizeMappedAnnotationBody(center, { width, height }, u, to);
+}
+
+/** Whole-object transforms carry scene anchors with the body. Explicit handle edits remain independent. */
+export function transformReviewAnnotationAnchors(
+  instance: ReviewAnnotationEffect,
+  transform: ReviewAnnotationEffectTransform,
+  plane: Size
+): ReviewAnnotationEffect['anchors'] {
+  if (!instance.anchors) return undefined;
+  const before = instance.transform;
+  if (
+    before.width === transform.width &&
+    before.height === transform.height &&
+    before.rotation === transform.rotation
+  )
+    return Object.fromEntries(
+      Object.entries(instance.anchors).map(([id, point]) => [
+        id,
+        {
+          x: point.x + transform.x - before.x,
+          y: point.y + transform.y - before.y,
+        },
+      ])
+    );
+  const cos = Math.cos(before.rotation),
+    sin = Math.sin(before.rotation);
+  const nextCos = Math.cos(transform.rotation),
+    nextSin = Math.sin(transform.rotation);
+  return Object.fromEntries(
+    Object.entries(instance.anchors).map(([id, point]) => {
+      const dx = (point.x - before.x - before.width / 2) * plane.width;
+      const dy = (point.y - before.y - before.height / 2) * plane.height;
+      const x = ((dx * cos + dy * sin) * transform.width) / before.width;
+      const y = ((-dx * sin + dy * cos) * transform.height) / before.height;
+      return [
+        id,
+        {
+          x: transform.x + transform.width / 2 + (x * nextCos - y * nextSin) / plane.width,
+          y: transform.y + transform.height / 2 + (x * nextSin + y * nextCos) / plane.height,
+        },
+      ];
+    })
+  );
 }

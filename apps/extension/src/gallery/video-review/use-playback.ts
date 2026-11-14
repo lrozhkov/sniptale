@@ -1,3 +1,4 @@
+import { createReviewPlaybackPresentationClock } from './playback-presentation-clock';
 import {
   createReviewPlaybackRange,
   reviewPlaybackRangeStart,
@@ -31,6 +32,11 @@ interface ReviewPlaybackProps {
 /** Owns source-time playback; the persisted original-audio gate and rate live here. */
 export function useReviewPlayback(props: ReviewPlaybackProps) {
   const video = useRef<HTMLVideoElement>(null);
+  const [playheadClock] = useState(() =>
+    createReviewPlaybackPresentationClock(
+      () => !!video.current && !video.current.paused && !video.current.error
+    )
+  );
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const latest = useRef(props);
@@ -84,10 +90,16 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
       if (pendingResume.current === request) pendingResume.current = null;
     };
   }, [resumeRevision]);
-  const publishTime = useCallback((value: number) => {
-    // Browser media clocks can round the terminal timestamp beyond the project endpoint.
-    if (Number.isFinite(value)) setTime(Math.max(0, Math.min(latest.current.duration, value)));
-  }, []);
+  const publishTime = useCallback(
+    (value: number) => {
+      // Browser media clocks can round the terminal timestamp beyond the project endpoint.
+      if (!Number.isFinite(value)) return;
+      const time = Math.max(0, Math.min(latest.current.duration, value));
+      playheadClock.publish(time);
+      setTime(time);
+    },
+    [playheadClock]
+  );
   const presentation = useRef<{ source: string; active: boolean } | null>(null);
   const setPresentationActive = useCallback((source: string, active: boolean) => {
     if (active) presentation.current = { source, active };
@@ -198,6 +210,7 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
     if (resume && node) prepareAfterSeek(node);
   };
   return {
+    playheadClock,
     video,
     recovering: recovery.recovering,
     time,

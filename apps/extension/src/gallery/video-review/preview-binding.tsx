@@ -274,8 +274,9 @@ function ReviewPreviewStage({
   const { busy, features, composer, snapshot, canvasComments } = state;
   const captionPreview = useReviewCaptionPreview(state);
   const outerFadePlan = useReviewOuterFadePlan(state);
-  const sceneEditable =
-    !state.playing && !busy && state.editing.exporter.phase === 'idle' && !composer.annotation;
+  const sceneAvailable =
+    !state.playing && state.editing.exporter.phase === 'idle' && !composer.annotation;
+  const sceneEditable = sceneAvailable && !busy;
   return (
     <ReviewStageBinding
       previewOverlay={previewOverlay}
@@ -308,7 +309,7 @@ function ReviewPreviewStage({
         state.annotationEffects &&
         state.advanced.ui.mode === 'advanced' &&
         state.advanced.ui.tracks.annotationEffects !== false &&
-        sceneEditable &&
+        sceneAvailable &&
         features.overlaysVisible
           ? {
               magnetEnabled: annotationMagnetEnabled ?? false,

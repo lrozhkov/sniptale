@@ -636,3 +636,41 @@ it('omits a conflicting camera copy from Native composition without changing its
   );
   expect(input.document.advancedContent.zoom.regions).toContainEqual(copy);
 });
+
+it('keeps independent spatial motion consistent in Gallery and reopened Native export composition', () => {
+  const input = motionFixture(true, false);
+  const region = input.document.advancedContent.zoom.regions[0]!;
+  region.effect = '3d';
+  region.transform = { scale: 1, centerX: 0.5, centerY: 0.5 };
+  region.perspective = { enabled: true, rotateX: -12, rotateY: 24, rotateZ: 5, strength: 0.7 };
+  region.spatialMotion = {
+    enabled: true,
+    easing: 'linear',
+    end: { ...region.perspective, rotateY: -24 },
+  };
+  region.enter = { type: 'linear', duration: 0.3 };
+  region.exit = { type: 'linear', duration: 0.3 };
+  const plan = planReviewProjectConversion(input);
+  if (plan.status !== 'prepared') throw new Error(JSON.stringify(plan));
+  const project = hydrateVideoProject(JSON.parse(JSON.stringify(plan.project)));
+  expect(project.version).toBe(55);
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  const regions = projectReviewFocus(
+    input.document.advancedContent.zoom.regions,
+    buildReviewTimeMap(input.source.duration, input.document.edits)
+  );
+  for (const time of [0.15, 0.8, 1.2, 2.5, 4, 5.7]) {
+    const gallery = evaluateQuickEditCameraAtTime(regions, time);
+    const native = resolveVideoCompositionCamera({
+      project,
+      currentTime: time,
+      actions: [],
+      cursorSample: null,
+    });
+    expect(native.scale).toBe(1);
+    expect(native.spatial?.rotation).toEqual(gallery.spatial?.rotation);
+    if (gallery.spatial)
+      expect(native.spatial?.perspective).toBeCloseTo(gallery.spatial.perspective, 8);
+    else expect(native.spatial).toBeUndefined();
+  }
+});

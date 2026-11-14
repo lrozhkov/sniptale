@@ -657,11 +657,13 @@ export function reviewSelectionLabel(
   if (selection.kind === 'zoom') {
     const region = state.advanced.zoom.regions.find((item) => item.id === selection.id);
     return translate(
-      region?.border
-        ? 'gallery.videoReview.focusBorder'
-        : region?.spotlight
-          ? 'gallery.videoReview.focusSpotlight'
-          : 'gallery.videoReview.zoomRegionLabel'
+      region?.effect === '3d'
+        ? 'gallery.videoReview.focus3d'
+        : region?.border
+          ? 'gallery.videoReview.focusBorder'
+          : region?.spotlight
+            ? 'gallery.videoReview.focusSpotlight'
+            : 'gallery.videoReview.zoomRegionLabel'
     );
   }
   if (selection.kind === 'zoom-link') return translate('gallery.videoReview.zoomLinkSettings');

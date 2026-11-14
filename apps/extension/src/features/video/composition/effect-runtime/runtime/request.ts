@@ -1,3 +1,4 @@
+import type { AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
 import { createEffectRuntimeAssetSelectionId } from '../../../../../contracts/effect-runtime/immutable-refs';
 import { verifyRuntimeAnimationSource } from '../../../../../contracts/effect-runtime/animation';
 import type {
@@ -9,6 +10,7 @@ import type { EffectRuntimeFramePlan } from './types';
 
 export async function createEffectRuntimeRenderMessage(args: {
   inputFrames: EffectRuntimeFrameInputs;
+  verifiedDocument?: { source: string; sha256: string; document: AnimationTemplate };
   plan: EffectRuntimeFramePlan;
   requestId: string;
   sequenceId: number;
@@ -16,7 +18,14 @@ export async function createEffectRuntimeRenderMessage(args: {
   const { plan } = args;
   if (plan.assets.length !== 0 || Object.keys(args.inputFrames).length !== 0)
     throw new Error('EFFECT_RUNTIME_ANIMATION_INPUT_REJECTED');
-  const document = readEffectPresentationDocument(plan.documentSource).document;
+  const prepared = args.verifiedDocument;
+  if (
+    prepared &&
+    (prepared.source !== plan.documentSource || prepared.sha256 !== plan.documentSha256)
+  )
+    throw new Error('EFFECT_RUNTIME_ANIMATION_SOURCE_REJECTED');
+  const document =
+    prepared?.document ?? readEffectPresentationDocument(plan.documentSource).document;
   if (!document) throw new Error('EFFECT_RUNTIME_ANIMATION_SOURCE_REJECTED');
   const assetSelectionId = await createEffectRuntimeAssetSelectionId(
     document.resources.map(({ path, sha256 }) => ({ id: path, sha256 }))

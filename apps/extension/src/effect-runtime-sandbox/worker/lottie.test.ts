@@ -13,6 +13,8 @@ type Player = {
   destroyed: boolean;
   setFrame: ReturnType<typeof vi.fn>;
   resize: ReturnType<typeof vi.fn>;
+  setTransform: ReturnType<typeof vi.fn>;
+  setViewport: ReturnType<typeof vi.fn>;
   emit(type: string): void;
 };
 const state = vi.hoisted(() => ({
@@ -178,13 +180,13 @@ it('materializes standard named layer slots once per parameter change without mu
   first.close();
   expect(state.players).toHaveLength(1);
   expect(state.players[0]!.data).toMatchObject({
-    w: 386,
+    w: 422,
     h: 180,
     layers: [
       expect.objectContaining({ ks: expect.objectContaining({ p: { a: 0, k: [-50, 90] } }) }),
       expect.objectContaining({
         ty: 3,
-        ks: expect.objectContaining({ p: { a: 0, k: [66, expect.closeTo(0, 9), 0] } }),
+        ks: expect.objectContaining({ p: { a: 0, k: [102, expect.closeTo(0, 9), 0] } }),
       }),
     ],
   });
@@ -428,3 +430,21 @@ it.each(['callout', 'arrow'])(
     expect(state.players.at(-1)!.destroyed).toBe(true);
   }
 );
+
+it('does not redraw the previous frame by resetting an unchanged viewport transform', async () => {
+  const renderer = await createLottieFrameRenderer(template());
+  (await renderer.render(request())).close();
+  const player = state.players.at(-1)!;
+  (await renderer.render(request({ time: 0.5 }))).close();
+  expect(player.setTransform).toHaveBeenCalledTimes(1);
+  expect(player.setViewport).toHaveBeenCalledTimes(1);
+  expect(player.setFrame).toHaveBeenCalledTimes(2);
+  (await renderer.render(request({ time: 0.6, width: 640, height: 360 }))).close();
+  expect(player.setTransform).toHaveBeenCalledTimes(2);
+  expect(player.setViewport).toHaveBeenCalledTimes(2);
+  (await renderer.render(request({ time: 0.7, values: { ...values, opacity: 50 } }))).close();
+  const rebuilt = state.players.at(-1)!;
+  expect(rebuilt).not.toBe(player);
+  expect(rebuilt.setTransform).toHaveBeenCalledOnce();
+  renderer.dispose();
+});

@@ -451,13 +451,15 @@ function reviewZoomBlockPresentation(
     ? anchor.end / sourceDuration
     : (projection?.position(range.end, 'end') ?? range.end / duration);
   const kindLabel = translate(
-    region.border
-      ? 'gallery.videoReview.focusBorder'
-      : region.spotlight?.effect === 'magnify'
-        ? 'gallery.videoReview.focusLens'
-        : region.spotlight
-          ? 'gallery.videoReview.focusSpotlight'
-          : 'gallery.videoReview.zoomRegionLabel'
+    region.effect === '3d'
+      ? 'gallery.videoReview.focus3d'
+      : region.border
+        ? 'gallery.videoReview.focusBorder'
+        : region.spotlight?.effect === 'magnify'
+          ? 'gallery.videoReview.focusLens'
+          : region.spotlight
+            ? 'gallery.videoReview.focusSpotlight'
+            : 'gallery.videoReview.zoomRegionLabel'
   );
   const label =
     `${kindLabel} ` +
@@ -660,15 +662,19 @@ function ReviewZoomRegionBlock(
             )
           }
           name={translate(
-            region.border
-              ? 'gallery.videoReview.focusBorder'
-              : region.spotlight?.effect === 'magnify'
-                ? 'gallery.videoReview.focusLens'
-                : region.spotlight
-                  ? 'gallery.videoReview.focusSpotlight'
-                  : 'gallery.videoReview.zoomRegionLabel'
+            region.effect === '3d'
+              ? 'gallery.videoReview.focus3d'
+              : region.border
+                ? 'gallery.videoReview.focusBorder'
+                : region.spotlight?.effect === 'magnify'
+                  ? 'gallery.videoReview.focusLens'
+                  : region.spotlight
+                    ? 'gallery.videoReview.focusSpotlight'
+                    : 'gallery.videoReview.zoomRegionLabel'
           )}
-          value={region.spotlight || region.border ? undefined : scaleLabel}
+          value={
+            region.effect === '3d' || region.spotlight || region.border ? undefined : scaleLabel
+          }
         />
       </span>
       {(['start', 'end'] as const).map((edge) => (

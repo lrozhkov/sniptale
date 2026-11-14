@@ -551,6 +551,10 @@ it('uses effective preview controls and retains geometry while overlays are hidd
     remove: vi.fn(),
     duplicate: vi.fn(),
     beginGesture: vi.fn(() => true),
+    bodyMeasurements: new Map(),
+    refreshBodyGeometry: vi.fn(),
+    movement: { subscribe: vi.fn(() => () => undefined) },
+    previewMovement: vi.fn(() => false),
     previewGesture: vi.fn(),
     cancelGesture: vi.fn(),
     commitGesture: vi.fn(async () => true),
@@ -563,6 +567,15 @@ it('uses effective preview controls and retains geometry while overlays are hidd
   expect(stage().annotationEffects?.lane).toBe(previewLane);
   expect(stage().annotationEditing?.selectedId).toBe(instance.id);
   expect(stage().annotationEditing?.time).toBe(state.timeline.sceneOutputTime);
+  state.busy = true;
+  state.annotationEffects.pending = true;
+  await render();
+  expect(stage().annotationEditing?.selectedId).toBe(instance.id);
+  expect(stage().annotationEditing?.busy).toBe(true);
+  expect(stage().annotationEditing?.editor).toBe(state.annotationEffects);
+  state.busy = false;
+  state.annotationEffects.pending = false;
+
   expect(stage().onAnnotationGeometry).toBe(state.annotationEffects?.setGeometry);
   state.features.overlaysVisible = false;
   await render();

@@ -1,3 +1,6 @@
+import type { CursorMotion } from '../cursor-motion';
+import type { ReviewInteractionTimeline } from '../../review/interaction-types';
+import type { VideoProjectActionFeedback } from '../action-feedback/types';
 import type { CameraShadowDirection } from '../camera/shadow-direction';
 import type { ReviewOriginalSpeech } from '../../review/original-speech';
 import type { SourceAudioGainRange } from '../../audio/source-envelope';
@@ -33,6 +36,19 @@ import type {
   VideoProjectEffectInstance,
   VideoProjectEffectSnapshot,
 } from '../effect-instance/types';
+
+/** Source-clock authoring stays independent from immutable capture facts and current clip placements. */
+export interface VideoProjectSourceInteractionDocument {
+  id: string;
+  binding: { assetId: string; sourceInstanceId: string };
+  cursorMotions: CursorMotion[];
+  cursorEnabled: boolean;
+  timeline: ReviewInteractionTimeline;
+  keyboardEnabled: boolean;
+  mouseEnabled: boolean;
+  actionOverrides?: VideoProjectActionFeedback['actionOverrides'];
+  feedback?: Pick<VideoProjectActionFeedback, 'settings' | 'gestureStyles' | 'keyStyles'>;
+}
 
 /** Source content survives cuts and missing placements without extending the composition. */
 export interface VideoProjectSourceAudioDocument {
@@ -418,8 +434,9 @@ export interface VideoProject {
     | 51
     | 52
     | 53
-    | 54;
-  sourceInteractionDocuments?: import('../source-interaction-documents').VideoProjectSourceInteractionDocument[];
+    | 54
+    | 55;
+  sourceInteractionDocuments?: VideoProjectSourceInteractionDocument[];
   sourceVoiceoverDocuments?: VideoProjectSourceVoiceoverDocument[];
   sourceAudioDocuments?: VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];

@@ -7,6 +7,7 @@ import {
   type QuickEditBorder,
   type QuickEditSpotlight,
 } from '../scene/focus-appearance';
+import { DEFAULT_CAMERA_PERSPECTIVE } from './spatial';
 import { isBoundedNumber, isRecord } from '../validation/primitives';
 import type { VideoProject, VideoProjectMotionRegion } from '../types';
 
@@ -16,6 +17,7 @@ type AppearancePatch<T extends { area: QuickEditSpotlight['area'] }> = Omit<Part
 
 /** Explicit activation can change mode. Partial edits cannot revive a removed appearance. */
 export type MotionFocusEdit =
+  | { kind: '3d'; enabled: boolean }
   | {
       kind: 'border';
       enabled?: boolean;
@@ -35,6 +37,46 @@ export function editMotionFocus(
   region: VideoProjectMotionRegion,
   edit: MotionFocusEdit
 ): VideoProjectMotionRegion | null {
+  if (edit.kind === '3d') {
+    if (typeof edit.enabled !== 'boolean') return null;
+    if (edit.enabled === (region.effect === '3d')) return region;
+    const {
+      effect: _effect,
+      spatialMotion: _motion,
+      perspective: _perspective,
+      depthOfField: _depth,
+      border: _border,
+      borderTarget: _bt,
+      spotlight: _spot,
+      spotlightTarget: _st,
+      ...rest
+    } = region;
+    return edit.enabled
+      ? {
+          ...rest,
+          effect: '3d',
+          perspective: {
+            ...DEFAULT_CAMERA_PERSPECTIVE,
+            rotateX: -12,
+            rotateY: 18,
+            ...region.perspective,
+            enabled: true,
+          },
+          ...(region.depthOfField ? { depthOfField: region.depthOfField } : {}),
+          ...(region.spatialMotion ? { spatialMotion: region.spatialMotion } : {}),
+        }
+      : rest;
+  }
+  if (region.effect === '3d') {
+    const {
+      effect: _effect,
+      spatialMotion: _motion,
+      perspective: _perspective,
+      depthOfField: _depth,
+      ...nonSpatial
+    } = region;
+    region = nonSpatial;
+  }
   if (!isMotionFocusEdit(edit)) return null;
   const active = edit.kind === 'border' ? region.border : region.spotlight;
   if (!(edit.enabled ?? active !== undefined)) {
@@ -91,7 +133,7 @@ export function editMotionFocus(
   return { ...retained, spotlight, spotlightTarget: target };
 }
 
-function isMotionFocusEdit(edit: MotionFocusEdit): boolean {
+function isMotionFocusEdit(edit: Exclude<MotionFocusEdit, { kind: '3d' }>): boolean {
   if (edit.kind !== 'border' && edit.kind !== 'spotlight') return false;
   if (edit.enabled !== undefined && typeof edit.enabled !== 'boolean') return false;
   if (

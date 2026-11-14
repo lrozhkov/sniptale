@@ -28,6 +28,7 @@ function getMutationSchemaVersion(
 }
 
 function motionSchemaRequirement(regions: VideoProject['motionRegions']): VideoProject['version'] {
+  if (regions?.some((region) => region.effect === '3d')) return 55;
   if (regions?.some((region) => region.cursorComposition !== undefined)) return 51;
   if (regions?.some((region) => requiresExtendedBorderSchema(region.border))) return 48;
   if (regions?.some((region) => region.spotlightTarget === 'source-scene')) return 39;
