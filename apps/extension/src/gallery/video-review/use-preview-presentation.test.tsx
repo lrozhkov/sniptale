@@ -1,3 +1,8 @@
+import {
+  resolvePresentationDescription,
+  canCoalescePresentationInteraction,
+} from './preview-presentation-state';
+import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
 // @vitest-environment jsdom
 import { act, createRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -772,4 +777,87 @@ it('publishes geometry only with the matching completed front frame', async () =
   props.visible = false;
   await render();
   expect(report).toHaveBeenLastCalledWith(null, undefined, props.sourceIdentity);
+});
+
+it('coalesces only one annotation draft while retaining every unrelated source and scene invariant', () => {
+  const before: ReviewAnnotationEffect = {
+    id: 'drag',
+    snapshotId: 'source',
+    enabled: true,
+    start: 0,
+    end: 5,
+    attachment: 'content',
+    order: 0,
+    transform: { x: 0.1, y: 0.1, width: 0.2, height: 0.1, rotation: 0 },
+    controls: { title: 'Title' },
+  };
+  props.annotationGesture = before;
+  props.scene.annotationEffects = {
+    lane: { enabled: true, instances: [before, { ...before, id: 'other' }] },
+    snapshots: [],
+    segments: [],
+  };
+  const describe = (input: ReviewPreviewPresentationInput) =>
+    resolvePresentationDescription(input, {}, null, true, null).description;
+  const first = describe(props);
+  const scene = {
+    ...props.scene,
+    annotationEffects: {
+      ...props.scene.annotationEffects,
+      lane: {
+        enabled: true,
+        instances: [
+          {
+            ...before,
+            transform: { ...before.transform, x: 0.3 },
+            controls: { title: 'Changed' },
+            anchors: { tip: { x: 0.2, y: 0.2 } },
+          },
+          { ...before, id: 'other' },
+        ],
+      },
+    },
+  };
+  const next = { ...props, scene };
+  expect(canCoalescePresentationInteraction(first, describe(next))).toBe(true);
+  for (const changed of [
+    { ...next, sourceIdentity: 'another-source' },
+    { ...next, pausedSourceTime: 2 },
+    { ...next, pausedResultTime: 2 },
+    { ...next, css: { width: 600, height: 300 } },
+    { ...next, preferences: { ...next.preferences, renderer: 'legacy' as const } },
+    { ...next, annotationGesture: undefined },
+    { ...next, annotationGesture: { ...before, transform: { ...before.transform, y: 0.3 } } },
+    {
+      ...next,
+      scene: {
+        ...scene,
+        showEditorComments: false,
+        comments: [{ ...createCanvasComment({ id: 'new', at: 1 }), resolvedText: 'Note' }],
+      },
+    },
+    {
+      ...next,
+      scene: {
+        ...scene,
+        annotationEffects: {
+          ...scene.annotationEffects,
+          lane: {
+            enabled: true,
+            instances: [
+              scene.annotationEffects.lane.instances[0]!,
+              { ...before, id: 'other', transform: { ...before.transform, x: 0.4 } },
+            ],
+          },
+        },
+      },
+    },
+  ])
+    expect(canCoalescePresentationInteraction(first, describe(changed))).toBe(false);
+  expect(
+    canCoalescePresentationInteraction(
+      first,
+      resolvePresentationDescription(next, {}, null, false, null).description
+    )
+  ).toBe(false);
 });

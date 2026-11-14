@@ -30,6 +30,8 @@ interface Dependencies<Scene, Prepared, Captured, Completed> {
   /** Only opted-in owners can admit a published playing generation on its animation frame. */
   allowPreparedPlayingFrames?: boolean;
   maximumInFlight?(scene: Scene): 1 | 2;
+  /** Opt in only when preparation and capture retain one immutable gesture frame packet. */
+  canCoalesceInteraction?(previous: Scene, next: Scene): boolean;
   requestTick(callback: () => void, phase?: ReviewPresentationTickPhase): number;
   cancelTick(id: number): void;
   now(): number;
@@ -273,8 +275,25 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
         (!next.playing && state.pausedTime !== next.pausedTime);
       // The new FPS policy follows the published phase after pending admissions are invalidated.
       if (state?.frameRate !== next.frameRate) lastAdmitted = lastPublished;
+      const coalescing =
+        state &&
+        state.visible &&
+        next.visible &&
+        !state.playing &&
+        !next.playing &&
+        state.interacting &&
+        next.interacting &&
+        state.frameRate === next.frameRate &&
+        state.detailedPaused === next.detailedPaused &&
+        state.pausedTime === next.pausedTime &&
+        dependencies.canCoalesceInteraction?.(state.scene, next.scene);
       state = { ...next };
-      if (changed) invalidate();
+      if (changed) {
+        if (coalescing) {
+          pending = state;
+          schedule();
+        } else invalidate();
+      }
     },
     invalidate,
     dispose() {

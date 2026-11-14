@@ -6723,6 +6723,8 @@
       "previewFailed": "Не удалось отобразить превью",
       "previewNativeFrameRate": "Частота кадров видео",
       "previewPresentedFrameRate": "Частота отрисовки превью",
+      "annotationMagnet": "Привязка аннотаций",
+      "annotationMagnetHint": "Привязка к краям и центрам · Alt — без привязки",
       "liveSeek": "Предпросмотр при наведении",
       "previewSettings": "Настройки превью",
       "previewSection": "Настройки области просмотра",

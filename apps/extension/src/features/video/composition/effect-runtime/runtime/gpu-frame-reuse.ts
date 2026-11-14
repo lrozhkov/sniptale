@@ -11,7 +11,9 @@ import { EFFECT_RUNTIME_RESOURCE_LIMITS, assertEffectRasterDimensions } from './
 import type { EffectRuntimeFramePlan, EffectRuntimeGpuPreparedFrame } from './types';
 
 type Preparation = Parameters<typeof prepareEffectRuntimeGpuFramePlans>[0];
+type Signature = { key: string; document: AnimationTemplate };
 type Entry = {
+  document: AnimationTemplate;
   frame: EffectRuntimeGpuPreparedFrame;
   signature: string;
   source: string;
@@ -91,14 +93,19 @@ export function createEffectRuntimeGpuFrameReuse() {
       },
     };
   };
-  const signature = async (plan: EffectRuntimeFramePlan): Promise<string | null> => {
+  const signature = async (plan: EffectRuntimeFramePlan): Promise<Signature | null> => {
     if (
       plan.kind !== 'standalone' ||
       (plan.target.kind !== 'scene' && plan.target.kind !== 'clip') ||
       plan.assets.length
     )
       return null;
-    const document = readEffectPresentationDocument(plan.documentSource).document;
+    const previous = entries.get(plan.effectInstanceId);
+    const sameSource =
+      previous?.source === plan.documentSource && previous.digest === plan.documentSha256;
+    const document = sameSource
+      ? previous.document
+      : readEffectPresentationDocument(plan.documentSource).document;
     if (
       !document ||
       !parseRuntimeAnimationFrame(
@@ -117,11 +124,8 @@ export function createEffectRuntimeGpuFrameReuse() {
       )
     )
       return null;
-    const previous = entries.get(plan.effectInstanceId);
     if (
-      (!previous ||
-        previous.source !== plan.documentSource ||
-        previous.digest !== plan.documentSha256) &&
+      !sameSource &&
       !(await verifyRuntimeAnimationSource(plan.documentSource, plan.documentSha256))
     )
       return null;
@@ -131,14 +135,17 @@ export function createEffectRuntimeGpuFrameReuse() {
       contentKey = createEffectRuntimeGpuContentKey(document);
       contentKeys.set(document, contentKey);
     }
-    return JSON.stringify([
-      plan.documentSha256,
-      plan.controls,
-      plan.dimensions,
-      plan.renderDimensions,
-      plan.bitmapBounds,
-      contentKey(animationRuntimeFrameIndex(document.animation, plan.time)),
-    ]);
+    return {
+      document,
+      key: JSON.stringify([
+        plan.documentSha256,
+        plan.controls,
+        plan.dimensions,
+        plan.renderDimensions,
+        plan.bitmapBounds,
+        contentKey(animationRuntimeFrameIndex(document.animation, plan.time)),
+      ]),
+    };
   };
   return {
     async prepare(args: Preparation): Promise<ReadonlyMap<string, EffectRuntimeGpuPreparedFrame>> {
@@ -160,7 +167,7 @@ export function createEffectRuntimeGpuFrameReuse() {
         context = nextContext;
       }
       const views = new Map<string, EffectRuntimeGpuPreparedFrame>();
-      const signatures = new Map<string, string | null>();
+      const signatures = new Map<string, Signature | null>();
       const missing: EffectRuntimeFramePlan[] = [];
       const transferred = new Set<EffectRuntimeGpuPreparedFrame>();
       let fresh: ReadonlyMap<string, EffectRuntimeGpuPreparedFrame> | undefined;
@@ -176,7 +183,7 @@ export function createEffectRuntimeGpuFrameReuse() {
           checkContext();
           signatures.set(plan.effectInstanceId, key);
           const entry = entries.get(plan.effectInstanceId);
-          if (key !== null && entry?.signature === key && entry.source === plan.documentSource)
+          if (key !== null && entry?.signature === key.key && entry.source === plan.documentSource)
             views.set(plan.effectInstanceId, borrow(entry, plan));
           else missing.push(plan);
         }
@@ -195,7 +202,10 @@ export function createEffectRuntimeGpuFrameReuse() {
               transferred.add(frame);
               continue;
             }
-            const bytes = assertEffectRasterDimensions(frame.width, frame.height) * 4;
+            // Frozen metadata follows the existing entry lifetime and shares its bounded cache budget.
+            const bytes =
+              assertEffectRasterDimensions(frame.width, frame.height) * 4 +
+              plan.documentSource.length * 2;
             while (
               entries.size >= EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterEntries ||
               retainedBytes + bytes > EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterBytes
@@ -208,7 +218,8 @@ export function createEffectRuntimeGpuFrameReuse() {
             identity ??= crypto.randomUUID();
             const entry: Entry = {
               frame,
-              signature: key,
+              signature: key.key,
+              document: key.document,
               source: plan.documentSource,
               digest: plan.documentSha256,
               bytes,

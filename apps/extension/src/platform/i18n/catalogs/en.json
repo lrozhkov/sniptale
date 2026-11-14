@@ -6723,6 +6723,8 @@
       "previewFailed": "Could not render preview",
       "previewNativeFrameRate": "Video frame rate",
       "previewPresentedFrameRate": "Preview presentation rate",
+      "annotationMagnet": "Snap annotations",
+      "annotationMagnetHint": "Snap annotations to edges and centres · Hold Alt to bypass",
       "liveSeek": "Preview on hover",
       "previewSettings": "Preview settings",
       "previewSection": "Preview settings",

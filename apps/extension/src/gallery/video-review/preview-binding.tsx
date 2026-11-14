@@ -103,11 +103,13 @@ export function ReviewPreviewBinding({
   onPreviewRaster,
   onPreviewRendererStatus,
   onOpenPreviewSettings,
+  annotationMagnetEnabled,
 }: {
   resource: Pick<LoadedReview, 'file' | 'url' | 'session'> &
     Partial<Pick<LoadedReview, 'telemetry'>>;
   state: PreviewState;
   sceneActive: boolean;
+  annotationMagnetEnabled?: boolean;
   previewOverlay?: ReactNode;
   previewPreferences?: QuickPreviewPreferences | undefined;
   onPreviewRendererStatus?: ((status: PreviewRendererStatus | null) => void) | undefined;
@@ -205,6 +207,7 @@ export function ReviewPreviewBinding({
             resource={resource}
             state={state}
             sceneActive={sceneActive}
+            annotationMagnetEnabled={annotationMagnetEnabled}
             fullscreen={fullscreen}
             previewOverlay={previewOverlay}
             focusInteracting={zoom.previewing}
@@ -250,6 +253,7 @@ function ReviewPreviewStage({
   sceneActive,
   previewOverlay,
   fullscreen,
+  annotationMagnetEnabled,
   focusInteracting,
   previewPreferences,
   onPreviewRaster,
@@ -259,6 +263,7 @@ function ReviewPreviewStage({
     Partial<Pick<LoadedReview, 'telemetry'>>;
   state: PreviewState;
   sceneActive: boolean;
+  annotationMagnetEnabled?: boolean | undefined;
   previewOverlay?: ReactNode;
   fullscreen: boolean;
   focusInteracting: boolean;
@@ -306,6 +311,7 @@ function ReviewPreviewStage({
         sceneEditable &&
         features.overlaysVisible
           ? {
+              magnetEnabled: annotationMagnetEnabled ?? false,
               editor: state.annotationEffects,
               selectedId:
                 state.activeSelection?.kind === 'annotation-effect'

@@ -1,3 +1,4 @@
+import { canCoalescePresentationInteraction } from './preview-presentation-state';
 import type { VideoPreviewRenderer } from '../../features/video/preview/preferences';
 import { prepareReviewCameraPlans } from '../../features/video/review/advanced/camera-plan-preparation';
 import { createEffectRuntimeSandboxExecutor } from '../../workflows/video/effect-runtime-sandbox';
@@ -77,6 +78,7 @@ class ManualPresentationSession {
   private disposed = false;
   private waiting = false;
   private playing = false;
+  private interacting = false;
   private sequence = 0;
   private current: Description | null = null;
   private cameraDescription: Description | null = null;
@@ -124,6 +126,7 @@ class ManualPresentationSession {
     this.scheduler = createReviewPreviewPresentation({
       ...createReviewPresentationPaintClock(),
       allowPreparedPlayingFrames: true,
+      canCoalesceInteraction: canCoalescePresentationInteraction,
       maximumInFlight: (description) =>
         description.renderer === 'legacy' ? 1 : this.renderer.maximumInFlight(description.scene),
       now: () => performance.now(),
@@ -211,7 +214,10 @@ class ManualPresentationSession {
     return time;
   };
 
-  private prepare = async (request: { scene: Description; time: number }, signal: AbortSignal) => {
+  private prepare = async (
+    request: { scene: Description; generation: string; time: number },
+    signal: AbortSignal
+  ) => {
     if (this.contextLost) throw new Error('Preview context lost');
     if (this.latest().input.backgroundPending) throw new PendingPresentation();
     const rendererPreference = request.scene.renderer ?? 'gpu';
@@ -231,6 +237,8 @@ class ManualPresentationSession {
       this.cameraDescription = request.scene;
     }
     this.current = request.scene;
+    // This session emits decimal generation values; capture keeps the admitted job's sequence.
+    this.sequence = Number(request.generation);
     this.resultTime =
       this.latest().input.playing && this.video
         ? (this.latest().input.sourceToResult(this.video.currentTime) ?? request.time)
@@ -247,7 +255,7 @@ class ManualPresentationSession {
     if (transition?.failed) throw new Error('Transition preview unavailable');
     if (transition && (!transition.frames || !transition.lease?.active))
       throw new PendingPresentation();
-    const current = this.current;
+    const current = request.scene;
     const prepared = await reviewExportPhase(signal, 'prepare', () =>
       this.renderer.prepare(
         current.scene.captions && current.scene.webcam
@@ -631,9 +639,19 @@ class ManualPresentationSession {
       !this.latest().input.playing
     )
       this.renderer.cancelWarmAnnotations?.();
-    this.current = description;
-    this.sequence = generation;
     const input = this.latest().input;
+    const coalescing =
+      active &&
+      !input.playing &&
+      interacting &&
+      this.interacting &&
+      this.current &&
+      canCoalescePresentationInteraction(this.current, description);
+    if (!coalescing) {
+      this.current = description;
+      this.sequence = generation;
+    }
+    this.interacting = interacting;
     const deferFrames = !input.playing && !!input.deferFrames;
     if (this.playing !== input.playing || !active) this.publications.length = 0;
     this.playing = active && input.playing;

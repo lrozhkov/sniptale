@@ -1,3 +1,4 @@
+import { reviewPreviewSceneKey } from '../../workflows/video-review/preview-scene';
 // @vitest-environment jsdom
 import * as cameraSources from './webcam-preview';
 import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
@@ -595,4 +596,24 @@ it('retains the compatible lease through frame release and resets it for Standar
   await f.hooks.capture(legacy.value, f.hooks.sampleTime(), f.signal);
   expect(io.htmlProvider).toHaveBeenCalledTimes(2);
   expect(io.legacy).not.toHaveBeenCalled();
+});
+
+it('keeps the admitted description and sequence while a compatible drag replaces the pending scene', async () => {
+  const f = sourceSession();
+  f.input.playing = false;
+  const key = reviewPreviewSceneKey(f.description.scene, 'gesture-context');
+  const first = { ...f.description, interactionKey: key };
+  const second = { ...first, scene: { ...first.scene, comments: [] } };
+  f.session.update(first, 1, true);
+  const preparing = f.hooks.prepare(
+    { scene: first, generation: '1', quality: 'selected', time: 1 },
+    f.signal
+  );
+  f.session.update(second, 2, true);
+  const prepared = await preparing;
+  const captured = await f.hooks.capture(prepared.value, 1, f.signal);
+  expect(io.decoded.mock.calls.at(-1)![0]).toMatchObject({ description: first, sequence: 1 });
+  expect(io.decoded.mock.calls.at(-1)![0].description).toBe(first);
+  captured.release();
+  prepared.release();
 });

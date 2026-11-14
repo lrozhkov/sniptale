@@ -1,3 +1,4 @@
+import * as presentationDocuments from '../../../project/effect-bundle/presentation-document';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { parseEffectControlValues } from '@sniptale/runtime-contracts/effect-controls';
@@ -441,4 +442,29 @@ it('keeps identical Lottie hold pixels while rendering the authored entrance and
   }
   expect(f.ledger.snapshot().liveDecodedRasterBytes).toBe(0);
   expect(f.bitmaps.every((bitmap) => bitmap.close.mock.calls.length === 1)).toBe(true);
+});
+
+it('retains one admitted immutable document per cached source and re-admits changed sources or context', async () => {
+  const read = vi.spyOn(presentationDocuments, 'readEffectPresentationDocument');
+  const f = fixture();
+  const sourcesRead = () => read.mock.calls.map(([value]) => value);
+  try {
+    const first = frame(await f.prepare());
+    first.dispose();
+    // Cold admission reads the signature and the runtime request; cache hits read neither.
+    expect(sourcesRead()).toEqual([source, source]);
+    const moved = frame(await f.prepare(plan(0.01)));
+    moved.dispose();
+    expect(sourcesRead()).toEqual([source, source]);
+    const changed = JSON.stringify({ ...template, id: 'changed-source' });
+    const replacement = { ...plan(), documentSource: changed, documentSha256: digest(changed) };
+    frame(await f.prepare(replacement)).dispose();
+    expect(sourcesRead()).toEqual([source, source, changed, changed]);
+    f.rotate();
+    frame(await f.prepare(replacement)).dispose();
+    expect(sourcesRead()).toEqual([source, source, changed, changed, changed, changed]);
+  } finally {
+    f.owner.dispose();
+    read.mockRestore();
+  }
 });

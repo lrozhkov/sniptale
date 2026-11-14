@@ -5,6 +5,7 @@ import {
   useId,
   useMemo,
   useRef,
+  useState,
   type PointerEvent,
 } from 'react';
 import { type AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
@@ -30,6 +31,13 @@ import {
 } from './annotation-effects-geometry';
 import type { useReviewAnnotationEffects } from './annotation-effects-editor';
 
+import {
+  reviewAnnotationMagnetTargets,
+  snapReviewAnnotation,
+  type AnnotationMagnetGuide,
+  type AnnotationMagnetLocks,
+} from './annotation-effects-magnets';
+
 type Editor = ReturnType<typeof useReviewAnnotationEffects>;
 type Point = { x: number; y: number };
 export type ReviewAnnotationEditing = {
@@ -39,6 +47,7 @@ export type ReviewAnnotationEditing = {
   segments: readonly ReviewTimeSegment[];
   time: number;
   busy: boolean;
+  magnetEnabled?: boolean;
   beforeAction?: ReviewBeforeAction | undefined;
   onSelect(id: string): void;
 };
@@ -54,6 +63,10 @@ type Drag = {
   admission: ReturnType<typeof deferReviewGesture> | null;
   ended: boolean;
   ready: boolean;
+  moved: boolean;
+  bypass: boolean;
+  targets: ReturnType<typeof reviewAnnotationMagnetTargets>;
+  locks: AnnotationMagnetLocks;
 };
 
 function canonicalPointer(
@@ -84,6 +97,8 @@ export function ReviewAnnotationOverlay({
   const latest = useRef(binding);
   latest.current = binding;
   const drag = useRef<Drag | null>(null);
+  const [guides, setGuides] = useState<AnnotationMagnetGuide[]>([]);
+  const previewLatest = useRef<(current: Drag) => void>(() => undefined);
   const documents = useMemo(
     () =>
       new Map(
@@ -97,6 +112,7 @@ export function ReviewAnnotationOverlay({
   const cancel = () => {
     const current = drag.current;
     drag.current = null;
+    setGuides([]);
     current?.admission?.cancel();
     latest.current.editor.cancelGesture();
     if (current?.node.hasPointerCapture(current.pointerId))
@@ -104,6 +120,10 @@ export function ReviewAnnotationOverlay({
   };
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Alt' && drag.current) {
+        drag.current.bypass = event.type === 'keydown';
+        previewLatest.current(drag.current);
+      }
       if (event.key === 'Escape' && drag.current) {
         event.preventDefault();
         event.stopPropagation();
@@ -111,16 +131,39 @@ export function ReviewAnnotationOverlay({
       }
     };
     window.addEventListener('keydown', escape, true);
+    window.addEventListener('keyup', escape, true);
     return () => {
       window.removeEventListener('keydown', escape, true);
+      window.removeEventListener('keyup', escape, true);
       cancel();
     };
   }, []);
   const preview = (current: Drag) => {
     if (!current.ready) return;
-    const patch = previewReviewAnnotationDrag(current);
+    const movement = previewReviewAnnotationDrag(current);
+    if (movement) current.moved = true;
+    const patch =
+      movement ??
+      (current.moved && current.kind === 'move'
+        ? { transform: current.instance.transform }
+        : undefined);
+    if (patch?.transform && current.kind === 'move' && latest.current.magnetEnabled) {
+      const snapped = snapReviewAnnotation({
+        instance: { ...current.instance, transform: patch.transform },
+        document: current.document,
+        geometry: current.geometry,
+        size,
+        targets: current.targets,
+        locks: current.locks,
+        bypass: current.bypass,
+      });
+      current.locks = snapped.locks;
+      setGuides(snapped.guides);
+      patch.transform = snapped.transform;
+    }
     if (patch) latest.current.editor.previewGesture(patch);
   };
+  previewLatest.current = preview;
   const begin = (
     event: PointerEvent<SVGElement>,
     instance: ReviewAnnotationEffect,
@@ -146,6 +189,24 @@ export function ReviewAnnotationOverlay({
       admission: null,
       ended: false,
       ready: false,
+      moved: false,
+      bypass: event.altKey,
+      locks: {},
+      targets: reviewAnnotationMagnetTargets(
+        instance,
+        (binding.editor.previewLane?.instances ?? []).flatMap((peer) => {
+          const doc = documents.get(peer.snapshotId);
+          return doc &&
+            sampleReviewAnnotationEffect(
+              projectReviewAnnotationEffect(peer, binding.segments),
+              animationRuntimeDuration(doc),
+              binding.time
+            )
+            ? [{ instance: peer, document: doc }]
+            : [];
+        }),
+        geometry
+      ),
     };
     drag.current = current;
     node.setPointerCapture(event.pointerId);
@@ -210,6 +271,10 @@ export function ReviewAnnotationOverlay({
       admission: null,
       ended: true,
       ready: true,
+      moved: true,
+      bypass: true,
+      locks: {},
+      targets: { x: [], y: [] },
     };
     const edit = () => {
       if (!latest.current.editor.beginGesture(instance.id)) return;
@@ -223,6 +288,7 @@ export function ReviewAnnotationOverlay({
     const current = drag.current;
     if (!current || current.ended) return;
     current.ended = true;
+    setGuides([]);
     if (current.node.hasPointerCapture(current.pointerId))
       current.node.releasePointerCapture(current.pointerId);
     current.admission?.commit(() => {
@@ -283,6 +349,7 @@ export function ReviewAnnotationOverlay({
           reviewAnnotationPlanePoint(current.geometry, current.instance.attachment, canonical);
         if (point) {
           current.point = point;
+          current.bypass = event.altKey;
           preview(current);
         }
       }}
@@ -304,6 +371,23 @@ export function ReviewAnnotationOverlay({
           </clipPath>
         ) : null}
       </defs>
+      <g
+        data-ui="gallery.videoReview.annotationMagnetGuides"
+        stroke="var(--sniptale-color-accent)"
+        strokeWidth={1}
+        strokeDasharray="4 3"
+      >
+        {guides.map((guide, index) => (
+          <line
+            key={index}
+            x1={guide.start.x}
+            y1={guide.start.y}
+            x2={guide.end.x}
+            y2={guide.end.y}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+      </g>
       {binding.editor.previewLane?.instances.map((instance) => {
         const document = documents.get(instance.snapshotId);
         if (

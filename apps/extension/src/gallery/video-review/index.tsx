@@ -1,5 +1,5 @@
 import { useReviewLiveSeek } from './use-live-seek';
-import { ScanLine } from 'lucide-react';
+import { Magnet, ScanLine } from 'lucide-react';
 import { ReviewButton, reviewIconButtonClassName } from './controls';
 import { resolveReviewTimelineSelection } from './timeline-batch-selection';
 import { ReviewInspectorToolbarNavigation } from './review-toolbar';
@@ -163,6 +163,7 @@ function ReviewEditor({
     retryProject: state.retryAdvanced,
   });
   const previewPreferences = previewSettings.preferences;
+  const [annotationMagnetEnabled, setAnnotationMagnetEnabled] = useState(true);
   const liveSeek = useReviewLiveSeek(
     resource,
     state,
@@ -229,6 +230,7 @@ function ReviewEditor({
         >
           <div className="contents" inert={voiceover.recording}>
             <ReviewPreviewBinding
+              annotationMagnetEnabled={annotationMagnetEnabled}
               previewOverlay={
                 <canvas
                   ref={liveSeek.canvas}
@@ -331,6 +333,18 @@ function ReviewEditor({
               }
               utilityControls={
                 <>
+                  {features.mode === 'advanced' && (
+                    <ReviewButton
+                      label={translate('gallery.videoReview.annotationMagnet')}
+                      title={translate('gallery.videoReview.annotationMagnetHint')}
+                      className={reviewIconButtonClassName}
+                      aria-pressed={annotationMagnetEnabled}
+                      data-ui="gallery.videoReview.annotationMagnetToggle"
+                      onClick={() => setAnnotationMagnetEnabled(!annotationMagnetEnabled)}
+                    >
+                      <Magnet size={16} aria-hidden="true" />
+                    </ReviewButton>
+                  )}
                   <ReviewButton
                     label={translate('gallery.videoReview.liveSeek')}
                     className={reviewIconButtonClassName}
