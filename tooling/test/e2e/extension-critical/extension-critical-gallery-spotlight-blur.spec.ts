@@ -7,7 +7,7 @@ import {
   seedReviewVideo,
   clickReviewExport,
 } from '../support/quick-editor-media-fixture';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { build } from 'esbuild';
 import { expect, test } from '@playwright/test';
 

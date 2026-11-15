@@ -1,7 +1,22 @@
 // @vitest-environment jsdom
+
+import {
+  editorFixtureMessages,
+  prepareEditorTranslations,
+} from '../../testing/translations.test-support';
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: Parameters<typeof editorFixtureMessages>[0]) =>
+    editorFixtureMessages(locale)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareEditorTranslations('en');
+});
 import { exportEditorDocumentViaController } from './document/export';
 import { ActiveSelection, Canvas, Color, FabricImage, Group, type FabricObject } from 'fabric';
-import { afterEach, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, expect, it, vi } from 'vitest';
 import { createEditorVectorInstance } from '../../../features/editor/document/vector-element';
 import * as preparation from '../../objects/vector-elements/prepare';
 import {

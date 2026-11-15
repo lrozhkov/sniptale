@@ -9,7 +9,7 @@ import {
   createTourDocument,
   createTourImageSlide,
 } from '../../../../apps/extension/src/features/scenario/project/factories';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 test.use({ actionTimeout: 10_000 });
 

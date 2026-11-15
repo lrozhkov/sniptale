@@ -1,4 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import {
+  loadFeatureCatalogFixture,
+  prepareFeatureTranslations,
+} from '../../catalog-fixture.test-support';
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadFeatureCatalogFixture>[0]) =>
+    loadFeatureCatalogFixture(locale),
+}));
+
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 
 import { createSystemBorderPresetCatalog } from './catalog';
 import { getBorderPresetDisplayName } from './display-name';
@@ -30,4 +39,8 @@ describe('border preset display name', () => {
     expect(getBorderPresetDisplayName(systemPreset, 'en')).toBe('Мой акцент');
     expect(getBorderPresetDisplayName(userPreset, 'ru')).toBe('Custom');
   });
+});
+
+beforeEach(async () => {
+  await prepareFeatureTranslations('content', 'ru');
 });

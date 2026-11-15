@@ -1,8 +1,19 @@
 // @vitest-environment jsdom
+import {
+  loadScenarioCatalogFixture,
+  prepareScenarioTranslations,
+} from '../test-support/translations.test-support';
 import { act } from 'react';
 import { AudioJobProviderError } from '../../../workflows/audio-jobs/failure';
 import { createRoot, type Root } from 'react-dom/client';
-import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, afterEach, expect, it, vi } from 'vitest';
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadScenarioCatalogFixture>[0]) =>
+    loadScenarioCatalogFixture(locale),
+}));
+
+beforeAll(prepareScenarioTranslations);
+
 import { TourNarrationAI } from './narration-ai';
 import { TourWorkspace } from './workspace';
 import { useGuidePanels } from '../panel-layout';

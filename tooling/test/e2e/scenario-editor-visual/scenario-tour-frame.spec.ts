@@ -1,6 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { createTranslator } from '../../../../apps/extension/src/platform/i18n';
+import { createTranslator } from '../support/catalog-fixture';
 import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { test } from '../support/extension-fixture';
 import { expectFittedFrame } from './scenario-tour-frame.helpers';

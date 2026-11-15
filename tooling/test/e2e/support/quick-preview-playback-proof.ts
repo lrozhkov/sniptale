@@ -4,7 +4,7 @@ import { expect, type Page } from '@playwright/test';
 import { execFile } from 'node:child_process';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from './catalog-fixture';
 import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import {
   replayReviewHistory,

@@ -17,7 +17,7 @@ function fixture() {
   const root = createTempRoot('i18n-catalog-');
   writeFile(
     root,
-    'packages/platform/src/i18n/config.ts',
+    'packages/runtime-contracts/src/i18n.ts',
     'const LOCALE_REGISTRY = {en:{}, ru:{}} as const;'
   );
   writeFile(

@@ -1,5 +1,9 @@
 import type { VoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../catalog-fixture.test-support';
 
 const settingsFixture = {
   captureAction: 'download_default' as const,
@@ -74,6 +78,7 @@ function createDeferred<T>() {
 
 async function loadStore() {
   vi.resetModules();
+  await prepareSettingsTranslations('en');
   const module = await import('./useSettingsStore');
   module.useSettingsStore.setState({
     settings: settingsFixture,
@@ -86,6 +91,7 @@ async function loadStore() {
 
 async function createIsolatedSettingsStore() {
   vi.resetModules();
+  await prepareSettingsTranslations('en');
   const module = await import('./useSettingsStore');
   return module.createSettingsStore();
 }
@@ -375,3 +381,8 @@ it('keeps a newer canonical voice choice when a Settings reset response arrives 
   await resetting;
   expect(store.getState().settings.voiceInput?.enabled).toBe(false);
 });
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));

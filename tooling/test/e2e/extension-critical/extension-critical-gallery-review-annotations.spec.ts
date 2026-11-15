@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { build } from 'esbuild';
 import { writeFile } from 'node:fs/promises';
 import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { startHostServer } from '../support/host-server';
 import { createInlineWorkerBundlePlugin } from '../support/inline-worker-bundle';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';

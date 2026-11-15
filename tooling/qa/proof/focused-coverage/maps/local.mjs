@@ -257,7 +257,9 @@ export const LOCAL_OWNER_MAPPINGS = [
     testFiles: [
       'apps/extension/src/platform/i18n/catalog-reader.test.ts',
       'apps/extension/src/platform/i18n/catalog-types.test.ts',
-      'apps/extension/src/platform/i18n/dictionaries.test.ts',
+      'apps/extension/src/platform/i18n/catalog-store.test.ts',
+      'apps/extension/src/platform/i18n/catalog-transport.test.ts',
+      'apps/extension/src/platform/i18n/locale/state.test.ts',
       'apps/extension/src/platform/i18n/index.test.ts',
       'apps/extension/src/platform/i18n/popup.test.ts',
       'apps/extension/src/platform/i18n/highlighter-messages.test.ts',

@@ -2,6 +2,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { SUPPORTED_LOCALES } from '@sniptale/runtime-contracts/i18n';
 import { THEME_PREFERENCE_CHANGE_EVENT } from '@sniptale/ui/branding';
 import { useWelcomeSetup, type WelcomeDependencies, type WelcomeAccess } from './welcome';
 
@@ -158,8 +159,10 @@ it('saves appearance through existing owners and retains a valid theme after ref
   });
   expect(deps.locale).not.toHaveBeenCalled();
   expect(deps.theme).not.toHaveBeenCalled();
-  await act(async () => setup.setLocale('ru'));
-  expect(deps.locale).toHaveBeenCalledWith('ru');
+  for (const locale of SUPPORTED_LOCALES) {
+    await act(async () => setup.setLocale(locale));
+    expect(deps.locale).toHaveBeenCalledWith(locale);
+  }
   await act(async () => setup.setTheme('dark'));
   expect(setup.theme).toBe('dark');
   deps.theme.mockRejectedValueOnce(new Error('save failed'));

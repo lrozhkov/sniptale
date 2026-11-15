@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeAll, vi } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../../../catalog-fixture.test-support';
 import type { QuickAction, ViewportPreset } from '../../../../../contracts/settings';
 import { CONTEXT_MENU_STATIC_COMMANDS } from '../../../../../contracts/settings/context-menu-layout';
 import { translate } from '../../../../../platform/i18n';
@@ -117,3 +121,10 @@ describe('context menu catalog', () => {
     ).toContain(translate('settings.appearance.contextMenuMissingCommand', 'en'));
   });
 });
+
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('ru'));

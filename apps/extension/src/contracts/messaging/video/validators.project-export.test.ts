@@ -11,7 +11,8 @@ import {
 } from '../../../features/video/project/factories/creation';
 import { createVideoClipFromAsset } from '../../../features/video/project/factories/clip';
 import { VideoProjectAssetType } from '../../../features/video/project/types/index';
-import { isVideoProject, isVideoProjectExportSettings } from './validators';
+import { isExportReadyVideoProject } from '../../../features/video/project/validation';
+import { isVideoProjectExportSettings } from './validators';
 
 function createVideoProject() {
   return {
@@ -71,13 +72,13 @@ function createExportSettings() {
 }
 
 it('validates video project export project payloads', () => {
-  expect(isVideoProject(createVideoProject())).toBe(true);
-  expect(isVideoProject({ ...createVideoProject(), clips: 'bad-clips' })).toBe(false);
-  expect(isVideoProject({ ...createVideoProject(), source: null })).toBe(false);
+  expect(isExportReadyVideoProject(createVideoProject())).toBe(true);
+  expect(isExportReadyVideoProject({ ...createVideoProject(), clips: 'bad-clips' })).toBe(false);
+  expect(isExportReadyVideoProject({ ...createVideoProject(), source: null })).toBe(false);
   const referencedProject = createReferencedVideoProject();
-  expect(isVideoProject(referencedProject)).toBe(true);
+  expect(isExportReadyVideoProject(referencedProject)).toBe(true);
   expect(
-    isVideoProject({
+    isExportReadyVideoProject({
       ...referencedProject,
       clips: [{ ...referencedProject.clips[0]!, assetId: 'missing-asset' }],
     })

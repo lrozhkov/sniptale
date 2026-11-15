@@ -1,4 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import {
+  loadOffscreenCatalogFixture,
+  prepareOffscreenTranslations,
+} from '../../catalog-fixture.test-support';
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadOffscreenCatalogFixture>[0]) =>
+    loadOffscreenCatalogFixture(locale),
+}));
+
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import {
   VideoExportFormat,
   type VideoProjectExportSettings,
@@ -23,4 +32,8 @@ describe('persistence blob helpers', () => {
       'Fast-path MP4 экспорт поддерживается только для исходного MP4 asset.'
     );
   });
+});
+
+beforeEach(async () => {
+  await prepareOffscreenTranslations('ru');
 });

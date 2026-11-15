@@ -18,3 +18,6 @@ declare module 'sniptale:i18n/content-shim' {
     import('./catalog-subsets').CatalogSubset<'content-shim'>
   >;
 }
+declare module 'sniptale:i18n/bootstrap' {
+  export const catalogs: Record<'en', import('./catalog-subsets').CatalogSubset<'bootstrap'>>;
+}

@@ -1,9 +1,24 @@
 // @vitest-environment jsdom
 
+import {
+  editorFixtureMessages,
+  prepareEditorTranslations,
+} from '../../testing/translations.test-support';
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: Parameters<typeof editorFixtureMessages>[0]) =>
+    editorFixtureMessages(locale)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareEditorTranslations('ru');
+});
+
 import type { ComponentProps } from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { translate } from '../../../platform/i18n';
 import type { SavePreset } from '../../../contracts/settings';
 import {

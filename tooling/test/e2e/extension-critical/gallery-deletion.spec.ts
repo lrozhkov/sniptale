@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../support/extension-fixture';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 async function countMediaLibraryEntries(page: Page, assetId?: string): Promise<number> {
   return page.evaluate(async (id) => {

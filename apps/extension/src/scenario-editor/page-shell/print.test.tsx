@@ -1,9 +1,19 @@
 // @vitest-environment jsdom
+import {
+  loadScenarioCatalogFixture,
+  prepareScenarioTranslations,
+} from './test-support/translations.test-support';
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadScenarioCatalogFixture>[0]) =>
+    loadScenarioCatalogFixture(locale),
+}));
+beforeAll(prepareScenarioTranslations);
+
 import { act } from 'react';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import { createRoot } from 'react-dom/client';
-import { afterEach, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, expect, it, vi } from 'vitest';
 import {
   createGuideProject,
   createGuideStep,

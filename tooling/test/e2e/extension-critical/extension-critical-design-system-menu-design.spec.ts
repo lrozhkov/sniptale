@@ -1,6 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import { test, expect } from '../support/extension-fixture';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 const compositions = [
   { locale: 'ru', theme: 'light', viewport: { width: 1280, height: 560 } },

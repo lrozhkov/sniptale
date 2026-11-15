@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { expect, test, type Page, type Locator } from '@playwright/test';
-import { translate, formatNumber } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
+import { formatNumber } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
 import {
   seedReviewVideo,

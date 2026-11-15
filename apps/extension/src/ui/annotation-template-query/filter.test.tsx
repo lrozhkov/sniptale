@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { expect, it, vi } from 'vitest';
+import { expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadUiCatalogFixture,
+  prepareUiTranslations,
+} from '../test-support/translations.test-support';
 import { AnnotationTemplateQueryControls } from './filter';
 
 async function verifyTagMenuInteractions(host: Element | DocumentFragment) {
@@ -148,3 +152,10 @@ it('applies rapid tag toggles and clear against the latest optimistic selection'
   act(() => root.unmount());
   host.remove();
 });
+
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadUiCatalogFixture>[0]) =>
+    loadUiCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareUiTranslations('content', 'ru'));

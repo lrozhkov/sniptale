@@ -1,10 +1,25 @@
 // @vitest-environment jsdom
+
+import {
+  videoeditorFixtureMessages,
+  prepareVideoEditorTranslations,
+} from '../../../../testing/translations.test-support';
+
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: Parameters<typeof videoeditorFixtureMessages>[0]) =>
+    videoeditorFixtureMessages(locale)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareVideoEditorTranslations('en');
+});
 import { VideoTrackKind } from '../../../../../features/video/project/types';
 
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   APPLE_GLASS_ANNOTATION_PACK,
   CURSOR_OPS_ANNOTATION_PACK,
@@ -27,7 +42,7 @@ import { AnnotationGeneratedControls } from './generated-controls';
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
-  translate: (key: string) => key,
+  translate: (key: string) => `localized:${key}`,
   useAppLocale: () => 'en',
 }));
 
@@ -346,7 +361,7 @@ it('displays timeline milliseconds as editable seconds and writes native millise
     )
   );
   const duration = container!.querySelector<HTMLInputElement>(
-    'input[aria-label="videoEditor.sidebar.annotationTemplates.controls.durationMs"]'
+    'input[aria-label="localized:videoEditor.sidebar.annotationTemplates.controls.durationMs"]'
   )!;
   expect(duration.value).toBe('2.2');
   expect(container!.textContent).toContain('s');

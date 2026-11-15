@@ -1,4 +1,13 @@
-import { afterEach, expect, it, vi } from 'vitest';
+import {
+  loadOffscreenCatalogFixture,
+  prepareOffscreenTranslations,
+} from '../../../catalog-fixture.test-support';
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadOffscreenCatalogFixture>[0]) =>
+    loadOffscreenCatalogFixture(locale),
+}));
+
+import { afterEach, expect, it, vi, beforeEach } from 'vitest';
 import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import {
   VideoExportFormat,
@@ -137,4 +146,8 @@ it('keeps supported HEVC with identical 1904x1064/30 settings in capability and 
   expect(
     await getSupportedMp4VideoCodecProfiles({ ...settings, fps: 40 }, [VideoMp4Codec.HEVC])
   ).toEqual([]);
+});
+
+beforeEach(async () => {
+  await prepareOffscreenTranslations('en');
 });

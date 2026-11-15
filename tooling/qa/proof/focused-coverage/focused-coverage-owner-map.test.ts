@@ -610,8 +610,11 @@ it.each(['en', 'ru'])('selects exact product proof for the %s catalog data', asy
   const files = module.resolveMappedCoverageOwnerTests(
     `apps/extension/src/platform/i18n/catalogs/${locale}.json`
   );
-  expect(files).toHaveLength(12);
+  expect(files).toHaveLength(14);
   expect(files).toContain('apps/extension/src/platform/i18n/catalog-reader.test.ts');
+  expect(files).toContain('apps/extension/src/platform/i18n/catalog-store.test.ts');
+  expect(files).toContain('apps/extension/src/platform/i18n/catalog-transport.test.ts');
+  expect(files).toContain('apps/extension/src/platform/i18n/locale/state.test.ts');
   expect(files).toContain('apps/extension/src/content/runtime/shim/launcher.test.ts');
   expect(files.every((file) => file.startsWith('apps/extension/src/'))).toBe(true);
   expect(

@@ -1,4 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
+import {
+  loadPopupCatalogFixture,
+  prepareRussianPopupTranslations,
+} from '../../../catalog-fixture.test-support';
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadPopupCatalogFixture>[0]) =>
+    loadPopupCatalogFixture(locale),
+}));
+beforeAll(prepareRussianPopupTranslations);
+
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./layout', () => ({
   ExportFooterLayout: (props: Record<string, unknown>) => (

@@ -183,6 +183,7 @@ it('publishes page collection as a partial progress patch', async () => {
 
   expect(updatePagePackageJobStatus).toHaveBeenCalledWith(active, {
     progress: {
+      collectingPageTitle: 'One',
       current: 0,
       errors: [],
       message: `${translate('popup.export.batchCollectingMessage', 'en')} One`,

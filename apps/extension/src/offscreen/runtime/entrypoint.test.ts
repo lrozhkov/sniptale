@@ -2,12 +2,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   bootstrapOffscreenDocumentMock,
+  prepareTranslationsMock,
+  subscribeToLocaleChangesMock,
+  disposeLocaleMock,
   getCurrentLocaleMock,
   registerOffscreenRuntimeMessageListenerMock,
   registerOffscreenVoiceInputMessageListenerMock,
   translateMock,
 } = vi.hoisted(() => ({
   bootstrapOffscreenDocumentMock: vi.fn(),
+  prepareTranslationsMock: vi.fn(async (): Promise<void> => undefined),
+  subscribeToLocaleChangesMock: vi.fn(),
+  disposeLocaleMock: vi.fn(),
   getCurrentLocaleMock: vi.fn(() => 'en'),
   registerOffscreenRuntimeMessageListenerMock: vi.fn(),
   registerOffscreenVoiceInputMessageListenerMock: vi.fn(),
@@ -71,6 +77,8 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
   getCurrentLocale: getCurrentLocaleMock,
   translate: translateMock,
+  prepareTranslations: prepareTranslationsMock,
+  subscribeToLocaleChanges: subscribeToLocaleChangesMock,
 }));
 
 vi.mock('../../composition/persistence/secret-protection/transition.store', () => ({
@@ -82,6 +90,8 @@ import type { SyncCredentialLease } from '../../contracts/messaging/contracts/ru
 let documentEvents: EventTarget;
 beforeEach(() => {
   vi.clearAllMocks();
+  prepareTranslationsMock.mockReset().mockResolvedValue(undefined);
+  subscribeToLocaleChangesMock.mockReturnValue(disposeLocaleMock);
   vi.resetModules();
   vi.unstubAllGlobals();
   documentEvents = new EventTarget();
@@ -315,14 +325,20 @@ it('owns one media publisher through offscreen disposal', async () => {
     ['sync', []],
   ]);
   expect(mediaEvents.dispose).not.toHaveBeenCalled();
-  expect(globalThis.addEventListener).toHaveBeenCalledExactlyOnceWith(
-    'pagehide',
-    expect.any(Function),
-    { once: true }
-  );
+  expect(globalThis.addEventListener).toHaveBeenCalledWith('pagehide', disposeLocaleMock, {
+    once: true,
+  });
+  const mediaCleanupRegistrations = vi
+    .mocked(globalThis.addEventListener)
+    .mock.calls.filter(
+      ([event, listener]) => event === 'pagehide' && listener !== disposeLocaleMock
+    );
+  expect(mediaCleanupRegistrations).toHaveLength(1);
+  expect(mediaCleanupRegistrations[0]?.[2]).toEqual({ once: true });
   documentEvents.dispatchEvent(new Event('pagehide'));
   documentEvents.dispatchEvent(new Event('pagehide'));
   expect(mediaEvents.dispose).toHaveBeenCalledOnce();
+  expect(disposeLocaleMock).toHaveBeenCalledOnce();
 });
 
 const credentialLease: SyncCredentialLease = {

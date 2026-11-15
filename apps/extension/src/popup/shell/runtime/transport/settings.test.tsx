@@ -1,8 +1,17 @@
 // @vitest-environment jsdom
+import {
+  loadPopupCatalogFixture,
+  preparePopupTranslations,
+} from '../../../catalog-fixture.test-support';
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadPopupCatalogFixture>[0]) =>
+    loadPopupCatalogFixture(locale),
+}));
+beforeAll(preparePopupTranslations);
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const { loggerErrorMock, sendRuntimeMessageMock } = vi.hoisted(() => ({
   loggerErrorMock: vi.fn(),

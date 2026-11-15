@@ -1,4 +1,8 @@
-import { expect, it } from 'vitest';
+import { expect, it, beforeAll, vi } from 'vitest';
+import {
+  loadUiCatalogFixture,
+  prepareUiTranslations,
+} from '../test-support/translations.test-support';
 import { getAnnotationTemplateTagDisplayName } from './tag-display-name';
 
 it('localizes canonical system tags and preserves customized and user labels', () => {
@@ -30,3 +34,10 @@ it('localizes canonical system tags and preserves customized and user labels', (
     'Editorial'
   );
 });
+
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadUiCatalogFixture>[0]) =>
+    loadUiCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareUiTranslations('content', 'ru'));

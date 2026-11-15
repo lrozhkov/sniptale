@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { createBookendVideoPresentation } from '../../../../apps/extension/src/features/video/project/scene/bookend-media';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { createVideoProjectFromRecording } from '../../../../apps/extension/src/features/video/project/factories/creation';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
 import { chooseInspectorValue } from '../support/inspector-utilities';

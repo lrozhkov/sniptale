@@ -9,7 +9,7 @@ import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from '../support/extension-fixture';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 // The real credential must never enter a trace, recording, screenshot, or assertion output.
 test.use({ trace: 'off', video: 'off', screenshot: 'off', actionTimeout: 10000 });

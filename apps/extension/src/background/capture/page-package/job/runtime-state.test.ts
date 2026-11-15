@@ -275,6 +275,75 @@ it('deduplicates warnings through immutable revisioned updates and normalizes th
   expect(popupExportJobErrorText('failed')).toBe('failed');
 });
 
+it('orders collection context before queued counter and replacement-message updates', async () => {
+  const job = createJob();
+  let releaseWrite = () => {};
+  let markStarted = () => {};
+  const started = new Promise<void>((resolve) => {
+    markStarted = resolve;
+  });
+  mocks.write.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        releaseWrite = resolve;
+        markStarted();
+      })
+  );
+  const collection = updatePagePackageJobStatus(job, {
+    progress: { collectingPageTitle: 'Page', message: 'Collecting Page', phase: 'downloading' },
+  });
+  await started;
+  const counter = updatePagePackageJobStatus(job, { progress: { current: 2, total: 8 } });
+  const replacement = updatePagePackageJobStatus(job, {
+    progress: { message: 'Creating archive', phase: 'zipping' },
+  });
+  expect(mocks.write).toHaveBeenCalledOnce();
+  releaseWrite();
+  await Promise.all([collection, counter, replacement]);
+  expect(mocks.write.mock.calls.map(([entry]) => entry.progress.collectingPageTitle)).toEqual([
+    'Page',
+    'Page',
+    undefined,
+  ]);
+  expect(job.status.progress).not.toHaveProperty('collectingPageTitle');
+  expect(job.status.progress).toMatchObject({ current: 2, total: 8, phase: 'zipping' });
+});
+
+it('preserves collection context after a failed replacement and clears it on retry', async () => {
+  const job = createJob();
+  await updatePagePackageJobStatus(job, {
+    progress: { collectingPageTitle: 'Page', message: 'Collecting Page', phase: 'downloading' },
+  });
+  mocks.write.mockRejectedValueOnce(new Error('session write failed'));
+  await expect(
+    updatePagePackageJobStatus(job, {
+      progress: { message: 'Creating archive', phase: 'zipping' },
+    })
+  ).rejects.toThrow('session write failed');
+  expect(job.status.progress.collectingPageTitle).toBe('Page');
+  await updatePagePackageJobStatus(job, {
+    progress: { message: 'Creating archive', phase: 'zipping' },
+  });
+  expect(job.status.progress).not.toHaveProperty('collectingPageTitle');
+});
+
+it.each(['cancellation', 'completion'] as const)(
+  'removes collection context when %s replaces its message',
+  async (outcome) => {
+    const job = createJob();
+    await updatePagePackageJobStatus(job, {
+      progress: { collectingPageTitle: 'Page', message: 'Collecting Page', phase: 'downloading' },
+    });
+    if (outcome === 'cancellation') await admitPopupExportJobCancellation(job);
+    else
+      await completePagePackageJobStatus(job, {
+        phase: 'completed',
+        progress: { message: 'Done', phase: 'done' },
+      });
+    expect(job.status.progress).not.toHaveProperty('collectingPageTitle');
+  }
+);
+
 it('does not let dynamic warnings overflow the durable aggregate budget', async () => {
   const job = createJob();
   job.status.warnings = Array.from({ length: 32 }, () => 'x'.repeat(16 * 1024));

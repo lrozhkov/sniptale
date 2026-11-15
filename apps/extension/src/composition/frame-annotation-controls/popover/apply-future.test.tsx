@@ -1,8 +1,16 @@
 // @vitest-environment jsdom
+import {
+  loadCompositionCatalogFixture,
+  prepareCompositionTranslations,
+} from '../../catalog-fixture.test-support';
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadCompositionCatalogFixture>[0]) =>
+    loadCompositionCatalogFixture(locale),
+}));
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi, beforeEach } from 'vitest';
 import {
   ApplyToFutureFramesGuard,
   ApplyToFutureFramesSetting,
@@ -84,4 +92,8 @@ it('presents the future-frame action as a described save setting', () => {
   act(() => action?.click());
   expect(onClick).toHaveBeenCalledOnce();
   act(() => root.unmount());
+});
+
+beforeEach(async () => {
+  await prepareCompositionTranslations('content', 'ru');
 });

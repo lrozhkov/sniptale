@@ -3,7 +3,11 @@
 import { forwardRef, useState } from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../../../catalog-fixture.test-support';
 
 import { translate } from '../../../../../platform/i18n';
 import type { AIProvider } from '../../../../../contracts/settings';
@@ -479,3 +483,10 @@ it.each(['catalog', 'manual'] as const)(
     }
   }
 );
+
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('ru'));

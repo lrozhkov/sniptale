@@ -1,5 +1,20 @@
 // @vitest-environment jsdom
-import { beforeEach, expect, it, vi } from 'vitest';
+
+import {
+  editorFixtureMessages,
+  prepareEditorTranslations,
+} from '../testing/translations.test-support';
+
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: Parameters<typeof editorFixtureMessages>[0]) =>
+    editorFixtureMessages(locale)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareEditorTranslations('ru');
+});
+import { beforeAll, beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   entry: vi.fn(),
   blob: vi.fn(),

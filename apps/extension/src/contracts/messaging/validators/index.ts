@@ -29,7 +29,6 @@ export {
   isCaptureSource,
   isSize2d,
   isVideoExportCapabilities,
-  isVideoProject,
   isVideoProjectExportSettings,
   isVideoRecordingRuntimeState,
   isVideoMicrophoneActivity,

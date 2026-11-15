@@ -6,7 +6,7 @@ import {
   createTourDocument,
   createTourImageSlide,
 } from '../../../../apps/extension/src/features/scenario/project/factories';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { getSystemSurfaceStylePresets } from '../../../../apps/extension/src/features/highlighter/surface-style/system-presets';
 
 function fixtureProject() {

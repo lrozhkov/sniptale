@@ -27,6 +27,7 @@ function fixture() {
   const inventory = { ...empty(), video: [candidate] };
   const ports = {
     prepareAdapters: vi.fn(async (): Promise<void> => {}),
+    prepareCatalogs: vi.fn(async (): Promise<void> => {}),
     readInventory: vi.fn(async () => inventory),
     restoreFixture: vi.fn(async () => ['video-project:project']),
     readImported: vi.fn(() => null),
@@ -43,11 +44,13 @@ function deferred() {
   });
   return { promise, resolve };
 }
-it('awaits adapter admission and the complete import before selecting or mounting the page', async () => {
+it('awaits adapters, catalogs, and the complete import before selecting or mounting the page', async () => {
   const { ports } = fixture();
   const adapters = deferred(),
+    catalogs = deferred(),
     restore = deferred();
   ports.prepareAdapters.mockImplementation(() => adapters.promise);
+  ports.prepareCatalogs.mockImplementation(() => catalogs.promise);
   ports.restoreFixture.mockImplementation(async () => {
     await restore.promise;
     return ['video-project:project'];
@@ -55,6 +58,11 @@ it('awaits adapter admission and the complete import before selecting or mountin
   const pending = prepareDevSurface(config, ports);
   expect(ports.readInventory).not.toHaveBeenCalled();
   adapters.resolve();
+  await vi.waitFor(() => expect(ports.prepareCatalogs).toHaveBeenCalledWith(config));
+  expect(ports.restoreFixture).not.toHaveBeenCalled();
+  expect(ports.readInventory).not.toHaveBeenCalled();
+  expect(ports.mount).not.toHaveBeenCalled();
+  catalogs.resolve();
   await vi.waitFor(() => expect(ports.restoreFixture).toHaveBeenCalledOnce());
   expect(ports.mount).not.toHaveBeenCalled();
   expect(ports.writeImported).not.toHaveBeenCalled();
@@ -71,6 +79,15 @@ it('awaits adapter admission and the complete import before selecting or mountin
     scenario: [],
   });
   expect(ports.mount).toHaveBeenCalledOnce();
+});
+it('leaves stored roots and rendering untouched when catalog preparation fails', async () => {
+  const { ports } = fixture();
+  ports.prepareCatalogs.mockRejectedValueOnce(new Error('Catalog unavailable'));
+  await expect(prepareDevSurface(config, ports)).rejects.toThrow('Catalog unavailable');
+  expect(ports.restoreFixture).not.toHaveBeenCalled();
+  expect(ports.readInventory).not.toHaveBeenCalled();
+  expect(ports.setPage).not.toHaveBeenCalled();
+  expect(ports.mount).not.toHaveBeenCalled();
 });
 it('preserves completed roots on import failure and leaves retry and mount under caller control', async () => {
   const { inventory, ports } = fixture();

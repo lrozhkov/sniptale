@@ -2,7 +2,11 @@
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../catalog-fixture.test-support';
 
 import { SettingsCollection } from '.';
 import { SettingsCollectionRowIdentity } from './row-identity';
@@ -384,3 +388,10 @@ describe('SettingsCollection pending and drag controls', () => {
     expect(container.textContent).toContain('Перемещение отменено');
   });
 });
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('ru'));

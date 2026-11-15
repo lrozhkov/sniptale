@@ -2,7 +2,7 @@ import { chooseInspectorValue } from '../support/inspector-utilities';
 import { build } from 'esbuild';
 import { expect, test, type Page } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { ACTION_SOUND_CATALOG } from '../../../../apps/extension/src/features/video/review/action-audio-catalog';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';

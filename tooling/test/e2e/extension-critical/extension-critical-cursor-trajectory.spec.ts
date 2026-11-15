@@ -9,7 +9,7 @@ import { writeFile } from 'node:fs/promises';
 import { encodedNativeVideoSamples } from '../support/native-video-export-proof';
 import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
 import { chooseInspectorValue } from '../support/inspector-utilities';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import eventsFixture from '../../../../apps/extension/src/features/video/project/recording-events/fixtures.json' with { type: 'json' };
 import {

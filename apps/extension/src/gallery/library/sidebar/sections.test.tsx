@@ -2,7 +2,18 @@
 
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadGalleryCatalogFixture,
+  prepareGalleryTranslations,
+} from '../../test-support/translations.test-support';
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadGalleryCatalogFixture>[0]) =>
+    loadGalleryCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareGalleryTranslations('ru'));
 import { translate } from '../../../platform/i18n';
 import { GallerySavedViewError } from '../../../composition/persistence/gallery-saved-views';
 import { GalleryFacetFilters, GalleryFolderList } from './sections';

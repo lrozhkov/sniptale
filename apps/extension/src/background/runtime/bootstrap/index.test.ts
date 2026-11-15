@@ -8,11 +8,15 @@ import { registerDiagnosticLogPorts } from '../../application/diagnostics/ports'
 
 const {
   initTracerMock,
+  prepareTranslationsMock,
+  registerCatalogPortsMock,
   initializeBackgroundRuntimeMock,
   registerBackgroundRuntimeMessageListenerMock,
   scenarioSessionServiceCtorMock,
 } = vi.hoisted(() => ({
   initTracerMock: vi.fn(),
+  prepareTranslationsMock: vi.fn(async (): Promise<void> => undefined),
+  registerCatalogPortsMock: vi.fn(),
   initializeBackgroundRuntimeMock: vi.fn(),
   registerBackgroundRuntimeMessageListenerMock: vi.fn(),
   scenarioSessionServiceCtorMock: vi.fn(function ScenarioSessionServiceMock(this: {
@@ -21,6 +25,9 @@ const {
     this.kind = 'scenario-session-service';
   }),
 }));
+
+vi.mock('../../../platform/i18n', () => ({ prepareTranslations: prepareTranslationsMock }));
+vi.mock('../../i18n/catalog-port', () => ({ registerCatalogPorts: registerCatalogPortsMock }));
 
 vi.mock('@sniptale/platform/observability/message-tracer', () => ({
   initTracer: initTracerMock,
@@ -49,6 +56,9 @@ describe('background/index', () => {
 
     expect(installRuntimeLogCapture).toHaveBeenCalledWith('background');
     expect(registerDiagnosticLogPorts).toHaveBeenCalledOnce();
+    expect(registerCatalogPortsMock).toHaveBeenCalledOnce();
+    expect(prepareTranslationsMock).toHaveBeenCalledWith('background');
+    expect(registerCatalogPortsMock).toHaveBeenCalledBefore(initializeBackgroundRuntimeMock);
     expect(initTracerMock).toHaveBeenCalledWith('bg');
     expect(initializeBackgroundRuntimeMock).toHaveBeenCalledWith(
       expect.objectContaining({

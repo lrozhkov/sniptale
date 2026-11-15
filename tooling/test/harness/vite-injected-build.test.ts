@@ -1,9 +1,23 @@
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { runInNewContext } from 'node:vm';
+import { colornames } from 'color-name-list';
+import { build as buildEsbuild } from 'esbuild';
+import { build as buildVite } from 'vite';
 
 import { expect, it } from 'vitest';
 
-import { createContentRuntimeBuildId } from '../../../apps/extension/build/content-runtime-build-id';
 import {
+  compactColorCatalog,
+  createCompactColorCatalogSource,
+  esbuildCompactColorCatalog,
+} from '../../../apps/extension/build/color-catalog';
+import { createContentRuntimeBuildId } from '../../../apps/extension/build/content-runtime-build-id';
+import { createNamedCatalog } from '../../../apps/extension/src/ui/color-selector/catalog-model';
+import {
+  CONTENT_RUNTIME_EXECUTION_FOOTER,
+  CONTENT_RUNTIME_GLOBAL_NAME,
   getTraceWsUrlForMode,
   isTraceMessagesEnabledForMode,
   shouldEmitBuildSourcemaps,
@@ -62,4 +76,132 @@ it('uses a deterministic content runtime build id for release bundles', () => {
 
 it('requires the extension version for release content runtime build ids', () => {
   expect(() => createContentRuntimeBuildId('release')).toThrow(/requires an extension version/u);
+});
+
+it('preserves every named color, its order, and the searchable catalog projection', () => {
+  const colors = runInNewContext(
+    `${createCompactColorCatalogSource().replace('export const ', 'const ')}; colornames;`
+  );
+  expect(colors).toEqual(colornames);
+  expect(createNamedCatalog(colors)).toEqual(createNamedCatalog(colornames));
+});
+
+it('reduces injected catalog bytes without additional imports or lost Unicode', async () => {
+  const options = {
+    stdin: {
+      contents: "export { colornames } from 'color-name-list';",
+      resolveDir: process.cwd(),
+    },
+    write: false,
+    bundle: true,
+    charset: 'utf8' as const,
+    format: 'iife' as const,
+    globalName: 'catalogProof',
+    minify: true,
+    metafile: true,
+    target: CHROME_BUILD_TARGET,
+  };
+  const [original, compact] = await Promise.all([
+    buildEsbuild(options),
+    buildEsbuild({ ...options, plugins: [esbuildCompactColorCatalog()] }),
+  ]);
+  expect(compact.outputFiles[0].contents.length).toBeLessThan(
+    original.outputFiles[0].contents.length * 0.8
+  );
+  expect(runInNewContext(`${compact.outputFiles[0].text}; catalogProof.colornames;`)).toEqual(
+    colornames
+  );
+  expect(compact.outputFiles[0].text).toContain('À l’Orange');
+  expect(Object.values(compact.metafile.outputs).flatMap((output) => output.imports)).toEqual([]);
+});
+
+it('uses the same compact catalog and UTF-8 in page bundles', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'sniptale-color-catalog-'));
+  try {
+    const entry = path.join(directory, 'entry.js');
+    fs.writeFileSync(
+      entry,
+      `export { colornames } from ${JSON.stringify(path.resolve('node_modules/color-name-list/dist/colornames.esm.js'))};`
+    );
+    const result = await buildVite({
+      configFile: false,
+      logLevel: 'silent',
+      plugins: [compactColorCatalog()],
+      build: {
+        write: false,
+        rollupOptions: {
+          input: entry,
+          preserveEntrySignatures: 'strict',
+          output: {
+            charset: 'utf8',
+            format: 'iife',
+            name: 'catalogProof',
+          },
+        },
+      },
+    });
+    if (Array.isArray(result) || !('output' in result)) throw new Error('Expected one bundle');
+    const chunk = result.output.find((output) => output.type === 'chunk');
+    if (!chunk) throw new Error('Expected the catalog chunk');
+    expect(runInNewContext(`${chunk.code}; catalogProof.colornames;`)).toEqual(colornames);
+    expect(chunk.code).toContain('À l’Orange');
+    expect(chunk.imports).toEqual([]);
+    expect(chunk.dynamicImports).toEqual([]);
+    expect(Buffer.byteLength(chunk.code)).toBeLessThan(
+      fs.statSync(path.resolve('node_modules/color-name-list/dist/colornames.esm.js')).size * 0.8
+    );
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+it('limits the color transform to its installed dependency module', () => {
+  const plugin = compactColorCatalog();
+  if (typeof plugin.transform !== 'function') throw new Error('Expected the transform hook');
+  const id = path.resolve('node_modules/color-name-list/dist/colornames.esm.js');
+  const transform = (moduleId: string) =>
+    Reflect.apply(plugin.transform, undefined, ['', moduleId]);
+  expect(transform(id)).toBe(createCompactColorCatalogSource());
+  expect(transform(id.replaceAll('/', '\\'))).toBe(createCompactColorCatalogSource());
+  expect(transform(path.resolve('apps/extension/src/unrelated.js'))).toBeUndefined();
+});
+
+it('keeps UTF-8 explicit in the page and injected build configurations', () => {
+  const viteSource = fs.readFileSync('apps/extension/vite.config.ts', 'utf8');
+  const injectedSource = fs.readFileSync('apps/extension/build/injected-build.ts', 'utf8');
+  expect(viteSource).toContain("charset: 'utf8'");
+  expect(viteSource).toContain('asciiOnly: false');
+  expect(injectedSource.match(/charset: 'utf8'/gu)).toHaveLength(2);
+});
+
+it('returns eager initialization completion from the injected script evaluation', async () => {
+  const result = await buildEsbuild({
+    stdin: {
+      contents:
+        'export const contentRuntimePreparation = new Promise(resolve => {' +
+        'globalThis.finishPreparation = resolve; });',
+    },
+    bundle: true,
+    write: false,
+    format: 'iife',
+    globalName: CONTENT_RUNTIME_GLOBAL_NAME,
+    footer: { js: CONTENT_RUNTIME_EXECUTION_FOOTER },
+    target: CHROME_BUILD_TARGET,
+  });
+  const output = result.outputFiles[0];
+  if (!output) throw new Error('Expected the injected script');
+  const context = {};
+  const completion = runInNewContext(output.text, context);
+  expect(typeof completion.then).toBe('function');
+  let settled = false;
+  void completion.then(() => {
+    settled = true;
+  });
+  await Promise.resolve();
+  expect(settled).toBe(false);
+  const finish = Reflect.get(context, 'finishPreparation');
+  if (typeof finish !== 'function') throw new Error('Expected the preparation control');
+  finish();
+  await completion;
+  expect(settled).toBe(true);
 });

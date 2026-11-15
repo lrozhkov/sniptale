@@ -8,6 +8,7 @@ const {
   logOffscreenDebugErrorMock,
   loggerDebugMock,
   parseOffscreenRuntimeMessageMock,
+  prepareTranslationsMock,
   sendRuntimeMessageBestEffortMock,
   startProjectExportMock,
   startRecordingMock,
@@ -20,10 +21,16 @@ const {
   logOffscreenDebugErrorMock: vi.fn(),
   loggerDebugMock: vi.fn(),
   parseOffscreenRuntimeMessageMock: vi.fn(),
+  prepareTranslationsMock: vi.fn(),
   sendRuntimeMessageBestEffortMock: vi.fn(),
   startProjectExportMock: vi.fn(),
   startRecordingMock: vi.fn(),
   stringifyOffscreenErrorMock: vi.fn(),
+}));
+
+vi.mock('../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../platform/i18n')>()),
+  prepareTranslations: prepareTranslationsMock,
 }));
 
 vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
@@ -139,6 +146,7 @@ async function flushRuntimeRouting() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.resetModules();
+  prepareTranslationsMock.mockResolvedValue(undefined);
   startProjectExportMock.mockResolvedValue(undefined);
   cancelProjectExportMock.mockResolvedValue(undefined);
   consumeProjectExportInputMock.mockResolvedValue(createProject());
@@ -192,7 +200,8 @@ it('routes export start, cancel, and capability probe messages', async () => {
     expect.any(Function)
   );
   expect(cancelProjectExportMock).toHaveBeenCalledWith('job-1');
-  expect(getProjectExportCapabilitiesMock).toHaveBeenCalledWith(settings);
+  await vi.waitFor(() => expect(getProjectExportCapabilitiesMock).toHaveBeenCalledWith(settings));
+  expect(prepareTranslationsMock).toHaveBeenCalledWith('offscreen');
   expect(keepStartChannelOpen).toBe(true);
   expect(keepChannelOpen).toBe(true);
   expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
@@ -285,4 +294,36 @@ it('keeps start-recording failures local after logging them', async () => {
     })
   );
   expect(sendRuntimeMessageBestEffortMock).not.toHaveBeenCalled();
+});
+
+it('waits for prepared translations before probing project export capabilities', async () => {
+  const listener = await captureSubscriptionListener();
+  const settings = createExportSettings();
+  const sendResponse = vi.fn();
+  let releasePreparation = () => {};
+  prepareTranslationsMock.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        releasePreparation = resolve;
+      })
+  );
+  parseOffscreenRuntimeMessageMock.mockImplementation((message: unknown) => message);
+  emitTrustedRuntimeMessage(
+    listener,
+    {
+      type: VideoMessageType.OFFSCREEN_GET_PROJECT_EXPORT_CAPABILITIES,
+      settings,
+    },
+    sendResponse
+  );
+  await vi.waitFor(() => expect(prepareTranslationsMock).toHaveBeenCalledWith('offscreen'));
+  expect(getProjectExportCapabilitiesMock).not.toHaveBeenCalled();
+  releasePreparation();
+  await vi.waitFor(() => expect(getProjectExportCapabilitiesMock).toHaveBeenCalledWith(settings));
+  await vi.waitFor(() =>
+    expect(sendResponse).toHaveBeenCalledWith({
+      success: true,
+      capabilities: expect.any(Object),
+    })
+  );
 });

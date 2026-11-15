@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import type { BrowserContext, Page } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { expect, test, terminateExtensionServiceWorker } from '../support/extension-fixture';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';

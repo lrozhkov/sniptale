@@ -1,8 +1,42 @@
 // @vitest-environment jsdom
+import en from '../../../../../platform/i18n/catalogs/en.json';
+import ru from '../../../../../platform/i18n/catalogs/ru.json';
+import {
+  prepareTranslations,
+  setLocalePreference,
+} from '../../../../../platform/i18n/locale/state';
+import type { AppLocale } from '@sniptale/platform/i18n/config';
 
 import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (language: AppLocale) => Promise.resolve(catalogFixtureMessages(language)),
+}));
+
+beforeAll(async () => {
+  await prepareTranslations('content', 'ru');
+  await setLocalePreference('ru');
+});
+
+function catalogFixtureMessages(language: AppLocale): Record<string, string> {
+  const messages: Record<string, string> = {};
+  function visit(value: unknown, prefix: string) {
+    if (typeof value === 'string') {
+      messages[prefix] = value;
+      return;
+    }
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error('Invalid authored catalog fixture');
+    }
+    for (const [key, child] of Object.entries(value)) {
+      visit(child, prefix ? `${prefix}.${key}` : key);
+    }
+  }
+  visit({ en, ru }[language], '');
+  return messages;
+}
+
 import {
   createIntegrationBootstrapPayload,
   createIntegrationTemplatesState,

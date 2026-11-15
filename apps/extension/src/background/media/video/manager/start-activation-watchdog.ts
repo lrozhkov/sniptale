@@ -1,5 +1,5 @@
 import { runBestEffort } from '@sniptale/foundation/best-effort';
-import { translate } from '../../../../platform/i18n';
+import { VideoRecordingFailureCode } from '@sniptale/runtime-contracts/video/types/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { RECORDING_START_ACTIVATION_TIMEOUT_MS } from '@sniptale/runtime-contracts/video/types/timeouts';
 import { getVideoRecordingId, isVideoRecordingPreparationInProgress } from '../session-state';
@@ -11,14 +11,12 @@ type WatchdogDeps = {
   getRecordingId: () => string | null;
   isPreparing: () => boolean;
   failStart: (recordingId: string, error: string) => Promise<void>;
-  translate: (key: 'background.runtime.recordingStartTimeout') => string;
 };
 
 const defaultDeps: WatchdogDeps = {
   getRecordingId: getVideoRecordingId,
   isPreparing: isVideoRecordingPreparationInProgress,
   failStart: failRecordingStartAfterTimeout,
-  translate,
 };
 
 let activationTimer: ReturnType<typeof setTimeout> | null = null;
@@ -54,7 +52,7 @@ export function scheduleRecordingStartActivationWatchdog(
     }
 
     runBestEffort(
-      deps.failStart(recordingId, deps.translate('background.runtime.recordingStartTimeout')),
+      deps.failStart(recordingId, VideoRecordingFailureCode.START_ACTIVATION_TIMEOUT),
       logger,
       'Failed to complete recording start timeout cleanup',
       { recordingId }

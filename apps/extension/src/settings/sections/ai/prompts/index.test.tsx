@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { expect, it, vi } from 'vitest';
+import { expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../../catalog-fixture.test-support';
 const controller = vi.hoisted(() => ({ state: { isLoading: false, error: false, prompts: {} } }));
 vi.mock('./controller', () => ({ useAiPromptsController: () => controller.state }));
 vi.mock('./surface/content', () => ({ AiPromptsContent: () => <div>prompt-settings</div> }));
@@ -53,3 +57,10 @@ it('routes scenario templates to their own scope', () => {
   expect(node.textContent).toContain('prompt-templates:page');
   act(() => root.unmount());
 });
+
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('ru'));

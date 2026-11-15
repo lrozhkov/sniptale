@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { SUPPORTED_LOCALES } from '../../i18n';
 import { VideoMessageType } from '../messages';
 import {
   isActivateVideoRecordingSurfaceMessage,
@@ -229,6 +230,9 @@ it('accepts only the bounded private permission protocol and read-only authority
   };
   const bootstrap = { type: 'recording-media-permission', request, locale: 'en', theme: 'dark' };
   expect(isRecordingMediaPermissionBootstrap(bootstrap)).toBe(true);
+  for (const locale of SUPPORTED_LOCALES) {
+    expect(isRecordingMediaPermissionBootstrap({ ...bootstrap, locale })).toBe(true);
+  }
   for (const command of [
     { kind: 'set-microphone-enabled', enabled: true },
     { kind: 'list-media-devices', deviceKind: 'audioinput' },
@@ -238,7 +242,9 @@ it('accepts only the bounded private permission protocol and read-only authority
       isRecordingMediaPermissionBootstrap({ ...bootstrap, request: { ...request, command } })
     ).toBe(false);
   }
-  expect(isRecordingMediaPermissionBootstrap({ ...bootstrap, locale: 'fr' })).toBe(false);
+  expect(isRecordingMediaPermissionBootstrap({ ...bootstrap, locale: '__unsupported__' })).toBe(
+    false
+  );
   expect(isRecordingMediaPermissionBootstrap({ ...bootstrap, extra: true })).toBe(false);
   expect(
     isRecordingMediaPermissionBootstrap({ ...bootstrap, request: { ...request, surfaceToken: '' } })

@@ -3,7 +3,18 @@
 import React, { useState } from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadContentCatalogFixture,
+  prepareContentTranslations,
+} from '../../../test-support/translations.test-support';
+
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadContentCatalogFixture>[0]) =>
+    loadContentCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareContentTranslations('en'));
 import { FullPageCaptureSplitButton } from './full-page-menu';
 import { useToolbarMenuState } from '../state/menu';
 import type { FullPageCapturePreferences } from '../../../../contracts/full-page-capture';

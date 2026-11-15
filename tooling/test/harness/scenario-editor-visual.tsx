@@ -22,7 +22,10 @@ import { commitScenarioAggregateMutation } from '../../../apps/extension/src/com
 import { getScenarioProject } from '../../../apps/extension/src/composition/persistence/scenario/projects';
 import { createScenarioAssetEntryFromBlob } from '../../../apps/extension/src/composition/persistence/scenario/store/capture-step/asset-entry';
 import { initializeAppTheme } from '../../../apps/extension/src/ui/theme/index';
-import { setLocalePreference } from '../../../apps/extension/src/platform/i18n';
+import {
+  prepareTranslations,
+  setLocalePreference,
+} from '../../../apps/extension/src/platform/i18n';
 import '@sniptale/ui/styles';
 import '@sniptale/ui/styles/ai-modal';
 import '@sniptale/ui/styles/glass';
@@ -197,6 +200,7 @@ async function mountGuideHarness(): Promise<void> {
     });
   initializeAppTheme(params.get('theme') === 'dark' ? 'dark' : 'light');
   await setLocalePreference(params.get('locale') === 'ru' ? 'ru' : 'en');
+  await prepareTranslations('scenario-editor');
   const projectId = params.get('projectId') ?? 'guide-visual';
   if (params.get('skipSeed') !== '1')
     await seedGuide(

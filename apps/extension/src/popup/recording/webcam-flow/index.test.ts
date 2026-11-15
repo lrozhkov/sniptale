@@ -1,4 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  loadPopupCatalogFixture,
+  preparePopupTranslations,
+} from '../../catalog-fixture.test-support';
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadPopupCatalogFixture>[0]) =>
+    loadPopupCatalogFixture(locale),
+}));
+beforeAll(preparePopupTranslations);
+
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import { refreshWebcamDevices, toggleWebcam } from './index';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';

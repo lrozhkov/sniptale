@@ -22,13 +22,38 @@ function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sniptale-i18n-build-'));
   roots.push(root);
   fs.mkdirSync(path.join(root, i18n, 'catalogs'), { recursive: true });
-  fs.mkdirSync(path.join(root, 'packages/platform/src/i18n'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'packages/runtime-contracts/src'), { recursive: true });
   fs.writeFileSync(
-    path.join(root, 'packages/platform/src/i18n/config.ts'),
+    path.join(root, 'packages/runtime-contracts/src/i18n.ts'),
     'const LOCALE_REGISTRY = {en: {}, ru: {}};'
   );
   writeManifest(root, manifest);
   writeCatalogs(root, 'Common');
+  for (const owner of [
+    'content',
+    'popup',
+    'editor',
+    'gallery',
+    'video-editor',
+    'scenario-editor',
+    'settings',
+    'web-snapshot-viewer',
+    'camera-recorder',
+    'background',
+    'offscreen',
+    'media-permission',
+    'design-system',
+  ]) {
+    const entry =
+      owner === 'offscreen'
+        ? 'offscreen.ts'
+        : owner === 'background' || owner === 'media-permission'
+          ? 'index.ts'
+          : 'index.tsx';
+    const directory = path.join(root, 'apps/extension/src', owner);
+    fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(path.join(directory, entry), 'export {};');
+  }
   return root;
 }
 
@@ -108,7 +133,7 @@ it('watches all source inputs and rereads catalog and subset changes without a s
       path.join(root, i18n, 'catalog-subsets.ts'),
       path.join(root, i18n, 'catalogs/en.json'),
       path.join(root, i18n, 'catalogs/ru.json'),
-      path.join(root, 'packages/platform/src/i18n/config.ts'),
+      path.join(root, 'packages/runtime-contracts/src/i18n.ts'),
     ])
   );
   writeCatalogs(root, 'Changed');

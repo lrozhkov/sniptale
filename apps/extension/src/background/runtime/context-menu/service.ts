@@ -1,3 +1,4 @@
+import { prepareTranslations } from '../../../platform/i18n';
 import { PRODUCT_BRAND_NAME } from '@sniptale/ui/branding';
 import {
   browserContextMenus,
@@ -48,6 +49,7 @@ function logContextMenuUpdateFailure(
 }
 
 async function runBackgroundContextMenuRebuild(): Promise<void> {
+  await prepareTranslations('background');
   const [settings, quickActions] = await Promise.all([loadSettings(), getQuickActions()]);
   const contextMenuSettings = settings.contextMenu;
 

@@ -10,6 +10,42 @@ const choose = (page: Page, field: string, name: string) =>
   ui(page, `welcome.${field}`).getByRole('button', { name, exact: true });
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`native language choices do not load inactive catalogs ${viewport.name}`, async ({}, info) => {
+    const launched = await launchExtensionBrowser({ viewport: viewport.size });
+    try {
+      const { context } = launched;
+      await expect
+        .poll(() =>
+          context
+            .pages()
+            .find((page) => page.url().includes('welcome=1'))
+            ?.url()
+        )
+        .toBeTruthy();
+      const page = context.pages().find((candidate) => candidate.url().includes('welcome=1'))!;
+      const requests: string[] = [];
+      page.on('request', (request) => {
+        const path = new URL(request.url()).pathname;
+        if (path.startsWith('/i18n/')) requests.push(path);
+      });
+      await page.reload();
+      await expect(ui(page, 'settings.welcome.root')).toBeVisible();
+      await page.screenshot({
+        path: info.outputPath('native-language-choices.png'),
+        fullPage: false,
+      });
+      await expect(choose(page, 'language', 'English')).toHaveAttribute('aria-pressed', 'true');
+      await expect(choose(page, 'language', 'Русский')).toBeVisible();
+      expect(requests).toContain('/i18n/settings/en.json');
+      expect(requests.some((path) => path.endsWith('/ru.json'))).toBe(false);
+      await choose(page, 'language', 'Русский').click();
+      await expect(choose(page, 'language', 'Русский')).toHaveAttribute('aria-pressed', 'true');
+      expect(requests).toContain('/i18n/settings/ru.json');
+    } finally {
+      await closeExtensionBrowser(launched, { removeUserDataDir: true });
+    }
+  });
+
   test(`first-install welcome persists setup and remains optional ${viewport.name}`, async ({}, info) => {
     const launched = await launchExtensionBrowser({
       viewport: viewport.size,

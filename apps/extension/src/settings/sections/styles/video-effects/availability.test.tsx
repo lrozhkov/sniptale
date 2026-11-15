@@ -1,10 +1,29 @@
 // @vitest-environment jsdom
+
+import en from '../../../../platform/i18n/catalogs/en.json';
+import ru from '../../../../platform/i18n/catalogs/ru.json';
+import {
+  prepareTranslations,
+  setLocalePreference,
+  type AppLocale,
+} from '../../../../platform/i18n';
+
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: AppLocale) =>
+    flatCatalogFixture(locale === 'ru' ? ru : en)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareTranslations('settings', 'ru');
+  await setLocalePreference('ru');
+});
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, expect, it, vi } from 'vitest';
 import type { SettingsCollectionProps } from '../../../section-surface';
 import type { EffectBundleCatalogEntry } from '../../../../features/video/project/effect-bundle/catalog';
 import { VideoEffectsSection } from './index';
@@ -141,3 +160,15 @@ it('keeps invalid imported packs removable and reports a failed catalog reload',
     host.remove();
   }
 });
+
+function flatCatalogFixture(value: unknown, prefix = ''): Record<string, string> {
+  if (typeof value === 'string') return { [prefix]: value };
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Invalid authored catalog fixture');
+  }
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, child]) =>
+      Object.entries(flatCatalogFixture(child, prefix ? `${prefix}.${key}` : key))
+    )
+  );
+}

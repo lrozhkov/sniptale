@@ -1,4 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import {
+  loadFeatureCatalogFixture,
+  prepareFeatureTranslations,
+} from '../../catalog-fixture.test-support';
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadFeatureCatalogFixture>[0]) =>
+    loadFeatureCatalogFixture(locale),
+}));
+
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import type { CalloutPreset } from '@sniptale/runtime-contracts/highlighter/callout';
 import { getCalloutPresetDisplayName } from './display-name';
 
@@ -36,4 +45,8 @@ describe('getCalloutPresetDisplayName', () => {
       getCalloutPresetDisplayName({ ...preset, customized: true, name: 'My bubble' }, 'ru')
     ).toBe('My bubble');
   });
+});
+
+beforeEach(async () => {
+  await prepareFeatureTranslations('content', 'ru');
 });

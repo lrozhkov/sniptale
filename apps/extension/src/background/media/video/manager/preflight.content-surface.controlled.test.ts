@@ -1,4 +1,36 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import en from '../../../../platform/i18n/catalogs/en.json';
+import ru from '../../../../platform/i18n/catalogs/ru.json';
+import { prepareTranslations, type AppLocale } from '../../../../platform/i18n';
+
+vi.mock('../../../../composition/persistence/infrastructure/browser-storage', async (original) => {
+  const actual =
+    await original<
+      typeof import('../../../../composition/persistence/infrastructure/browser-storage')
+    >();
+  return {
+    ...actual,
+    browserStorage: {
+      ...actual.browserStorage,
+      local: {
+        ...actual.browserStorage.local,
+        isAvailable: () => true,
+        get: async () => ({ 'sniptale-locale-preference': 'ru' }),
+      },
+      subscribeToChanges: () => () => undefined,
+    },
+  };
+});
+
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: AppLocale) =>
+    flatCatalogFixture(locale === 'ru' ? ru : en)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareTranslations('background');
+});
+import { beforeAll, beforeEach, expect, it, vi } from 'vitest';
 
 import type {
   TabMessageType,
@@ -164,3 +196,15 @@ it('skips unsupported capture modes when cursor telemetry is disabled', async ()
     )
   ).resolves.toBeUndefined();
 });
+
+function flatCatalogFixture(value: unknown, prefix = ''): Record<string, string> {
+  if (typeof value === 'string') return { [prefix]: value };
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Invalid authored catalog fixture');
+  }
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, child]) =>
+      Object.entries(flatCatalogFixture(child, prefix ? `${prefix}.${key}` : key))
+    )
+  );
+}

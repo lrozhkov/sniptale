@@ -4,7 +4,7 @@
   const storageKey = 'sniptale-theme-preference';
   const localeStorageKey = 'sniptale-locale-preference';
   let preference = 'system';
-  let locale = 'ru';
+  let locale = 'en';
 
   try {
     const storedPreference = window.localStorage.getItem(storageKey);
@@ -16,7 +16,17 @@
       preference = storedPreference;
     }
     const storedLocale = window.localStorage.getItem(localeStorageKey);
-    if (storedLocale === 'en' || storedLocale === 'ru') locale = storedLocale;
+    // This paint hint does not select a catalog. Bootstrap checks the locale registry.
+    if (
+      storedLocale &&
+      storedLocale
+        .split('-')
+        .every((part, index) =>
+          index === 0 ? /^[a-z]{2,3}$/.test(part) : /^[A-Za-z0-9]{2,8}$/.test(part)
+        )
+    ) {
+      locale = storedLocale;
+    }
   } catch {
     // The system preference below remains the fail-safe first-paint source.
   }

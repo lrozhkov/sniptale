@@ -1,7 +1,7 @@
 import { expect, type Locator } from '@playwright/test';
 import { test } from '../support/extension-fixture';
 import { openVisualHarness, SCENARIO_VISUAL_THEMES } from './scenario-editor-visual.helpers';
-import { createTranslator } from '../../../../apps/extension/src/platform/i18n';
+import { createTranslator } from '../support/catalog-fixture';
 
 for (const theme of SCENARIO_VISUAL_THEMES) {
   test(`scenario inspector shares color and section patterns in ${theme}`, async ({

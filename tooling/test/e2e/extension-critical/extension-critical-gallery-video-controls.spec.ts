@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 const label = (key: Parameters<typeof translate>[0]) => translate(key, 'ru');
 const gallery = '/apps/extension/src/gallery/index.html';

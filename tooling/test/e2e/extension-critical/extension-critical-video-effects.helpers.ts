@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { createGlTransitionSelection } from '../../../../apps/extension/src/features/video/project/transition/gl-catalog';
 import { basename } from 'node:path';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { fileURLToPath } from 'node:url';
 import { expect, type Page } from '@playwright/test';
 import {

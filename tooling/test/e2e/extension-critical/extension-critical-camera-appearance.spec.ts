@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
-import { translate, type AppLocale } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
+import type { AppLocale } from '../../../../apps/extension/src/platform/i18n';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { closeExtensionBrowser, launchExtensionBrowser } from '../support/extension-browser-launch';
 import { startHostServer } from '../support/host-server';

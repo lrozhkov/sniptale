@@ -3,7 +3,11 @@
 import { act, useState } from 'react';
 import type React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadUiCatalogFixture,
+  prepareUiTranslations,
+} from '../test-support/translations.test-support';
 import { NumericRow } from './numeric';
 
 let container: HTMLDivElement | null = null;
@@ -460,3 +464,10 @@ it('returns to the practical scale only after a deliberate range edit', () => {
   act(() => getRange().dispatchEvent(new KeyboardEvent('keyup', { key: 'Home', bubbles: true })));
   expect(commit).toHaveBeenCalledExactlyOnceWith(10);
 });
+
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadUiCatalogFixture>[0]) =>
+    loadUiCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareUiTranslations('content', 'ru'));

@@ -1,5 +1,5 @@
 import type { BrowserContext, Locator, Page, TestInfo, ViewportSize } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { applyHarnessBootstrap, EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { expect, test } from '../support/extension-fixture';

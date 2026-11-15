@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { createVideoProjectFromRecording } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { isValidVideoProject } from '../../../../apps/extension/src/features/video/project/validation';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
 import { startHostServer } from '../support/host-server';

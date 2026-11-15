@@ -1,8 +1,16 @@
 // @vitest-environment jsdom
+import {
+  loadViewerCatalogFixture,
+  prepareViewerTranslations,
+} from '../../catalog-fixture.test-support';
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadViewerCatalogFixture>[0]) =>
+    loadViewerCatalogFixture(locale),
+}));
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { expect, it, vi } from 'vitest';
+import { expect, it, vi, beforeEach } from 'vitest';
 import { ViewerPackageFileList } from './package-file-list';
 
 it('keeps file identity before its trailing preview, open and download actions', () => {
@@ -83,4 +91,8 @@ it('reports a failed separate open beside the file and keeps download usable', a
   expect(container.querySelector('[role="status"]')).toBeNull();
   act(() => root.unmount());
   vi.unstubAllGlobals();
+});
+
+beforeEach(async () => {
+  await prepareViewerTranslations();
 });

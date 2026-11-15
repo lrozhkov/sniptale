@@ -1,8 +1,38 @@
 // @vitest-environment jsdom
+import en from '../../../../platform/i18n/catalogs/en.json';
+import ru from '../../../../platform/i18n/catalogs/ru.json';
+import { prepareTranslations } from '../../../../platform/i18n/locale/state';
+import type { AppLocale } from '@sniptale/platform/i18n/config';
 import { voiceFixture } from './voice.test-support';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, vi } from 'vitest';
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (language: AppLocale) => Promise.resolve(catalogFixtureMessages(language)),
+}));
+
+beforeAll(async () => {
+  await prepareTranslations('content', 'en');
+});
+
+function catalogFixtureMessages(language: AppLocale): Record<string, string> {
+  const messages: Record<string, string> = {};
+  function visit(value: unknown, prefix: string) {
+    if (typeof value === 'string') {
+      messages[prefix] = value;
+      return;
+    }
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error('Invalid authored catalog fixture');
+    }
+    for (const [key, child] of Object.entries(value)) {
+      visit(child, prefix ? `${prefix}.${key}` : key);
+    }
+  }
+  visit({ en, ru }[language], '');
+  return messages;
+}
+
 import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 import { browserAnnotationSession } from '../../../parser/page-preparation/annotations';
 import {

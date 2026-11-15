@@ -8,7 +8,7 @@ import {
 } from '../support/inspector-utilities';
 import { readNativeVideoProject } from '../support/native-video-project';
 import { encodedNativeVideoSamples } from '../support/native-video-export-proof';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { startHostServer } from '../support/host-server';
 import {
   applyHarnessBootstrap,

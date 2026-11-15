@@ -1,3 +1,4 @@
+import { prepareTranslations } from '../../../../platform/i18n';
 import { ensurePersistentStorage } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { cleanupDrafts } from '../../../../composition/persistence/library-lifecycle';
 import {
@@ -84,17 +85,24 @@ export function runStartupMaintenance(
     logger.warn('AI storage initialization failed (non-critical)', error);
   });
 
-  migrateHighlighterSystemPresetCatalog().catch((error) => {
-    logger.warn('Highlighter preset catalog migration failed (non-critical)', error);
-  });
+  const presetTranslations = prepareTranslations('background');
+  presetTranslations
+    .then(() => migrateHighlighterSystemPresetCatalog())
+    .catch((error) => {
+      logger.warn('Highlighter preset catalog migration failed (non-critical)', error);
+    });
 
-  migrateCalloutSystemPresetCatalog().catch((error) => {
-    logger.warn('Callout preset catalog migration failed (non-critical)', error);
-  });
+  presetTranslations
+    .then(() => migrateCalloutSystemPresetCatalog())
+    .catch((error) => {
+      logger.warn('Callout preset catalog migration failed (non-critical)', error);
+    });
 
-  migrateStepBadgeSystemPresetCatalog().catch((error) => {
-    logger.warn('Step badge preset catalog migration failed (non-critical)', error);
-  });
+  presetTranslations
+    .then(() => migrateStepBadgeSystemPresetCatalog())
+    .catch((error) => {
+      logger.warn('Step badge preset catalog migration failed (non-critical)', error);
+    });
 
   resetVideoRecordingRuntimeState();
   recoverPendingVideoRecordingCameraPeerCleanup().catch((error) => {

@@ -3,6 +3,7 @@ import { GlCatalogSettings } from './gl-catalog';
 import { SettingsSubpageTabs } from '../../../section-surface';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { Download } from 'lucide-react';
+import { resolveEffectLocaleText } from '@sniptale/runtime-contracts/effect-controls';
 import {
   EffectCatalogPreview,
   EffectCatalogPreviewProvider,
@@ -21,7 +22,7 @@ import {
   queryEffectCatalog,
   type EffectCatalogFilter,
 } from '../../../../features/video/project/effect-bundle/catalog/query';
-import { translate, useAppLocale } from '../../../../platform/i18n';
+import { translate, useAppLocale, type AppLocale } from '../../../../platform/i18n';
 import { useVideoEffectsSettings } from './controller';
 
 interface EffectSettingsItem extends SettingsCollectionItem {
@@ -146,7 +147,7 @@ function AnimationEffectsSection() {
 function resolveCollectionView(
   controller: ReturnType<typeof useVideoEffectsSettings>,
   filter: EffectCatalogFilter,
-  locale: 'en' | 'ru'
+  locale: AppLocale
 ) {
   const themes = getEffectCatalogThemes(
     controller.entries.flatMap((entry) => (entry.status === 'ready' ? [entry.entry] : [])),
@@ -164,7 +165,7 @@ function resolveCollectionView(
 function buildCollectionItems(
   controller: Pick<ReturnType<typeof useVideoEffectsSettings>, 'entries' | 'busy' | 'download'>,
   filter: EffectCatalogFilter,
-  locale: 'ru' | 'en'
+  locale: AppLocale
 ): EffectSettingsItem[] {
   return controller.entries.flatMap<EffectSettingsItem>((entry) => {
     if (entry.status === 'invalid')
@@ -178,6 +179,7 @@ function buildCollectionItems(
           busy: controller.busy,
         },
       ];
+    const packName = resolveEffectLocaleText(entry.label, locale);
     const matches = queryEffectCatalog(entry.entry, filter, locale, { includeDisabled: true });
     const seen = new Set<string>();
     const documents = matches.filter((document) => {
@@ -190,14 +192,14 @@ function buildCollectionItems(
       return {
         id: `${entry.packId}/${document.id}`,
         packId: entry.packId,
-        packName: entry.label[locale],
+        packName,
         documentId: document.id,
         title: metadata.label,
         enabled: document.enabled ?? entry.enabled,
         previewVariant: 'image' as const,
         preview: <EffectCatalogPreview catalog={entry.entry} document={document} />,
         busy: controller.busy,
-        meta: metadata.themeLabel || entry.label[locale],
+        meta: metadata.themeLabel || packName,
         capabilities: {
           toggle: true,
           edit: entry.source !== 'builtin',

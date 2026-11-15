@@ -3,7 +3,7 @@ import { expect, test } from '../support/extension-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 import { DEFAULT_DRAWING_COLORS } from '../../../../apps/extension/src/features/drawing/public';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 const t = (key: Parameters<typeof translate>[0]) => translate(key, 'ru');
 const ui = (page: Page, name: string) => page.locator(`[data-ui="${name}"]`);
 

@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { enableGpuPreviewProof, installCameraFrameObserver } from '../support/gpu-preview-proof';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { startHostServer } from '../support/host-server';
 import { seedReviewWebcamBundle } from '../support/quick-editor-media-fixture';
 import { readWebcamWorkspace } from '../support/quick-editor-webcam-proof';

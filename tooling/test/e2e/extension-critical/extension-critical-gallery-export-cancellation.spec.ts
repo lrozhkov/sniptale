@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { closeExtensionBrowser, launchExtensionBrowser } from '../support/extension-browser-launch';
 import { terminateExtensionServiceWorker } from '../support/extension-fixture';

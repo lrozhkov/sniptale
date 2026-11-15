@@ -2,7 +2,11 @@
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../catalog-fixture.test-support';
 
 import { SettingsCollection } from '.';
 import type { SettingsCollectionItem } from './types';
@@ -207,3 +211,10 @@ it('keeps rapid reversals bounded and cancels only owned animations on teardown'
   for (const animation of animations) expect(animation.cancel).toHaveBeenCalledExactlyOnceWith();
   expect(unrelatedCancel).not.toHaveBeenCalled();
 });
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('ru'));

@@ -1,8 +1,27 @@
 // @vitest-environment jsdom
 
+import en from '../../../../platform/i18n/catalogs/en.json';
+import ru from '../../../../platform/i18n/catalogs/ru.json';
+import {
+  prepareTranslations,
+  setLocalePreference,
+  type AppLocale,
+} from '../../../../platform/i18n';
+
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: AppLocale) =>
+    flatCatalogFixture(locale === 'ru' ? ru : en)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareTranslations('popup', 'ru');
+  await setLocalePreference('ru');
+});
+
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ExportProgressSectionView } from './view';
 import type { ExportProgressSectionProps } from './types';
@@ -110,6 +129,7 @@ async function verifyBatchPageProgressDescription() {
     createProps({
       progress: {
         phase: 'downloading',
+        collectingPageTitle: 'Example',
         message: 'Collecting page: Example',
         current: 2,
         total: 5,
@@ -119,7 +139,7 @@ async function verifyBatchPageProgressDescription() {
   );
 
   const description = container?.querySelector('[data-ui="popup.export.progress-description"]');
-  expect(description?.textContent).toBe('Collecting page: Example');
+  expect(description?.textContent).toBe('Собираем страницу: Example');
 }
 
 async function verifyCompletedState() {
@@ -341,3 +361,15 @@ describe('ExportProgressSectionView long step lists', () => {
     expect(icon?.querySelector('.animate-spin')).not.toBeNull();
   });
 });
+
+function flatCatalogFixture(value: unknown, prefix = ''): Record<string, string> {
+  if (typeof value === 'string') return { [prefix]: value };
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Invalid authored catalog fixture');
+  }
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, child]) =>
+      Object.entries(flatCatalogFixture(child, prefix ? `${prefix}.${key}` : key))
+    )
+  );
+}

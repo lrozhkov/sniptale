@@ -1,7 +1,7 @@
 import { createVideoProjectCursorTrack } from '../../../../apps/extension/src/features/video/project/defaults';
 import { expect, test, type Page } from '@playwright/test';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { syntheticSpeechWav, speechModelResponse } from '../support/voiceover-speech-fixture';
 import { startHostServer } from '../support/host-server';
 import {

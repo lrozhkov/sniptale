@@ -14,7 +14,7 @@ import {
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { createEmptyVideoProject } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { createTextClip } from '../../../../apps/extension/src/features/video/project/factories/overlay-clip';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 type Measurement = {
   frames: number;

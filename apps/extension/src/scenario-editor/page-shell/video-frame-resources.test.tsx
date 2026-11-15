@@ -1,7 +1,17 @@
 // @vitest-environment jsdom
+import {
+  loadScenarioCatalogFixture,
+  prepareScenarioTranslations,
+} from './test-support/translations.test-support';
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadScenarioCatalogFixture>[0]) =>
+    loadScenarioCatalogFixture(locale),
+}));
+beforeAll(prepareScenarioTranslations);
+
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { createTranslator } from '../../platform/i18n';
 const io = vi.hoisted(() => ({ load: vi.fn(), capture: vi.fn() }));
 vi.mock('./runtime/video-frame', () => ({

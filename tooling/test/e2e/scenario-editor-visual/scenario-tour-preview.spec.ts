@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { createTranslator } from '../../../../apps/extension/src/platform/i18n';
+import { createTranslator } from '../support/catalog-fixture';
 import { test } from '../support/extension-fixture';
 import { openVisualHarness } from './scenario-editor-visual.helpers';
 

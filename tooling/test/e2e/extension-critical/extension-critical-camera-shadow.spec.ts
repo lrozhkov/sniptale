@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { translate, type AppLocale } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
+import type { AppLocale } from '../../../../apps/extension/src/platform/i18n';
 import { createVideoProjectFromMultiSourceRecording } from '../../../../apps/extension/src/features/video/project/factories/multi-source-recording';
 import { resolveCameraVisualClip } from '../../../../apps/extension/src/features/video/project/camera/animation';
 import { isValidVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';

@@ -1,8 +1,17 @@
 // @vitest-environment jsdom
+import {
+  loadPopupCatalogFixture,
+  prepareRussianPopupTranslations,
+} from '../../../catalog-fixture.test-support';
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadPopupCatalogFixture>[0]) =>
+    loadPopupCatalogFixture(locale),
+}));
+beforeAll(prepareRussianPopupTranslations);
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import { createVideoCapabilities } from '../../test-support/video-capabilities';
 import type { ExportFooterActions } from '../footer/actions';

@@ -6,7 +6,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Locator } from '@playwright/test';
 import { createVideoProjectFromRecording } from '../../../../apps/extension/src/features/video/project/factories/creation';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { enableGpuPreviewProof, installCameraFrameObserver } from '../support/gpu-preview-proof';
 import { startHostServer } from '../support/host-server';
 import { readNativeVideoProject } from '../support/native-video-project';

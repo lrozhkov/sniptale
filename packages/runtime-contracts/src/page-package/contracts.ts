@@ -165,6 +165,7 @@ export interface PagePackageExportOptionsV1 {
 }
 
 export interface PagePackageProgressV1 {
+  collectingPageTitle?: string;
   activeStepKey?: PagePackageProgressStepV1 | null;
   completedStepKeys?: PagePackageProgressStepV1[];
   current: number;

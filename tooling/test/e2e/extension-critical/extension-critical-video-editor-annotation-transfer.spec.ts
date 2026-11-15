@@ -42,7 +42,7 @@ import { expect, test, type Page, type Locator } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { isProjectExportInputReference } from '../../../../apps/extension/src/contracts/video/types/project-export-input';
 import { startHostServer } from '../support/host-server';
 import {

@@ -2,7 +2,11 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { ComponentProps } from 'react';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../../../catalog-fixture.test-support';
 import { createRecommendedContextMenuSettings } from '../../../../../contracts/settings/context-menu-layout';
 import { ContextMenuEditor } from './context-menu-editor';
 import { installPersistenceLockManagerForTests } from '../../../../../composition/persistence/infrastructure/mutation-barrier';
@@ -496,3 +500,10 @@ it('returns an entire section to the catalog and Undo restores the saved hierarc
     Reflect.deleteProperty(document, 'elementFromPoint');
   }
 });
+
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('en'));

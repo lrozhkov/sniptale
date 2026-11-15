@@ -1,3 +1,7 @@
+vi.mock('../../platform/i18n', async (original) => ({
+  ...(await original<typeof import('../../platform/i18n')>()),
+  prepareTranslations: vi.fn(async () => undefined),
+}));
 import { expect, it, vi } from 'vitest';
 import { createOffscreenDataReadiness } from './data-readiness';
 

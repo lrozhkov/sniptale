@@ -8,11 +8,8 @@ import {
   type Page,
   type TestInfo,
 } from '@playwright/test';
-import {
-  translate,
-  type AppLocale,
-  type TranslationKey,
-} from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
+import type { AppLocale, TranslationKey } from '../../../../apps/extension/src/platform/i18n';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
 import { startHostServer } from '../support/host-server';
 import { openRealPopup, sendRuntimeMessage } from '../support/recording-action';

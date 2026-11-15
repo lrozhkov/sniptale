@@ -4,7 +4,8 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { ReviewPreviewInspector } from './preview-inspector';
 import { DEFAULT_QUICK_PREVIEW_PREFERENCES } from '../../features/video/preview/quick-preferences';
-import { getDictionary } from '../../platform/i18n';
+import en from '../../platform/i18n/catalogs/en.json';
+import ru from '../../platform/i18n/catalogs/ru.json';
 
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
@@ -110,7 +111,7 @@ it('shows current defaults and actual raster, commits local settings and offers 
 
 it('provides both shipped translations for each preview label', () => {
   for (const locale of ['en', 'ru'] as const) {
-    const messages = getDictionary(locale).gallery.videoReview;
+    const messages = { en, ru }[locale].gallery.videoReview;
     for (const [key, message] of Object.entries(messages)) {
       if (
         key.startsWith('preview') ||

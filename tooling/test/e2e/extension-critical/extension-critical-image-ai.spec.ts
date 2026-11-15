@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { installImageApiFixture } from './extension-critical-image-ai.helpers';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { applyHarnessBootstrap, EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { startHostServer } from '../support/host-server';

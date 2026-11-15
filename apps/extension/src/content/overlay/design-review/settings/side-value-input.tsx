@@ -17,11 +17,36 @@ type SideValueKind = 'color' | 'length' | 'select' | 'text';
 const COLOR_PALETTE = ['#27272a', '#09090b', '#6b7280', '#f97316', '#2563eb', '#059669'];
 
 const BORDER_STYLE_OPTIONS = [
-  { value: 'none', label: translate('content.designReview.optionNone') },
-  { value: 'solid', label: translate('content.designReview.optionSolid') },
-  { value: 'dashed', label: translate('content.designReview.optionDashed') },
-  { value: 'dotted', label: translate('content.designReview.optionDotted') },
-  { value: 'double', label: translate('content.designReview.optionDouble') },
+  {
+    value: 'none',
+    get label() {
+      return translate('content.designReview.optionNone');
+    },
+  },
+  {
+    value: 'solid',
+    get label() {
+      return translate('content.designReview.optionSolid');
+    },
+  },
+  {
+    value: 'dashed',
+    get label() {
+      return translate('content.designReview.optionDashed');
+    },
+  },
+  {
+    value: 'dotted',
+    get label() {
+      return translate('content.designReview.optionDotted');
+    },
+  },
+  {
+    value: 'double',
+    get label() {
+      return translate('content.designReview.optionDouble');
+    },
+  },
 ] as const;
 
 function normalizeBorderStyleValue(value: string): string {

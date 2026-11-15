@@ -3,7 +3,7 @@ import { betaV1Fixture } from '../../../../apps/extension/src/composition/persis
 import { expect, test, type Page } from '@playwright/test';
 import { build } from 'esbuild';
 import { readFile, writeFile } from 'node:fs/promises';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 import { seedReviewVideo, clickReviewExport } from '../support/quick-editor-media-fixture';

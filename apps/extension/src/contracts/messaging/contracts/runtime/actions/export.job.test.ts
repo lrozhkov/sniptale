@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { SUPPORTED_LOCALES } from '@sniptale/runtime-contracts/i18n';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { MAX_POPUP_EXPORT_JOB_ID_BYTES } from '@sniptale/runtime-contracts/export';
@@ -34,6 +35,14 @@ it('parses the native popup export job lifecycle contracts', () => {
   } as const;
 
   expect(start.parseRequest(request)).toEqual(request);
+  for (const locale of SUPPORTED_LOCALES) {
+    expect(start.parseRequest({ ...request, locale })).toEqual({ ...request, locale });
+    expect(getStatus.parseResponse({ locale, status: null, success: true })).toEqual({
+      locale,
+      status: null,
+      success: true,
+    });
+  }
   expect(
     start.parseRequest({
       ...request,
@@ -57,7 +66,9 @@ it('parses the native popup export job lifecycle contracts', () => {
   });
   expect(() => getStatus.parseResponse({ locale: 'en', success: true })).toThrow();
   expect(() => getStatus.parseResponse({ status: null, success: true })).toThrow();
-  expect(() => getStatus.parseResponse({ locale: 'fr', status: null, success: true })).toThrow();
+  expect(() =>
+    getStatus.parseResponse({ locale: '__unsupported__', status: null, success: true })
+  ).toThrow();
   expect(
     cancel.parseRequest({ jobId: 'job-1', type: MessageType.CANCEL_PAGE_PACKAGE_JOB })
   ).toEqual({ jobId: 'job-1', type: MessageType.CANCEL_PAGE_PACKAGE_JOB });
@@ -73,7 +84,7 @@ it('parses the native popup export job lifecycle contracts', () => {
   expect(() => start.parseRequest({ ...request, intent: 'other' })).toThrow();
   const { locale: _omittedLocale, ...requestWithoutLocale } = request;
   expect(() => start.parseRequest(requestWithoutLocale)).toThrow();
-  expect(() => start.parseRequest({ ...request, locale: 'fr' })).toThrow();
+  expect(() => start.parseRequest({ ...request, locale: '__unsupported__' })).toThrow();
   const { includeWebCopy: _omittedWebCopy, ...requestWithoutWebCopy } = request;
   expect(() => start.parseRequest(requestWithoutWebCopy)).toThrow();
   expect(() => start.parseRequest({ ...request, includeWebCopy: 'yes' })).toThrow();
@@ -205,9 +216,12 @@ it('requires a supported locale on popup-export status broadcasts', () => {
   };
 
   expect(contract.parseRequest(message)).toEqual(message);
+  for (const locale of SUPPORTED_LOCALES) {
+    expect(contract.parseRequest({ ...message, locale })).toEqual({ ...message, locale });
+  }
   const { locale: _locale, ...withoutLocale } = message;
   expect(() => contract.parseRequest(withoutLocale)).toThrow();
-  expect(() => contract.parseRequest({ ...message, locale: 'fr' })).toThrow();
+  expect(() => contract.parseRequest({ ...message, locale: '__unsupported__' })).toThrow();
 });
 
 it('parses every structured Page Package producer progress step', () => {

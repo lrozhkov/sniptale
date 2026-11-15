@@ -5,7 +5,7 @@ import {
   createGuideStep,
   createGuideParagraphs,
 } from '../../../../apps/extension/src/features/scenario/project/public';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { test, expect } from './live-fixture';
 import { getLiveProfile } from './configuration';
 import { setupLiveProvider, type LiveConnection } from './provider-ui.test-support';

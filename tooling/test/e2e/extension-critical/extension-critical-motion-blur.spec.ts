@@ -75,7 +75,7 @@ import {
   seedReviewVideo,
   persistedFocus,
 } from '../support/quick-editor-media-fixture';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 for (const variant of [
   { width: 1280, height: 560, locale: 'ru', theme: 'light' },

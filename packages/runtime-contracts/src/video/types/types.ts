@@ -56,6 +56,7 @@ export type VideoRecordingStatus = (typeof VideoRecordingStatus)[keyof typeof Vi
 
 export const VideoRecordingFailureCode = {
   CAMERA_FRAME_RATE_UNSUPPORTED: 'camera-frame-rate-unsupported',
+  START_ACTIVATION_TIMEOUT: 'start-activation-timeout',
 } as const;
 
 export type VideoRecordingFailureCode =

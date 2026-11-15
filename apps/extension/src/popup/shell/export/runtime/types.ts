@@ -1,3 +1,4 @@
+import type { AppLocale } from '@sniptale/platform/i18n/config';
 import type { PopupExportPreview } from '@sniptale/runtime-contracts/export';
 import type { PagePackageJobStatusV1 } from '@sniptale/runtime-contracts/page-package';
 import type { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
@@ -44,7 +45,7 @@ export type PopupExportRuntimeDeps = {
 export type { PopupExportRuntimeContract } from './state';
 
 export type PopupExportRuntimeMessage = {
-  locale: 'en' | 'ru';
+  locale: AppLocale;
   type: typeof MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED;
   status: PagePackageJobStatusV1;
 };

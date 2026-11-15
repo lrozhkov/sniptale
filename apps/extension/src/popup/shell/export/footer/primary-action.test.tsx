@@ -1,8 +1,27 @@
 // @vitest-environment jsdom
 
+import en from '../../../../platform/i18n/catalogs/en.json';
+import ru from '../../../../platform/i18n/catalogs/ru.json';
+import {
+  prepareTranslations,
+  setLocalePreference,
+  type AppLocale,
+} from '../../../../platform/i18n';
+
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: AppLocale) =>
+    flatCatalogFixture(locale === 'ru' ? ru : en)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareTranslations('popup', 'ru');
+  await setLocalePreference('ru');
+});
+
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileArchive, FileCode, Library } from 'lucide-react';
 
 const popupActionButtonMock = vi.hoisted(() => vi.fn());
@@ -174,3 +193,15 @@ describe('ExportFooterPrimaryActionButton active states', () => {
     );
   });
 });
+
+function flatCatalogFixture(value: unknown, prefix = ''): Record<string, string> {
+  if (typeof value === 'string') return { [prefix]: value };
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Invalid authored catalog fixture');
+  }
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, child]) =>
+      Object.entries(flatCatalogFixture(child, prefix ? `${prefix}.${key}` : key))
+    )
+  );
+}

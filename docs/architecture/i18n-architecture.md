@@ -1,6 +1,8 @@
 # i18n architecture
 
-Sniptale ships Russian and English. `packages/platform/src/i18n/config.ts` owns locale identifiers, Intl tags, and the fallback locale. Product catalogs own localized language names. The fallback locale remains Russian.
+Sniptale ships Russian and English. `packages/runtime-contracts/src/i18n.ts` owns locale identifiers, Intl tags, and the fallback locale. Product catalogs own localized language names. English is the default language and the fallback language. Preserve an explicit stored language preference.
+
+The registry also owns `nativeName`, which identifies each language in its own language. Welcome uses this identity metadata without loading inactive catalogs. Product catalogs retain localized language names for other contexts.
 
 On first installation, the background install owner stores English only if no preference exists. It checks and writes under the existing exclusive persistence permit. A delayed install callback must preserve a user choice or restored preference. The initializer releases the permit before hydration. On update, it preserves the stored locale.
 
@@ -9,16 +11,21 @@ On first installation, the background install owner stores English only if no pr
 - `apps/extension/src/platform/i18n/catalogs/` owns one authored JSON catalog per locale.
 - `catalogs/en.json` defines the message structure and key order.
 - `apps/extension/src/platform/i18n/types.ts` derives translation keys and dictionary types from the English catalog.
-- `apps/extension/src/platform/i18n/dictionaries.ts` supplies full runtime catalogs.
-- `apps/extension/src/platform/i18n/catalog-reader.ts` owns synchronous lookup and fallback behavior.
-- `apps/extension/src/platform/i18n/catalog-subsets.ts` declares compact message selections.
-- `apps/extension/build/i18n-catalogs.ts` creates compact catalogs during the build.
+- `apps/extension/src/platform/i18n/catalog-store.ts` prepares scoped data and supplies synchronous lookup with fallback.
+- `apps/extension/src/platform/i18n/catalog-reader.ts` reads nested projections without runtime state.
+- `apps/extension/src/platform/i18n/catalog-profiles.ts` declares the permitted runtime selections.
+- `apps/extension/src/platform/i18n/catalog-subsets.ts` declares compact shell message selections.
+- `apps/extension/src/platform/i18n/catalog-transport.ts` reads bounded local resources or requests content data through a checked Port.
+- `apps/extension/build/i18n-profile-selections.ts` selects owned domains and reachable message keys.
+- `apps/extension/build/i18n-catalogs.ts` creates packaged JSON resources and the English bootstrap projection.
+- `apps/extension/src/background/i18n/catalog-port.ts` registers the read-only content catalog Port.
 - `apps/extension/src/platform/i18n/locale/state.ts` owns locale preference policy, events, and subscriptions.
 - `apps/extension/src/composition/persistence/infrastructure/preference-service` owns raw browser-storage operations for these preferences.
 - `apps/extension/src/platform/i18n/locale/hook.ts` owns the React locale subscription.
 - `apps/extension/src/platform/i18n/index.ts` is the app runtime API.
 - `apps/extension/src/background/runtime/routing/runtime-wiring/install.ts` owns locale initialization on first installation.
-- `packages/platform/src/i18n/**` owns pure locale configuration and formatting in the package.
+- `packages/runtime-contracts/src/i18n.ts` owns the canonical locale registry and strict identity validation.
+- `packages/platform/src/i18n/**` owns formatting and preserves the established locale configuration API.
 
 ## Catalog contract
 
@@ -34,17 +41,37 @@ Catalogs have no line-width limit. The existing `npm run format:write` command a
 
 Add all shipped translations for each new or changed message. If you add a locale, update the registry and add its complete catalog. Update dictionary, formatter, preference, and affected surface proof.
 
+Wire contracts and settings transfer use the canonical locale identity. Do not duplicate language unions or receiver allowlists. Imported multilingual asset metadata retains its separate English fallback policy.
+
 ## Runtime boundaries
 
-Translation remains synchronous. Full catalogs serve the app API. Separate build projections serve the initial popup shell, popup screens, and content shim. These projections contain no additional authored translations.
+Translation remains synchronous after preparation. Before a surface uses translated copy, prepare its selected language and English fallback. Load each language only once when English is selected. Read packaged JSON data during startup, without additional feature imports or deferred feature loading.
 
-Keep the initial popup shell independent of the full popup translator. Keep the content shim independent of React and the full app i18n runtime. Check emitted dependencies when message selections change.
+The build emits one resource for each locale and runtime profile. Each resource contains owned message domains and reachable cross-owner keys. Collect exact references and anchored dynamic families from cached source snapshots. Reuse each selection for every locale. Do not create a separate TypeScript program or scan sources once per locale.
+
+Keep authored JSON catalogs outside runtime JavaScript dependency graphs. Do not embed all-language projections in startup bundles. Only three English messages enter the bootstrap failure shell: its title, body, and Retry label. These messages come from the authored English catalog.
+
+Extension documents and background read their packaged resources directly. Content requests only its permitted profile through the background Port. The broker checks sender identity, locale, profile, request count, and response size. It accepts no resource path or remote URL. Catalog loading has no durable writer and grants no operation authority.
+
+The existing locale owner coordinates preferences and ready catalog data. Prepare a new language before publishing it to subscribers. A failed preparation preserves the previous ready interface and permits retry. A superseded language request must not overwrite a newer choice. Keep the preference storage key, mutation permit, and cross-window synchronization owner unchanged.
+
+Reserve the existing persistence transition gate before preparing a language choice. Release it after preference persistence and paint-hint reconciliation. Privacy erasure waits for that complete operation. Delayed catalog completion must not recreate a removed preference or overwrite its restoration under the exclusive erasure gate.
+
+Keep background and offscreen listener registration independent of catalog preparation. Lifecycle commands and readiness probes must remain available. Prepare data at the owner of translated work. Media permission UI prepares the language from its checked bootstrap before exposing controls.
+
+Imported labels can contain keys outside the prepared selection. Preserve their supplied literal fallback instead of loading unrelated message domains. Do not classify errors or progress by comparing translated strings from every language. Send stable codes and structured parameters, then translate at the displaying surface.
+
+Keep the initial popup shell independent of the full popup translator. Keep the content shim independent of React and the full app i18n runtime. Its preferences loader owns its prepared translator. Check emitted dependencies when message selections change.
 
 Use shared formatters for dates, numbers, and lists that depend on the locale. Subscribe adopted React surfaces through the locale seam.
 
 ## QA
 
 The existing i18n guard checks catalog structure and canonical formatting. Catalog changes must trigger this check even when no TypeScript file changes.
+
+Build proof must add eight synthetic locales and compare emitted startup JavaScript. Additional locale messages must appear only in packaged data resources. Check owned domains, cross-owner references, dynamic families, and the exact English bootstrap exception. Reject full catalog imports and all-language virtual projections in runtime bundles.
+
+Readiness proof covers initial preparation, retries, language changes, stale results, and failure without loss of completed work. Check actual popup and content interactions at both primary viewports. Preserve listener readiness while data preparation is pending or fails.
 
 Catalog-only changes select exact product tests through `productionDataFiles` in the existing owner map. Register each new locale catalog in that mapping. Changes to `catalogs/en.json` also trigger typecheck proof for the key contract. Code coverage rules remain unchanged.
 

@@ -1,9 +1,20 @@
 // @vitest-environment jsdom
+import {
+  loadScenarioCatalogFixture,
+  prepareScenarioTranslations,
+} from './test-support/translations.test-support';
 import { createTourDocument, createTourImageSlide } from '../../features/scenario/project/public';
 import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, expect, it, vi } from 'vitest';
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadScenarioCatalogFixture>[0]) =>
+    loadScenarioCatalogFixture(locale),
+}));
+
+beforeAll(prepareScenarioTranslations);
+
 import {
   createGuideImageBlock,
   createGuideProject,
@@ -595,7 +606,7 @@ it('uses the project name in the tab and distinguishes reader preview', async ()
   await editField('.guide-project-name input', 'Renamed guide');
   expect(document.title).toBe('Renamed guide');
   await click('Export');
-  expect(document.title).toBe('Renamed guide · Просмотр');
+  expect(document.title).toBe('Renamed guide · Preview');
   await click('Back to editing');
   expect(document.title).toBe('Renamed guide');
 });

@@ -19,7 +19,7 @@ import {
   REVIEW_KEY_DEFAULT,
 } from '../../../../apps/extension/src/features/video/project/action-feedback/key-animation';
 import { assertExportReadyVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { readNativeVideoProject } from '../support/native-video-project';

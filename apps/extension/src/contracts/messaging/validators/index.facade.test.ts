@@ -16,7 +16,6 @@ import {
 import { isCaptureActionType, isQuickActionOverlay, isShowToastPayload } from './ui';
 import {
   isVideoExportCapabilities,
-  isVideoProject,
   isVideoProjectExportSettings,
   isRecordingStateHealth,
   isSize2d,
@@ -49,6 +48,5 @@ it('keeps the shared messaging validators root as a thin facade over owner-local
   expect(facade.isVideoRecordingRuntimeState).toBe(isVideoRecordingRuntimeState);
   expect(facade.isRecordingStateHealth).toBe(isRecordingStateHealth);
   expect(facade.isVideoExportCapabilities).toBe(isVideoExportCapabilities);
-  expect(facade.isVideoProject).toBe(isVideoProject);
   expect(facade.isVideoProjectExportSettings).toBe(isVideoProjectExportSettings);
 });

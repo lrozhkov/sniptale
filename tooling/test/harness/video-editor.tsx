@@ -10,10 +10,12 @@ import '@sniptale/ui/styles/overlays';
 import '../../../apps/extension/src/video-editor/styles/spacing-compatibility.css';
 import '../../../apps/extension/src/video-editor/styles/timeline-items.css';
 import { initializeAppTheme } from '../../../apps/extension/src/ui/theme/index';
+import { prepareTranslations } from '../../../apps/extension/src/platform/i18n';
 
 initializeAppTheme();
 
-void harnessReady.then(() => {
+void harnessReady.then(async () => {
+  await prepareTranslations('video-editor');
   createRoot(document.getElementById('root')!).render(
     <EditorResourceAdmission>
       <App />

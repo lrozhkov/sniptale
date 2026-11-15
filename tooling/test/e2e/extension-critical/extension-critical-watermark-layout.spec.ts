@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
-import { translate, type TranslationKey } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
+import type { TranslationKey } from '../../../../apps/extension/src/platform/i18n';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
 import { installReviewModeChoice } from '../support/quick-editor-media-fixture';

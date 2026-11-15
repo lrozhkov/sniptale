@@ -16,7 +16,12 @@ import {
 import { registerOffscreenSyncMessageListener } from './sync-connection/runtime';
 import { bootstrapOffscreenDocument } from './runtime/bootstrap';
 import { registerOffscreenRuntimeMessageListener } from './runtime';
-import { getCurrentLocale, translate } from '../platform/i18n';
+import {
+  getCurrentLocale,
+  translate,
+  prepareTranslations,
+  subscribeToLocaleChanges,
+} from '../platform/i18n';
 import { registerOffscreenVoiceInputMessageListener } from './voice-input/runtime';
 import '@sniptale/ui/styles';
 import '../features/highlighter/frame-annotation/callout/font.css';
@@ -37,7 +42,9 @@ function applyOffscreenDocumentMetadata(): void {
   }
 }
 
-applyOffscreenDocumentMetadata();
+void prepareTranslations('offscreen').then(applyOffscreenDocumentMetadata, () => undefined);
+const disposeLocale = subscribeToLocaleChanges(applyOffscreenDocumentMetadata);
+globalThis.addEventListener('pagehide', disposeLocale, { once: true });
 registerOffscreenRuntimeMessageListener();
 registerOffscreenVoiceInputMessageListener();
 const offscreenUrl = new URL(globalThis.location.href);

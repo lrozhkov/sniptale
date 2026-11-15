@@ -2,7 +2,11 @@
 
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadUiCatalogFixture,
+  prepareUiTranslations,
+} from '../../test-support/translations.test-support';
 import { InlineCurtainSelect } from './select';
 import { PopupSelect } from '../select';
 import { CompactSelect } from '../../compact-inspector-controls';
@@ -372,3 +376,10 @@ it.each([false, true])(
     expect(container?.querySelector('[data-ui="popup.inline-curtain.header"]')).toBeNull();
   }
 );
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadUiCatalogFixture>[0]) =>
+    loadUiCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareUiTranslations('popup', 'ru'));

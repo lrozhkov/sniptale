@@ -1,5 +1,5 @@
 import { test, expect } from '../support/extension-fixture';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import {
   queueHash,
   queueOperationKey,

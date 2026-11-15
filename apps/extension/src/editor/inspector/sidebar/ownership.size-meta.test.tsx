@@ -1,7 +1,22 @@
 // @vitest-environment jsdom
 
+import {
+  editorFixtureMessages,
+  prepareEditorTranslations,
+} from '../../testing/translations.test-support';
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: Parameters<typeof editorFixtureMessages>[0]) =>
+    editorFixtureMessages(locale)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareEditorTranslations('en');
+});
+
 import { act } from 'react';
-import { expect, it, vi } from 'vitest';
+import { beforeAll, expect, it, vi } from 'vitest';
 import { translate } from '../../../platform/i18n';
 import {
   cleanupDom,

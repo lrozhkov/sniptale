@@ -3,7 +3,11 @@
 import { act, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createSolidPaint } from '@sniptale/foundation/paint';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadUiCatalogFixture,
+  prepareUiTranslations,
+} from '../test-support/translations.test-support';
 import { translate } from '../../platform/i18n';
 
 const paintSelectorProps = vi.hoisted(() => vi.fn());
@@ -425,3 +429,10 @@ it('selects a surface immediately without management or favorite actions', async
   expect(onChange).toHaveBeenCalledWith(style('#ffffff80', 'backdrop-filter: blur(16px);'));
   expect(document.querySelector('[role="dialog"]')).not.toBeNull();
 });
+
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadUiCatalogFixture>[0]) =>
+    loadUiCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareUiTranslations('content', 'ru'));

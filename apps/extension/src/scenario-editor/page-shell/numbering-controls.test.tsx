@@ -1,8 +1,18 @@
 // @vitest-environment jsdom
+import {
+  loadScenarioCatalogFixture,
+  prepareScenarioTranslations,
+} from './test-support/translations.test-support';
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadScenarioCatalogFixture>[0]) =>
+    loadScenarioCatalogFixture(locale),
+}));
+beforeAll(prepareScenarioTranslations);
+
 import { act } from 'react';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import { createRoot, type Root } from 'react-dom/client';
-import { beforeEach, afterEach, it, expect, vi } from 'vitest';
+import { beforeAll, beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { createGuideProject, createGuideStep } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
 import { GuideNumberingControls } from './numbering-controls';

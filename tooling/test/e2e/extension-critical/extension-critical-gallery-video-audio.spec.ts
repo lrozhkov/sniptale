@@ -1,7 +1,7 @@
 import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import { expect, test, type Page, type Locator } from '@playwright/test';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import {
   replayReviewHistory,
   reviewAdvancedContentBaseline,

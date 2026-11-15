@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../../catalog-fixture.test-support';
 import type { NativeAppRuntimeStatus } from '../../../../contracts/native-app/runtime';
 import { NativeAppSection } from '.';
 
@@ -272,3 +276,10 @@ it('checks a disconnected host without a previously observed installation identi
   await click('Проверить подключение');
   expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({ operation: 'reconnect' }));
 });
+
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('ru'));

@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import { startHostServer } from '../support/host-server';

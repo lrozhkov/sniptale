@@ -1,3 +1,8 @@
+const catalogPreparation = vi.hoisted(() => vi.fn(async (): Promise<void> => undefined));
+vi.mock('../../../platform/i18n', async (original) => ({
+  ...(await original<typeof import('../../../platform/i18n')>()),
+  prepareTranslations: catalogPreparation,
+}));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';

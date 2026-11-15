@@ -42,6 +42,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/audio-preset-resources`
 - `apps/extension/src/composition/audio-recording`
 - `apps/extension/src/composition/background-resources`
+- `apps/extension/src/composition/catalog-fixture.test-support.ts`
 - `apps/extension/src/composition/editor-resource-admission.test.tsx`
 - `apps/extension/src/composition/editor-resource-admission.tsx`
 - `apps/extension/src/composition/frame-annotation-controls`
@@ -134,6 +135,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/features/ai`
 - `apps/extension/src/features/autosave`
 - `apps/extension/src/features/browser-frame`
+- `apps/extension/src/features/catalog-fixture.test-support.ts`
 - `apps/extension/src/features/drawing`
 - `apps/extension/src/features/editor`
 - `apps/extension/src/features/editor-history`
@@ -215,6 +217,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/source-image-filter-fields.tsx`
 - `apps/extension/src/ui/surface-style-selector`
 - `apps/extension/src/ui/sync-cache-feedback.tsx`
+- `apps/extension/src/ui/test-support`
 - `apps/extension/src/ui/text-document.test.tsx`
 - `apps/extension/src/ui/text-document.tsx`
 - `apps/extension/src/ui/theme`

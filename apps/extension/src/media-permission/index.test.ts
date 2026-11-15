@@ -5,6 +5,7 @@ import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/
 
 const mocks = vi.hoisted(() => ({
   send: vi.fn(),
+  prepare: vi.fn(),
   acquire: vi.fn(),
   stop: vi.fn(),
   query: vi.fn(),
@@ -16,7 +17,10 @@ vi.mock('../platform/navigation/extension-pages', () => ({
 vi.mock('../platform/runtime-messaging', () => ({
   createRuntimeMessagingTransport: () => ({ sendRuntimeMessage: mocks.send }),
 }));
-vi.mock('../platform/i18n', () => ({ createTranslator: () => (key: string) => key }));
+vi.mock('../platform/i18n', () => ({
+  createTranslator: () => (key: string) => key,
+  prepareTranslations: mocks.prepare,
+}));
 
 const bootstrap = {
   type: 'recording-media-permission',
@@ -71,6 +75,7 @@ beforeEach(async () => {
   settings.dataset['ui'] = 'recording.media-permission.settings';
   main.append(heading, status, cancel, settings);
   document.body.append(main);
+  mocks.prepare.mockResolvedValue(undefined);
   mocks.send.mockResolvedValue({ success: true, snapshot });
   mocks.acquire.mockResolvedValue({ getTracks: () => [{ stop: mocks.stop }] });
   mocks.query.mockResolvedValue({ state: 'prompt' });
@@ -291,4 +296,32 @@ it('tolerates an unavailable policy API while keeping native acquisition authori
   window.dispatchEvent(new Event('pagehide'));
   expect(mocks.stop).toHaveBeenCalledOnce();
   expect(port.close).toHaveBeenCalledOnce();
+});
+
+it('accepts cancellation while catalogs are pending without acquiring a device', async () => {
+  let complete!: () => void;
+  mocks.prepare.mockReturnValue(
+    new Promise<void>((resolve) => {
+      complete = resolve;
+    })
+  );
+  const port = deliver();
+  expect(mocks.prepare).toHaveBeenCalledWith('media-permission', 'en');
+  expect(mocks.send).not.toHaveBeenCalled();
+  expect(document.querySelector('main')!.hidden).toBe(true);
+  port.onmessage?.(new MessageEvent('message', { data: { type: 'cancel' } }));
+  expect(port.postMessage).toHaveBeenLastCalledWith({ status: 'cancelled' });
+  complete();
+  await Promise.resolve();
+  expect(mocks.send).not.toHaveBeenCalled();
+  expect(mocks.acquire).not.toHaveBeenCalled();
+});
+
+it('reports unavailable catalogs without starting permission acquisition', async () => {
+  mocks.prepare.mockRejectedValue(new Error('Unavailable catalog'));
+  const port = deliver();
+  await Promise.resolve();
+  expect(port.postMessage).toHaveBeenCalledWith({ status: 'failed', reason: 'unavailable' });
+  expect(port.close).toHaveBeenCalledOnce();
+  expect(mocks.acquire).not.toHaveBeenCalled();
 });

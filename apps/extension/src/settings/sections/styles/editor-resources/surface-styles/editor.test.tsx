@@ -2,7 +2,11 @@
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { expect, it, vi } from 'vitest';
+import { expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../../../catalog-fixture.test-support';
 
 vi.mock('@sniptale/ui/product-modal', () => ({
   ProductModal: (props: { children: React.ReactNode; isOpen: boolean }) =>
@@ -100,3 +104,10 @@ it('clears the ordinary preset name without saving and returns focus to the fiel
     node.remove();
   }
 });
+
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('ru'));

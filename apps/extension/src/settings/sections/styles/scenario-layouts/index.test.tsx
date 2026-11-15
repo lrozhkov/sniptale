@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../../catalog-fixture.test-support';
 import { ScenarioLayoutsSection } from '.';
 const io = vi.hoisted(() => ({ list: vi.fn(), save: vi.fn(), remove: vi.fn(), open: vi.fn() }));
 vi.mock('../../../../composition/persistence/scenario/store/public', () => ({
@@ -114,3 +118,10 @@ it('keeps a newer catalog refresh when the initial request arrives late', async 
   expect(host.textContent).toContain('Latest layout');
   expect(host.textContent).not.toContain('Obsolete layout');
 });
+
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('en'));

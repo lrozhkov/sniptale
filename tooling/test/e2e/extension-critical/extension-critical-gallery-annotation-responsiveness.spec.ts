@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { startHostServer } from '../support/host-server';
 import { addReviewFocus, seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { readNativeReviewWorkspace } from '../support/native-review-workspace';

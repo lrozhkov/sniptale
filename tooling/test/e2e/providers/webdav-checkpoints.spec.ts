@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { test, openProvider, saveProof } from './webdav-fixtures';
 import { parseSyncProductResponse } from '../../../../apps/extension/src/contracts/messaging/contracts/runtime/sync-product';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import type { NativeEditingRoot } from '../../../../apps/extension/src/composition/persistence/assets/editing-resources';
 import { ASSET_ROOT_DIRECTORY_NAME } from '../../../../apps/extension/src/composition/persistence/assets/opfs-store';
 import { chooseInspectorValue } from '../support/inspector-utilities';

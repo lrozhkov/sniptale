@@ -5,7 +5,11 @@ import { InspectorLayout } from '../../compact-inspector-controls/layout';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { expect, it, vi } from 'vitest';
+import { expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadUiCatalogFixture,
+  prepareUiTranslations,
+} from '../../test-support/translations.test-support';
 import {
   createStepBadgeSettingsFromTemplate,
   DEFAULT_STEP_BADGE_TEMPLATE,
@@ -143,3 +147,10 @@ it('commits typed fractional diameters as whole pixels', async () => {
   await act(async () => root.unmount());
   host.remove();
 });
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadUiCatalogFixture>[0]) =>
+    loadUiCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareUiTranslations('settings', 'ru'));

@@ -1,5 +1,6 @@
 import React from 'react';
 import { translate } from '../../platform/i18n';
+import { catalogs } from 'sniptale:i18n/bootstrap';
 
 interface PageBootstrapErrorBoundaryProps {
   children: React.ReactNode;
@@ -66,11 +67,19 @@ export class PageBootstrapErrorBoundary extends React.Component<
       return this.props.children;
     }
 
+    const title = translate('common.bootstrap.errorTitle');
+    const body = translate('common.bootstrap.errorBody');
     return (
       <div style={fallbackShellStyle}>
         <div role="alert" style={fallbackPanelStyle}>
-          <p style={fallbackTitleStyle}>{translate('common.bootstrap.errorTitle')}</p>
-          <p style={fallbackBodyStyle}>{translate('common.bootstrap.errorBody')}</p>
+          <p style={fallbackTitleStyle}>
+            {title === 'common.bootstrap.errorTitle'
+              ? catalogs.en.common.bootstrap.errorTitle
+              : title}
+          </p>
+          <p style={fallbackBodyStyle}>
+            {body === 'common.bootstrap.errorBody' ? catalogs.en.common.bootstrap.errorBody : body}
+          </p>
         </div>
       </div>
     );

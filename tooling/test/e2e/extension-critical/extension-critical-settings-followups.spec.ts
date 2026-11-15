@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { expect, test } from '../support/extension-fixture';
 import { createSystemViewportPresetCatalog } from '../../../../apps/extension/src/features/viewport-presets/catalog';

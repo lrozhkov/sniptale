@@ -7,7 +7,7 @@ import { setupLiveProvider, type LiveConnection } from './provider-ui.test-suppo
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { persistedReviewContent } from '../support/voiceover-speech-fixture';
 import { chooseInspectorValue } from '../support/inspector-utilities';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { parseAIScenarioSelections } from '../../../../apps/extension/src/contracts/settings/ai-catalog';
 
 const profile = getLiveProfile();

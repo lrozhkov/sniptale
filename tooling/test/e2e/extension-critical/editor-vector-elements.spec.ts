@@ -1,7 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { isEditorVectorInstance } from '../../../../apps/extension/src/features/editor/document/vector-element';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { expect, test } from '../support/extension-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { EDITOR_HARNESS_PATH, SETTINGS_HARNESS_PATH } from '../extension-critical.helpers';

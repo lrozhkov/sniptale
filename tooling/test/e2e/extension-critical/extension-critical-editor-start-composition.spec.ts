@@ -1,4 +1,4 @@
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { test, expect } from '../support/extension-fixture';
 import { createGuideProject } from '../../../../apps/extension/src/features/scenario/project/factories';
 import { createVideoProject } from '../../../../apps/extension/src/composition/persistence/projects/index.test-support';

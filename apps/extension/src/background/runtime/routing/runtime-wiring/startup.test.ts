@@ -1,3 +1,8 @@
+const prepareTranslations = vi.hoisted(() => vi.fn(async (): Promise<void> => undefined));
+vi.mock('../../../../platform/i18n', async (original) => ({
+  ...(await original<typeof import('../../../../platform/i18n')>()),
+  prepareTranslations,
+}));
 import { expect, it, vi } from 'vitest';
 
 const migrateHighlighterSystemPresetCatalog = vi.hoisted(() => vi.fn(async () => true));
@@ -195,4 +200,25 @@ it('resets reconstructible and disposable state during startup maintenance', () 
   expect(state.viewportState).toEqual(new Map());
   expect(state.captureGuardState.isCapturing).toBe(false);
   expect(state.webSnapshotViewerPorts).toEqual(new Map());
+});
+
+it('prepares translated preset migrations without delaying recording recovery', async () => {
+  vi.clearAllMocks();
+  let complete!: () => void;
+  prepareTranslations.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      complete = resolve;
+    })
+  );
+  runStartupMaintenance(createModeState(), logger);
+  expect(migrateHighlighterSystemPresetCatalog).not.toHaveBeenCalled();
+  expect(migrateCalloutSystemPresetCatalog).not.toHaveBeenCalled();
+  expect(migrateStepBadgeSystemPresetCatalog).not.toHaveBeenCalled();
+  expect(resetVideoRecordingRuntimeState).toHaveBeenCalledOnce();
+  expect(recoverVideoCaptureSurfaceOnStartup).toHaveBeenCalledOnce();
+  complete();
+  await flushMicrotasks();
+  expect(migrateHighlighterSystemPresetCatalog).toHaveBeenCalledOnce();
+  expect(migrateCalloutSystemPresetCatalog).toHaveBeenCalledOnce();
+  expect(migrateStepBadgeSystemPresetCatalog).toHaveBeenCalledOnce();
 });

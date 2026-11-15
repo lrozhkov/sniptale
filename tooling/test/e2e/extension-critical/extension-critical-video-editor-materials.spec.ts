@@ -13,7 +13,7 @@ import { readFile } from 'node:fs/promises';
 import { createVideoProjectCursorTrack } from '../../../../apps/extension/src/features/video/project/defaults';
 import { createEmptyVideoProject } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { GALLERY_SAVED_VIEWS_STORAGE_KEY } from '../../../../apps/extension/src/composition/persistence/gallery-saved-views/contract';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { checkInspectorPaintedFont, chooseInspectorValue } from '../support/inspector-utilities';
 import {

@@ -207,6 +207,7 @@ export async function collectPopupExportPagePackages(
     if (!tab) continue;
     await updatePagePackageJobStatus(job, {
       progress: {
+        collectingPageTitle: selected.title,
         current: index,
         total: job.status.orderedTabs.length,
         errors: [...errors],

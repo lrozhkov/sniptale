@@ -11,7 +11,7 @@ import {
 import { createVideoProjectMotionRegion } from '../../../../apps/extension/src/features/video/project/motion';
 import { bindMotionRegionToClip } from '../../../../apps/extension/src/features/video/project/motion/source-binding';
 import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { readNativeVideoProject } from '../support/native-video-project';
 import {

@@ -1,5 +1,5 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import { startHostServer } from '../support/host-server';

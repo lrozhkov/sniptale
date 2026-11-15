@@ -2,7 +2,7 @@ import { checkInspectorUtility } from '../support/inspector-utilities';
 import { expect } from '@playwright/test';
 import { test } from '../support/extension-fixture';
 import { openVisualHarness } from './scenario-editor-visual.helpers';
-import { createTranslator } from '../../../../apps/extension/src/platform/i18n';
+import { createTranslator } from '../support/catalog-fixture';
 
 for (const theme of ['light', 'dark'] as const) {
   for (const locale of ['ru', 'en'] as const) {

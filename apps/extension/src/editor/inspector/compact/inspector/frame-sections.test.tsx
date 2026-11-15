@@ -1,4 +1,18 @@
-import { expect, it, vi } from 'vitest';
+import {
+  editorFixtureMessages,
+  prepareEditorTranslations,
+} from '../../../testing/translations.test-support';
+
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: Parameters<typeof editorFixtureMessages>[0]) =>
+    editorFixtureMessages(locale)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareEditorTranslations('en');
+});
+import { beforeAll, expect, it, vi } from 'vitest';
 
 import { translate } from '../../../../platform/i18n';
 import { createInspectorCommandParams } from '../../../../../../../tooling/test/harness/editor/ownership/fixtures';
@@ -45,7 +59,7 @@ it('prepends frame mode commands before surface commands and updates frame draft
   const commands = buildFrameCompactCommands(params as never);
 
   expect(commands.map((command) => command.id)).toEqual(['frame-layout-mode', 'surface-command']);
-  expect(((commands[0]!.content as any).props.children as any).props.ariaLabel).toBe('Размещение');
+  expect(((commands[0]!.content as any).props.children as any).props.ariaLabel).toBe('Placement');
 
   const layoutOnChange = ((commands[0]!.content as any).props.children as any).props.onChange;
 

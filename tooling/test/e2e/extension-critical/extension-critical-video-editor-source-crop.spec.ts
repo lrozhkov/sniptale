@@ -11,7 +11,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
 import { createVideoProjectFromMultiSourceRecording } from '../../../../apps/extension/src/features/video/project/factories/multi-source-recording';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { seedReviewWebcamBundle } from '../support/quick-editor-media-fixture';
 import { readNativeVideoProject } from '../support/native-video-project';

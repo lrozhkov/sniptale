@@ -1,3 +1,4 @@
+import { prepareTranslations } from '../../platform/i18n';
 import { offscreenDataReadiness } from './data-readiness';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
@@ -35,7 +36,12 @@ export async function handleProjectExportRuntimeMessage(
         message.jobId,
         () => consumeProjectExportInput(message.input),
         message.settings,
-        offscreenDataReadiness.ensureAssets
+        async () => {
+          await Promise.all([
+            prepareTranslations('offscreen'),
+            offscreenDataReadiness.ensureAssets(),
+          ]);
+        }
       );
       return 'accepted';
     }
@@ -43,6 +49,7 @@ export async function handleProjectExportRuntimeMessage(
       await cancelProjectExport(message.jobId);
       return 'accepted';
     case VideoMessageType.OFFSCREEN_GET_PROJECT_EXPORT_CAPABILITIES: {
+      await prepareTranslations('offscreen');
       await reconcileProjectExportJobs();
       const capabilities = await getProjectExportCapabilities(message.settings);
       sendResponse?.({ success: true, capabilities });

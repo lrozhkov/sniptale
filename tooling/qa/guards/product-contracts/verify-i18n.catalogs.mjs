@@ -9,7 +9,7 @@ import {
   validateCatalogShape,
 } from './i18n-catalog-format.mjs';
 
-const LOCALE_CONFIG = 'packages/platform/src/i18n/config.ts';
+const LOCALE_CONFIG = 'packages/runtime-contracts/src/i18n.ts';
 
 function readLocaleIds(root) {
   const file = path.join(root, LOCALE_CONFIG);

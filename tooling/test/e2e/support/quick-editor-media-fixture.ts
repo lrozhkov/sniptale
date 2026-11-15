@@ -1,6 +1,6 @@
 import { readNativeReviewWorkspace } from './native-review-workspace';
 import { expect, type Page, type Locator } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from './catalog-fixture';
 import { readFile } from 'node:fs/promises';
 import {
   ALL_FORMATS,

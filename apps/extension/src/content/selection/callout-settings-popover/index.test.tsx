@@ -3,7 +3,18 @@
 import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadContentCatalogFixture,
+  prepareContentTranslations,
+} from '../../test-support/translations.test-support';
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadContentCatalogFixture>[0]) =>
+    loadContentCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareContentTranslations('ru'));
 
 vi.mock(
   '../../../composition/surface-style-preset-resources/use-surface-style-preset-catalog',

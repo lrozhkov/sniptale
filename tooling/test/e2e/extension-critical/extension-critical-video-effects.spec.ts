@@ -20,7 +20,7 @@ import {
   readPreviewCanvasSignature,
 } from './extension-critical-video-effects.helpers';
 import { VIDEO_EDITOR_PAUSE_LABEL, VIDEO_EDITOR_PLAY_LABEL } from '../extension-critical.helpers';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 const VIDEO_EDITOR_PREVIEW_CACHE_LABEL = translate('videoEditor.stage.previewModeCache', 'ru');
 const VIDEO_EDITOR_PREVIEW_CACHE_READY_LABEL = translate(

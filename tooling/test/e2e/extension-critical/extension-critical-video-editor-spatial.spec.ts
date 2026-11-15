@@ -10,7 +10,7 @@ import { resolveProjectCursorCameraPlan } from '../../../../apps/extension/src/f
 import { resolveVideoCompositionCamera } from '../../../../apps/extension/src/features/video/composition/motion';
 import { createHash } from 'node:crypto';
 import { createSourceImageFilter } from '../../../../apps/extension/src/features/image-filters/contract';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import {
   chooseInspectorValue,
   checkInspectorPaintedFont,

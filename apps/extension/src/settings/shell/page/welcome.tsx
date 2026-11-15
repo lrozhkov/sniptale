@@ -1,5 +1,6 @@
 import './welcome.css';
 import { PRODUCT_BRAND_NAME } from '@sniptale/ui/branding';
+import { LOCALE_REGISTRY } from '@sniptale/runtime-contracts/i18n';
 import {
   ArrowLeft,
   ArrowRight,
@@ -141,7 +142,7 @@ function AppearanceStep({ setup }: { setup: Setup }) {
                 disabled={setup.busy}
                 onClick={() => setup.setLocale(value)}
               >
-                {translate(`common.languages.${value}`, value)}
+                {LOCALE_REGISTRY[value].nativeName}
                 {setup.locale === value ? <Check size={16} aria-hidden="true" /> : null}
               </button>
             ))}

@@ -15,6 +15,7 @@ const FULL_SCAN_TRIGGER_PATTERNS = [
   /^tooling\/qa\/guards\/product-contracts\/verify-i18n(?:\.helpers|\.catalogs|\.test)?\.[cm]?[jt]sx?$/u,
   /^tooling\/qa\/guards\/product-contracts\/i18n-catalog-format(?:\.test)?\.[cm]?[jt]sx?$/u,
   /^packages\/platform\/src\/i18n\/config\.ts$/u,
+  /^packages\/runtime-contracts\/src\/i18n\.ts$/u,
   /^tooling\/qa\/composition\/checkpoint\/focused(?:-triggered\/helpers|\/config)\.mjs$/u,
 ];
 

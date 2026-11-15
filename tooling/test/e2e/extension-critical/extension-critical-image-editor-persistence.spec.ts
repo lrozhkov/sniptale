@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { test } from '../support/extension-fixture';
 import {
   applyHarnessBootstrap,

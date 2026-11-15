@@ -1,4 +1,14 @@
-import { expect, it, vi } from 'vitest';
+import {
+  loadPopupCatalogFixture,
+  preparePopupTranslations,
+} from '../../../../catalog-fixture.test-support';
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadPopupCatalogFixture>[0]) =>
+    loadPopupCatalogFixture(locale),
+}));
+beforeAll(preparePopupTranslations);
+
+import { beforeAll, expect, it, vi } from 'vitest';
 import { applyPopupExportRuntimeMessage } from './apply';
 
 it('keeps raw background job failures out of popup progress and results', () => {

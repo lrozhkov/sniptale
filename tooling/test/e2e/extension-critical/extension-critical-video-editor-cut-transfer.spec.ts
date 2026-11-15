@@ -5,7 +5,7 @@ import { resolveVideoProjectCompositionJoinPlans } from '../../../../apps/extens
 import { expect, test, type Page } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { ALL_FORMATS, BlobSource, EncodedPacketSink, Input } from 'mediabunny';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { startHostServer } from '../support/host-server';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';

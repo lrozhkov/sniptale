@@ -3,7 +3,7 @@ import { hydrateVideoProject } from '../../../../apps/extension/src/features/vid
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { createVideoProjectFromMultiSourceRecording } from '../../../../apps/extension/src/features/video/project/factories/multi-source-recording';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { seedReviewWebcamBundle } from '../support/quick-editor-media-fixture';

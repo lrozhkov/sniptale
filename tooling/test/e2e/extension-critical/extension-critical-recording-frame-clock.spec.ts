@@ -1,4 +1,4 @@
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { projectRecordingObservationClock } from '../../../../apps/extension/src/features/video/project/observation-clock';
 import type { RecordingTelemetryEntry } from '../../../../apps/extension/src/composition/persistence/recordings/contracts';
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';

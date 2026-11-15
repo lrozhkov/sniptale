@@ -1,7 +1,22 @@
 // @vitest-environment jsdom
+
+import {
+  editorFixtureMessages,
+  prepareEditorTranslations,
+} from '../../testing/translations.test-support';
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: Parameters<typeof editorFixtureMessages>[0]) =>
+    editorFixtureMessages(locale)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareEditorTranslations('en');
+});
 import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, expect, it, vi } from 'vitest';
 const acquisition = vi.hoisted(() => ({ acquire: vi.fn() }));
 vi.mock('../../../workflows/browser-frame/favicon', () => ({
   acquireWindowHeaderFavicon: acquisition.acquire,

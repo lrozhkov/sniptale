@@ -12,7 +12,8 @@ import {
   createGuideStep,
   createGuideParagraphs,
 } from '../../../../apps/extension/src/features/scenario/project/public';
-import { translate, type TranslationKey } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
+import type { TranslationKey } from '../../../../apps/extension/src/platform/i18n';
 
 const label = (key: TranslationKey) => translate(key, 'en');
 const PRIVATE_BODY = 'LOCAL_PROVIDER_PRIVATE_BODY';

@@ -2,7 +2,11 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../catalog-fixture.test-support';
 import { translate } from '../../platform/i18n';
 import { SecretProtectionView } from './view';
 import { createMockSecretProtectionState } from './test-support';
@@ -112,3 +116,10 @@ it('keeps the local-encryption and shared-phrase explanations attached to the cu
   expect(markup).toContain(translate('settings.secretProtection.sessionLocked'));
   expect(markup).not.toContain(translate('settings.secretProtection.transparentDescription'));
 });
+
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('ru'));

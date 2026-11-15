@@ -1,7 +1,16 @@
 // @vitest-environment jsdom
+import {
+  loadCompositionCatalogFixture,
+  prepareCompositionTranslations,
+} from '../../catalog-fixture.test-support';
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadCompositionCatalogFixture>[0]) =>
+    loadCompositionCatalogFixture(locale),
+}));
+
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi, beforeEach } from 'vitest';
 
 import { TemplateForkReturnGuard, useTemplateForkWorkflow } from './template-fork';
 
@@ -81,3 +90,7 @@ function clickButton(host: HTMLElement, label: string) {
 function findButton(host: HTMLElement, label: string) {
   return [...host.querySelectorAll('button')].find((item) => item.textContent === label);
 }
+
+beforeEach(async () => {
+  await prepareCompositionTranslations('content', 'ru');
+});

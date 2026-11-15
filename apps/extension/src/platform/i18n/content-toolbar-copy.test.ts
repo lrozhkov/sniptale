@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { translate, type AppLocale, type TranslationKey } from '.';
+import { translateCatalogFixture } from './catalog-fixture.test-support';
+import type { AppLocale, TranslationKey } from './types';
 
 type ExpectedCopy = Record<AppLocale, string>;
 
@@ -268,8 +269,8 @@ describe('main content toolbar copy', () => {
   it.each(Object.entries(FRIENDLY_MAIN_TOOLBAR_COPY))(
     'keeps %s understandable without implementation jargon',
     (key, expected) => {
-      expect(translate(key as TranslationKey, 'ru')).toBe(expected.ru);
-      expect(translate(key as TranslationKey, 'en')).toBe(expected.en);
+      expect(translateCatalogFixture(key as TranslationKey, 'ru')).toBe(expected.ru);
+      expect(translateCatalogFixture(key as TranslationKey, 'en')).toBe(expected.en);
     }
   );
 });

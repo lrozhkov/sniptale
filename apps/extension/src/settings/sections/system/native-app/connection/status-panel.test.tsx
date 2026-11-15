@@ -2,7 +2,11 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../../../catalog-fixture.test-support';
 
 import type { NativeAppRuntimeStatus } from '../../../../../contracts/native-app/runtime';
 import { NativeStatusPanel } from './status-panel';
@@ -121,3 +125,10 @@ it('shows a disconnected fallback and a connection action before status is avail
   expect(container?.textContent).toContain('Проверить подключение');
   expect(container?.textContent).not.toContain('Доверять приложению');
 });
+
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('ru'));

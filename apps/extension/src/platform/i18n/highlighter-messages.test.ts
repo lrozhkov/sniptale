@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { getDictionary, translate, type TranslationKey } from './index';
+import { getCatalogFixture, translateCatalogFixture } from './catalog-fixture.test-support';
+import type { TranslationKey } from './types';
 
 function collectLocalizedValues(node: unknown): string[] {
   if (typeof node === 'string') return [node];
@@ -17,7 +18,7 @@ describe('highlighter messages', () => {
 
   it('uses template terminology across highlighter settings and content popovers', () => {
     const values = ['en', 'ru'].flatMap((locale) => {
-      const dictionary = getDictionary(locale === 'en' ? 'en' : 'ru');
+      const dictionary = getCatalogFixture(locale === 'en' ? 'en' : 'ru');
       return collectLocalizedValues({
         callout: dictionary.content.callout,
         frame: dictionary.content.interactiveFrame,
@@ -52,5 +53,5 @@ describe('highlighter messages', () => {
 });
 
 function localized(key: TranslationKey) {
-  return { en: translate(key, 'en'), ru: translate(key, 'ru') };
+  return { en: translateCatalogFixture(key, 'en'), ru: translateCatalogFixture(key, 'ru') };
 }

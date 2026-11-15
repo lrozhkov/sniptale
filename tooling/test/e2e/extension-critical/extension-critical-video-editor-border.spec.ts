@@ -2,7 +2,7 @@ import { createGlTransitionSelection } from '../../../../apps/extension/src/feat
 import type { VideoProject } from '../../../../apps/extension/src/features/video/project/types';
 import { createQuickEditBorder } from '../../../../apps/extension/src/features/video/project/scene/focus-appearance';
 import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import {
   createVideoProjectFromRecording,
   createVideoProjectTrack,

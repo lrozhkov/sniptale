@@ -1,4 +1,15 @@
-import { expect, it, vi } from 'vitest';
+import { expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadContentCatalogFixture,
+  prepareContentTranslations,
+} from '../../../test-support/translations.test-support';
+
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadContentCatalogFixture>[0]) =>
+    loadContentCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareContentTranslations('en'));
 
 import { respondWithPopupPreview } from './preview';
 
@@ -41,7 +52,7 @@ it('returns translated copy when preview parsing fails with a non-error', async 
   await respondWithPopupPreview({ parseTree, sendResponse });
 
   expect(sendResponse).toHaveBeenCalledWith({
-    error: 'Не удалось подготовить экспорт',
+    error: 'Failed to prepare export',
     success: false,
   });
 });

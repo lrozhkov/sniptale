@@ -4,7 +4,7 @@ import {
   checkInspectorParameterRows,
 } from '../support/inspector-utilities';
 import { readNativeVideoProject } from '../support/native-video-project';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { readFile, writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import {

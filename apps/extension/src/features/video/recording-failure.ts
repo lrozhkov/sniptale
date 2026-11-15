@@ -11,6 +11,9 @@ export function resolveVideoRecordingFailureMessage(
   if (errorCode === VideoRecordingFailureCode.CAMERA_FRAME_RATE_UNSUPPORTED) {
     return translate('background.runtime.cameraFrameRateUnsupported');
   }
+  if (errorCode === VideoRecordingFailureCode.START_ACTIVATION_TIMEOUT) {
+    return translate('background.runtime.recordingStartTimeout');
+  }
   if (isVideoRecordingStartFailureCode(errorCode)) {
     const messageKeys = {
       'permission-required': 'content.toolbar.videoRecordingStartPermissionRequired',

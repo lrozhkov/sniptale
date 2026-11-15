@@ -36,9 +36,6 @@ const TARGET_RECT_CLASS_NAME = [
   ].join(' '),
 ].join(' ');
 
-const MOVE_ANNOTATION_TARGET_LABEL = translate('videoEditor.stage.moveAnnotationTarget');
-const MOVE_ANNOTATION_TARGET_AREA_LABEL = translate('videoEditor.stage.moveAnnotationTargetArea');
-
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
@@ -202,7 +199,7 @@ function renderPointTarget(
   return (
     <button
       type="button"
-      aria-label={MOVE_ANNOTATION_TARGET_LABEL}
+      aria-label={translate('videoEditor.stage.moveAnnotationTarget')}
       data-preview-annotation-target-handle="point"
       className={TARGET_POINT_HANDLE_CLASS_NAME}
       style={{
@@ -237,7 +234,7 @@ function renderRectTarget(
   return (
     <button
       type="button"
-      aria-label={MOVE_ANNOTATION_TARGET_AREA_LABEL}
+      aria-label={translate('videoEditor.stage.moveAnnotationTargetArea')}
       data-preview-annotation-target-rect="true"
       className={TARGET_RECT_CLASS_NAME}
       style={{

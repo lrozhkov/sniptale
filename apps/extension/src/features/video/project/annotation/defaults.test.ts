@@ -1,4 +1,13 @@
-import { expect, it } from 'vitest';
+import {
+  loadFeatureCatalogFixture,
+  prepareFeatureTranslations,
+} from '../../../catalog-fixture.test-support';
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadFeatureCatalogFixture>[0]) =>
+    loadFeatureCatalogFixture(locale),
+}));
+
+import { expect, it, beforeEach, vi } from 'vitest';
 import { resolveAnnotationTemplateDefaults } from './defaults';
 import { VideoOverlayTemplateKind } from '../types/index';
 
@@ -115,4 +124,8 @@ it('resolves side reveal panel defaults as a full-height left-edge scene reveal'
   );
   expect(defaults.direction).toBe('LEFT');
   expect(defaults.content.headline).toBe('Новая сцена');
+});
+
+beforeEach(async () => {
+  await prepareFeatureTranslations('video-editor', 'ru');
 });

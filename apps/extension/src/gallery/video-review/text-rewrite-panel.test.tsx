@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import en from '../../platform/i18n/catalogs/en.json';
+import ru from '../../platform/i18n/catalogs/ru.json';
 import { act } from 'react';
 import { TextJobProviderError } from '../../workflows/ai-session/text-request-port';
 import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
@@ -371,9 +373,7 @@ it('offers explicit catalog retry after successful empty discovery without selec
 it.each(['ru', 'en'] as const)(
   'discloses metadata-only history in the %s rewrite notice',
   async (locale) => {
-    const { translate } =
-      await vi.importActual<typeof import('../../platform/i18n')>('../../platform/i18n');
-    const notice = translate('gallery.videoReview.textRewriteDisclosure', locale);
+    const notice = { en, ru }[locale].gallery.videoReview.textRewriteDisclosure;
     expect(notice).toContain(
       locale === 'ru'
         ? 'В истории AI сохраняются только модель, время и статус запроса.'

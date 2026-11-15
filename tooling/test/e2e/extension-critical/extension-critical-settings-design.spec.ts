@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import type { Page, TestInfo } from '@playwright/test';
 import { expect, test } from '../support/extension-fixture';
 
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import {
   SETTINGS_SECTION_IDS,
   SETTINGS_SECTION_VIEWS,

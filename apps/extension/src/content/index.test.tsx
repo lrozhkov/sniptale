@@ -4,8 +4,10 @@ const mocks = vi.hoisted(() => ({
   install: vi.fn(),
   dispose: vi.fn(),
   bootstrap: vi.fn(),
+  prepare: vi.fn(async (): Promise<void> => undefined),
   tracer: vi.fn(),
 }));
+vi.mock('../platform/i18n', () => ({ prepareTranslations: mocks.prepare }));
 vi.mock('../platform/runtime-messaging/diagnostic-capture', () => ({
   installDiagnosticPortCapture: mocks.install,
 }));
@@ -18,7 +20,9 @@ afterEach(() => vi.restoreAllMocks());
 it('installs diagnostics before content startup, disposes on hiding and reinstalls after BFCache restore', async () => {
   mocks.install.mockReturnValue(mocks.dispose);
   const listeners = vi.spyOn(window, 'addEventListener');
-  await import('./index');
+  const entry = await import('./index');
+  await entry.contentRuntimePreparation;
+  expect(mocks.prepare).toHaveBeenCalledWith('content');
   expect(mocks.install).toHaveBeenCalledOnce();
   expect(mocks.bootstrap).toHaveBeenCalledOnce();
   window.dispatchEvent(new Event('pagehide'));

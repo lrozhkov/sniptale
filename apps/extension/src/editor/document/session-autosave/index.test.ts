@@ -1,6 +1,19 @@
 // @vitest-environment jsdom
+
+import { editorFixtureMessages } from '../../testing/translations.test-support';
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: Parameters<typeof editorFixtureMessages>[0]) =>
+    editorFixtureMessages(locale)
+  ),
+}));
+
+beforeEach(async () => {
+  const translations = await import('../../testing/translations.test-support');
+  await translations.prepareEditorTranslations('en');
+});
 import { EDITOR_AUTOSAVE_POLICY } from '../../../features/autosave/policy';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   activate,
   createDocument,

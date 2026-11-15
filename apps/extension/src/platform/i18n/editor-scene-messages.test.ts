@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { getDictionary, translate, type TranslationKey } from './index';
+import { getCatalogFixture, translateCatalogFixture } from './catalog-fixture.test-support';
+import type { TranslationKey } from './types';
 
 describe('editor scene messages', () => {
   it('defines the visible gradient angle label and removes the exact-input message key', () => {
@@ -7,10 +8,10 @@ describe('editor scene messages', () => {
       ru: 'Угол',
       en: 'Angle',
     });
-    expect(getDictionary('en').editor.scene).not.toHaveProperty('gradientAngleExactAria');
+    expect(getCatalogFixture('en').editor.scene).not.toHaveProperty('gradientAngleExactAria');
   });
 });
 
 function localized(key: TranslationKey) {
-  return { en: translate(key, 'en'), ru: translate(key, 'ru') };
+  return { en: translateCatalogFixture(key, 'en'), ru: translateCatalogFixture(key, 'ru') };
 }

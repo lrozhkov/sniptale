@@ -11,7 +11,7 @@ import {
   DEFAULT_WINDOW_HEADER,
   windowHeaderGeometry,
 } from '../../../../packages/runtime-contracts/src/window-header';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { readNativeVideoProject } from '../support/native-video-project';

@@ -2,7 +2,11 @@
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../../../catalog-fixture.test-support';
 import type { GradientTemplateResources } from '../../../../../composition/gradient-preset-resources/use-gradient-preset-catalog';
 import { GradientPresetEditor } from './editor';
 import { DEFAULT_DRAWING_COLORS } from '../../../../../features/drawing/public';
@@ -211,3 +215,10 @@ it('restores focus to the connected opener when the editor unmounts', async () =
     opener.remove();
   }
 });
+
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('ru'));

@@ -6,7 +6,7 @@ import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { applyHarnessBootstrap, VIDEO_EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
 import { createEmptyVideoProject } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { createTextClip } from '../../../../apps/extension/src/features/video/project/factories/overlay-clip';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 const ui = (page: Page, name: string) => page.locator(`[data-ui="${name}"]`);
 test.use({ actionTimeout: 10_000 });

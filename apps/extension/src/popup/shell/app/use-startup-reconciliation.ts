@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
+import type { AppLocale } from '@sniptale/platform/i18n/config';
 
-export function usePopupStartupReconciliation(setLocale: (locale: 'en' | 'ru') => void): void {
+export function usePopupStartupReconciliation(setLocale: (locale: AppLocale) => void): void {
   useEffect(() => {
     performance.mark('sniptale-popup-react-shell-rendered');
     let disposeLocale: (() => void) | undefined;

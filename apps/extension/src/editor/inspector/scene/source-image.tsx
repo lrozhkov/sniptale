@@ -9,9 +9,24 @@ import { EditorInspectorDetails } from '../grouped';
 import { EditorInspectorRangeField } from './shared';
 
 const DEFAULT_SOURCE_IMAGE_LINE_STYLE_OPTIONS = [
-  { label: translate('editor.compact.lineStyleSolid'), value: 'solid' },
-  { label: translate('editor.compact.lineStyleDash'), value: 'dash' },
-  { label: translate('editor.compact.lineStyleDot'), value: 'dot' },
+  {
+    get label() {
+      return translate('editor.compact.lineStyleSolid');
+    },
+    value: 'solid',
+  },
+  {
+    get label() {
+      return translate('editor.compact.lineStyleDash');
+    },
+    value: 'dash',
+  },
+  {
+    get label() {
+      return translate('editor.compact.lineStyleDot');
+    },
+    value: 'dot',
+  },
 ] satisfies CompactSelectOption<EditorImageSettings['strokeStyle']>[];
 
 function patchSourceImage(

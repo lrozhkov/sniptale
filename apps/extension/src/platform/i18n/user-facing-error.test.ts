@@ -1,5 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { catalogFixtureMessages } from './catalog-fixture.test-support';
+import { prepareTranslations } from './locale/state';
+import type { AppLocale } from './types';
 import { createUserFacingErrorMessage } from './user-facing-error';
+
+vi.mock('./catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: AppLocale) => catalogFixtureMessages(locale)),
+}));
+
+beforeAll(async () => {
+  await prepareTranslations('popup', 'ru');
+  await prepareTranslations('scenario-editor', 'ru');
+});
 
 describe('user-facing error messages', () => {
   it('keeps raw exceptions out of Russian and English UI copy', () => {

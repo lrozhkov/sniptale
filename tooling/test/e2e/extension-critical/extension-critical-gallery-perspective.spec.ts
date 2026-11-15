@@ -9,7 +9,7 @@ import {
   clickReviewExport,
 } from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 test('quick zoom perspective survives reopening and matches encoded output', async ({
   page,

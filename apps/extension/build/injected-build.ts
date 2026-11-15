@@ -1,4 +1,5 @@
 import { esbuildI18nCatalogs } from './i18n-catalogs.ts';
+import { esbuildCompactColorCatalog } from './color-catalog.ts';
 import { readFile } from 'node:fs/promises';
 import { join, resolve as resolvePath } from 'node:path';
 import type { Plugin } from 'vite';
@@ -13,6 +14,8 @@ import {
 } from './content-runtime-build-id.ts';
 import {
   assertBundleHasNoImports,
+  assertContentRuntimeMessagingInputsAreCompact,
+  assertInjectedI18nInputsAreScoped,
   createInlineCssTextPlugin,
   createReleaseSafeDependencyAliasPlugin,
   getReleaseDrop,
@@ -21,6 +24,8 @@ import {
 import { CHROME_BUILD_TARGET } from './manifest.ts';
 
 const CONTENT_RUNTIME_ENTRY = 'apps/extension/src/content/index.tsx';
+export const CONTENT_RUNTIME_GLOBAL_NAME = '__sniptaleContentRuntimeEntry';
+export const CONTENT_RUNTIME_EXECUTION_FOOTER = `${CONTENT_RUNTIME_GLOBAL_NAME}.contentRuntimePreparation;`;
 const CONTENT_RUNTIME_OUTPUT = 'assets/contentRuntime.js';
 const CONTENT_RUNTIME_SHIM_ENTRY = 'apps/extension/src/content/runtime/shim/index.ts';
 const CONTENT_RUNTIME_SHIM_OUTPUT = 'assets/contentRuntimeShim.js';
@@ -74,10 +79,13 @@ export function buildContentRuntime(mode: string): Plugin {
       const result = await buildEsbuild({
         absWorkingDir: appRoot,
         bundle: true,
+        charset: 'utf8',
         define: contentRuntimeDefines(mode, contentRuntimeBuildId),
         drop: getReleaseDrop(mode),
         entryPoints: [join(repositoryRoot, CONTENT_RUNTIME_ENTRY)],
         format: 'iife',
+        globalName: CONTENT_RUNTIME_GLOBAL_NAME,
+        footer: { js: CONTENT_RUNTIME_EXECUTION_FOOTER },
         jsx: 'automatic',
         legalComments: 'eof',
         logLevel: 'silent',
@@ -86,6 +94,7 @@ export function buildContentRuntime(mode: string): Plugin {
         outfile: runtimeOutputPath,
         platform: 'browser',
         plugins: [
+          esbuildCompactColorCatalog(),
           esbuildI18nCatalogs(repositoryRoot),
           createReleaseSafeDependencyAliasPlugin(repositoryRoot),
           createInlineCssTextPlugin(appRoot),
@@ -95,6 +104,8 @@ export function buildContentRuntime(mode: string): Plugin {
       });
       const imports = Object.values(result.metafile.outputs).flatMap((output) => output.imports);
       assertBundleHasNoImports('Injected content runtime', imports);
+      assertContentRuntimeMessagingInputsAreCompact(result.metafile.inputs);
+      assertInjectedI18nInputsAreScoped(result.metafile.inputs);
     },
   };
 }
@@ -117,6 +128,7 @@ export function buildContentRuntimeShim(mode: string): Plugin {
       const result = await buildEsbuild({
         absWorkingDir: appRoot,
         bundle: true,
+        charset: 'utf8',
         define: {
           __ENABLE_DESIGN_SYSTEM__: JSON.stringify(mode !== 'release'),
           __SNIPTALE_SECURITY_E2E__: JSON.stringify(mode === 'security-e2e'),
@@ -142,6 +154,7 @@ export function buildContentRuntimeShim(mode: string): Plugin {
       });
       const imports = Object.values(result.metafile.outputs).flatMap((output) => output.imports);
       assertBundleHasNoImports('Injected content runtime shim', imports);
+      assertInjectedI18nInputsAreScoped(result.metafile.inputs);
       assertContentRuntimeShimInputsAreCompact(result.metafile.inputs);
       assertContentRuntimeShimOutputIsCompact(await readFile(shimOutputPath, 'utf8'));
     },

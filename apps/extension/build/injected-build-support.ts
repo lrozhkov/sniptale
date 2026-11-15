@@ -86,6 +86,54 @@ export function assertBundleHasNoImports(label: string, imports: Array<{ path: s
   );
 }
 
+/** Reject full project admission dependencies from the page content runtime. */
+export function assertContentRuntimeMessagingInputsAreCompact(
+  inputs: Record<string, unknown>
+): void {
+  const forbiddenInputs = Object.keys(inputs).filter((input) => {
+    const path = input.replaceAll('\\', '/');
+    return (
+      /(?:^|\/)features\/video\/project\/validation\/(?:index|root)\.ts$/u.test(path) ||
+      path.endsWith('/transition/gl-catalog.generated.json') ||
+      path.endsWith('/animation-template/lottie-schema.generated.js')
+    );
+  });
+  if (forbiddenInputs.length === 0) return;
+  throw new Error(
+    `Content runtime must not include full video project admission dependencies: ${forbiddenInputs.join(', ')}`
+  );
+}
+
+/** Keep authored catalogs and all-language projections out of injected startup JavaScript. */
+export function assertInjectedI18nInputsAreScoped(inputs: Record<string, unknown>): void {
+  const forbiddenInputs = Object.keys(inputs).filter((input) => {
+    const path = input.replaceAll('\\', '/');
+    return (
+      isAuthoredI18nCatalogInput(path) ||
+      ['sniptale-i18n:popup', 'sniptale-i18n:popup-shell', 'sniptale-i18n:content-shim'].includes(
+        path
+      )
+    );
+  });
+  if (forbiddenInputs.length === 0) return;
+  const description =
+    'Injected startup JavaScript must not import authored catalogs or all-language projections';
+  throw new Error(`${description}: ${forbiddenInputs.join(', ')}`);
+}
+
+/** Identify authored catalog modules in either bundler's normalized input paths. */
+export function isAuthoredI18nCatalogInput(input: string): boolean {
+  const path = input.replaceAll('\\', '/').split('?')[0] ?? '';
+  const [source, platform, i18n, catalogs, fileName] = path.split('/').slice(-5);
+  return (
+    source === 'src' &&
+    platform === 'platform' &&
+    i18n === 'i18n' &&
+    catalogs === 'catalogs' &&
+    fileName?.endsWith('.json') === true
+  );
+}
+
 async function inlineCssImports(filePath: string, visited = new Set<string>()): Promise<string> {
   if (visited.has(filePath)) return '';
   visited.add(filePath);

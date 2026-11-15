@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
-import { translate, type AppLocale } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
+import type { AppLocale } from '../../../../apps/extension/src/platform/i18n';
 import {
   replayReviewHistory,
   reviewDocumentBaseline,

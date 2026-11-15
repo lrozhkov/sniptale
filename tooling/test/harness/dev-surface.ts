@@ -1,4 +1,6 @@
 import type { SniptaleHarnessBootstrap } from './browser-mocks/browser-mocks.types';
+import { prepareTranslations } from '../../../apps/extension/src/platform/i18n';
+import type { CatalogProfile } from '../../../apps/extension/src/platform/i18n/catalog-profiles';
 
 const profiles = [
   'video-editor',
@@ -37,6 +39,7 @@ export interface DevSurfaceConfig {
 }
 interface SurfacePorts {
   prepareAdapters(config: DevSurfaceConfig): Promise<void>;
+  prepareCatalogs(config: DevSurfaceConfig): Promise<void>;
   readInventory(): Promise<Inventory>;
   restoreFixture(config: DevSurfaceConfig): Promise<readonly string[]>;
   readImported(digest: string): Imported | null;
@@ -137,6 +140,7 @@ function groupFor(profile: Profile): keyof Inventory | null {
 /** Prepare adapters and the complete archive before selecting or importing a production page. */
 export async function prepareDevSurface(config: DevSurfaceConfig, ports: SurfacePorts) {
   await ports.prepareAdapters(config);
+  await ports.prepareCatalogs(config);
   let imported = config.fixtureDigest ? ports.readImported(config.fixtureDigest) : null;
   let inventory: Inventory;
   if (config.fixtureUrl && config.fixtureDigest && !imported) {
@@ -206,6 +210,22 @@ async function prepareAdapters(config: DevSurfaceConfig) {
   document.documentElement.style.colorScheme = document.documentElement.dataset['theme'];
   const { harnessReady } = await import('./browser-mocks/browser-mocks');
   await harnessReady;
+}
+async function prepareCatalogs(config: DevSurfaceConfig): Promise<void> {
+  const catalogProfiles: Record<Profile, CatalogProfile | null> = {
+    'video-editor': 'video-editor',
+    'image-editor': 'editor',
+    'gallery-editor': 'gallery',
+    popup: 'popup',
+    settings: 'settings',
+    library: 'gallery',
+    'scenario-editor': 'scenario-editor',
+    components: 'design-system',
+    'image-inspector': 'editor',
+    'audio-preview': null,
+  };
+  const profile = catalogProfiles[config.profile];
+  if (profile) await prepareTranslations(profile);
 }
 async function readInventory(): Promise<Inventory> {
   const [
@@ -456,6 +476,7 @@ export async function startDevSurface() {
     status.profile = config.profile;
     const prepared = await prepareDevSurface(config, {
       prepareAdapters,
+      prepareCatalogs,
       readInventory,
       restoreFixture,
       readImported,

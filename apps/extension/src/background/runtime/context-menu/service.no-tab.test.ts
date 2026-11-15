@@ -1,3 +1,7 @@
+vi.mock('../../../platform/i18n', async (original) => ({
+  ...(await original<typeof import('../../../platform/i18n')>()),
+  prepareTranslations: vi.fn(async () => undefined),
+}));
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import { buildContextMenuQuickActionId } from './constants';

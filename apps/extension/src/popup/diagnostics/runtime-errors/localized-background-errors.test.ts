@@ -8,18 +8,9 @@ vi.mock('../../../platform/i18n/popup', async (importOriginal) => ({
 import { getPopupRuntimeErrorMessage } from './index';
 
 describe('localized background popup runtime errors', () => {
-  it('normalizes recording timeout errors through the popup locale', () => {
+  it('normalizes a recording timeout code through the popup locale', () => {
     expect(
-      getPopupRuntimeErrorMessage(
-        'Запуск записи занял слишком много времени.',
-        'popup.video.startRecordingError'
-      )
-    ).toBe('t:popup.video.startRecordingTimeout');
-    expect(
-      getPopupRuntimeErrorMessage(
-        'Starting the recording took too long.',
-        'popup.video.startRecordingError'
-      )
+      getPopupRuntimeErrorMessage('start-activation-timeout', 'popup.video.startRecordingError')
     ).toBe('t:popup.video.startRecordingTimeout');
   });
 

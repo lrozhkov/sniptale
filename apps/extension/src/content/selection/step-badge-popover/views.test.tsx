@@ -3,7 +3,18 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadContentCatalogFixture,
+  prepareContentTranslations,
+} from '../../test-support/translations.test-support';
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadContentCatalogFixture>[0]) =>
+    loadContentCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareContentTranslations('ru'));
 import { addStepBadgeReorderListener } from '../../platform/page-context/frame-events';
 import { StepBadgePopoverContent } from '../../../composition/frame-annotation-controls/step-badge/body';
 import { DEFAULT_STEP_BADGE_TEMPLATE } from '../../../features/highlighter/step-badge-presets/catalog';

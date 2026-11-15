@@ -1,7 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
-import { createTranslator } from '../../../../apps/extension/src/platform/i18n';
+import { createTranslator } from '../support/catalog-fixture';
 import { test } from '../support/extension-fixture';
 import { SCENARIO_EDITOR_VISUAL_HARNESS_PATH } from '../extension-critical.helpers';
 import { openVisualHarness, createPageIssueCollector } from './scenario-editor-visual.helpers';

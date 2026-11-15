@@ -1,7 +1,7 @@
 import { persistedReviewContent } from './voiceover-speech-fixture';
 import { expect, type Page, type TestInfo } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from './catalog-fixture';
 import { VIDEO_EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
 import { readNativeVideoProject } from './native-video-project';
 import { captureQuickPreviewPerformanceEnvironment } from './quick-preview-performance-probe';

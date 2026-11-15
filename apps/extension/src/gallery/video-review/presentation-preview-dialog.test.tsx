@@ -1,7 +1,18 @@
 // @vitest-environment jsdom
 import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadGalleryCatalogFixture,
+  prepareGalleryTranslations,
+} from '../test-support/translations.test-support';
+
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadGalleryCatalogFixture>[0]) =>
+    loadGalleryCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareGalleryTranslations('ru'));
 import { ReviewPresentationPreviewDialog } from './presentation-preview-dialog';
 
 const locale = vi.hoisted(() => ({ value: 'en' as 'en' | 'ru' }));

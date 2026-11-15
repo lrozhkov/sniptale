@@ -3,11 +3,8 @@ import type { Page, Locator, BrowserContext, TestInfo } from '@playwright/test';
 import { expect, test } from '../support/extension-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
-import {
-  translate,
-  type AppLocale,
-  type TranslationKey,
-} from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
+import type { AppLocale, TranslationKey } from '../../../../apps/extension/src/platform/i18n';
 
 test.setTimeout(180_000);
 const replacement = '<b>Plain replacement text</b>';

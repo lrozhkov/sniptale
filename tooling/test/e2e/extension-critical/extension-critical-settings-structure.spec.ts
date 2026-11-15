@@ -1,6 +1,7 @@
 import type { BrowserContext, Page } from '@playwright/test';
 import { expect, test } from '../support/extension-fixture';
-import { translate, type AppLocale } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
+import type { AppLocale } from '../../../../apps/extension/src/platform/i18n';
 import type { ContextMenuTree } from '../../../../apps/extension/src/contracts/settings/context-menu-layout';
 import { POPUP_STARTUP_TARGETS } from '../../../../apps/extension/src/composition/persistence/capture-settings/popup-startup-contracts';
 

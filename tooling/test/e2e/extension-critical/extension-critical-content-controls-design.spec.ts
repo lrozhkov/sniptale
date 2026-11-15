@@ -1,7 +1,8 @@
 import { writeFile } from 'node:fs/promises';
 import type { BrowserContext, Locator, Page, TestInfo, ViewportSize } from '@playwright/test';
 import { expect, test } from '../support/extension-fixture';
-import { translate, type TranslationKey } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
+import type { TranslationKey } from '../../../../apps/extension/src/platform/i18n';
 
 type Composition = { locale: 'ru' | 'en'; theme: 'light' | 'dark'; viewport: ViewportSize };
 const ui = (page: Page, id: string) => page.locator(`[data-ui="${id}"]`);

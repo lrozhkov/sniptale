@@ -1,8 +1,17 @@
 // @vitest-environment jsdom
+import {
+  loadPopupCatalogFixture,
+  prepareRussianPopupTranslations,
+} from '../../../catalog-fixture.test-support';
+vi.mock('../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadPopupCatalogFixture>[0]) =>
+    loadPopupCatalogFixture(locale),
+}));
+beforeAll(prepareRussianPopupTranslations);
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { beforeAll, afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../ui/popup-shell/action-button', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../ui/popup-shell/action-button')>()),

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { applyHarnessBootstrap, EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
 import { startHostServer } from '../support/host-server';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';

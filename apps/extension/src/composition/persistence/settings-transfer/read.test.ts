@@ -12,7 +12,22 @@ vi.mock('../effect-bundles', async (original) => ({
   ...(await original<typeof import('../effect-bundles')>()),
   listAnimationCatalogEntries: vi.fn(async () => []),
 }));
-import { beforeEach, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, expect, it, vi } from 'vitest';
+import en from '../../../platform/i18n/catalogs/en.json';
+import ru from '../../../platform/i18n/catalogs/ru.json';
+import { prepareTranslations } from '../../../platform/i18n';
+import type { AppLocale } from '@sniptale/runtime-contracts/i18n';
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES, isAppLocale } from '@sniptale/runtime-contracts/i18n';
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: AppLocale) =>
+    flatCatalogFixture(locale === 'ru' ? ru : en)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareTranslations('settings', 'ru');
+});
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { resolveStoredCalloutPresetCatalog } from '../callout-presets/migration';
 import { resolveStoredStepBadgePresetCatalog } from '../step-badge-presets/migration';
@@ -226,6 +241,20 @@ it('uses the current Settings locale for system item display names', async () =>
     ])
   );
 });
+
+it.each([...SUPPORTED_LOCALES, undefined, '__unsupported__'])(
+  'preserves registered preference %s and uses English only for an absent or invalid locale',
+  async (storedLocale) => {
+    mocks.localGet.mockResolvedValue({ 'sniptale-locale-preference': storedLocale });
+    const snapshot = await readSettingsTransferSnapshot();
+    const expected = isAppLocale(storedLocale) ? storedLocale : DEFAULT_LOCALE;
+    expect(snapshot.locale).toBe(expected);
+    expect(snapshot.domains['interface.preferences']?.data).toMatchObject({ locale: expected });
+    expect(
+      parseSettingsTransferDomains(snapshot.domains)['interface.preferences']?.data
+    ).toMatchObject({ locale: expected });
+  }
+);
 
 it('produces a complete snapshot that remains valid during commit revalidation', async () => {
   const snapshot = await readSettingsTransferSnapshot();
@@ -850,3 +879,15 @@ it('refuses a malformed audio catalogue without writing replacement defaults dur
     'Audio preset catalogue is unavailable.'
   );
 });
+
+function flatCatalogFixture(value: unknown, prefix = ''): Record<string, string> {
+  if (typeof value === 'string') return { [prefix]: value };
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Invalid authored catalog fixture');
+  }
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, child]) =>
+      Object.entries(flatCatalogFixture(child, prefix ? `${prefix}.${key}` : key))
+    )
+  );
+}

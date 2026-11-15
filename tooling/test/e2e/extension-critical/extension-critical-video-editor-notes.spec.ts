@@ -16,7 +16,7 @@ import {
 } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { addVideoProjectCommentDocument } from '../../../../apps/extension/src/features/video/project/comments/authoring';
 import { createCanvasComment } from '../../../../apps/extension/src/features/video/review/comments';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 for (const [index, size] of [
   { width: 1280, height: 560 },

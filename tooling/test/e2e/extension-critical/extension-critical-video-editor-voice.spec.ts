@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { VideoProject } from '../../../../apps/extension/src/features/video/project/types/model';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { readNativeVideoProject as readProject } from '../support/native-video-project';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { startHostServer } from '../support/host-server';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';

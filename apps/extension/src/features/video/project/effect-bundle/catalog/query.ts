@@ -1,3 +1,5 @@
+import type { AppLocale } from '@sniptale/runtime-contracts/i18n';
+import { resolveEffectLocaleText } from '@sniptale/runtime-contracts/effect-controls';
 import { readCatalogPresentation } from './presentation';
 import type { EffectBundleCatalogDocumentEntry, EffectBundleCatalogEntry } from './index';
 
@@ -13,7 +15,7 @@ export interface EffectCatalogTheme {
 }
 export function describeCatalogDocument(
   document: EffectBundleCatalogDocumentEntry,
-  locale: 'en' | 'ru'
+  locale: AppLocale
 ) {
   const parsed = readCatalogPresentation(document);
   const preset = parsed?.controlPresets?.find(
@@ -42,7 +44,7 @@ export function describeCatalogDocument(
 export function queryEffectCatalog(
   catalog: EffectBundleCatalogEntry,
   filter: EffectCatalogFilter,
-  locale: 'en' | 'ru',
+  locale: AppLocale,
   options: { includeDisabled?: boolean } = {}
 ) {
   const query = filter.query.trim().toLocaleLowerCase(locale);
@@ -76,7 +78,7 @@ export function queryEffectCatalog(
           metadata.theme === filter.theme ||
           metadata.style === filter.theme) &&
         [
-          catalog.label[locale],
+          resolveEffectLocaleText(catalog.label, locale),
           document.id,
           metadata.label,
           metadata.description,
@@ -88,7 +90,7 @@ export function queryEffectCatalog(
 }
 export function getEffectCatalogThemes(
   catalogs: readonly EffectBundleCatalogEntry[],
-  locale: 'en' | 'ru' = 'en',
+  locale: AppLocale = 'en',
   options: { includeDisabled?: boolean } = {}
 ): EffectCatalogTheme[] {
   const groups = new Map<string, { label: string; styles: Map<string, string> }>();

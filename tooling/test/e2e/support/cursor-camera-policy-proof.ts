@@ -5,7 +5,7 @@ import {
   reviewAdvancedContentBaseline,
 } from '../../../../apps/extension/src/features/video/review/document';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from './catalog-fixture';
 import { addReviewFocus, installReviewModeChoice } from './quick-editor-media-fixture';
 import { readNativeReviewWorkspace } from './native-review-workspace';
 import type { applyHarnessBootstrap } from '../extension-critical.helpers';

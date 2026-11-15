@@ -1,7 +1,22 @@
 // @vitest-environment jsdom
+
+import {
+  videoeditorFixtureMessages,
+  prepareVideoEditorTranslations,
+} from '../../../../testing/translations.test-support';
+
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: vi.fn(async (locale: Parameters<typeof videoeditorFixtureMessages>[0]) =>
+    videoeditorFixtureMessages(locale)
+  ),
+}));
+
+beforeAll(async () => {
+  await prepareVideoEditorTranslations('en');
+});
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { expect, it, vi } from 'vitest';
+import { beforeAll, expect, it, vi } from 'vitest';
 import { setup } from '../../../../project/state/insertion/material.test-support';
 import { ClipOrderControls } from './clip-order';
 import { translate } from '../../../../../platform/i18n';

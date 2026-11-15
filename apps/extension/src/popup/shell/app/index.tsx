@@ -5,6 +5,7 @@ import toolsIcon from '@iconify-icons/tabler/tools';
 import worldDownIcon from '@iconify-icons/tabler/world-down';
 import { readPopupShellTranslation } from '../../../platform/i18n/popup-shell';
 import type { AppLocale } from '../../../platform/i18n/types';
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@sniptale/platform/i18n/config';
 import type { PopupPage } from '../navigation/actions';
 import { preloadPopupPage } from '../startup/resource';
 import { usePopupRouteController } from '../startup/use-route-controller';
@@ -50,7 +51,8 @@ function ShellIcon({ path }: { path: string }) {
 }
 
 function readInitialLocale(): AppLocale {
-  return document.documentElement.dataset['locale'] === 'en' ? 'en' : 'ru';
+  const hint = document.documentElement.dataset['locale'];
+  return SUPPORTED_LOCALES.find((locale) => locale === hint) ?? DEFAULT_LOCALE;
 }
 
 export function PopupApp() {

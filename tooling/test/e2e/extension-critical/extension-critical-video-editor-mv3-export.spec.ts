@@ -6,7 +6,7 @@ import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { readNativeVideoProject } from '../support/native-video-project';
 import { chooseInspectorValue, checkInspectorPaintedFont } from '../support/inspector-utilities';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 test('Native export traverses production MV3 dispatch and publishes a decoded file', async ({
   page,

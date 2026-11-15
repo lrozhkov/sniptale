@@ -1,5 +1,5 @@
 import { expect, test } from '../support/extension-fixture';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 
 // This spec operates the Settings UI with a controlled native runtime response.
 // Desktop e2e-lab owns the real host, browser selection, file transfer, and restart proof.

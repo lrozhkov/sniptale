@@ -2,6 +2,7 @@ import { DEFAULT_PAGE_LAUNCH_PREFERENCES } from '../../contracts/page-launch';
 import { hasQuickActionArtwork } from '../../contracts/quick-action-appearance';
 import { normalizeConfigurableCaptureAction } from '../../features/quick-actions-presets/policy';
 import { z } from 'zod';
+import { SUPPORTED_LOCALES } from '@sniptale/runtime-contracts/i18n';
 import type {
   SettingsTransferDomainPayload,
   SettingsTransferJsonValue,
@@ -33,7 +34,7 @@ const recordSchema = z.record(z.string(), z.unknown());
 const interfaceSchema = z
   .object({
     theme: z.enum(['light', 'dark', 'system']).optional(),
-    locale: z.enum(['en', 'ru']).optional(),
+    locale: z.enum(SUPPORTED_LOCALES).optional(),
     popupStartup: z.unknown().optional(),
     contextMenu: z.unknown().optional(),
     pageLaunch: z.unknown().optional(),

@@ -2,7 +2,11 @@ vi.mock('@sniptale/platform/browser/permissions', () => ({
   browserPermissions: { isAvailable: () => false },
 }));
 import type { SetStateAction } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadSettingsCatalogFixture,
+  prepareSettingsTranslations,
+} from '../../../../catalog-fixture.test-support';
 import { translate } from '../../../../../platform/i18n';
 
 const { addAIModelMock, loggerErrorMock, toastErrorMock, updateAIModelMock } = vi.hoisted(() => ({
@@ -214,3 +218,10 @@ it('keeps text instructions when a multi-operation model views recognition param
     'incarnation'
   );
 });
+
+vi.mock('../../../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadSettingsCatalogFixture>[0]) =>
+    loadSettingsCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareSettingsTranslations('en'));

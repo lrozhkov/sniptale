@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
+  prepare: vi.fn(),
   refresh: vi.fn(),
   removeAll: vi.fn(),
   update: vi.fn(),
@@ -13,6 +14,10 @@ const mocks = vi.hoisted(() => ({
   settings: vi.fn(),
   videoPreset: vi.fn(),
   warn: vi.fn(),
+}));
+vi.mock('../../../platform/i18n', async (original) => ({
+  ...(await original<typeof import('../../../platform/i18n')>()),
+  prepareTranslations: mocks.prepare,
 }));
 vi.mock('@sniptale/platform/browser/context-menus', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/platform/browser/context-menus')>()),
@@ -69,6 +74,7 @@ function deferred() {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.prepare.mockReset().mockResolvedValue(undefined);
   mocks.create.mockResolvedValue(undefined);
   mocks.removeAll.mockResolvedValue(undefined);
   mocks.update.mockResolvedValue(undefined);
@@ -152,4 +158,24 @@ it('serializes overlapping rebuilds so a later removeAll cannot delete a partial
   await Promise.all([first, second]);
   expect(mocks.removeAll).toHaveBeenCalledTimes(2);
   expect(mocks.create).toHaveBeenCalledTimes(6);
+});
+
+it('preserves the existing menu while catalog preparation is pending or fails and retries', async () => {
+  await rebuildBackgroundContextMenus();
+  const before = mocks.removeAll.mock.calls.length;
+  let fail!: (reason: Error) => void;
+  mocks.prepare.mockReturnValueOnce(
+    new Promise<void>((_, reject) => {
+      fail = reject;
+    })
+  );
+  const pending = rebuildBackgroundContextMenus();
+  const failure = expect(pending).rejects.toThrow('Catalog unavailable');
+  await Promise.resolve();
+  expect(mocks.removeAll).toHaveBeenCalledTimes(before);
+  fail(new Error('Catalog unavailable'));
+  await failure;
+  expect(mocks.removeAll).toHaveBeenCalledTimes(before);
+  await rebuildBackgroundContextMenus();
+  expect(mocks.removeAll).toHaveBeenCalledTimes(before + 1);
 });

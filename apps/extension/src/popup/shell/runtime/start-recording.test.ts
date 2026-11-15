@@ -1,4 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  loadPopupCatalogFixture,
+  prepareRussianPopupTranslations,
+} from '../../catalog-fixture.test-support';
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadPopupCatalogFixture>[0]) =>
+    loadPopupCatalogFixture(locale),
+}));
+beforeAll(prepareRussianPopupTranslations);
+
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { startRecordingHandler } from './start-recording';

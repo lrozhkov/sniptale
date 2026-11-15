@@ -1,7 +1,7 @@
 import { expect, test as browserTest, type Page } from '@playwright/test';
 import { BlobReader, ZipReader } from '@zip.js/zip.js';
 import { readFile, writeFile } from 'node:fs/promises';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate } from '../support/catalog-fixture';
 import { createVideoProject } from '../../../../apps/extension/src/composition/persistence/projects/index.test-support';
 import { createGuideProject } from '../../../../apps/extension/src/features/scenario/project/public';
 import { betaV1Fixture as betaV1PersistenceFixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';

@@ -18,6 +18,7 @@ const harnessMocks = vi.hoisted(() => {
     createRootMock: vi.fn(() => ({ render: vi.fn<(node: ReactNode) => void>() })),
     createPayloadMock: vi.fn(() => ({ title: 'Harness capture' })),
     initializeAppThemeMock: vi.fn(),
+    prepareTranslationsMock: vi.fn<() => Promise<void>>(async () => {}),
     normalizeBrowserFrameStateMock: vi.fn((value: unknown) => value),
     ready: new Promise<void>((resolve) => {
       resolveHarnessReady = resolve;
@@ -32,6 +33,11 @@ vi.mock('react-dom/client', () => ({
 
 vi.mock('../browser-mocks/browser-mocks', () => ({
   harnessReady: harnessMocks.ready,
+}));
+
+vi.mock('../../../../apps/extension/src/platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../apps/extension/src/platform/i18n')>()),
+  prepareTranslations: harnessMocks.prepareTranslationsMock,
 }));
 
 vi.mock('../../../../apps/extension/src/ui/theme/index', async (importOriginal) => ({
@@ -75,6 +81,7 @@ beforeEach(() => {
   harnessMocks.controller.applyBrowserFrame.mockClear();
   harnessMocks.controller.loadDocument.mockReset();
   harnessMocks.initializeAppThemeMock.mockClear();
+  harnessMocks.prepareTranslationsMock.mockClear();
   vi.useFakeTimers();
   document.body.innerHTML = '<div id="root"></div>';
 });
@@ -83,7 +90,14 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-it('initializes the app theme only after harness bootstrap storage is ready', async () => {
+it('waits for bootstrap storage and catalogs before mounting the editor harness', async () => {
+  let finishCatalogs!: () => void;
+  harnessMocks.prepareTranslationsMock.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finishCatalogs = resolve;
+      })
+  );
   await import('./index');
 
   expect(harnessMocks.initializeAppThemeMock).not.toHaveBeenCalled();
@@ -91,6 +105,10 @@ it('initializes the app theme only after harness bootstrap storage is ready', as
   harnessMocks.resolveHarnessReady();
   await harnessMocks.ready;
   await Promise.resolve();
+  expect(harnessMocks.prepareTranslationsMock).toHaveBeenCalledWith('editor');
+  expect(harnessMocks.createRootMock).not.toHaveBeenCalled();
+  expect(harnessMocks.initializeAppThemeMock).not.toHaveBeenCalled();
+  finishCatalogs();
   await vi.advanceTimersByTimeAsync(50);
 
   expect(harnessMocks.initializeAppThemeMock).toHaveBeenCalledTimes(1);

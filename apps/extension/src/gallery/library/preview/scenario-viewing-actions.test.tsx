@@ -1,7 +1,18 @@
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { expect, it, vi } from 'vitest';
+import { expect, it, vi, beforeAll } from 'vitest';
+import {
+  loadGalleryCatalogFixture,
+  prepareGalleryTranslations,
+} from '../../test-support/translations.test-support';
+
+vi.mock('../../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: (locale: Parameters<typeof loadGalleryCatalogFixture>[0]) =>
+    loadGalleryCatalogFixture(locale),
+}));
+
+beforeAll(() => prepareGalleryTranslations('en'));
 const io = vi.hoisted(() => ({ snapshot: vi.fn() }));
 vi.mock('../../../composition/persistence/scenario/projects/viewing', () => ({
   readScenarioViewingSnapshot: io.snapshot,

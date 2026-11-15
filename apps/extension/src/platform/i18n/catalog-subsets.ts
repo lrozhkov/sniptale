@@ -2,6 +2,7 @@ import type { TranslationDictionary } from './types';
 
 /** Exact message domains bundled into each compact runtime entry. */
 const CATALOG_SUBSETS = {
+  bootstrap: ['common.bootstrap.errorTitle', 'common.bootstrap.errorBody', 'common.actions.retry'],
   popup: [
     'background',
     'common',

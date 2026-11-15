@@ -26,6 +26,7 @@ import { getSurfaceStylePresetDisplayName } from '../../../features/highlighter/
 import { getEditorPresetDisplayName } from '../../../features/editor/presets/display';
 import { getViewportPresetDisplayName } from '../../../features/viewport-presets/display-name';
 import type { AppLocale } from '../../../platform/i18n';
+import { DEFAULT_LOCALE, isAppLocale } from '@sniptale/runtime-contracts/i18n';
 import { loadAISettings } from '../ai-settings';
 import { loadAnnotationTemplateTagState } from '../annotation-template-tags';
 import { loadCalloutPresetCatalog } from '../callout-presets';
@@ -108,11 +109,13 @@ export async function readSettingsTransferSnapshot(
   const effects = await Promise.all(effectCatalogs.map(encodeEffectSettingsEntry));
   const audioPresets = parseAudioPresetCatalog(preferences[AUDIO_PRESET_STORAGE_KEY]);
   if (!audioPresets) throw new TypeError('Audio preset catalogue is unavailable.');
+  const storedLocale: unknown = preferences[LOCALE_STORAGE_KEY];
+  const locale = isAppLocale(storedLocale) ? storedLocale : DEFAULT_LOCALE;
   const domains: Record<string, SettingsTransferDomainPayload> = {
     'styles.audio-effects': payload(projectAudioPresetTransfer(audioPresets)),
     'interface.preferences': payload({
       theme: preferences[THEME_STORAGE_KEY] ?? 'system',
-      locale: preferences[LOCALE_STORAGE_KEY] ?? 'ru',
+      locale,
       popupStartup,
       contextMenu: settings.contextMenu,
       pageLaunch: normalizePageLaunchPreferences(settings.pageLaunch),
@@ -178,7 +181,6 @@ export async function readSettingsTransferSnapshot(
     }),
   };
 
-  const locale: AppLocale = preferences[LOCALE_STORAGE_KEY] === 'en' ? 'en' : 'ru';
   return {
     domains,
     dynamicItems: collectSettingsTransferDynamicItems(domains, locale),

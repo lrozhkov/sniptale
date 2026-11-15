@@ -1,7 +1,7 @@
 import { expect, type Page, type TestInfo } from '@playwright/test';
 import type { AIScenarioSelection } from '../../../../apps/extension/src/contracts/settings/ai-catalog';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
-import { createTranslator } from '../../../../apps/extension/src/platform/i18n';
+import { createTranslator } from '../support/catalog-fixture';
 import { test } from '../support/extension-fixture';
 import { materializeScenarioUnitStorage } from '../../../../apps/extension/src/composition/persistence/scenario/storage-units';
 import {

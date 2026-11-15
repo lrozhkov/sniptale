@@ -1,5 +1,4 @@
-import { catalogs } from 'sniptale:i18n/popup-shell';
-import { readCatalogTranslation } from './catalog-reader';
+import { readPreparedTranslation } from './locale/state';
 import type { AppLocale, LeafTranslationKey } from './types';
 import type { CatalogSubset } from './catalog-subsets';
 
@@ -8,5 +7,5 @@ export function readPopupShellTranslation(
   locale: AppLocale,
   key: LeafTranslationKey<CatalogSubset<'popup-shell'>>
 ): string {
-  return readCatalogTranslation(catalogs, locale, key);
+  return readPreparedTranslation(locale, key);
 }

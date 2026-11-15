@@ -1,4 +1,4 @@
-import { translate } from '../../../platform/i18n';
+import { prepareTranslations, translate } from '../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { getErrorMessage } from '../../../platform/runtime-messaging';
 import { getViewportPresetErrorMessage } from '../../../features/viewport-presets/error-message';
@@ -183,6 +183,7 @@ export async function handleBackgroundContextMenuAction(args: {
     return;
   }
 
+  await prepareTranslations('background');
   const tab = requireTab(args.tab);
   const tabId = tab.id;
 
@@ -206,6 +207,7 @@ export async function handleBackgroundContextMenuQuickAction(args: {
   deps: BackgroundContextMenuActionDeps;
   tab?: chrome.tabs.Tab;
 }): Promise<void> {
+  await prepareTranslations('background');
   const tab = requireTab(args.tab);
   const tabId = tab.id;
 
@@ -233,6 +235,12 @@ export async function showBackgroundContextMenuError(args: {
     return;
   }
 
+  try {
+    await prepareTranslations('background');
+  } catch {
+    logger.warn('Context menu error feedback could not prepare translations');
+    return;
+  }
   const message =
     getViewportPresetErrorMessage(args.error) ??
     getErrorMessage(args.error, translate('content.runtime.unknownError'));
@@ -249,6 +257,7 @@ export async function hasContextMenuVideoPreset(tab?: chrome.tabs.Tab): Promise<
   if (!tab?.id || classifyTabRuntimeCapability(tab) !== TabRuntimeCapability.Regular) {
     return false;
   }
+  await prepareTranslations('background');
   const settings = await loadSettings();
   try {
     const availability = await getContextMenuVideoPresetAvailability(tab.id, settings);
