@@ -2,6 +2,7 @@ import type {
   RuntimeMessageType,
   RuntimeRequestByType,
 } from '../../contracts/messaging/contracts/runtime-message';
+import type { VideoRecordingInterruptionReason } from '@sniptale/runtime-contracts/video/types/types';
 
 export type ControlCapability = {
   controlToken: string;
@@ -9,6 +10,7 @@ export type ControlCapability = {
 };
 
 export type CameraRecorderRouteState = {
+  failureReason?: VideoRecordingInterruptionReason;
   draft?: boolean;
   teleprompter?: boolean;
   registrationToken: string | null;

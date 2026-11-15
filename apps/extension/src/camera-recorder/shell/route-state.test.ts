@@ -15,6 +15,26 @@ beforeEach(() => {
   vi.spyOn(Date, 'now').mockReturnValue(1_000);
 });
 
+it.each(['audio-capacity', 'unknown', 'untrusted diagnostic'])(
+  'accepts only fixed failure reasons: %s',
+  (reason) => {
+    window.history.replaceState(
+      {},
+      '',
+      '/apps/extension/src/camera-recorder/index.html?failure=' +
+        encodeURIComponent(reason) +
+        '&launchToken=secret&recordingId=rec-1'
+    );
+    expect(consumeCameraRecorderRouteState()).toEqual({
+      recordingId: null,
+      registrationToken: null,
+      routeError: null,
+      failureReason: reason === 'audio-capacity' ? 'audio-capacity' : 'unknown',
+    });
+    expect(window.location.search).toBe('');
+  }
+);
+
 it('scrubs the launch URL without retaining recording identity in page storage', () => {
   window.history.replaceState(
     {},

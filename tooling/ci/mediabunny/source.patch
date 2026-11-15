@@ -167,7 +167,7 @@
  			// Ensure audio parameters remain constant
  			if (this.lastNumberOfChannels !== null && this.lastSampleRate !== null) {
  				if (
-@@ -2817,6 +2862,28 @@
+@@ -2817,6 +2862,30 @@
  	/** @internal */
  	private _abortController: AbortController | null = null;
  	/** @internal */
@@ -184,6 +184,8 @@
 +	/** @internal */
 +	private _admittedAudioDuration = 0;
 +	/** @internal */
++	private _admittedAudioBurstPackets = 0;
++	/** @internal */
 +	private _admittedAudioBytes = 0;
 +	/** @internal */
 +	private _nativeReader: ReadableStreamDefaultReader<AudioData> | null = null;
@@ -196,7 +198,7 @@
  	private _track: MediaStreamAudioTrack;
  	/** @internal */
  	private _audioContext: AudioContext | null = null;
-@@ -2872,11 +2939,13 @@
+@@ -2872,11 +2941,13 @@
  		this._options = options;
  		this._encoder = new AudioEncoderWrapper(this, encodingConfig);
  		this._track = track;
@@ -210,7 +212,7 @@
  			Logging._warn(
  				'Make sure not to ignore the `errorPromise` field on MediaStreamAudioTrackSource, so that any internal'
  				+ ' errors get bubbled up properly.',
-@@ -2889,16 +2958,28 @@
+@@ -2889,16 +2960,28 @@
  		let errored = false;
  		let lastSampleTimestamp: number | null = null;
  		let timestampOffset = 0;
@@ -224,8 +226,8 @@
 +		};
 +
 +		const nativeBufferSize = 128;
-+		// A full native backlog can arrive while one earlier sample awaits encoder or writer progress.
-+		const nativeBurstCapacity = typeof MediaStreamTrackProcessor !== 'undefined' ? nativeBufferSize + 1 : 0;
++		// Native backlog is additional to PCM already waiting for encoder or writer progress.
++		const nativeBurstCapacity = typeof MediaStreamTrackProcessor !== 'undefined' ? nativeBufferSize : 0;
  
  		const onAudioSample = (audioSample: AudioSample) => {
 -			if (errored) {
@@ -241,7 +243,7 @@
  				const dataSeen = firstAudioDataTimestamp !== null;
  				if (dataSeen) {
  					if (lastSampleTimestamp !== null && this._options.timestampBase !== 'unix') {
-@@ -2915,6 +2996,11 @@
+@@ -2915,6 +2998,11 @@
  				return;
  			}
  
@@ -253,7 +255,7 @@
  			if (firstAudioDataTimestamp === null) {
  				firstAudioDataTimestamp = audioSample.timestamp;
  
-@@ -2939,39 +3025,68 @@
+@@ -2939,39 +3027,70 @@
  
  			lastSampleTimestamp = currentTimestamp;
  
@@ -262,8 +264,8 @@
 +			// Native packet quanta vary. Bound retained PCM, not the number of packet objects.
 +			const duration = audioSample.duration;
 +			const bytes = audioSample.allocationSize({ format: 'f32', planeIndex: 0 });
-+			if ((this._admittedAudioDuration + duration > 1 + 1e-9
-+				&& this._admittedAudio.size >= nativeBurstCapacity)
++			const usesBurstCapacity = this._admittedAudioDuration + duration > 1 + 1e-9;
++			if ((usesBurstCapacity && this._admittedAudioBurstPackets >= nativeBurstCapacity)
 +				|| this._admittedAudioBytes + bytes > 4 * 1024 * 1024) {
  				audioSample.close();
 +				fail(new Error('Live audio buffer exceeded its bounded capacity.'));
@@ -281,12 +283,14 @@
 -					void this._audioContext?.suspend();
 +			this._admittedAudio.add(audioSample);
 +			this._admittedAudioDuration += duration;
++			if (usesBurstCapacity) this._admittedAudioBurstPackets++;
 +			this._admittedAudioBytes += bytes;
 +			this._audioDrain = this._encoder.add(audioSample, true, this._audioDrain)
 +				.finally(() => {
 +					if (!this._admittedAudio.delete(audioSample)) return;
 +					this._admittedAudioDuration = Math.max(0, this._admittedAudioDuration - duration);
 +					this._admittedAudioBytes -= bytes;
++					if (usesBurstCapacity) this._admittedAudioBurstPackets--;
  				});
 +			void this._audioDrain.catch(fail);
  		};
@@ -345,7 +349,7 @@
  		} else {
  			// Let's fall back to an AudioContext approach
  
-@@ -3012,21 +3127,37 @@
+@@ -3012,21 +3131,38 @@
  	 */
  	pause() {
  		this._paused = true;
@@ -369,6 +373,7 @@
 +			for (const sample of this._admittedAudio) sample.close();
 +			this._admittedAudio.clear();
 +			this._admittedAudioDuration = 0;
++			this._admittedAudioBurstPackets = 0;
 +			this._admittedAudioBytes = 0;
 +		}
  		try {

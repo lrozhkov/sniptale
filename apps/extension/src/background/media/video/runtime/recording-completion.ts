@@ -1,4 +1,9 @@
 import { translate } from '../../../../platform/i18n';
+import { openRecordingFailurePage } from '../../../../platform/navigation/extension-pages';
+import {
+  acquireMediaMutationPermit,
+  getMediaAuthorityGeneration,
+} from '../../../mutation-exclusion/media-activity';
 import type { RecordingEventsDescriptor } from '../../../../features/video/project/recording-events/types';
 import type { CursorTrajectoryDescriptor } from '../../../../features/video/project/cursor-trajectory/types';
 import type { VideoRecordingControlLease } from '../../../storage/video/recording-control-lease';
@@ -529,8 +534,11 @@ export async function notifyRecordingStartFailed(
     setVideoRecordingId(null);
     resetVideoRecordingStartSession();
     resetVideoRecordingRuntimeState();
-    publishRecordingCompletionState({ error });
   }
+  publishRecordingCompletionState(
+    { error },
+    { notifyFailure: options.diagnosticCode !== 'cancelled' }
+  );
 
   runBestEffort(
     getBackgroundRuntimeMessaging().sendRuntimeMessage({
@@ -727,6 +735,31 @@ export async function handleRecordingFailure(message: {
   }
 }
 
+async function showRecordingFailureResult(
+  message: { recordingId?: string; error?: string },
+  generation: number
+): Promise<void> {
+  const currentId = getVideoRecordingId();
+  if (
+    (currentId !== null && currentId !== message.recordingId) ||
+    getMediaAuthorityGeneration() !== generation
+  )
+    return;
+  const release = acquireMediaMutationPermit();
+  if (!release) return;
+  try {
+    await openRecordingFailurePage(
+      message.error === 'Live audio buffer exceeded its bounded capacity.'
+        ? 'audio-capacity'
+        : 'unknown'
+    );
+  } catch (error) {
+    logger.warn('Failed to open recording failure result', error);
+  } finally {
+    release();
+  }
+}
+
 /** Startup cleanup joins the accepted Stop and cannot revoke its retained failure. */
 export async function stopRecordingSourceForStartFailure(
   binding: RecordingSourceBinding
@@ -836,6 +869,20 @@ export function getRecordingCompletionState(): Exclude<
   };
 }
 
-function publishRecordingCompletionState(patch: Partial<VideoRecordingRuntimeState>): void {
+function publishRecordingCompletionState(
+  patch: Partial<VideoRecordingRuntimeState>,
+  options: { notifyFailure?: boolean } = {}
+): void {
+  const newError =
+    options.notifyFailure !== false &&
+    patch.error &&
+    patch.error !== getVideoRecordingRuntimeState().error;
   setVideoRecordingRuntimeState({ ...patch, completion: getRecordingCompletionState() });
+  if (newError && patch.error) {
+    const recordingId = getVideoRecordingId();
+    void showRecordingFailureResult(
+      { error: patch.error, ...(recordingId ? { recordingId } : {}) },
+      getMediaAuthorityGeneration()
+    );
+  }
 }

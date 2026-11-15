@@ -67,6 +67,25 @@ it('injects and waits when the top-level content runtime is not ready', async ()
   expect(sendTabMessageMock).toHaveBeenCalledTimes(2);
 });
 
+it('can inject the admitted recording runtime before the page finishes loading', async () => {
+  sendTabMessageMock
+    .mockRejectedValueOnce(new Error('Receiving end does not exist.'))
+    .mockResolvedValueOnce(VIEWPORT_COORDS_RESPONSE);
+  await injectContentRuntimeAndAwaitReady(
+    {
+      tab: { id: 7, url: 'https://example.test/path' } as chrome.tabs.Tab,
+      tabId: 7,
+      url: new URL('https://example.test/path'),
+    },
+    { allFrames: false, injectImmediately: true }
+  );
+  expect(browserScriptingExecuteScriptMock).toHaveBeenCalledWith({
+    files: ['assets/contentRuntime.js'],
+    injectImmediately: true,
+    target: { allFrames: false, tabId: 7 },
+  });
+});
+
 it('injects when a failed response carries otherwise current viewport data', async () => {
   sendTabMessageMock
     .mockResolvedValueOnce({ ...VIEWPORT_COORDS_RESPONSE, success: false })

@@ -67,6 +67,9 @@ export type VideoPostRecordResult = {
   recordingId: string;
 };
 
+/** Fixed reasons for the advisory recording failure result. */
+export type VideoRecordingInterruptionReason = 'audio-capacity' | 'unknown';
+
 export const WebcamResolutionPreset = {
   AUTO: 'AUTO',
   P720: '720P',

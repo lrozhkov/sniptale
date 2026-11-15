@@ -293,19 +293,19 @@
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.6-modified/patch-manifest.json",
-      "sha256": "b5201f8d0985605d3769439cc67a2cac1bbbc942de0e882087062e17af1a44cd",
+      "sha256": "ac5a954e5ea148e5a9efd33914e55e3c4cbd7a22f6177aeaac241e46f9733a02",
       "source": "LICENSES/dependencies/mediabunny-1.61.6-modified/patch-manifest.json",
       "distribution": "source"
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.6-modified/patch-payload.json.gz",
-      "sha256": "f9be915f3a4bfb3c6e7648e9c6b32b0da8e551f9f639ad22552d3c0db9111fd8",
+      "sha256": "48b03a105e7e78cc1554f77e13edcdd53af7fbf558c014982c59a4442146aed4",
       "source": "LICENSES/dependencies/mediabunny-1.61.6-modified/patch-payload.json.gz",
       "distribution": "source"
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.6-modified/source.patch",
-      "sha256": "67e9895b496ac9cb46acad2a2174c2893fe9bbef02f69c63f191e677b2a20cae",
+      "sha256": "e58d26e5b06cb842932a7fe64b2d74fb79d1eaa7b0f2c609539a4694c3201dbd",
       "source": "LICENSES/dependencies/mediabunny-1.61.6-modified/source.patch",
       "distribution": "source"
     },
@@ -451,12 +451,12 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "d99b2f37d79e23855a193d583fe394b650b101ef2a934472b6ebc36308e2d1bf",
+      "sha256": "3e1a958702c8851745b3b07e7f056ddbc1ac01fad58dad5bd395547afcb3a0f0",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "f4f2a35e6f5786cc9e5dedb9279da493f4c24e48fcc9cae5af533dfdc49bcd52",
+      "sha256": "7c1b06b2fbfb0897fc5f982f382605235f9a2cfbd8c46f810eb6420206bfb731",
       "source": "THIRD_PARTY_NOTICES.md"
     },
     {

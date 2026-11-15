@@ -19,6 +19,11 @@ const {
   releaseVideoCaptureSurfaceMock,
   cancelVideoSourceReadyWaitMock,
   runBestEffortMock,
+  openFailureMock,
+  clearLeaseMock,
+  clearCameraGrantMock,
+  mediaPermitMock,
+  mediaGenerationMock,
 } = vi.hoisted(() => ({
   getVideoRecordingTabIdMock: vi.fn(),
   getVideoRecordingRuntimeStateMock: vi.fn(),
@@ -35,6 +40,27 @@ const {
   releaseVideoCaptureSurfaceMock: vi.fn(),
   cancelVideoSourceReadyWaitMock: vi.fn(),
   runBestEffortMock: vi.fn(),
+  openFailureMock: vi.fn(),
+  clearLeaseMock: vi.fn(),
+  clearCameraGrantMock: vi.fn(),
+  mediaPermitMock: vi.fn(),
+  mediaGenerationMock: vi.fn(),
+}));
+
+vi.mock('../../../../platform/navigation/extension-pages', () => ({
+  openRecordingFailurePage: openFailureMock,
+}));
+vi.mock('../../../mutation-exclusion/media-activity', () => ({
+  acquireMediaMutationPermit: mediaPermitMock,
+  getMediaAuthorityGeneration: mediaGenerationMock,
+}));
+vi.mock('./camera-recorder-control', () => ({
+  clearCameraRecorderControlGrant: clearCameraGrantMock,
+}));
+vi.mock('../recording-control-lease', async (original) => ({
+  ...(await original<typeof import('../recording-control-lease')>()),
+  clearActiveVideoRecordingLease: clearLeaseMock,
+  getActiveVideoRecordingLeaseSnapshot: vi.fn(() => null),
 }));
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
@@ -84,10 +110,15 @@ vi.mock('../capture-surface', async (importOriginal) => ({
   releaseVideoCaptureSurface: releaseVideoCaptureSurfaceMock,
 }));
 
-import { notifyRecordingStartFailed } from './recording-completion';
+import { handleRecordingFailure, notifyRecordingStartFailed } from './recording-completion';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  openFailureMock.mockReset().mockResolvedValue(undefined);
+  clearCameraGrantMock.mockReset().mockResolvedValue(undefined);
+  clearLeaseMock.mockReset().mockResolvedValue(undefined);
+  mediaGenerationMock.mockReset().mockReturnValue(0);
+  mediaPermitMock.mockReset().mockReturnValue(vi.fn());
   getVideoRecordingTabIdMock.mockReturnValue(7);
   getVideoRecordingIdMock.mockReturnValue('recording-1');
   getVideoRecordingRuntimeStateMock.mockReturnValue({ captureMode: CaptureMode.SCREEN });
@@ -116,6 +147,56 @@ beforeEach(() => {
       });
     }
   );
+});
+
+it.each([
+  ['Live audio buffer exceeded its bounded capacity.', 'audio-capacity'],
+  ['private diagnostic text', 'unknown'],
+  ['Video encoder failed', 'unknown'],
+  ['Storage writer failed', 'unknown'],
+] as const)('opens a fixed failure result without blocking cleanup: %s', async (error, reason) => {
+  await handleRecordingFailure({ recordingId: 'recording-1', phase: 'runtime', error });
+  expect(openFailureMock).toHaveBeenCalledExactlyOnceWith(reason);
+  expect(releaseVideoCaptureSurfaceMock.mock.invocationCallOrder[0]).toBeLessThan(
+    openFailureMock.mock.invocationCallOrder[0]!
+  );
+});
+
+it('keeps cleanup successful when failure window delivery rejects', async () => {
+  openFailureMock.mockRejectedValueOnce(new Error('window unavailable'));
+  await expect(
+    handleRecordingFailure({ recordingId: 'recording-1', phase: 'runtime' })
+  ).resolves.toBeUndefined();
+  expect(clearLeaseMock).toHaveBeenCalled();
+  expect(loggerWarnMock).toHaveBeenCalledWith(
+    'Failed to open recording failure result',
+    expect.any(Error)
+  );
+});
+
+it('keeps deliberate source selection cancellation out of the failure window', async () => {
+  await notifyRecordingStartFailed('localized cancellation text', { diagnosticCode: 'cancelled' });
+  expect(openFailureMock).not.toHaveBeenCalled();
+  expect(resetVideoRecordingStartSessionMock).toHaveBeenCalled();
+});
+
+it('does not open a recording failure window for export errors', async () => {
+  await handleRecordingFailure({ recordingId: 'recording-1', phase: 'export' });
+  expect(openFailureMock).not.toHaveBeenCalled();
+});
+
+it('suppresses stale failure UI when a new recording begins during cleanup', async () => {
+  clearCameraGrantMock.mockImplementationOnce(async () =>
+    getVideoRecordingIdMock.mockReturnValue('recording-2')
+  );
+  await handleRecordingFailure({ recordingId: 'recording-1', phase: 'runtime' });
+  expect(openFailureMock).not.toHaveBeenCalled();
+});
+
+it('suppresses failure UI while privacy erasure owns the media gate', async () => {
+  mediaPermitMock.mockReturnValueOnce(null);
+  await handleRecordingFailure({ recordingId: 'recording-1', phase: 'runtime' });
+  expect(openFailureMock).not.toHaveBeenCalled();
 });
 
 it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(

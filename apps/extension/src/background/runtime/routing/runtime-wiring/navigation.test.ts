@@ -1,8 +1,14 @@
-import { expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 
 const restorePinnedToolbarAfterNavigation = vi.hoisted(() => vi.fn(async () => true));
 const invalidatePinnedToolbarOperations = vi.hoisted(() => vi.fn());
 const bindAnnotationForkSessionDocument = vi.hoisted(() => vi.fn(async () => undefined));
+const ensurePageAccessMock = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock('../../../page-access/service', async (original) => ({
+  ...(await original<typeof import('../../../page-access/service')>()),
+  ensureActivePageAccessRuntime: ensurePageAccessMock,
+}));
+beforeEach(() => ensurePageAccessMock.mockReset().mockResolvedValue(undefined));
 
 vi.mock('../../page-access/pinned-toolbar-restore', () => ({
   restorePinnedToolbarAfterNavigation,
@@ -38,6 +44,44 @@ import {
   flushMicrotasks,
 } from '../../../../../../../tooling/test/support/background-runtime-wiring.test-support';
 import { registerNavigationListeners } from './navigation';
+
+it('retains completion recovery after early runtime readiness fails', async () => {
+  ensurePageAccessMock.mockRejectedValueOnce(new Error('Body is not available yet'));
+  handleTabRecordingNavigationCommitted.mockReturnValueOnce(true);
+  parseTopLevelDocumentNavigation.mockReturnValue({
+    documentId: 'document-1',
+    frameId: 0,
+    tabId: 7,
+  });
+  registerNavigationListeners(createModeState());
+  navigationCommittedListenerRef.current?.({ documentId: 'document-1', frameId: 0, tabId: 7 });
+  await flushMicrotasks();
+  expect(handleTabRecordingNavigationCompleted).not.toHaveBeenCalled();
+  navigationCompletedListenerRef.current?.({ documentId: 'document-1', frameId: 0, tabId: 7 });
+  await flushMicrotasks();
+  expect(handleTabRecordingNavigationCompleted).toHaveBeenCalledWith(
+    7,
+    'document-1',
+    expect.any(Function)
+  );
+});
+
+it('restores active recording effects at commit without waiting for page completion', async () => {
+  handleTabRecordingNavigationCommitted.mockReturnValueOnce(true);
+  parseTopLevelDocumentNavigation.mockReturnValue({
+    documentId: 'document-1',
+    frameId: 0,
+    tabId: 7,
+  });
+  registerNavigationListeners(createModeState());
+  navigationCommittedListenerRef.current?.({ documentId: 'document-1', frameId: 0, tabId: 7 });
+  await flushMicrotasks();
+  expect(handleTabRecordingNavigationCompleted).toHaveBeenCalledExactlyOnceWith(
+    7,
+    'document-1',
+    expect.any(Function)
+  );
+});
 
 it('hydrates the persisted recording lease before routing tab and navigation events', async () => {
   const state = createModeState();

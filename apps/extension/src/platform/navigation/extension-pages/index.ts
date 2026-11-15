@@ -2,6 +2,7 @@ import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { browserAction } from '@sniptale/platform/browser/action';
 import { browserWindows } from '@sniptale/platform/browser/windows';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
+import type { VideoRecordingInterruptionReason } from '@sniptale/runtime-contracts/video/types/types';
 import { buildEditorUrl } from './editor';
 import { EDITOR_EMBED_SESSION_QUERY_PARAM } from '../../../features/editor/contracts/embed';
 import { buildScenarioEditorUrl } from './scenario-editor';
@@ -288,6 +289,15 @@ export async function openTeleprompterPage(): Promise<void> {
   const url = new URL(runtimeInfo.getURL('apps/extension/src/camera-recorder/index.html'));
   url.searchParams.set('teleprompter', '1');
   url.searchParams.set('draft', '1');
+  await openRecordingCompanion(url);
+}
+
+/** Opens the recording result without recording control authority or raw diagnostics. */
+export async function openRecordingFailurePage(
+  reason: VideoRecordingInterruptionReason
+): Promise<void> {
+  const url = new URL(runtimeInfo.getURL('apps/extension/src/camera-recorder/index.html'));
+  url.searchParams.set('failure', reason);
   await openRecordingCompanion(url);
 }
 

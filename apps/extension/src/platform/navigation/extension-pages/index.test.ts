@@ -435,6 +435,22 @@ it('opens camera recorder in a popup window and falls back to a tab', async () =
   });
 });
 
+it('opens a recording failure result with no recording identity or launch token', async () => {
+  const { openRecordingFailurePage } = await import('./index');
+  await openRecordingFailurePage('audio-capacity');
+  expect(browserWindowsCreateMock).toHaveBeenLastCalledWith({
+    height: 720,
+    type: 'popup',
+    width: 960,
+    url: 'chrome-extension://test/apps/extension/src/camera-recorder/index.html?failure=audio-capacity',
+  });
+  browserWindowsCreateMock.mockRejectedValueOnce(new Error('popup unavailable'));
+  await openRecordingFailurePage('unknown');
+  expect(browserTabsCreateMock).toHaveBeenLastCalledWith({
+    url: 'chrome-extension://test/apps/extension/src/camera-recorder/index.html?failure=unknown',
+  });
+});
+
 it('builds and opens the web snapshot viewer page through runtime urls', async () => {
   const { buildWebSnapshotViewerUrl, openWebSnapshotViewerPage } = await import('./index');
 

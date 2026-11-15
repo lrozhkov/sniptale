@@ -79,9 +79,23 @@ export function registerNavigationListeners(state: BackgroundModeState): void {
         logger.warn('Failed to bind annotation fork session document', error);
       }
     );
-    runWithVideoLeaseHydrationFallback('bind recording navigation document', () =>
-      handleTabRecordingNavigationCommitted(navigation.tabId, navigation.documentId)
-    );
+    runWithVideoLeaseHydrationFallback('bind recording navigation document', () => {
+      if (!handleTabRecordingNavigationCommitted(navigation.tabId, navigation.documentId))
+        return false;
+      // A failed early readiness probe must leave the bound transaction for completion recovery.
+      void ensureActivePageAccessRuntime(navigation.tabId, undefined, { injectImmediately: true })
+        .then(() => {
+          handleTabRecordingNavigationCompleted(
+            navigation.tabId,
+            navigation.documentId,
+            ensureActivePageAccessRuntime
+          );
+        })
+        .catch((error) => {
+          logger.warn('Recording page runtime is not ready before load completion', error);
+        });
+      return true;
+    });
   });
 
   browserWebNavigation.subscribeToCompleted((details: unknown) => {

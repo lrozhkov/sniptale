@@ -100,7 +100,9 @@ async function verifyTabCropCancellation() {
     )
   ).resolves.toBeNull();
 
-  expect(deps.notifyStartFailed).toHaveBeenCalledWith('background.runtime.areaSelectionCancelled');
+  expect(deps.notifyStartFailed).toHaveBeenCalledWith('background.runtime.areaSelectionCancelled', {
+    diagnosticCode: 'cancelled',
+  });
 }
 
 async function verifyStringifiedTabCaptureFailure() {
@@ -169,7 +171,8 @@ async function verifyScreenCaptureCancellation() {
   ).resolves.toBeNull();
 
   expect(deps.notifyStartFailed).toHaveBeenCalledWith(
-    'background.runtime.sourceSelectionCancelled'
+    'background.runtime.sourceSelectionCancelled',
+    { diagnosticCode: 'cancelled' }
   );
 }
 

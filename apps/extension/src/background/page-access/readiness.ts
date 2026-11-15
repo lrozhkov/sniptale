@@ -74,7 +74,7 @@ export async function waitForContentRuntimeReady(
 
 export async function injectContentRuntimeAndAwaitReady(
   target: SupportedPageTarget,
-  options: { allFrames: boolean }
+  options: { allFrames: boolean; injectImmediately?: boolean }
 ): Promise<void> {
   if (await waitForContentRuntimeReadyAttempt(target.tabId, defaultReadinessDeps)) {
     return;

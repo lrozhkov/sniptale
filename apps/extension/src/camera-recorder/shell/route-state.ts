@@ -12,6 +12,16 @@ export function consumeCameraRecorderRouteState(): CameraRecorderRouteState {
   const recordingId = params.get('recordingId');
   clearCameraRecorderLaunchUrlParams();
 
+  const failure = params.get('failure');
+  if (failure !== null) {
+    return {
+      recordingId: null,
+      registrationToken: null,
+      routeError: null,
+      failureReason: failure === 'audio-capacity' ? 'audio-capacity' : 'unknown',
+    };
+  }
+
   if (registrationToken && recordingId) {
     return { recordingId, registrationToken, routeError: null, ...flags };
   }

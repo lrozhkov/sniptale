@@ -183,7 +183,7 @@ function registerCameraRecorder(
     }
   }
 
-  if (!routeState.routeError) {
+  if (!routeState.routeError && !routeState.failureReason) {
     void registerAndLoadState();
   }
   return () => {
