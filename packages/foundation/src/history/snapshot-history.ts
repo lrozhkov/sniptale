@@ -31,6 +31,25 @@ function shouldTreatSnapshotsAsDistinct<T>(left: T, right: T): boolean {
 }
 
 export class SnapshotHistory<T> {
+  /** Restores a detached retained stack; the new runtime owns its own revision sequence. */
+  static restore<T>(
+    snapshots: readonly T[],
+    cursor: number,
+    options: SnapshotHistoryOptions<T> = {}
+  ): SnapshotHistory<T> {
+    const first = snapshots[0];
+    if (
+      first === undefined ||
+      !Number.isSafeInteger(cursor) ||
+      cursor < 0 ||
+      cursor >= snapshots.length
+    )
+      throw new RangeError('Invalid restored history cursor or stack.');
+    const history = new SnapshotHistory<T>(first, options);
+    history.retain(snapshots.map(cloneHistorySnapshot), cursor);
+    return history;
+  }
+
   private readonly limit: number;
   private stack: T[];
   private index: number;

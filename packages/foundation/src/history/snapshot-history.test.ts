@@ -2,6 +2,31 @@ import { describe, expect, it } from 'vitest';
 import { SnapshotHistory } from './snapshot-history';
 
 describe('SnapshotHistory navigation', () => {
+  it('restores a detached retained stack with its cursor and future intact', () => {
+    const input = [{ title: 'First' }, { title: 'Current' }, { title: 'Future' }];
+    const history = SnapshotHistory.restore(input, 1);
+    input[1]!.title = 'External mutation';
+    expect(history.getState()).toMatchObject({
+      current: { title: 'Current' },
+      index: 1,
+      size: 3,
+      canUndo: true,
+      canRedo: true,
+    });
+    expect(history.redo()?.current).toEqual({ title: 'Future' });
+    expect(history.undo()?.current).toEqual({ title: 'Current' });
+    expect(history.undo()?.current).toEqual({ title: 'First' });
+    expect(() => SnapshotHistory.restore([], 0)).toThrow(RangeError);
+    expect(() => SnapshotHistory.restore(input, -1)).toThrow(RangeError);
+    expect(() => SnapshotHistory.restore(input, 3)).toThrow(RangeError);
+    expect(() => SnapshotHistory.restore(input, 0.5)).toThrow(RangeError);
+  });
+
+  it('applies the configured retention window while restoring an oversized stack', () => {
+    const history = SnapshotHistory.restore(['a', 'b', 'c', 'd'], 2, { limit: 3 });
+    expect(history.getSnapshots()).toEqual(['b', 'c', 'd']);
+    expect(history.getState().index).toBe(1);
+  });
   it('seeks a retained state in one revision and rejects invalid positions without mutation', () => {
     const history = new SnapshotHistory<string>('initial');
     for (const value of ['a', 'b', 'c']) history.push(value);

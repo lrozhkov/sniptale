@@ -1,4 +1,13 @@
-import { EDITOR_RASTER_BINARY_FIELDS } from '../../../features/editor/document/raster-state';
+import {
+  encodeEditorImageHistorySnapshot,
+  decodeEditorImageHistorySnapshot,
+  IMAGE_HISTORY_VALUE_TOKEN_PREFIX,
+  type EditorImageHistoryValueKind,
+} from '../../../features/editor-history/image-snapshot';
+import {
+  parseEditorImageHistoryCheckpoint,
+  type EditorImageHistoryCheckpoint,
+} from '../../../features/editor-history/image-checkpoint';
 import { isEditorDocument } from '../../../features/editor/document/guards';
 import { type EditorDocument } from '../../../features/editor/document/types';
 import { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
@@ -15,26 +24,13 @@ import {
   type EditorHistoryDescription,
 } from './actions';
 
-const HISTORY_VALUE_INLINE_LIMIT = 4_096;
-const HISTORY_VALUE_TOKEN_PREFIX = 'sniptale-history-asset:';
-const CANVAS_POOLED_FIELDS = new Set([
-  ...EDITOR_RASTER_BINARY_FIELDS,
-  'src',
-  'sniptaleBackgroundImageData',
-  'sniptaleSimplifySourceData',
-  'sniptaleBlurSourceData',
-  'sniptaleDrawingJson',
-]);
-const DOCUMENT_POOLED_FIELDS = new Set([
-  'sourceImageData',
-  'backgroundImageData',
-  'faviconDataUrl',
-]);
-
 type EditorHistoryAssets = {
   byValue: Map<string, string>;
   byToken: Map<string, string>;
+  kindsByToken: Map<string, EditorImageHistoryValueKind>;
   nextId: number;
+  epoch: string;
+  allocationPrefix: string;
   bytesByToken: Map<string, number>;
   cost: ReturnType<typeof createEditorHistoryCostIndex>;
   actionLimit: number;
@@ -45,38 +41,23 @@ type EditorHistoryAssets = {
 
 const historyAssets = new WeakMap<SnapshotHistory<string>, EditorHistoryAssets>();
 
-function encodeSharedValue(
-  value: unknown,
-  key: string,
-  assets: EditorHistoryAssets,
-  tokens: Set<string>
-): unknown {
-  if (
-    typeof value !== 'string' ||
-    value.length < HISTORY_VALUE_INLINE_LIMIT ||
-    (key !== 'sniptaleDrawingJson' && !value.startsWith('data:')) ||
-    !(DOCUMENT_POOLED_FIELDS.has(key) || CANVAS_POOLED_FIELDS.has(key))
-  ) {
-    return value;
-  }
-  return internHistoryValue(value, assets, tokens);
-}
-
 function internHistoryValue(
   value: string,
   assets: EditorHistoryAssets,
-  tokens: Set<string>
+  kind: EditorImageHistoryValueKind
 ): string {
   const existing = assets.byValue.get(value);
   if (existing) {
-    tokens.add(existing);
     return existing;
   }
-  const token = `${HISTORY_VALUE_TOKEN_PREFIX}${assets.nextId++}`;
+  let token: string;
+  do {
+    token = `${assets.allocationPrefix}${assets.nextId++}`;
+  } while (assets.byToken.has(token));
   assets.byValue.set(value, token);
   assets.byToken.set(token, value);
   assets.bytesByToken.set(token, new TextEncoder().encode(value).byteLength);
-  tokens.add(token);
+  assets.kindsByToken.set(token, kind);
   return token;
 }
 
@@ -86,22 +67,17 @@ function encodeEditorSnapshot(
   tokens: Set<string>
 ): string {
   const objects: EditorHistoryDescription['objects'] = [];
-  const snapshot = JSON.stringify(document, (key, value: unknown) => {
-    if (key === 'canvasJson' && typeof value === 'string') {
-      return encodeCanvasHistoryValue(JSON.parse(value) as unknown, assets, tokens, objects);
+  const snapshot = encodeEditorImageHistorySnapshot(
+    document,
+    {
+      intern: (value, kind) => internHistoryValue(value, assets, kind),
+    },
+    tokens,
+    (token, object) => {
+      const description = describeEditorHistoryObject(token, object);
+      if (description) objects.push(description);
     }
-    if (key === 'vectorDefinitions' && isRecord(value)) {
-      return Object.fromEntries(
-        Object.entries(value).map(([id, definition]) => [
-          id,
-          internHistoryValue(JSON.stringify(definition), assets, tokens),
-        ])
-      );
-    }
-    if (key === 'richShapes' && Array.isArray(value))
-      return poolObjectVersions(value, assets, tokens, objects);
-    return encodeSharedValue(value, key, assets, tokens);
-  });
+  );
   const metadata: unknown = JSON.parse(snapshot);
   if (isRecord(metadata)) {
     delete metadata['canvasJson'];
@@ -110,102 +86,6 @@ function encodeEditorSnapshot(
     assets.descriptions.set(snapshot, { objects, document: metadata });
   }
   return snapshot;
-}
-
-function encodeCanvasHistoryValue(
-  value: unknown,
-  assets: EditorHistoryAssets,
-  tokens: Set<string>,
-  descriptions?: EditorHistoryDescription['objects']
-): string {
-  return JSON.stringify(value, (key, child: unknown) => {
-    if (key === 'objects' && Array.isArray(child))
-      return poolObjectVersions(child, assets, tokens, descriptions);
-    return encodeSharedValue(child, key, assets, tokens);
-  });
-}
-
-function poolObjectVersions(
-  objects: unknown[],
-  assets: EditorHistoryAssets,
-  tokens: Set<string>,
-  descriptions?: EditorHistoryDescription['objects']
-): unknown[] {
-  return objects.map((object: unknown) => {
-    if (!isRecord(object)) return object;
-    const token = internHistoryValue(
-      encodeCanvasHistoryValue(object, assets, tokens),
-      assets,
-      tokens
-    );
-    const description = descriptions && describeEditorHistoryObject(token, object);
-    if (description) descriptions.push(description);
-    return token;
-  });
-}
-
-function restoreObjectVersions(objects: unknown[], assets: EditorHistoryAssets): unknown[] {
-  return objects.map((object: unknown) => {
-    if (typeof object !== 'string') return object;
-    const pooled = assets.byToken.get(object);
-    return pooled === undefined ? object : (JSON.parse(pooled) as unknown);
-  });
-}
-
-function decodeEditorSnapshot(value: string, assets?: EditorHistoryAssets): unknown {
-  const document = JSON.parse(value) as unknown;
-  if (!assets || !isRecord(document)) return document;
-  restoreSharedFields(document, DOCUMENT_POOLED_FIELDS, assets);
-  const definitions = document['vectorDefinitions'];
-  if (isRecord(definitions)) {
-    for (const [id, token] of Object.entries(definitions)) {
-      if (typeof token !== 'string') continue;
-      const pooled = assets.byToken.get(token);
-      if (pooled !== undefined) definitions[id] = JSON.parse(pooled) as unknown;
-    }
-  }
-  if (Array.isArray(document['richShapes'])) {
-    const shapes = restoreObjectVersions(document['richShapes'], assets);
-    restoreSharedFields(shapes, CANVAS_POOLED_FIELDS, assets, true);
-    document['richShapes'] = shapes;
-  }
-  const canvasJson = document['canvasJson'];
-  if (typeof canvasJson === 'string' && canvasJson.includes(HISTORY_VALUE_TOKEN_PREFIX)) {
-    const canvas = JSON.parse(canvasJson) as unknown;
-    restoreSharedFields(canvas, CANVAS_POOLED_FIELDS, assets, true);
-    document['canvasJson'] = JSON.stringify(canvas);
-  }
-  return document;
-}
-
-function restoreSharedFields(
-  root: unknown,
-  fieldNames: ReadonlySet<string>,
-  assets: EditorHistoryAssets,
-  restoreObjects = false
-): void {
-  const pending: unknown[] = [root];
-  while (pending.length > 0) {
-    const current = pending.pop();
-    if (Array.isArray(current)) {
-      for (const child of current) {
-        if (typeof child === 'object' && child !== null) pending.push(child);
-      }
-      continue;
-    }
-    if (!isRecord(current)) continue;
-    for (const [key, child] of Object.entries(current)) {
-      if (restoreObjects && key === 'objects' && Array.isArray(child)) {
-        const objects = restoreObjectVersions(child, assets);
-        current[key] = objects;
-        pending.push(objects);
-      } else if (typeof child === 'string' && fieldNames.has(key)) {
-        current[key] = assets.byToken.get(child) ?? child;
-      } else if (typeof child === 'object' && child !== null) {
-        pending.push(child);
-      }
-    }
-  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -225,6 +105,7 @@ function pruneEditorHistoryAssets(
   for (const token of discarded.tokens) {
     const url = assets.byToken.get(token);
     assets.byToken.delete(token);
+    assets.kindsByToken.delete(token);
     assets.bytesByToken.delete(token);
     if (url !== undefined) assets.byValue.delete(url);
   }
@@ -238,7 +119,10 @@ export function createEditorSnapshotHistory(
   const assets: EditorHistoryAssets = {
     byValue: new Map(),
     byToken: new Map(),
+    kindsByToken: new Map(),
     nextId: 0,
+    epoch: crypto.randomUUID(),
+    allocationPrefix: IMAGE_HISTORY_VALUE_TOKEN_PREFIX,
     bytesByToken,
     cost: createEditorHistoryCostIndex(bytesByToken),
     actionLimit: limits.maxActions,
@@ -255,6 +139,14 @@ export function createEditorSnapshotHistory(
     measureBytes: assets.cost.measure,
     measureWindowBytes: assets.cost.measureWindow,
   });
+  bindEditorHistoryAssets(history, assets);
+  return history;
+}
+
+function bindEditorHistoryAssets(
+  history: SnapshotHistory<string>,
+  assets: EditorHistoryAssets
+): void {
   historyAssets.set(history, assets);
   assets.deferred = createDeferredEditorHistory({
     revision: () => history.getRevision(),
@@ -262,8 +154,100 @@ export function createEditorSnapshotHistory(
       pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => document });
     },
     schedule: scheduleEditorHistoryAfterPaint,
-    maxPending: limits.maxActions,
+    maxPending: assets.actionLimit,
   });
+}
+
+/** Captures a ready graph without encoding pending work or expanding media and past documents. */
+export function captureEditorHistoryCheckpoint(
+  history: SnapshotHistory<string> | null
+): EditorImageHistoryCheckpoint | null {
+  const assets = history && historyAssets.get(history);
+  if (!history || !assets || assets.deferred?.getCount()) return null;
+  return {
+    version: 1,
+    epoch: assets.epoch,
+    cursor: history.getState().index,
+    snapshots: history.getSnapshots(),
+    values: [...assets.byToken].map(([id, value]) => ({
+      id,
+      value,
+      kind: assets.kindsByToken.get(id)!,
+    })),
+    actions: readEditorHistoryEntries(history).map((entry) =>
+      entry.action ? structuredClone(entry.action) : null
+    ),
+  };
+}
+
+/** Creates a new runtime lifetime only after its complete retained graph has been admitted. */
+export function restoreEditorHistoryCheckpoint(
+  value: unknown,
+  limits: Readonly<{ maxActions: number; maxBytes: number }> = IMAGE_EDITOR_HISTORY_LIMITS
+): SnapshotHistory<string> | null {
+  const admitted = parseEditorImageHistoryCheckpoint(value, limits);
+  if (!admitted) return null;
+  const { checkpoint, tokensBySnapshot, bytesByToken } = admitted;
+  const tokenBytes = new Map(bytesByToken);
+  const assets: EditorHistoryAssets = {
+    byValue: new Map(checkpoint.values.map((unit) => [unit.value, unit.id])),
+    byToken: new Map(checkpoint.values.map((unit) => [unit.id, unit.value])),
+    kindsByToken: new Map(checkpoint.values.map((unit) => [unit.id, unit.kind])),
+    bytesByToken: tokenBytes,
+    nextId: 0,
+    epoch: checkpoint.epoch,
+    // A new allocation namespace cannot reuse a retired ID from a previous writer lifetime.
+    allocationPrefix: `${IMAGE_HISTORY_VALUE_TOKEN_PREFIX}${crypto.randomUUID()}:`,
+    cost: createEditorHistoryCostIndex(tokenBytes),
+    actionLimit: limits.maxActions,
+    descriptions: new Map(),
+    actions: new Map(),
+  };
+  const identities = new Map<string, ReturnType<typeof describeEditorHistoryObject>>();
+  for (const unit of checkpoint.values)
+    if (unit.kind === 'json') {
+      const object: unknown = JSON.parse(unit.value);
+      identities.set(unit.id, describeEditorHistoryObject(unit.id, object));
+    }
+  for (const [index, snapshot] of checkpoint.snapshots.entries()) {
+    assets.cost.register(snapshot, tokensBySnapshot[index]!);
+    const metadata: unknown = JSON.parse(snapshot);
+    if (!isRecord(metadata)) return null;
+    const canvas: unknown =
+      typeof metadata['canvasJson'] === 'string' ? JSON.parse(metadata['canvasJson']) : null;
+    const objectTokens: unknown[] =
+      isRecord(canvas) && Array.isArray(canvas['objects']) ? canvas['objects'] : [];
+    if (Array.isArray(metadata['richShapes'])) {
+      const shapes: unknown[] = metadata['richShapes'];
+      objectTokens.push(...shapes);
+    }
+    const objects: EditorHistoryDescription['objects'] = [];
+    for (const token of objectTokens)
+      if (typeof token === 'string') {
+        const identity = identities.get(token);
+        if (identity) objects.push(identity);
+      }
+    delete metadata['canvasJson'];
+    delete metadata['richShapes'];
+    delete metadata['vectorDefinitions'];
+    assets.descriptions.set(snapshot, { objects, document: metadata });
+    const previous = checkpoint.snapshots[index - 1];
+    const action = checkpoint.actions[index];
+    if (previous && action) {
+      const actions = assets.actions.get(previous) ?? new Map<string, EditorHistoryAction>();
+      actions.set(snapshot, action);
+      assets.actions.set(previous, actions);
+    }
+  }
+  assets.cost.measure(checkpoint.snapshots);
+  const history = SnapshotHistory.restore(checkpoint.snapshots, checkpoint.cursor, {
+    limit: limits.maxActions + 1,
+    maxBytes: limits.maxBytes,
+    measureBytes: assets.cost.measure,
+    measureWindowBytes: assets.cost.measureWindow,
+  });
+  pruneEditorHistoryAssets(history, assets);
+  bindEditorHistoryAssets(history, assets);
   return history;
 }
 
@@ -396,7 +380,10 @@ function parseEditorSnapshotDocument(
   assets?: EditorHistoryAssets
 ): EditorDocument | null {
   try {
-    const parsed = decodeEditorSnapshot(value, assets);
+    const parsed = decodeEditorImageHistorySnapshot(
+      value,
+      assets ? (token) => assets.byToken.get(token) : undefined
+    );
     return isEditorHistoryDocument(parsed) ? parsed : null;
   } catch {
     return null;

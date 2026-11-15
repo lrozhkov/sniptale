@@ -11,3 +11,5 @@ export {
   resolveDefaultBorderPresetVisual,
 } from './highlighter-projection';
 export { hasSameEditorImageGeometry } from './image-geometry';
+export { isEditorDocument } from './guards';
+export { EDITOR_RASTER_BINARY_FIELDS } from './raster-state';
