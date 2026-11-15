@@ -180,6 +180,69 @@ function sourceSession(
   };
 }
 
+it('prepares and captures an independently decoded source with metadata and no native frame', async () => {
+  const f = sourceSession();
+  Object.defineProperty(f.video, 'readyState', { configurable: true, value: 1 });
+  const prepared = await f.prepare();
+  Object.defineProperty(f.video, 'readyState', { configurable: true, value: 0 });
+  expect(() => f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal)).toThrow();
+  Object.defineProperty(f.video, 'readyState', { configurable: true, value: 1 });
+  Object.defineProperty(f.video, 'seeking', { configurable: true, value: true });
+  expect(() => f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal)).toThrow();
+  expect(f.acquire).toHaveBeenCalledOnce();
+  Object.defineProperty(f.video, 'seeking', { configurable: true, value: false });
+  await f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal);
+  expect(f.acquire).toHaveBeenCalledTimes(2);
+  expect(io.decoded).toHaveBeenCalledOnce();
+  expect(io.legacy).not.toHaveBeenCalled();
+});
+
+it('retries an initially empty source when metadata arrives and removes that listener on disposal', async () => {
+  const f = sourceSession();
+  Object.defineProperty(f.video, 'readyState', { configurable: true, value: 0 });
+  await f.prepare().catch((error: unknown) => f.hooks.onError(error));
+  expect(f.acquire).not.toHaveBeenCalled();
+  const invalidate = io.scheduler.mock.results[0]!.value.invalidate;
+  vi.mocked(invalidate).mockClear();
+  Object.defineProperty(f.video, 'readyState', { configurable: true, value: 1 });
+  f.video.dispatchEvent(new Event('loadedmetadata'));
+  expect(invalidate).toHaveBeenCalledOnce();
+  const prepared = await f.prepare();
+  await f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal);
+  expect(io.decoded).toHaveBeenCalledOnce();
+  const remove = vi.spyOn(f.video, 'removeEventListener');
+  f.session.dispose();
+  expect(remove).toHaveBeenCalledWith('loadedmetadata', expect.any(Function));
+});
+
+it('requires a native current frame for preparation and direct HTML capture without source decoding', async () => {
+  const f = sourceSession();
+  vi.stubGlobal('VideoDecoder', undefined);
+  Object.defineProperty(f.video, 'readyState', { configurable: true, value: 1 });
+  await expect(f.prepare()).rejects.toThrow();
+  expect(io.legacy).not.toHaveBeenCalled();
+  Object.defineProperty(f.video, 'readyState', { configurable: true, value: 2 });
+  const prepared = await f.prepare();
+  Object.defineProperty(f.video, 'readyState', { configurable: true, value: 1 });
+  expect(() => f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal)).toThrow();
+  expect(io.legacy).not.toHaveBeenCalled();
+  Object.defineProperty(f.video, 'readyState', { configurable: true, value: 2 });
+  f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal);
+  expect(io.legacy).toHaveBeenCalledOnce();
+  expect(f.acquire).not.toHaveBeenCalled();
+});
+
+it('uses the independent HTML provider at metadata when precise decoding is unsupported', async () => {
+  const f = sourceSession();
+  Object.defineProperty(f.video, 'readyState', { configurable: true, value: 1 });
+  f.acquire.mockResolvedValue(null);
+  const prepared = await f.prepare();
+  await f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal);
+  expect(f.htmlAcquire).toHaveBeenCalledTimes(2);
+  expect(io.decoded).toHaveBeenCalledOnce();
+  expect(io.legacy).not.toHaveBeenCalled();
+});
+
 it('freezes the source/result clock pair before decoded acquisition and reuses the session provider', async () => {
   const f = sourceSession();
   const prepared = await f.prepare();

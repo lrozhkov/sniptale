@@ -148,9 +148,11 @@ function ReviewPlaybackClock(props: { time: number; duration: number }) {
   const readout = useRef<HTMLSpanElement>(null);
   const label = (time: number) => `${playbackTime(time)} / ${playbackTime(props.duration)}`;
   const update = useCallback(() => {
-    if (!clock?.isPlaying() || !readout.current) return;
+    const text = readout.current?.firstChild;
+    if (!clock?.isPlaying() || !(text instanceof Text)) return;
     const value = `${playbackTime(clock.read())} / ${playbackTime(props.duration)}`;
-    if (readout.current.textContent !== value) readout.current.textContent = value;
+    // Retain the text node: replacing it causes structural style invalidation each frame.
+    if (text.nodeValue !== value) text.nodeValue = value;
   }, [clock, props.duration]);
   useLayoutEffect(() => clock?.subscribe(update), [clock, update]);
   // A late root commit must not replace the time of an already displayed frame.

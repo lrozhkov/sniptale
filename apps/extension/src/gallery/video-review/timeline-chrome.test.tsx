@@ -315,12 +315,17 @@ it('updates the clock from presented frames without a root render and rejects st
         </ReviewPlaybackPresentationClockContext.Provider>
       )
     );
+  const mutations = new MutationObserver(() => {});
   try {
     render(0);
     const readout = host.querySelector('.review-playback-clock-value')!;
+    const text = readout.firstChild;
+    expect(text).toBeInstanceOf(Text);
+    mutations.observe(readout, { subtree: true, characterData: true, childList: true });
     const count = renders;
     clock.publish(2.34);
     expect(readout.textContent).toBe('0:02.34 / 0:10.00');
+    expect(readout.firstChild).toBe(text);
     expect(renders).toBe(count);
     clock.publish(3.45);
     render(1);
@@ -331,7 +336,15 @@ it('updates the clock from presented frames without a root render and rejects st
     render(6);
     clock.publish(7);
     expect(readout.textContent).toBe('0:06.00 / 0:10.00');
+    expect(readout.firstChild).toBe(text);
+    expect(text?.isConnected).toBe(true);
+    const records = mutations.takeRecords();
+    expect(records.length).toBeGreaterThan(0);
+    expect(
+      records.every((record) => record.type === 'characterData' && record.target === text)
+    ).toBe(true);
   } finally {
+    mutations.disconnect();
     act(() => root.unmount());
     expect(() => clock.publish(8)).not.toThrow();
     host.remove();

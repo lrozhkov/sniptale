@@ -247,7 +247,12 @@ class ManualPresentationSession {
       this.latest().input.playing && this.video
         ? (this.latest().input.sourceToResult(this.video.currentTime) ?? request.time)
         : request.time;
-    if (!this.video || this.video.seeking || this.video.readyState < 2)
+    // Independent source providers need metadata, not a decoded frame from this HTML video.
+    if (
+      !this.video ||
+      this.video.seeking ||
+      this.video.readyState < (this.canDecodeSource() ? 1 : 2)
+    )
       throw new PendingPresentation();
     if (this.canDecodeSource() && !this.sourceReady)
       await this.prepareSource(
@@ -300,7 +305,12 @@ class ManualPresentationSession {
 
   private capture = (prepared: Prepared, time: number, signal: AbortSignal) => {
     const video = this.video;
-    if (!this.current || !video || video.seeking || video.readyState < 2)
+    if (
+      !this.current ||
+      !video ||
+      video.seeking ||
+      video.readyState < (this.canDecodeSource() ? 1 : 2)
+    )
       throw new PendingPresentation();
     this.resultTime = time;
     const transition = this.latest().cut.read(time);
@@ -609,7 +619,7 @@ class ManualPresentationSession {
   };
 
   private connectSources() {
-    for (const event of ['loadeddata', 'seeked', 'timeupdate'])
+    for (const event of ['loadedmetadata', 'loadeddata', 'seeked', 'timeupdate'])
       this.video?.addEventListener(event, this.ready);
     this.video?.addEventListener('seeking', this.seeking);
     this.connectCamera();
@@ -807,7 +817,7 @@ class ManualPresentationSession {
     this.cancelSourceFrameCallback();
     this.scheduler.dispose();
     this.resetSource();
-    for (const event of ['loadeddata', 'seeked', 'timeupdate'])
+    for (const event of ['loadedmetadata', 'loadeddata', 'seeked', 'timeupdate'])
       this.video?.removeEventListener(event, this.ready);
     this.video?.removeEventListener('seeking', this.seeking);
     this.cameraSource?.dispose();
