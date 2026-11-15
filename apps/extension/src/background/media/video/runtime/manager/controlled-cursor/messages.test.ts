@@ -102,3 +102,11 @@ it('closes a navigation observation without declaring the recording stopped', as
     boundaryReason: 'observation',
   });
 });
+
+it('propagates a refused final history flush instead of treating it as empty telemetry', async () => {
+  sendTabMessageMock.mockResolvedValueOnce({
+    success: false,
+    error: 'RECORDING_HISTORY_FLUSH_FAILED',
+  });
+  await expect(disableControlledCursorCapture(7)).rejects.toThrow('RECORDING_HISTORY_FLUSH_FAILED');
+});

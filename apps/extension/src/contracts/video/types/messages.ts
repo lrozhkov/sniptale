@@ -36,22 +36,21 @@ export type * from '@sniptale/runtime-contracts/video/types/messages.control';
 export type * from './messages.export.ts';
 export type * from './messages.offscreen.ts';
 
+/** Exactly one inline, streaming, or final-batch payload reaches the native source owner. */
+export type RecordingObservationPayload =
+  | {
+      telemetry: RecordingTelemetrySnapshot;
+      cursorPacket?: never;
+      eventPacket?: never;
+      cursorPackets?: never;
+      eventPackets?: never;
+    }
+  | import('../observation-payload').RecordingBlockObservationPayload;
+
 export type RecordingObservationsMessage = {
   type: typeof VideoMessageType.RECORDING_OBSERVATIONS;
   recordingId: string;
-} & (
-  | { telemetry: RecordingTelemetrySnapshot; cursorPacket?: never; eventPacket?: never }
-  | {
-      cursorPacket: import('../cursor-observations').RecordingCursorObservationPacket;
-      telemetry?: never;
-      eventPacket?: never;
-    }
-  | {
-      eventPacket: import('../event-observations').RecordingEventObservationPacket;
-      telemetry?: never;
-      cursorPacket?: never;
-    }
-);
+} & RecordingObservationPayload;
 
 export type VideoRuntimeMessage =
   | RecordingObservationsMessage

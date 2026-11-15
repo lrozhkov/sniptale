@@ -1,3 +1,4 @@
+import { isFinalObservationBatch } from './observation-batches';
 import {
   hasExactKeys,
   isNumber,
@@ -24,6 +25,9 @@ export interface RecordingEventObservationPacket {
   version: 1;
   recordingId: string;
   batchSequence: number;
+  /** Stable producer instance. Legacy packets omit this field. */
+  sourceInstanceId?: string;
+  /** Observation phase identity, which can change on Resume. */
   sourceClockId: string;
   clockRevision: number;
   clock: CursorTrajectorySegment['clock'];
@@ -48,6 +52,7 @@ export function isRecordingEventObservationPacket(
       'clock',
       'viewport',
       'records',
+      ...(Object.hasOwn(value, 'sourceInstanceId') ? ['sourceInstanceId'] : []),
     ])
   )
     return false;
@@ -57,6 +62,7 @@ export function isRecordingEventObservationPacket(
     value['version'] !== 1 ||
     !identifier(value['recordingId']) ||
     !identifier(value['sourceClockId']) ||
+    (Object.hasOwn(value, 'sourceInstanceId') && !identifier(value['sourceInstanceId'])) ||
     !isTrajectoryInteger(value['batchSequence']) ||
     !isTrajectoryInteger(value['clockRevision']) ||
     !isCursorTrajectoryClock(value['clock']) ||
@@ -97,4 +103,25 @@ export function isRecordingEventObservationPacket(
   return (
     new TextEncoder().encode(JSON.stringify(value)).byteLength <= RECORDING_EVENTS_PACKET_MAX_BYTES
   );
+}
+
+/** Validates a bounded final packet batch from one producer incarnation. */
+export function isFinalRecordingEventPackets(
+  value: unknown
+): value is RecordingEventObservationPacket[] {
+  if (
+    !isFinalObservationBatch(
+      value,
+      isRecordingEventObservationPacket,
+      RECORDING_EVENTS_INPUT_QUEUE_CAPACITY + RECORDING_EVENTS_PACKET_MAX_RECORDS + 2
+    )
+  )
+    return false;
+  let previous: number | null = null;
+  for (const packet of value)
+    for (const record of packet.records) {
+      if (previous !== null && record.recordSeq !== previous + 1) return false;
+      previous = record.recordSeq;
+    }
+  return true;
 }

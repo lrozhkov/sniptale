@@ -95,6 +95,17 @@ function handleEnableControlledCursorCaptureMessage(
   return false;
 }
 
+async function flushDisabledHistory(flush: () => Promise<boolean>): Promise<boolean> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      if (await flush()) return true;
+    } catch {
+      // The source retains the exact packet for one final retry after transport failure.
+    }
+  }
+  return false;
+}
+
 function handleDisableControlledCursorCaptureMessage(
   message: Extract<ViewportMessage, { type: VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE }>,
   sendResponse: ResponseSender
@@ -104,10 +115,17 @@ function handleDisableControlledCursorCaptureMessage(
     ? disableVideoTelemetry(message.boundaryReason)
     : disableVideoTelemetry();
   if (message.cursorTrajectoryMode === 'blocks' || message.recordingEventsMode === 'blocks') {
-    void Promise.all([flushVideoTelemetryCursor(), flushVideoTelemetryEvents()]).then(
-      () => sendResponse({ success: true, ...(telemetry ? { telemetry } : {}) }),
-      () => sendResponse({ success: true, ...(telemetry ? { telemetry } : {}) })
-    );
+    void Promise.all([
+      flushDisabledHistory(flushVideoTelemetryCursor),
+      flushDisabledHistory(flushVideoTelemetryEvents),
+    ]).then((delivered) => {
+      const success = delivered.every(Boolean);
+      sendResponse({
+        success,
+        ...(!success ? { error: 'RECORDING_HISTORY_FLUSH_FAILED' } : {}),
+        ...(telemetry ? { telemetry } : {}),
+      });
+    });
     return true;
   }
   sendResponse(telemetry ? { success: true, telemetry } : { success: true });

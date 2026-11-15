@@ -32,56 +32,81 @@ it('projects a closed source binding without command capabilities or envelopes',
   expect(JSON.stringify(reply.mock.calls[0]![0])).not.toContain('PRIVATE_CAPABILITY');
 });
 
-it('routes event observations to the bound event owner without exposing the capability', async () => {
-  const clock = {
-    source: 'dom-event-time' as const,
-    timestampQuantumUs: null,
-    resolutionBoundUs: null,
-    mappingUncertaintyUs: null,
-  };
-  const eventPacket = {
-    version: 1 as const,
-    recordingId: 'r',
-    batchSequence: 0,
-    sourceClockId: 'phase',
-    clockRevision: 0,
-    clock,
-    viewport: {
-      width: 1280,
-      height: 720,
-      devicePixelRatio: 1,
-      visualViewportScale: 1,
-      visualViewportOffsetX: 0,
-      visualViewportOffsetY: 0,
-    },
-    records: [
-      {
-        kind: 'segment' as const,
-        recordSeq: 0,
-        segmentId: 0,
-        activeTimeUs: 0,
-        clock,
-        reason: 'start' as const,
+it.each([false, true])(
+  'routes event observations final=%s without exposing the capability',
+  async (final) => {
+    const clock = {
+      source: 'dom-event-time' as const,
+      timestampQuantumUs: null,
+      resolutionBoundUs: null,
+      mappingUncertaintyUs: null,
+    };
+    const eventPacket = {
+      version: 1 as const,
+      recordingId: 'r',
+      batchSequence: 0,
+      sourceClockId: 'phase',
+      clockRevision: 0,
+      clock,
+      viewport: {
+        width: 1280,
+        height: 720,
+        devicePixelRatio: 1,
+        visualViewportScale: 1,
+        visualViewportOffsetX: 0,
+        visualViewportOffsetY: 0,
       },
-    ],
-  };
-  mocks.events.mockResolvedValue(undefined);
-  const binding = { recordingId: 'r', generation: 1, streamInstanceId: 's' };
-  const reply = vi.fn();
-  const result = await handleOffscreenRuntimeMessage(
-    {
-      type: VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS,
-      ...binding,
-      nativeDocumentId: 'native-document',
-      eventPacket,
-      capabilityToken: 'PRIVATE_CAPABILITY',
-    },
-    reply
-  );
-  expect(mocks.events).toHaveBeenCalledWith(binding, eventPacket, 'native-document');
-  expect(mocks.cursor).not.toHaveBeenCalled();
-  expect(reply).not.toHaveBeenCalled();
-  expect(
-    buildOffscreenCommandResponse(VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS, result)
-  ).toEqual({ success: true, result: 'accepted' });
-});
+      records: [
+        {
+          kind: 'segment' as const,
+          recordSeq: 0,
+          segmentId: 0,
+          activeTimeUs: 0,
+          clock,
+          reason: 'start' as const,
+        },
+      ],
+    };
+    const eventPackets = [
+      {
+        ...eventPacket,
+        records: [
+          ...eventPacket.records,
+          {
+            kind: 'boundary' as const,
+            reason: 'stop' as const,
+            recordSeq: 1,
+            segmentId: 0,
+            activeTimeUs: 1,
+          },
+        ],
+      },
+    ];
+    mocks.events.mockResolvedValue(undefined);
+    const binding = { recordingId: 'r', generation: 1, streamInstanceId: 's' };
+    const reply = vi.fn();
+    const result = await handleOffscreenRuntimeMessage(
+      {
+        type: VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS,
+        ...binding,
+        nativeDocumentId: 'native-document',
+        ...(final ? { eventPackets } : { eventPacket }),
+        capabilityToken: 'PRIVATE_CAPABILITY',
+      },
+      reply
+    );
+    if (final)
+      expect(mocks.events).toHaveBeenLastCalledWith(
+        binding,
+        eventPackets,
+        'native-document',
+        'final'
+      );
+    else expect(mocks.events).toHaveBeenLastCalledWith(binding, eventPacket, 'native-document');
+    expect(mocks.cursor).not.toHaveBeenCalled();
+    expect(reply).not.toHaveBeenCalled();
+    expect(
+      buildOffscreenCommandResponse(VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS, result)
+    ).toEqual({ success: true, result: 'accepted' });
+  }
+);

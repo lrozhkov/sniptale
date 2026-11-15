@@ -185,6 +185,8 @@ describe('bounded browser cursor source', () => {
     source.sample(moment(2, 'phase-1'), point);
     await source.flush();
     expect(packets).toHaveLength(3);
+    expect(packets[0]?.sourceInstanceId).toEqual(expect.any(String));
+    expect(new Set(packets.map((packet) => packet.sourceInstanceId)).size).toBe(1);
     expect(packets.map((packet) => [packet.sourceClockId, packet.viewport.width])).toEqual([
       ['phase-0', 1920],
       ['phase-0', 1280],

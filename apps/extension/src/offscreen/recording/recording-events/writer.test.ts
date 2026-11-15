@@ -53,6 +53,7 @@ function packet(
     version: 1,
     recordingId: fixture.recordingId,
     sourceClockId: 'phase',
+    sourceInstanceId: 'producer',
     batchSequence,
     clockRevision,
     clock,
@@ -361,4 +362,125 @@ it('includes a delayed Pause before confirming a paused Stop at the drain deadli
   const records = await read();
   expect(records.at(-1)).toMatchObject({ kind: 'boundary', reason: 'pause' });
   expect(records.filter((record) => record.kind === 'segment')).toHaveLength(1);
+});
+
+it('persists a closing batch once across lost acknowledgements and late scalar retries', async () => {
+  const { writer, read } = await setup();
+  const whole = simple();
+  const first = { ...whole, records: whole.records.slice(0, 2) };
+  const last = { ...whole, batchSequence: 1, records: whole.records.slice(2) };
+  await writer.append(first, 'document');
+  await writer.appendFinal([first, last], 'document');
+  await writer.appendFinal([first, last], 'document');
+  await writer.append(first, 'document');
+  expect((await writer.finish()).state).toBe('complete');
+  expect(
+    (await read()).filter((record) => record.kind === 'boundary' && record.reason === 'stop')
+  ).toHaveLength(1);
+});
+
+it('admits a fresh clock incarnation of the same document after a confirmed visibility boundary', async () => {
+  const { writer } = await setup();
+  const whole = simple();
+  const end = whole.records.at(-1)!;
+  if (end.kind !== 'boundary') throw new Error('Missing boundary');
+  await writer.appendFinal(
+    [{ ...whole, records: [...whole.records.slice(0, -1), { ...end, reason: 'visibility' }] }],
+    'document'
+  );
+  await writer.appendFinal(
+    [
+      {
+        ...whole,
+        sourceClockId: 'returned-clock',
+        sourceInstanceId: 'returned-producer',
+        records: [whole.records[0]!, click('click-b', 1, 100000), whole.records[2]!],
+      },
+    ],
+    'document'
+  );
+  expect((await writer.finish()).state).toBe('complete');
+});
+
+it('keeps the durable history complete when a restored old producer retries before fresh Enable', async () => {
+  const { writer, read } = await setup();
+  const deliver = async (
+    value: RecordingEventObservationPacket,
+    document: string,
+    closing: boolean
+  ) => {
+    await (closing ? writer.appendFinal([value], document) : writer.append(value, document));
+  };
+  const first = packet([source[0]!, click('a', 1, 100000)]);
+  const closing = packet(
+    [{ kind: 'boundary', recordSeq: 2, segmentId: 0, activeTimeUs: 200000, reason: 'visibility' }],
+    1
+  );
+  await deliver(first, 'native-A', false);
+  await deliver(closing, 'native-A', true);
+  // Canonical persistence succeeded, but A retains this closing batch after a lost response.
+  // A restarted background cannot bypass the surviving writer's retirement fence.
+  await deliver(
+    {
+      ...packet([
+        { ...source[0]!, activeTimeUs: 300000 },
+        click('b', 1, 350000),
+        {
+          kind: 'boundary',
+          recordSeq: 2,
+          segmentId: 0,
+          activeTimeUs: 400000,
+          reason: 'visibility',
+        },
+      ]),
+      sourceClockId: 'B-clock',
+    },
+    'native-B',
+    true
+  );
+  await expect(deliver(closing, 'native-A', true)).rejects.toThrow('SOURCE_UNAVAILABLE');
+
+  await deliver(
+    {
+      ...packet([
+        { ...source[0]!, activeTimeUs: 500000 },
+        click('fresh-a', 1, 550000),
+        { kind: 'boundary', recordSeq: 2, segmentId: 0, activeTimeUs: 600000, reason: 'stop' },
+      ]),
+      sourceClockId: 'A-fresh-clock',
+      sourceInstanceId: 'A-fresh-producer',
+    },
+    'native-A',
+    true
+  );
+  expect((await writer.finish()).state).toBe('complete');
+  expect((await read()).filter((record) => record.kind === 'action')).toHaveLength(3);
+});
+
+it('retains one producer sequence across Pause and Resume clock phases', async () => {
+  const { writer, read } = await setup();
+  await writer.append(
+    packet([
+      source[0]!,
+      click('before-pause', 1, 100000),
+      { kind: 'boundary', recordSeq: 2, segmentId: 0, activeTimeUs: 200000, reason: 'pause' },
+    ]),
+    'document'
+  );
+  await writer.append(
+    {
+      ...packet(
+        [
+          { ...source[0]!, recordSeq: 3, segmentId: 1, activeTimeUs: 300000, reason: 'resume' },
+          click('after-resume', 4, 350000, 1),
+          { kind: 'boundary', recordSeq: 5, segmentId: 1, activeTimeUs: 400000, reason: 'stop' },
+        ],
+        1
+      ),
+      sourceClockId: 'resume-phase',
+    },
+    'document'
+  );
+  expect((await writer.finish()).state).toBe('complete');
+  expect((await read()).filter((record) => record.kind === 'action')).toHaveLength(2);
 });

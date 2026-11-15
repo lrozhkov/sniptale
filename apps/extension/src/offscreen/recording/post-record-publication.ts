@@ -12,6 +12,26 @@ type PendingPublication = {
 };
 
 let pendingPublication: PendingPublication | null = null;
+const historyDrains = new Map<string, { completion: Promise<void> }>();
+
+/** Retains media publication until the bound Stop owner settles its browser histories. */
+export function delayPostRecordPublication(
+  recordingId: string,
+  drain: Promise<unknown>
+): () => void {
+  if (historyDrains.has(recordingId))
+    throw new Error('Recording history publication already has a drain owner.');
+  const owner = {
+    completion: drain.then(
+      () => undefined,
+      () => undefined
+    ),
+  };
+  historyDrains.set(recordingId, owner);
+  return () => {
+    if (historyDrains.get(recordingId) === owner) historyDrains.delete(recordingId);
+  };
+}
 
 export class PostRecordPublicationError extends Error {
   readonly result: VideoPostRecordResult;
@@ -70,6 +90,7 @@ async function publishPersistedResult(
   result: VideoPostRecordResult,
   messaging: PostRecordMessaging
 ): Promise<void> {
+  await historyDrains.get(result.recordingId)?.completion;
   if (!(await readExactPersistedResult(result))) {
     return;
   }

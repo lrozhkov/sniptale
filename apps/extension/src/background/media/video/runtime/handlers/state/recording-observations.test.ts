@@ -122,6 +122,32 @@ function bind(recordingId: string) {
   });
 }
 
+it('forwards the closed document batch through the background route', async () => {
+  bind('final-route');
+  const header = raw('final-route').cursorPacket;
+  const message = {
+    type: VideoMessageType.RECORDING_OBSERVATIONS,
+    recordingId: 'final-route',
+    cursorPackets: [
+      {
+        ...header,
+        records: [{ kind: 'boundary' as const, reason: 'stop' as const, activeTimeUs: 12345 }],
+      },
+    ],
+  };
+  const parse =
+    runtimeVideoSessionMessageContracts[VideoMessageType.RECORDING_OBSERVATIONS].parseRequest;
+  expect(parse(message)).toEqual(message);
+  expect(() => parse({ ...message, cursorPacket: header })).toThrow();
+  expect(() => parse({ ...message, recordingId: 'other' })).toThrow();
+  const response = vi.fn();
+  handleRecordingObservations(message, response, sender);
+  await vi.waitFor(() => expect(response).toHaveBeenCalledWith({ success: true }));
+  expect(owner.send).toHaveBeenCalledWith(
+    expect.objectContaining({ cursorPackets: message.cursorPackets, nativeDocumentId: 'document' })
+  );
+});
+
 it('forwards bounded raw packets with native source identity and current recording capability', async () => {
   bind('raw-forward');
   const message = raw('raw-forward');
@@ -380,7 +406,7 @@ it.each(outgoingSources)(
 );
 
 it.each(outgoingSources)(
-  'refuses an outgoing $kind ($documentLifecycle) packet queued behind successor admission',
+  'drains an outgoing $kind ($documentLifecycle) packet while successor admission waits',
   async ({ kind, documentLifecycle, frameId }) => {
     const recordingId = `outgoing-queued-${kind}-${documentLifecycle}`;
     bind(recordingId);
@@ -397,14 +423,11 @@ it.each(outgoingSources)(
       documentLifecycle,
       frameId,
     });
-    await vi.waitFor(() =>
-      expect(outgoing).toHaveBeenCalledWith({
-        success: false,
-        error: 'RECORDING_OBSERVATIONS_UNAVAILABLE',
-      })
-    );
-    expect(successor).toHaveBeenCalledWith({ success: true });
-    expect(owner.send).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(outgoing).toHaveBeenCalledWith({ success: true }));
+    await vi.waitFor(() => expect(successor).toHaveBeenCalledWith({ success: true }), {
+      timeout: 3000,
+    });
+    expect(owner.send).toHaveBeenCalledTimes(3);
   }
 );
 
@@ -448,7 +471,9 @@ it.each(outgoingSources)(
     owner.frames.mockResolvedValue([{ frameId: 0, documentId: 'successor' }]);
     const successor = vi.fn();
     handleRecordingObservations(message, successor, { ...sender, documentId: 'successor' });
-    await vi.waitFor(() => expect(successor).toHaveBeenCalledWith({ success: true }));
+    await vi.waitFor(() => expect(successor).toHaveBeenCalledWith({ success: true }), {
+      timeout: 3000,
+    });
     const outgoing = vi.fn();
     handleRecordingObservations(message, outgoing, {
       ...sender,

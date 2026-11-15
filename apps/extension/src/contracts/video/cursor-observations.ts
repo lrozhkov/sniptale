@@ -1,3 +1,4 @@
+import { isFinalObservationBatch } from './observation-batches';
 import {
   hasExactKeys,
   isStringMember,
@@ -57,6 +58,9 @@ export interface RecordingCursorObservationPacket {
   version: 1;
   recordingId: string;
   batchSequence: number;
+  /** Stable producer instance. Legacy packets omit this field. */
+  sourceInstanceId?: string;
+  /** Observation phase identity, which can change on Resume. */
   sourceClockId: string;
   clockRevision: number;
   clock: CursorTrajectorySegment['clock'];
@@ -147,6 +151,7 @@ export function isRecordingCursorObservationPacket(
       'clock',
       'viewport',
       'records',
+      ...(Object.hasOwn(value, 'sourceInstanceId') ? ['sourceInstanceId'] : []),
     ])
   )
     return false;
@@ -158,6 +163,9 @@ export function isRecordingCursorObservationPacket(
     /^[A-Za-z0-9._:-]{1,128}$/.test(value['recordingId']) &&
     typeof value['sourceClockId'] === 'string' &&
     /^[A-Za-z0-9._:-]{1,128}$/.test(value['sourceClockId']) &&
+    (!Object.hasOwn(value, 'sourceInstanceId') ||
+      (typeof value['sourceInstanceId'] === 'string' &&
+        /^[A-Za-z0-9._:-]{1,128}$/.test(value['sourceInstanceId']))) &&
     isTrajectoryInteger(value['batchSequence']) &&
     isTrajectoryInteger(value['clockRevision']) &&
     isCursorTrajectoryClock(value['clock']) &&
@@ -183,5 +191,16 @@ export function isRecordingCursorObservationPacket(
   if (!shape) return false;
   return (
     new TextEncoder().encode(JSON.stringify(value)).byteLength <= RECORDING_CURSOR_PACKET_MAX_BYTES
+  );
+}
+
+/** Validates a bounded final packet batch from one producer incarnation. */
+export function isFinalRecordingCursorPackets(
+  value: unknown
+): value is RecordingCursorObservationPacket[] {
+  return isFinalObservationBatch(
+    value,
+    isRecordingCursorObservationPacket,
+    RECORDING_CURSOR_INPUT_QUEUE_CAPACITY + RECORDING_CURSOR_PACKET_MAX_RECORDS + 2
   );
 }

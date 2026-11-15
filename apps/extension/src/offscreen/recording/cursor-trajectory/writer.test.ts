@@ -79,6 +79,7 @@ function packet(
     recordingId: identity.recordingId,
     batchSequence,
     sourceClockId: 'clock-1',
+    sourceInstanceId: 'producer',
     clockRevision: 1,
     clock: {
       source: 'dom-event-time',
@@ -286,5 +287,38 @@ it('rejects malformed or unrelated packets before the valid source is affected',
     'INVALID_INPUT'
   );
   await writer.append(value, 'native-doc');
+  expect((await writer.finish()).state).toBe('complete');
+});
+
+it('persists a closing batch once across lost acknowledgements and late scalar retries', async () => {
+  const { writer, records } = await setup();
+  const first = packet([sample(0, 0, 100)]);
+  const last = packet([{ kind: 'boundary', activeTimeUs: 1000, reason: 'stop' }], 1);
+  await writer.append(first, 'doc');
+  await writer.appendFinal([first, last], 'doc');
+  await writer.appendFinal([first, last], 'doc');
+  await writer.append(first, 'doc');
+  expect((await writer.finish()).state).toBe('complete');
+  expect(
+    (await records()).filter((record) => record.kind === 'boundary' && record.reason === 'stop')
+  ).toHaveLength(1);
+});
+
+it('admits a fresh clock incarnation of the same document after a confirmed observation boundary', async () => {
+  const { writer } = await setup();
+  await writer.appendFinal(
+    [packet([sample(0, 0, 100), { kind: 'boundary', activeTimeUs: 1000, reason: 'observation' }])],
+    'doc'
+  );
+  await writer.appendFinal(
+    [
+      {
+        ...packet([sample(0, 2000, 100), { kind: 'boundary', activeTimeUs: 3000, reason: 'stop' }]),
+        sourceClockId: 'returned-clock',
+        sourceInstanceId: 'returned-producer',
+      },
+    ],
+    'doc'
+  );
   expect((await writer.finish()).state).toBe('complete');
 });

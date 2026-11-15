@@ -1,4 +1,4 @@
-export const CONTENT_RUNTIME_PROTOCOL_VERSION = 3 as const;
+export const CONTENT_RUNTIME_PROTOCOL_VERSION = 4 as const;
 
 export const VideoMessageType = {
   OPEN_VIDEO_RECORDER: 'OPEN_VIDEO_RECORDER',

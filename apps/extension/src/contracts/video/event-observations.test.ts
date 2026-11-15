@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import fixture from '../../features/video/project/recording-events/fixtures.json';
 import {
+  isFinalRecordingEventPackets,
   isRecordingEventObservationPacket,
   type RecordingEventObservationPacket,
 } from './event-observations';
@@ -115,4 +116,44 @@ it('bounds serialized bytes independently of record count', () => {
   expect(isRecordingEventObservationPacket(source)).toBe(false);
   source.records = source.records.slice(0, 1);
   expect(isRecordingEventObservationPacket(source)).toBe(true);
+});
+
+it('checks final packet identity, sequence, closed tail, and whole-batch bounds', () => {
+  const first = packet();
+  const last: RecordingEventObservationPacket = {
+    ...packet(),
+    batchSequence: 1,
+    records: [
+      {
+        kind: 'boundary',
+        recordSeq: first.records.at(-1)!.recordSeq + 1,
+        segmentId: 0,
+        activeTimeUs: 12345,
+        reason: 'stop',
+      },
+    ],
+  };
+  expect(isFinalRecordingEventPackets([first, last])).toBe(true);
+  const phased = [
+    { ...first, sourceInstanceId: 'producer' },
+    { ...last, sourceInstanceId: 'producer', sourceClockId: 'resume-phase' },
+  ];
+  expect(isFinalRecordingEventPackets(phased)).toBe(true);
+  expect(
+    isFinalRecordingEventPackets([phased[0], { ...phased[1], sourceInstanceId: 'other' }])
+  ).toBe(false);
+  expect(isRecordingEventObservationPacket({ ...first, sourceInstanceId: '' })).toBe(false);
+  expect(isRecordingEventObservationPacket({ ...first, sourceInstanceId: 3 })).toBe(false);
+  expect(isFinalRecordingEventPackets([])).toBe(false);
+  expect(isFinalRecordingEventPackets([{ ...first, records: first.records.slice(0, 1) }])).toBe(
+    false
+  );
+  expect(isFinalRecordingEventPackets([first, { ...last, recordingId: 'foreign' }])).toBe(false);
+  expect(isFinalRecordingEventPackets([first, { ...last, sourceClockId: 'other' }])).toBe(false);
+  expect(isFinalRecordingEventPackets([first, { ...last, batchSequence: 3 }])).toBe(false);
+  expect(
+    isFinalRecordingEventPackets(
+      Array.from({ length: 600 }, (_, i) => ({ ...last, batchSequence: i }))
+    )
+  ).toBe(false);
 });

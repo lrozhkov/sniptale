@@ -40,6 +40,7 @@ import {
 import { updateRecordingSettings as applyRecordingSettings } from './update-settings';
 import {
   PostRecordPublicationError,
+  delayPostRecordPublication,
   retryPendingPostRecordResult,
 } from './post-record-publication';
 import {
@@ -71,7 +72,8 @@ let recordingEvents: {
 export async function appendRecordingEventObservations(
   binding: RecordingSourceBinding,
   packet: unknown,
-  nativeDocumentId: string
+  nativeDocumentId: string,
+  mode: 'packet' | 'final' = 'packet'
 ): Promise<void> {
   assertActiveRecordingBinding(binding);
   const source = recordingEvents;
@@ -83,18 +85,21 @@ export async function appendRecordingEventObservations(
     await writer.discard();
     throw new Error('Event recording binding is unavailable');
   }
-  await writer.append(packet, nativeDocumentId);
+  if (mode === 'final') await writer.appendFinal(packet, nativeDocumentId);
+  else await writer.append(packet, nativeDocumentId);
 }
 
 export async function appendRecordingCursorObservations(
   binding: RecordingSourceBinding,
   packet: unknown,
-  nativeDocumentId: string
+  nativeDocumentId: string,
+  mode: 'packet' | 'final' = 'packet'
 ): Promise<void> {
   assertActiveRecordingBinding(binding);
   if (!cursorTrajectory || !matchesRecordingFrameClockBinding(binding, cursorTrajectory.binding))
     throw new Error('Cursor recording source is unavailable');
-  await cursorTrajectory.writer.append(packet, nativeDocumentId);
+  if (mode === 'final') await cursorTrajectory.writer.appendFinal(packet, nativeDocumentId);
+  else await cursorTrajectory.writer.append(packet, nativeDocumentId);
 }
 let pendingDataPreparation: {
   binding: RecordingSourceBinding;
@@ -494,6 +499,59 @@ async function retryPostRecordPublication(stopRequested: boolean): Promise<strin
   return recordingId;
 }
 
+type BrowserHistoryOutcome = Pick<
+  Extract<RecordingStopOutcome, { result: 'stopped' }>,
+  'cursorTrajectory' | 'recordingEvents'
+>;
+
+async function finishBrowserRecordingHistories(
+  binding: RecordingSourceBinding,
+  discard: boolean,
+  stoppedWhilePaused: boolean,
+  waitForSourceStop: boolean
+): Promise<BrowserHistoryOutcome> {
+  const history: BrowserHistoryOutcome = {};
+  const cursor = cursorTrajectory;
+  if (cursor && matchesRecordingFrameClockBinding(cursor.binding, binding)) {
+    try {
+      if (discard) await cursor.writer.discard();
+      else {
+        const descriptor = await cursor.writer.finish({
+          waitForSourceStop,
+          stoppedWhilePaused,
+        });
+        history.cursorTrajectory = descriptor;
+      }
+      if (cursorTrajectory === cursor) cursorTrajectory = null;
+    } catch (error) {
+      if (discard) throw error;
+      logger.warn('Cursor trajectory finalization failed; stored prefix retained');
+    }
+  }
+  const events = recordingEvents;
+  if (events && matchesRecordingFrameClockBinding(events.binding, binding)) {
+    try {
+      if (events.writer) {
+        const writer = await events.writer;
+        if (discard) await writer.discard();
+        else {
+          const descriptor = await writer.finish({
+            waitForSourceStop,
+            stoppedWhilePaused,
+          });
+          history.recordingEvents = descriptor;
+        }
+      }
+    } catch (error) {
+      if (discard) throw error;
+      logger.warn('Event finalization failed; stored prefix retained');
+    } finally {
+      if (recordingEvents === events) recordingEvents = null;
+    }
+  }
+  return history;
+}
+
 export function stopRecording(
   binding: RecordingSourceBinding,
   discard = false
@@ -523,48 +581,23 @@ export function stopRecording(
   }
 
   const stoppedWhilePaused = recordingContext.artifactSession?.state === 'paused';
+  // Stop the media immediately while both history sources can still finish under their lease.
+  const histories = discard
+    ? null
+    : finishBrowserRecordingHistories(binding, false, stoppedWhilePaused, true);
+  const releasePublication = histories
+    ? delayPostRecordPublication(binding.recordingId, histories)
+    : () => {};
   const work = stopRecordingOnce(discard)
     .then(async (outcome): Promise<RecordingStopOutcome> => {
-      const cursor = cursorTrajectory;
-      if (cursor && matchesRecordingFrameClockBinding(cursor.binding, binding)) {
-        try {
-          if (discard) await cursor.writer.discard();
-          else {
-            const descriptor = await cursor.writer.finish({
-              waitForSourceStop: outcome.result === 'stopped',
-              stoppedWhilePaused,
-            });
-            if (outcome.result === 'stopped')
-              outcome = { ...outcome, cursorTrajectory: descriptor };
-          }
-          if (cursorTrajectory === cursor) cursorTrajectory = null;
-        } catch (error) {
-          if (discard) throw error;
-          logger.warn('Cursor trajectory finalization failed; stored prefix retained');
-        }
-      }
-      const events = recordingEvents;
-      if (events && matchesRecordingFrameClockBinding(events.binding, binding)) {
-        try {
-          if (events.writer) {
-            const writer = await events.writer;
-            if (discard) await writer.discard();
-            else {
-              const descriptor = await writer.finish({
-                waitForSourceStop: outcome.result === 'stopped',
-                stoppedWhilePaused,
-              });
-              if (outcome.result === 'stopped')
-                outcome = { ...outcome, recordingEvents: descriptor };
-            }
-          }
-        } catch (error) {
-          if (discard) throw error;
-          logger.warn('Event finalization failed; stored prefix retained');
-        } finally {
-          if (recordingEvents === events) recordingEvents = null;
-        }
-      }
+      const history = await (histories ??
+        finishBrowserRecordingHistories(
+          binding,
+          discard,
+          stoppedWhilePaused,
+          outcome.result === 'stopped'
+        ));
+      if (outcome.result === 'stopped') outcome = { ...outcome, ...history };
       if (outcome.result === 'stopped' || !hasActiveRecordingSession())
         activeRecordingBinding = null;
       return outcome;
@@ -578,6 +611,7 @@ export function stopRecording(
       return outcome;
     });
   const tracked = work.finally(() => {
+    releasePublication();
     if (pendingRecordingStop === tracked) {
       pendingRecordingStop = null;
     }

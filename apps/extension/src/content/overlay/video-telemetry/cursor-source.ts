@@ -1,5 +1,7 @@
+import { createClosingObservationDrain } from './closing-batch';
 import {
   RECORDING_CURSOR_INPUT_QUEUE_CAPACITY,
+  isFinalRecordingCursorPackets,
   RECORDING_CURSOR_PACKET_MAX_RECORDS,
   type RecordingCursorObservation,
   type RecordingCursorObservationPacket,
@@ -27,7 +29,9 @@ export function createCursorObservationSource(options: {
   recordingId: string;
   project(moment: CursorSourceMoment): Projection;
   send(packet: RecordingCursorObservationPacket): Promise<void>;
+  sendFinal?(packets: RecordingCursorObservationPacket[]): Promise<void>;
 }) {
+  const sourceInstanceId = crypto.randomUUID();
   const queue: PendingRecord[] = [];
   let loss: PendingRecord | null = null;
   let terminal: PendingRecord | null = null;
@@ -117,6 +121,7 @@ export function createCursorObservationSource(options: {
     }
     return {
       version: 1,
+      sourceInstanceId,
       recordingId: options.recordingId,
       batchSequence: batchSequence++,
       sourceClockId: first.moment.sourceClockId,
@@ -158,7 +163,19 @@ export function createCursorObservationSource(options: {
     else queue.push(input);
     void pump();
   }
+  const flushClosing = options.sendFinal
+    ? createClosingObservationDrain({
+        inFlight: () => retry,
+        takeNext: packet,
+        isValid: isFinalRecordingCursorPackets,
+        send: options.sendFinal,
+      })
+    : pump;
   return {
+    flushClosing() {
+      closed = true;
+      return flushClosing();
+    },
     /** Set the initial calibration barrier before the browser can deliver another input task. */
     waitForCalibration(work: Promise<unknown>) {
       barrier = work.then(
@@ -185,7 +202,7 @@ export function createCursorObservationSource(options: {
     },
     /** A failed flush keeps its pending packet. The caller must report incomplete coverage. */
     async flush(): Promise<boolean> {
-      return pump();
+      return closed && options.sendFinal ? flushClosing() : pump();
     },
     close() {
       closed = true;

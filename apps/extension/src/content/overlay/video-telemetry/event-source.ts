@@ -1,8 +1,10 @@
+import { createClosingObservationDrain } from './closing-batch';
 import {
   RECORDING_EVENTS_INPUT_QUEUE_CAPACITY,
   RECORDING_EVENTS_PACKET_MAX_BYTES,
   RECORDING_EVENTS_PACKET_MAX_RECORDS,
   isRecordingEventObservationPacket,
+  isFinalRecordingEventPackets,
   type RecordingEventObservationPacket,
 } from '../../../contracts/video/event-observations';
 import {
@@ -55,7 +57,9 @@ export function createRecordingEventSource(options: {
   recordingId: string;
   project(moment: EventSourceMoment): Projection;
   send(packet: RecordingEventObservationPacket): Promise<void>;
+  sendFinal?(packets: RecordingEventObservationPacket[]): Promise<void>;
 }) {
+  const sourceInstanceId = crypto.randomUUID();
   const queue: Pending[] = [];
   let pendingProtected: Pending | null = null;
   let loss: Pending | null = null;
@@ -216,6 +220,7 @@ export function createRecordingEventSource(options: {
     ]);
     const header = {
       version: 1 as const,
+      sourceInstanceId,
       recordingId: options.recordingId,
       batchSequence: batch,
       sourceClockId: first.moment.sourceClockId,
@@ -274,16 +279,29 @@ export function createRecordingEventSource(options: {
         return false;
       }
     })();
-    running = work;
-    void work.then((drained) => {
-      if (running !== work) return;
+    const completion = work.then((drained) => {
+      if (running !== completion) return drained;
       running = null;
-      if (drained && (queue.length || loss || terminal)) void pump();
+      return drained && (queue.length || loss || terminal) ? pump() : drained;
     });
-    return work;
+    running = completion;
+    return completion;
   }
+  const flushClosing = options.sendFinal
+    ? createClosingObservationDrain({
+        inFlight: () => retry,
+        takeNext: packet,
+        isValid: isFinalRecordingEventPackets,
+        send: options.sendFinal,
+      })
+    : pump;
   return {
     open,
+    flushClosing() {
+      flushProtected();
+      closed = true;
+      return flushClosing();
+    },
     emit(moment: EventSourceMoment, fact: RecordingEventSourceFact): boolean {
       if (closed || failed || paused) return false;
       const isProtected =
@@ -382,7 +400,7 @@ export function createRecordingEventSource(options: {
         () => undefined
       );
     },
-    flush: () => pump(),
+    flush: () => (closed && options.sendFinal ? flushClosing() : pump()),
     close() {
       flushProtected();
       closed = true;

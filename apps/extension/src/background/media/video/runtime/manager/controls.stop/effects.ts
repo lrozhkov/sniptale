@@ -23,7 +23,6 @@ import {
   getControlledCursorTelemetry,
   getVideoRecordingId,
   isControlledCursorCaptureEnabled,
-  isControlledCursorNavigationPending,
 } from '../../../session-state';
 import { disableControlledCursorCapture } from '../controlled-cursor/messages';
 import {
@@ -92,12 +91,10 @@ function collectAndPersistTelemetry(
   const captureEnabled = isControlledCursorCaptureEnabled();
   const cursorMode = resolvePersistedCursorCaptureMode();
   const priorTelemetry = getControlledCursorTelemetry();
-  const navigationPending = isControlledCursorNavigationPending();
   const collection = (async () => {
     if (!tabId) return null;
     const telemetryPromise = collectTelemetrySnapshot(tabId, mode, failureLogger, {
       priorTelemetry,
-      navigationPending,
       captureEnabled,
     });
     const surface = getVideoRecordingSurfaceLeaseSnapshot();
@@ -239,7 +236,6 @@ async function collectTelemetrySnapshot(
   failureLogger: StopFailureLogger,
   frozen: {
     priorTelemetry: ReturnType<typeof getControlledCursorTelemetry>;
-    navigationPending: boolean;
     captureEnabled: boolean;
   }
 ): Promise<ReturnType<typeof getControlledCursorTelemetry> | null> {
@@ -247,15 +243,13 @@ async function collectTelemetrySnapshot(
     return null;
   }
 
-  if (!frozen.navigationPending) {
-    try {
-      const segment = await disableControlledCursorCapture(tabId);
-      return segment === null
-        ? frozen.priorTelemetry
-        : mergeTelemetrySnapshots(frozen.priorTelemetry, segment);
-    } catch (error) {
-      failureLogger.warn('Failed to disable controlled cursor capture during stop', error);
-    }
+  try {
+    const segment = await disableControlledCursorCapture(tabId);
+    return segment === null
+      ? frozen.priorTelemetry
+      : mergeTelemetrySnapshots(frozen.priorTelemetry, segment);
+  } catch (error) {
+    failureLogger.warn('Failed to disable controlled cursor capture during stop', error);
   }
 
   return frozen.priorTelemetry;

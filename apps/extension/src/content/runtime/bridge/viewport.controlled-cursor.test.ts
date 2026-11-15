@@ -107,8 +107,8 @@ it('enables the bounded cursor source and keeps Disable open until its last pack
   let release!: () => void;
   flushVideoTelemetryCursor.mockImplementationOnce(
     () =>
-      new Promise<void>((resolve) => {
-        release = resolve;
+      new Promise<boolean>((resolve) => {
+        release = () => resolve(true);
       })
   );
   disableVideoTelemetry.mockReturnValueOnce(null);
@@ -130,7 +130,7 @@ it('enables the bounded cursor source and keeps Disable open until its last pack
   release();
   await Promise.resolve();
   await Promise.resolve();
-  expect(sendResponse).toHaveBeenCalledWith({ success: true });
+  await vi.waitFor(() => expect(sendResponse).toHaveBeenCalledWith({ success: true }));
 });
 
 it('routes controlled cursor bootstrap through the telemetry owner without page annotations', () => {
@@ -275,7 +275,7 @@ it('keeps events-only Disable open until its last event packet settles', async (
   drained.resolve(true);
   await Promise.resolve();
   await Promise.resolve();
-  expect(sendResponse).toHaveBeenCalledExactlyOnceWith({ success: true });
+  await vi.waitFor(() => expect(sendResponse).toHaveBeenCalledExactlyOnceWith({ success: true }));
 });
 
 it('validates independent event block mode at the tab boundary', () => {
@@ -305,4 +305,40 @@ it('validates independent event block mode at the tab boundary', () => {
       recordingEventsMode: 'thin-4096',
     })
   ).toThrow();
+});
+
+it('reports permanent terminal delivery failure rather than acknowledging history flush', async () => {
+  flushVideoTelemetryEvents.mockResolvedValue(false);
+  flushVideoTelemetryCursor.mockResolvedValue(true);
+  disableVideoTelemetry.mockReturnValue(null);
+  const response = vi.fn();
+  handleViewportMessage(
+    { type: VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE, recordingEventsMode: 'blocks' },
+    response,
+    createViewportInfo,
+    createRegionSelectorController()
+  );
+  await vi.waitFor(() =>
+    expect(response).toHaveBeenCalledWith({
+      success: false,
+      error: 'RECORDING_HISTORY_FLUSH_FAILED',
+    })
+  );
+});
+
+it('retries one failed final event flush without disabling the source again', async () => {
+  flushVideoTelemetryEvents.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+  flushVideoTelemetryCursor.mockResolvedValue(true);
+  disableVideoTelemetry.mockReturnValue(null);
+  const response = vi.fn();
+  handleViewportMessage(
+    { type: VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE, recordingEventsMode: 'blocks' },
+    response,
+    createViewportInfo,
+    createRegionSelectorController()
+  );
+  await vi.waitFor(() => expect(response).toHaveBeenCalledWith({ success: true }));
+  expect(disableVideoTelemetry).toHaveBeenCalledOnce();
+  expect(flushVideoTelemetryEvents).toHaveBeenCalledTimes(2);
+  expect(flushVideoTelemetryCursor).toHaveBeenCalledOnce();
 });

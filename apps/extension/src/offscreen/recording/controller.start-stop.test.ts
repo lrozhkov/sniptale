@@ -903,7 +903,12 @@ it.each([false, true])(
     ).rejects.toThrow('Stale');
     const stopped = controller.stopRecording(sourceBinding, discard);
     await vi.waitFor(() => expect(stopRecorder).toHaveBeenCalledOnce());
-    recordingContext.stopRecordingResolve?.();
+    try {
+      if (!discard) expect(eventsMocks.finish).toHaveBeenCalledOnce();
+    } finally {
+      recordingContext.stopRecordingResolve?.();
+      await stopped;
+    }
     const outcome = await stopped;
     if (discard) {
       expect(outcome).not.toHaveProperty('recordingEvents');

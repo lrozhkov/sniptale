@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import http from 'node:http';
+import { decodeRecordingEventsBlock } from '../../../../apps/extension/src/features/video/project/recording-events/blocks';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
 import {
@@ -39,17 +40,21 @@ async function historyStates(page: import('@playwright/test').Page, recordingId:
   }, recordingId);
 }
 
-for (const loadingResource of [
-  'image',
-  'pre-body-script',
-  'pre-body-script-and-image',
-  'destination-response',
+for (const [loadingResource, stopDuringNavigation] of [
+  ['image', false],
+  ['pre-body-script', false],
+  ['pre-body-script-and-image', false],
+  ['destination-response', false],
+  ['image', true],
 ] as const) {
-  test(`TAB history resumes around ${loadingResource} loading and BFCache return`, async ({}, info) => {
+  const name = `TAB ${loadingResource}, BFCache, navigation Stop=${stopDuringNavigation}`;
+  test(name, async ({}, info) => {
     test.setTimeout(90_000);
     let releaseResource = () => {};
     let releaseImage = () => {};
     const resourceRequested = Promise.withResolvers<void>();
+    const stopNavigationRequested = Promise.withResolvers<void>();
+    let releaseStopNavigation = () => {};
     const server = http.createServer((request, response) => {
       if (request.url === '/held-image' || request.url === '/held-script') {
         const release = () => {
@@ -83,7 +88,10 @@ for (const loadingResource of [
       <button style="margin:100px;width:200px;height:80px">Record click</button>
       ${image}</body>`);
       };
-      if (request.url === '/loading' && loadingResource === 'destination-response') {
+      if (request.url === '/stop-navigation') {
+        releaseStopNavigation = writePage;
+        stopNavigationRequested.resolve();
+      } else if (request.url === '/loading' && loadingResource === 'destination-response') {
         releaseResource = writePage;
         resourceRequested.resolve();
       } else writePage();
@@ -139,11 +147,12 @@ for (const loadingResource of [
       await popup.evaluate(() => {
         Reflect.set(window, 'historyPackets', []);
         chrome.runtime.onMessage.addListener((message, sender) => {
-          if (message.type === 'RECORDING_OBSERVATIONS' && message.eventPacket && sender.tab)
-            Reflect.get(window, 'historyPackets').push({
-              url: sender.url,
-              packet: message.eventPacket,
-            });
+          if (message.type === 'RECORDING_OBSERVATIONS' && sender.tab) {
+            const packets =
+              message.eventPackets ?? (message.eventPacket ? [message.eventPacket] : []);
+            for (const packet of packets)
+              Reflect.get(window, 'historyPackets').push({ url: sender.url, packet });
+          }
           return false;
         });
       });
@@ -203,6 +212,14 @@ for (const loadingResource of [
         .poll(() => sendRuntimeMessage(popup, { type: 'GET_RECORDING_STATE' }))
         .toMatchObject({ state: { status: 'RECORDING' } });
       const active = await sendRuntimeMessage(popup, { type: 'GET_RECORDING_STATE' });
+      if (
+        !active ||
+        typeof active !== 'object' ||
+        !('recordingId' in active) ||
+        !('controlToken' in active)
+      )
+        throw new Error('Recording capability is unavailable');
+
       const historyCount = (url: string, kind: string) =>
         popup.evaluate(
           ({ url, kind }) => {
@@ -218,6 +235,59 @@ for (const loadingResource of [
           { url, kind }
         );
       await expect.poll(() => historyCount(`${origin}/initial`, 'segment')).toBeGreaterThan(0);
+      if (loadingResource === 'image' && !stopDuringNavigation) {
+        if (typeof tabId !== 'number') throw new Error('Recording tab is unavailable');
+        await popup.evaluate(async (id) => {
+          await chrome.scripting.executeScript({
+            target: { tabId: id, frameIds: [0] },
+            func: () => {
+              const original = chrome.runtime.sendMessage;
+              const held = new Set<string>();
+              const gate = new Promise<void>((resolve) =>
+                Reflect.set(globalThis, 'releaseObservationAck', resolve)
+              );
+              Reflect.set(globalThis, 'observationAckHeld', 0);
+              Reflect.set(chrome.runtime, 'sendMessage', async (...args: unknown[]) => {
+                const message = args[0];
+                const response = Reflect.apply(original, chrome.runtime, args);
+                if (
+                  typeof message === 'object' &&
+                  message !== null &&
+                  'type' in message &&
+                  message.type === 'RECORDING_OBSERVATIONS'
+                ) {
+                  const kind =
+                    'eventPacket' in message
+                      ? 'event'
+                      : 'cursorPacket' in message
+                        ? 'cursor'
+                        : null;
+                  if (kind && !held.has(kind)) {
+                    held.add(kind);
+                    const result = await response;
+                    Reflect.set(globalThis, 'observationAckHeld', held.size);
+                    await gate;
+                    return result;
+                  }
+                }
+                return await response;
+              });
+            },
+          });
+        }, tabId);
+        await target.mouse.click(200, 140);
+        await expect
+          .poll(() =>
+            popup.evaluate(async (id) => {
+              const result = await chrome.scripting.executeScript({
+                target: { tabId: id, frameIds: [0] },
+                func: () => Reflect.get(globalThis, 'observationAckHeld'),
+              });
+              return result[0]?.result;
+            }, tabId)
+          )
+          .toBeGreaterThan(0);
+      }
       if (loadingResource === 'destination-response') {
         const navigation = target.goto(`${origin}/loading`, { waitUntil: 'commit' });
         void navigation.catch(() => undefined);
@@ -251,6 +321,26 @@ for (const loadingResource of [
         expect(await target.evaluate(() => document.readyState)).not.toBe('complete');
       await target.getByRole('button', { name: 'Record click', exact: true }).click();
       await expect.poll(() => historyCount(`${origin}/loading`, 'action')).toBeGreaterThan(0);
+      if (loadingResource === 'image' && !stopDuringNavigation) {
+        const capability = { recordingId: active.recordingId, controlToken: active.controlToken };
+        expect(
+          await sendRuntimeMessage(popup, { type: 'PAUSE_RECORDING', ...capability })
+        ).toMatchObject({ result: 'accepted' });
+        await expect
+          .poll(() => sendRuntimeMessage(popup, { type: 'GET_RECORDING_STATE' }))
+          .toMatchObject({ state: { status: 'PAUSED' } });
+        expect(
+          await sendRuntimeMessage(popup, { type: 'RESUME_RECORDING', ...capability })
+        ).toMatchObject({ result: 'accepted' });
+        await expect
+          .poll(() => sendRuntimeMessage(popup, { type: 'GET_RECORDING_STATE' }))
+          .toMatchObject({ state: { status: 'RECORDING' } });
+        const beforeResumeClick = await historyCount(`${origin}/loading`, 'action');
+        await target.getByRole('button', { name: 'Record click', exact: true }).click();
+        await expect
+          .poll(() => historyCount(`${origin}/loading`, 'action'))
+          .toBeGreaterThan(beforeResumeClick);
+      }
       await target.screenshot({
         path: info.outputPath('collecting-before-load.png'),
         fullPage: false,
@@ -265,17 +355,25 @@ for (const loadingResource of [
         .poll(() => target.evaluate(() => Reflect.get(window, 'restoredFromCache')))
         .toBe(true);
       await expect.poll(() => historyCount(`${origin}/initial`, 'segment')).toBeGreaterThan(before);
+      if (loadingResource === 'image' && !stopDuringNavigation) {
+        await popup.evaluate(async (id) => {
+          await chrome.scripting.executeScript({
+            target: { tabId: id, frameIds: [0] },
+            func: () => Reflect.get(globalThis, 'releaseObservationAck')?.(),
+          });
+        }, tabId);
+      }
       await target.getByRole('button', { name: 'Record click', exact: true }).click();
       await expect
         .poll(() => historyCount(`${origin}/initial`, 'action'))
         .toBeGreaterThan(actionsBeforeReturn);
-      if (
-        !active ||
-        typeof active !== 'object' ||
-        !('recordingId' in active) ||
-        !('controlToken' in active)
-      )
-        throw new Error('Recording capability is unavailable');
+      let stoppingNavigation: Promise<unknown> | undefined;
+      if (stopDuringNavigation) {
+        stoppingNavigation = target.goto(`${origin}/stop-navigation`, { waitUntil: 'commit' });
+        void stoppingNavigation.catch(() => undefined);
+        await stopNavigationRequested.promise;
+        expect(target.url()).toBe(`${origin}/initial`);
+      }
       expect(
         await sendRuntimeMessage(popup, {
           type: 'STOP_RECORDING',
@@ -286,6 +384,8 @@ for (const loadingResource of [
       await expect
         .poll(() => sendRuntimeMessage(popup, { type: 'GET_RECORDING_STATE' }))
         .toMatchObject({ state: { status: 'IDLE' } });
+      releaseStopNavigation();
+      await stoppingNavigation;
       const gallery = await context.newPage();
       await gallery.setViewportSize({ width: 1280, height: 560 });
       await gallery.goto(
@@ -303,6 +403,52 @@ for (const loadingResource of [
           )
           .first()
       ).toBeVisible();
+      const saved = await gallery.evaluate(async (id) => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open('sniptale-db');
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        try {
+          const rows: unknown[] = await new Promise((resolve, reject) => {
+            const request = db
+              .transaction('recording_events')
+              .objectStore('recording_events')
+              .getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+          return rows.flatMap((row) => {
+            if (
+              typeof row !== 'object' ||
+              row === null ||
+              !('recordingId' in row) ||
+              row.recordingId !== id ||
+              !('kind' in row) ||
+              row.kind !== 'block' ||
+              !('bytes' in row) ||
+              !(row.bytes instanceof Uint8Array)
+            )
+              return [];
+            return [Array.from(row.bytes)];
+          });
+        } finally {
+          db.close();
+        }
+      }, String(active.recordingId));
+      const records = saved.flatMap((bytes) => {
+        const block = decodeRecordingEventsBlock(new Uint8Array(bytes));
+        if (!block) throw new Error('Invalid saved history block');
+        return block.records;
+      });
+      expect(
+        records.filter((record) => record.kind === 'boundary' && record.reason === 'visibility')
+          .length
+      ).toBeGreaterThanOrEqual(2);
+      expect(
+        records.filter((record) => record.kind === 'boundary' && record.reason === 'stop')
+      ).toHaveLength(1);
+      expect(records.filter((record) => record.kind === 'gap')).toHaveLength(0);
       await gallery.screenshot({
         path: info.outputPath('saved-navigation-history.png'),
         fullPage: false,
@@ -310,6 +456,7 @@ for (const loadingResource of [
     } finally {
       releaseResource();
       releaseImage();
+      releaseStopNavigation();
       if (launched) await closeExtensionBrowser(launched, { removeUserDataDir: true });
       server.closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));

@@ -1,5 +1,6 @@
 import { createRecordingHistoryIntake, waitForRecordingHistoryStop } from '../history-intake';
 import {
+  isFinalRecordingCursorPackets,
   isRecordingCursorObservationPacket,
   type RecordingCursorObservationPacket,
   type RecordingCursorPointObservation,
@@ -96,6 +97,7 @@ export async function createBrowserCursorTrajectoryWriter(options: {
   let lastEmittedSequence = -1;
   let lastBoundary: CursorTrajectoryBoundaryReason | null = null;
   let documentId: string | null = null;
+  let sourceInstanceId: string | undefined;
   let clockKey: string | null = null;
   let lastBatchSequence = -1;
   let lastBatchDigest = '';
@@ -276,7 +278,8 @@ export async function createBrowserCursorTrajectoryWriter(options: {
     digest: string
   ) => {
     if (intake.failed) throw new Error('CURSOR_TRAJECTORY_STORAGE_UNAVAILABLE');
-    const changedDocument = documentId !== nativeDocumentId;
+    const changedDocument =
+      documentId !== nativeDocumentId || sourceInstanceId !== packet.sourceInstanceId;
     if (!changedDocument && packet.batchSequence === lastBatchSequence) {
       if (digest !== lastBatchDigest) throw new Error('CURSOR_TRAJECTORY_CONFLICT');
       return;
@@ -295,6 +298,7 @@ export async function createBrowserCursorTrajectoryWriter(options: {
       if (documentId !== null && active)
         await gap(lastTime, Math.max(lastTime, firstTime), 'source-unavailable', packet.clock);
       documentId = nativeDocumentId;
+      sourceInstanceId = packet.sourceInstanceId;
       lastLocalSequence = -1;
       unknownLocalGap = false;
       releasedUps.clear();
@@ -356,12 +360,14 @@ export async function createBrowserCursorTrajectoryWriter(options: {
   >({
     recordingId,
     errorPrefix: 'CURSOR_TRAJECTORY',
+    isFinalBatch: isFinalRecordingCursorPackets,
     isPacket: isRecordingCursorObservationPacket,
     process,
   });
 
   return {
     append: intake.append,
+    appendFinal: intake.appendFinal,
     finish(
       options: { waitForSourceStop?: boolean; stoppedWhilePaused?: boolean } = {}
     ): Promise<CursorTrajectoryDescriptor> {

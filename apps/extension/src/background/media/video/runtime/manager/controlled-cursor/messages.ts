@@ -40,6 +40,7 @@ export async function disableControlledCursorCapture(
     ...(boundaryReason === 'observation' ? { boundaryReason } : {}),
   });
 
+  if (!response.success) throw new Error(response.error ?? 'RECORDING_HISTORY_FLUSH_FAILED');
   return response.telemetry ?? null;
 }
 

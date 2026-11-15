@@ -211,3 +211,19 @@ it('waits until the toolbar confirms that screenshot mode was applied', async ()
   expect(sendTabMessage).toHaveBeenCalledTimes(2);
   expect(wait).toHaveBeenCalledWith(50);
 });
+
+it('reinjects protocol 3 observers before recording uses stable producer identities', async () => {
+  sendTabMessageMock
+    .mockResolvedValueOnce({ ...VIEWPORT_COORDS_RESPONSE, contentRuntimeProtocolVersion: 3 })
+    .mockResolvedValueOnce(VIEWPORT_COORDS_RESPONSE);
+  await injectContentRuntimeAndAwaitReady(
+    {
+      tab: { id: 7, url: 'https://example.test/path' } as chrome.tabs.Tab,
+      tabId: 7,
+      url: new URL('https://example.test/path'),
+    },
+    { allFrames: true }
+  );
+  expect(browserScriptingExecuteScriptMock).toHaveBeenCalledOnce();
+  expect(sendTabMessageMock).toHaveBeenCalledTimes(2);
+});

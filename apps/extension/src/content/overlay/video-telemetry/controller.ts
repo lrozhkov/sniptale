@@ -283,14 +283,16 @@ export function createVideoTelemetryController(
     publish?: (recordingId: string, snapshot: RecordingTelemetrySnapshot) => void;
     publishCursor?: (packet: RecordingCursorObservationPacket) => Promise<void>;
     publishEvents?: (packet: RecordingEventObservationPacket) => Promise<void>;
+    publishFinalEvents?: (packets: RecordingEventObservationPacket[]) => Promise<void>;
+    publishFinalCursor?: (packets: RecordingCursorObservationPacket[]) => Promise<void>;
   } = {}
 ): VideoTelemetryController {
   const state = createInitialState();
   const textCursor = createRecordingTextCursor();
   const pagehide = () => {
     disable('observation');
-    void state.cursorSource?.flush();
-    void state.eventSource?.flush();
+    void state.cursorSource?.flushClosing();
+    void state.eventSource?.flushClosing();
   };
   const disable = (reason: 'stop' | 'observation' = 'stop') => {
     window.removeEventListener('pagehide', pagehide);
@@ -320,6 +322,7 @@ export function createVideoTelemetryController(
         const observationClock = state.observationClock;
         state.cursorSource = createCursorObservationSource({
           recordingId,
+          ...(deps.publishFinalCursor ? { sendFinal: deps.publishFinalCursor } : {}),
           project: (moment) =>
             observationClock.projectAt(moment.sourceClockId, moment.observationTimeSeconds),
           send,
@@ -331,6 +334,7 @@ export function createVideoTelemetryController(
         const observationClock = state.observationClock;
         state.eventSource = createRecordingEventSource({
           recordingId,
+          ...(deps.publishFinalEvents ? { sendFinal: deps.publishFinalEvents } : {}),
           project: (moment) =>
             observationClock.projectAt(moment.sourceClockId, moment.observationTimeSeconds),
           send,

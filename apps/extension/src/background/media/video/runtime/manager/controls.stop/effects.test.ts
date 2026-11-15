@@ -442,3 +442,10 @@ it.each([false, true])(
       );
   }
 );
+
+it('requests the terminal source flush even while navigation is pending', async () => {
+  isControlledCursorNavigationPendingMock.mockReturnValue(true);
+  await runStopSideEffects({ mode: CaptureMode.TAB, tabId: 7 }, 'detailed');
+  await waitForStopSideEffects();
+  expect(disableControlledCursorCaptureMock).toHaveBeenCalledWith(7);
+});

@@ -2,8 +2,14 @@ import {
   isRecordingClockTiming,
   isRecordingFrameClockBinding,
 } from '../../../../video/recording-frame-clock';
-import { isRecordingEventObservationPacket } from '../../../../video/event-observations';
-import { isRecordingCursorObservationPacket } from '../../../../video/cursor-observations';
+import {
+  isFinalRecordingEventPackets,
+  isRecordingEventObservationPacket,
+} from '../../../../video/event-observations';
+import {
+  isFinalRecordingCursorPackets,
+  isRecordingCursorObservationPacket,
+} from '../../../../video/cursor-observations';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
   createGuardParser,
@@ -168,14 +174,20 @@ function isRecordingObservationsRequest(
       telemetry: isRecordingTelemetrySnapshot,
       cursorPacket: isRecordingCursorObservationPacket,
       eventPacket: isRecordingEventObservationPacket,
+      eventPackets: isFinalRecordingEventPackets,
+      cursorPackets: isFinalRecordingCursorPackets,
     },
   });
   if (!guard(value) || !isRecord(value)) return false;
-  const { telemetry, cursorPacket, eventPacket } = value;
-  if ([telemetry, cursorPacket, eventPacket].filter((item) => item !== undefined).length !== 1)
+  const { telemetry, cursorPacket, eventPacket, cursorPackets, eventPackets } = value;
+  if (
+    [telemetry, cursorPacket, eventPacket, cursorPackets, eventPackets].filter(
+      (item) => item !== undefined
+    ).length !== 1
+  )
     return false;
   if (telemetry !== undefined) return isRecord(telemetry) && Array.isArray(telemetry['signals']);
-  const packet = cursorPacket ?? eventPacket;
+  const packet = cursorPacket ?? eventPacket ?? cursorPackets?.[0] ?? eventPackets?.[0];
   return packet !== undefined && packet.recordingId === value['recordingId'];
 }
 
