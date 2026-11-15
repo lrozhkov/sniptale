@@ -3,6 +3,7 @@ import { CommandPressScope, useCommandPress } from '../control-language/press';
 import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
 import { resolveRangeVisualStyle } from '../range-control/style';
 import { joinClassNames } from './helpers';
+import { NumberInput, type NumberInputProps } from '../number-input';
 
 export interface ProductGlassIconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   active?: boolean;
@@ -23,7 +24,7 @@ export interface ProductGlassSwitchProps extends ButtonHTMLAttributes<HTMLButton
 
 export type ProductGlassRangeProps = InputHTMLAttributes<HTMLInputElement>;
 
-export type ProductGlassInputProps = InputHTMLAttributes<HTMLInputElement>;
+export type ProductGlassInputProps = NumberInputProps;
 
 export interface ProductGlassBoldButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   active?: boolean;
@@ -157,7 +158,12 @@ export function ProductGlassRangeMeta({
 export const ProductGlassInput = forwardRef<HTMLInputElement, ProductGlassInputProps>(
   function ProductGlassInput({ className = '', ...props }, ref) {
     return (
-      <input ref={ref} className={joinClassNames('sniptale-glass-input', className)} {...props} />
+      <NumberInput
+        ref={ref}
+        className={joinClassNames('sniptale-glass-input', className)}
+        {...props}
+        type={props.type ?? 'text'}
+      />
     );
   }
 );

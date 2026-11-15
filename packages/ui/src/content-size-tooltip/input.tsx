@@ -7,6 +7,7 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { parsePositiveInteger } from './helpers';
+import { NumberInput } from '../number-input';
 import { CONTENT_SIZE_TOOLTIP_INPUT_CLASS_NAME, CONTENT_SIZE_TOOLTIP_INPUT_STYLE } from './styles';
 
 export function TooltipSizeInput(props: {
@@ -20,7 +21,7 @@ export function TooltipSizeInput(props: {
   const inputDraft = useTooltipSizeInputDraft(props);
 
   return (
-    <input
+    <NumberInput
       type="number"
       inputMode="numeric"
       aria-label={props.ariaLabel}

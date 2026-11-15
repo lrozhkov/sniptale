@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
 import { LinkedSideFields, SIDE_ORDER, createSideProperty } from './side-fields';
+import { SideValueInput } from './side-value-input';
 
 const marginProperties = SIDE_ORDER.map((side) => createSideProperty('margin', side));
 const fieldKey = marginProperties.join('|');
@@ -207,3 +208,35 @@ it.each([
     unit
   );
 });
+
+it('steps a focused linked side once through the linked update callback', () => {
+  const values = Object.fromEntries(marginProperties.map((property) => [property, '1,5em']));
+  const { onChange, onChangeMany } = renderSides(createState(values));
+  const input = container.querySelector<HTMLInputElement>('input')!;
+  input.focus();
+  const wheel = new WheelEvent('wheel', { deltaY: 20, bubbles: true, cancelable: true });
+  act(() => input.dispatchEvent(wheel));
+  expect(wheel.defaultPrevented).toBe(true);
+  expect(onChangeMany).toHaveBeenCalledExactlyOnceWith(
+    marginProperties.map((property) => ({ property, value: '0.5em' }))
+  );
+  expect(onChange).not.toHaveBeenCalled();
+});
+
+it.each(['text', 'length'] as const)(
+  'retains normal wheel for %s without numeric edit authority',
+  (kind) => {
+    const onChange = vi.fn();
+    act(() =>
+      root.render(
+        <SideValueInput disabled={kind === 'length'} kind={kind} value="12px" onChange={onChange} />
+      )
+    );
+    const input = container.querySelector<HTMLInputElement>('input')!;
+    input.focus();
+    const wheel = new WheelEvent('wheel', { deltaY: -20, bubbles: true, cancelable: true });
+    act(() => input.dispatchEvent(wheel));
+    expect(wheel.defaultPrevented).toBe(false);
+    expect(onChange).not.toHaveBeenCalled();
+  }
+);

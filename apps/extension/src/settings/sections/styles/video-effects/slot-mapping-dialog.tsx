@@ -47,6 +47,12 @@ const unitKeys = {
   'degrees-to-radians': 'videoEditor.effectsLibrary.mapping.degrees',
   'normalized-to-pixels': 'videoEditor.effectsLibrary.mapping.normalized',
 } as const;
+function stepBound(value: string, direction: 1 | -1): string {
+  if (!value.trim()) return value;
+  const number = Number(value);
+  const next = number + direction;
+  return Number.isFinite(number) && Number.isFinite(next) ? String(next) : value;
+}
 function SlotFields(props: {
   slot: AnimationTemplateSlot;
   draft: SlotMappingDraft;
@@ -108,6 +114,9 @@ function SlotFields(props: {
                 <ProductInput
                   inputMode="decimal"
                   value={draft.minimum}
+                  onNumericStep={(direction) =>
+                    props.change({ minimum: stepBound(draft.minimum, direction) })
+                  }
                   disabled={props.busy}
                   aria-label={
                     translate('videoEditor.effectsLibrary.mapping.minimum') + ' ' + slot.id
@@ -119,6 +128,9 @@ function SlotFields(props: {
                 <ProductInput
                   inputMode="decimal"
                   value={draft.maximum}
+                  onNumericStep={(direction) =>
+                    props.change({ maximum: stepBound(draft.maximum, direction) })
+                  }
                   disabled={props.busy}
                   aria-label={
                     translate('videoEditor.effectsLibrary.mapping.maximum') + ' ' + slot.id

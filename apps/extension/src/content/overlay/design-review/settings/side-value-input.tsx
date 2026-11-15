@@ -159,6 +159,9 @@ function SideLengthInput(props: {
         className={inputClassName}
         disabled={props.disabled}
         inputMode="decimal"
+        onNumericStep={(direction) =>
+          props.onChange(stepCssLength(props.value, props.fallbackValue, direction))
+        }
         value={inputValue}
         onChange={(event) =>
           props.onChange(normalizeCssLengthInput(event.currentTarget.value, `0${unit}`))

@@ -8,6 +8,8 @@ Numeric fields provide exact values, units, bounds, and meaningful precision. Ra
 
 Preserve the product mapping, units, precision, snapping, valid boundaries, and accepted off-step values.
 
+Focused, hovered numeric inputs accept vertical wheel steps through existing owners, consuming handled wheel events.
+
 ## Row geometry and hierarchy
 
 Names remain secondary. Values/units remain primary, with tabular digits where useful. Only editable values receive hover paint. Numeric/color value edges stay aligned while steppers appear and editing starts. Ordinary forms retain the shared 32px control. Equivalent compact parameters use 40px rows: a 32px control band and an 8px contextual strip. Slider targets/thumbs stay clear of labels and neighboring rows. Use a 3px track. Wrapped names can increase allocation. Hover never changes height or adds margins beyond the 4px group gap. Slider targets stay separate from label/value targets.

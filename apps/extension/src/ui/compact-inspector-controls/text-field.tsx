@@ -1,4 +1,5 @@
 import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
+import { NumberInput, type NumberInputProps } from '@sniptale/ui/number-input';
 import { forwardRef, useContext, useRef, useState } from 'react';
 import type React from 'react';
 import type { ProductInputProps } from '@sniptale/ui/product-form-controls';
@@ -28,6 +29,7 @@ function commitTextValue(
 }
 
 export interface TextFieldProps extends ProductInputProps {
+  onNumericStep?: NumberInputProps['onNumericStep'];
   inputClassName?: string | undefined;
   label: string;
   trailingActions?: React.ReactNode;
@@ -158,8 +160,9 @@ function TextFieldInput({
   setInputRef: (node: HTMLInputElement | null) => void;
 }) {
   return (
-    <input
+    <NumberInput
       {...props}
+      type={props.type ?? 'text'}
       ref={setInputRef}
       placeholder={props.placeholder ?? label}
       aria-label={props['aria-label'] ?? label}

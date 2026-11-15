@@ -59,6 +59,46 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('forwards numeric wheel editing while keeping native text defaults and blur acceptance', () => {
+  container = document.createElement('div');
+  document.body.append(container);
+  root = createRoot(container);
+  const commit = vi.fn();
+  const change = vi.fn();
+  act(() =>
+    root?.render(
+      <>
+        <TextField
+          label="Seed"
+          type="number"
+          min={0}
+          max={10}
+          defaultValue="4"
+          onChange={change}
+          onValueCommit={commit}
+        />
+        <TextField label="Name" defaultValue="123" />
+      </>
+    )
+  );
+  const seed = container.querySelector<HTMLInputElement>('[aria-label="Seed"]')!;
+  const name = container.querySelector<HTMLInputElement>('[aria-label="Name"]')!;
+  expect(name.type).toBe('text');
+  act(() => seed.focus());
+  const wheel = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -1 });
+  act(() => seed.dispatchEvent(wheel));
+  expect(seed.value).toBe('5');
+  expect(change).toHaveBeenCalledOnce();
+  expect(commit).not.toHaveBeenCalled();
+  expect(wheel.defaultPrevented).toBe(true);
+  act(() => name.focus());
+  expect(commit).toHaveBeenCalledExactlyOnceWith('5');
+  const textWheel = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -1 });
+  act(() => name.dispatchEvent(textWheel));
+  expect(textWheel.defaultPrevented).toBe(false);
+  expect(name.value).toBe('123');
+});
+
 it('commits text edits and focuses the next compact input on Enter', () => {
   const { first, second, onValueCommit } = renderFields();
   expect(first).not.toBeNull();

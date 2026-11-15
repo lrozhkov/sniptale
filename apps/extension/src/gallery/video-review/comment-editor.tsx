@@ -1,3 +1,4 @@
+import { NumberInput } from '@sniptale/ui/number-input';
 import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { CompactPaintSelector } from '../../ui/paint-selector';
 import {
@@ -49,7 +50,7 @@ function ReviewOverlayTimeFields(props: {
       </legend>
       <div className="sniptale-parameter-stack">
         <InspectorParameterRow label={translate('gallery.videoReview.overlayStart')}>
-          <input
+          <NumberInput
             data-ui="gallery.videoReview.overlayStartInput"
             aria-label={translate('gallery.videoReview.overlayStart')}
             type="number"
@@ -67,7 +68,7 @@ function ReviewOverlayTimeFields(props: {
           />
         </InspectorParameterRow>
         <InspectorParameterRow label={translate('gallery.videoReview.overlayEnd')}>
-          <input
+          <NumberInput
             data-ui="gallery.videoReview.overlayEndInput"
             aria-label={translate('gallery.videoReview.overlayEnd')}
             type="number"
@@ -441,7 +442,7 @@ function ReviewCommentStyleFields(props: {
           ] as const
         ).map((field) => (
           <InspectorParameterRow key={field.key} label={translate(field.label)}>
-            <input
+            <NumberInput
               type="number"
               aria-label={translate(field.label)}
               min={field.min}

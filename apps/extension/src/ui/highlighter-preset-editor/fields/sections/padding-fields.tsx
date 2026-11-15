@@ -1,3 +1,4 @@
+import { NumberInput } from '@sniptale/ui/number-input';
 import { translate } from '../../../../platform/i18n';
 import type { BorderPadding } from '../../../../features/highlighter/contracts';
 import { editorInputClassName } from '../../constants';
@@ -22,7 +23,7 @@ export function EditorPaddingFields({
             <label className="mb-1 block text-xs uppercase tracking-wider text-[var(--sniptale-color-text-dim)]">
               {labels[side]}
             </label>
-            <input
+            <NumberInput
               type="number"
               min="0"
               max="50"

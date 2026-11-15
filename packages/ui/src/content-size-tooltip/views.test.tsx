@@ -67,6 +67,20 @@ function renderTooltip(
   return props;
 }
 
+it('changes the focused size draft by wheel and retains blur commit authority', () => {
+  const props = renderTooltip();
+  const input = getInput('Width');
+  if (!input) throw new Error('Width input did not mount');
+  act(() => input.focus());
+  const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -120 });
+  act(() => input.dispatchEvent(event));
+  expect(event.defaultPrevented).toBe(true);
+  expect(input.value).toBe('321');
+  expect(props.onWidthChangeCommit).not.toHaveBeenCalled();
+  act(() => input.blur());
+  expect(props.onWidthChangeCommit).toHaveBeenCalledExactlyOnceWith(321);
+});
+
 function getButton(label: string) {
   return container?.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`) ?? null;
 }

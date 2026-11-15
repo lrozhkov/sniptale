@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { NumberInput } from '@sniptale/ui/number-input';
 import { translate } from '../../platform/i18n';
 import {
   COMPACT_INLINE_VALUE_SURFACE_CLASS_NAME,
@@ -135,8 +136,9 @@ function NumericValueInput({
   setPointerFocus(value: boolean): void;
 }) {
   return (
-    <input
+    <NumberInput
       ref={state.inputRef}
+      onNumericStep={state.applyStep}
       data-pointer-focus={pointerFocus || undefined}
       aria-label={props.label}
       disabled={props.disabled}

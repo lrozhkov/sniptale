@@ -68,6 +68,42 @@ afterEach(() => {
   container = null;
 });
 
+it('steps focused wheel through irregular domain boundaries and commits without blur duplicates', () => {
+  const getStepValue = vi.fn((value: number, direction: 1 | -1) =>
+    direction === 1 ? (value < 12 ? 12 : 20) : value === 20 ? 12 : 0
+  );
+  const { onCommitValue, onPreviewValue } = renderNumeric({
+    value: 10,
+    getStepValue,
+    precision: 2,
+    unit: 'px',
+  });
+  const field = input();
+  const unfocused = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -100 });
+  act(() => field.dispatchEvent(unfocused));
+  expect(unfocused.defaultPrevented).toBe(false);
+  expect(onCommitValue).not.toHaveBeenCalled();
+  act(() => field.focus());
+  const wheel = () =>
+    field.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -100 }));
+  act(() => {
+    wheel();
+    wheel();
+  });
+  expect(field.value).toBe('20');
+  expect(getStepValue).toHaveBeenNthCalledWith(1, 10, 1);
+  expect(getStepValue).toHaveBeenNthCalledWith(2, 12, 1);
+  expect(onPreviewValue).toHaveBeenCalledTimes(2);
+  expect(onPreviewValue).toHaveBeenNthCalledWith(1, 12);
+  expect(onPreviewValue).toHaveBeenNthCalledWith(2, 20);
+  expect(onCommitValue).toHaveBeenCalledTimes(2);
+  expect(onCommitValue).toHaveBeenNthCalledWith(1, 12);
+  expect(onCommitValue).toHaveBeenNthCalledWith(2, 20);
+  expect(document.activeElement).toBe(field);
+  act(() => field.blur());
+  expect(onCommitValue).toHaveBeenCalledTimes(2);
+});
+
 it('repeats stepper changes while a direction button is held', () => {
   vi.useFakeTimers();
   const { onCommitValue, onPreviewValue } = renderNumeric({ step: 5, value: 10 });

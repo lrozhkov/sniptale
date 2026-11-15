@@ -1,3 +1,4 @@
+import { NumberInput } from '@sniptale/ui/number-input';
 import { readCatalogPresentation } from '../../../features/video/project/effect-bundle/catalog/presentation';
 import { useEffect, useState, useRef } from 'react';
 import { ArrowLeft, Play, Pause } from 'lucide-react';
@@ -110,7 +111,7 @@ export function AnnotationSourcePreview(
       </div>
       <label className="flex items-center justify-between gap-2 text-xs">
         {translate('videoEditor.effectsLibrary.fxDuration')}
-        <input
+        <NumberInput
           className={[
             'w-20 rounded-[4px] border border-[var(--sniptale-color-border-soft)]',
             'bg-transparent px-2 py-1 text-right',

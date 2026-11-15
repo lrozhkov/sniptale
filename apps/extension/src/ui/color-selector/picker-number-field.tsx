@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { NumberInput } from '@sniptale/ui/number-input';
 import type { ChangeEvent, FocusEvent, KeyboardEvent, RefObject } from 'react';
 import './picker.css';
 
@@ -190,8 +191,9 @@ export function PickerNumberField(props: PickerNumberFieldProps) {
   return (
     <div className="sniptale-picker-number">
       {props.prefix ? <span aria-hidden="true">{props.prefix}</span> : null}
-      <input
+      <NumberInput
         ref={editing.input}
+        onNumericStep={editing.changeStep}
         disabled={props.disabled}
         aria-label={props.ariaLabel}
         aria-invalid={editing.invalid || undefined}

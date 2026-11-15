@@ -230,4 +230,29 @@ function runContentSizeTooltipDomSuite() {
   registerAspectRatioButtonStateTest();
 }
 
-describe('content-size-tooltip.dom', runContentSizeTooltipDomSuite);
+describe('content-size-tooltip.dom', () => {
+  runContentSizeTooltipDomSuite();
+
+  it('uses the focused DOM input step and preserves native input/change consumers', () => {
+    const { tooltip } = createMountedTooltip();
+    tooltip.widthInput.value = '320';
+    tooltip.widthInput.step = '2';
+    const events: string[] = [];
+    tooltip.widthInput.addEventListener('input', () => events.push('input'));
+    tooltip.widthInput.addEventListener('change', () => events.push('change'));
+    tooltip.widthInput.focus();
+    const wheel = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -120 });
+    tooltip.widthInput.dispatchEvent(wheel);
+    expect(wheel.defaultPrevented).toBe(true);
+    expect(tooltip.widthInput.value).toBe('322');
+    expect(events).toEqual(['input', 'change']);
+    expect(document.activeElement).toBe(tooltip.widthInput);
+
+    tooltip.widthInput.value = '800';
+    const boundary = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -120 });
+    tooltip.widthInput.dispatchEvent(boundary);
+    expect(boundary.defaultPrevented).toBe(true);
+    expect(tooltip.widthInput.value).toBe('800');
+    expect(events).toEqual(['input', 'change']);
+  });
+});

@@ -64,3 +64,34 @@ it('allows switching the structured shadow off', async () => {
 
   expect(onChange).toHaveBeenCalledWith('none');
 });
+
+it('steps focused shadow offsets through serialization without clamping negative lengths', () => {
+  const onChange = renderField('0px 8px 18px 0px rgba(0, 0, 0, 0.2)');
+  const input = document.querySelector<HTMLInputElement>(
+    `input[aria-label="${translate('content.designReview.shadowOffsetX')}"]`
+  )!;
+  input.focus();
+  const wheel = new WheelEvent('wheel', { deltaY: 20, bubbles: true, cancelable: true });
+  act(() => input.dispatchEvent(wheel));
+  expect(wheel.defaultPrevented).toBe(true);
+  expect(onChange).toHaveBeenCalledWith('-1px 8px 18px 0px rgba(0, 0, 0, 0.2)');
+  expect(document.activeElement).toBe(input);
+});
+
+it('retains the shadow parser numeric domain when stepping exponential offsets', () => {
+  const onChange = renderField('1e3px 8px 18px 0px #000000');
+  const input = document.querySelector<HTMLInputElement>(
+    `input[aria-label="${translate('content.designReview.shadowOffsetX')}"]`
+  )!;
+  input.focus();
+  act(() =>
+    input.dispatchEvent(
+      new WheelEvent('wheel', {
+        deltaY: -20,
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+  );
+  expect(onChange).toHaveBeenCalledWith('1001px 8px 18px 0px #000000');
+});

@@ -481,3 +481,42 @@ it.each([
     )
   );
 });
+
+it.each([
+  { name: 'overlayStart', value: '2.1', patch: { start: 2.1 } },
+  { name: 'overlayEnd', value: '5.1', patch: { end: 5.1 } },
+  { name: 'overlayFontSize', value: '13', patch: { style: { fontSize: 13 } } },
+])('steps $name with the wheel and accepts only on blur', async ({ name, value, patch }) => {
+  const onPatch = vi.fn();
+  await act(async () =>
+    renderEditor(
+      <ReviewCanvasCommentEditor
+        comment={{ ...comment(), end: 5 }}
+        annotations={[]}
+        duration={10}
+        busy={false}
+        onPatch={onPatch}
+        onSwitchAttachment={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+  );
+  const input = host.querySelector<HTMLInputElement>(
+    `input[aria-label="gallery.videoReview.${name}"]`
+  )!;
+  const wheel = new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true });
+  await act(async () => {
+    input.focus();
+    input.dispatchEvent(wheel);
+  });
+  expect(wheel.defaultPrevented).toBe(true);
+  expect(input.value).toBe(value);
+  expect(document.activeElement).toBe(input);
+  expect(onPatch).not.toHaveBeenCalled();
+  await act(async () => input.blur());
+  expect(onPatch).toHaveBeenCalledWith(
+    expect.objectContaining(
+      'style' in patch ? { style: expect.objectContaining(patch.style) } : patch
+    )
+  );
+});

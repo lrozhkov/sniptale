@@ -103,6 +103,23 @@ it('previews without editing the project and applies the chosen time, track and 
   expect(duration.value).toBe('3');
   change(duration, '1');
   expect(duration.value).toBe('1');
+  change(host.querySelector<HTMLInputElement>('input[type=range]')!, '0.95');
+  act(() => button('videoEditor.effectsLibrary.previewPlay').click());
+  const wheel = new WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true });
+  act(() => {
+    duration.focus();
+    duration.dispatchEvent(wheel);
+  });
+  expect(wheel.defaultPrevented).toBe(true);
+  expect(duration.value).toBe('0.9');
+  expect(document.activeElement).toBe(duration);
+  expect(host.querySelector('output')!.dataset['progress']).toBe('1');
+  expect(host.querySelector('input[type=range]')!.getAttribute('aria-valuetext')).toBe('0.9 / 0.9');
+  expect(button('videoEditor.effectsLibrary.previewPause')).toBeUndefined();
+  act(() => vi.advanceTimersByTime(500));
+  expect(host.querySelector('output')!.dataset['progress']).toBe('1');
+  change(duration, '1');
+  change(host.querySelector<HTMLInputElement>('input[type=range]')!, '0');
   act(() => button('videoEditor.effectsLibrary.previewPlay').click());
   act(() => vi.advanceTimersByTime(500));
   expect(Number(host.querySelector('output')!.dataset['progress'])).toBeGreaterThan(0);
