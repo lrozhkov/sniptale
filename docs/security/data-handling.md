@@ -465,6 +465,8 @@ Feedback actions accept native trusted clicks and the existing private mouse bri
 
 ## Vector SVG admission
 
+Vector catalog settings, collections, presets, and cached artwork remain local in `editor_vector_library`. Settings transfer does not serialize these records.
+
 The editor applies one preparation policy to local SVG, Iconify artwork, catalog results, and restored vector definitions. Strict admission checks the source size before parsing and enforces the existing SVG profile and geometry limits. Scripts, event handlers, HTML, CSS, resource references, and unsupported SVG features cause explicit refusal.
 
 The platform SVG sanitizer applies DOMPurify to admitted canonical SVG with explicit tag, attribute, and namespace limits. The editor normalizes the sanitized result again. It rejects any change to canonical artwork, geometry, palette slots, or capabilities. Security decisions do not use `DOMPurify.removed`.

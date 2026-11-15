@@ -11,7 +11,7 @@ import { createVideoClipFromAsset } from '../../../features/video/project/factor
 import { VideoProjectAssetType } from '../../../features/video/project/types';
 import { readFileSync } from 'node:fs';
 import { importAnimationArtifactBytes } from '../../../features/video/project/effect-bundle/lottie-profile';
-import * as animationTemplate from '@sniptale/runtime-contracts/animation-template';
+import * as runtimeAnimation from '../../../contracts/effect-runtime/animation';
 import type { ReviewTextStart, ReviewTextServerMessage } from '../../../contracts/ai/review-text';
 import type { VideoProjectEntry } from '../../../composition/persistence/projects/contracts';
 
@@ -175,16 +175,18 @@ it.each([
     start.llmSessionToken = token;
     const entered = deferred();
     const release = deferred();
-    const actualVerify = animationTemplate.verifyAnimationResource;
+    const actualVerify = runtimeAnimation.verifyRuntimeAnimationSource;
     let integrityReads = 0;
-    vi.spyOn(animationTemplate, 'verifyAnimationResource').mockImplementation(async (resource) => {
-      const valid = await actualVerify(resource);
-      if (++integrityReads === 3) {
-        entered.resolve();
-        await release.promise;
+    vi.spyOn(runtimeAnimation, 'verifyRuntimeAnimationSource').mockImplementation(
+      async (...args) => {
+        const valid = await actualVerify(...args);
+        if (++integrityReads === 3) {
+          entered.resolve();
+          await release.promise;
+        }
+        return valid;
       }
-      return valid;
-    });
+    );
     const config = {
       modelId: 'model',
       providerId: 'provider',

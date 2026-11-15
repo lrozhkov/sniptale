@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { applyHarnessBootstrap, EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
+import { installBrowserLocaleBeforeNavigation } from '../../support/browser-preferences';
 
 export const rasterControl = (page: Page, name: string) =>
   page.locator(`[data-ui="editor.raster.${name}"]:visible`);
@@ -54,7 +55,7 @@ export async function openRasterFixture(
     },
     editorBootstrapPayload: { dataUrl, title: 'Raster tools proof' },
   });
-  await page.addInitScript(() => localStorage.setItem('sniptale-locale-preference', 'en'));
+  await installBrowserLocaleBeforeNavigation(page, 'en');
   await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
   await expect
     .poll(() =>

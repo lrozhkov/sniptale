@@ -50,14 +50,19 @@ export const SETTINGS_TRANSFER_VIEW_COVERAGE = {
   },
 } as const;
 
-// docs/security/data-handling.md, "Background preset metadata": this local catalog is
-// explicitly excluded from settings transfer; Library image bytes keep their separate owner.
+// Local background and vector catalogs retain their documented settings-transfer exclusions.
 export const SETTINGS_TRANSFER_EXCLUDED_VIEW_COVERAGE = {
   'editor-resources': {
     backgrounds: {
       storageKey: 'sniptale_background_presets',
       policy: 'docs/security/data-handling.md',
       reason: 'Local-only background preset metadata is excluded from settings transfer.',
+    },
+    icons: {
+      storeName: 'editor_vector_library',
+      policy: 'docs/security/data-handling.md',
+      reason:
+        'Local vector catalog settings, metadata and cache are excluded from settings transfer.',
     },
   },
 } as const;
@@ -85,6 +90,11 @@ type PersistenceMutationCoverage = {
 };
 
 export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
+  excluded(
+    'styles/editor-resources/icons/controller.ts',
+    ['createEditorVectorCache', 'createEditorVectorLibraryMetadata'],
+    'action/status'
+  ),
   excluded('system/access-data/permissions/index.tsx', ['mutateVideoSettings'], 'action/status'),
   excluded(
     'system/events-logs/index.tsx',

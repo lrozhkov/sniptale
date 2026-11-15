@@ -7,6 +7,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { formatDateTime } from '../../../../../platform/i18n';
 import { translate } from '../../../../../platform/i18n';
 import type { AIModel, AIProvider } from '../../../../../contracts/settings';
+import { getAIProviderOperations } from '../../../../../contracts/settings/ai-provider';
 import type { AiProvidersSectionState } from '../controller/types';
 import { AIProvidersModelsCard } from './models-card';
 import { AIProvidersProvidersCard } from './cards';
@@ -625,7 +626,12 @@ it('does not confuse retired, disabled or explicitly unsupported models with mis
     const capabilities = {
       operations:
         variant === 'unsupported'
-          ? ({ text: 'unsupported', transcription: 'unsupported', speech: 'unsupported' } as const)
+          ? Object.fromEntries(
+              getAIProviderOperations(PROVIDER.connectionType).map((operation) => [
+                operation,
+                'unsupported' as const,
+              ])
+            )
           : {},
       input: {},
       output: {},

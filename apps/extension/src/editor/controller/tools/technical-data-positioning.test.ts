@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, expect, it, vi } from 'vitest';
+import { Textbox } from 'fabric';
 
 const { getCurrentLocaleMock } = vi.hoisted(() => ({
   getCurrentLocaleMock: vi.fn(),
@@ -151,7 +152,7 @@ it('reduces the font when column data fits the width but not the available heigh
   expect((result.top ?? 0) + result.getScaledHeight()).toBeLessThanOrEqual(90);
 });
 
-it('uses the full available image width for a short technical-data row', () => {
+it('permits the full available wrapping width for a short technical-data row', () => {
   const result = createTechnicalDataTextObject({
     kinds: ['url', 'date'],
     layout: 'row',
@@ -173,7 +174,12 @@ it('uses the full available image width for a short technical-data row', () => {
     },
   });
 
-  expect(result.width).toBe(2960);
+  expect(result).toBeInstanceOf(Textbox);
+  if (!(result instanceof Textbox)) throw new Error('Expected technical-data text');
+  expect(result.textLines).toHaveLength(1);
+  expect(result.sniptaleDrawingTextMaxWidth).toBe(2960);
+  expect(result.width).toBeLessThanOrEqual(2960);
+  expect(readEditorDrawingObject(result)).toMatchObject({ kind: 'text', fontSize: 20 });
   expect(result.left).toBe(20);
 });
 
@@ -198,5 +204,10 @@ it('starts a technical-data column wide enough for unwrapped labels on a large i
     },
   });
 
-  expect(result.width).toBe(640);
+  expect(result).toBeInstanceOf(Textbox);
+  if (!(result instanceof Textbox)) throw new Error('Expected technical-data text');
+  expect(result.textLines).toHaveLength(result.text.split('\n').length);
+  expect(result.sniptaleDrawingTextMaxWidth).toBe(640);
+  expect(result.width).toBeLessThanOrEqual(640);
+  expect(readEditorDrawingObject(result)).toMatchObject({ kind: 'text', fontSize: 20 });
 });

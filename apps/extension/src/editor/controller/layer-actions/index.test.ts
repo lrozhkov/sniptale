@@ -210,7 +210,9 @@ function runTextResizeSuite() {
     expect(target.scaleX).toBe(1);
     expect(target.scaleY).toBe(1);
     expect(target['width']).toBe(280);
-    expect(target.setCoords).toHaveBeenCalledOnce();
+    expect(target['fontSize']).toBe(20);
+    expect(target['initDimensions']).toHaveBeenCalledOnce();
+    expect(target.setCoords).toHaveBeenCalled();
     expect(ensureObjectReachable).toHaveBeenCalledWith(target);
   });
 }

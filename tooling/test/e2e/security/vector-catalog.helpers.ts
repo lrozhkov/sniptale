@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import type { Socket } from 'node:net';
 import { promisify } from 'node:util';
 import { expect, type BrowserContext, type Page, type ViewportSize } from '@playwright/test';
+import { installBrowserLocaleBeforeNavigation } from '../../support/browser-preferences';
 import {
   acceptOptionalExtensionPermissionPrompt,
   denyOptionalExtensionPermissionPrompt,
@@ -252,7 +253,7 @@ export async function openCatalogEditor(
   const page = await context.newPage();
   await page.setViewportSize(viewport);
   await context.route('https://api.iconify.design/**', (route) => route.abort());
-  await context.addInitScript(() => localStorage.setItem('sniptale-locale-preference', 'en'));
+  await installBrowserLocaleBeforeNavigation(context, 'en');
   await page.goto(`chrome-extension://${extensionId}/apps/extension/src/editor/index.html`, {
     waitUntil: 'domcontentloaded',
   });

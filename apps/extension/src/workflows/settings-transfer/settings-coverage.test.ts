@@ -45,13 +45,19 @@ describe('visible Settings transfer coverage guard', () => {
     }
   });
 
-  it('declares only the policy-excluded local background catalog as a non-transferable view', () => {
+  it('declares the policy-excluded local background and vector catalogs as non-transferable views', () => {
     expect(SETTINGS_TRANSFER_EXCLUDED_VIEW_COVERAGE).toEqual({
       'editor-resources': {
         backgrounds: {
           storageKey: 'sniptale_background_presets',
           policy: 'docs/security/data-handling.md',
           reason: 'Local-only background preset metadata is excluded from settings transfer.',
+        },
+        icons: {
+          storeName: 'editor_vector_library',
+          policy: 'docs/security/data-handling.md',
+          reason:
+            'Local vector catalog settings, metadata and cache are excluded from settings transfer.',
         },
       },
     });
@@ -61,6 +67,11 @@ describe('visible Settings transfer coverage guard', () => {
       .find((paragraph) => paragraph.startsWith('Background preset metadata'));
     expect(backgroundPolicy).toContain('sniptale_background_presets');
     expect(backgroundPolicy).toContain('Exclude it from sync, settings transfer');
+    const vectorPolicy = policy
+      .split('\n\n')
+      .find((paragraph) => paragraph.startsWith('Vector catalog settings'));
+    expect(vectorPolicy).toContain('editor_vector_library');
+    expect(vectorPolicy).toContain('Settings transfer does not serialize these records.');
   });
 
   it('discovers the shared protection client outside sections and requires its secret classification', () => {

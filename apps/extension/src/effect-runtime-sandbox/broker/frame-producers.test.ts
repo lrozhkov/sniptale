@@ -141,9 +141,17 @@ it.each([false, true])(
       native = resolveEffectRuntimeFramePlans(value.project, 3)[0]!,
       review = gallery(value, 3)!.plan;
     expect(native).toMatchObject({ time: 0.5, duration: 2, progress: 0.25, frameIndex: 30 });
-    expect(native.controls).toEqual(review.controls);
-    expect(native.bitmapBounds).toEqual(review.bitmapBounds);
-    expect(native.dimensions).toEqual(review.dimensions);
+    // Gallery quantizes derived anchors to 1e-10 intrinsic units. Allow only numerical propagation.
+    const numericFields = (fields: object, precision: number) =>
+      Object.fromEntries(
+        Object.entries(fields).map(([key, value]) => [
+          key,
+          typeof value === 'number' ? expect.closeTo(value, precision) : value,
+        ])
+      );
+    expect(native.controls).toEqual(numericFields(review.controls, 9));
+    expect(native.bitmapBounds).toEqual(numericFields(review.bitmapBounds!, 11));
+    expect(native.dimensions).toEqual(numericFields(review.dimensions, 9));
     expect(
       Math.abs(native.renderDimensions.width - review.renderDimensions.width)
     ).toBeLessThanOrEqual(1);

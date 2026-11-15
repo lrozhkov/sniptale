@@ -103,13 +103,11 @@ it('uses shared first-image acquisition, Background fit controls and reset throu
         .querySelectorAll<HTMLButtonElement>('[data-ui="editor.frame.background-mode"] button')[2]!
         .getAttribute('aria-pressed')
     ).toBe('true');
-    const advanced = [...host.querySelectorAll('details')].find(
-      (item) => item.querySelector('summary')?.textContent === 'Фон'
-    )!;
-    expect(advanced.textContent).toContain('Заполнение фона');
-    await act(async () =>
-      advanced.querySelector<HTMLButtonElement>('button[aria-label="Заполнение фона"]')!.click()
+    const backgroundFit = host.querySelector<HTMLButtonElement>(
+      'button[aria-label="Заполнение фона"]'
     );
+    expect(backgroundFit).not.toBeNull();
+    await act(async () => backgroundFit!.click());
     const contain = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((item) =>
       item.textContent?.includes('Contain')
     )!;

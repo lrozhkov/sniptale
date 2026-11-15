@@ -75,7 +75,12 @@ it('keeps restored file URLs alive after save-as-copy and through the next autos
   });
   mocks.commitWorkspace.mockImplementation(async (input) => {
     if (released) throw new Error('Editor object URL is unavailable');
-    return { aggregateId: input.aggregateId, revision: input.expectedRevision + 1 };
+    return {
+      aggregateId: input.aggregateId,
+      revision: input.expectedRevision + 1,
+      documentAssetsByRuntimeUrl: new Map(),
+      documentAssetsByVectorDefinitionId: new Map(),
+    };
   });
 
   const autosaveService = createEditorSessionAutosaveService();

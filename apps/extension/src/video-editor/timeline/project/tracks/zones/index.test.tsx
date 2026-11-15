@@ -30,9 +30,8 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-const CROSSFADE_DETAIL =
-  'videoEditor.templates.transitionGroupCore · videoEditor.sidebar.transitionRenderComposite';
-const CROSSFADE_TITLE = `videoEditor.sidebar.transitionCrossfade · ${CROSSFADE_DETAIL}`;
+const FADE_DETAIL = 'videoEditor.sidebar.transitionRenderShader';
+const FADE_TITLE = `Fade · ${FADE_DETAIL}`;
 
 beforeEach(() => {
   container = document.createElement('div');
@@ -151,14 +150,14 @@ function expectPrimaryTrackZones(
   expect(buildTrackJunctionZones(project, trackId)).toEqual([
     {
       locked: false,
-      detail: CROSSFADE_DETAIL,
+      detail: FADE_DETAIL,
       end: 5,
       id: 'transition-1',
       label: '1 videoEditor.timeline.secondsSuffix',
       stackIndex: 0,
       start: 4,
-      title: CROSSFADE_TITLE,
-      zoneClassName: expect.stringContaining('var(--sniptale-color-accent)'),
+      title: FADE_TITLE,
+      zoneClassName: expect.stringContaining('var(--sniptale-color-warning)'),
       zoneSelectedClassName: expect.stringContaining('var(--sniptale-color-border-accent-strong)'),
     },
   ]);

@@ -60,12 +60,22 @@ it('renders all eight neutral resize handles on proximity in standard cursor sta
   ]);
   expect(handles[0]?.style.cursor).toBe('nwse-resize');
   expect(handles[1]?.style.cursor).toBe('ns-resize');
-  expect(handles[0]?.style.width).toBe('13px');
-  expect(handles[0]?.style.height).toBe('13px');
+  expect(handles[0]?.style.width).toBe('9px');
+  expect(handles[0]?.style.height).toBe('9px');
+  expect(handles[1]?.style.width).toBe('12px');
+  expect(handles[1]?.style.height).toBe('6px');
+  expect(handles[3]?.style.width).toBe('6px');
+  expect(handles[3]?.style.height).toBe('12px');
+  for (const handle of handles) {
+    const hitTarget = handle.querySelector('span');
+    expect(hitTarget?.style.width).toBe('22px');
+    expect(hitTarget?.style.height).toBe('22px');
+    expect(hitTarget?.style.pointerEvents).toBe('auto');
+  }
   expect(handles[0]?.style.boxSizing).toBe('border-box');
   expect(handles[0]?.style.backgroundColor).toBe('rgb(255, 255, 255)');
-  expect(handles[0]?.style.left).toBe('1px');
-  expect(handles[0]?.style.top).toBe('11px');
+  expect(handles[0]?.style.left).toBe('5.5px');
+  expect(handles[0]?.style.top).toBe('15.5px');
 
   act(() => {
     handles[4]?.dispatchEvent(

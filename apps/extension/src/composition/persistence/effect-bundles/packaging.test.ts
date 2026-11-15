@@ -24,9 +24,9 @@ async function copyCollection() {
   await cp(root, dir, { recursive: true });
   return dir;
 }
-it('packages only seven checked Lottie documents and a small source-free catalog index', () => {
+it('packages only ten checked Lottie documents and a small source-free catalog index', () => {
   expect(parseBuiltinEffectIndex(valid)).toEqual(valid);
-  expect(valid.documents).toHaveLength(7);
+  expect(valid.documents).toHaveLength(10);
   expect(valid.documents.every((document) => document.kind === 'standalone')).toBe(true);
   expect(JSON.stringify(valid)).not.toContain('"graph"');
   expect(JSON.stringify(valid)).not.toContain('"base64"');
