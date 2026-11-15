@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { resolvePreviewRenderAllocation } from './preview-render-allocation';
 import type { PreviewScene } from './preview-scene';
 import { createReviewPreviewRenderer } from './render-preview';
@@ -5,7 +6,6 @@ import { createPreviewRenderResources } from './preview-render-resources';
 import { prepareReviewExportSourceSampling } from './export-source-sampling';
 import { vi } from 'vitest';
 import type { ExportEnhancer } from '../../features/video/composition/export-enhancement/enhancer';
-// @vitest-environment jsdom
 import { expect, it } from 'vitest';
 import {
   createSourceImageFilter,

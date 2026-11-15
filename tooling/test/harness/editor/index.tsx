@@ -50,7 +50,7 @@ declare global {
         historyMuted: number;
         frame: ReturnType<typeof useEditorStore.getState>['frame'];
         framePreviewActive: boolean;
-        transform: { action: string; actionPerformed: boolean; corner: string } | null;
+        transform: { action: string | undefined; actionPerformed: boolean; corner: string } | null;
       };
       setZoomLevel: (value: number) => void;
     };

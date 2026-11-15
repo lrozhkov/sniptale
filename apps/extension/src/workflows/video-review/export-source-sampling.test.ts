@@ -1,5 +1,5 @@
-import { createPreparedSourceBudget } from '../../features/video/composition/export-enhancement/prepared-source';
 // @vitest-environment jsdom
+import { createPreparedSourceBudget } from '../../features/video/composition/export-enhancement/prepared-source';
 import type { CanvasCommentExport } from '../../features/video/review/comments';
 import { isCanvasCommentVisibleAt } from '../../features/video/review/comments';
 import type {

@@ -112,6 +112,24 @@
       }
     },
     {
+      "id": "046b0869b43a98f9eed0f782ae9bd57ce4daf5612e67b490fa6cd881133291cf",
+      "classification": "tool-noise",
+      "owner": "features/video/project/cursor-motion/apple pinned source artwork",
+      "reason": "The match is an upstream SVG filter in pinned Apple Cursor artwork. Each filter retains its own identifier and bounds. identity.json binds the original SVG hashes and upstream commit. Editing these source fragments would break their provenance without consolidating runtime code.",
+      "removalCondition": "Remove when this exact pair disappears or the pinned artwork source changes.",
+      "reviewBy": "2027-05-15",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/project/cursor-motion/apple/crosshair.svg",
+        "start": 22,
+        "end": 28
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/project/cursor-motion/apple/hand2.svg",
+        "start": 10,
+        "end": 16
+      }
+    },
+    {
       "id": "04fedfa75986e5a0b1ceb9c8f7c4975e114ed313250e374d21368ff91c75452e",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/product-form-controls",
@@ -328,24 +346,6 @@
       }
     },
     {
-      "id": "1bf12ef16d9c8d7b42f60bb68a544c34017aa15547a8a13a333a22b188b5fad8",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/video-review/speech-panel.tsx",
-      "reason": "Gallery uses SelectField and its recognition command. Montage uses OptionButtonsField and inspector callbacks. Shared option literals do not unify field controls.",
-      "removalCondition": "Remove when this exact match disappears or an accepted common owner replaces the stated contract distinction.",
-      "reviewBy": "2027-04-28",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/speech-panel.tsx",
-        "start": 544,
-        "end": 551
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.tsx",
-        "start": 215,
-        "end": 222
-      }
-    },
-    {
       "id": "1e6bcf01ce6591cb14f7d63993ac0f1fa1820ab3a06832b30b83854bc6e38b5b",
       "classification": "tool-noise",
       "owner": "apps/extension/src/design-system/parity/helpers.tsx",
@@ -415,6 +415,24 @@
         "path": "apps/extension/src/background/media/video/runtime/handlers/state/recording-state.ts",
         "start": 238,
         "end": 246
+      }
+    },
+    {
+      "id": "20badf6c7ad5c562992c6e48d54b4eb9f2e2062f74a5f716fb57c3d328c0e09e",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/video-editor/timeline/project/tracks/list.tsx",
+      "reason": "Track-list public props include refs, onScroll and insertion; the inner label projection declares only selection/utility callbacks needed for rows. Overlapping signatures describe a narrowed structural port rather than duplicated track state.",
+      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/video-editor/timeline/project/tracks/list.tsx",
+        "start": 302,
+        "end": 312
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/timeline/project/tracks/list.tsx",
+        "start": 39,
+        "end": 49
       }
     },
     {
@@ -652,24 +670,6 @@
       }
     },
     {
-      "id": "2e1cdc2768657faab8b738dd1342dc9b16b80c4c1493419b6cf5f419e4264c92",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels",
-      "reason": "The matched props invoke ActionFeedbackFields for gesture appearance and gesture or click animation. Editing has one owner in the shared component. VisualPart differs.",
-      "removalCondition": "Remove when this exact finding disappears or either branch copies the shared editing implementation.",
-      "reviewBy": "2027-05-02",
-      "firstFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
-        "start": 338,
-        "end": 344
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
-        "start": 609,
-        "end": 615
-      }
-    },
-    {
       "id": "2fa914cd0dbb992c0a6f8d1b58aeb457ed8e55f19e7bff2c02cf0c4a355d7c09",
       "classification": "tool-noise",
       "owner": "offscreen-runtime-routing",
@@ -742,6 +742,24 @@
       }
     },
     {
+      "id": "3312e0bfd700c3c4c8d3c15324032ada2d494241c0d99d04f84c5fd632ece4db",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels",
+      "reason": "The matched props invoke ActionFeedbackFields for gesture appearance and gesture or click animation. Editing has one owner in the shared component. VisualPart differs.",
+      "removalCondition": "Remove when this exact finding disappears or either branch copies the shared editing implementation.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 342,
+        "end": 348
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 613,
+        "end": 619
+      }
+    },
+    {
       "id": "338d22408f73735a74283702b4a945552d6f1c9631f865467a12cb2d2995034f",
       "classification": "tool-noise",
       "owner": "apps/extension/src/features/video/project/cursor-trajectory",
@@ -796,6 +814,24 @@
       }
     },
     {
+      "id": "35c0460cc46ce2310f97db37aab0fb91e79f8b70b62269183f980d2e77297f77",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
+      "reason": "Gesture cleanup clears distinct local drafts; review commits directly, editor through guarded history.",
+      "removalCondition": "Remove when gesture lifetime/commit contract converges or exact pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
+        "start": 343,
+        "end": 356
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/preview/stage/point-overlay/cursor-path.tsx",
+        "start": 358,
+        "end": 371
+      }
+    },
+    {
       "id": "3631130708073fb0b8384e1489029d3fc92e22bfc1837fc7a990dcd8919dd7d8",
       "classification": "tool-noise",
       "owner": "composition WebGL backend adapters",
@@ -811,6 +847,42 @@
         "path": "apps/extension/src/features/video/composition/export-enhancement/bicubic.ts",
         "start": 103,
         "end": 108
+      }
+    },
+    {
+      "id": "36bca96f91d7d84084c40b06e3d1079211608948f9f0e2d89802604d71c56afc",
+      "classification": "tool-noise",
+      "owner": "workflows/video/native-composition/frame-plan",
+      "reason": "Both sites invoke the existing raster-scale resolver with the same typed inputs. One supplies a default argument. The other prepares a frame and passes its resolved scale onward. The matched invocation contains no scale algorithm.",
+      "removalCondition": "Remove when this exact pair disappears or both operations accept one resolved preparation input.",
+      "reviewBy": "2027-05-15",
+      "firstFile": {
+        "path": "apps/extension/src/workflows/video/native-composition/frame-plan.ts",
+        "start": 164,
+        "end": 170
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/video/native-composition/frame-plan.ts",
+        "start": 237,
+        "end": 243
+      }
+    },
+    {
+      "id": "3759824525e43ac1822ceb591511e47a1177721b0509d4929b0a719aedb85569",
+      "classification": "tool-noise",
+      "owner": "features/video/project/cursor-motion/apple pinned source artwork",
+      "reason": "The match is an upstream SVG filter in pinned Apple Cursor artwork. Each filter retains its own identifier and bounds. identity.json binds the original SVG hashes and upstream commit. Editing these source fragments would break their provenance without consolidating runtime code.",
+      "removalCondition": "Remove when this exact pair disappears or the pinned artwork source changes.",
+      "reviewBy": "2027-05-15",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/project/cursor-motion/apple/crosshair.svg",
+        "start": 31,
+        "end": 40
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/project/cursor-motion/apple/crosshair.svg",
+        "start": 40,
+        "end": 49
       }
     },
     {
@@ -886,6 +958,24 @@
       }
     },
     {
+      "id": "3c3cca099c3e1fe2af6a3c423731fe4ead49478a7290f519aa7cb60f97ba52b9",
+      "classification": "tool-noise",
+      "owner": "composition geometry and Native source sampling",
+      "reason": "The fragment enumerates four rectangle corners. Effect bounds use affine arithmetic. Native sampling uses homography projection and horizon refusal. Both already share point-bound reduction. A common transform would change their contracts.",
+      "removalCondition": "Remove if this exact match disappears or an established corner operation preserves their current order and serves an accepted requirement.",
+      "reviewBy": "2026-12-09",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/composition/effect-runtime/render/gpu-plan-layers.ts",
+        "start": 192,
+        "end": 198
+      },
+      "secondFile": {
+        "path": "apps/extension/src/offscreen/project-export/renderer/source-sampling-plan.ts",
+        "start": 130,
+        "end": 136
+      }
+    },
+    {
       "id": "3c57c58ff692095476e2d8e57c85c770b9d0318fb8bff0d1a62b5fa3c44c86b7",
       "classification": "tool-noise",
       "owner": "apps/extension/src/composition/background-resources and gallery/video-review",
@@ -901,24 +991,6 @@
         "path": "apps/extension/src/gallery/video-review/presentation-library.tsx",
         "start": 76,
         "end": 88
-      }
-    },
-    {
-      "id": "3c66c0320a30f51280a889d869ad18898282f4e5e8e5763bedd33bf187c75fdb",
-      "classification": "tool-noise",
-      "owner": "features/video/composition/motion",
-      "reason": "The shared prefix validates finite coordinates/camera scale. Forward mapping applies projection; inverse mapping must invert it and fail for singular matrices. Scalar translations also run in opposite directions.",
-      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/composition/motion/index.ts",
-        "start": 382,
-        "end": 394
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/composition/motion/index.ts",
-        "start": 417,
-        "end": 429
       }
     },
     {
@@ -994,24 +1066,6 @@
       }
     },
     {
-      "id": "47111a81f930caef1c62e218c759c831ce1785a5b660adb5b469e8cd000ffcf5",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
-      "reason": "Style-domain schemas explicitly allow different field sets: catalog/system revisions versus per-surface revision/maps. Repeated reject-unknown/default-projection syntax preserves domain-specific trust validation, and the subsequent validation predicates differ.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
-        "start": 225,
-        "end": 230
-      },
-      "secondFile": {
-        "path": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
-        "start": 283,
-        "end": 288
-      }
-    },
-    {
       "id": "47d29325d2c4f87c5a5476ac2e043e0dc203de0ae6037da601093ab04c5864e6",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/ai-modal/shell.css",
@@ -1084,6 +1138,24 @@
       }
     },
     {
+      "id": "4d6a9240c9cc7c5d0339f6326983247bb1c5e145ec5980ba14fd3f3cf6fc1700",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels",
+      "reason": "Sound selects keyboard or mouse with part sound. Gesture appearance selects mouse with part visual. Repeated props bind the existing shared control to distinct panel contracts.",
+      "removalCondition": "Remove when this exact finding disappears or the distinct sound and appearance contracts cease to apply.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 136,
+        "end": 145
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 339,
+        "end": 346
+      }
+    },
+    {
       "classification": "tool-noise",
       "owner": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
       "reason": "Existing card calls belong to absolute virtual rows and grouped members with distinct layout identities.",
@@ -1138,6 +1210,24 @@
       }
     },
     {
+      "id": "51fe6476657aed0d9da486e15b8762026edb359d885cf1ab62c750cc5e42b6bc",
+      "classification": "tool-noise",
+      "owner": "features/image-filters GPU renderer <-> video composition mip renderer",
+      "reason": "The match contains WebGPU command syntax. Image filtering binds two textures and a sampler at slots 1 through 3. Video mip filtering binds a sampler and one input view at slots 1 and 2. These shaders require different binding contracts.",
+      "removalCondition": "Remove when this exact pair disappears or both shaders adopt one accepted binding and resource contract.",
+      "reviewBy": "2027-05-15",
+      "firstFile": {
+        "path": "apps/extension/src/features/image-filters/gpu.ts",
+        "start": 179,
+        "end": 189
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/composition/canvas/gpu-preview-filter.ts",
+        "start": 248,
+        "end": 258
+      }
+    },
+    {
       "id": "52732c12cd52c3ae0efc32fa3650b18de507a63b188e45b7196fd6e7985391f3",
       "classification": "tool-noise",
       "owner": "background-design-review-session and background-page-recovery",
@@ -1189,24 +1279,6 @@
         "path": "apps/extension/src/content/parser/export-manager/diagnostics/extended-evidence.ts",
         "start": 42,
         "end": 48
-      }
-    },
-    {
-      "id": "5616b4eda10076dfe80a8ab131c1cf21a30c83a6c926cfee06e5703b62cc9dd3",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
-      "reason": "Review circles use review dimensions; editor ellipses use stage transforms and validated editor commits.",
-      "removalCondition": "Remove when coordinate and commit contracts converge or exact pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
-        "start": 193,
-        "end": 206
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/preview/stage/point-overlay/cursor-path.tsx",
-        "start": 436,
-        "end": 449
       }
     },
     {
@@ -1300,6 +1372,24 @@
       }
     },
     {
+      "id": "5c204a1042de13985995f4b3426df5a63e84d090931600047df5db985c235e28",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
+      "reason": "Style-domain schemas explicitly allow different field sets: catalog/system revisions versus per-surface revision/maps. Repeated reject-unknown/default-projection syntax preserves domain-specific trust validation, and the subsequent validation predicates differ.",
+      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
+        "start": 251,
+        "end": 256
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
+        "start": 309,
+        "end": 314
+      }
+    },
+    {
       "id": "5cae0326e58a9965a709563c60dbc36da4afe7fd54f0cf586d6f0d404d5f1288",
       "classification": "tool-noise",
       "owner": "offscreen/recording/encoding",
@@ -1315,6 +1405,24 @@
         "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
         "start": 346,
         "end": 351
+      }
+    },
+    {
+      "id": "5ec5d10b74fa99875aad952c6fee3348251d51fd7cd307bc4dc817cf96d7b885",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels",
+      "reason": "Gesture appearance and click position invoke ActionFeedbackFields with distinct visual families, visual parts, and disabling policies. The match contains no editing algorithm.",
+      "removalCondition": "Remove when this exact finding disappears or these distinct control compositions acquire one accepted owner.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 340,
+        "end": 347
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 424,
+        "end": 431
       }
     },
     {
@@ -1516,21 +1624,21 @@
       }
     },
     {
-      "id": "6f53fb9f53906e6c9e1b9e7724c3df00f59f90c43c9b676ba0dc2b38afce510a",
+      "id": "700a94a9427a435f55af43d970ec5f00f8378a5968ed0932720fb9a90784a8fb",
       "classification": "tool-noise",
-      "owner": "composition spotlight painting",
-      "reason": "The fragment projects a point and appends it to a closed Path2D. Rounded openings sample corner curves. Outlines traverse authored vertices. Their point-generation contracts remain distinct.",
-      "removalCondition": "Remove if this exact match disappears or an accepted common point-generation contract replaces both algorithms.",
-      "reviewBy": "2026-12-09",
+      "owner": "features/video/composition/motion",
+      "reason": "The shared prefix validates finite coordinates/camera scale. Forward mapping applies projection; inverse mapping must invert it and fail for singular matrices. Scalar translations also run in opposite directions.",
+      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
+      "reviewBy": "2027-04-15",
       "firstFile": {
-        "path": "apps/extension/src/features/video/composition/draw/spotlight.ts",
-        "start": 471,
-        "end": 480
+        "path": "apps/extension/src/features/video/composition/motion/index.ts",
+        "start": 393,
+        "end": 405
       },
       "secondFile": {
-        "path": "apps/extension/src/features/video/composition/draw/spotlight.ts",
-        "start": 515,
-        "end": 524
+        "path": "apps/extension/src/features/video/composition/motion/index.ts",
+        "start": 428,
+        "end": 440
       }
     },
     {
@@ -1588,6 +1696,24 @@
       }
     },
     {
+      "id": "7240eb169a5514078b5b97a3882b4d8684cfcf47104a3bf17e065bf5e2996a2b",
+      "classification": "tool-noise",
+      "owner": "project and review camera adapters",
+      "reason": "The fragment publishes a success result and bounds a four-entry cache. Project and review adapters own different conflict records, keys, contexts, and observation inputs. A shared cache wrapper would not unify those contracts.",
+      "removalCondition": "Remove if this exact match disappears or an accepted common camera result and cache owner replaces both adapters.",
+      "reviewBy": "2026-12-09",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/composition/motion/project-follow.ts",
+        "start": 704,
+        "end": 711
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/review/advanced/scene.ts",
+        "start": 367,
+        "end": 373
+      }
+    },
+    {
       "id": "72ae2b63fae1cc078d1d728ac790d368a978f3dd6b45a8c109775b5f96f87f6d",
       "classification": "tool-noise",
       "owner": "frame annotation composition",
@@ -1624,6 +1750,24 @@
       }
     },
     {
+      "id": "775edcb1843e675daafa31c609eb1084fdb637e4a79dcfa7307e7dedfb347697",
+      "classification": "tool-noise",
+      "owner": "features/video/project/cursor-motion/apple pinned source artwork",
+      "reason": "The match is an upstream SVG filter in pinned Apple Cursor artwork. Each filter retains its own identifier and bounds. identity.json binds the original SVG hashes and upstream commit. Editing these source fragments would break their provenance without consolidating runtime code.",
+      "removalCondition": "Remove when this exact pair disappears or the pinned artwork source changes.",
+      "reviewBy": "2027-05-15",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/project/cursor-motion/apple/left_ptr.svg",
+        "start": 7,
+        "end": 13
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/project/cursor-motion/apple/xterm.svg",
+        "start": 9,
+        "end": 15
+      }
+    },
+    {
       "classification": "tool-noise",
       "owner": "ui/sync-cache-feedback",
       "reason": "The exact match destructures feedback from the single useSyncCacheFeedback owner and declares caller-local observation references. Shared cancellation and feedback rendering now have one implementation. Gallery retains root-bound status revision and an operation-kind ticket. Settings retains budget input and a trim request ID. This match is consumer wiring, not another cancellation or cache state machine.",
@@ -1657,6 +1801,24 @@
         "path": "packages/ui/src/styles/content-popover/index.css",
         "start": 197,
         "end": 205
+      }
+    },
+    {
+      "id": "79bb89eb339610b299dabcf2c167f87665e6e52eb9aad2e6acc732839b78cadd",
+      "classification": "tool-noise",
+      "owner": "features/video/project/cursor-motion/apple pinned source artwork",
+      "reason": "The match is an upstream SVG filter in pinned Apple Cursor artwork. Each filter retains its own identifier and bounds. identity.json binds the original SVG hashes and upstream commit. Editing these source fragments would break their provenance without consolidating runtime code.",
+      "removalCondition": "Remove when this exact pair disappears or the pinned artwork source changes.",
+      "reviewBy": "2027-05-15",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/project/cursor-motion/apple/crosshair.svg",
+        "start": 22,
+        "end": 31
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/project/cursor-motion/apple/crosshair.svg",
+        "start": 58,
+        "end": 67
       }
     },
     {
@@ -1714,6 +1876,24 @@
       }
     },
     {
+      "id": "82c1a40b87c65980d36919ded64396ed05c07b6749b21e3a4546cbf4292389d0",
+      "classification": "tool-noise",
+      "owner": "features/video/project/cursor-motion/apple pinned source artwork",
+      "reason": "The match is an upstream SVG filter in pinned Apple Cursor artwork. Each filter retains its own identifier and bounds. identity.json binds the original SVG hashes and upstream commit. Editing these source fragments would break their provenance without consolidating runtime code.",
+      "removalCondition": "Remove when this exact pair disappears or the pinned artwork source changes.",
+      "reviewBy": "2027-05-15",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/project/cursor-motion/apple/crosshair.svg",
+        "start": 22,
+        "end": 31
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/project/cursor-motion/apple/crosshair.svg",
+        "start": 31,
+        "end": 40
+      }
+    },
+    {
       "classification": "tool-noise",
       "owner": "extension:scenario-editor:tour:inspector",
       "reason": "Hotspot and annotation settings pass common context into distinct typed controls. Each callback delegates to the shared updateAction operation. The callback retains its own action discriminant and object type. No immutable update algorithm remains duplicated. Mixed-action sibling preservation is covered by the inspector unit proof.",
@@ -1729,6 +1909,24 @@
         "path": "apps/extension/src/scenario-editor/page-shell/tour/inspector.tsx",
         "start": 520,
         "end": 529
+      }
+    },
+    {
+      "id": "82dfdfbe14df5ac52d1f966b0514fccd6a2d2506695246c3378b4e8d1d84eb54",
+      "classification": "tool-noise",
+      "owner": "features/video/project/cursor-motion/apple pinned source artwork",
+      "reason": "The match is an upstream SVG filter in pinned Apple Cursor artwork. Each filter retains its own identifier and bounds. identity.json binds the original SVG hashes and upstream commit. Editing these source fragments would break their provenance without consolidating runtime code.",
+      "removalCondition": "Remove when this exact pair disappears or the pinned artwork source changes.",
+      "reviewBy": "2027-05-15",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/project/cursor-motion/apple/crosshair.svg",
+        "start": 22,
+        "end": 31
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/project/cursor-motion/apple/crosshair.svg",
+        "start": 49,
+        "end": 58
       }
     },
     {
@@ -1786,24 +1984,6 @@
       }
     },
     {
-      "id": "8a90473912d4e3487a3ff35a537cade1270247e36905a2b03ee3126b14342bf4",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels",
-      "reason": "Click position and animation invoke ActionFeedbackFields with different visualPart and disabling policies. The match contains shared invocation props, not an editing algorithm.",
-      "removalCondition": "Remove when this exact finding disappears or either branch copies the shared editing implementation.",
-      "reviewBy": "2027-05-02",
-      "firstFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
-        "start": 420,
-        "end": 427
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
-        "start": 607,
-        "end": 614
-      }
-    },
-    {
       "id": "8b591fe6edbc7b1760ef4e0fb86577af0cfd0055a7958cf40154e7c4e030424b",
       "classification": "tool-noise",
       "owner": "apps/extension/src/ui/highlighter-preset-editor <-> apps/extension/src/ui/surface-style-selector",
@@ -1855,24 +2035,6 @@
         "path": "apps/extension/src/features/simplify/engine/structure-topology.mjs",
         "start": 343,
         "end": 351
-      }
-    },
-    {
-      "id": "901c0993b8bfb16bb097b395f947d794094231f0fd524733d07b0075f30d023b",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels",
-      "reason": "Sound selects keyboard or mouse with part sound. Gesture appearance selects mouse with part visual. Repeated props bind the existing shared control to distinct panel contracts.",
-      "removalCondition": "Remove when this exact finding disappears or the distinct sound and appearance contracts cease to apply.",
-      "reviewBy": "2027-05-02",
-      "firstFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
-        "start": 132,
-        "end": 141
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
-        "start": 335,
-        "end": 342
       }
     },
     {
@@ -2020,6 +2182,24 @@
       }
     },
     {
+      "id": "955fe69b61ce2b8c1920ff1e2639165c9b7eda6bea2c9b51245678883126e22f",
+      "classification": "tool-noise",
+      "owner": "video composition mip renderer <-> video composition scene renderer",
+      "reason": "The match contains WebGPU pipeline and bind-group setup. Mip rendering binds its input level. Scene composition additionally binds optional masks and operation clips, then applies scissor and blend policy. The shared syntax does not define one render operation.",
+      "removalCondition": "Remove when this exact pair disappears or both render operations adopt one accepted binding and draw contract.",
+      "reviewBy": "2027-05-15",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/composition/canvas/gpu-preview-filter.ts",
+        "start": 250,
+        "end": 259
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/composition/canvas/gpu-preview-slot.ts",
+        "start": 397,
+        "end": 406
+      }
+    },
+    {
       "id": "95937012c3fe874152d41a49570f7989c92916e38ce11413ed8e17d3bd3f92c7",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/overlays/ai-modal-overrides/surface.css <-> packages/ui/src/styles/overlays/menu-surfaces.css",
@@ -2164,6 +2344,42 @@
       }
     },
     {
+      "id": "9aa15e93bd0397b990ad1e8920e48864ad0b338fb93b4628724e3db8a4a6df91",
+      "classification": "tool-noise",
+      "owner": "video-editor/project/state/effects.effect-instance",
+      "reason": "The overlap wraps two distinct plans with the existing applyProjectUpdate and mutation-patch owner. Source-range restore replaces planned instance; attachment change conditionally changes sceneAnchors. The shared prefix is not the complete mutation.",
+      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/video-editor/project/state/effects.effect-instance.ts",
+        "start": 119,
+        "end": 126
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/project/state/effects.effect-instance.ts",
+        "start": 138,
+        "end": 146
+      }
+    },
+    {
+      "id": "9af29f4e55d437d9159d5895ed48ff9e9ce28efa386075e1a907bc592514ce95",
+      "classification": "tool-noise",
+      "owner": "composition spotlight painting",
+      "reason": "The fragment projects a point and appends it to a closed Path2D. Rounded openings sample corner curves. Outlines traverse authored vertices. Their point-generation contracts remain distinct.",
+      "removalCondition": "Remove if this exact match disappears or an accepted common point-generation contract replaces both algorithms.",
+      "reviewBy": "2026-12-09",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/composition/draw/spotlight.ts",
+        "start": 559,
+        "end": 568
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/composition/draw/spotlight.ts",
+        "start": 603,
+        "end": 612
+      }
+    },
+    {
       "id": "9c22d0595ab4de301f055725bc187bd87d63e58231f099570cb702c16c60f7dc",
       "classification": "tool-noise",
       "owner": "Gallery video-review inspector and shared compact inspector",
@@ -2197,6 +2413,24 @@
         "path": "packages/ui/src/styles/content-popover/index.css",
         "start": 188,
         "end": 197
+      }
+    },
+    {
+      "id": "9d1631557b6a24265e2f262667c4516a8f70e9cd7cd20ba5b8899cd67d44d0e2",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
+      "reason": "Event listener binding surrounds distinct draft shapes, coordinate adapters, commit gates and selection callbacks.",
+      "removalCondition": "Remove when a common gesture-session owner covers both or exact pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
+        "start": 361,
+        "end": 378
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/preview/stage/point-overlay/cursor-path.tsx",
+        "start": 375,
+        "end": 392
       }
     },
     {
@@ -2269,42 +2503,6 @@
         "path": "apps/extension/src/features/simplify/engine/media-components.mjs",
         "start": 333,
         "end": 340
-      }
-    },
-    {
-      "id": "a01bd7f4b2f316648582f430ae4f53cd99a5baef702d8e1c84840c9a90c091a5",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/features/video/project/validation",
-      "reason": "The shared prefix checks optional style and easing leaves. Complete presentation requires enabled, clickPreset, duration, offset, suppression interval, and showKeystrokes. Sparse override permits omissions and uses preset and optional point.",
-      "removalCondition": "Remove when this exact finding disappears or both validators acquire the same complete contract.",
-      "reviewBy": "2027-05-02",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/project/validation/interaction.ts",
-        "start": 259,
-        "end": 264
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/project/validation/interaction.ts",
-        "start": 276,
-        "end": 281
-      }
-    },
-    {
-      "id": "a3a3d7200d26a543142f4019776f235babe71b7bf9234ab27e1b4b50bf73a899",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
-      "reason": "Event listener binding surrounds distinct draft shapes, coordinate adapters, commit gates and selection callbacks.",
-      "removalCondition": "Remove when a common gesture-session owner covers both or exact pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
-        "start": 360,
-        "end": 377
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/preview/stage/point-overlay/cursor-path.tsx",
-        "start": 375,
-        "end": 392
       }
     },
     {
@@ -2488,6 +2686,24 @@
       }
     },
     {
+      "id": "af7d3b0d2de11d66a57277c640f5cf1f5898c1b9f922d016a09576558df13db7",
+      "classification": "tool-noise",
+      "owner": "features/image-filters GPU renderer <-> video composition mip renderer",
+      "reason": "Pipeline descriptors use different shader modules with the same WebGPU descriptor structure. Image filtering owns program textures and uniforms. Mip filtering owns sampled mip levels and retained content. Sharing descriptor syntax would not unify these rendering contracts.",
+      "removalCondition": "Remove when this exact pair disappears or one accepted shader and resource contract replaces both renderers.",
+      "reviewBy": "2027-05-15",
+      "firstFile": {
+        "path": "apps/extension/src/features/image-filters/gpu.ts",
+        "start": 36,
+        "end": 45
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/composition/canvas/gpu-preview-filter.ts",
+        "start": 106,
+        "end": 113
+      }
+    },
+    {
       "id": "b07219f2e5af149f429fb7410de2f9d0a3a0aad276c90a83a758646d13147236",
       "classification": "tool-noise",
       "owner": "tooling/design-reference example entry pages",
@@ -2593,24 +2809,6 @@
         "path": "packages/ui/src/styles/product-form-controls/range.css",
         "start": 157,
         "end": 172
-      }
-    },
-    {
-      "id": "b43f89a1a7eb564ef151adad397fe1c9a09be5a595fbd9eccde4fd9c1cfb8c05",
-      "classification": "tool-noise",
-      "owner": "composition geometry and Native source sampling",
-      "reason": "The fragment enumerates four rectangle corners. Effect bounds use affine arithmetic. Native sampling uses homography projection and horizon refusal. Both already share point-bound reduction. A common transform would change their contracts.",
-      "removalCondition": "Remove if this exact match disappears or an established corner operation preserves their current order and serves an accepted requirement.",
-      "reviewBy": "2026-12-09",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/composition/effect-runtime/render/gpu-plan-layers.ts",
-        "start": 192,
-        "end": 198
-      },
-      "secondFile": {
-        "path": "apps/extension/src/offscreen/project-export/renderer/source-sampling-plan.ts",
-        "start": 130,
-        "end": 136
       }
     },
     {
@@ -2722,24 +2920,6 @@
       }
     },
     {
-      "id": "b99ce558827c12152322d451a5ba167ebc26951ee12dc4d9ac4d2f22f2f51213",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/video-editor/timeline/project/tracks/list.tsx",
-      "reason": "Track-list public props include refs, onScroll and insertion; the inner label projection declares only selection/utility callbacks needed for rows. Overlapping signatures describe a narrowed structural port rather than duplicated track state.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/video-editor/timeline/project/tracks/list.tsx",
-        "start": 302,
-        "end": 312
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/timeline/project/tracks/list.tsx",
-        "start": 39,
-        "end": 49
-      }
-    },
-    {
       "id": "b9d1cd1cf46261a9f3d21e47a897306e2cf10188d8e74d5d315260c8f5479046",
       "classification": "tool-noise",
       "owner": "content/public/preparation-surface scrollbar effects",
@@ -2755,6 +2935,24 @@
         "path": "apps/extension/src/content/public/preparation-surface/effects.css",
         "start": 115,
         "end": 124
+      }
+    },
+    {
+      "id": "bc7426d22be7d3502c54ee3e183aa6624183e78bc6c46aa098990c665065824b",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
+      "reason": "Review circles use review dimensions; editor ellipses use stage transforms and validated editor commits.",
+      "removalCondition": "Remove when coordinate and commit contracts converge or exact pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
+        "start": 194,
+        "end": 207
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/preview/stage/point-overlay/cursor-path.tsx",
+        "start": 436,
+        "end": 449
       }
     },
     {
@@ -2848,24 +3046,6 @@
       }
     },
     {
-      "id": "c115179db2a6ecb858fb739fb89b7868707007e1b6204775d72f46a73ba1c5b2",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels",
-      "reason": "Gesture appearance and click position invoke ActionFeedbackFields with distinct visual families, visual parts, and disabling policies. The match contains no editing algorithm.",
-      "removalCondition": "Remove when this exact finding disappears or these distinct control compositions acquire one accepted owner.",
-      "reviewBy": "2027-05-02",
-      "firstFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
-        "start": 336,
-        "end": 343
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
-        "start": 420,
-        "end": 427
-      }
-    },
-    {
       "id": "c22dcbbf9e37361cb97195c154487e392d3525049ef8b66d2bbd2a35b7d62622",
       "classification": "tool-noise",
       "owner": "background-design-review-session and background-page-recovery",
@@ -2956,24 +3136,6 @@
       }
     },
     {
-      "id": "c6b3739e48aec2250bf21a38efc8a06303de086b1ba8cb3ad9a0427615f52791",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels",
-      "reason": "Separate click-style and click-timing groups select appearance and animation semantics. Both delegate editing to ActionFeedbackFields with different visualPart values.",
-      "removalCondition": "Remove when this exact finding disappears or these branches copy the shared editing implementation.",
-      "reviewBy": "2027-05-02",
-      "firstFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
-        "start": 280,
-        "end": 291
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
-        "start": 298,
-        "end": 309
-      }
-    },
-    {
       "id": "c86e6f96b6d613cdb51310327a277ad2bbc6886f4d88a63f424d118771e0c26f",
       "classification": "tool-noise",
       "owner": "simplify-engine-components",
@@ -2989,24 +3151,6 @@
         "path": "apps/extension/src/features/simplify/engine/partial-row-uncertainty.mjs",
         "start": 40,
         "end": 47
-      }
-    },
-    {
-      "id": "c9aa6b1897a30ba3c9dfaa5ceaaaa02f42889db72cbf1c8cbde579176e8bcf82",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
-      "reason": "Gesture cleanup clears distinct local drafts; review commits directly, editor through guarded history.",
-      "removalCondition": "Remove when gesture lifetime/commit contract converges or exact pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
-        "start": 342,
-        "end": 355
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/preview/stage/point-overlay/cursor-path.tsx",
-        "start": 358,
-        "end": 371
       }
     },
     {
@@ -3118,24 +3262,6 @@
       }
     },
     {
-      "id": "cf985685bc57875f954f87cc4cc3461a4245e216af1e7523d025b68e11bc3728",
-      "classification": "tool-noise",
-      "owner": "project and review camera adapters",
-      "reason": "The fragment publishes a success result and bounds a four-entry cache. Project and review adapters own different conflict records, keys, contexts, and observation inputs. A shared cache wrapper would not unify those contracts.",
-      "removalCondition": "Remove if this exact match disappears or an accepted common camera result and cache owner replaces both adapters.",
-      "reviewBy": "2026-12-09",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/composition/motion/project-follow.ts",
-        "start": 689,
-        "end": 696
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/review/advanced/scene.ts",
-        "start": 365,
-        "end": 371
-      }
-    },
-    {
       "id": "d00ff96d3328a5a217cb05b39166042a53bca0472f3c45256af30ab56f1a7a79",
       "classification": "tool-noise",
       "owner": "composition/persistence/infrastructure/indexed-db/fixtures",
@@ -3172,6 +3298,24 @@
       }
     },
     {
+      "id": "d16731689e3a9882e541ecdbb76b9b4d557efc67fdec7269b5767a95ff178d66",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels",
+      "reason": "Separate click-style and click-timing groups select appearance and animation semantics. Both delegate editing to ActionFeedbackFields with different visualPart values.",
+      "removalCondition": "Remove when this exact finding disappears or these branches copy the shared editing implementation.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 284,
+        "end": 295
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 302,
+        "end": 313
+      }
+    },
+    {
       "id": "d1f3afe5b9058c27e244806f48eb29eaaae869d1855161fbd0e1a96fc50562f3",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/ai-modal-content",
@@ -3205,6 +3349,24 @@
         "path": "packages/ui/src/styles/toolbar-shell/button.css",
         "start": 237,
         "end": 248
+      }
+    },
+    {
+      "id": "d69410b4a58c2cdcb28a66dc72fce75b28a8a5e3d3d2707bef1d5d8296c1c53a",
+      "classification": "tool-noise",
+      "owner": "features/drawing hit-test geometry <-> drawing marquee selection",
+      "reason": "The match enumerates four rectangle corners. Hit-test quads then apply object rotation. Marquee bounds apply the complete object point transformation. These transforms have different contracts. The matched literals contain no selection or transformation algorithm.",
+      "removalCondition": "Remove when this exact pair disappears or an accepted common quad contract replaces both geometry operations.",
+      "reviewBy": "2027-05-15",
+      "firstFile": {
+        "path": "apps/extension/src/features/drawing/geometry.ts",
+        "start": 327,
+        "end": 332
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/drawing/selection.ts",
+        "start": 12,
+        "end": 17
       }
     },
     {
@@ -3262,6 +3424,42 @@
       }
     },
     {
+      "id": "d96aae6da9bd5fc88856e04e4cd70be03da895c965c68ef563e4818e9a4c1eeb",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels",
+      "reason": "Click position and animation invoke ActionFeedbackFields with different visualPart and disabling policies. The match contains shared invocation props, not an editing algorithm.",
+      "removalCondition": "Remove when this exact finding disappears or either branch copies the shared editing implementation.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 424,
+        "end": 431
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 611,
+        "end": 618
+      }
+    },
+    {
+      "id": "da685115db52a71975e79838b2f15ae39b565be2047df8a6ab908ef9b2d236d6",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/features/video/project/validation",
+      "reason": "The shared prefix checks optional style and easing leaves. Complete presentation requires enabled, clickPreset, duration, offset, suppression interval, and showKeystrokes. Sparse override permits omissions and uses preset and optional point.",
+      "removalCondition": "Remove when this exact finding disappears or both validators acquire the same complete contract.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/project/validation/interaction.ts",
+        "start": 264,
+        "end": 269
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/project/validation/interaction.ts",
+        "start": 281,
+        "end": 286
+      }
+    },
+    {
       "id": "dc4c4676fdbed71d9c743d74111462ca7cc5cca84418632990a869075f180a41",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/overlays/ai-modal-overrides/actions.css",
@@ -3280,6 +3478,24 @@
       }
     },
     {
+      "id": "dd9542be2f90aec659d19c9f36f56ab1c018634a70d76989b71db80743fe3866",
+      "classification": "tool-noise",
+      "owner": "video composition preview sampling <-> video review export source planning",
+      "reason": "The match enumerates four rectangle corners before shared point projection. Preview returns null for an unavailable projection. Export throws when projection crosses the camera horizon. Both already share point projection and bound reduction. A common transform would change their failure contracts.",
+      "removalCondition": "Remove when this exact pair disappears or preview and export adopt one accepted projection failure contract.",
+      "reviewBy": "2027-05-15",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/composition/canvas/gpu-preview-plan.ts",
+        "start": 736,
+        "end": 741
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/video-review/export-source-plan.ts",
+        "start": 91,
+        "end": 96
+      }
+    },
+    {
       "id": "df3eb459126c3ceec94d985fd25f550373efbf0f5591a80a16312ba88e00c87d",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/toolbar/legacy-actions.css",
@@ -3295,24 +3511,6 @@
         "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
         "start": 58,
         "end": 69
-      }
-    },
-    {
-      "id": "e2ceae1b7bc5a6c95e7635310038c58b479513159ce58a3bc4ec7379797925f1",
-      "classification": "tool-noise",
-      "owner": "features/video/project/motion and features/video/review/advanced",
-      "reason": "The endpoints return a rectangle record after different validators. Project crop permits positive values viazero check; review webcam requires Number.EPSILON and owns its own boundary. Both check normalized extents.",
-      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/project/motion/spatial.ts",
-        "start": 331,
-        "end": 337
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/review/advanced/webcam.ts",
-        "start": 82,
-        "end": 88
       }
     },
     {
@@ -3349,24 +3547,6 @@
         "path": "tooling/design-reference/examples/properties/index.html",
         "start": 2,
         "end": 13
-      }
-    },
-    {
-      "id": "e65129f591ba01573aa9f4bfca8d3daf1e639ee3f656af7fa92b97f4e9945452",
-      "classification": "tool-noise",
-      "owner": "video-editor/project/state/effects.effect-instance",
-      "reason": "The overlap wraps two distinct plans with the existing applyProjectUpdate and mutation-patch owner. Source-range restore replaces planned instance; attachment change conditionally changes sceneAnchors. The shared prefix is not the complete mutation.",
-      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/video-editor/project/state/effects.effect-instance.ts",
-        "start": 121,
-        "end": 128
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/project/state/effects.effect-instance.ts",
-        "start": 140,
-        "end": 148
       }
     },
     {
@@ -3514,6 +3694,60 @@
       }
     },
     {
+      "id": "fb547832c3a3059adc68a61251eeea97ca9889bdf54e18e81cc0a316ff80983f",
+      "classification": "tool-noise",
+      "owner": "workflows/video-review freeze frame timing <-> source metadata inspection",
+      "reason": "The match contains six lines that open a decoder and attach abort disposal. Freeze reads and validates an original frame interval. Source inspection validates metadata and provenance. Each operation closes its own input in finally. Shared setup syntax does not unify decoder work or admission.",
+      "removalCondition": "Remove when this exact pair disappears or an accepted common decoder operation owns both lifetimes.",
+      "reviewBy": "2027-05-15",
+      "firstFile": {
+        "path": "apps/extension/src/workflows/video-review/freeze-frame.ts",
+        "start": 12,
+        "end": 17
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/video-review/source.ts",
+        "start": 80,
+        "end": 85
+      }
+    },
+    {
+      "id": "fb6d54e22ebe81aabbc03379ba65a0e20d006d58c4a125ba2867a1b87af51fb9",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/speech-panel.tsx",
+      "reason": "Gallery uses SelectField and its recognition command. Montage uses OptionButtonsField and inspector callbacks. Shared option literals do not unify field controls.",
+      "removalCondition": "Remove when this exact match disappears or an accepted common owner replaces the stated contract distinction.",
+      "reviewBy": "2027-04-28",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/speech-panel.tsx",
+        "start": 578,
+        "end": 585
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.tsx",
+        "start": 215,
+        "end": 222
+      }
+    },
+    {
+      "id": "fb8a16b5bd745074e51ea5580c4c3825db10c8497db8441793d464e79d230901",
+      "classification": "tool-noise",
+      "owner": "features/video/project/motion and features/video/review/advanced",
+      "reason": "The endpoints return a rectangle record after different validators. Project crop permits positive values viazero check; review webcam requires Number.EPSILON and owns its own boundary. Both check normalized extents.",
+      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/project/motion/spatial.ts",
+        "start": 377,
+        "end": 383
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/review/advanced/webcam.ts",
+        "start": 82,
+        "end": 88
+      }
+    },
+    {
       "id": "fc3fe7e007849645023b4779929d1accbe0c84ffe40d19358686a68240006584",
       "classification": "tool-noise",
       "owner": "Native selection-panel projections",
@@ -3529,6 +3763,24 @@
         "path": "apps/extension/src/video-editor/workspace/sidebar/panel-content/selection-panel.tsx",
         "start": 78,
         "end": 84
+      }
+    },
+    {
+      "id": "ff05f3de76d6125840096aaaf2688118443c29837b02ed5949642bfdd6ee4d30",
+      "classification": "tool-noise",
+      "owner": "features/video/project/cursor-motion/apple pinned source artwork",
+      "reason": "The match is an upstream SVG filter in pinned Apple Cursor artwork. Each filter retains its own identifier and bounds. identity.json binds the original SVG hashes and upstream commit. Editing these source fragments would break their provenance without consolidating runtime code.",
+      "removalCondition": "Remove when this exact pair disappears or the pinned artwork source changes.",
+      "reviewBy": "2027-05-15",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/project/cursor-motion/apple/crosshair.svg",
+        "start": 22,
+        "end": 28
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/project/cursor-motion/apple/hand1.svg",
+        "start": 10,
+        "end": 16
       }
     }
   ]

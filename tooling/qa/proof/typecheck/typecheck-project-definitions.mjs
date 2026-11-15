@@ -186,6 +186,7 @@ export const NODE_TYPECHECK_PROJECT = {
   id: 'node-config',
   files: [
     'apps/extension/vite.config.ts',
+    'tooling/dev-surface/vite.config.ts',
     'apps/extension/build/content-runtime-build-id.ts',
     'apps/extension/build/injected-build.ts',
     'apps/extension/build/injected-build-shim-guard.ts',

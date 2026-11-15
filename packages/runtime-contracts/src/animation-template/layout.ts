@@ -137,6 +137,19 @@ export function resolveAnimationObjectRenderBounds(
   }
   return { x, y, width: right - x, height: bottom - y };
 }
+/** Express raster bounds in the authored animation plane without clipping external handles. */
+export function resolveAnimationObjectBitmapBounds(
+  template: AnimationTemplate,
+  bounds: ReturnType<typeof resolveAnimationObjectRenderBounds>
+) {
+  return {
+    x: bounds.x / template.animation.w,
+    y: bounds.y / template.animation.h,
+    width: bounds.width / template.animation.w,
+    height: bounds.height / template.animation.h,
+  };
+}
+
 function checkPlacement(placement: AnimationPlacement, point: { x: number; y: number }) {
   if (
     !Object.values(placement).every(Number.isFinite) ||

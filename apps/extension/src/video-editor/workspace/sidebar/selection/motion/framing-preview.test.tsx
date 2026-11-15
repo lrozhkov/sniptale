@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 import { createSourceImageFilter } from '../../../../../features/image-filters/contract';
 import { applyVideoProjectMutationPatch } from '../../../../../features/video/project/mutation';
-// @vitest-environment jsdom
 import type {
   GpuPreviewOutput,
   GpuPreviewTargetFactory,

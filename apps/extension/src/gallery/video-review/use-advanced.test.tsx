@@ -1,5 +1,5 @@
-import { createSourceImageFilter } from '../../features/image-filters/contract';
 // @vitest-environment jsdom
+import { createSourceImageFilter } from '../../features/image-filters/contract';
 import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 import { createNeutralPresentationSettings } from '../../features/video/review/advanced/presentation';
 import { patchReviewClicks } from '../../features/video/review/advanced/click-animation';

@@ -39,6 +39,8 @@ const BROAD_SHARED_PREFIXES = [
   'packages/ui/src/',
 ];
 const FULL_TYPECHECK_TRIGGER_FILES = new Set([
+  // This test-only entry imports every UI runtime and needs their combined ambient declarations.
+  'tooling/test/harness/dev-surface.ts',
   'apps/extension/src/platform/i18n/catalogs/en.json',
   'package.json',
   'package-lock.json',

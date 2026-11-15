@@ -27,7 +27,7 @@ import {
   snapTimelineTime,
 } from '../../features/video/review/snap';
 import { reviewTrackStatusButtonClassName, reviewTimeLabel } from './controls';
-import type { ReviewTrackProjection } from './track-projection';
+import { reviewTimelinePointerSource, type ReviewTrackProjection } from './track-projection';
 import { useReviewDragEscape } from './timeline-drag';
 
 type FocusRange = Pick<QuickEditZoomRegion, 'start' | 'end' | 'sourceAnchor'>;
@@ -561,20 +561,18 @@ function ReviewZoomRegionBlock(
       target instanceof Element
         ? target.closest('[data-zoom-edge]')?.getAttribute('data-zoom-edge')
         : null;
+    const laneBounds = event.currentTarget.parentElement!.getBoundingClientRect();
     props.drag.current = {
       admission,
       id: region.id,
       x: event.clientX,
-      sourceAtPointer:
-        props.projection?.display.displayToSource(
-          ((event.clientX - event.currentTarget.parentElement!.getBoundingClientRect().left) /
-            event.currentTarget.parentElement!.getBoundingClientRect().width) *
-            props.projection.display.duration
-        ) ??
-        ((event.clientX - event.currentTarget.parentElement!.getBoundingClientRect().left) /
-          event.currentTarget.parentElement!.getBoundingClientRect().width) *
-          duration,
-      width: event.currentTarget.parentElement!.getBoundingClientRect().width,
+      sourceAtPointer: reviewTimelinePointerSource(
+        event.clientX,
+        laneBounds,
+        duration,
+        props.projection
+      ),
+      width: laneBounds.width,
       edge: edge === 'start' || edge === 'end' ? edge : 'move',
       range: props.range,
       length: region.end - region.start,

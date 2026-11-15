@@ -6,7 +6,9 @@ test('retained paint preserves native path coverage, gradients and fractional tr
 }, info) => {
   const bundle = await build({
     stdin: {
-      contents: `export {rasterizeGpuPreviewPaint} from './apps/extension/src/features/video/composition/canvas/gpu-preview-primitive';`,
+      contents:
+        'export {rasterizeGpuPreviewPaint} from ' +
+        "'./apps/extension/src/features/video/composition/canvas/gpu-preview-primitive';",
       resolveDir: process.cwd(),
     },
     bundle: true,

@@ -38,7 +38,11 @@ import {
   trimQuickEditAudioClip,
 } from '../../features/video/review/advanced/audio';
 import { reviewTrackStatusButtonClassName } from './controls';
-import { reviewAudioClipRows, type ReviewTrackProjection } from './track-projection';
+import {
+  reviewAudioClipRows,
+  reviewTimelinePointerSource,
+  type ReviewTrackProjection,
+} from './track-projection';
 import { ReviewAudioWaveform } from './audio-waveform';
 import type { ReviewWaveform } from '../../workflows/video-review/waveform';
 import { SNAP_THRESHOLD_PX } from '../../features/video/review/snap';
@@ -414,22 +418,20 @@ function reviewAudioClipGesture(
         event.target instanceof Element
           ? event.target.closest('[data-audio-edge]')?.getAttribute('data-audio-edge')
           : null;
+      const laneBounds = event.currentTarget.parentElement!.getBoundingClientRect();
       props.drag.current = {
         original: props.shown,
         admission,
         lane: props.lane,
         edge: edge === 'start' || edge === 'end' ? edge : 'move',
         x: event.clientX,
-        sourceAtPointer:
-          props.projection?.display.displayToSource(
-            ((event.clientX - event.currentTarget.parentElement!.getBoundingClientRect().left) /
-              event.currentTarget.parentElement!.getBoundingClientRect().width) *
-              props.projection.display.duration
-          ) ??
-          ((event.clientX - event.currentTarget.parentElement!.getBoundingClientRect().left) /
-            event.currentTarget.parentElement!.getBoundingClientRect().width) *
-            props.duration,
-        width: event.currentTarget.parentElement!.getBoundingClientRect().width,
+        sourceAtPointer: reviewTimelinePointerSource(
+          event.clientX,
+          laneBounds,
+          props.duration,
+          props.projection
+        ),
+        width: laneBounds.width,
         moved: false,
         pointerId: event.pointerId,
         node: event.currentTarget,
@@ -675,6 +677,7 @@ function ReviewAudioLaneStatus(props: { guide: number | null; duration: number }
 
 /** File-drop hover and source-axis placement are independent of clip pointer trimming. */
 function useAudioLaneDrop(props: {
+  lane: ReviewAudioLane;
   busy: boolean;
   duration: number;
   projection?: ReviewTrackProjection | undefined;
@@ -719,17 +722,17 @@ function useAudioLaneDrop(props: {
           const file = event.dataTransfer.files[0];
           if (!file) return;
           const rect = event.currentTarget.getBoundingClientRect();
-          const time =
-            rect.width > 0 ? ((event.clientX - rect.left) / rect.width) * props.duration : 0;
+          const sourceDuration = props.projection?.originalDuration ?? props.duration;
           const sourceTime =
             rect.width > 0
-              ? ((event.clientX - rect.left) / rect.width) *
-                (props.projection?.duration ?? props.duration)
+              ? reviewTimelinePointerSource(event.clientX, rect, sourceDuration, props.projection)
               : 0;
           drop(
             file,
-            props.projection?.output(props.projection.display.displayToSource(sourceTime)) ??
-              Math.max(0, Math.min(time, props.duration))
+            props.lane === 'voiceover'
+              ? Math.max(0, Math.min(sourceTime, sourceDuration))
+              : (props.projection?.output(sourceTime) ??
+                  Math.max(0, Math.min(sourceTime, props.duration)))
           );
         },
       }

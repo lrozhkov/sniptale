@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { useGlTransitionCatalog } from '../../../../../../composition/gl-transition-presets/catalog';
 import {
   createGlCatalogFixture,
@@ -7,7 +8,6 @@ import {
   GL_TRANSITIONS,
   createGlTransitionSelection,
 } from '../../../../../../features/video/project/transition/gl-catalog';
-// @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';

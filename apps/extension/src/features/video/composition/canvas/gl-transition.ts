@@ -279,6 +279,12 @@ function createGlTransitionWebGl(args: { gl: WebGL2RenderingContext; load: Asset
   const programs = new Map<string, Promise<WebGLProgram>>();
   const extras = new Map<string, Promise<WebGLTexture>>();
   const sources: WebGLTexture[] = [];
+  const configureBoundTexture = () => {
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  };
   let disposed = false;
   const check = () => {
     if (disposed || gl.isContextLost()) throw new Error('GL transition fallback is unavailable.');
@@ -365,10 +371,7 @@ function createGlTransitionWebGl(args: { gl: WebGL2RenderingContext; load: Asset
               gl.UNSIGNED_BYTE,
               pixels
             );
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            configureBoundTexture();
             return texture;
           })();
           extras.set(name, pendingTexture);
@@ -446,10 +449,7 @@ function createGlTransitionWebGl(args: { gl: WebGL2RenderingContext; load: Asset
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
         gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, input!);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        configureBoundTexture();
         gl.uniform1i(
           gl.getUniformLocation(program, index === 0 ? '_sniptaleFrom' : '_sniptaleTo'),
           index

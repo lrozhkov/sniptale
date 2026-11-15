@@ -1,5 +1,5 @@
-import { createSourceImageFilter } from '../../features/image-filters/contract';
 // @vitest-environment jsdom
+import { createSourceImageFilter } from '../../features/image-filters/contract';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';

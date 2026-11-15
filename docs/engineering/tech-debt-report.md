@@ -4,8 +4,8 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 
 ## Registry summary
 
-- Classification: accepted-architecture=4, tool-noise=73.
-- Enforced source: codeql=11, gitleaks=62, license=1, scc=3.
+- Classification: accepted-architecture=5, tool-noise=73.
+- Enforced source: codeql=11, gitleaks=62, license=2, scc=3.
 
 ## Active decisions
 
@@ -86,3 +86,4 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 - `noise.codeql.remote-integrity-transformer` — workflows/sync-transfer/remote-object-integrity: A broad exception could hide remote integrity errors. The native transformer checks the body size before digest admission. Action: Retain only this exact reviewed finding. Recheck source evidence and authority on any drift. Review: 2027-05-14.
 - `noise.codeql.webdav-metadata-transformer` — workflows/sync-transfer/webdav: A broad exception could hide unbounded XML. The native transformer enforces the metadata byte limit before parsing. Action: Retain only this exact reviewed finding. Recheck source evidence and authority on any drift. Review: 2027-05-14.
 - `accepted.scc.editor-controller-raster-composition` — apps/extension/src/editor: An owner-edge allowance could conceal new module cycles or changes to controller history, currentness and native publication authority. This record binds only the two exact owner edges and does not bind the 21 reviewed module imports. Action: Keep only the exact controller/raster owner composition. Reassess module imports, state/runtime authority and cycles on change. Preserve canonical module-cycle checks. Review: 2027-05-14.
+- `accepted.license.faustwasm-0.20.2` — repository-owner: The fixed audio build uses a copyleft compiler. Packaging must exclude compiler code and retain notices for the distributed runtime subset. Action: Keep compiler inputs pinned and verify that release artifacts contain only the inventoried fixed processors and runtime subset. Review: 2027-05-12.

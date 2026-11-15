@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 import { applySourceImageFilters } from '../../features/image-filters/reference';
 import { createSourceImageFilter } from '../../features/image-filters/contract';
-// @vitest-environment jsdom
 import { ReviewPreviewRendererContext } from './use-preview-preferences';
 import { act, type ComponentProps } from 'react';
 import { createRoot } from 'react-dom/client';

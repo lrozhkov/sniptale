@@ -1,5 +1,5 @@
-import { createSourceImageFilter } from '../../../image-filters/contract';
 // @vitest-environment jsdom
+import { createSourceImageFilter } from '../../../image-filters/contract';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   createGpuPreviewRenderer,

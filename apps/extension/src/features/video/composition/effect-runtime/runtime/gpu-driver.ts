@@ -5,6 +5,7 @@ import { buildEffectRuntimeGpuPlan } from '../render/gpu-plan';
 import { createEffectRuntimeRenderMessage } from './request';
 import {
   closeEffectRuntimeGpuSceneResources,
+  createEffectRuntimeGpuFrameLifetime,
   type createEffectRuntimeGpuFrameLedger,
 } from './resource-limits';
 import type { EffectRuntimeFramePlan, EffectRuntimeGpuPreparedFrame } from './types';
@@ -50,15 +51,10 @@ export async function prepareEffectRuntimeGpuFramePlans(args: {
         const source =
           result.kind === 'gpu-plan' ? buildEffectRuntimeGpuPlan(result) : result.bitmap;
         const reservation = scope.reserve(collectEffectRuntimeResultBitmaps(result));
-        let retired = false,
-          closed = false,
-          borrowers = 0;
-        const release = () => {
-          if (!retired || borrowers || closed) return;
-          closed = true;
+        const lifetime = createEffectRuntimeGpuFrameLifetime(() => {
           closeEffectRuntimeGpuSceneResources(result);
           reservation.release();
-        };
+        });
         const frame: EffectRuntimeGpuPreparedFrame = {
           source,
           width: result.width,
@@ -70,23 +66,7 @@ export async function prepareEffectRuntimeGpuFramePlans(args: {
           kind: plan.kind,
           target: plan.target,
           ...(plan.bitmapBounds ? { bitmapBounds: plan.bitmapBounds } : {}),
-          retain() {
-            if (retired) throw new Error('EFFECT_RUNTIME_GPU_FRAME_RETIRED');
-            borrowers++;
-            let returned = false;
-            return {
-              release() {
-                if (returned) return;
-                returned = true;
-                borrowers--;
-                release();
-              },
-            };
-          },
-          dispose() {
-            retired = true;
-            release();
-          },
+          ...lifetime,
         };
         accepted = true;
         return frame;

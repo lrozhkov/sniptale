@@ -46,6 +46,7 @@ This index lists current active documents and their authority.
 - [Project facts](engineering/project-facts.md) is the generated projection of values that can change. These values concern product, browser, permission, persistence, runtime, security-reporting, and release-policy facts.
 - [Canonical CI/CD](tooling/ci-cd.md) owns external execution and release admission.
 - [Operator handbook](tooling/operator-handbook.md) routes commands.
+- [Development surfaces](tooling/dev-surfaces.md) describes source and built page previews and managed browser captures.
 - [Preview performance](tooling/preview-performance.md) describes optional canvas measurements and new scenarios.
 - [Wrapper summary](tooling/wrapper-summary.md) explains wrapper behavior.
 - [Code quality](tooling/code-quality.md) owns gate and exception policy.

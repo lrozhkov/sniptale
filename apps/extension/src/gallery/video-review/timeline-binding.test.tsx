@@ -1,10 +1,10 @@
+// @vitest-environment jsdom
 import { inspectVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
 import {
   reviewAdvancedContentBaseline,
   createReviewAdvancedContentOperation,
 } from '../../features/video/review/document';
 import { withReviewTrackEnabled } from '../../features/video/review/advanced/track-controls';
-// @vitest-environment jsdom
 import { createHash } from 'node:crypto';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';

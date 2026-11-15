@@ -1,9 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import type { ReviewEdit } from '../../features/video/review/types';
-import type { useReviewSourcePlayback } from './use-playback';
+import type { ReviewPlaybackRange } from './playback-range';
 
-type SourcePlayback = ReturnType<typeof useReviewSourcePlayback>;
+interface SourcePlayback {
+  video: RefObject<HTMLVideoElement | null>;
+  playbackRange: ReviewPlaybackRange | null;
+  playing: boolean;
+  time: number;
+  setPlaying(value: boolean): void;
+  seek(time: number, snap?: boolean): void;
+  onTime(time: number): number;
+  onEnded(): void;
+  onMediaError(): void;
+  play(): void;
+}
 type Segment = ReturnType<typeof buildReviewTimeMap>[number];
 interface Hold {
   segment: Segment;
@@ -12,8 +23,8 @@ interface Hold {
 }
 
 /** Inserted time has a project clock; it never advances or loops the physical source element. */
-export function useReviewFreezePlayback(
-  base: SourcePlayback,
+export function useReviewFreezePlayback<Playback extends SourcePlayback>(
+  base: Playback,
   edits: readonly ReviewEdit[],
   duration: number
 ) {

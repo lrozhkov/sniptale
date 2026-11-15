@@ -26,6 +26,7 @@ export {
   layoutAnimationPointer,
   layoutAnimationArrow,
   resolveAnimationObjectRenderBounds,
+  resolveAnimationObjectBitmapBounds,
   mapAnimationScenePoint,
   mapAnimationObjectPoint,
 } from './layout.js';

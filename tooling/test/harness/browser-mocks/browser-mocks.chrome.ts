@@ -15,10 +15,25 @@ type ChromeMockController = {
   handleTabCreate: (createProperties: chrome.tabs.CreateProperties) => Promise<chrome.tabs.Tab>;
 };
 
+function isHarnessOffscreenMessage(
+  message: unknown
+): message is Record<string, unknown> & { type: string } {
+  return (
+    typeof message === 'object' &&
+    message !== null &&
+    !Array.isArray(message) &&
+    'type' in message &&
+    typeof message.type === 'string' &&
+    message.type.length > 0
+  );
+}
+
 export function emitOffscreenMessage(
-  runtimeOnMessage: typeof chrome.runtime.onMessage,
+  runtimeOnMessage: Pick<ChromeEvent<[unknown, unknown?, ((response?: unknown) => void)?]>, 'emit'>,
   message: unknown
 ): void {
+  if (!isHarnessOffscreenMessage(message))
+    throw new Error('Harness offscreen message must contain a message type.');
   const extensionId = chrome.runtime.id;
   runtimeOnMessage.emit(
     attachRuntimeMessageFreshness(attachOffscreenCommandCapability(message)),

@@ -6,7 +6,7 @@ import { translate } from '../../../platform/i18n';
 import { CompactColorSelector } from '../../../ui/color-selector';
 import { NumericValueField } from '../../chrome/ui';
 import { InspectorSurface } from '../../../ui/compact-inspector-controls/layout';
-import './vector-tools.css';
+import './layer-tool-controls.css';
 import type { EditorVectorDefinition } from '../../../features/editor/document/vector-element';
 import type { EditorVectorStyleTransaction } from './use-vector-style-transaction';
 const message = (

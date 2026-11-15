@@ -1,9 +1,9 @@
+// @vitest-environment jsdom
 import {
   resolvePresentationDescription,
   canCoalescePresentationInteraction,
 } from './preview-presentation-state';
 import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
-// @vitest-environment jsdom
 import { act, createRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';

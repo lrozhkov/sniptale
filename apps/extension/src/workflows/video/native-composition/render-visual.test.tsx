@@ -1,8 +1,8 @@
+// @vitest-environment jsdom
 import { createNativeGlTrackCanvas } from './gl-track-canvas';
 import { buildGlTrackPlan } from '../../../features/video/project/transition/gl-track-plan';
 import { createGlTransitionSelection } from '../../../features/video/project/transition/gl-catalog';
 import { drawEffectRuntimeVisualLayer } from '../../../features/video/composition/draw';
-// @vitest-environment jsdom
 
 import { afterEach, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';

@@ -5,6 +5,7 @@ import type { useReviewEditorState } from './use-editor-state';
 import { ReviewButton, reviewTextButtonClassName } from './controls';
 import { ReviewInspectorCloneContext } from './inspector-sections';
 import { canCloneReviewSelection, cloneReviewTimelineSelection } from './timeline-clone';
+import { commitReviewTimelineClonePlan } from './timeline-clone-commit';
 
 type State = Pick<
   ReturnType<typeof useReviewEditorState>,
@@ -60,22 +61,12 @@ export function ReviewTimelineCloneScope({
           state.setMessage(translate('gallery.videoReview.timelineSelectionCloneUnavailable'));
           return;
         }
-        if (selection.kind !== 'edit')
-          await state.session.commit({
-            id: crypto.randomUUID(),
-            at: Date.now(),
-            target: 'advancedContent',
-            before: document.advancedContent,
-            after: plan.content,
-          });
-        for (const after of plan.edits)
-          await state.session.commit({
-            id: crypto.randomUUID(),
-            at: Date.now(),
-            target: 'edit',
-            before: null,
-            after,
-          });
+        await commitReviewTimelineClonePlan(
+          state.session,
+          document,
+          plan,
+          selection.kind !== 'edit'
+        );
       });
     } finally {
       setPending(false);

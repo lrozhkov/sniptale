@@ -1,5 +1,5 @@
-import { applySourceImageFilters } from '../../../image-filters/reference';
 // @vitest-environment jsdom
+import { applySourceImageFilters } from '../../../image-filters/reference';
 import { expect, it, vi } from 'vitest';
 import { createSourceImageFilter } from '../../../image-filters/contract';
 import { withSourceImageFilterCanvas } from './source-image-filter';

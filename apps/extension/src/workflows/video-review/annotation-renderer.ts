@@ -8,6 +8,7 @@ import { prepareEffectRuntimeGpuFramePlans } from '../../features/video/composit
 import { createEffectRuntimeGpuFrameLedger } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
 import {
   resolveAnimationObjectRenderBounds,
+  resolveAnimationObjectBitmapBounds,
   type AnimationTemplate,
 } from '@sniptale/runtime-contracts/animation-template';
 import type { EffectRuntimeSandboxExecutor } from '../../contracts/effect-runtime/types';
@@ -85,12 +86,7 @@ export function planReviewAnnotationFrame(args: {
   const box = resolveReviewAnnotationEffectBox(instance.transform, plane);
   const controls = resolveReviewAnnotationEffectControls(document, instance, plane);
   const bounds = resolveAnimationObjectRenderBounds(document, controls);
-  const bitmapBounds = {
-    x: bounds.x / document.animation.w,
-    y: bounds.y / document.animation.h,
-    width: bounds.width / document.animation.w,
-    height: bounds.height / document.animation.h,
-  };
+  const bitmapBounds = resolveAnimationObjectBitmapBounds(document, bounds);
   const dimensions = { width: bounds.width, height: bounds.height };
   const renderDimensions = {
     width: Math.max(1, Math.ceil(box.width * bitmapBounds.width * args.density.width)),

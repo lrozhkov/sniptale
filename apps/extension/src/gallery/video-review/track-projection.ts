@@ -121,3 +121,16 @@ export function reviewAudioClipRows(
   }
   return rows;
 }
+
+/** Maps a lane pointer through inserted display time, with a source-axis fallback. */
+export function reviewTimelinePointerSource(
+  clientX: number,
+  rect: { left: number; width: number },
+  duration: number,
+  projection: ReviewTrackProjection | undefined
+): number {
+  const position = (clientX - rect.left) / rect.width;
+  return projection
+    ? projection.display.displayToSource(position * projection.display.duration)
+    : position * duration;
+}

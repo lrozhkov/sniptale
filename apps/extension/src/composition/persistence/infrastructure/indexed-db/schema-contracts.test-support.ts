@@ -2,7 +2,7 @@ import { vi } from 'vitest';
 
 export const expectedVectorLibraryCreation = ['editor_vector_library', { keyPath: 'key' }] as const;
 
-export function createNativeUpgradeTransaction(put = vi.fn(), createIndex = vi.fn()) {
+function createNativeUpgradeTransaction(put = vi.fn(), createIndex = vi.fn()) {
   return {
     abort: vi.fn(),
     objectStore: vi.fn((_name: string) => ({

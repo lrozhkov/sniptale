@@ -344,6 +344,23 @@ export function createProjectExportSourceSampling(args: {
       throw error;
     }
   };
+  const publishPass = (
+    input: Parameters<ProjectExportSourceSampling['prepare']>[0],
+    pass: NativePreparedSourcePass
+  ) => {
+    if (input.retain) retained.add(pass);
+    current = pass;
+    key = {
+      time: input.time,
+      frame: input.frame,
+      lensFrame: input.lensFrame,
+      sceneTime: input.sceneTime,
+      fallback: input.fallback,
+      project: input.project,
+      media: input.media,
+    };
+    return pass;
+  };
   const prepare = async (
     input: Parameters<ProjectExportSourceSampling['prepare']>[0]
   ): Promise<NativePreparedSourcePass> => {
@@ -454,18 +471,7 @@ export function createProjectExportSourceSampling(args: {
           decoded.release();
         },
       };
-      if (input.retain) retained.add(pass);
-      current = pass;
-      key = {
-        time: input.time,
-        frame: input.frame,
-        lensFrame: input.lensFrame,
-        sceneTime: input.sceneTime,
-        fallback: input.fallback,
-        project: input.project,
-        media: input.media,
-      };
-      return pass;
+      return publishPass(input, pass);
     }
     const leases: Array<{ dispose(): void }> = [];
     const owned: VideoFrame[] = [];
@@ -578,18 +584,7 @@ export function createProjectExportSourceSampling(args: {
         release,
       };
       passReference = pass;
-      if (input.retain) retained.add(pass);
-      current = pass;
-      key = {
-        time: input.time,
-        frame: input.frame,
-        lensFrame: input.lensFrame,
-        sceneTime: input.sceneTime,
-        fallback: input.fallback,
-        project: input.project,
-        media: input.media,
-      };
-      return pass;
+      return publishPass(input, pass);
     } catch (error) {
       release();
       throw error;

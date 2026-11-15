@@ -9,6 +9,7 @@ import {
   removeReviewTimelineSelection,
 } from './timeline-batch-selection';
 import { canCloneReviewSelection, cloneReviewTimelineSelection } from './timeline-clone';
+import { commitReviewTimelineClonePlan } from './timeline-clone-commit';
 import { reviewSelectionExists } from './use-review-selection';
 import { ReviewInspectorSections, reviewInspectorActions } from './inspector-sections';
 import { ReviewButton, reviewDeleteButtonClassName, reviewTextButtonClassName } from './controls';
@@ -97,22 +98,12 @@ export function ReviewTimelineBatchInspector({
             state.setMessage(translate('gallery.videoReview.timelineSelectionCloneUnavailable'));
             return;
           }
-          if (selections.some((item) => item.kind !== 'edit'))
-            await state.session.commit({
-              id: crypto.randomUUID(),
-              at: Date.now(),
-              target: 'advancedContent',
-              before: document.advancedContent,
-              after: plan.content,
-            });
-          for (const after of plan.edits)
-            await state.session.commit({
-              id: crypto.randomUUID(),
-              at: Date.now(),
-              target: 'edit',
-              before: null,
-              after,
-            });
+          await commitReviewTimelineClonePlan(
+            state.session,
+            document,
+            plan,
+            selections.some((item) => item.kind !== 'edit')
+          );
           completed = true;
           return;
         }

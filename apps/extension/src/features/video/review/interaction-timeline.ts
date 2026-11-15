@@ -178,6 +178,22 @@ export function resolveReviewInteractions(
         (span > 0
           ? ((value - marker.start) * (change.end - change.start)) / span
           : value - marker.start);
+      const keyboardTime = (block: ReturnType<typeof encodeRecordingKeyboardRhythm>) =>
+        change.end - change.start === span || span <= 0
+          ? { ...block, startTime: block.startTime + delta }
+          : encodeRecordingKeyboardRhythm(
+              block.id,
+              [...iterateRecordingKeyboardRhythm(block)].map((attack) => time(attack.time))
+            );
+      const cadenceTime = (block: ReturnType<typeof encodeRecordingEventCadence>) =>
+        change.end - change.start === span || span <= 0
+          ? { ...block, startTimeUs: block.startTimeUs + Math.round(delta * 1000000) }
+          : encodeRecordingEventCadence(
+              block.id,
+              (decodeRecordingEventCadence(block) ?? []).map((value) =>
+                Math.round(time(value / 1000000) * 1000000)
+              )
+            );
       return [
         {
           ...marker,
@@ -218,51 +234,19 @@ export function resolveReviewInteractions(
             : {}),
           ...(marker.keyboardRhythm
             ? {
-                keyboardRhythm: marker.keyboardRhythm.map((p) => ({
-                  ...(change.end - change.start === span || span <= 0
-                    ? { ...p, startTime: p.startTime + delta }
-                    : encodeRecordingKeyboardRhythm(
-                        p.id,
-                        [...iterateRecordingKeyboardRhythm(p)].map((attack) => time(attack.time))
-                      )),
-                })),
+                keyboardRhythm: marker.keyboardRhythm.map(keyboardTime),
               }
             : {}),
           ...(marker.keyboardRepeats
             ? {
-                keyboardRepeats: marker.keyboardRepeats.map((p) => ({
-                  ...(change.end - change.start === span || span <= 0
-                    ? { ...p, startTime: p.startTime + delta }
-                    : encodeRecordingKeyboardRhythm(
-                        p.id,
-                        [...iterateRecordingKeyboardRhythm(p)].map((attack) => time(attack.time))
-                      )),
-                })),
+                keyboardRepeats: marker.keyboardRepeats.map(keyboardTime),
               }
             : {}),
           ...(marker.recordingCadence
             ? {
                 recordingCadence: {
-                  onsets: marker.recordingCadence.onsets.map((p) => ({
-                    ...(change.end - change.start === span || span <= 0
-                      ? { ...p, startTimeUs: p.startTimeUs + Math.round(delta * 1000000) }
-                      : encodeRecordingEventCadence(
-                          p.id,
-                          (decodeRecordingEventCadence(p) ?? []).map((value) =>
-                            Math.round(time(value / 1000000) * 1000000)
-                          )
-                        )),
-                  })),
-                  repeats: marker.recordingCadence.repeats.map((p) => ({
-                    ...(change.end - change.start === span || span <= 0
-                      ? { ...p, startTimeUs: p.startTimeUs + Math.round(delta * 1000000) }
-                      : encodeRecordingEventCadence(
-                          p.id,
-                          (decodeRecordingEventCadence(p) ?? []).map((value) =>
-                            Math.round(time(value / 1000000) * 1000000)
-                          )
-                        )),
-                  })),
+                  onsets: marker.recordingCadence.onsets.map(cadenceTime),
+                  repeats: marker.recordingCadence.repeats.map(cadenceTime),
                 },
               }
             : {}),

@@ -34,7 +34,7 @@ import {
 } from '../../raster-editing/tool-icons';
 import { NumericValueField } from '../../chrome/ui';
 import { InspectorSurface } from '../../../ui/compact-inspector-controls/layout';
-import './raster-tools.css';
+import './layer-tool-controls.css';
 import { CompactColorSelector } from '../../../ui/color-selector';
 
 type RasterSnapshot = ReturnType<EditorRasterRuntime['getSnapshot']>;

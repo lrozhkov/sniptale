@@ -31,7 +31,7 @@ interface ReviewPlaybackProps {
 }
 
 /** Owns source-time playback; the persisted original-audio gate and rate live here. */
-export function useReviewSourcePlayback(props: ReviewPlaybackProps) {
+function useReviewSourcePlayback(props: ReviewPlaybackProps) {
   const video = useRef<HTMLVideoElement>(null);
   const [playheadClock] = useState(() =>
     createReviewPlaybackPresentationClock(

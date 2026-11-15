@@ -12,9 +12,8 @@ import {
   serializeAudioProcessingPreset,
 } from '../../features/video/audio/effects/presets';
 import { browserStorage } from '../persistence/infrastructure/browser-storage';
-import { runWithPersistenceDomainMutationLock } from '../persistence/infrastructure/mutation-barrier';
 import {
-  createAudioPresetCatalogOwner,
+  createBrowserAudioPresetCatalogOwner,
   type AudioPresetCommand,
 } from '../persistence/audio-presets';
 import {
@@ -38,18 +37,7 @@ function downloadPresetSource(source: string) {
 /** Owns catalogue IO and disposable feedback. Editor adapters retain project commands and Undo. */
 export function useAudioPresets(ownerKey: string, value: AudioProcessing | undefined) {
   const locale = useAppLocale();
-  const owner = useMemo(
-    () =>
-      createAudioPresetCatalogOwner({
-        read: async () =>
-          (await browserStorage.local.get([AUDIO_PRESET_STORAGE_KEY]))[AUDIO_PRESET_STORAGE_KEY],
-        write: (catalog, permit) =>
-          browserStorage.local.set({ [AUDIO_PRESET_STORAGE_KEY]: catalog }, permit),
-        runMutation: (operation) =>
-          runWithPersistenceDomainMutationLock('audio-presets', operation),
-      }),
-    []
-  );
+  const owner = useMemo(createBrowserAudioPresetCatalogOwner, []);
   const [catalog, setCatalog] = useState<AudioPresetCatalog | null>(null);
   const [error, setError] = useState<'load' | 'write' | null>(null);
   const [busy, setBusy] = useState(false);

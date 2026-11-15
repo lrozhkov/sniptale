@@ -1,7 +1,7 @@
+// @vitest-environment jsdom
 import { createSourceImageFilter } from '../../../features/image-filters/contract';
 import { normalizeVideoProjectCursorSkin } from '../../../features/video/project/cursor';
 import { createGlTransitionSelection } from '../../../features/video/project/transition/gl-catalog';
-// @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   createProject,

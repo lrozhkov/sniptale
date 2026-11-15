@@ -1,4 +1,7 @@
-import { resolveAnimationObjectRenderBounds } from '@sniptale/runtime-contracts/animation-template';
+import {
+  resolveAnimationObjectRenderBounds,
+  resolveAnimationObjectBitmapBounds,
+} from '@sniptale/runtime-contracts/animation-template';
 import {
   animationRuntimeDuration,
   effectRuntimeFrameIndex,
@@ -68,12 +71,7 @@ export function resolveEffectRuntimeFramePlans(
       throw new EffectRuntimePlanError('effectPlanTargetFailure');
     const controls = resolveEffectObjectControls(document, instance, target.placement);
     const bounds = resolveAnimationObjectRenderBounds(document, controls);
-    const bitmapBounds = {
-      x: bounds.x / document.animation.w,
-      y: bounds.y / document.animation.h,
-      width: bounds.width / document.animation.w,
-      height: bounds.height / document.animation.h,
-    };
+    const bitmapBounds = resolveAnimationObjectBitmapBounds(document, bounds);
     const width = target.placement.width * bitmapBounds.width,
       height = target.placement.height * bitmapBounds.height;
     if (![width, height].every((value) => Number.isFinite(value) && value > 0))

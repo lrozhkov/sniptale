@@ -185,8 +185,12 @@ it(
   'uses the same authored plane for body placement, inverse pointer ' +
     'mapping and negative external raster bounds',
   async () => {
-    const { resolveAnimationObjectRenderBounds, mapAnimationScenePoint, mapAnimationObjectPoint } =
-      await import('./index.js');
+    const {
+      resolveAnimationObjectRenderBounds,
+      resolveAnimationObjectBitmapBounds,
+      mapAnimationScenePoint,
+      mapAnimationObjectPoint,
+    } = await import('./index.js');
     const result = validateAnimationTemplate(fixture());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -202,6 +206,12 @@ it(
       width: 386,
       height: 216,
     });
+    expect(
+      resolveAnimationObjectBitmapBounds(
+        template,
+        resolveAnimationObjectRenderBounds(template, { x: -50, y: 200 })
+      )
+    ).toEqual({ x: -0.20625, y: 0, width: 1.20625, height: 1.2 });
     const placement = { x: 100, y: 80, width: 640, height: 360, rotation: 0.7 };
     const point = { x: -50, y: 200 };
     const scene = mapAnimationObjectPoint(template, placement, point);

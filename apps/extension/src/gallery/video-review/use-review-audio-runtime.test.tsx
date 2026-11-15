@@ -1,5 +1,5 @@
-import { createAudioEffectInstance } from '../../features/video/audio/effects/catalog';
 // @vitest-environment jsdom
+import { createAudioEffectInstance } from '../../features/video/audio/effects/catalog';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';

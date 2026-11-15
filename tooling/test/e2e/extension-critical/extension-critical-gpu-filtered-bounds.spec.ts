@@ -19,7 +19,9 @@ test('filtered sparse groups preserve full-scissor pixels and faint convolution 
     [false, true].map((reference) =>
       build({
         stdin: {
-          contents: `export {createGpuPreviewRenderer} from './apps/extension/src/features/video/composition/canvas/gpu-preview';`,
+          contents:
+            'export {createGpuPreviewRenderer} from ' +
+            "'./apps/extension/src/features/video/composition/canvas/gpu-preview';",
           resolveDir: process.cwd(),
         },
         bundle: true,
@@ -33,7 +35,8 @@ test('filtered sparse groups preserve full-scissor pixels and faint convolution 
                 setup(builder) {
                   builder.onLoad({ filter: /[/\\]gpu-preview-bounds\.ts$/ }, () => ({
                     contents:
-                      'export function createGpuPreviewDrawBounds(){return(_layer,output)=>[0,0,output.width,output.height]}',
+                      'export function createGpuPreviewDrawBounds(){' +
+                      'return(_layer,output)=>[0,0,output.width,output.height]}',
                     loader: 'ts',
                   }));
                 },

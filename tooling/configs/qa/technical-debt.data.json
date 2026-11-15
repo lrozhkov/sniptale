@@ -1624,6 +1624,30 @@
         ]
       },
       "targetAction": "Keep only the exact controller/raster owner composition. Reassess module imports, state/runtime authority and cycles on change. Preserve canonical module-cycle checks."
+    },
+    {
+      "id": "accepted.license.faustwasm-0.20.2",
+      "classification": "accepted-architecture",
+      "owner": "repository-owner",
+      "risk": "The fixed audio build uses a copyleft compiler. Packaging must exclude compiler code and retain notices for the distributed runtime subset.",
+      "reason": "The pinned compiler is a build dependency. Release generation emits fixed DSP and a separately inventoried LGPL runtime subset with notices and source provenance. The compiler and its data files do not ship.",
+      "removalCondition": "Remove this decision when the compiler version, license, or artifact inclusion changes.",
+      "reviewBy": "2027-05-12",
+      "source": {
+        "kind": "license",
+        "key": "@grame/faustwasm@0.20.2:direct-development:development-only:LGPL-2.1"
+      },
+      "scope": {
+        "packageName": "@grame/faustwasm",
+        "resolvedVersion": "0.20.2",
+        "dependencyScope": "direct-development",
+        "artifactInclusion": "development-only",
+        "licenseExpression": "LGPL-2.1",
+        "reason": "The pinned compiler is a build dependency. Release generation emits fixed DSP and a separately inventoried LGPL runtime subset with notices and source provenance. The compiler and its data files do not ship.",
+        "approvalOwner": "repository-owner",
+        "expiresOn": "2027-05-12"
+      },
+      "targetAction": "Keep compiler inputs pinned and verify that release artifacts contain only the inventoried fixed processors and runtime subset."
     }
   ]
 }

@@ -1,5 +1,5 @@
-import { reviewPreviewSceneKey } from '../../workflows/video-review/preview-scene';
 // @vitest-environment jsdom
+import { reviewPreviewSceneKey } from '../../workflows/video-review/preview-scene';
 import * as cameraSources from './webcam-preview';
 import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
 import { afterEach, expect, it, vi } from 'vitest';

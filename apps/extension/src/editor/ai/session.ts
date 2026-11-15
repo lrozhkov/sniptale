@@ -220,6 +220,13 @@ export function createImageEditorSession(
     state = { ...state, ...patch };
     listeners.forEach((listener) => listener());
   };
+  const publishJobFailure = (job: AbortController, error: unknown) => {
+    if (active !== job) return;
+    publish({
+      error: job.signal.aborted ? 'cancelled' : failureCode(error),
+      diagnostic: error instanceof ImageJobError ? error.diagnostic : null,
+    });
+  };
   const selectedVariant = (reference = state.selected) => {
     if (!reference) return null;
     return (
@@ -332,11 +339,7 @@ export function createImageEditorSession(
       try {
         await prepareCapturedSource(source, size, preparationVariant(), key, job);
       } catch (error) {
-        if (active === job)
-          publish({
-            error: job.signal.aborted ? 'cancelled' : failureCode(error),
-            diagnostic: error instanceof ImageJobError ? error.diagnostic : null,
-          });
+        publishJobFailure(job, error);
       } finally {
         end(job);
       }
@@ -438,11 +441,7 @@ export function createImageEditorSession(
         attemptedPreparationKey = key;
         await prepareCapturedSource(source, size, undefined, key, job);
       } catch (error) {
-        if (active === job)
-          publish({
-            error: job.signal.aborted ? 'cancelled' : failureCode(error),
-            diagnostic: error instanceof ImageJobError ? error.diagnostic : null,
-          });
+        publishJobFailure(job, error);
       } finally {
         end(job);
       }
@@ -563,11 +562,7 @@ export function createImageEditorSession(
         if (active === job && state.draft.prompt === draft.prompt)
           publish({ draft: { ...state.draft, prompt: '' } });
       } catch (error) {
-        if (active === job)
-          publish({
-            error: job.signal.aborted ? 'cancelled' : failureCode(error),
-            diagnostic: error instanceof ImageJobError ? error.diagnostic : null,
-          });
+        publishJobFailure(job, error);
       } finally {
         end(job);
       }
@@ -620,11 +615,7 @@ export function createImageEditorSession(
           ),
         });
       } catch (error) {
-        if (active === job)
-          publish({
-            error: job.signal.aborted ? 'cancelled' : failureCode(error),
-            diagnostic: error instanceof ImageJobError ? error.diagnostic : null,
-          });
+        publishJobFailure(job, error);
       } finally {
         end(job);
       }

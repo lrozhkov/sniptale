@@ -1,5 +1,5 @@
-import { createSourceImageFilter } from '../../features/image-filters/contract';
 // @vitest-environment jsdom
+import { createSourceImageFilter } from '../../features/image-filters/contract';
 import { ReviewPreviewRendererContext } from './use-preview-preferences';
 import { VideoSample } from 'mediabunny';
 import type { PreviewSourceLease } from '../../workflows/video/preview-source';

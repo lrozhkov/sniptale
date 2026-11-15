@@ -3,8 +3,13 @@ import {
   parseAudioProcessingPreset,
   type AudioProcessingPreset,
 } from '@sniptale/runtime-contracts/audio-effects';
-import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
+import { browserStorage } from '../infrastructure/browser-storage';
 import {
+  runWithPersistenceDomainMutationLock,
+  type PersistenceMutationPermit,
+} from '../infrastructure/mutation-barrier';
+import {
+  AUDIO_PRESET_STORAGE_KEY,
   isBuiltinAudioPreset,
   parseAudioPresetCatalog,
   renameAudioPreset,
@@ -147,4 +152,15 @@ export function createAudioPresetCatalogOwner(ports: AudioPresetPersistencePorts
       });
     },
   };
+}
+
+/** Bind the catalog owner to browser storage and its existing cross-context mutation barrier. */
+export function createBrowserAudioPresetCatalogOwner() {
+  return createAudioPresetCatalogOwner({
+    read: async () =>
+      (await browserStorage.local.get([AUDIO_PRESET_STORAGE_KEY]))[AUDIO_PRESET_STORAGE_KEY],
+    write: (catalog, permit) =>
+      browserStorage.local.set({ [AUDIO_PRESET_STORAGE_KEY]: catalog }, permit),
+    runMutation: (operation) => runWithPersistenceDomainMutationLock('audio-presets', operation),
+  });
 }

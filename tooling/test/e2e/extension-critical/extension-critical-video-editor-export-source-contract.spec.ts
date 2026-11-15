@@ -35,9 +35,11 @@ test.use({
 const execute = promisify(execFile);
 
 for (const held of process.env.SNIPTALE_E2E_B1_PROJECT ? [true] : [true, false]) {
-  test(`Native complete export preserves VFR exposures with enhancement off and on in both formats (${held ? 'held' : 'ordinary accelerated source'})`, async ({
-    page,
-  }, info) => {
+  const sourceKind = held ? 'held' : 'ordinary accelerated source';
+  const title =
+    'Native complete export preserves VFR exposures with enhancement off and on in both formats ' +
+    `(${sourceKind})`;
+  test(title, async ({ page }, info) => {
     test.setTimeout(180_000);
     await page.setViewportSize({ width: 1920, height: 900 });
     const sourcePath = process.env.SNIPTALE_E2E_B1_SOURCE ?? info.outputPath('source-vfr.webm');

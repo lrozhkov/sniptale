@@ -295,3 +295,34 @@ export function createEffectRuntimeGpuFrameLedger(
     snapshot: () => ({ liveDecodedRasterBytes: bytes }),
   };
 }
+
+/** Retire a GPU frame after its final borrow returns, then release its owner's resources once. */
+export function createEffectRuntimeGpuFrameLifetime(onReleased: () => void) {
+  let retired = false;
+  let released = false;
+  let borrowers = 0;
+  const release = () => {
+    if (!retired || borrowers || released) return;
+    released = true;
+    onReleased();
+  };
+  return {
+    retain() {
+      if (retired) throw new Error('EFFECT_RUNTIME_GPU_FRAME_RETIRED');
+      borrowers++;
+      let returned = false;
+      return {
+        release() {
+          if (returned) return;
+          returned = true;
+          borrowers--;
+          release();
+        },
+      };
+    },
+    dispose() {
+      retired = true;
+      release();
+    },
+  };
+}

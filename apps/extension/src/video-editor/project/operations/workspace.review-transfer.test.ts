@@ -1,5 +1,5 @@
-import { readValidAnimationSnapshot } from '../../../composition/persistence/effect-bundles/fixture.test-support';
 // @vitest-environment jsdom
+import { readValidAnimationSnapshot } from '../../../composition/persistence/effect-bundles/fixture.test-support';
 
 import { Blob as NodeBlob, File as NodeFile } from 'node:buffer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';

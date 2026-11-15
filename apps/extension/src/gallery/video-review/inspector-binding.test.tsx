@@ -6,6 +6,7 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import { reviewAdvancedContentBaseline } from '../../features/video/review/document';
 import type { ReviewActionHistory } from './action-history';
 import {
   REVIEW_ACTION_AUDIO_DEFAULT,
@@ -155,6 +156,14 @@ function inspectorFixture(
   select: ComponentProps<typeof ReviewInspectorBinding>['state']['setActiveSelection'],
   beforeAction: (action: () => void) => void
 ): ComponentProps<typeof ReviewInspectorBinding> {
+  const snapshot = {
+    snapshot: { workspace: { advanced, sourceAssetId: 'source' } },
+    document: {
+      annotations: [],
+      edits: [],
+      advancedContent: reviewAdvancedContentBaseline(advanced),
+    },
+  };
   return {
     resource: { filename: 'video', file: new Blob(), source: {}, session: {} },
     state: {
@@ -167,10 +176,8 @@ function inspectorFixture(
       projected: {
         markers: [{ ref: { kind: 'action', id: 'recorded' }, type: 'CLICK', start: 1, end: 1.2 }],
       },
-      snapshot: {
-        snapshot: { workspace: { advanced, sourceAssetId: 'source' } },
-        document: { annotations: [], edits: [] },
-      },
+      snapshot,
+      session: { getSnapshot: () => snapshot },
       text: {
         document: { fragments: [{ id: 'related' }] },
         sourceInterval: () => ({ start: 9, end: 10 }),

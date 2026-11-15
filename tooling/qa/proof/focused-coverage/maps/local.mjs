@@ -112,7 +112,7 @@ export const LOCAL_OWNER_MAPPINGS = [
     owner: 'review-workspace-source-admission',
     productionFile: 'apps/extension/src/composition/persistence/review-workspaces/parser.ts',
     reason:
-      'Workspace admission checks baseline, redo, canonical append, asset closure, embedded sources and portable restore.',
+      'Admission checks baseline, redo, canonical append, asset closure, embedded sources and portable restore.',
     testFiles: [
       'apps/extension/src/composition/persistence/review-workspaces/parser.test.ts',
       'apps/extension/src/composition/persistence/review-workspaces/store-incremental.test.ts',

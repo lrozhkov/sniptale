@@ -6,7 +6,11 @@ import {
 } from '../../../../../contracts/effect-runtime/animation';
 import { createEffectRuntimeGpuContentKey } from './gpu-frame-content';
 import { prepareEffectRuntimeGpuFramePlans } from './gpu-driver';
-import { EFFECT_RUNTIME_RESOURCE_LIMITS, assertEffectRasterDimensions } from './resource-limits';
+import {
+  EFFECT_RUNTIME_RESOURCE_LIMITS,
+  assertEffectRasterDimensions,
+  createEffectRuntimeGpuFrameLifetime,
+} from './resource-limits';
 import type { EffectRuntimeFramePlan, EffectRuntimeGpuPreparedFrame } from './types';
 
 type Preparation = Parameters<typeof prepareEffectRuntimeGpuFramePlans>[0];
@@ -60,15 +64,10 @@ export function createEffectRuntimeGpuFrameReuse() {
   };
   const borrow = (entry: Entry, plan: EffectRuntimeFramePlan): EffectRuntimeGpuPreparedFrame => {
     entry.readers++;
-    let retired = false;
-    let borrowers = 0;
-    let released = false;
-    const release = () => {
-      if (!retired || borrowers || released) return;
-      released = true;
+    const lifetime = createEffectRuntimeGpuFrameLifetime(() => {
       entry.readers--;
       finish(entry);
-    };
+    });
     const { bitmapBounds: _bounds, ...frame } = entry.frame;
     return {
       ...frame,
@@ -78,23 +77,7 @@ export function createEffectRuntimeGpuFrameReuse() {
       kind: plan.kind,
       ...(plan.bitmapBounds ? { bitmapBounds: plan.bitmapBounds } : {}),
       rasterCache: entry.cache,
-      retain() {
-        if (retired) throw new Error('EFFECT_RUNTIME_GPU_FRAME_RETIRED');
-        borrowers++;
-        let returned = false;
-        return {
-          release() {
-            if (returned) return;
-            returned = true;
-            borrowers--;
-            release();
-          },
-        };
-      },
-      dispose() {
-        retired = true;
-        release();
-      },
+      ...lifetime,
     };
   };
   const signature = async (

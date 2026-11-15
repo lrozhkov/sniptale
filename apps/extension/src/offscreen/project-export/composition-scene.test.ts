@@ -1,5 +1,5 @@
-import type { ProjectCompositionSceneInput } from './types';
 // @vitest-environment jsdom
+import type { ProjectCompositionSceneInput } from './types';
 import { beforeEach, expect, it, vi } from 'vitest';
 import fixture from '../../features/video/project/recording-events/fixtures.json';
 import { isRecordingEventsDescriptor } from '../../features/video/project/recording-events/records';

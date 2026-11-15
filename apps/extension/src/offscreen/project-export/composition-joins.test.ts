@@ -1,5 +1,5 @@
-import { createGlTransitionSelection } from '../../features/video/project/transition/gl-catalog';
 // @vitest-environment jsdom
+import { createGlTransitionSelection } from '../../features/video/project/transition/gl-catalog';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   createImageClip,

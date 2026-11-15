@@ -17,6 +17,7 @@
     "apps/extension/vite.config.ts",
     "apps/extension/build/**/*.ts",
     "tooling/design-reference/pickers/vite.config.ts",
-    "tooling/design-reference/pickers/shadow-properties.ts"
+    "tooling/design-reference/pickers/shadow-properties.ts",
+    "tooling/dev-surface/vite.config.ts"
   ]
 }

@@ -9,7 +9,9 @@ test('native-grid opaque video removes only the redundant group with identical p
 }, info) => {
   const bundle = await build({
     stdin: {
-      contents: `export {createGpuPreviewRenderer} from './apps/extension/src/features/video/composition/canvas/gpu-preview';`,
+      contents:
+        'export {createGpuPreviewRenderer} from ' +
+        "'./apps/extension/src/features/video/composition/canvas/gpu-preview';",
       resolveDir: process.cwd(),
     },
     bundle: true,

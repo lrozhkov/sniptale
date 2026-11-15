@@ -1,5 +1,5 @@
-import { translate } from '../../platform/i18n';
 // @vitest-environment jsdom
+import { translate } from '../../platform/i18n';
 import { createQuickEditBorder } from '../../features/video/project/scene/focus-appearance';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 

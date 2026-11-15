@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 import { createSourceImageFilter } from '../../../image-filters/contract';
 import { planEnhancedRegion } from './region-plan';
-// @vitest-environment jsdom
 import {
   EFFECT_RUNTIME_RESOURCE_LIMITS,
   EffectRuntimeResourceError,
