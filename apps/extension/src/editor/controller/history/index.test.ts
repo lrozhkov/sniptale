@@ -31,6 +31,54 @@ import {
   undoEditorSnapshot,
 } from './';
 
+it('does not recount pooled object bytes across the retained past on each append', () => {
+  function appendCost(depth: number): number {
+    const objects = Array.from({ length: 64 }, (_, index) => ({
+      type: 'rect',
+      sniptaleId: `shape-${index}`,
+      left: index,
+      top: 0,
+      width: 20,
+      height: 20,
+    }));
+    const document = createMockDocument();
+    const history = createImageHistory({
+      ...document,
+      canvasJson: JSON.stringify({ objects }),
+    });
+    const push = (left: number) => {
+      objects[0] = { ...objects[0]!, left };
+      pushEditorSnapshotHistory({
+        history,
+        muted: false,
+        exportDocument: () => ({ ...document, canvasJson: JSON.stringify({ objects }) }),
+      });
+    };
+    for (let index = 1; index <= depth; index++) push(index);
+    let reads = 0;
+    const originalGet = Map.prototype.get;
+    const spy = vi.spyOn(Map.prototype, 'get').mockImplementation(function (
+      this: Map<unknown, unknown>,
+      key: unknown
+    ) {
+      if (typeof key === 'string' && key.startsWith('sniptale-history-asset:')) reads++;
+      return originalGet.call(this, key);
+    });
+    try {
+      push(depth + 1);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(history.getState().size).toBe(depth + 2);
+    return reads;
+  }
+
+  const short = appendCost(8);
+  const long = appendCost(80);
+  // Allow bookkeeping for the new/current resource sets, never a recount of old payloads.
+  expect(long).toBeLessThanOrEqual(short * 2 + 64);
+});
+
 // Keep small-budget retention cases independent of the Image Editor product default.
 const createEditorSnapshotHistory = (document: EditorDocument) =>
   createImageHistory(document, EDITOR_HISTORY_LIMITS);

@@ -2,6 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { SnapshotHistory } from './snapshot-history';
 
 describe('SnapshotHistory navigation', () => {
+  it('seeks a retained state in one revision and rejects invalid positions without mutation', () => {
+    const history = new SnapshotHistory<string>('initial');
+    for (const value of ['a', 'b', 'c']) history.push(value);
+    const revision = history.getRevision();
+    expect(history.seek(0)?.current).toBe('initial');
+    expect(history.getRevision()).toBe(revision + 1);
+    expect(history.seek(3)?.current).toBe('c');
+    const selectedRevision = history.getRevision();
+    for (const index of [-1, 4, 0.5, Number.NaN, Number.POSITIVE_INFINITY])
+      expect(history.seek(index)).toBeNull();
+    expect(history.seek(3)?.current).toBe('c');
+    expect(history.getRevision()).toBe(selectedRevision);
+  });
   it('tracks pushes, undo, redo, and reset state', () => {
     const history = new SnapshotHistory('initial');
 

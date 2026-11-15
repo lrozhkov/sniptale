@@ -53,6 +53,47 @@ import { createMockDocument } from '../../instance/bindings/test-fixtures-docume
 import { prepareAppliedDocument } from '..';
 import type { EditorDocument } from '../../../../features/editor/document/types';
 import { EditorCanvas } from '../../../document/canvas-surface/render-region';
+import { serializeCanvasObjects } from '../serialization';
+
+it('keeps an unchanged source bitmap instead of hydrating it again during history navigation', async () => {
+  const canvas = new Canvas(document.createElement('canvas'), { renderOnAddRemove: false });
+  const bitmap = document.createElement('canvas');
+  bitmap.width = 2;
+  bitmap.height = 2;
+  const source = new FabricImage(bitmap, { width: 2, height: 2 });
+  source.sniptaleId = 'source-image-layer';
+  source.sniptaleType = 'source-image';
+  source.sniptaleRole = 'source';
+  canvas.add(source);
+  const snapshot = {
+    ...createMockDocument(),
+    sourceImageData: source.getSrc(),
+    sourceWidth: 2,
+    sourceHeight: 2,
+    sourceDisplayWidth: 2,
+    sourceDisplayHeight: 2,
+    canvasJson: serializeCanvasObjects(canvas),
+  };
+  const hydrate = vi
+    .spyOn(FabricImage, 'fromObject')
+    .mockResolvedValue(new FabricImage(bitmap, { width: 2, height: 2 }));
+  try {
+    await loadPreparedDocumentOnCanvas({
+      canvas,
+      prepared: prepareAppliedDocument(snapshot),
+      prepareObject: vi.fn(),
+      rebuildFrameDecorations: async () => undefined,
+      preserveViewport: true,
+      zoomLevel: 1,
+    });
+    expect(hydrate).not.toHaveBeenCalled();
+    expect(canvas.getObjects()).toContain(source);
+    expect(source.getElement()).toBe(bitmap);
+  } finally {
+    hydrate.mockRestore();
+    canvas.destroy();
+  }
+});
 
 function createPreparedDocument() {
   return {

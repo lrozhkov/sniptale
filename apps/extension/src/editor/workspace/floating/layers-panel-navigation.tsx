@@ -1,13 +1,23 @@
 import pencilAiIcon from '@iconify-icons/tabler/pencil-ai';
 import iconsIcon from '@iconify-icons/tabler/icons';
 import { Icon } from '@iconify/react';
-import { AppWindow, ChevronDown, Crop, Info, Layers3, Scaling, Wallpaper } from 'lucide-react';
+import {
+  AppWindow,
+  ChevronDown,
+  Crop,
+  History,
+  Info,
+  Layers3,
+  Scaling,
+  Wallpaper,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import { translate } from '../../../platform/i18n';
 import type { EditorInspector } from '../../state/types';
 import { EditorIconButton, cx } from '../../chrome/ui';
 
 export type EditorLayersPanelMode =
+  | 'history'
   | 'ai'
   | 'elements'
   | 'layers'
@@ -18,6 +28,7 @@ export type EditorLayersPanelMode =
   | 'canvas-size';
 
 const MODE_BY_INSPECTOR: Partial<Record<EditorInspector, EditorLayersPanelMode>> = {
+  history: 'history',
   ai: 'ai',
   elements: 'elements',
   frame: 'frame',
@@ -40,6 +51,11 @@ const modes: ReadonlyArray<{
     id: 'layers',
     icon: <Layers3 size={16} strokeWidth={2} />,
     label: () => translate('editor.toolbar.layersTitle'),
+  },
+  {
+    id: 'history',
+    icon: <History size={16} strokeWidth={2} />,
+    label: () => translate('editor.history.title'),
   },
   {
     id: 'elements',
@@ -78,7 +94,7 @@ const modes: ReadonlyArray<{
   },
 ];
 
-const [layersMode, ...settingsModes] = modes;
+const [layersMode, historyMode, ...settingsModes] = modes;
 
 function renderModeButton(
   mode: (typeof modes)[number],
@@ -120,7 +136,10 @@ export function EditorFloatingLayersNavigation(props: {
       )}
     >
       {layersMode ? renderModeButton(layersMode, props) : null}
-      {settingsModes.map((mode) => renderModeButton(mode, props))}
+      {historyMode ? renderModeButton(historyMode, props) : null}
+      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+        {settingsModes.map((mode) => renderModeButton(mode, props))}
+      </div>
       <span aria-hidden="true" className={props.collapsed ? 'h-5 w-px' : 'ml-auto'} />
       {props.collapsed || !props.onCollapse ? null : (
         <EditorIconButton

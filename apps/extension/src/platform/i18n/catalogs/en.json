@@ -2685,6 +2685,31 @@
     }
   },
   "editor": {
+    "history": {
+      "title": "History",
+      "subtitle": "Return to an earlier state",
+      "start": "Start of available history",
+      "current": "Current",
+      "undone": "Undone",
+      "document": "Image",
+      "empty": "Your changes will appear here. Choose an entry to return to that state.",
+      "colorChange": "Color change",
+      "operations": {
+        "add": "Add object",
+        "remove": "Delete object",
+        "move": "Move",
+        "resize": "Resize",
+        "rotate": "Rotate",
+        "reorder": "Change layer order",
+        "text": "Edit text",
+        "fill": "Change fill",
+        "stroke": "Change stroke",
+        "rename": "Rename",
+        "visibility": "Change visibility",
+        "lock": "Change lock",
+        "update": "Edit"
+      }
+    },
     "page": {
       "startCreate": "Create image 1280 × 720",
       "startRecent": "Recent images",

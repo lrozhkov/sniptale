@@ -191,6 +191,7 @@ it('moves collapsed layers to the bottom-right toolbar without insert image acti
   const modes = container?.querySelectorAll('[data-ui^="editor.floating.layers.mode."]');
   expect(Array.from(modes ?? [], (mode) => mode.getAttribute('data-ui'))).toEqual([
     'editor.floating.layers.mode.layers',
+    'editor.floating.layers.mode.history',
     'editor.floating.layers.mode.elements',
     'editor.floating.layers.mode.frame',
     'editor.floating.layers.mode.browser-frame',

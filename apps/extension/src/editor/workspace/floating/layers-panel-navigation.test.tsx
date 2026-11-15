@@ -16,6 +16,7 @@ vi.mock('../../inspector/layers/file-input', () => ({
 
 it('maps only owned settings inspectors into the unified layers panel', () => {
   expect(resolveEditorLayersPanelMode('tool')).toBe('layers');
+  expect(resolveEditorLayersPanelMode('history')).toBe('history');
   expect(resolveEditorLayersPanelMode('ai')).toBe('ai');
   expect(resolveEditorLayersPanelMode('elements')).toBe('elements');
   expect(resolveEditorLayersPanelMode('layer-effects')).toBe('layers');
@@ -47,6 +48,7 @@ it('keeps modes available without image insertion when collapsed', () => {
     )
   ).toEqual([
     'layers',
+    'history',
     'elements',
     'frame',
     'browser-frame',
@@ -81,6 +83,7 @@ it('keeps the canonical header order when expanded', () => {
 function expectToolbarOrder(markup: string, includeCollapse: boolean) {
   const selectors = [
     'editor.floating.layers.mode.layers',
+    'editor.floating.layers.mode.history',
     'editor.floating.layers.mode.elements',
     'editor.floating.layers.mode.frame',
     'editor.floating.layers.mode.browser-frame',

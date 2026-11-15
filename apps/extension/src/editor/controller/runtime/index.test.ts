@@ -74,6 +74,7 @@ it('syncs runtime state with selected object details and history metadata', () =
   };
   const history = {
     getState: () => ({ canRedo: true, canUndo: true, index: 2, size: 5 }),
+    getRevision: () => 7,
   };
   const viewport = { left: 12, top: 24, zoom: 2 } as never;
 
@@ -94,7 +95,7 @@ it('syncs runtime state with selected object details and history metadata', () =
     cropReady: true,
     cropSelection: { height: 10, left: 0, top: 0, width: 10 },
     frame: storeState.frame,
-    history: { canRedo: true, canUndo: true, index: 2, size: 5 },
+    history: { canRedo: true, canUndo: true, index: 2, size: 5, revision: 7 },
     layers: [{ id: 'layer-1' }],
     selection: {
       hasSelection: true,

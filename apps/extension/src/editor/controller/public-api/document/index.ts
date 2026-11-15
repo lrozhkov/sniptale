@@ -14,6 +14,7 @@ export {
   resetEditorControllerToOriginal,
   restoreEditorControllerOriginalDocument,
   undoEditorControllerSnapshot,
+  seekEditorControllerSnapshot,
 } from './history';
 export {
   applyEditorSelectionSettingsViaController,

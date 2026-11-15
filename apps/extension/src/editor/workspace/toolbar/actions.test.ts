@@ -19,6 +19,13 @@ function args(inspector: 'tool' | 'file' | 'canvas-size' | 'image-size' | 'frame
 
 beforeEach(() => vi.clearAllMocks());
 
+it('keeps the history list open while activating an editing tool', () => {
+  const options = { ...args(), inspector: 'history' as const };
+  createEditorToolbarActions(options).activateTool('pencil');
+  expect(options.setInspector).toHaveBeenLastCalledWith('history');
+  expect(options.controller.setActiveTool).toHaveBeenCalledWith('pencil');
+});
+
 it('activates current tools after clearing selection and closing layer effects', () => {
   const options = args();
   const actions = createEditorToolbarActions(options);

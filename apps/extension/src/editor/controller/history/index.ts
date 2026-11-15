@@ -4,6 +4,16 @@ import { type EditorDocument } from '../../../features/editor/document/types';
 import { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
 import { IMAGE_EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 import { createDeferredEditorHistory, scheduleEditorHistoryAfterPaint } from './deferred';
+import { createEditorHistoryCostIndex } from './retention-cost';
+import type {
+  EditorHistoryAction,
+  EditorHistoryEntry,
+} from '../../../features/editor-history/action';
+import {
+  describeEditorHistoryAction,
+  describeEditorHistoryObject,
+  type EditorHistoryDescription,
+} from './actions';
 
 const HISTORY_VALUE_INLINE_LIMIT = 4_096;
 const HISTORY_VALUE_TOKEN_PREFIX = 'sniptale-history-asset:';
@@ -24,11 +34,12 @@ const DOCUMENT_POOLED_FIELDS = new Set([
 type EditorHistoryAssets = {
   byValue: Map<string, string>;
   byToken: Map<string, string>;
-  tokensBySnapshot: Map<string, Set<string>>;
   nextId: number;
   bytesByToken: Map<string, number>;
-  bytesBySnapshot: Map<string, number>;
+  cost: ReturnType<typeof createEditorHistoryCostIndex>;
   actionLimit: number;
+  descriptions: Map<string, EditorHistoryDescription>;
+  actions: Map<string, Map<string, EditorHistoryAction>>;
   deferred?: ReturnType<typeof createDeferredEditorHistory>;
 };
 
@@ -74,9 +85,10 @@ function encodeEditorSnapshot(
   assets: EditorHistoryAssets,
   tokens: Set<string>
 ): string {
-  return JSON.stringify(document, (key, value: unknown) => {
+  const objects: EditorHistoryDescription['objects'] = [];
+  const snapshot = JSON.stringify(document, (key, value: unknown) => {
     if (key === 'canvasJson' && typeof value === 'string') {
-      return encodeCanvasHistoryValue(JSON.parse(value) as unknown, assets, tokens);
+      return encodeCanvasHistoryValue(JSON.parse(value) as unknown, assets, tokens, objects);
     }
     if (key === 'vectorDefinitions' && isRecord(value)) {
       return Object.fromEntries(
@@ -87,18 +99,28 @@ function encodeEditorSnapshot(
       );
     }
     if (key === 'richShapes' && Array.isArray(value))
-      return poolObjectVersions(value, assets, tokens);
+      return poolObjectVersions(value, assets, tokens, objects);
     return encodeSharedValue(value, key, assets, tokens);
   });
+  const metadata: unknown = JSON.parse(snapshot);
+  if (isRecord(metadata)) {
+    delete metadata['canvasJson'];
+    delete metadata['richShapes'];
+    delete metadata['vectorDefinitions'];
+    assets.descriptions.set(snapshot, { objects, document: metadata });
+  }
+  return snapshot;
 }
 
 function encodeCanvasHistoryValue(
   value: unknown,
   assets: EditorHistoryAssets,
-  tokens: Set<string>
+  tokens: Set<string>,
+  descriptions?: EditorHistoryDescription['objects']
 ): string {
   return JSON.stringify(value, (key, child: unknown) => {
-    if (key === 'objects' && Array.isArray(child)) return poolObjectVersions(child, assets, tokens);
+    if (key === 'objects' && Array.isArray(child))
+      return poolObjectVersions(child, assets, tokens, descriptions);
     return encodeSharedValue(child, key, assets, tokens);
   });
 }
@@ -106,13 +128,20 @@ function encodeCanvasHistoryValue(
 function poolObjectVersions(
   objects: unknown[],
   assets: EditorHistoryAssets,
-  tokens: Set<string>
+  tokens: Set<string>,
+  descriptions?: EditorHistoryDescription['objects']
 ): unknown[] {
-  return objects.map((object: unknown) =>
-    isRecord(object)
-      ? internHistoryValue(encodeCanvasHistoryValue(object, assets, tokens), assets, tokens)
-      : object
-  );
+  return objects.map((object: unknown) => {
+    if (!isRecord(object)) return object;
+    const token = internHistoryValue(
+      encodeCanvasHistoryValue(object, assets, tokens),
+      assets,
+      tokens
+    );
+    const description = descriptions && describeEditorHistoryObject(token, object);
+    if (description) descriptions.push(description);
+    return token;
+  });
 }
 
 function restoreObjectVersions(objects: unknown[], assets: EditorHistoryAssets): unknown[] {
@@ -187,22 +216,17 @@ function pruneEditorHistoryAssets(
   history: SnapshotHistory<string>,
   assets: EditorHistoryAssets
 ): void {
-  const retainedSnapshots = new Set(history.getSnapshots());
-  for (const snapshot of assets.tokensBySnapshot.keys()) {
-    if (!retainedSnapshots.has(snapshot)) {
-      assets.tokensBySnapshot.delete(snapshot);
-      assets.bytesBySnapshot.delete(snapshot);
-    }
+  const discarded = assets.cost.retain(history.getSnapshots());
+  for (const snapshot of discarded.snapshots) {
+    assets.descriptions.delete(snapshot);
+    assets.actions.delete(snapshot);
+    for (const actions of assets.actions.values()) actions.delete(snapshot);
   }
-  const retained = new Set<string>();
-  for (const tokens of assets.tokensBySnapshot.values()) {
-    for (const token of tokens) retained.add(token);
-  }
-  for (const [token, url] of assets.byToken) {
-    if (retained.has(token)) continue;
+  for (const token of discarded.tokens) {
+    const url = assets.byToken.get(token);
     assets.byToken.delete(token);
     assets.bytesByToken.delete(token);
-    assets.byValue.delete(url);
+    if (url !== undefined) assets.byValue.delete(url);
   }
 }
 
@@ -210,42 +234,26 @@ export function createEditorSnapshotHistory(
   document: EditorDocument,
   limits: Readonly<{ maxActions: number; maxBytes: number }> = IMAGE_EDITOR_HISTORY_LIMITS
 ): SnapshotHistory<string> {
+  const bytesByToken = new Map<string, number>();
   const assets: EditorHistoryAssets = {
     byValue: new Map(),
     byToken: new Map(),
-    tokensBySnapshot: new Map(),
     nextId: 0,
-    bytesByToken: new Map(),
-    bytesBySnapshot: new Map(),
+    bytesByToken,
+    cost: createEditorHistoryCostIndex(bytesByToken),
     actionLimit: limits.maxActions,
+    descriptions: new Map(),
+    actions: new Map(),
   };
   const tokens = new Set<string>();
   const snapshot = encodeEditorSnapshot(document, assets, tokens);
-  assets.tokensBySnapshot.set(snapshot, tokens);
-  assets.bytesBySnapshot.set(snapshot, new TextEncoder().encode(snapshot).byteLength);
+  assets.cost.register(snapshot, tokens);
+  assets.cost.measure([snapshot]);
   const history = new SnapshotHistory<string>(snapshot, {
     limit: limits.maxActions + 1,
     maxBytes: limits.maxBytes,
-    measureBytes: (snapshots) => {
-      let bytes = 0;
-      let smallestBaseline = Number.POSITIVE_INFINITY;
-      const retained = new Set<string>();
-      for (const value of snapshots) {
-        const metadata =
-          assets.bytesBySnapshot.get(value) ?? new TextEncoder().encode(value).byteLength;
-        bytes += metadata;
-        let baseline = metadata;
-        for (const token of assets.tokensBySnapshot.get(value) ?? []) {
-          retained.add(token);
-          baseline += assets.bytesByToken.get(token) ?? 0;
-        }
-        smallestBaseline = Math.min(smallestBaseline, baseline);
-      }
-      for (const token of retained) bytes += assets.bytesByToken.get(token) ?? 0;
-      // Bound additional history at every possible cursor. Current content is mandatory,
-      // and a retained window must stay affordable in both Undo and Redo directions.
-      return bytes - smallestBaseline;
-    },
+    measureBytes: assets.cost.measure,
+    measureWindowBytes: assets.cost.measureWindow,
   });
   historyAssets.set(history, assets);
   assets.deferred = createDeferredEditorHistory({
@@ -287,6 +295,7 @@ export function readEditorHistoryState(
 ) {
   if (!history) return { canUndo: false, canRedo: false, index: 0, size: 1 };
   const current = history.getState();
+  const revision = history.getRevision();
   const pending = (historyAssets.get(history)?.deferred?.getCount() ?? 0) + pendingActions;
   if (!pending)
     return {
@@ -294,12 +303,67 @@ export function readEditorHistoryState(
       canRedo: current.canRedo,
       index: current.index,
       size: current.size,
+      revision,
     };
   const index = Math.min(
     historyAssets.get(history)?.actionLimit ?? IMAGE_EDITOR_HISTORY_LIMITS.maxActions,
     current.index + pending
   );
-  return { canUndo: index > 0, canRedo: false, index, size: index + 1 };
+  return { canUndo: index > 0, canRedo: false, index, size: index + 1, revision };
+}
+
+function captureEditorHistoryAction(
+  assets: EditorHistoryAssets,
+  before: string,
+  after: string
+): void {
+  if (before === after) return;
+  const previous = assets.descriptions.get(before);
+  const next = assets.descriptions.get(after);
+  if (!previous || !next) return;
+  const actions = assets.actions.get(before) ?? new Map<string, EditorHistoryAction>();
+  actions.set(
+    after,
+    describeEditorHistoryAction(previous, next, (token) => assets.byToken.get(token))
+  );
+  assets.actions.set(before, actions);
+}
+
+/** Reads lightweight presentation data without flushing pending capture or decoding documents. */
+export function readEditorHistoryEntries(
+  history: SnapshotHistory<string> | null
+): EditorHistoryEntry[] {
+  if (!history) return [];
+  const assets = historyAssets.get(history);
+  const snapshots = history.getSnapshots();
+  const entries = snapshots.map((snapshot, index) => ({
+    index,
+    action:
+      index === 0
+        ? null
+        : (assets?.actions.get(snapshots[index - 1]!)?.get(snapshot) ?? {
+            operation: 'update' as const,
+            target: null,
+          }),
+    pending: false,
+  }));
+  const pending = assets?.deferred?.getCount() ?? 0;
+  if (pending) {
+    entries.splice(history.getState().index + 1);
+    for (let step = 0; step < pending; step++)
+      entries.push({
+        index: entries.length,
+        action: { operation: 'update', target: null },
+        pending: true,
+      });
+    if (entries.length > (assets?.actionLimit ?? 0) + 1)
+      entries.splice(0, entries.length - (assets?.actionLimit ?? 0) - 1);
+  }
+  return entries.map((entry, index) => ({
+    ...entry,
+    index,
+    action: index === 0 ? null : entry.action,
+  }));
 }
 
 export function resetEditorSnapshotHistory(
@@ -312,13 +376,8 @@ export function resetEditorSnapshotHistory(
   const snapshot = assets
     ? encodeEditorSnapshot(document, assets, tokens)
     : JSON.stringify(document);
+  assets?.cost.register(snapshot, tokens);
   history.reset(snapshot);
-  if (assets) {
-    assets.tokensBySnapshot.clear();
-    assets.bytesBySnapshot.clear();
-    assets.tokensBySnapshot.set(snapshot, tokens);
-    assets.bytesBySnapshot.set(snapshot, new TextEncoder().encode(snapshot).byteLength);
-  }
   if (assets) pruneEditorHistoryAssets(history, assets);
 }
 
@@ -406,8 +465,8 @@ export function pushEditorSnapshotHistory(options: {
   const snapshot = assets
     ? encodeEditorSnapshot(options.exportDocument(), assets, tokens)
     : JSON.stringify(options.exportDocument());
-  if (assets) assets.tokensBySnapshot.set(snapshot, tokens);
-  if (assets) assets.bytesBySnapshot.set(snapshot, new TextEncoder().encode(snapshot).byteLength);
+  assets?.cost.register(snapshot, tokens);
+  if (assets) captureEditorHistoryAction(assets, options.history.getCurrent(), snapshot);
   options.history.push(snapshot);
   if (assets) pruneEditorHistoryAssets(options.history, assets);
   return true;
@@ -423,16 +482,19 @@ export function replaceCurrentEditorSnapshotHistory(options: {
   flushDeferredEditorHistory(history);
   if (!history || history.getRevision() !== options.expectedRevision) return false;
   const assets = historyAssets.get(history);
+  const snapshots = history.getSnapshots();
+  const index = history.getState().index;
+  const previous = snapshots[index - 1];
+  const current = snapshots[index];
+  const action = previous && current ? assets?.actions.get(previous)?.get(current) : undefined;
   const tokens = new Set<string>();
   const document = options.exportDocument();
   const snapshot = assets
     ? encodeEditorSnapshot(document, assets, tokens)
     : JSON.stringify(document);
-  if (assets) {
-    assets.tokensBySnapshot.set(snapshot, tokens);
-    assets.bytesBySnapshot.set(snapshot, new TextEncoder().encode(snapshot).byteLength);
-  }
+  assets?.cost.register(snapshot, tokens);
   const replaced = history.replaceCurrent(options.expectedRevision, snapshot);
+  if (replaced && previous && action && assets) assets.actions.get(previous)?.set(snapshot, action);
   if (assets) pruneEditorHistoryAssets(history, assets);
   return replaced !== null;
 }

@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { FloatingChromePanel, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
 import { EditorInspectorLayersPanel } from '../../inspector/layers';
+import { EditorInspectorHistory } from '../../inspector/history';
 import { EditorInspectorContent } from '../../inspector/content';
 import {
   createEditorInspectorContentPanelProps,
@@ -110,6 +111,14 @@ function EditorFloatingLayersPanelBody(props: {
     if (scroller.current)
       scroller.current.scrollTop = props.scrollPositions.get(props.activeMode) ?? 0;
   }, [props.activeMode, props.scrollPositions]);
+  if (props.activeMode === 'history')
+    return (
+      <EditorInspectorHistory
+        hasImage={props.hasImage}
+        initialScrollOffset={props.scrollPositions.get('history') ?? 0}
+        onScrollOffsetChange={(offset) => props.scrollPositions.set('history', offset)}
+      />
+    );
   if (props.documentController.inspector === 'layer-effects') {
     return (
       <EditorFloatingLayerEffectsPanel
@@ -268,8 +277,10 @@ export function EditorFloatingLayersPanel({
     if (mode === activeMode && documentController.inspector !== 'layer-effects') return;
     if (
       mode === 'ai' ||
+      mode === 'history' ||
       mode === 'elements' ||
-      ((activeMode === 'ai' || activeMode === 'elements') && mode === 'layers')
+      ((activeMode === 'ai' || activeMode === 'elements' || activeMode === 'history') &&
+        mode === 'layers')
     ) {
       documentController.setInspector(mode === 'layers' ? 'tool' : mode);
       return;

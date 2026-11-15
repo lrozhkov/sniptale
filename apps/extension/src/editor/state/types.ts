@@ -16,6 +16,7 @@ import type { DrawingToolDefaults } from '../../features/drawing/public';
 import type { EditorCustomShapeDefinition } from '../../features/editor/document/rich-shape/custom';
 
 export type EditorInspector =
+  | 'history'
   | 'ai'
   | 'elements'
   | 'none'

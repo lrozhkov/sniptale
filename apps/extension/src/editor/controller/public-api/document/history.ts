@@ -61,6 +61,49 @@ async function preserveRasterEditing(
   else await operation();
 }
 
+/** Applies one retained state and publishes once, including jumps across several actions. */
+export async function seekEditorControllerSnapshot(
+  controller: EditorDocumentHistoryController,
+  index: number
+): Promise<void> {
+  return runEditorDocumentTransition(controller.canvas ?? controller.history, () =>
+    preserveRasterEditing(controller, async () => {
+      if (controller.canvas) cancelPendingEditorSimplify(controller.canvas, false);
+      flushActiveFrameAnnotationDraft();
+      flushDeferredEditorHistory(controller.history);
+      const history = controller.history;
+      if (!history || history.getState().index === index) return;
+      const previousIndex = history.getState().index;
+      if (!history.seek(index)) return;
+      const document = readCurrentEditorSnapshot(history);
+      if (!document) {
+        history.seek(previousIndex);
+        return;
+      }
+      try {
+        await controller.applyDocument(document, {
+          resetHistory: false,
+          updateOriginal: false,
+          preserveViewport: true,
+        });
+      } catch (error) {
+        // Restore the previous document and cursor under the same transition owner.
+        history.seek(previousIndex);
+        const previous = readCurrentEditorSnapshot(history);
+        let restored = false;
+        try {
+          restored = await restoreHistoryDocument(controller, previous, error);
+          if (restored && previous) controller.publishHistoryDocument(previous);
+        } finally {
+          if (!restored) history.seek(index);
+        }
+        throw error;
+      }
+      controller.publishHistoryDocument(document);
+    })
+  );
+}
+
 async function undoEditorControllerSnapshotInTurn(
   controller: EditorDocumentHistoryController
 ): Promise<void> {

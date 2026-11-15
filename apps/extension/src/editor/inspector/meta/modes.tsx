@@ -13,6 +13,7 @@ import {
   Scaling,
   SlidersHorizontal,
   Sparkles,
+  History,
 } from 'lucide-react';
 import type { EditorLayerEffectCategory } from '../../../features/editor/document/effects';
 import type { EditorInspector } from '../../state/types';
@@ -32,6 +33,11 @@ interface TranslatedInspectorDescriptor {
 }
 
 const staticInspectorDescriptors = {
+  history: {
+    Icon: History,
+    subtitleKey: 'editor.history.subtitle',
+    titleKey: 'editor.history.title',
+  },
   elements: {
     Icon: CatalogIcon,
     subtitleKey: 'editor.elements.subtitle',
