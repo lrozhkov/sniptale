@@ -171,15 +171,24 @@ it('rechecks recording authority after native document admission completes', asy
   expect(owner.send).not.toHaveBeenCalled();
 });
 
-it.each(['cursor', 'events'] as const)(
-  'refuses an unadmitted outgoing %s document before forwarding',
-  (kind) => {
+const outgoingSources = (['cursor', 'events'] as const).flatMap((kind) =>
+  (['pending_deletion', 'cached'] as const).map((documentLifecycle) => ({
+    kind,
+    documentLifecycle,
+    frameId: documentLifecycle === 'cached' ? 5 : 0,
+  }))
+);
+
+it.each(outgoingSources)(
+  'refuses an unadmitted outgoing $kind ($documentLifecycle) document before forwarding',
+  ({ kind, documentLifecycle, frameId }) => {
     bind('raw-denied');
     const response = vi.fn();
     const message = kind === 'cursor' ? raw('raw-denied') : rawEvents('raw-denied');
     handleRecordingObservations(message, response, {
       ...sender,
-      documentLifecycle: 'pending_deletion',
+      documentLifecycle,
+      frameId,
     });
     expect(response).toHaveBeenCalledWith({
       success: false,
@@ -315,10 +324,10 @@ function rawEvents(recordingId: string) {
   };
 }
 
-it.each(['cursor', 'events'] as const)(
-  'retains the admitted outgoing %s document while its final packet drains',
-  async (kind) => {
-    const recordingId = `outgoing-${kind}`;
+it.each(outgoingSources)(
+  'retains the admitted outgoing $kind ($documentLifecycle) document while its final packet drains',
+  async ({ kind, documentLifecycle, frameId }) => {
+    const recordingId = `outgoing-${kind}-${documentLifecycle}`;
     bind(recordingId);
     const message = kind === 'cursor' ? raw(recordingId) : rawEvents(recordingId);
     const initial = vi.fn();
@@ -361,7 +370,8 @@ it.each(['cursor', 'events'] as const)(
           };
     handleRecordingObservations(terminal, outgoing, {
       ...sender,
-      documentLifecycle: 'pending_deletion',
+      documentLifecycle,
+      frameId,
     });
     await vi.waitFor(() => expect(outgoing).toHaveBeenCalledWith({ success: true }));
     expect(owner.frames).toHaveBeenCalledTimes(1);
@@ -369,10 +379,10 @@ it.each(['cursor', 'events'] as const)(
   }
 );
 
-it.each(['cursor', 'events'] as const)(
-  'refuses an outgoing %s packet queued behind successor admission',
-  async (kind) => {
-    const recordingId = `outgoing-queued-${kind}`;
+it.each(outgoingSources)(
+  'refuses an outgoing $kind ($documentLifecycle) packet queued behind successor admission',
+  async ({ kind, documentLifecycle, frameId }) => {
+    const recordingId = `outgoing-queued-${kind}-${documentLifecycle}`;
     bind(recordingId);
     const message = kind === 'cursor' ? raw(recordingId) : rawEvents(recordingId);
     const initial = vi.fn();
@@ -384,7 +394,8 @@ it.each(['cursor', 'events'] as const)(
     const outgoing = vi.fn();
     handleRecordingObservations(message, outgoing, {
       ...sender,
-      documentLifecycle: 'pending_deletion',
+      documentLifecycle,
+      frameId,
     });
     await vi.waitFor(() =>
       expect(outgoing).toHaveBeenCalledWith({
@@ -397,10 +408,10 @@ it.each(['cursor', 'events'] as const)(
   }
 );
 
-it.each(['cursor', 'events'] as const)(
-  'refuses the outgoing %s document after the recording binding changes',
-  async (kind) => {
-    const recordingId = `outgoing-binding-${kind}`;
+it.each(outgoingSources)(
+  'refuses the outgoing $kind ($documentLifecycle) document after the recording binding changes',
+  async ({ kind, documentLifecycle, frameId }) => {
+    const recordingId = `outgoing-binding-${kind}-${documentLifecycle}`;
     bind(recordingId);
     const message = kind === 'cursor' ? raw(recordingId) : rawEvents(recordingId);
     const initial = vi.fn();
@@ -414,7 +425,8 @@ it.each(['cursor', 'events'] as const)(
     const outgoing = vi.fn();
     handleRecordingObservations(message, outgoing, {
       ...sender,
-      documentLifecycle: 'pending_deletion',
+      documentLifecycle,
+      frameId,
     });
     expect(outgoing).toHaveBeenCalledWith({
       success: false,
@@ -424,10 +436,10 @@ it.each(['cursor', 'events'] as const)(
   }
 );
 
-it.each(['cursor', 'events'] as const)(
-  'refuses the outgoing %s document after its successor is admitted',
-  async (kind) => {
-    const recordingId = `outgoing-replaced-${kind}`;
+it.each(outgoingSources)(
+  'refuses the outgoing $kind ($documentLifecycle) document after its successor is admitted',
+  async ({ kind, documentLifecycle, frameId }) => {
+    const recordingId = `outgoing-replaced-${kind}-${documentLifecycle}`;
     bind(recordingId);
     const message = kind === 'cursor' ? raw(recordingId) : rawEvents(recordingId);
     const initial = vi.fn();
@@ -440,7 +452,8 @@ it.each(['cursor', 'events'] as const)(
     const outgoing = vi.fn();
     handleRecordingObservations(message, outgoing, {
       ...sender,
-      documentLifecycle: 'pending_deletion',
+      documentLifecycle,
+      frameId,
     });
     expect(outgoing).toHaveBeenCalledWith({
       success: false,
@@ -547,3 +560,22 @@ it('rechecks event recording authority after asynchronous document admission', a
   });
   expect(owner.send).not.toHaveBeenCalled();
 });
+
+it.each(['cursor', 'events'] as const)(
+  'refuses an active non-top-level %s sender even for the admitted document identity',
+  async (kind) => {
+    const recordingId = `active-frame-${kind}`;
+    bind(recordingId);
+    const message = kind === 'cursor' ? raw(recordingId) : rawEvents(recordingId);
+    const initial = vi.fn();
+    handleRecordingObservations(message, initial, sender);
+    await vi.waitFor(() => expect(initial).toHaveBeenCalledWith({ success: true }));
+    const refused = vi.fn();
+    handleRecordingObservations(message, refused, { ...sender, frameId: 5 });
+    expect(refused).toHaveBeenCalledWith({
+      success: false,
+      error: 'RECORDING_OBSERVATIONS_SOURCE_UNAVAILABLE',
+    });
+    expect(owner.send).toHaveBeenCalledTimes(1);
+  }
+);

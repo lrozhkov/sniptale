@@ -98,7 +98,7 @@ export function registerNavigationListeners(state: BackgroundModeState): void {
     });
   });
 
-  browserWebNavigation.subscribeToCompleted((details: unknown) => {
+  const restoreRecordingAfterDocumentReady = (details: unknown) => {
     const navigation = parseTopLevelDocumentNavigation(details);
     if (!navigation) return;
     runWithVideoLeaseHydrationFallback('complete recording navigation', () =>
@@ -108,7 +108,11 @@ export function registerNavigationListeners(state: BackgroundModeState): void {
         ensureActivePageAccessRuntime
       )
     );
-  });
+  };
+
+  // An expired commit probe must not defer history until slow subresources finish.
+  browserWebNavigation.subscribeToDOMContentLoaded(restoreRecordingAfterDocumentReady);
+  browserWebNavigation.subscribeToCompleted(restoreRecordingAfterDocumentReady);
 
   browserWebNavigation.subscribeToErrorOccurred((details: unknown) => {
     const navigation = parseTopLevelDocumentNavigation(details);

@@ -1,7 +1,6 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import {
-  appendControlledCursorTelemetry,
   beginControlledCursorNavigation,
   clearControlledCursorNavigationPending,
   getRecordingFrameClock,
@@ -10,11 +9,7 @@ import {
   setControlledCursorAutoPaused,
 } from '../../../session-state';
 import { getVideoRecordingRuntimeState } from '../../session-state';
-import {
-  disableControlledCursorCapture,
-  enableControlledCursorCapture,
-  syncControlledCursorCapture,
-} from './messages';
+import { enableControlledCursorCapture, syncControlledCursorCapture } from './messages';
 
 const logger = createLogger({ namespace: 'BackgroundVideoControlledCursorNavigationEffects' });
 const REBOOTSTRAP_RETRY_DELAYS_MS = [0, 250, 1000] as const;
@@ -69,12 +64,8 @@ export async function suspendControlledCursorEffects(
 ): Promise<void> {
   if (!isControlledCursorEffectActive(binding)) return;
   setControlledCursorAutoPaused(binding.shouldResume);
-  try {
-    const telemetry = await disableControlledCursorCapture(binding.tabId, 'observation');
-    if (isControlledCursorEffectActive(binding)) appendControlledCursorTelemetry(telemetry);
-  } catch (error) {
-    logger.warn('Failed to flush controlled cursor telemetry before navigation', error);
-  }
+  // The old document remains observable while its successor response is pending.
+  // Its content controller closes and flushes at pagehide, not at request start.
 }
 
 export async function restoreControlledCursorEffects(

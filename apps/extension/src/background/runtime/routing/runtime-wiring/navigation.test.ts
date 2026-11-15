@@ -35,6 +35,7 @@ import {
   handleTabRecordingNavigationStart,
   navigationCommittedListenerRef,
   navigationCompletedListenerRef,
+  navigationDOMContentLoadedListenerRef,
   navigationErrorListenerRef,
   navigationListenerRef,
   parseTopLevelDocumentNavigation,
@@ -63,6 +64,32 @@ it('retains completion recovery after early runtime readiness fails', async () =
     7,
     'document-1',
     expect.any(Function)
+  );
+});
+
+it('restores history at DOM readiness after the commit probe expires while subresources are pending', async () => {
+  handleTabRecordingNavigationCompleted.mockReturnValueOnce(true);
+  ensurePageAccessMock.mockRejectedValueOnce(new Error('Body is not available yet'));
+  handleTabRecordingNavigationCommitted.mockReturnValueOnce(true);
+  parseTopLevelDocumentNavigation.mockReturnValue({
+    documentId: 'document-1',
+    frameId: 0,
+    tabId: 7,
+  });
+  registerNavigationListeners(createModeState());
+  navigationCommittedListenerRef.current?.({ documentId: 'document-1', frameId: 0, tabId: 7 });
+  await flushMicrotasks();
+  expect(handleTabRecordingNavigationCompleted).not.toHaveBeenCalled();
+  navigationDOMContentLoadedListenerRef.current?.({
+    documentId: 'document-1',
+    frameId: 0,
+    tabId: 7,
+  });
+  await flushMicrotasks();
+  expect(handleTabRecordingNavigationCompleted).toHaveBeenCalledExactlyOnceWith(
+    7,
+    'document-1',
+    ensurePageAccessMock
   );
 });
 

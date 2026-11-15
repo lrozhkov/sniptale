@@ -10,26 +10,83 @@ import {
   triggerExtensionAction,
 } from '../support/recording-action';
 
-for (const loadingResource of ['image', 'pre-body-script'] as const) {
+async function historyStates(page: import('@playwright/test').Page, recordingId: string) {
+  return page.evaluate(async (id) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('sniptale-db');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      const value = await new Promise<unknown>((resolve, reject) => {
+        const request = db
+          .transaction('recording_telemetry')
+          .objectStore('recording_telemetry')
+          .get(id);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const state = (entry: unknown) =>
+        typeof entry === 'object' && entry !== null && 'state' in entry ? entry.state : null;
+      if (typeof value !== 'object' || value === null) return null;
+      return {
+        events: state('recordingEvents' in value ? value.recordingEvents : null),
+        cursor: state('cursorTrajectory' in value ? value.cursorTrajectory : null),
+      };
+    } finally {
+      db.close();
+    }
+  }, recordingId);
+}
+
+for (const loadingResource of [
+  'image',
+  'pre-body-script',
+  'pre-body-script-and-image',
+  'destination-response',
+] as const) {
   test(`TAB history resumes around ${loadingResource} loading and BFCache return`, async ({}, info) => {
     test.setTimeout(90_000);
     let releaseResource = () => {};
+    let releaseImage = () => {};
     const resourceRequested = Promise.withResolvers<void>();
     const server = http.createServer((request, response) => {
       if (request.url === '/held-image' || request.url === '/held-script') {
-        releaseResource = () => {
+        const release = () => {
           if (response.writableEnded || response.destroyed) return;
           response.writeHead(204);
           response.end();
         };
-        resourceRequested.resolve();
+        if (request.url === '/held-image' && loadingResource === 'pre-body-script-and-image')
+          releaseImage = release;
+        else {
+          releaseResource = release;
+          resourceRequested.resolve();
+        }
         return;
       }
-      response.setHeader('content-type', 'text/html');
-      response.end(`<!doctype html><head><title>Recording navigation</title>
-      ${request.url === '/loading' && loadingResource === 'pre-body-script' ? '<script src="/held-script"></script>' : ''}</head><body>
+      const writePage = () => {
+        if (response.writableEnded || response.destroyed) return;
+        response.setHeader('content-type', 'text/html');
+        const loading = request.url === '/loading';
+        const script =
+          loading && loadingResource.startsWith('pre-body-script')
+            ? '<script src="/held-script"></script>'
+            : '';
+        const image =
+          loading &&
+          (loadingResource === 'image' || loadingResource === 'pre-body-script-and-image')
+            ? '<img src="/held-image">'
+            : '';
+        response.end(`<!doctype html><head><title>Recording navigation</title>
+      ${script}</head><body>
       <button style="margin:100px;width:200px;height:80px">Record click</button>
-      ${request.url === '/loading' && loadingResource === 'image' ? '<img src="/held-image">' : ''}</body>`);
+      ${image}</body>`);
+      };
+      if (request.url === '/loading' && loadingResource === 'destination-response') {
+        releaseResource = writePage;
+        resourceRequested.resolve();
+      } else writePage();
     });
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
     const address = server.address();
@@ -106,6 +163,22 @@ for (const loadingResource of ['image', 'pre-body-script'] as const) {
       ).toMatchObject({ success: true });
       await target.bringToFront();
       const actionTarget = await triggerExtensionAction(context, extensionId, target);
+      await expect
+        .poll(() =>
+          evaluateInTarget(
+            context,
+            actionTarget,
+            `!!document.querySelector('[data-ui="popup.menu.route"]')`
+          )
+        )
+        .toBe(true);
+      // Finish first-render preference initialization before testing recording navigation.
+      await evaluateInTarget(
+        context,
+        actionTarget,
+        "navigator.locks.request('sniptale:persistence:privacy-erasure', { mode: 'shared' }, () => true)",
+        true
+      );
       await sendRuntimeMessageInTarget(
         context,
         actionTarget,
@@ -145,11 +218,22 @@ for (const loadingResource of ['image', 'pre-body-script'] as const) {
           { url, kind }
         );
       await expect.poll(() => historyCount(`${origin}/initial`, 'segment')).toBeGreaterThan(0);
-      await target.goto(`${origin}/loading`, {
-        waitUntil: loadingResource === 'image' ? 'domcontentloaded' : 'commit',
-      });
+      if (loadingResource === 'destination-response') {
+        const navigation = target.goto(`${origin}/loading`, { waitUntil: 'commit' });
+        void navigation.catch(() => undefined);
+        await resourceRequested.promise;
+        expect(target.url()).toBe(`${origin}/initial`);
+        await target.mouse.click(200, 140);
+        await expect.poll(() => historyCount(`${origin}/initial`, 'action')).toBeGreaterThan(0);
+        releaseResource();
+        await navigation;
+      } else {
+        await target.goto(`${origin}/loading`, {
+          waitUntil: loadingResource === 'image' ? 'domcontentloaded' : 'commit',
+        });
+      }
       await resourceRequested.promise;
-      if (loadingResource === 'pre-body-script') {
+      if (loadingResource.startsWith('pre-body-script')) {
         await expect
           .poll(
             () => evaluateInTarget(context, workerTarget, 'globalThis.earlyRuntimeReadinessFailed'),
@@ -163,7 +247,7 @@ for (const loadingResource of ['image', 'pre-body-script'] as const) {
       await expect
         .poll(() => historyCount(`${origin}/loading`, 'segment'), { timeout: 5000 })
         .toBeGreaterThan(0);
-      if (loadingResource === 'image')
+      if (loadingResource === 'image' || loadingResource === 'pre-body-script-and-image')
         expect(await target.evaluate(() => document.readyState)).not.toBe('complete');
       await target.getByRole('button', { name: 'Record click', exact: true }).click();
       await expect.poll(() => historyCount(`${origin}/loading`, 'action')).toBeGreaterThan(0);
@@ -172,15 +256,19 @@ for (const loadingResource of ['image', 'pre-body-script'] as const) {
         fullPage: false,
       });
       releaseResource();
+      releaseImage();
       await target.waitForLoadState('load');
       const before = await historyCount(`${origin}/initial`, 'segment');
+      const actionsBeforeReturn = await historyCount(`${origin}/initial`, 'action');
       await target.goBack({ waitUntil: 'commit' });
       await expect
         .poll(() => target.evaluate(() => Reflect.get(window, 'restoredFromCache')))
         .toBe(true);
       await expect.poll(() => historyCount(`${origin}/initial`, 'segment')).toBeGreaterThan(before);
       await target.getByRole('button', { name: 'Record click', exact: true }).click();
-      await expect.poll(() => historyCount(`${origin}/initial`, 'action')).toBeGreaterThan(0);
+      await expect
+        .poll(() => historyCount(`${origin}/initial`, 'action'))
+        .toBeGreaterThan(actionsBeforeReturn);
       if (
         !active ||
         typeof active !== 'object' ||
@@ -205,6 +293,9 @@ for (const loadingResource of ['image', 'pre-body-script'] as const) {
       );
       await expect(gallery.locator('[data-ui="gallery.videoReview.dialog"]')).toBeVisible();
       await gallery.getByRole('button', { name: 'Advanced editing', exact: true }).click();
+      await expect
+        .poll(() => historyStates(gallery, String(active.recordingId)))
+        .toEqual({ events: 'complete', cursor: 'complete' });
       await expect(
         gallery
           .locator(
@@ -218,6 +309,7 @@ for (const loadingResource of ['image', 'pre-body-script'] as const) {
       });
     } finally {
       releaseResource();
+      releaseImage();
       if (launched) await closeExtensionBrowser(launched, { removeUserDataDir: true });
       server.closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));

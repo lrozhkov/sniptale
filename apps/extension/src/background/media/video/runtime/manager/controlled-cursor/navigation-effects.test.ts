@@ -89,21 +89,21 @@ it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
     mocks.isEnabled.mockReturnValue(false);
     mocks.getRuntimeState.mockReturnValue({ duration: 12, captureMode });
     await suspendControlledCursorEffects(binding);
-    expect(mocks.appendTelemetry).toHaveBeenCalledWith({ signals: [] });
+    expect(mocks.appendTelemetry).not.toHaveBeenCalled();
     await restoreControlledCursorEffects(binding);
     expect(mocks.enable).toHaveBeenCalledWith(7, 'recording-1', 12, clock);
     expect(mocks.sync).toHaveBeenCalledWith(7, 'resume', clock);
   }
 );
 
-it('flushes telemetry without owning recorder pause or resume transport', async () => {
+it('keeps the outgoing observer until pagehide without pausing the recorder', async () => {
   expect(beginControlledCursorNavigationEffects()).toBe(11);
   await suspendControlledCursorEffects(binding);
   expect(mocks.beginNavigation).toHaveBeenCalledOnce();
   expect(mocks.setAutoPaused).toHaveBeenCalledWith(true);
   expect(mocks.setOffset).not.toHaveBeenCalled();
-  expect(mocks.appendTelemetry).toHaveBeenCalledWith({ signals: [] });
-  expect(mocks.disable).toHaveBeenCalledExactlyOnceWith(7, 'observation');
+  expect(mocks.appendTelemetry).not.toHaveBeenCalled();
+  expect(mocks.disable).not.toHaveBeenCalled();
 });
 
 it('restores content telemetry state and clears pending effects', async () => {
@@ -144,15 +144,13 @@ it('does not mutate cursor state when the binding is inactive', async () => {
   expect(mocks.clearNavigation).toHaveBeenCalledWith(11);
 });
 
-it('keeps navigation cleanup alive when telemetry flushing fails', async () => {
+it('does not contact an outgoing page that can already be entering BFCache', async () => {
   mocks.disable.mockRejectedValueOnce(new Error('content disappeared'));
 
   await expect(suspendControlledCursorEffects(binding)).resolves.toBeUndefined();
 
-  expect(mocks.loggerWarn).toHaveBeenCalledWith(
-    'Failed to flush controlled cursor telemetry before navigation',
-    expect.any(Error)
-  );
+  expect(mocks.disable).not.toHaveBeenCalled();
+  expect(mocks.loggerWarn).not.toHaveBeenCalled();
 });
 
 it('retries restoration and fails after the bounded retry schedule', async () => {

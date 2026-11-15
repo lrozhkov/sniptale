@@ -15,6 +15,11 @@ type CompletedListener = typeof chrome.webNavigation.onCompleted.addListener ext
 ) => void
   ? T
   : never;
+type DOMContentLoadedListener = typeof chrome.webNavigation.onDOMContentLoaded.addListener extends (
+  listener: infer T
+) => void
+  ? T
+  : never;
 type ErrorOccurredListener = typeof chrome.webNavigation.onErrorOccurred.addListener extends (
   listener: infer T
 ) => void
@@ -30,6 +35,7 @@ interface BrowserWebNavigationAdapter {
   ): Promise<chrome.webNavigation.GetAllFrameResultDetails[] | null>;
   subscribeToBeforeNavigate(listener: BeforeNavigateListener): () => void;
   subscribeToCommitted(listener: CommittedListener): () => void;
+  subscribeToDOMContentLoaded(listener: DOMContentLoadedListener): () => void;
   subscribeToCompleted(listener: CompletedListener): () => void;
   subscribeToErrorOccurred(listener: ErrorOccurredListener): () => void;
 }
@@ -43,6 +49,9 @@ export const browserWebNavigation: BrowserWebNavigationAdapter = {
   },
   subscribeToCommitted(listener) {
     return subscribeToChromeEvent(chrome.webNavigation?.onCommitted, listener);
+  },
+  subscribeToDOMContentLoaded(listener) {
+    return subscribeToChromeEvent(chrome.webNavigation?.onDOMContentLoaded, listener);
   },
   subscribeToCompleted(listener) {
     return subscribeToChromeEvent(chrome.webNavigation?.onCompleted, listener);

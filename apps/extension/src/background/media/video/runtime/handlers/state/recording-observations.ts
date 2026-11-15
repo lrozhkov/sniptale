@@ -34,12 +34,20 @@ function forwardBlockObservations(
   const tabId = sender?.tab?.id;
   const kind = message.eventPacket ? 'events' : 'cursor';
   const packet = message.eventPacket ?? message.cursorPacket;
+  const outgoing =
+    sender?.documentLifecycle === 'pending_deletion' || sender?.documentLifecycle === 'cached';
+  const hasSourceFrame =
+    sender?.frameId === 0 ||
+    (outgoing &&
+      typeof sender?.frameId === 'number' &&
+      Number.isInteger(sender.frameId) &&
+      sender.frameId >= 0);
   if (
     !binding ||
     !lease ||
     sender?.id !== chrome.runtime.id ||
-    sender.frameId !== 0 ||
-    (sender.documentLifecycle !== 'active' && sender.documentLifecycle !== 'pending_deletion') ||
+    !hasSourceFrame ||
+    (sender.documentLifecycle !== 'active' && !outgoing) ||
     typeof documentId !== 'string' ||
     !documentId ||
     typeof tabId !== 'number' ||
@@ -61,7 +69,8 @@ function forwardBlockObservations(
     binding.streamInstanceId,
     tabId,
   ]);
-  const outgoing = sender.documentLifecycle === 'pending_deletion';
+  // BFCache can assign a nonzero frameId to the same retired top-level document.
+  // Only its previously admitted native document may drain before successor admission.
   if (
     outgoing &&
     (observationForwarding[kind]?.key !== key ||
