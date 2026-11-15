@@ -1328,9 +1328,9 @@
       "noiseId": "noise.policy-state-descriptor.review-text-scope-schema"
     },
     {
-      "rule": "policy-state-descriptor-required",
       "file": "apps/extension/src/contracts/effect-runtime/animation.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.contracts.effect-runtime.animation"
     },
     {
@@ -1622,9 +1622,9 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
-      "rule": "policy-state-descriptor-required",
       "file": "apps/extension/src/effect-runtime-sandbox/worker/lottie.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.effect-runtime-sandbox.worker.lottie"
     },
     {
@@ -1730,9 +1730,9 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
-      "rule": "policy-state-descriptor-required",
       "file": "apps/extension/src/features/video/composition/effect-runtime/runtime/gpu-frame-content.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.features.video.composition.effect-runtime.runtime.gpu-frame-content"
     },
     {
@@ -1754,15 +1754,15 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
-      "rule": "policy-state-descriptor-required",
       "file": "apps/extension/src/features/video/project/cursor-motion/index.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.features.video.project.cursor-motion.index"
     },
     {
-      "rule": "policy-state-descriptor-required",
       "file": "apps/extension/src/features/video/project/cursor-motion/paint.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.features.video.project.cursor-motion.paint"
     },
     {
@@ -1796,15 +1796,15 @@
       "noiseId": "noise.policy-state-descriptor.recording-event-json-field-membership"
     },
     {
-      "rule": "policy-state-descriptor-required",
       "file": "apps/extension/src/features/video/project/source-interaction-documents.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.features.video.project.source-interaction-documents"
     },
     {
-      "rule": "policy-state-descriptor-required",
       "file": "apps/extension/src/features/video/project/transition/gl-catalog.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.features.video.project.transition.gl-catalog"
     },
     {
@@ -2246,9 +2246,9 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
-      "rule": "policy-state-descriptor-required",
       "file": "packages/runtime-contracts/src/audio-effects/worklet.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.audio-effects.worklet"
     },
     {
@@ -2258,15 +2258,15 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
-      "rule": "policy-state-descriptor-required",
       "file": "packages/runtime-contracts/src/effect-controls/locale.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.effect-controls.locale"
     },
     {
-      "rule": "policy-state-descriptor-required",
       "file": "packages/runtime-contracts/src/effect-controls/presets.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.effect-controls.presets"
     },
     {
