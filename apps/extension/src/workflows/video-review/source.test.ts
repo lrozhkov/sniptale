@@ -63,7 +63,7 @@ vi.mock('mediabunny', () => ({
     }
   },
 }));
-import { loadVideoReviewSource } from './source';
+import { loadVideoReviewSource, refreshVideoReviewRecordingHistory } from './source';
 import { projectReviewTelemetry } from '../../features/video/review/telemetry';
 
 beforeEach(() => {
@@ -323,4 +323,17 @@ it('exposes compact stream bindings for an original recording', async () => {
   expect(result.telemetry?.recordingEvents).toEqual(eventsFixture.descriptor);
   expect(result.historyProject?.actionFeedback?.[0]?.events).toEqual(eventsFixture.descriptor);
   expect(result.historyProject?.actionEvents).toEqual([]);
+});
+
+it('rejects a replacement recording before reading late history', async () => {
+  await expect(
+    refreshVideoReviewRecordingHistory(
+      { recordingId: 'r', assetId: 'replaced', filename: 'clip.webm' },
+      { duration: 12, width: 360, height: 640, size: 5, mimeType: 'video/webm' },
+      new AbortController().signal
+    )
+  ).rejects.toMatchObject({ stage: 'telemetry', reason: 'changed-source' });
+  expect(mocks.telemetry).not.toHaveBeenCalled();
+  expect(mocks.open).not.toHaveBeenCalled();
+  expect(mocks.dispose).not.toHaveBeenCalled();
 });

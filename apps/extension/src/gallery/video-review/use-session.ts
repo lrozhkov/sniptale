@@ -9,7 +9,12 @@ import {
   type RefObject,
 } from 'react';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { loadVideoReviewSource, VideoReviewLoadError } from '../../workflows/video-review/source';
+import {
+  loadVideoReviewSource,
+  refreshVideoReviewRecordingHistory,
+  VideoReviewLoadError,
+} from '../../workflows/video-review/source';
+import { subscribeToMediaHubEvents } from '../../features/media-hub/events';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import type { ReviewAnnotation } from '../../features/video/review/types';
 import {
@@ -38,6 +43,52 @@ export function useLoadedReview(aggregateId: string) {
     let ownedSession: Session | null = null;
     let reader: AssetResourceSession | null = null;
     let releasing: Promise<void> | null = null;
+    let loadedReview: Awaited<ReturnType<typeof loadVideoReviewSource>> | null = null;
+    let pendingHistory = false;
+    let refreshing: Promise<void> | null = null;
+    const refreshHistory = () => {
+      if (refreshing || !loadedReview?.recordingHistorySource || controller.signal.aborted) return;
+      const identity = loadedReview.recordingHistorySource;
+      const loaded = loadedReview;
+      refreshing = (async () => {
+        while (pendingHistory && !controller.signal.aborted) {
+          pendingHistory = false;
+          try {
+            const history = await refreshVideoReviewRecordingHistory(
+              identity,
+              loaded.source,
+              controller.signal
+            );
+            if (controller.signal.aborted || !history.telemetry) continue;
+            setResource((current) =>
+              current?.session === ownedSession
+                ? {
+                    ...current,
+                    telemetry: history.telemetry,
+                    ...(history.historyProject ? { historyProject: history.historyProject } : {}),
+                  }
+                : current
+            );
+          } catch {
+            if (!controller.signal.aborted) logger.warn('video-review-history-refresh-failed');
+          }
+        }
+      })().finally(() => {
+        refreshing = null;
+      });
+    };
+    // Subscribe before reading metadata so publication during opening is also observed.
+    const unsubscribe = subscribeToMediaHubEvents((event) => {
+      if (event.type !== 'library-changed' || event.reason === 'delete') return;
+      const identity = loadedReview?.recordingHistorySource;
+      if (
+        loadedReview &&
+        (!identity || !event.assetIds.includes(`recording:${identity.recordingId}`))
+      )
+        return;
+      pendingHistory = true;
+      refreshHistory();
+    });
     setResource(null);
     setFailed(null);
     let loadedSource = false;
@@ -52,6 +103,7 @@ export function useLoadedReview(aggregateId: string) {
       releasing ??= (async () => {
         // Opening can still commit after abort; retain exclusion until that writer settles.
         await loading.catch(() => undefined);
+        await refreshing;
         try {
           await ownedSession?.dispose();
         } finally {
@@ -69,6 +121,8 @@ export function useLoadedReview(aggregateId: string) {
         ownedSession = session;
         url = URL.createObjectURL(loaded.file);
         setResource({ ...loaded, url, session });
+        loadedReview = loaded;
+        refreshHistory();
       })
       .catch((error: unknown) => {
         void release().catch(() => logger.warn('video-review-resource-cleanup-deferred'));
@@ -86,6 +140,7 @@ export function useLoadedReview(aggregateId: string) {
       });
     return () => {
       controller.abort();
+      unsubscribe();
       void release().catch(() => logger.warn('video-review-resource-cleanup-deferred'));
       if (url) URL.revokeObjectURL(url);
     };

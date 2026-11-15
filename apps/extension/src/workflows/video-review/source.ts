@@ -16,6 +16,33 @@ import {
 import { parseReviewSource } from '../../features/video/review/validation';
 import type { MediaAssetSource } from '../../composition/persistence/media-library/contracts';
 import { parseReviewProvenance } from '../../features/video/review/provenance';
+import type { ReviewSource } from '../../features/video/review/types';
+
+/** Immutable recording identity used for later history publication. */
+export interface ReviewRecordingHistorySource {
+  recordingId: string;
+  assetId: string;
+  filename: string;
+}
+
+/** Refreshes history without reopening the workspace or decoding its media. */
+export async function refreshVideoReviewRecordingHistory(
+  identity: ReviewRecordingHistorySource,
+  source: ReviewSource,
+  signal: AbortSignal
+) {
+  signal.throwIfAborted();
+  const recording = await getRecording(identity.recordingId);
+  if (!recording || recording.assetId !== identity.assetId)
+    throw new VideoReviewLoadError('telemetry', 'changed-source');
+  const raw = await getRecordingTelemetry(identity.recordingId);
+  signal.throwIfAborted();
+  const telemetry = raw ? projectRecordingObservationClock(raw) : null;
+  const historyProject = telemetry
+    ? createReviewRecordingHistoryProject(telemetry, source, identity.filename)
+    : null;
+  return { telemetry, historyProject };
+}
 
 type ReviewLoadStage = 'library' | 'source' | 'metadata' | 'telemetry' | 'workspace' | 'session';
 type ReviewLoadReason =
@@ -150,6 +177,15 @@ export async function loadVideoReviewSource(aggregateId: string, signal: AbortSi
       ...(provenance ? { provenance } : {}),
       snapshot,
       telemetry,
+      ...(media.source.kind === 'recording' && !media.recordingMetadata
+        ? {
+            recordingHistorySource: {
+              recordingId: media.source.recordingId,
+              assetId: original.assetId,
+              filename: media.filename,
+            },
+          }
+        : {}),
       ...(historyProject ? { historyProject } : {}),
       ...(media.recordingMetadata ? { recordingMetadata: media.recordingMetadata } : {}),
     };
