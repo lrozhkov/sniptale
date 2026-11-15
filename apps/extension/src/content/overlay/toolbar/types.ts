@@ -25,6 +25,7 @@ import type { VideoOutputProfile } from '@sniptale/runtime-contracts/video/types
 import type { WebcamPresentationPatch } from '../../../features/video/recording/webcam-presentation';
 
 export interface ToolbarVideoRecordingProps {
+  drawingCaptureSuppressed?: boolean;
   drawingOwner: RecordingDrawingOwner;
   state: VideoRecordingToolbarState;
   setupPending?: boolean;

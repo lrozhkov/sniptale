@@ -59,7 +59,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('hands off an EffectV1 project larger than the runtime message blob ceiling', async () => {
+it('hands off a source-only Lottie project larger than the runtime message blob ceiling', async () => {
   const project = await createLargeEffectProject();
 
   const reference = await stageProjectExportInput('job-large', project, 100);
@@ -70,8 +70,8 @@ it('hands off an EffectV1 project larger than the runtime message blob ceiling',
   const stored = expectRecord(mocks.records.get('job-large'));
   const storedProject = expectRecord(stored['project']);
   const snapshot = expectRecord(expectArray(storedProject['effectSnapshots'])[0]);
-  const asset = expectRecord(expectArray(snapshot['assets'])[0]);
-  expect(asset['blob']).toBeInstanceOf(Blob);
+  expect(snapshot['assets']).toEqual([]);
+  expect(snapshot['source']).toBe(project.effectSnapshots![0]!.source);
 });
 
 it('atomically consumes one job-scoped input and rejects a replay', async () => {

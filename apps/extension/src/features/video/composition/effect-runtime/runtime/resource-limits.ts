@@ -276,7 +276,7 @@ export function createEffectRuntimeGpuFrameLedger(
           const frameLimit = EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterBytes;
           if (frameBytes + cost > frameLimit || bytes + cost > frameLimit * maximumInFlight)
             throw new EffectRuntimeResourceError();
-          const reservation = reserveBytes?.(cost);
+          const reservation = cost > 0 ? reserveBytes?.(cost) : undefined;
           frameBytes += cost;
           bytes += cost;
           let released = false;
@@ -293,5 +293,36 @@ export function createEffectRuntimeGpuFrameLedger(
       };
     },
     snapshot: () => ({ liveDecodedRasterBytes: bytes }),
+  };
+}
+
+/** Retire a GPU frame after its final borrow returns, then release its owner's resources once. */
+export function createEffectRuntimeGpuFrameLifetime(onReleased: () => void) {
+  let retired = false;
+  let released = false;
+  let borrowers = 0;
+  const release = () => {
+    if (!retired || borrowers || released) return;
+    released = true;
+    onReleased();
+  };
+  return {
+    retain() {
+      if (retired) throw new Error('EFFECT_RUNTIME_GPU_FRAME_RETIRED');
+      borrowers++;
+      let returned = false;
+      return {
+        release() {
+          if (returned) return;
+          returned = true;
+          borrowers--;
+          release();
+        },
+      };
+    },
+    dispose() {
+      retired = true;
+      release();
+    },
   };
 }

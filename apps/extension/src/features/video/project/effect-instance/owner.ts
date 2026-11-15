@@ -1,7 +1,7 @@
 import type { VideoProject, VideoProjectTrack } from '../types';
 import type { VideoProjectEffectTarget } from './types';
 
-export function isVideoEffectTrack(track: VideoProjectTrack): boolean {
+function isVideoEffectTrack(track: VideoProjectTrack): boolean {
   return track.kind === 'PRIMARY' && track.role !== 'CAMERA';
 }
 

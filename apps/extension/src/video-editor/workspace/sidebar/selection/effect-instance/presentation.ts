@@ -1,12 +1,12 @@
+import type { EffectControlContext } from '@sniptale/runtime-contracts/effect-controls';
 import {
   resolveEffectLocaleText,
-  resolveEffectV1ControlGroup,
-  type EffectV1Document,
+  resolveEffectControlGroup,
   type ControlDefinition,
-} from '@sniptale/runtime-contracts/effect-v1';
+} from '@sniptale/runtime-contracts/effect-controls';
 import { getCurrentLocale, translate } from '../../../../../platform/i18n';
 
-export function getEffectControlSections(document: EffectV1Document) {
+export function getEffectControlSections(document: EffectControlContext) {
   const axes = new Set(
     document.objectLayout?.handles?.flatMap((handle) => [handle.xControl, handle.yControl]) ?? []
   );
@@ -29,8 +29,7 @@ export function getEffectControlSections(document: EffectV1Document) {
       controls: controls
         .filter(
           (control) =>
-            (resolveEffectV1ControlGroup(control.group, document.controlGroups) ?? 'advanced') ===
-            id
+            (resolveEffectControlGroup(control.group, document.controlGroups) ?? 'advanced') === id
         )
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     }))

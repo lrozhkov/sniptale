@@ -18,7 +18,6 @@ const STRICT_COERCION_OWNER_ROOTS = [
 ];
 const SCHEMA_CONTRACT_ROOTS = [
   'apps/extension/src/contracts/messaging/',
-  'packages/runtime-contracts/src/effect-v1/validation/',
   'packages/runtime-contracts/src/messaging/',
 ];
 const POST_VALIDATION_CALLS = new Set(['finishEffectV1Validation']);

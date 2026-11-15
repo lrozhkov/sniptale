@@ -228,6 +228,7 @@ export function usePreviewStageRuntime(params: PreviewStageProps) {
     previewRasterSize,
     project: previewProject,
     recordingProject: transient.previewProject,
+    sourceProject: project,
     renderGenerationRef,
     registerPreviewRuntime: params.registerPreviewRuntime,
   });
@@ -245,6 +246,7 @@ export function usePreviewStageRuntime(params: PreviewStageProps) {
       effectRuntimeFeedback,
       project: previewProject,
       effectPreparationProject: transient.previewProject,
+      transformInteraction: transient.transformInteraction,
       renderGenerationRef,
     },
     surface,

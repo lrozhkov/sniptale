@@ -1,3 +1,5 @@
+import { createReviewInteractionEditor } from './interaction-editor';
+import { useReviewCursorMotions } from './cursor-motion-editor';
 import { useReviewRecordingHistory } from './use-recording-history';
 import {
   addReviewCursorFocusKey,
@@ -51,6 +53,7 @@ export function useReviewEditorState(resource: LoadedReview) {
     run,
     canStart,
     video,
+    pause,
     time,
     seek,
     play,
@@ -78,6 +81,7 @@ export function useReviewEditorState(resource: LoadedReview) {
     beforeAction: core.beforeAction,
     playbackRange: core.playbackRange,
     video,
+    pause,
     seek,
     setTimelineSelection: setSelection,
     setCutting: cuts.setCutting,
@@ -95,21 +99,56 @@ export function useReviewEditorState(resource: LoadedReview) {
     () =>
       scheduleReviewClicks(
         wiring.projected.markers,
-        actionsApplied ? (advanced.clickAnimations ?? []) : [],
+        actionsApplied && (advanced.ui.tracks.mouse ?? advanced.ui.tracks.actions) !== false
+          ? (advanced.clickAnimations ?? [])
+          : [],
         core.timeline.timeMap.getSegments()
       ),
-    [wiring.projected.markers, actionsApplied, advanced.clickAnimations, core.timeline.timeMap]
+    [
+      wiring.projected.markers,
+      actionsApplied,
+      advanced.clickAnimations,
+      advanced.ui.tracks.mouse,
+      advanced.ui.tracks.actions,
+      core.timeline.timeMap,
+    ]
   );
   const keyCues = useMemo(
     () =>
       scheduleReviewKeys(
         wiring.projected.markers,
-        actionsApplied ? (advanced.keyAnimations ?? []) : [],
+        actionsApplied && (advanced.ui.tracks.keyboard ?? advanced.ui.tracks.actions) !== false
+          ? (advanced.keyAnimations ?? [])
+          : [],
         core.timeline.timeMap.getSegments()
       ),
-    [wiring.projected.markers, actionsApplied, advanced.keyAnimations, core.timeline.timeMap]
+    [
+      wiring.projected.markers,
+      actionsApplied,
+      advanced.keyAnimations,
+      advanced.ui.tracks.keyboard,
+      advanced.ui.tracks.actions,
+      core.timeline.timeMap,
+    ]
   );
-  return { ...assembleReviewEditorState(core, wiring), clickCues, keyCues };
+  const state = assembleReviewEditorState(core, wiring);
+  const cursorMotion = useReviewCursorMotions({
+    advanced: state.advanced,
+    time: state.time,
+    duration: source.duration,
+    selection: state.activeSelection,
+    onChange: state.setCursorMotions,
+    onEnabledChange: state.setCursorMotionEnabled,
+    select: state.setActiveSelection,
+    seek: state.seek,
+    canStart: state.canStart,
+    setMessage: state.setMessage,
+  });
+  const interactionEditor = createReviewInteractionEditor({
+    ...state,
+    duration: source.duration,
+  });
+  return { ...state, interactionEditor, cursorMotion, clickCues, keyCues };
 }
 
 /** Combines session state with the timeline transport and editing controls. */
@@ -124,6 +163,7 @@ function useReviewEditorCore(resource: LoadedReview) {
     ) * Math.max(1, ...timeline.timeline.timeMap.getSegments().map((segment) => segment.rate));
   const previewHistory = useReviewRecordingHistory(resource, timeline.time, base.activeSelection, {
     reach,
+    interactionTimeline: base.advanced.interactionTimeline,
   });
   const [visibleHistory, setVisibleHistory] = useState<{
     project: LoadedReview['historyProject'];
@@ -150,7 +190,11 @@ function useReviewEditorCore(resource: LoadedReview) {
     resource,
     (historyRange.start + historyRange.end) / 2,
     base.activeSelection,
-    { range: historyRange, includeCursor: false }
+    {
+      range: historyRange,
+      includeCursor: false,
+      interactionTimeline: base.advanced.interactionTimeline,
+    }
   );
   const history = {
     ...previewHistory,
@@ -195,7 +239,7 @@ function useReviewEditorCore(resource: LoadedReview) {
     time: timeline.time,
     selection: base.activeSelection,
     select: base.setActiveSelection,
-    pause: () => timeline.video.current?.pause(),
+    pause: timeline.pause,
     seek: (time) => timeline.seek(time, false),
     allowed: () =>
       !base.busy &&
@@ -209,7 +253,7 @@ function useReviewEditorCore(resource: LoadedReview) {
     settings: base.advanced.watermark,
     flushAdvanced: base.advancedState.flush,
     stageSettings: base.advancedState.setWatermark,
-    pause: () => timeline.video.current?.pause(),
+    pause: timeline.pause,
     allowed: () =>
       !base.busy &&
       !presentationPending.current &&
@@ -221,7 +265,7 @@ function useReviewEditorCore(resource: LoadedReview) {
     settings: base.advanced.presentation,
     flushAdvanced: base.advancedState.flush,
     stageSettings: base.advancedState.setPresentation,
-    pause: () => timeline.video.current?.pause(),
+    pause: timeline.pause,
     allowed: () =>
       !base.busy &&
       !webcam.pending &&
@@ -230,6 +274,14 @@ function useReviewEditorCore(resource: LoadedReview) {
       !base.composer.getCurrent().annotation &&
       base.advanced.ui.mode === 'advanced',
   });
+  const features = useMemo(
+    () =>
+      resolveQuickEditEffectiveState(base.advanced, {
+        facts: previewHistory.telemetry,
+        source: resource.source,
+      }),
+    [base.advanced, previewHistory.telemetry, resource.source]
+  );
   presentationPending.current = presentation.pending;
   const annotationEffects = useReviewAnnotationEffects({
     session: base.session,
@@ -238,7 +290,7 @@ function useReviewEditorCore(resource: LoadedReview) {
     flush: base.advancedState.flush,
     beforeAction: base.beforeAction,
     performAction: base.performAction,
-    pause: () => timeline.video.current?.pause(),
+    pause: timeline.pause,
     select: base.setActiveSelection,
     allowed: () =>
       !base.actionBusy &&
@@ -257,10 +309,7 @@ function useReviewEditorCore(resource: LoadedReview) {
     historyTelemetry,
     setHistoryRange,
     cursorArchiveAvailable: !!resource.telemetry?.cursorTrajectory?.totalSamples,
-    features: resolveQuickEditEffectiveState(base.advanced, {
-      facts: previewHistory.telemetry,
-      source: resource.source,
-    }),
+    features,
     performAction: async (action: () => Promise<boolean>) => {
       await annotationEffects.flush();
       return await base.performAction(action);
@@ -434,10 +483,13 @@ function useReviewEditorTimeline(
   };
   const {
     video,
+    pause,
+    seekResult,
     time,
     onTime,
     playing,
     setPlaying,
+    playheadClock,
     setPresentationActive,
     onPresentedTime,
     seek,
@@ -458,6 +510,8 @@ function useReviewEditorTimeline(
     voiceover: features.voiceover,
     music: features.music,
     ...(advanced.actionAudio ? { actionAudio: advanced.actionAudio } : {}),
+    interactionTimeline: advanced.interactionTimeline,
+    interactionEnabled: advanced.ui.tracks,
     actionsApplied: features.actionsApplied,
     onSeek: (next) => {
       if (selection.kind === 'point') setSelection({ kind: 'point', time: next });
@@ -486,11 +540,14 @@ function useReviewEditorTimeline(
     activeSelection,
     setActiveSelection,
     sourceDuration: source.duration,
+    sourceTime: time,
+    file: resource.file,
     timelineSelection: selection,
     exporter,
     edits: snapshot.document.edits,
-    pause: () => video.current?.pause(),
+    pause,
     seek,
+    seekResult,
     setTimelineSelection: setSelection,
     onInvalid: () => setMessage(translate('gallery.videoReview.invalidEditRange')),
     session,
@@ -501,6 +558,8 @@ function useReviewEditorTimeline(
   return {
     actionSoundPreview,
     video,
+    pause,
+    seekResult,
     time,
     onTime,
     playbackRange,
@@ -512,6 +571,7 @@ function useReviewEditorTimeline(
     navigationRevision,
     playing,
     setPlaying,
+    playheadClock,
     setPresentationActive,
     onPresentedTime,
     seek,
@@ -609,6 +669,7 @@ function reviewAdvancedControls(
     setTrackVisibility: advancedState.setTrackVisibility,
     setOverlaysVisible: advancedState.setOverlaysVisible,
     setWorkspaceColor: advancedState.setWorkspaceColor,
+    setInteractionTimeline: advancedState.setInteractionTimeline,
     setKeyAnimations: advancedState.setKeyAnimations,
     setActionAudio: advancedState.setActionAudio,
     setActionsEnabled: advancedState.setActionsEnabled,
@@ -618,6 +679,9 @@ function reviewAdvancedControls(
     previewBackground: advancedState.previewBackground,
     setCanvas: advancedState.setCanvas,
     setWindowHeader: advancedState.setWindowHeader,
+    setSourceFilters: advancedState.setSourceFilters,
+    setCursorMotions: advancedState.setCursorMotions,
+    setCursorMotionEnabled: advancedState.setCursorMotionEnabled,
     setText: advancedState.setText,
     setCaptions: advancedState.setCaptions,
     resetAdvanced: advancedState.reset,

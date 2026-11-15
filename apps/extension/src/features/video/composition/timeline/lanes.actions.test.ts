@@ -1,10 +1,10 @@
+import { createGlTransitionSelection } from '../../project/transition/gl-catalog';
 import { describe, expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../../project/factories/creation';
 import {
   VideoCursorCaptureMode,
   VideoTemporalEasing,
   VideoTransitionEasing,
-  VideoTransitionKind,
 } from '../../project/types/index';
 import {
   buildVideoCompositionCursorSegments,
@@ -66,7 +66,8 @@ function createLaneProject() {
       duration: 1,
       easing: VideoTransitionEasing.LINEAR,
       id: 'transition-1',
-      kind: VideoTransitionKind.CROSSFADE,
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       leadingClipId: 'clip-a',
       trailingClipId: 'clip-b',
     },
@@ -123,7 +124,8 @@ function verifyEmptyAndInvalidLaneBranches() {
       duration: 1,
       easing: VideoTransitionEasing.LINEAR,
       id: 'missing-transition',
-      kind: VideoTransitionKind.CROSSFADE,
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       leadingClipId: 'missing-a',
       trailingClipId: 'missing-b',
     },

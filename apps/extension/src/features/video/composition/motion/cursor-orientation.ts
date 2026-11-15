@@ -212,7 +212,10 @@ export function resolveProjectCursorOrientation(
   project: VideoProject,
   region: VideoProjectMotionRegion
 ) {
-  if (region.focusMode !== 'CURSOR' || !hasCursorComposition(region.cursorComposition))
+  if (
+    (region.effect !== '3d' && region.focusMode !== 'CURSOR') ||
+    !hasCursorComposition(region.cursorComposition)
+  )
     return undefined;
   const bundle = preparedProjectCamera(project);
   const prepared = bundle?.orientations.find(
@@ -334,7 +337,12 @@ export function projectCursorSpatialSettings(
   base = false
 ): VideoProjectMotionRegion {
   const plan = resolveProjectCursorOrientation(project, region);
-  if (region.focusMode !== 'CURSOR' || !region.cursorComposition) return region;
+  if (
+    (region.effect !== '3d' && region.focusMode !== 'CURSOR') ||
+    !region.cursorComposition ||
+    (region.effect === '3d' && region.cursorComposition.mode === 'off')
+  )
+    return region;
   const { perspective: _perspective, depthOfField: _depth, ...retained } = region;
   return {
     ...retained,

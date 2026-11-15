@@ -31,6 +31,7 @@ vi.mock('../../../../features/video/project/effect-bundle/catalog/export', async
   exportEffectCatalog: exportCatalog,
 }));
 import { VideoEffectsSection } from './index';
+import { translate } from '../../../../platform/i18n';
 let root: Root;
 let container: HTMLDivElement;
 const entries: EffectBundleCatalogListItem[] = [];
@@ -45,6 +46,18 @@ beforeEach(() => {
     }
   );
   list.mockResolvedValue(entries);
+  exportCatalog.mockResolvedValue({
+    blob: new Blob(['pack']),
+    filename: 'pack.sniptale-animations.zip',
+  });
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+  vi.stubGlobal(
+    'URL',
+    class extends URL {
+      static override createObjectURL = vi.fn(() => 'blob:portable-pack');
+      static override revokeObjectURL = vi.fn();
+    }
+  );
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -53,6 +66,8 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 it('keeps readonly filters enabled and mounted while an effect update is pending', async () => {
   list.mockResolvedValue(catalogRows());
@@ -107,7 +122,7 @@ it('ignores a late load after leaving settings', async () => {
 });
 
 function catalogRows(): EffectBundleCatalogListItem[] {
-  return ['standalone', 'targetEffect', 'transition'].map((kind, index) => {
+  return [0, 1, 2].map((index) => {
     const entry = {
       packId: `pack-${index}`,
       label: { en: `Pack ${index}`, ru: `Пакет ${index}` },
@@ -124,9 +139,9 @@ function catalogRows(): EffectBundleCatalogListItem[] {
         {
           id: `effect-${index}`,
           source: '{}',
-          kind: kind as 'standalone' | 'targetEffect' | 'transition',
+          kind: 'standalone' as const,
           assets: [],
-          schemaVersion: 'sniptale.effect.v1' as const,
+          schemaVersion: 'sniptale.animation.v1' as const,
           sha256: 'a'.repeat(64),
         },
       ],
@@ -134,13 +149,13 @@ function catalogRows(): EffectBundleCatalogListItem[] {
     return { ...entry, status: 'ready' as const, entry, documentKinds: [entry.documents[0]!.kind] };
   });
 }
-it('manages saved packs and confirms removal without per-pack export', async () => {
+it('manages saved packs with download and confirms removal', async () => {
   list.mockResolvedValue(catalogRows());
   await act(async () => root.render(<VideoEffectsSection />));
   const row = container.querySelector('[data-settings-collection-item="pack-0/effect-0"]')!;
   await act(async () => (row.querySelector('[role=switch]') as HTMLElement).click());
   expect(toggle).toHaveBeenCalledWith('pack-0', 'effect-0', false);
-  expect(row.querySelector('svg.lucide-download')).toBeNull();
+  expect(row.querySelector('svg.lucide-download')).not.toBeNull();
   await act(async () =>
     (row.querySelector('[data-collection-inline-action="delete"]') as HTMLElement).click()
   );
@@ -163,4 +178,182 @@ it('shows load and operation failures and recovers on focus', async () => {
   const button = container.querySelector('[role=switch]') as HTMLElement;
   await act(async () => button.click());
   expect(container.querySelector('[role=alert]')).not.toBeNull();
+});
+
+it('downloads the selected complete pack without reload or mutation and releases its URL', async () => {
+  const rows = catalogRows();
+  list.mockResolvedValue(rows);
+  await act(async () => root.render(<VideoEffectsSection />));
+  const loads = list.mock.calls.length;
+  vi.useFakeTimers();
+  await act(async () =>
+    container
+      .querySelector<HTMLButtonElement>('[data-collection-inline-action="download"]')!
+      .click()
+  );
+  expect(exportCatalog).toHaveBeenCalledExactlyOnceWith(
+    rows[0]!.status === 'ready' ? rows[0]!.entry : undefined
+  );
+  expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledOnce();
+  expect(list).toHaveBeenCalledTimes(loads);
+  expect(toggle).not.toHaveBeenCalled();
+  expect(remove).not.toHaveBeenCalled();
+  expect(importFiles).not.toHaveBeenCalled();
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:portable-pack');
+});
+it('keeps a failed download retryable without changing the visible catalogue', async () => {
+  list.mockResolvedValue(catalogRows());
+  exportCatalog.mockRejectedValueOnce(new Error('PRIVATE_CONTENT'));
+  await act(async () => root.render(<VideoEffectsSection />));
+  const button = container.querySelector<HTMLButtonElement>(
+    '[data-collection-inline-action="download"]'
+  )!;
+  await act(async () => button.click());
+  expect(container.textContent).toContain(
+    translate('videoEditor.effectsLibrary.downloadPackFailed')
+  );
+  expect(container.textContent).not.toContain('PRIVATE_CONTENT');
+  expect(button.disabled).toBe(false);
+  await act(async () => button.click());
+  expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledOnce();
+});
+it('suppresses a late download after leaving Settings', async () => {
+  list.mockResolvedValue(catalogRows());
+  const deferred = Promise.withResolvers<{ blob: Blob; filename: string }>();
+  exportCatalog.mockReturnValueOnce(deferred.promise);
+  await act(async () => root.render(<VideoEffectsSection />));
+  await act(async () =>
+    container
+      .querySelector<HTMLButtonElement>('[data-collection-inline-action="download"]')!
+      .click()
+  );
+  act(() => root.render(null));
+  await act(async () => deferred.resolve({ blob: new Blob(['pack']), filename: 'pack.zip' }));
+  expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
+  expect(URL.createObjectURL).not.toHaveBeenCalled();
+});
+it('offers no package download for builtin or malformed rows', async () => {
+  const rows = catalogRows();
+  const first = rows[0];
+  if (!first || first.status !== 'ready') throw new Error('Missing fixture');
+  list.mockResolvedValue([
+    { ...first, source: 'builtin', entry: { ...first.entry, source: 'builtin' } },
+    { status: 'invalid', packId: 'broken' },
+  ]);
+  await act(async () => root.render(<VideoEffectsSection />));
+  expect(container.querySelector('[data-collection-inline-action="download"]')).toBeNull();
+});
+
+it('serializes preparation and copy saves, preserves the source and retries the same copy identity', async () => {
+  const { useVideoEffectsSettings } = await import('./controller');
+  const { validateAnimationTemplate } =
+    await import('@sniptale/runtime-contracts/animation-template');
+  const source = validateAnimationTemplate({
+    format: 'sniptale-animation',
+    version: 1,
+    id: 'mapping-source',
+    label: { en: 'Source' },
+    resources: [],
+    controls: [],
+    bindings: [],
+    animation: {
+      v: '5.12.2',
+      fr: 30,
+      w: 320,
+      h: 180,
+      ip: 0,
+      op: 60,
+      assets: [],
+      layers: [],
+      slots: { title: { p: { a: 0, k: [{ t: 0, s: { t: 'Keep' } }] } } },
+    },
+  });
+  if (!source.ok) throw new Error('Invalid source');
+  const raw = JSON.stringify(source.template);
+  const { createHash } = await import('node:crypto');
+  const digest = createHash('sha256').update(raw).digest('hex');
+  const row = catalogRows()[0]!;
+  if (row.status !== 'ready') throw new Error('Invalid fixture');
+  const catalog = {
+    ...row.entry,
+    packId: 'animation.mapping-source',
+    sourceSha256: digest,
+    retainedByteLength: new TextEncoder().encode(raw).byteLength,
+    documents: [{ ...row.entry.documents[0]!, id: 'mapping-source', source: raw, sha256: digest }],
+  };
+  const before = structuredClone(catalog);
+  const pendingRead = Promise.withResolvers<typeof catalog>();
+  get.mockReturnValueOnce(pendingRead.promise);
+  let state!: ReturnType<typeof useVideoEffectsSettings>;
+  function Probe() {
+    state = useVideoEffectsSettings();
+    return null;
+  }
+  await act(async () => root.render(<Probe />));
+  let first!: Promise<boolean>;
+  await act(async () => {
+    first = state.configure(catalog.packId, 'mapping-source', null);
+    expect(await state.configure(catalog.packId, 'mapping-source', null)).toBe(false);
+  });
+  await act(async () => {
+    pendingRead.resolve(catalog);
+    await first;
+  });
+  expect(get).toHaveBeenCalledOnce();
+  expect(state.mapping).not.toBeNull();
+  const { prepareSlotMappedAnimation, createSlotMappingDrafts } =
+    await import('./slot-mapping-model');
+  const copy = prepareSlotMappedAnimation({
+    template: source.template,
+    id: state.mapping!.copyId,
+    label: 'Copy',
+    drafts: createSlotMappingDrafts(source.template).map((draft) => ({ ...draft, enabled: true })),
+  });
+  expect(await state.saveMapping({ ...copy, id: 'wrong-identity' })).toBe(false);
+  expect(importFiles).not.toHaveBeenCalled();
+  importFiles.mockResolvedValueOnce([{ filename: 'copy.json', status: 'failed' }]);
+  await act(async () => {
+    expect(await state.saveMapping(copy)).toBe(false);
+  });
+  expect(state.mapping?.copyId).toBe(copy.id);
+  const pendingSave = Promise.withResolvers<unknown[]>();
+  importFiles.mockReturnValueOnce(pendingSave.promise);
+  let save!: Promise<boolean>;
+  await act(async () => {
+    save = state.saveMapping(copy);
+    expect(await state.saveMapping(copy)).toBe(false);
+    state.closeMapping();
+  });
+  expect(state.mapping?.copyId).toBe(copy.id);
+  await act(async () => {
+    pendingSave.resolve([{ filename: 'copy.json', status: 'imported' }]);
+    expect(await save).toBe(true);
+  });
+  expect(importFiles).toHaveBeenCalledTimes(2);
+  expect(state.mapping).toBeNull();
+  expect(catalog).toEqual(before);
+  expect(toggle).not.toHaveBeenCalled();
+  expect(remove).not.toHaveBeenCalled();
+  get.mockResolvedValueOnce(catalog);
+  await act(async () => {
+    await state.configure(catalog.packId, 'mapping-source', null);
+  });
+  const abandonedCopy = { ...copy, id: state.mapping!.copyId };
+  const abandonedSave = Promise.withResolvers<unknown[]>();
+  importFiles.mockReturnValueOnce(abandonedSave.promise);
+  let abandoned!: Promise<boolean>;
+  await act(async () => {
+    abandoned = state.saveMapping(abandonedCopy);
+  });
+  const signal = importFiles.mock.calls.at(-1)![1] as AbortSignal;
+  expect(signal.aborted).toBe(false);
+  act(() => root.render(null));
+  expect(signal.aborted).toBe(true);
+  await act(async () => {
+    abandonedSave.resolve([{ filename: 'copy.json', status: 'failed' }]);
+    await abandoned;
+  });
+  expect(container.innerHTML).toBe('');
+  expect(catalog).toEqual(before);
 });

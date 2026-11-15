@@ -1,30 +1,37 @@
 import { expect, it, vi } from 'vitest';
-import { createEffectCatalogEntry } from '../../composition/persistence/effect-bundles/catalog-builder';
-import { readValidBundleArtifact } from '../../composition/persistence/effect-bundles/fixture.test-support';
-import { type EffectRuntimeRenderCommand } from '../../contracts/effect-runtime/types';
-import { renderEffectCatalogPreview } from './effect-catalog-preview';
+import { readValidAnimationCatalog } from '../../composition/persistence/effect-bundles/fixture.test-support';
+import type { EffectRuntimeRenderCommand } from '../../contracts/effect-runtime/types';
+import { getEffectRuntimeIdentity } from '../../contracts/effect-runtime/identity';
+import {
+  renderEffectCatalogPreview,
+  effectPreviewProgress,
+  effectPosterKey,
+} from './effect-catalog-preview';
 
-it('materializes only the selected effect assets and returns caller-owned output', async () => {
-  const catalog = await createEffectCatalogEntry(await readValidBundleArtifact(), 1);
-  const document = catalog.documents.find((document) => document.kind === 'standalone')!;
-  const bitmap = { close: vi.fn() } as unknown as ImageBitmap;
+class Bitmap implements ImageBitmap {
+  close = vi.fn();
+  constructor(
+    readonly width: number,
+    readonly height: number
+  ) {}
+}
+it('materializes one verified self-contained animation and returns caller-owned output', async () => {
+  const catalog = await readValidAnimationCatalog(),
+    document = catalog.documents[0]!;
+  const bitmap = new Bitmap(320, 180);
   const renderFrame = vi.fn(async (command: EffectRuntimeRenderCommand) => {
-    const { materializeImmutablePayloads, ...fields } = command;
-    const immutable = await materializeImmutablePayloads();
+    const immutable = await command.materializeImmutablePayloads();
     expect(immutable.documentSource).toBe(document.source);
-    expect(immutable.assets.map((asset) => asset.id)).toEqual(
-      document.assets
-        .filter(
-          (reference) =>
-            catalog.assets.find((asset) => asset.sha256 === reference.sha256)?.kind !== 'audio'
-        )
-        .map((reference) => reference.id)
-    );
+    expect(immutable.assets).toEqual([]);
     expect(command.inputFrames).toEqual({});
+    expect(command.duration).toBe(3);
+    expect(command.time).toBe(1.5);
     return {
-      ...fields,
+      ...getEffectRuntimeIdentity(command),
       kind: 'frame' as const,
       bitmap,
+      width: bitmap.width,
+      height: bitmap.height,
       acknowledged: {
         documentId: command.documentRef.id,
         assetSelectionId: command.assetSelectionRef.id,
@@ -36,37 +43,14 @@ it('materializes only the selected effect assets and returns caller-owned output
   ).resolves.toBe(bitmap);
   expect(bitmap.close).not.toHaveBeenCalled();
 });
-
-it('provides target and transition inputs and releases them when rendering fails', async () => {
-  const { readFileSync } = await import('node:fs');
-  const { parseEffectV1Source } = await import('@sniptale/runtime-contracts/effect-v1');
-  const catalog = await createEffectCatalogEntry(await readValidBundleArtifact(), 1);
-  const close = vi.fn();
-  vi.stubGlobal(
-    'OffscreenCanvas',
-    class {
-      getContext() {
-        return { fillRect() {}, beginPath() {}, arc() {}, fill() {} };
-      }
-      transferToImageBitmap() {
-        return { close };
-      }
-    }
-  );
+it('rejects retired source and transition package roles before creating sampled inputs', async () => {
+  const catalog = await readValidAnimationCatalog(),
+    canvas = vi.fn();
+  vi.stubGlobal('OffscreenCanvas', canvas);
   try {
-    for (const name of ['neutral-target-effect', 'neutral-transition']) {
-      const source = readFileSync(
-        `packages/runtime-contracts/src/effect-v1/fixtures/valid/${name}.sniptale-effect.json`,
-        'utf8'
-      );
-      const document = parseEffectV1Source(source).document!;
-      const entry = {
-        ...catalog.documents[0]!,
-        id: document.id,
-        kind: document.kind,
-        source,
-        assets: [],
-      };
+    for (const kind of ['targetEffect', 'transition'] as const) {
+      const entry = { ...catalog.documents[0]! };
+      Reflect.set(entry, 'kind', kind);
       const renderFrame = vi.fn(async () => {
         throw new Error('sandbox unavailable');
       });
@@ -78,40 +62,44 @@ it('provides target and transition inputs and releases them when rendering fails
           0.25,
           1
         )
-      ).rejects.toThrow('sandbox unavailable');
-      expect(renderFrame).toHaveBeenCalledOnce();
+      ).rejects.toMatchObject({ code: 'effectCatalogIntegrityFailure' });
+      expect(renderFrame).not.toHaveBeenCalled();
     }
-    expect(close).toHaveBeenCalledTimes(3);
+    expect(canvas).not.toHaveBeenCalled();
   } finally {
     vi.unstubAllGlobals();
   }
 });
-
-it('gives long entrance/exit animations scrub space while keeping transitions linear', async () => {
-  const { effectPreviewProgress, effectPosterKey } = await import('./effect-catalog-preview');
-  expect(effectPreviewProgress(0.2, 10, 'standalone')).toBeCloseTo(0.05);
-  expect(effectPreviewProgress(0.8, 10, 'standalone')).toBeCloseTo(0.95);
-  expect(effectPreviewProgress(0.2, 10, 'transition')).toBe(0.2);
-  const catalog = await createEffectCatalogEntry(await readValidBundleArtifact(), 1);
-  const entry = catalog.documents[0]!;
-  expect(effectPosterKey(entry)).toBe(effectPosterKey({ ...entry }));
-  expect(effectPosterKey(entry)).not.toBe(
-    effectPosterKey({ ...entry, assets: [{ id: 'replacement', sha256: 'b'.repeat(64) }] })
-  );
+it('keeps sandbox failure explicit and refuses invalid preview times before execution', async () => {
+  const catalog = await readValidAnimationCatalog(),
+    entry = catalog.documents[0]!;
+  const renderFrame = vi.fn(async () => {
+    throw new Error('sandbox unavailable');
+  });
+  await expect(
+    renderEffectCatalogPreview({ renderFrame, dispose: vi.fn() }, catalog, entry, 0.25, 1)
+  ).rejects.toThrow('sandbox unavailable');
+  for (const progress of [-0.1, 1.1, NaN])
+    await expect(
+      renderEffectCatalogPreview({ renderFrame, dispose: vi.fn() }, catalog, entry, progress, 2)
+    ).rejects.toThrow('Invalid preview time');
+  expect(renderFrame).toHaveBeenCalledOnce();
 });
-
+it('gives long entrance and exit animations scrub space while keeping short animations linear', async () => {
+  expect(effectPreviewProgress(0.2, 10)).toBeCloseTo(0.05);
+  expect(effectPreviewProgress(0.8, 10)).toBeCloseTo(0.95);
+  expect(effectPreviewProgress(0.2, 2)).toBe(0.2);
+  const catalog = await readValidAnimationCatalog(),
+    entry = catalog.documents[0]!;
+  expect(effectPosterKey(entry)).toBe(effectPosterKey({ ...entry }));
+  expect(effectPosterKey(entry)).not.toBe(effectPosterKey({ ...entry, sha256: 'b'.repeat(64) }));
+});
 it('keys each localized style independently of unrelated user presets', async () => {
-  const { readFileSync } = await import('node:fs');
-  const { effectPosterKey } = await import('./effect-catalog-preview');
-  const source = readFileSync(
-    'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-callout.sniptale-effect.json',
-    'utf8'
-  );
-  const catalog = await createEffectCatalogEntry(await readValidBundleArtifact(), 1);
-  const entry = { ...catalog.documents[0]!, source, previewPresetId: 'sniptale-orange-light' };
+  const catalog = await readValidAnimationCatalog(),
+    entry = { ...catalog.documents[0]!, previewPresetId: 'midnight-amber' };
   expect(effectPosterKey(entry, 'en')).not.toBe(effectPosterKey(entry, 'ru'));
   expect(effectPosterKey(entry)).not.toBe(
-    effectPosterKey({ ...entry, previewPresetId: 'sniptale-orange-dark' })
+    effectPosterKey({ ...entry, previewPresetId: 'midnight-blue' })
   );
   expect(effectPosterKey(entry)).toBe(
     effectPosterKey({
@@ -120,16 +108,13 @@ it('keys each localized style independently of unrelated user presets', async ()
     })
   );
 });
-
-it('invalidates covers after transition source, default preset or selected values change', async () => {
-  const { effectPosterKey } = await import('./effect-catalog-preview');
-  const catalog = await createEffectCatalogEntry(await readValidBundleArtifact(), 1);
+it('invalidates covers after source, default preset or selected values change', async () => {
+  const catalog = await readValidAnimationCatalog();
   const entry = {
     ...catalog.documents[0]!,
-    kind: 'transition' as const,
     presetPreferences: {
       defaultPreset: { kind: 'user' as const, id: 'custom' },
-      presets: [{ id: 'custom', name: 'Custom', values: { amount: 0.2 } }],
+      presets: [{ id: 'custom', name: 'Custom', values: { opacity: 20 } }],
     },
   };
   const key = effectPosterKey(entry);
@@ -139,10 +124,10 @@ it('invalidates covers after transition source, default preset or selected value
       ...entry,
       presetPreferences: {
         ...entry.presetPreferences,
-        presets: [{ id: 'custom', name: 'Custom', values: { amount: 0.8 } }],
+        presets: [{ id: 'custom', name: 'Custom', values: { opacity: 80 } }],
       },
     })
   ).not.toBe(key);
-  expect(effectPosterKey({ ...entry, previewPresetId: 'built-in' })).not.toBe(key);
+  expect(effectPosterKey({ ...entry, previewPresetId: 'midnight-amber' })).not.toBe(key);
   expect(effectPosterKey({ ...entry, presetPreferences: { presets: [] } })).not.toBe(key);
 });

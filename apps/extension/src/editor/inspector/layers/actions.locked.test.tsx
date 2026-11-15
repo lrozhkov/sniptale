@@ -58,7 +58,6 @@ let root: Root | null = null;
 
 function renderLockedActions() {
   const onOpenLayerEffects = vi.fn();
-  const onRenameLayer = vi.fn();
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -72,13 +71,12 @@ function renderLockedActions() {
           isImmutable={false}
           layer={LAYER as never}
           visible
-          onRenameLayer={onRenameLayer}
           onOpenLayerEffects={onOpenLayerEffects}
         />
       </div>
     )
   );
-  return { onOpenLayerEffects, onRenameLayer };
+  return { onOpenLayerEffects };
 }
 
 function clickButtonTitle(title: string) {
@@ -95,7 +93,7 @@ afterEach(() => {
 
 describe('locked layer actions', () => {
   it('disables visibility and layer mutations while keeping unlock available', () => {
-    const { onOpenLayerEffects, onRenameLayer } = renderLockedActions();
+    const { onOpenLayerEffects } = renderLockedActions();
 
     expect(container?.querySelector('button[title="editor.toolbar.hideLayer"]')).toHaveProperty(
       'disabled',
@@ -106,12 +104,9 @@ describe('locked layer actions', () => {
       false
     );
     expect(
-      container?.querySelector('button[title="editor.toolbar.layerEffectsAdjustments"]')
+      container?.querySelector('button[title="editor.toolbar.layerImageSettings"]')
     ).toHaveProperty('disabled', true);
-    expect(container?.querySelector('button[title="editor.toolbar.renameLayer"]')).toHaveProperty(
-      'disabled',
-      true
-    );
+    expect(container?.querySelector('button[title="editor.toolbar.renameLayer"]')).toBeNull();
     expect(
       container?.querySelector('button[title="editor.toolbar.duplicateLayer"]')
     ).toHaveProperty('disabled', true);
@@ -123,8 +118,7 @@ describe('locked layer actions', () => {
     act(() => {
       clickButtonTitle('editor.toolbar.hideLayer');
       clickButtonTitle('editor.toolbar.unlockLayer');
-      clickButtonTitle('editor.toolbar.layerEffectsAdjustments');
-      clickButtonTitle('editor.toolbar.renameLayer');
+      clickButtonTitle('editor.toolbar.layerImageSettings');
       clickButtonTitle('editor.toolbar.duplicateLayer');
       clickButtonTitle('editor.toolbar.deleteLayer');
     });
@@ -132,7 +126,6 @@ describe('locked layer actions', () => {
     expect(controllerMocks.toggleLayerVisibility).not.toHaveBeenCalled();
     expect(controllerMocks.toggleLayerLock).toHaveBeenCalledWith('layer-1');
     expect(onOpenLayerEffects).not.toHaveBeenCalled();
-    expect(onRenameLayer).not.toHaveBeenCalled();
     expect(controllerMocks.duplicateSelection).not.toHaveBeenCalled();
     expect(controllerMocks.deleteSelection).not.toHaveBeenCalled();
   });

@@ -1,30 +1,67 @@
 interface EffectRuntimePreparedModelCache<T> {
   clear(): void;
   get(id: string): T | null;
-  set(id: string, model: T): void;
-  snapshot(): { entries: number };
+  find(predicate: (model: T) => boolean): T | null;
+  deleteWhere(predicate: (model: T) => boolean): void;
+  set(id: string, model: T): boolean;
+  snapshot(): { entries: number; weight: number };
 }
 
-export function createEffectRuntimePreparedModelCache<T>(): EffectRuntimePreparedModelCache<T> {
-  const entries = new Map<string, T>();
+/** One LRU owner retires renderer resources before their immutable document can be forgotten. */
+export function createEffectRuntimePreparedModelCache<T>(
+  options: {
+    dispose?(model: T): void;
+    weight?(model: T): number;
+    maximumWeight?: number;
+  } = {}
+): EffectRuntimePreparedModelCache<T> {
+  const entries = new Map<string, { model: T; weight: number }>();
+  let total = 0;
+  const remove = (id: string, retire = true) => {
+    const entry = entries.get(id);
+    if (!entry) return;
+    entries.delete(id);
+    total -= entry.weight;
+    if (retire) options.dispose?.(entry.model);
+  };
   return {
-    clear: () => entries.clear(),
+    clear() {
+      for (const id of [...entries.keys()]) remove(id);
+    },
     get(id) {
-      const model = entries.get(id);
-      if (!model) return null;
+      const entry = entries.get(id);
+      if (!entry) return null;
       entries.delete(id);
-      entries.set(id, model);
-      return model;
+      entries.set(id, entry);
+      return entry.model;
+    },
+    find(predicate) {
+      for (const [id, entry] of entries) {
+        if (!predicate(entry.model)) continue;
+        entries.delete(id);
+        entries.set(id, entry);
+        return entry.model;
+      }
+      return null;
+    },
+    deleteWhere(predicate) {
+      for (const [id, entry] of [...entries]) if (predicate(entry.model)) remove(id);
     },
     set(id, model) {
-      entries.delete(id);
-      while (entries.size >= 8) {
+      const weight = options.weight?.(model) ?? 0,
+        maximum = options.maximumWeight ?? Number.MAX_SAFE_INTEGER;
+      if (!Number.isSafeInteger(weight) || weight < 0 || weight > maximum) return false;
+      const previous = entries.get(id);
+      remove(id, previous?.model !== model);
+      while (entries.size >= 8 || total + weight > maximum) {
         const oldest = entries.keys().next().value;
-        if (typeof oldest !== 'string') break;
-        entries.delete(oldest);
+        if (typeof oldest !== 'string') return false;
+        remove(oldest);
       }
-      entries.set(id, model);
+      entries.set(id, { model, weight });
+      total += weight;
+      return true;
     },
-    snapshot: () => ({ entries: entries.size }),
+    snapshot: () => ({ entries: entries.size, weight: total }),
   };
 }

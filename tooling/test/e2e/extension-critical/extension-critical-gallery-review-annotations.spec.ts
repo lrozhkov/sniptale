@@ -2,8 +2,7 @@ import { expect, test, type Locator, type Page, type TestInfo } from '@playwrigh
 import { createHash } from 'node:crypto';
 import { build } from 'esbuild';
 import { writeFile } from 'node:fs/promises';
-import { readFile } from 'node:fs/promises';
-import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
 import { createInlineWorkerBundlePlugin } from '../support/inline-worker-bundle';
@@ -18,11 +17,12 @@ import {
 
 const templates = [
   { ru: 'Имя и роль', en: 'Name and role' },
-  { ru: 'Главная мысль', en: 'Main idea' },
-  { ru: 'Маршрут видео', en: 'Video chapters' },
-  { ru: 'Пояснение с указателем', en: 'Pointer callout' },
-  { ru: 'Контур', en: 'Outline' },
-  { ru: 'Угловой фокус', en: 'Corner focus' },
+  { ru: 'Заголовок', en: 'Title' },
+  { ru: 'Глава', en: 'Chapter' },
+  { ru: 'Выноска', en: 'Callout' },
+  { ru: 'Рамка', en: 'Frame' },
+  { ru: 'Уголки', en: 'Corners' },
+  { ru: 'Стрелка', en: 'Arrow' },
 ] as const;
 
 async function drawInterval(
@@ -65,13 +65,13 @@ async function drawInterval(
   await page.mouse.up();
 }
 
-test('native imported PNG/SVG annotations retain complete sources after Undo, catalog deletion and reopen', async ({
+test('native embedded PNG annotations retain complete sources after Undo, catalog deletion and reopen', async ({
   page,
 }, info) => {
   test.setTimeout(120_000);
-  await page.setViewportSize({ width: 1280, height: 560 });
+  await page.setViewportSize({ width: 1920, height: 900 });
   const host = await startHostServer();
-  const title = 'Нативные PNG и SVG';
+  const title = 'Встроенные PNG';
   const label = (key: Parameters<typeof translate>[0]) => translate(key, 'ru');
   const dialog = page.locator('[data-ui="gallery.videoReview.dialog"]');
   const button = (key: Parameters<typeof translate>[0]) =>
@@ -102,92 +102,71 @@ test('native imported PNG/SVG annotations retain complete sources after Undo, ca
     await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
     await page.locator('[data-ui="gallery.page.root"]').waitFor();
     await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
-    const dataUrl = await page.evaluate(() => {
-      const canvas = Object.assign(document.createElement('canvas'), { width: 32, height: 32 });
-      canvas.getContext('2d')!.fillStyle = '#17b65a';
-      canvas.getContext('2d')!.fillRect(0, 0, 32, 32);
-      return canvas.toDataURL('image/png');
-    });
-    const base = parseEffectV1Source(
-      await readFile(
-        'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
-        'utf8'
-      )
+    const dataUrls = await page.evaluate(() =>
+      ['#17b65a', '#a832b6'].map((color) => {
+        const canvas = Object.assign(document.createElement('canvas'), { width: 32, height: 32 });
+        canvas.getContext('2d')!.fillStyle = color;
+        canvas.getContext('2d')!.fillRect(0, 0, 32, 32);
+        return canvas.toDataURL('image/png');
+      })
     );
-    if (!base.ok || !base.document) throw new Error('SDK fixture invalid');
-    const png = Buffer.from(dataUrl.slice(dataUrl.indexOf(',') + 1), 'base64');
-    const svgText =
-      '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" fill="#a832b6"/></svg>';
-    const fraction = (path: 'width' | 'height', value: number) => ({
-      op: 'mul' as const,
-      args: [{ op: 'read' as const, path }, value],
+    const resources = dataUrls.map((dataUrl, index) => {
+      const bytes = Buffer.from(dataUrl.slice(dataUrl.indexOf(',') + 1), 'base64');
+      return {
+        path: `images/mark-${index}.png`,
+        mimeType: 'image/png',
+        byteLength: bytes.length,
+        sha256: createHash('sha256').update(bytes).digest('hex'),
+        base64: bytes.toString('base64'),
+      };
     });
-    const document = {
-      ...base.document,
+    const authoredSource = JSON.stringify({
+      format: 'sniptale-animation',
+      version: 1,
       id: 'native-gallery-assets',
-      label: { ru: title, en: 'Native PNG and SVG' },
+      label: { ru: title, en: 'Embedded PNG marks' },
       controls: [],
-      assets: [
-        {
-          id: 'native-png',
-          kind: 'image',
-          mimeType: 'image/png',
-          width: 32,
-          height: 32,
-          dataUrl,
-          byteLength: png.length,
-          sha256: createHash('sha256').update(png).digest('hex'),
-        },
-        {
-          id: 'native-svg',
-          kind: 'svg',
-          mimeType: 'image/svg+xml',
-          width: 32,
-          height: 32,
-          svgText,
-          byteLength: Buffer.byteLength(svgText),
-          sha256: createHash('sha256').update(svgText).digest('hex'),
-        },
-      ],
-      program: {
-        kind: 'graph',
-        version: 1,
-        commands: [
-          { op: 'clear' },
-          {
-            op: 'image',
-            assetId: 'native-png',
-            x: fraction('width', 0.05),
-            y: fraction('height', 0.1),
-            width: fraction('width', 0.4),
-            height: fraction('height', 0.7),
-            fit: 'fill',
+      bindings: [],
+      resources,
+      animation: {
+        v: '5.12.2',
+        w: 160,
+        h: 90,
+        fr: 30,
+        ip: 0,
+        op: 90,
+        ddd: 0,
+        assets: resources.map((_, index) => ({
+          id: `mark-${index}`,
+          w: 32,
+          h: 32,
+          u: 'images/',
+          p: `mark-${index}.png`,
+          e: 0,
+        })),
+        layers: resources.map((_, index) => ({
+          ty: 2,
+          ind: index + 1,
+          refId: `mark-${index}`,
+          ddd: 0,
+          sr: 1,
+          ip: 0,
+          op: 90,
+          st: 0,
+          ks: {
+            p: { a: 0, k: [8 + index * 80, 9, 0] },
+            a: { a: 0, k: [0, 0, 0] },
+            s: { a: 0, k: [200, 196.875, 100] },
+            r: { a: 0, k: 0 },
+            o: { a: 0, k: 100 },
           },
-          {
-            op: 'svgParts',
-            assetId: 'native-svg',
-            x: fraction('width', 0.55),
-            y: fraction('height', 0.1),
-            width: fraction('width', 0.4),
-            height: fraction('height', 0.7),
-            part: {
-              kind: 'preset',
-              mode: 'assemble',
-              order: 'center',
-              reveal: 1,
-              spread: 0,
-              scaleFrom: 1,
-              stagger: 0,
-              rotate: 0,
-            },
-          },
-        ],
+        })),
       },
-    };
-    const source = JSON.stringify(document);
-    const admitted = parseEffectV1Source(source);
+    });
+    const admitted = parseAnimationTemplateSource(authoredSource);
     expect(admitted.diagnostics, JSON.stringify(admitted.diagnostics)).toEqual([]);
     expect(admitted.ok).toBe(true);
+    const source = JSON.stringify(admitted.template);
     await settings();
     const chooser = page.waitForEvent('filechooser');
     await page
@@ -197,7 +176,7 @@ test('native imported PNG/SVG annotations retain complete sources after Undo, ca
     await (
       await chooser
     ).setFiles({
-      name: 'native-assets.sniptale-effect.json',
+      name: 'native-assets.sniptale-animation.json',
       mimeType: 'application/json',
       buffer: Buffer.from(source),
     });
@@ -262,12 +241,16 @@ test('native imported PNG/SVG annotations retain complete sources after Undo, ca
             (snapshot) => snapshot.documentId === 'native-gallery-assets'
           )?.assets.length
       )
-      .toBe(2);
+      .toBe(0);
     expect(
       (await workspace())?.effectSnapshots?.find(
         (snapshot) => snapshot.documentId === 'native-gallery-assets'
       )?.source
     ).toBe(source);
+    const savedSource = (await workspace())?.effectSnapshots?.find(
+      (snapshot) => snapshot.documentId === 'native-gallery-assets'
+    )?.source;
+    expect(parseAnimationTemplateSource(savedSource ?? '').template?.resources).toEqual(resources);
     await button('gallery.videoReview.undo').click();
     await expect(dialog.locator('[data-annotation-effect-id]')).toHaveCount(0);
     await page.reload();
@@ -298,7 +281,13 @@ test('native imported PNG/SVG annotations retain complete sources after Undo, ca
     await expect
       .poll(() =>
         canvas.evaluate((node) => {
-          const bytes = node.getContext('2d')!.getImageData(0, 0, node.width, node.height).data;
+          const readback = Object.assign(document.createElement('canvas'), {
+            width: node.width,
+            height: node.height,
+          });
+          const paint = readback.getContext('2d')!;
+          paint.drawImage(node, 0, 0);
+          const bytes = paint.getImageData(0, 0, node.width, node.height).data;
           let green = 0,
             magenta = 0;
           for (let i = 0; i < bytes.length; i += 4) {
@@ -324,11 +313,13 @@ test('native imported PNG/SVG annotations retain complete sources after Undo, ca
         (snapshot) => snapshot.documentId === 'native-gallery-assets'
       )?.source
     ).toBe(source);
-    expect(
-      (await workspace())?.effectSnapshots?.find(
-        (snapshot) => snapshot.documentId === 'native-gallery-assets'
-      )?.assets
-    ).toHaveLength(2);
+    const retained = (await workspace())?.effectSnapshots?.find(
+      (snapshot) => snapshot.documentId === 'native-gallery-assets'
+    );
+    expect(retained?.assets).toHaveLength(0);
+    expect(parseAnimationTemplateSource(retained?.source ?? '').template?.resources).toHaveLength(
+      2
+    );
     await page.screenshot({
       path: info.outputPath('annotation-native-png-svg-retained.png'),
       fullPage: false,
@@ -340,7 +331,7 @@ test('native imported PNG/SVG annotations retain complete sources after Undo, ca
       format: 'esm',
       platform: 'browser',
       write: false,
-      loader: { '.svg': 'text', '.woff2': 'dataurl' },
+      loader: { '.svg': 'text', '.woff2': 'dataurl', '.bin': 'dataurl' },
       define: { 'process.env.NODE_ENV': '"production"' },
     });
     await dialog
@@ -370,8 +361,15 @@ test('native imported PNG/SVG annotations retain complete sources after Undo, ca
     expect(portable.completeHistory).toBe(true);
     expect(portable.cursor).toBe(portable.expectedCursor);
     expect(portable.exactSource).toBe(true);
-    expect(portable.assets).toHaveLength(2);
-    expect(portable.assets.every((asset) => asset.exact && asset.rebound)).toBe(true);
+    expect(portable.resources).toHaveLength(3);
+    expect(
+      portable.resources.filter((resource) => resource.mimeType.startsWith('image/'))
+    ).toHaveLength(2);
+    expect(
+      portable.resources.filter((resource) => resource.mimeType.startsWith('font/'))
+    ).toHaveLength(1);
+    expect(portable.resources.every((resource) => resource.exact && resource.embedded)).toBe(true);
+    expect(portable.detachedAssets).toBe(0);
   } finally {
     // Restored-library previews may keep requests alive; release the page before its test server.
     await page.close();
@@ -500,7 +498,7 @@ for (const variant of [
   { width: 1280, height: 560, locale: 'ru', theme: 'light' },
   { width: 1920, height: 900, locale: 'en', theme: 'dark' },
 ] as const) {
-  test(`native annotation lane, six templates and history at ${variant.width}x${variant.height}`, async ({
+  test(`native annotation lane, seven templates and history at ${variant.width}x${variant.height}`, async ({
     page,
   }, info) => {
     test.setTimeout(120_000);
@@ -611,9 +609,9 @@ for (const variant of [
         'false'
       );
       const saved = await workspace();
-      expect(saved?.effectSnapshots).toHaveLength(6);
+      expect(saved?.effectSnapshots).toHaveLength(templates.length);
       const content = await persistedReviewContent(page);
-      expect(content?.annotationEffects?.instances).toHaveLength(6);
+      expect(content?.annotationEffects?.instances).toHaveLength(templates.length);
       for (const instance of content?.annotationEffects?.instances ?? []) {
         expect(instance.start).toBeCloseTo(1, 1);
         expect(instance.end).toBeCloseTo(7, 1);
@@ -624,11 +622,11 @@ for (const variant of [
             nodes.map((node) => node.getAttribute('data-annotation-effect-row'))
           )
         ).size
-      ).toBe(6);
+      ).toBe(templates.length);
       await button('gallery.videoReview.undo').click();
-      await expect(plates).toHaveCount(5);
+      await expect(plates).toHaveCount(templates.length - 1);
       await button('gallery.videoReview.redo').click();
-      await expect(plates).toHaveCount(6);
+      await expect(plates).toHaveCount(templates.length);
       const mute = button('gallery.videoReview.annotationEffectsEnabled');
       await mute.click();
       await expect(mute).toHaveAttribute('aria-pressed', 'false');
@@ -640,7 +638,7 @@ for (const variant of [
       await expect(mute).toHaveAttribute('aria-pressed', 'true');
       const inspector = dialog.locator('[data-ui="gallery.videoReview.annotationInspector"]');
       const name = inspector.getByRole('textbox', {
-        name: variant.locale === 'ru' ? 'Имя · строка 1' : 'Name · line 1',
+        name: variant.locale === 'ru' ? 'Текст' : 'Text',
         exact: true,
       });
       await inspector.scrollIntoViewIfNeeded();
@@ -655,7 +653,7 @@ for (const variant of [
       await expect(name).toHaveValue(original);
       const cursor = (await workspace())!.cursor;
       await name.fill('Accepted native field');
-      await name.press('Enter');
+      await name.press('Tab');
       await expect
         .poll(
           async () =>
@@ -734,8 +732,8 @@ for (const variant of [
         )
         .toBe('Field accepted by close');
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
-      await expect(plates).toHaveCount(6);
-      expect((await workspace())?.effectSnapshots).toHaveLength(6);
+      await expect(plates).toHaveCount(templates.length);
+      expect((await workspace())?.effectSnapshots).toHaveLength(templates.length);
       if (variant.width === 1280) {
         await page.setViewportSize({ width: 1024, height: 560 });
         const workspaceScroll = dialog.locator('[data-ui="gallery.videoReview.workspaceScroll"]');

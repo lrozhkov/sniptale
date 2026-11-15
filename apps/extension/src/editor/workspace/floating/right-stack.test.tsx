@@ -5,15 +5,15 @@ import { EditorFloatingRightStack } from './right-stack';
 vi.mock('./layers-panel', () => ({
   EditorFloatingLayersPanel: ({
     collapsed,
-    heightRatio,
+    preferredHeight,
     preferenceError,
   }: {
     collapsed: boolean;
-    heightRatio: number | null;
+    preferredHeight: number | null;
     preferenceError: string | null;
   }) => (
     <div
-      data-height-ratio={heightRatio ?? 'none'}
+      data-height={preferredHeight ?? 'none'}
       data-preference-error={preferenceError ?? ''}
       data-ui={collapsed ? 'mock.layers.collapsed' : 'mock.layers.expanded'}
     />
@@ -31,11 +31,11 @@ it('renders expanded layers inside the right stack and collapsed layers as a cor
     documentController: { inspector: 'tool' } as never,
     hasImage: true,
     inspectorMeta: { title: 'Inspector', subtitle: 'Mode' },
-    layersHeightRatio: 0.5,
+    layersHeight: 450,
     layersPreferenceError: null,
     onCollapseLayers: vi.fn(),
     onExpandLayers: vi.fn(),
-    onLayersHeightRatioChange: vi.fn(),
+    onLayersHeightChange: vi.fn(),
   };
 
   expect(
@@ -46,7 +46,7 @@ it('renders expanded layers inside the right stack and collapsed layers as a cor
   );
   expect(
     renderToStaticMarkup(<EditorFloatingRightStack {...props} layersCollapsed={false} />)
-  ).toContain('data-height-ratio="0.5"');
+  ).toContain('data-height="450"');
 });
 
 it('keeps effects inside the expanded layers surface even when layers were collapsed', () => {
@@ -54,11 +54,11 @@ it('keeps effects inside the expanded layers surface even when layers were colla
     documentController: { inspector: 'layer-effects' } as never,
     hasImage: true,
     inspectorMeta: { title: 'Effects', subtitle: 'Layer' },
-    layersHeightRatio: null,
+    layersHeight: null,
     layersPreferenceError: null,
     onCollapseLayers: vi.fn(),
     onExpandLayers: vi.fn(),
-    onLayersHeightRatioChange: vi.fn(),
+    onLayersHeightChange: vi.fn(),
   };
 
   expect(
@@ -74,11 +74,11 @@ it('passes floating preference errors to the layers surface', () => {
     documentController: { inspector: 'tool' } as never,
     hasImage: true,
     inspectorMeta: { title: 'Inspector', subtitle: 'Mode' },
-    layersHeightRatio: null,
+    layersHeight: null,
     layersPreferenceError: 'Could not save panel',
     onCollapseLayers: vi.fn(),
     onExpandLayers: vi.fn(),
-    onLayersHeightRatioChange: vi.fn(),
+    onLayersHeightChange: vi.fn(),
   };
 
   expect(

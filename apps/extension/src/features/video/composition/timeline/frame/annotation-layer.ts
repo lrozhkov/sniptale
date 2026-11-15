@@ -1,5 +1,5 @@
 import { resolveCompositionAnnotationClip } from '../../annotation/resolved-clip';
-import { resolveClipTransitionVisualState } from '../../../project/transition/presentation';
+import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../../project/transition/presentation.types';
 import type { VideoProject, VideoProjectAnnotationClip } from '../../../project/types/index';
 import type { VideoCompositionVisualLayer } from '../../types';
 
@@ -20,7 +20,7 @@ export function createAnnotationVisualLayer(
     height: layerFrame.height,
     kind: 'annotation',
     opacity: resolvedClip.presentation.frame.opacity,
-    renderState: resolveClipTransitionVisualState(project, clip, currentTime),
+    renderState: IDENTITY_TRANSITION_VISUAL_STATE,
     rotation: resolvedClip.presentation.frame.rotation,
     width: layerFrame.width,
     x: layerFrame.x,

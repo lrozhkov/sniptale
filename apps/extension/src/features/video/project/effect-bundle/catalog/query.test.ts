@@ -3,7 +3,7 @@ import { expect, it, vi } from 'vitest';
 import type { EffectBundleCatalogEntry } from './index';
 import { getEffectCatalogThemes, queryEffectCatalog } from './query';
 const source = readFileSync(
-  'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-callout.sniptale-effect.json',
+  'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json',
   'utf8'
 );
 const catalog: EffectBundleCatalogEntry = {
@@ -13,7 +13,7 @@ const catalog: EffectBundleCatalogEntry = {
       source,
       kind: 'standalone',
       assets: [],
-      schemaVersion: 'sniptale.effect.v1',
+      schemaVersion: 'sniptale.animation.v1',
       sha256: 'a'.repeat(64),
     },
   ],
@@ -25,28 +25,27 @@ const catalog: EffectBundleCatalogEntry = {
   description: { en: '', ru: '' },
   packId: 'cards',
   version: '1.0.0',
-  source: 'raw-json',
+  source: 'sniptale-animation',
   sourceSha256: 'a'.repeat(64),
   retainedByteLength: source.length,
 };
 it('expands graph styles and combines localized theme, style, category and search', () => {
   expect(
     queryEffectCatalog(catalog, { query: 'карточки', kind: 'standalone', theme: 'all' }, 'ru')
-  ).toHaveLength(2);
+  ).toHaveLength(3);
   expect(
     queryEffectCatalog(
       catalog,
-      { query: '', kind: 'all', theme: 'style:sniptale-orange:dark' },
+      { query: '', kind: 'all', theme: 'style:midnight:amber' },
       'en'
     ).map((d) => d.previewPresetId)
-  ).toEqual(['sniptale-orange-dark']);
-  expect(
-    queryEffectCatalog(catalog, { query: '', kind: 'transition', theme: 'all' }, 'en')
-  ).toEqual([]);
+  ).toEqual(['midnight-amber']);
+
   expect(getEffectCatalogThemes([catalog]).map((option) => option.value)).toEqual([
-    'theme:sniptale-orange',
-    'style:sniptale-orange:dark',
-    'style:sniptale-orange:light',
+    'theme:midnight',
+    'style:midnight:amber',
+    'style:midnight:blue',
+    'style:midnight:mint',
   ]);
 });
 it('does not infer themes from names and only exposes declared styles', () => {
@@ -72,7 +71,7 @@ it('does not infer themes from names and only exposes declared styles', () => {
 it('places the selected default first without hiding other variants', () => {
   const preferences = {
     presets: [],
-    defaultPreset: { kind: 'builtin' as const, id: 'sniptale-orange-light' },
+    defaultPreset: { kind: 'builtin' as const, id: 'midnight-blue' },
   };
   const entries = queryEffectCatalog(
     { ...catalog, documents: [{ ...catalog.documents[0]!, presetPreferences: preferences }] },
@@ -80,8 +79,9 @@ it('places the selected default first without hiding other variants', () => {
     'en'
   );
   expect(entries.map((entry) => entry.previewPresetId)).toEqual([
-    'sniptale-orange-light',
-    'sniptale-orange-dark',
+    'midnight-blue',
+    'midnight-amber',
+    'midnight-mint',
   ]);
 });
 it('names and filters user styles even when a graph does not declare a theme', () => {
@@ -129,7 +129,7 @@ it('hides all styles of disabled documents while Settings can still query and en
   const filter = { query: '', kind: 'all' as const, theme: 'all' };
   expect(queryEffectCatalog(disabled, filter, 'en')).toEqual([]);
   expect(getEffectCatalogThemes([disabled])).toEqual([]);
-  expect(queryEffectCatalog(disabled, filter, 'en', { includeDisabled: true })).toHaveLength(2);
-  expect(getEffectCatalogThemes([disabled], 'en', { includeDisabled: true })).toHaveLength(3);
-  expect(queryEffectCatalog(catalog, filter, 'en')).toHaveLength(2);
+  expect(queryEffectCatalog(disabled, filter, 'en', { includeDisabled: true })).toHaveLength(3);
+  expect(getEffectCatalogThemes([disabled], 'en', { includeDisabled: true })).toHaveLength(4);
+  expect(queryEffectCatalog(catalog, filter, 'en')).toHaveLength(3);
 });

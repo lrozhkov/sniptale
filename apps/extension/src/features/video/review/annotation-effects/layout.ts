@@ -1,9 +1,9 @@
 import {
-  mapEffectV1ObjectPoint,
-  mapEffectV1ScenePoint,
-  resolveEffectV1ControlDefault,
-  type EffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
+  mapAnimationObjectPoint,
+  mapAnimationScenePoint,
+  type AnimationTemplate,
+} from '@sniptale/runtime-contracts/animation-template';
+import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
 import {
   invertQuickEditProjection,
   projectQuickEditPoint,
@@ -30,13 +30,13 @@ export function resolveReviewAnnotationEffectBox(
 
 /** Anchors remain in the annotation plane when the body is moved or resized. */
 export function resolveReviewAnnotationEffectControls(
-  document: EffectV1Document,
+  document: AnimationTemplate,
   instance: ReviewAnnotationEffect,
   plane: Size
 ) {
   const controls = {
     ...Object.fromEntries(
-      document.controls.map((control) => [control.id, resolveEffectV1ControlDefault(control, 'en')])
+      document.controls.map((control) => [control.id, resolveEffectControlDefault(control, 'en')])
     ),
     ...instance.controls,
   };
@@ -46,19 +46,30 @@ export function resolveReviewAnnotationEffectControls(
   for (const handle of layout.handles ?? []) {
     const anchor = instance.anchors?.[handle.id];
     if (!anchor) throw new Error('Missing annotation anchor.');
-    const point = mapEffectV1ScenePoint(layout, box, {
+    const point = mapAnimationScenePoint(document, box, {
       x: anchor.x * plane.width,
       y: anchor.y * plane.height,
     });
-    controls[handle.xControl] = point.x;
-    controls[handle.yControl] = point.y;
+    // Old editor versions could persist scene anchors outside the template's numeric domain.
+    // Bound their derived runtime values without rewriting the stored scene coordinates.
+    for (const [id, value] of [
+      [handle.xControl, point.x],
+      [handle.yControl, point.y],
+    ] as const) {
+      const rounded = Math.round(value * 1e10) / 1e10;
+      const control = document.controls.find((control) => control.id === id);
+      controls[id] =
+        control?.kind === 'number'
+          ? Math.max(control.min ?? -Infinity, Math.min(control.max ?? Infinity, rounded))
+          : rounded;
+    }
   }
   return controls;
 }
 
 /** New anchors use declared control defaults/presets without clipping an external tip to the body. */
 export function initializeReviewAnnotationEffectAnchors(
-  document: EffectV1Document,
+  document: AnimationTemplate,
   transform: ReviewAnnotationEffectTransform,
   controls: Readonly<Record<string, number | string>>,
   plane: Size
@@ -72,7 +83,7 @@ export function initializeReviewAnnotationEffectAnchors(
         y = controls[handle.yControl];
       if (typeof x !== 'number' || typeof y !== 'number')
         throw new Error('Invalid annotation anchor default.');
-      const point = mapEffectV1ObjectPoint(layout, box, { x, y });
+      const point = mapAnimationObjectPoint(document, box, { x, y });
       return [handle.id, { x: point.x / plane.width, y: point.y / plane.height }];
     })
   );
@@ -80,16 +91,18 @@ export function initializeReviewAnnotationEffectAnchors(
 
 /** Fits a new annotation and binds declared anchors without retaining plane-bound handle controls. */
 export function initializeReviewAnnotationPlacement(
-  document: EffectV1Document,
+  document: AnimationTemplate,
   values: Readonly<Record<string, string | number>>,
   plane: Size
 ) {
   const layout = document.objectLayout;
-  const scale = layout
-    ? Math.min(1, (plane.width * 0.8) / layout.width, (plane.height * 0.8) / layout.height)
-    : 1;
-  const width = layout ? (layout.width * scale) / plane.width : 1;
-  const height = layout ? (layout.height * scale) / plane.height : 1;
+  const scale = Math.min(
+    1,
+    (plane.width * 0.8) / document.animation.w,
+    (plane.height * 0.8) / document.animation.h
+  );
+  const width = (document.animation.w * scale) / plane.width;
+  const height = (document.animation.h * scale) / plane.height;
   const transform = { x: (1 - width) / 2, y: (1 - height) / 2, width, height, rotation: 0 };
   const anchors = initializeReviewAnnotationEffectAnchors(document, transform, values, plane);
   const controls = { ...values };
@@ -207,4 +220,47 @@ function flattenMappedAnnotationBody(
   const width = Math.hypot(u.x, u.y),
     height = Math.hypot(v.x, v.y);
   return normalizeMappedAnnotationBody(center, { width, height }, u, to);
+}
+
+/** Whole-object transforms carry scene anchors with the body. Explicit handle edits remain independent. */
+export function transformReviewAnnotationAnchors(
+  instance: ReviewAnnotationEffect,
+  transform: ReviewAnnotationEffectTransform,
+  plane: Size
+): ReviewAnnotationEffect['anchors'] {
+  if (!instance.anchors) return undefined;
+  const before = instance.transform;
+  if (
+    before.width === transform.width &&
+    before.height === transform.height &&
+    before.rotation === transform.rotation
+  )
+    return Object.fromEntries(
+      Object.entries(instance.anchors).map(([id, point]) => [
+        id,
+        {
+          x: point.x + transform.x - before.x,
+          y: point.y + transform.y - before.y,
+        },
+      ])
+    );
+  const cos = Math.cos(before.rotation),
+    sin = Math.sin(before.rotation);
+  const nextCos = Math.cos(transform.rotation),
+    nextSin = Math.sin(transform.rotation);
+  return Object.fromEntries(
+    Object.entries(instance.anchors).map(([id, point]) => {
+      const dx = (point.x - before.x - before.width / 2) * plane.width;
+      const dy = (point.y - before.y - before.height / 2) * plane.height;
+      const x = ((dx * cos + dy * sin) * transform.width) / before.width;
+      const y = ((-dx * sin + dy * cos) * transform.height) / before.height;
+      return [
+        id,
+        {
+          x: transform.x + transform.width / 2 + (x * nextCos - y * nextSin) / plane.width,
+          y: transform.y + transform.height / 2 + (x * nextSin + y * nextCos) / plane.height,
+        },
+      ];
+    })
+  );
 }

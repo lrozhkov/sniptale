@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { useEditorVectorLibrarySession } from '../../application/vector-elements/context';
 
 type FloatingToolRailProps = {
   activeTool?: string;
@@ -90,12 +91,12 @@ vi.mock('./view-controls', () => ({
 vi.mock('./preferences', () => ({
   useFloatingLayersPreferenceState: () => ({
     layersCollapsed: mocks.layersPreference.collapsed,
-    layersHeightRatio: null,
+    layersHeight: null,
     layersPreferenceError: mocks.layersPreference.error,
     setLayersCollapsed: (collapsed: boolean) => {
       mocks.layersPreference.collapsed = collapsed;
     },
-    setLayersHeightRatio: vi.fn(),
+    setLayersHeight: vi.fn(),
   }),
 }));
 
@@ -304,4 +305,39 @@ it('collapses and expands the floating layers surface through loaded surface cal
   expandedStackProps.onExpandLayers();
   renderToStaticMarkup(<EditorFloatingWorkspace hasImage />);
   expect(mocks.rightStack.mock.lastCall?.[0].layersCollapsed).toBe(false);
+});
+
+it('retains one library session across surface changes and disposes it only with the workspace', async () => {
+  const sessions: ReturnType<typeof useEditorVectorLibrarySession>[] = [];
+  function LibraryProbe() {
+    sessions.push(useEditorVectorLibrarySession());
+    return <div data-ui="mock.library-probe" />;
+  }
+  mocks.toolRail.mockImplementation(() => <LibraryProbe />);
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  await act(async () => root.render(<EditorFloatingWorkspace hasImage />));
+  const session = sessions[0];
+  assertDefined(session);
+  const dispose = vi.spyOn(session, 'dispose');
+  mocks.useToolbarController.mockReturnValue({ ...createToolbarProps(), activeTool: 'shape' });
+  mocks.useInspectorController.mockReturnValue({
+    id: 'document-controller',
+    inspector: 'elements',
+    selection: { hasSelection: false },
+    setInspector: vi.fn(),
+  });
+  await act(async () => root.render(<EditorFloatingWorkspace hasImage />));
+  await act(async () => root.render(<EditorFloatingWorkspace hasImage={false} />));
+  await act(async () => root.render(<EditorFloatingWorkspace hasImage />));
+  expect(sessions.every((current) => current === session)).toBe(true);
+  expect(dispose).not.toHaveBeenCalled();
+  await act(async () => root.unmount());
+  expect(dispose).toHaveBeenCalledOnce();
+  const reopened = createRoot(container);
+  await act(async () => reopened.render(<EditorFloatingWorkspace hasImage />));
+  expect(sessions.at(-1)).not.toBe(session);
+  await act(async () => reopened.unmount());
+  container.remove();
 });

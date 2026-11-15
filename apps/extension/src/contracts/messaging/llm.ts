@@ -34,7 +34,11 @@ export interface ProcessWithLLMResponse {
   parseErrors?: string[] | undefined;
 }
 
-export type LlmSessionPurpose = 'content-ai-pick' | 'scenario-editor' | 'review-text';
+export type LlmSessionPurpose =
+  | 'content-ai-pick'
+  | 'scenario-editor'
+  | 'review-text'
+  | 'image-editor';
 
 export interface RequestLlmSessionMessage {
   egressAuthority: AiEgressAuthority;

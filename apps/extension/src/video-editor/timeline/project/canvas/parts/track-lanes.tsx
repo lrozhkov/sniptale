@@ -1,8 +1,5 @@
 import { ProjectTimelineSourceVoiceoverViews } from './source-voiceover';
 import { useTrackMaterialDrop } from './material-drop';
-import { resolveEffectOwner } from '../../../../../features/video/project/effect-instance/owner';
-import { readVideoEditorEffectDocumentDragPayload } from '../../../../contracts/effect-document-drag';
-import { ClipFxRows } from './clip-fx';
 import { useEffectDocumentDrag } from '../../../../chrome/effect-document-drag';
 import { getEffectInsertionError } from '../../../../../features/video/project/effect-instance/placement';
 import { createTrackEffectDropHandlers } from './effect-drop';
@@ -86,9 +83,6 @@ export const ProjectTimelineTrackLanes = memo(function ProjectTimelineTrackLanes
 ) {
   useAppLocale();
   const { drag } = useEffectDocumentDrag();
-  const globalOwner = resolveEffectOwner(props.project, { kind: 'video-group' });
-  const canDropGlobal =
-    drag?.kind === 'targetEffect' && globalOwner && !globalOwner.locked && globalOwner.duration > 0;
   const [dropTarget, setDropTarget] = useState<{
     trackId: string;
     clipId: string | null;
@@ -142,42 +136,6 @@ export const ProjectTimelineTrackLanes = memo(function ProjectTimelineTrackLanes
           onUnsupportedTimelineFileDrop={props.onUnsupportedTimelineFileDrop}
         />
       ))}
-      {props.trackLayoutModel.videoFx && (
-        <div
-          className={
-            canDropGlobal
-              ? 'relative outline outline-1 outline-[var(--sniptale-color-accent)]'
-              : 'relative'
-          }
-          onDragOver={(event) => {
-            event.stopPropagation();
-            event.dataTransfer.dropEffect = canDropGlobal ? 'copy' : 'none';
-            if (canDropGlobal) event.preventDefault();
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            const payload = readVideoEditorEffectDocumentDragPayload(event.dataTransfer);
-            if (canDropGlobal && payload?.kind === 'targetEffect')
-              props.onDropEffectDocument?.(payload, { kind: 'video-group' }, 0);
-          }}
-          style={{
-            height: props.trackLayoutModel.videoFx.fxHeight,
-          }}
-        >
-          <ClipFxRows
-            project={props.project}
-            layout={props.trackLayoutModel.videoFx}
-            pixelsPerSecond={props.pixelsPerSecond}
-            projection={props.projection}
-            selectedId={
-              props.selection.kind === VideoEditorSelectionKind.EFFECT_INSTANCE
-                ? props.selection.effectInstanceId
-                : null
-            }
-          />
-        </div>
-      )}
     </>
   );
 });
@@ -280,17 +238,7 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
         trackId={props.track.id}
         trackLayout={props.trackLayout}
       />
-      {props.trackLayout && props.trackLayout.fxHeight > 0 && (
-        <ClipFxRows
-          project={props.project}
-          layout={props.trackLayout}
-          pixelsPerSecond={props.pixelsPerSecond}
-          projection={props.projection}
-          selectedId={
-            props.selection.kind === 'effect-instance' ? props.selection.effectInstanceId : null
-          }
-        />
-      )}
+
       <ProjectTimelineSourceVoiceoverViews
         project={displayProject}
         trackId={props.track.id}

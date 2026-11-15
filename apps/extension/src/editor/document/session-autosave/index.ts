@@ -1,3 +1,4 @@
+import type { AssetRef } from '../../../composition/persistence/assets';
 import type { ImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces';
 import type { EditorDocument } from '../../../features/editor/document/types';
 import {
@@ -44,6 +45,8 @@ export interface EditorSessionAutosaveService {
   updateContext: (patch: Partial<Omit<ActiveEditorSessionContext, 'aggregateId'>>) => void;
   /** Adopt prepared resources only after a successful load under the hydration gate. */
   adoptPreparedDocument: (entry: PreparedEditorSessionDocument) => void;
+  /** Reuse definitions whose immutable bytes have completed durable publication. */
+  adoptVectorAssets: (refs: ReadonlyMap<string, AssetRef>) => void;
   restoreDraft: (
     aggregateId: string,
     isCurrent?: () => boolean
@@ -51,6 +54,8 @@ export interface EditorSessionAutosaveService {
   scheduleAutosave: (document: EditorDocument) => void;
   /** Defers presentation work; admitted immutable document captures remain eligible to save. */
   setInteractionActive: (active: boolean) => void;
+  /** Keeps accepted input protected until its deferred document capture completes. */
+  setPendingCompletionActive: (active: boolean) => void;
   flushAutosave: (getDocument: () => EditorDocument) => Promise<void>;
   /** Prepare a transient native receipt and a guard for an awaited normal-exit intent. */
   prepareCheckpointExit?: (getDocument: () => EditorDocument) => Promise<EditorCheckpointExit>;
@@ -75,6 +80,24 @@ export type {
 function createEditorSessionAutosaveActions(
   state: EditorSessionAutosaveState
 ): EditorSessionAutosaveService {
+  let inputActive = false;
+  const syncInteraction = () => {
+    const active = inputActive || state.pendingCompletionActive;
+    if (state.interactionActive === active) return;
+    state.interactionRevision += 1;
+    state.interactionActive = active;
+    if (active) {
+      beginAutosaveCheckpointEdit(state);
+      interruptImagePresentation(state);
+      return;
+    }
+    releaseAutosaveInteraction(state);
+    endAutosaveCheckpointEdit(state);
+    const context = state.activeContext;
+    if (context && state.presentationPending) {
+      scheduleImagePresentation(context, context.durableRevision, state.autosaveRevision, state);
+    }
+  };
   return {
     activate: (context, options) => activateAutosaveContext(state, context, options),
     beginHydration: (isCurrent) => {
@@ -104,23 +127,26 @@ function createEditorSessionAutosaveActions(
     rebindAggregate: (context) => rebindAutosaveAggregate(state, context),
     updateContext: (patch) => updateAutosaveContext(state, patch),
     adoptPreparedDocument: (entry) => adoptPreparedAutosaveDocument(state, entry),
+    adoptVectorAssets: (refs) => {
+      if (!state.activeContext || state.hydration) return;
+      state.documentAssetsByVectorDefinitionId = new Map([
+        ...state.documentAssetsByVectorDefinitionId,
+        ...refs,
+      ]);
+    },
     restoreDraft: (aggregateId, isCurrent) => restoreAutosaveDraft(state, aggregateId, isCurrent),
     scheduleAutosave: (document) => queuePendingAutosave(state, document),
     setInteractionActive: (active) => {
-      if (state.interactionActive === active) return;
-      state.interactionRevision += 1;
-      state.interactionActive = active;
-      if (active) {
-        beginAutosaveCheckpointEdit(state);
-        interruptImagePresentation(state);
-        return;
+      inputActive = active;
+      syncInteraction();
+    },
+    setPendingCompletionActive: (active) => {
+      if (active && !state.pendingCompletionActive && state.activeContext && !state.hydration) {
+        state.hasUnsavedChanges = true;
+        setEditorSaveState('idle');
       }
-      releaseAutosaveInteraction(state);
-      endAutosaveCheckpointEdit(state);
-      const context = state.activeContext;
-      if (context && state.presentationPending) {
-        scheduleImagePresentation(context, context.durableRevision, state.autosaveRevision, state);
-      }
+      state.pendingCompletionActive = active;
+      syncInteraction();
     },
     flushAutosave: (getDocument) => flushPendingAutosave(state, getDocument),
     prepareCheckpointExit: (getDocument) => prepareEditorCheckpointExit(state, getDocument),
@@ -148,7 +174,11 @@ function createEditorSessionAutosaveActions(
       if (context)
         scheduleImagePresentation(context, context.durableRevision, state.autosaveRevision, state);
     },
-    dispose: () => disposeAutosaveState(state),
+    dispose: () => {
+      inputActive = false;
+      state.pendingCompletionActive = false;
+      disposeAutosaveState(state);
+    },
   };
 }
 

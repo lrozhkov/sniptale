@@ -2,13 +2,14 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
 import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
+import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
 
 const mocks = vi.hoisted(() => ({
   assetSequence: 0,
   createJournal: vi.fn(),
   deleteAssetObject: vi.fn(async (_assetId: string) => undefined),
   cancelPublication: vi.fn(),
-  discardPreparedAsset: vi.fn(async () => undefined),
+  discardPreparedAsset: vi.fn(async (_assetId: string) => undefined),
   initDB: vi.fn(),
   releaseProtection: vi.fn(async () => undefined),
   recoverStandalone: vi.fn(async () => 0),
@@ -39,6 +40,14 @@ vi.mock('../assets', async (importOriginal) => ({
   deleteAssetObject: mocks.deleteAssetObject,
   cancelAssetPublication: mocks.cancelPublication,
   discardPreparedAsset: mocks.discardPreparedAsset,
+  collectPreparedAssetCleanupFailures: async (assetIds: readonly string[]) => {
+    const results = await Promise.allSettled(
+      assetIds.map((assetId) => mocks.discardPreparedAsset(assetId))
+    );
+    return results.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason as unknown] : []
+    );
+  },
   publishReadyJournalWithRetry: vi.fn(async (journal, publish) => publish(journal)),
   readAssetFile: vi.fn(async () => new File(['original'], 'image.png', { type: 'image/png' })),
   recoverStandaloneAssetPublications: mocks.recoverStandalone,
@@ -558,6 +567,25 @@ it('shares an imported original with its Montage borrower while staging only a n
 
 it('refuses a delayed parallel first Image writer after the competing native save commits', async () => {
   const f = await importedFirstSaveFixture();
+  f.document.version = 3;
+  f.document.canvasJson = JSON.stringify({
+    objects: [
+      {
+        type: 'image',
+        src: f.document.sourceImageData,
+        sniptaleRasterOriginalData: f.document.sourceImageData,
+        sniptaleRasterColorData: f.document.sourceImageData,
+        sniptaleRasterVisibilityData: f.document.sourceImageData,
+        sniptaleRasterKeyData: f.document.sourceImageData,
+        sniptaleRasterState: {
+          version: 1,
+          width: 8,
+          height: 6,
+          crop: { x: 2, y: 1, width: 4, height: 3 },
+        },
+      },
+    ],
+  });
   let entered!: () => void;
   let release!: () => void;
   const reached = new Promise<void>((resolve) => {
@@ -579,6 +607,12 @@ it('refuses a delayed parallel first Image writer after the competing native sav
   });
   expect(winner.revision).toBe(1);
   const accepted = structuredClone(f.rows);
+  const stored = parseImageWorkspaceEntry(f.table('image_workspaces').get(f.media.id));
+  if (!stored) throw new Error('Committed retained workspace did not parse.');
+  expect(stored.document.version).toBe(4);
+  expect(
+    stored.document.assets.filter((asset) => asset.role.includes('sniptaleRaster'))
+  ).toHaveLength(4);
   release();
   await expect(delayed).rejects.toThrow();
   expect(f.rows).toEqual(accepted);

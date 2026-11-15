@@ -1,3 +1,5 @@
+import type { ReviewAnnotationMovement } from './annotation-effects-editor';
+import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
 import type {
   PreviewRendererStatus,
   VideoPreviewRenderer,
@@ -38,6 +40,9 @@ export interface PresentationInput {
   preferences: QuickPreviewPreferences;
   playing: boolean;
   interacting?: boolean;
+  /** Committed baseline of the one annotation being edited by the active pointer gesture. */
+  annotationGesture?: ReviewAnnotationEffect | undefined;
+  annotationMovement?: ReviewAnnotationMovement | undefined;
   /** A paused inspector draft retains the displayed frame while its smaller preview renders. */
   deferFrames?: boolean;
   visible?: boolean;
@@ -68,6 +73,8 @@ export interface ReviewPreviewPresentationStatus {
 }
 
 export type Description = {
+  annotationMove?: { instance: ReviewAnnotationEffect; baseline: Scene } | undefined;
+  interactionKey?: PreviewSceneKey | undefined;
   renderer?: VideoPreviewRenderer;
   scene: Scene;
   dimensions: { canonical: Size; backing: Size };
@@ -105,7 +112,9 @@ export function resolvePresentationDescription(
       position: comments[comment.id] ?? comment.position,
     })),
   };
-  const key = reviewPreviewSceneKey(scene, [
+  const context = [
+    input.sourceIdentity,
+    input.annotationGesture,
     input.canonical,
     input.css,
     input.preferences,
@@ -121,7 +130,8 @@ export function resolvePresentationDescription(
     placement,
     input.webcam?.editor.crop,
     input.webcam?.editor.placement,
-  ]);
+  ];
+  const key = reviewPreviewSceneKey(scene, context);
   if (!previous || !sameReviewPreviewSceneKey(previous.key, key)) {
     const backing = resolveQuickPreviewRasterSize({
       canonical: input.canonical,
@@ -135,6 +145,10 @@ export function resolvePresentationDescription(
       key,
       generation: (previous?.generation ?? 0) + 1,
       description: {
+        interactionKey:
+          interacting && !input.playing
+            ? annotationInteractionKey(scene, input.annotationGesture, context)
+            : undefined,
         renderer: input.preferences.renderer,
         scene,
         dimensions: { canonical: input.canonical, backing },
@@ -151,6 +165,55 @@ export function resolvePresentationDescription(
   }
   Object.assign(previous.key, key);
   return previous;
+}
+
+/** Only selected annotation placement/content drafts may differ within one prepared gesture. */
+function annotationInteractionKey(
+  scene: Scene,
+  before: ReviewAnnotationEffect | undefined,
+  context: unknown
+): PreviewSceneKey | undefined {
+  const annotations = scene.annotationEffects;
+  if (
+    !before ||
+    !annotations ||
+    !annotations.lane.instances.some((entry) => entry.id === before.id)
+  )
+    return undefined;
+  return reviewPreviewSceneKey(
+    {
+      ...scene,
+      annotationEffects: {
+        ...annotations,
+        lane: {
+          ...annotations.lane,
+          instances: annotations.lane.instances.map((entry) => {
+            if (entry.id !== before.id) return entry;
+            const { anchors: _anchors, ...rest } = entry;
+            return {
+              ...rest,
+              transform: before.transform,
+              controls: before.controls,
+              ...(before.anchors ? { anchors: before.anchors } : {}),
+            };
+          }),
+        },
+      },
+    },
+    context
+  );
+}
+
+/** Complete source, camera, raster and unrelated layers must match before retaining an older gesture frame. */
+export function canCoalescePresentationInteraction(
+  previous: Description,
+  next: Description
+): boolean {
+  return (
+    !!previous.interactionKey &&
+    !!next.interactionKey &&
+    sameReviewPreviewSceneKey(previous.interactionKey, next.interactionKey)
+  );
 }
 
 export const PREVIEW_STATISTICS_INTERVAL_MS = 500;

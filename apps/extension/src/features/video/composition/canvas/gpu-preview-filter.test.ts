@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { createGpuPreviewFilter } from './gpu-preview-filter';
+import { createGpuPreviewFilter, gpuPreviewFilterSupport } from './gpu-preview-filter';
 import { graphics } from './gpu-preview.test-support';
 
 const filters: Awaited<ReturnType<typeof createGpuPreviewFilter>>[] = [];
@@ -149,4 +149,113 @@ it('refuses filter allocations beyond the texture budget before allocating GPU s
   expect(mock.reserve).not.toHaveBeenCalled();
   expect(filter.allocatedBytes).toBe(0);
   filter.endFrame();
+});
+
+it('bounds the actual reduction and cubic tap ancestry for odd and small mip dimensions', () => {
+  for (const width of [5, 7, 31, 255, 513]) {
+    const height = Math.max(1, width - 2);
+    const dimensions = [{ width, height }];
+    while (dimensions.length < 8) {
+      const last = dimensions.at(-1)!;
+      if (last.width === 1 && last.height === 1) break;
+      dimensions.push({
+        width: Math.max(1, Math.floor(last.width / 2)),
+        height: Math.max(1, Math.floor(last.height / 2)),
+      });
+    }
+    for (const axis of ['width', 'height'] as const) {
+      const sizes = dimensions.map((size) => size[axis]);
+      const ancestry = new Map<string, [number, number]>();
+      const texels = (position: number, size: number) => [
+        ...new Set(
+          [Math.floor(position - 0.5), Math.floor(position - 0.5) + 1].map((index) =>
+            Math.max(0, Math.min(size - 1, index))
+          )
+        ),
+      ];
+      const extent = (level: number, index: number): [number, number] => {
+        if (level === 0) return [index + 0.5, index + 0.5];
+        const key = `${level}:${index}`;
+        const known = ancestry.get(key);
+        if (known) return known;
+        const point = ((index + 0.5) / sizes[level]!) * sizes[level - 1]! - 0.5;
+        const base = Math.floor(point),
+          phase = point - base;
+        // Enumerate the shader's three bilinear taps, then follow their real input texels.
+        const taps = [
+          base - 1.5 + (4 - 3 * phase) / (5 - 4 * phase),
+          base + 0.5 + (4 + 2 * phase) / 10,
+          base + 2.5 + phase / (1 + 4 * phase),
+        ];
+        const inputs = taps
+          .flatMap((tap) => texels(tap, sizes[level - 1]!))
+          .map((input) => extent(level - 1, input));
+        const value: [number, number] = [
+          Math.min(...inputs.map((v) => v[0])),
+          Math.max(...inputs.map((v) => v[1])),
+        ];
+        ancestry.set(key, value);
+        return value;
+      };
+      for (let level = 0; level < sizes.length; level++) {
+        const support = gpuPreviewFilterSupport({ width, height }, level);
+        const margin = axis === 'width' ? support.x : support.y;
+        for (let step = 0; step <= 200; step++) {
+          const uv = step / 200;
+          const pixel = uv * sizes[level]! - 0.5;
+          const indices =
+            level === 0
+              ? texels(uv * sizes[0]!, sizes[0]!)
+              : [-1, 0, 1, 2].map((offset) =>
+                  Math.max(0, Math.min(sizes[level]! - 1, Math.floor(pixel) + offset))
+                );
+          for (const index of indices)
+            for (const contributor of extent(level, index))
+              expect(Math.abs(contributor - uv * sizes[0]!)).toBeLessThanOrEqual(margin);
+        }
+      }
+    }
+  }
+});
+
+it('reuses only confirmed mip contents and invalidates partial or unversioned writes', async () => {
+  const mock = graphics();
+  const { filter, device } = await filterOwner(mock.reserve);
+  const source = device.createTexture({ size: [128, 64], format: 'rgba8unorm', usage: 4 });
+  const render = (content: string | undefined, completed: boolean) => {
+    filter.beginFrame();
+    const result = filter.prepare(device.createCommandEncoder(), source, 'scene', content);
+    filter.endFrame(completed);
+    return result;
+  };
+  const target = render('a', true);
+  expect(mock.pass.draw).toHaveBeenCalledTimes(8);
+  expect(render('a', true)).toBe(target);
+  expect(mock.pass.draw).toHaveBeenCalledTimes(8);
+  render('b', false);
+  expect(mock.pass.draw).toHaveBeenCalledTimes(16);
+  render('b', true);
+  expect(mock.pass.draw).toHaveBeenCalledTimes(24);
+  render('b', true);
+  expect(mock.pass.draw).toHaveBeenCalledTimes(24);
+  render(undefined, true);
+  expect(mock.pass.draw).toHaveBeenCalledTimes(32);
+  render('b', true);
+  expect(mock.pass.draw).toHaveBeenCalledTimes(40);
+});
+
+it('rejects conflicting content on the same source within a frame and defaults to unconfirmed completion', async () => {
+  const mock = graphics(),
+    { filter, device } = await filterOwner(mock.reserve);
+  const source = device.createTexture({ size: [128, 64], format: 'rgba8unorm', usage: 4 });
+  filter.beginFrame();
+  filter.prepare(device.createCommandEncoder(), source, 'scene', 'a');
+  expect(() => filter.prepare(device.createCommandEncoder(), source, 'scene', 'b')).toThrow(
+    'conflicting'
+  );
+  filter.endFrame();
+  filter.beginFrame();
+  filter.prepare(device.createCommandEncoder(), source, 'scene', 'a');
+  expect(mock.pass.draw).toHaveBeenCalledTimes(16);
+  filter.endFrame(true);
 });

@@ -1,9 +1,9 @@
+import { createGlTransitionSelection } from '../../../../../features/video/project/transition/gl-catalog';
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
 import { createVideoClipFromAsset } from '../../../../../features/video/project/factories/clip';
 import {
   VideoTransitionEasing,
-  VideoTransitionKind,
   type VideoProject,
 } from '../../../../../features/video/project/types';
 import { createTimelineZoneAsset } from './test-support';
@@ -116,7 +116,8 @@ function createTransitionGroupGapProject(): VideoProject {
         duration: 2,
         easing: VideoTransitionEasing.LINEAR,
         id: 'transition-lower',
-        kind: VideoTransitionKind.CROSSFADE,
+        kind: 'gl' as const,
+        selection: createGlTransitionSelection('Fade')!,
         leadingClipId: lowerFirstClip.id,
         trailingClipId: lowerSecondClip.id,
       },

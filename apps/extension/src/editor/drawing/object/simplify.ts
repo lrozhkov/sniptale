@@ -162,9 +162,12 @@ export function createEditorDrawingSimplifyObject(
     'center'
   );
   object.sniptaleId = drawing.id;
-  object.sniptaleType = 'simplify';
+  object.sniptaleType = drawing.settings.erase ? 'blur' : 'simplify';
   object.sniptaleRole = 'annotation';
-  object.sniptaleLabel = createObjectLabel('simplify', labelIndex);
+  object.sniptaleLabel = createObjectLabel(
+    drawing.settings.erase ? 'blur' : 'simplify',
+    labelIndex
+  );
   writeEditorDrawingObject(object, drawing);
   applyEditorDrawingSimplifyVisuals(object);
   return object;

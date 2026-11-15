@@ -1,3 +1,4 @@
+import { getComposedEventTargetElement } from '@sniptale/ui/dom-events';
 import { useEffect, useRef } from 'react';
 const KEYDOWN_LISTENER_OPTIONS = { capture: true };
 type PlaybackSpaceTargetPolicy = 'native-controls' | 'all-targets';
@@ -31,14 +32,13 @@ function registerPlaybackSpaceShortcut(
   const restoreFocusPaint = () =>
     document.documentElement.removeAttribute('data-video-editor-focus');
   const onKeyDown = (event: KeyboardEvent) => {
-    const nativeDisclosure =
-      event.target instanceof Element &&
-      event.target.closest(
-        'summary, [role="switch"], [data-ui="library-media-footer"], [data-local-space-activation="true"]'
-      );
+    const target = getComposedEventTargetElement(event);
+    const nativeDisclosure = target?.closest(
+      'summary, [role="switch"], [data-ui="library-media-footer"], [data-local-space-activation="true"]'
+    );
     if (
       event.code !== 'Space' ||
-      (targetPolicy === 'native-controls' && (isEditableTarget(event.target) || nativeDisclosure))
+      (targetPolicy === 'native-controls' && (isEditableTarget(target) || nativeDisclosure))
     ) {
       restoreFocusPaint();
       return;

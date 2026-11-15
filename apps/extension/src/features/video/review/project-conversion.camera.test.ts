@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { createVideoProjectFromRecording } from '../project/factories/creation';
 import { hasCameraMediaAt, resolveCameraVisualClip } from '../project/camera/animation';
-import { getMediaClipSourceTime } from '../project/timeline/rate';
+import { getMediaClipSourceTime, getVideoClipSourceTime } from '../project/timeline/rate';
 import { isExportReadyVideoProject, parseHydratableVideoProject } from '../project/validation/root';
 import type { VideoProject, VideoProjectVideoClip } from '../project/types/model';
 import { createQuickEditWebcam, quickEditWebcamFrameAt } from './advanced/webcam';
@@ -395,3 +395,29 @@ it.each(['classic', 'angle', 'center', 'nearest-edge'] as const)(
     expect(parseHydratableVideoProject({ ...project, version: 46 })).toBeNull();
   }
 );
+
+it('holds webcam media with the original video during inserted time and keeps the authored offset', () => {
+  const input = cameraFixture();
+  input.document.edits = [
+    {
+      id: 'hold',
+      kind: 'freeze',
+      start: 2,
+      end: 2,
+      requestedStart: 2,
+      requestedEnd: 2,
+      duration: 2,
+      frameTime: 1.98,
+      frameDuration: 0.04,
+    },
+  ];
+  const plan = prepared(input);
+  const camera = cameras(plan.project).find((clip) => clip.startTime === 2)!;
+  expect(camera.playbackWindow).toEqual({ offset: 0, extent: 2, holdAt: 0 });
+  for (const time of [2, 3, 3.99])
+    expect(getVideoClipSourceTime(camera, time)).toBeCloseTo(
+      1.98 - (camera.cameraTiming?.offsetSeconds ?? 0)
+    );
+  expect(cameras(plan.project).find((clip) => clip.startTime === 4)?.sourceStart).toBe(2);
+  expect(isExportReadyVideoProject(plan.project)).toBe(true);
+});

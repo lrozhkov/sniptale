@@ -2,6 +2,29 @@ import type { BackgroundIngressRouteGroupData } from './background-ingress.types
 
 export const backgroundIngressBackgroundOwnedRouteGroups = [
   {
+    acceptedSenderClass: 'canonical editor hosts or ordinary Settings with native document binding',
+    actionKind: 'background-owned',
+    alternateAuthorizationPolicyIds: [],
+    alternateAuthorityFamilies: [],
+    authorizationPolicyId: 'background-owned',
+    boundary: 'background-runtime',
+    errorShape: 'fixed vector catalog error code',
+    freshnessReplayPolicy:
+      'caller-bound cancellation and persisted source incarnation/generation recheck before every egress',
+    handlerId: 'vector-catalog',
+    keepChannelBehaviorSource: 'background-owned-route-handler',
+    ownerModule: 'apps/extension/src/background/vector-catalog/route.ts',
+    policyAuthorityFamily: 'vector-catalog-authority',
+    policyStateIds: ['vector-catalog-requests'],
+    requiredAuthority:
+      'canonical sender, enabled informed consent, current source and optional host grant',
+    responseShape: 'typed bounded vector catalog response',
+    routeAuthorityFamily: 'background-owned-ipc',
+    sideEffects: 'anonymous metadata fetches to the explicitly configured source',
+    transitiveStateOwner: 'vector catalog source settings and caller-bound request owner',
+    messageTypes: ['EDITOR_VECTOR_CATALOG_COMMAND'],
+  },
+  {
     acceptedSenderClass:
       'exact ordinary Settings or Gallery top-level document with per-verb admission',
     actionKind: 'background-owned',

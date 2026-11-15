@@ -12,6 +12,7 @@ import {
   DIAGNOSTICS_EVENTS_STORE,
   DIAGNOSTICS_META_STORE,
   EDITOR_CUSTOM_SHAPES_STORE,
+  EDITOR_VECTOR_LIBRARY_STORE,
   FRAME_ANNOTATION_RASTER_JOBS_STORE,
   IMAGE_WORKSPACES_STORE,
   VIDEO_WORKSPACES_STORE,
@@ -45,6 +46,9 @@ import {
   STORE_NAME,
   THUMBNAILS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
+  VIDEO_ANIMATION_PACKAGES_STORE,
+  VIDEO_VISUAL_PREFERENCES_STORE,
+  VIDEO_GL_TRANSITION_PRESETS_STORE,
   VIDEO_PROJECTS_STORE,
   VIDEO_PROJECT_REVISIONS_STORE,
   WEB_SNAPSHOTS_STORE,
@@ -70,6 +74,11 @@ interface StoredSchemaContract {
 }
 
 export const PERSISTENCE_DOMAIN_REGISTRY = [
+  {
+    domainId: 'editorVectorLibrary',
+    schemaVersion: 1,
+    stores: [{ storeName: EDITOR_VECTOR_LIBRARY_STORE, dataClass: 'durable-authority' }],
+  },
   {
     domainId: 'secretProtection',
     schemaVersion: 1,
@@ -105,7 +114,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 34,
+    schemaVersion: 39,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
@@ -128,7 +137,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'videoProjects',
-    schemaVersion: 11,
+    schemaVersion: 13,
     stores: [
       { storeName: VIDEO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_PROJECT_REVISIONS_STORE, dataClass: 'durable-authority' },
@@ -139,7 +148,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'scenarioProjects',
-    schemaVersion: 10,
+    schemaVersion: 12,
     stores: [
       { storeName: SCENARIO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_PROJECT_HISTORY_STORE, dataClass: 'durable-authority' },
@@ -165,8 +174,13 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'effects',
-    schemaVersion: 1,
-    stores: [{ storeName: VIDEO_EFFECT_BUNDLES_STORE, dataClass: 'durable-authority' }],
+    schemaVersion: 4,
+    stores: [
+      { storeName: VIDEO_EFFECT_BUNDLES_STORE, dataClass: 'durable-authority' },
+      { storeName: VIDEO_ANIMATION_PACKAGES_STORE, dataClass: 'durable-authority' },
+      { storeName: VIDEO_VISUAL_PREFERENCES_STORE, dataClass: 'durable-authority' },
+      { storeName: VIDEO_GL_TRANSITION_PRESETS_STORE, dataClass: 'durable-authority' },
+    ],
   },
   {
     domainId: 'editorAssets',

@@ -61,7 +61,7 @@ it('moves only the view order with keyboard while retaining each mounted row', a
   await act(async () =>
     node.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
   );
-  expect(order().slice(0, 2)).toEqual(['actions', 'music']);
+  expect(order().slice(0, 2)).toEqual(['keyboard', 'music']);
 });
 it.each(['Escape', 'blur', 'pointercancel'])(
   'previews pointer order and restores it on %s',
@@ -72,7 +72,7 @@ it.each(['Escape', 'blur', 'pointercancel'])(
     await act(async () => pointer(node, 'pointerdown', 48));
     expect(host.querySelector('.review-track-reordering')).not.toBeNull();
     await act(async () => pointer(node, 'pointermove', 112));
-    expect(order().slice(0, 4)).toEqual(['actions', 'webcam', 'zoom', 'source']);
+    expect(order().slice(0, 4)).toEqual(['keyboard', 'mouse', 'webcam', 'source']);
     await act(async () => {
       if (cancel === 'Escape')
         window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
@@ -89,7 +89,7 @@ it('retains accepted pointer order after release and ignores later lost capture'
   await act(async () => pointer(node, 'pointermove', 112));
   await act(async () => pointer(node, 'pointerup', 112));
   await act(async () => pointer(node, 'lostpointercapture', 112));
-  expect(order().slice(0, 4)).toEqual(['actions', 'webcam', 'zoom', 'source']);
+  expect(order().slice(0, 4)).toEqual(['keyboard', 'mouse', 'webcam', 'source']);
 });
 
 it('keeps the pointer gesture through a portal DOM move and cancels when settings close', async () => {

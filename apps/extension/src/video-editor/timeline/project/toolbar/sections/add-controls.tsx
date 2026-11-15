@@ -6,7 +6,7 @@ import {
   resolveThemeSafePortalTarget,
   useResolvedPortalTheme,
 } from '@sniptale/ui/theme/safe-portal';
-import { Camera, Music, Plus, Video, ZoomIn } from 'lucide-react';
+import { Box, Camera, Music, Plus, Video, ZoomIn } from 'lucide-react';
 import { translate } from '../../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
@@ -58,6 +58,16 @@ export function ProjectTimelineAddControls(props: {
         <span className="@max-[1600px]/timeline:sr-only">
           {translate('videoEditor.timeline.addZoomRegion')}
         </span>
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        type="button"
+        onClick={() => props.insertion.onAddMotionRegion(undefined, '3d')}
+        className={toolbarButtonClassName}
+        title={translate('gallery.videoReview.focus3d')}
+        dataUi="video-editor.timeline.toolbar.add-3d"
+      >
+        <Box size={14} strokeWidth={2} />
+        <span>{translate('gallery.videoReview.focus3d')}</span>
       </ContentToolbarButton>
     </div>
   );

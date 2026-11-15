@@ -1,6 +1,5 @@
+import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-
-import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
 import { createEffectRuntimeAssetSelectionId } from '../../contracts/effect-runtime/immutable-refs';
 
 import {
@@ -10,7 +9,7 @@ import {
   type EffectRuntimeRenderMessage,
   type EffectRuntimeWorkerMessage,
 } from '../../contracts/effect-runtime/types';
-import { createDocument } from '../worker/interpreter/support.test-support';
+import { createAnimationDocument } from './request-boundary.test-support';
 import { EffectRuntimePreparationError } from './prepare-frame';
 import { createEffectRuntimeBrokerSession } from './session';
 import type { EffectRuntimeWorkerLike } from './worker-request';
@@ -167,7 +166,7 @@ it('rejects requests beyond the active queue depth without cancelling active wor
   ]);
 });
 
-it('rejects SVG clone amplification before constructing or messaging a worker', async () => {
+it('rejects detached SVG clone amplification before constructing or messaging a worker', async () => {
   const message = await createSvgAmplificationMessage();
   const workerFactory = vi.fn(() => new ReplyWorker());
   const session = createEffectRuntimeBrokerSession({ workerFactory });
@@ -177,8 +176,10 @@ it('rejects SVG clone amplification before constructing or messaging a worker', 
 });
 
 async function createMessage(): Promise<EffectRuntimeRenderMessage> {
-  const documentSource = JSON.stringify(createDocument([{ op: 'clear' }]));
-  const documentSha256 = await sha256EffectV1Bytes(new TextEncoder().encode(documentSource));
+  const documentSource = JSON.stringify(createAnimationDocument(10, 10));
+  const documentSha256 = await createHash('sha256')
+    .update(new TextEncoder().encode(documentSource))
+    .digest('hex');
   const assetSelectionId = await createEffectRuntimeAssetSelectionId([]);
   return {
     assetSelectionRef: { assets: [], id: assetSelectionId },
@@ -208,7 +209,7 @@ function createWorkerRequest(): EffectRuntimeWorkerMessage {
   return {
     assetSelectionRef: { assets: {}, id: 'd'.repeat(64) },
     controls: {},
-    documentRef: { document: createDocument([{ op: 'clear' }]), id: documentId },
+    documentRef: { document: createAnimationDocument(10, 10), id: documentId },
     duration: 2,
     effectInstanceId: 'instance',
     fps: 30,
@@ -235,24 +236,13 @@ async function createSvgAmplificationMessage(): Promise<EffectRuntimeRenderMessa
     (_, index) => `<g id="g${index}-${'x'.repeat(500)}">`
   ).join('')}${'<rect width="1" height="1"/>'.repeat(64)}${'</g>'.repeat(groupCount)}</svg>`;
   const bytes = new TextEncoder().encode(source);
-  const document = createDocument([
-    { assetId: 'svg', height: 1, op: 'svgParts', width: 1, x: 0, y: 0 },
-  ]);
-  const assetSha256 = await sha256EffectV1Bytes(bytes);
-  document.assets = [
-    {
-      byteLength: bytes.byteLength,
-      height: 1,
-      id: 'svg',
-      kind: 'svg',
-      mimeType: 'image/svg+xml',
-      path: 'assets/svg.svg',
-      sha256: assetSha256,
-      width: 1,
-    },
-  ];
+  const document = createAnimationDocument(10, 10);
+  const assetSha256 = await createHash('sha256').update(bytes).digest('hex');
+  // Foreign standalone SVG resources are refused before any decoder or worker.
   const documentSource = JSON.stringify(document);
-  const documentSha256 = await sha256EffectV1Bytes(new TextEncoder().encode(documentSource));
+  const documentSha256 = await createHash('sha256')
+    .update(new TextEncoder().encode(documentSource))
+    .digest('hex');
   const assetSelectionId = await createEffectRuntimeAssetSelectionId([
     { id: 'svg', sha256: assetSha256 },
   ]);
@@ -345,7 +335,7 @@ it('rejects bitmap commands on a plan-only connection before request admission',
   });
 });
 
-it('routes an oversized plan-only preparation through refusal without materialization', async () => {
+it('refuses a retired oversized GPU plan and releases every transferred resource', async () => {
   const bitmaps = Array.from({ length: 513 }, () => new FakeBitmap(1, 1));
   class PlanWorker extends ReplyWorker {
     override postMessage(): void {
@@ -393,18 +383,13 @@ it('routes an oversized plan-only preparation through refusal without materializ
       );
     }
   }
-  const render = vi.fn(async () => new FakeBitmap(10, 10));
-  const isAvailable = vi.fn(async () => true);
   const session = createEffectRuntimeBrokerSession({
     compositionBackend: 'gpu-scene-plan',
     workerFactory: () => new PlanWorker(),
     prepare: vi.fn().mockResolvedValue(createWorkerRequest()),
-    gpu: { isAvailable, render, dispose: vi.fn() },
   });
   await expect(
     session.execute({ ...(await createMessage()), kind: 'prepareGpuFrame' })
-  ).resolves.toMatchObject({ kind: 'error', code: 'resourceLimit' });
-  expect(render).not.toHaveBeenCalled();
-  expect(isAvailable).not.toHaveBeenCalled();
+  ).resolves.toMatchObject({ kind: 'error', code: 'malformed' });
   for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
 });

@@ -12,7 +12,9 @@ export function originalAudioGainAt(
     original.muted ||
     edits.some(
       (edit) =>
-        time >= edit.start && time < edit.end && (edit.kind === 'cut' || edit.audio === 'mute')
+        time >= edit.start &&
+        time < edit.end &&
+        (edit.kind === 'cut' || (edit.kind === 'speed' && edit.audio === 'mute'))
     )
   )
     return 0;

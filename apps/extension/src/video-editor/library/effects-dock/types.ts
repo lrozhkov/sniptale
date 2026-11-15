@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { EffectFileImportResult } from '../../../composition/persistence/effect-bundles/import-files';
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
 import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
@@ -8,11 +9,13 @@ export type VideoEditorEffectCatalogItem =
   | { packId: string; status: 'invalid' };
 
 export interface VideoEditorEffectsLibraryDockProps {
+  /** Alternate library sections use the same dock shell and keep their own command owners. */
+  content?: ReactNode;
+  showImport?: boolean;
   catalogs: readonly VideoEditorEffectCatalogItem[];
   currentTime: number;
   appendTime?: number;
   kind?: 'standalone' | 'targetEffect' | 'transition';
-  capturePreviewFrame?: () => HTMLCanvasElement | null;
   errorCode: string | null;
   isLoading: boolean;
   isOpen: boolean;

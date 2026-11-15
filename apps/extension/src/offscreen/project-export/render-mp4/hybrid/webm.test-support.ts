@@ -127,6 +127,7 @@ function createSettings(): VideoProjectExportSettings {
     fps: 2,
     height: 720,
     quality: VideoExportQualityPreset.MEDIUM,
+    detailEnhancement: 'bicubic-sharpen',
     width: 1280,
   };
 }

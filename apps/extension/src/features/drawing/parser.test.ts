@@ -102,6 +102,9 @@ it.each([
   { version: 1, objects: [{ ...objects[7], amount: -1 }] },
   { version: 1, objects: [{ ...objects[8], fontSize: 0 }] },
   { version: 1, objects: [{ ...objects[8], fontFamily: 'url(remote)' }] },
+  ...[{ autoWidth: 'true' }, { wrapWidth: 0 }, { wrapWidth: Infinity }, { wrapWidth: 131073 }].map(
+    (fields) => ({ version: 1, objects: [{ ...objects[8], ...fields }] })
+  ),
 ])('refuses malformed drawing input %j', (raw) => {
   expect(parseDrawingDocument(raw)).toBeNull();
 });
@@ -321,5 +324,31 @@ it.each(['', ' ', 'engine version', 'v'.repeat(129), 'engine/../next', null, 4, 
     expect(
       parseDrawingDocument({ version: 2, objects: [{ ...simplifyObject, engineVersion }] })
     ).toBeNull();
+  }
+);
+
+it('round-trips cleanup metadata and rejects invalid erase or retained strength values', () => {
+  const object = {
+    id: 'clean',
+    kind: 'simplify',
+    bounds: { x: 1, y: 2, width: 30, height: 40 },
+    blurAmount: 6,
+    settings: { ...createDefaultSimplifySettings(), content: 'all', erase: true },
+  };
+  expect(parseDrawingDocument({ version: 2, objects: [object] })?.objects[0]).toEqual(object);
+  expect(parseDrawingDocument({ version: 2, objects: [{ ...object, blurAmount: -1 }] })).toBeNull();
+  expect(
+    parseDrawingDocument({
+      version: 2,
+      objects: [{ ...object, settings: { ...object.settings, erase: 'true' } }],
+    })
+  ).toBeNull();
+});
+
+it.each([true, false])(
+  'preserves explicit text wrapping and the logical column %s',
+  (autoWidth) => {
+    const object = { ...objects[8], autoWidth, wrapWidth: 320 };
+    expect(parseDrawingDocument({ version: 1, objects: [object] })?.objects[0]).toEqual(object);
   }
 );

@@ -4,6 +4,8 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { installBackgroundRuntimeMessagingMock } from '../../../../routing-contracts/runtime-messaging/mock';
 
 const {
+  prepareDrawingCaptureMock,
+  restoreDrawingUiMock,
   getVideoRecordingCaptureModeMock,
   getVideoRecordingTabIdMock,
   hasActiveVideoRecordingSessionMock,
@@ -17,6 +19,8 @@ const {
   syncControlledCursorCaptureMock,
   markTabRecordingManuallyPausedMock,
 } = vi.hoisted(() => ({
+  prepareDrawingCaptureMock: vi.fn(),
+  restoreDrawingUiMock: vi.fn(),
   getVideoRecordingCaptureModeMock: vi.fn(),
   getVideoRecordingTabIdMock: vi.fn(),
   hasActiveVideoRecordingSessionMock: vi.fn(),
@@ -29,6 +33,10 @@ const {
   sendRuntimeMessageMock: vi.fn(),
   syncControlledCursorCaptureMock: vi.fn(),
   markTabRecordingManuallyPausedMock: vi.fn(),
+}));
+
+vi.mock('../../content-surface/runtime-state-sync', () => ({
+  prepareVideoRecordingSurfaceCapture: prepareDrawingCaptureMock,
 }));
 
 vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
@@ -73,6 +81,8 @@ import { pauseRecording, resumeRecording } from './controls.pause-resume';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  prepareDrawingCaptureMock.mockResolvedValue(restoreDrawingUiMock);
+  restoreDrawingUiMock.mockResolvedValue(undefined);
   getVideoRecordingCaptureModeMock.mockReturnValue(CaptureMode.TAB);
   getVideoRecordingTabIdMock.mockReturnValue(17);
   hasActiveVideoRecordingSessionMock.mockReturnValue(true);
@@ -185,4 +195,34 @@ describe('controls.pause-resume', () => {
   registerSyncTests();
   registerErrorHandlingTests();
   registerNavigationBlockTest();
+});
+
+it('waits for clean drawing paint before resuming frame admission', async () => {
+  let ready!: () => void;
+  prepareDrawingCaptureMock.mockReturnValueOnce(
+    new Promise<() => Promise<void>>((resolve) => {
+      ready = () => resolve(restoreDrawingUiMock);
+    })
+  );
+  const pending = resumeRecording();
+  await vi.waitFor(() => expect(prepareDrawingCaptureMock).toHaveBeenCalled());
+  expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
+  ready();
+  await expect(pending).resolves.toEqual({ result: 'accepted' });
+  expect(sendRuntimeMessageMock).toHaveBeenCalled();
+});
+
+it('keeps the recorder paused when drawing preparation is refused', async () => {
+  prepareDrawingCaptureMock.mockRejectedValueOnce(new Error('drawing surface unavailable'));
+  await expect(resumeRecording()).resolves.toEqual({
+    result: 'failed',
+    error: 'drawing surface unavailable',
+  });
+  expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
+});
+
+it('restores paused drawing controls if resume transport fails', async () => {
+  sendRuntimeMessageMock.mockRejectedValueOnce(new Error('resume failed'));
+  await expect(resumeRecording()).resolves.toEqual({ result: 'failed', error: 'resume failed' });
+  expect(restoreDrawingUiMock).toHaveBeenCalledOnce();
 });

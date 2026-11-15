@@ -1,3 +1,4 @@
+import { Group, Rect } from 'fabric';
 import { expect, it, vi } from 'vitest';
 import { ensureEditorObjectReachable, ensureEditorObjectsReachable } from './reachability';
 
@@ -77,4 +78,21 @@ it('recovers editable layers without treating crop guides as drawings', () => {
   expect(ensureEditorObjectsReachable(canvas as never, { width: 100, height: 100 })).toBe(true);
   expect(drawing.set).toHaveBeenCalledOnce();
   expect(cropGuide.getBoundingRect).not.toHaveBeenCalled();
+});
+
+it('recovers a child once in scene coordinates under a transformed parent without moving its sibling', () => {
+  const child = new Rect({ left: 0, top: 30, width: 60, height: 20, strokeWidth: 0 });
+  const peer = new Rect({ left: 150, top: 80, width: 30, height: 20, strokeWidth: 0 });
+  const parent = new Group([child, peer], { left: -6000, angle: 30, scaleX: 2, scaleY: 2 });
+  const peerPosition = peer.getCenterPoint();
+  const canvasSize = { width: 100, height: 100 };
+  expect(ensureEditorObjectReachable({} as never, canvasSize, child)).toBe(true);
+  expect(ensureEditorObjectReachable({} as never, canvasSize, child)).toBe(false);
+  expect(peer.getCenterPoint().distanceFrom(peerPosition)).toBeLessThan(0.001);
+  const bounds = child.getBoundingRect();
+  const parentBounds = parent.getBoundingRect();
+  expect(bounds.left + bounds.width).toBeGreaterThan(-2048);
+  expect(parentBounds.left + parentBounds.width).toBeGreaterThanOrEqual(
+    bounds.left + bounds.width - 0.001
+  );
 });

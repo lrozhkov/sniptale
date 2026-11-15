@@ -1,6 +1,8 @@
+import { reviewGpuAnnotationLayer } from './gpu-preview-annotations';
 import { expect, it, vi } from 'vitest';
 import {
   createReviewGpuPrimitives,
+  applyReviewGpuSpotlightFrames,
   reviewGpuContentLayers,
   reviewGpuFinishLayers,
 } from './gpu-preview-layers';
@@ -631,3 +633,63 @@ it('retains a magnifier outside the canonical source plane for later camera proj
     for (const call of item.value.context.clip.mock.calls) expect(call).toEqual(['evenodd']);
   f.primitives.dispose();
 });
+
+it('keeps immutable annotation contents while moving the Gallery placement', () => {
+  const f = fixture();
+  const rasterCache = { key: 'owned-contents', revision: {} };
+  const entry = {
+    instance: { transform: { x: 0.2, y: 0.3, width: 0.2, height: 0.2, rotation: 0 } },
+    bitmapBounds: { x: 0, y: 0, width: 1, height: 1 },
+    rasterCache,
+  };
+  const first = reviewGpuAnnotationLayer(entry, { x: 0, y: 0, ...size }, f.caption.source);
+  const next = reviewGpuAnnotationLayer(
+    { ...entry, instance: { transform: { ...entry.instance.transform, x: 0.5 } } },
+    { x: 0, y: 0, ...size },
+    f.caption.source
+  );
+  expect(next.source).toBe(first.source);
+  expect(first.cache).toBe(rasterCache);
+  expect(next.cache).toBe(rasterCache);
+  expect(next.inverse).not.toEqual(first.inverse);
+  f.primitives.dispose();
+});
+
+it.each([
+  ['blur', 0, 12],
+  ['dim', 0.5, 0],
+  ['both', 0.5, 12],
+] as const)(
+  'publishes only active Gallery spotlight channels with immutable cache metadata: %s',
+  (_name, dim, blur) => {
+    const f = fixture();
+    const dimSource = f.resources.canvas('dim', size).canvas;
+    const blurSource = f.resources.canvas('blur', size).canvas;
+    const cache = {
+      dim: { key: 'mask-dim', revision: {} },
+      blur: { key: 'mask-blur', revision: {} },
+    };
+    const dispose = vi.fn();
+    const acquire = vi.fn(() => ({
+      dim: dimSource,
+      blur: blurSource,
+      radius: blur,
+      cache,
+      dispose,
+    }));
+    const primitives = createReviewGpuPrimitives(f.resources, undefined, acquire);
+    const result = applyReviewGpuSpotlightFrames({
+      dimensions,
+      frames: [{ opening: { x: 20, y: 10, width: 100, height: 60 }, radius: 4, dim, blur }],
+      source: f.main,
+      primitives,
+    });
+    const nodes = visit(result.layers);
+    expect(nodes.some((node) => node.source === dimSource)).toBe(dim > 0);
+    expect(nodes.some((node) => node.source === blurSource)).toBe(blur > 0);
+    if (dim > 0) expect(nodes.find((node) => node.source === dimSource)!.cache).toBe(cache.dim);
+    if (blur > 0) expect(nodes.find((node) => node.source === blurSource)!.cache).toBe(cache.blur);
+    primitives.dispose();
+    expect(dispose).toHaveBeenCalledOnce();
+  }
+);

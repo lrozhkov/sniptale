@@ -1,27 +1,18 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { expect, it, vi } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { beforeAll, expect, it, vi } from 'vitest';
+import { buildVideoEffectIndex } from './fixture.test-support';
 import type { BuiltinEffectIndex } from '../../../features/video/project/effect-bundle/catalog/builtin-index';
-async function buildVideoEffectIndex(root: string): Promise<BuiltinEffectIndex> {
-  const script =
-    "import {buildVideoEffectIndex} from './apps/extension/build/video-effects.ts'; " +
-    'console.log(JSON.stringify(await buildVideoEffectIndex(process.argv[1])));';
-  const output = execFileSync(
-    process.execPath,
-    ['--import', 'tsx', '--input-type=module', '-e', script, root],
-    { encoding: 'utf8' }
-  );
-  return JSON.parse(output);
-}
-
 import { createBuiltinEffectResources } from './builtin';
 import { resolveCatalogDocument } from '../../../features/video/project/effect-bundle/catalog/resolution';
 import { readVerifiedCatalogDocument } from '../../../features/video/project/effect-instance/catalog-reader';
-import { overlayEffectPreferences } from './preferences';
+import { overlayVisualAnimationPreferences } from './preferences';
 const root = resolve('apps/extension/public/video-effects');
+let index: BuiltinEffectIndex;
+beforeAll(async () => {
+  index = await buildVideoEffectIndex(root);
+});
 it('loads only the index, deduplicates requested documents, snapshots through the common verifier', async () => {
-  const index = await buildVideoEffectIndex(root);
   const read = vi.fn(
     async (path: string) =>
       new Uint8Array(
@@ -33,7 +24,7 @@ it('loads only the index, deduplicates requested documents, snapshots through th
   const resource = createBuiltinEffectResources(read);
   const catalog = await resource.load();
   expect(read).toHaveBeenCalledTimes(1);
-  expect(catalog.packId).toBe('builtin:sniptale-base');
+  expect(catalog.packId).toBe('builtin:sniptale-animations');
   expect(catalog.documents.every((d) => d.source === undefined)).toBe(true);
   const id = catalog.documents[0]!.id;
   const [a, b] = await Promise.all([
@@ -46,31 +37,41 @@ it('loads only the index, deduplicates requested documents, snapshots through th
   expect(verified.document.id).toBe(id);
   expect(verified.catalogDocument.source).toBe(a.documents[0]!.source);
   expect(read).toHaveBeenCalledTimes(2);
+  const oneDisabled = {
+    ...catalog,
+    documents: catalog.documents.map((document) => ({ ...document, enabled: document.id !== id })),
+  };
+  await expect(resolveCatalogDocument(oneDisabled, id)).resolves.toMatchObject({
+    enabled: true,
+    documents: [{ id, enabled: false }],
+  });
   const preferences = [
     {
+      format: 'sniptale-visual-preferences' as const,
+      version: 1 as const,
+      kind: 'animation' as const,
       packId: catalog.packId,
-      enabled: false,
-      documents: { [id]: { presets: [{ id: 'mine', name: 'Mine', values: { removed: 1 } }] } },
+      documents: {
+        [id]: {
+          sourceSha256: catalog.documents[0]!.sha256,
+          enabled: false,
+          presetPreferences: { presets: [{ id: 'mine', name: 'Mine', values: { removed: 1 } }] },
+        },
+      },
     },
   ];
   const updated = { ...catalog, version: '2.0.0' };
-  expect(overlayEffectPreferences(updated, preferences)).toMatchObject({
-    version: '2.0.0',
+  expect(overlayVisualAnimationPreferences(updated, preferences).documents[0]).toMatchObject({
     enabled: false,
-    documents: [
-      expect.objectContaining({ presetPreferences: preferences[0]!.documents[id] }),
-      ...updated.documents.slice(1),
-    ],
+    presetPreferences: preferences[0]!.documents[id]!.presetPreferences,
   });
   expect(
-    overlayEffectPreferences(
-      { ...catalog, packId: 'sniptale-base', source: 'bundle-zip' },
-      preferences
-    ).enabled
+    overlayVisualAnimationPreferences({ ...catalog, packId: 'other' }, preferences).documents.every(
+      (document) => document.enabled
+    )
   ).toBe(true);
 });
 it('retries failed reads without admitting corrupted documents', async () => {
-  const index = await buildVideoEffectIndex(root);
   let broken = true;
   const resource = createBuiltinEffectResources(async (path) =>
     path === 'index.json'
@@ -86,79 +87,49 @@ it('retries failed reads without admitting corrupted documents', async () => {
   await expect(resolveCatalogDocument(catalog, id)).resolves.toMatchObject({ documents: [{ id }] });
 });
 
-it('retains external assets in project snapshots independently of the installed collection', async () => {
-  const { readValidBundleArtifact } = await import('./fixture.test-support');
-  const { projectCatalogPresentation } =
-    await import('../../../features/video/project/effect-bundle/catalog/presentation');
+it('retains embedded resources in project snapshots independently of the installed collection', async () => {
   const { applyEffectCatalogDocument } =
     await import('../../../features/video/project/effect-instance/apply');
   const { createEmptyVideoProject } =
     await import('../../../features/video/project/factories/creation');
-  const artifact = await readValidBundleArtifact();
-  const { sha256EffectV1Bytes } = await import('@sniptale/runtime-contracts/effect-v1');
-  const shared = artifact.bundle.documents[0]!;
-  const raw = JSON.parse(shared.source);
-  raw.assets.push({ ...raw.assets[0], id: 'shared-mark', path: 'assets/shared-mark.svg' });
-  raw.program.commands.push({ ...raw.program.commands[1], assetId: 'shared-mark' });
-  shared.source = JSON.stringify(raw);
-  artifact.bundle.manifest.assets.push({
-    ...artifact.bundle.manifest.assets[0]!,
-    path: 'assets/shared-mark.svg',
-  });
-  shared.assets.push({ ...shared.assets[0]!, id: 'shared-mark', path: 'assets/shared-mark.svg' });
-  const encoded = new TextEncoder().encode(shared.source);
-  artifact.bundle.manifest.effectDocuments[0]!.byteLength = encoded.length;
-  artifact.bundle.manifest.effectDocuments[0]!.sha256 = await sha256EffectV1Bytes(encoded);
-  const manifest = artifact.bundle.manifest;
-  const index = {
-    manifest,
-    sourceSha256: artifact.bundle.archiveSha256,
-    documents: artifact.bundle.documents.map((item) => ({
-      id: item.document.id,
-      kind: item.document.kind,
-      presentation: projectCatalogPresentation(item.document),
-    })),
-  };
-  const files = new Map<string, Uint8Array>([
-    ['index.json', new TextEncoder().encode(JSON.stringify(index))],
-  ]);
-  for (const item of artifact.bundle.documents) {
-    files.set(
-      manifest.effectDocuments.find((d) => d.id === item.document.id)!.path,
-      new TextEncoder().encode(item.source)
-    );
-    for (const asset of item.assets) if (asset.path) files.set(asset.path, asset.bytes);
-  }
+  const { resolveEffectRuntimeFramePlans } =
+    await import('../../../features/video/composition/effect-runtime/frame/plan');
+  let available = true;
   const read = vi.fn(async (path: string) => {
-    const bytes = files.get(path);
-    if (!bytes) throw new Error('Missing resource');
-    return bytes;
+    if (!available) throw new Error('Collection removed');
+    return new Uint8Array(
+      path === 'index.json'
+        ? new TextEncoder().encode(JSON.stringify(index))
+        : await readFile(resolve(root, path))
+    );
   });
   const catalog = await createBuiltinEffectResources(read).load();
-  expect(read).toHaveBeenCalledTimes(1);
-  const result = await applyEffectCatalogDocument({
+  const project = await applyEffectCatalogDocument({
     catalog,
-    documentId: index.documents[0]!.id,
-    instanceId: 'builtin-asset',
+    documentId: 'sniptale-leader-labels',
+    instanceId: 'builtin-resource',
     project: createEmptyVideoProject('offline'),
     startTime: 0,
     target: { kind: 'scene' },
   });
-  const snapshot = JSON.stringify(result);
-  expect(snapshot).toContain('builtin:');
-  expect(snapshot).toContain(manifest.assets[0]!.sha256);
-  files.clear();
-  expect(JSON.stringify(result)).toBe(snapshot);
-  expect(read.mock.calls.filter(([path]) => path === manifest.assets[0]!.path)).toHaveLength(1);
+  const retained = JSON.stringify(project);
+  expect(retained).toContain('builtin:');
+  expect(retained).toContain('929b0c4c13cffa9fff0a42cc5f014eb0c051a1cb8e212ca88b356d44c09ecb31');
+  expect(project.effectSnapshots![0]!.assets).toEqual([]);
+  available = false;
+  expect(JSON.stringify(project)).toBe(retained);
+  expect(resolveEffectRuntimeFramePlans(project, 0.5)).toHaveLength(1);
+  expect(read).toHaveBeenCalledTimes(2);
+  expect(read.mock.calls.some(([path]) => path.startsWith('fonts/'))).toBe(false);
 });
 
 it('projects full imported metadata and rejects unknown lazy document requests', async () => {
   const { readCatalogPresentation, projectCatalogPresentation } =
     await import('../../../features/video/project/effect-bundle/catalog/presentation');
-  const { parseEffectV1Source } = await import('@sniptale/runtime-contracts/effect-v1');
-  const index = await buildVideoEffectIndex(root);
-  const source = await readFile(resolve(root, index.manifest.effectDocuments[0]!.path), 'utf8');
-  const document = parseEffectV1Source(source).document!;
+  const { parseAnimationTemplateSource } =
+    await import('@sniptale/runtime-contracts/animation-template');
+  const source = await readFile(resolve(root, index.manifest.documents[0]!.path), 'utf8');
+  const document = parseAnimationTemplateSource(source).template!;
   expect(readCatalogPresentation({ source })).toMatchObject({ label: document.label });
   expect(readCatalogPresentation({})).toBeUndefined();
   expect(projectCatalogPresentation(document).controlPresets).toHaveLength(
@@ -168,6 +139,6 @@ it('projects full imported metadata and rejects unknown lazy document requests',
     new TextEncoder().encode(JSON.stringify(index))
   );
   await expect(resolveCatalogDocument(await resources.load(), 'missing')).rejects.toThrow(
-    'Unknown builtin effect'
+    'Unknown builtin animation'
   );
 });

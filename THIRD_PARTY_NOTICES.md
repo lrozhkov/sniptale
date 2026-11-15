@@ -30,6 +30,29 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 
 The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by the font license.
 
+## Apple Cursor artwork
+
+- Attribution: ful1e5 and Apple Cursor contributors
+- Source: https://github.com/ful1e5/apple_cursor/tree/fe044a42b4e9cea16ea762d2ed9004f6d7b35543
+- License: `GPL-3.0-only`
+- License text: [`apps/extension/src/features/video/project/cursor-motion/apple/LICENSE`](apps/extension/src/features/video/project/cursor-motion/apple/LICENSE)
+- License SHA-256: `b506d1619aaec697f71d1230af32190c46777bf541e68f0fa6bf54d48f72c935`
+- Notice text: [`apps/extension/src/features/video/project/cursor-motion/apple/NOTICE.txt`](apps/extension/src/features/video/project/cursor-motion/apple/NOTICE.txt)
+- Notice SHA-256: `252d495836fccc8ccca2037c38356c27b73242962a332dca6a0b32bbf8a91fb6`
+- Provenance record: [`apps/extension/src/features/video/project/cursor-motion/apple/identity.json`](apps/extension/src/features/video/project/cursor-motion/apple/identity.json)
+- Provenance SHA-256: `da5facca6df3558e5a9d9c18e55089f5923ebe4e8ff3ef62aebe40e94eed50a8`
+- Local changes: Extract SVG path attributes and hotspots into apple-shapes.json. Apply runtime fill, outline, scale and shadow. The generated artifact source hash identifies the source set in identity.json.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/src/features/video/project/cursor-motion/apple-shapes.json` | https://github.com/ful1e5/apple_cursor/tree/fe044a42b4e9cea16ea762d2ed9004f6d7b35543 | `f307941ba096017f0b6a62b7bfcff94d1f3171e5376415aed934ee29d0ff2237` | `d3180d9ecfc0471a9f3bb281a34f3befcadf5b15f63e2d95ff3107fc87f15f3e` |
+| `apps/extension/src/features/video/project/cursor-motion/apple/crosshair.svg` | https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/crosshair.svg | `dd41110cc30dd228f59e5acdcd091a5c01454d9ca86d574dcc1896197ef514c5` | `dd41110cc30dd228f59e5acdcd091a5c01454d9ca86d574dcc1896197ef514c5` |
+| `apps/extension/src/features/video/project/cursor-motion/apple/hand1.svg` | https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/hand1.svg | `dcb385764c2414870d1216f4c937bb21ff853a0a2e4519cc98913b622b0eb76b` | `dcb385764c2414870d1216f4c937bb21ff853a0a2e4519cc98913b622b0eb76b` |
+| `apps/extension/src/features/video/project/cursor-motion/apple/hand2.svg` | https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/hand2.svg | `1059f09b64ebe72946523d625fe1c4802ce1523f39c9519fb4620c66972bf5ab` | `1059f09b64ebe72946523d625fe1c4802ce1523f39c9519fb4620c66972bf5ab` |
+| `apps/extension/src/features/video/project/cursor-motion/apple/left_ptr.svg` | https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/left_ptr.svg | `1ed0122e8247c483374ebb0ab42895a890eebe0fb0c99824e3b56359f40be682` | `1ed0122e8247c483374ebb0ab42895a890eebe0fb0c99824e3b56359f40be682` |
+| `apps/extension/src/features/video/project/cursor-motion/apple/x.build.toml` | https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/configs/x.build.toml | `a1995c40a5621b3f5eeea016784f0aee0643632fae8bb2a4ef2a5e0b967fd997` | `a1995c40a5621b3f5eeea016784f0aee0643632fae8bb2a4ef2a5e0b967fd997` |
+| `apps/extension/src/features/video/project/cursor-motion/apple/xterm.svg` | https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/xterm.svg | `81ccdbbbd3d3b9a65678b37096e2d12b93d7b3cbbfd1719ebb759a2c322c475e` | `81ccdbbbd3d3b9a65678b37096e2d12b93d7b3cbbfd1719ebb759a2c322c475e` |
+
 ## Clark Realtime UI Video Upscaler x2
 
 - Attribution: Clark Labs
@@ -49,6 +72,158 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 | `apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/model.json` | https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/browser/model.json | `eba342bf8f54749490fecb9df43f399595c07b291d5188d67bb0f4448d38f09c` | `eba342bf8f54749490fecb9df43f399595c07b291d5188d67bb0f4448d38f09c` |
 | `apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/realtimeVideoUpscaler.js` | https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/browser/realtimeVideoUpscaler.js | `58dd6544858039b4f8ba7a6cf469a4ed22aadc8588c7483ca7b4af2901ac4742` | `c096435fa3aab07a086e72b26a819312383e29f2bd807131c6c190f90f9aa86c` |
 | `apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/runtimeCapabilities.js` | https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/browser/runtimeCapabilities.js | `d78fe2ce0f0a4513364599854b363cddae8c1479de17d2cfca006bdd2de931c6` | `d78fe2ce0f0a4513364599854b363cddae8c1479de17d2cfca006bdd2de931c6` |
+
+## Golos Text 2.004 in Lottie templates
+
+- Attribution: Copyright 2019 The Golos Text Project Authors (https://github.com/googlefonts/golos-text)
+- Source: https://github.com/googlefonts/golos-text
+- License: `OFL-1.1`
+- License text: [`apps/extension/public/video-effects/fonts/OFL.txt`](apps/extension/public/video-effects/fonts/OFL.txt)
+- License SHA-256: `ff532f9e8789f09a9fdffc3c0954eedfb0a48be77b2e2eb90f5f82e4f347f50c`
+- Notice text: [`apps/extension/public/video-effects/fonts/NOTICE.txt`](apps/extension/public/video-effects/fonts/NOTICE.txt)
+- Notice SHA-256: `7fc56df9fae16e89186f10c2104828777864f552e187319bcfd17b56b212379f`
+- Provenance record: [`apps/extension/public/video-effects/fonts/identity.json`](apps/extension/public/video-effects/fonts/identity.json)
+- Provenance SHA-256: `05b6d0ea0e29856142c3c4ddb75f6e2f1a7628283aabd29ae5ac8c8f0ae61516`
+- Local changes: The font bytes do not change. Sniptale animation files embed the bytes as base64. The OFL license applies to the font bytes.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/public/video-effects/animations/frame.sniptale-animation.json` | https://github.com/googlefonts/golos-text | `17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063` | `d4a52d535d3fc657ca5387b8ec97bcfdde6e8dae2b8e0e8f29871477c18a42a3` |
+| `apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json` | https://github.com/googlefonts/golos-text | `17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063` | `7638aac7a193c14792950668081a780685c2995a12206e4b446c5c600ef17cce` |
+
+## Klecks raster algorithms
+
+- Attribution: bitbof (bitbof.com)
+- Source: https://github.com/bitbof/klecks/tree/b86ba7d0edb2c48ad21ca58aae4775fccf329632
+- License: `MIT`
+- License text: [`apps/extension/src/editor/raster-editing/vendor/LICENSE`](apps/extension/src/editor/raster-editing/vendor/LICENSE)
+- License SHA-256: `0234a0861b38c1f3c9198b0f048a1b713bf3b1b198b5cced343acc7335b90785`
+- Notice text: [`apps/extension/src/editor/raster-editing/vendor/NOTICE.txt`](apps/extension/src/editor/raster-editing/vendor/NOTICE.txt)
+- Notice SHA-256: `180a6efecad16728850abc3a2c9e630eb445b16137e0e6ed8cee29673aed8a03`
+- Provenance record: [`apps/extension/src/editor/raster-editing/vendor/provenance.json`](apps/extension/src/editor/raster-editing/vendor/provenance.json)
+- Provenance SHA-256: `9c26643f25e139be15f954e8200cde51cfd036b1e97601ff797b9acc8b8f45cc`
+- Local changes: Sniptale extracts flood-fill, Bezier, and stamp-spacing algorithms with their required helpers. It adds typed source geometry, bounded reads, and row-safe growth. It adds immutable retained planes, independent hardness, Restore mode, selection clipping, and crop clipping. It removes upstream UI, Canvas, pressure, and history dependencies. It adds source-over paint with explicit color and opacity, and incremental preview patches.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/src/editor/raster-editing/brush.ts` | https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/klecks/brushes/eraser-brush.ts | `9aa231d02d555a3a13976a22ad74ce0f2f24c0e98e8e741c3f78971206dbb007` | `9e44f82752bfcdc8ef3dc0783194b116c7cb8c7831c8757c00ca13579954ed93` |
+| `apps/extension/src/editor/raster-editing/vendor/bezier-line.ts` | https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/bb/math/line.ts | `6336d91fcc70507bb67765310b7bbb3d6e77bbb316e0c0ff9fb443444c6815d0` | `52cf50f07c10807a44b8b3b36a1738f0e5ee9b96a9bc1e1a4e7fe21efa7b6568` |
+| `apps/extension/src/editor/raster-editing/vendor/flood-fill.ts` | https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/klecks/image-operations/flood-fill.ts | `c571c4fbc0ff4f4f1df1aedd01af02aadabc7226af187d1001fd26487875a5c0` | `c6ddb53f4aaee036d8395d948db7f66ad1d0b12c614270aa2fc625dceaa8941c` |
+
+## caveat renamed static Lottie fonts
+
+- Attribution: Copyright 2014 The Caveat Project Authors (https://github.com/googlefonts/caveat)
+- Source: https://github.com/google/fonts/tree/main/ofl/caveat
+- License: `OFL-1.1`
+- License text: [`apps/extension/public/video-effects/notices/opus-caveat-OFL.txt`](apps/extension/public/video-effects/notices/opus-caveat-OFL.txt)
+- License SHA-256: `1f9d81d094273d82f3898a1ee8b598a717d050ecbf5ff7bede105b704880157b`
+- Notice text: [`apps/extension/public/video-effects/notices/opus-motion-caveat-NOTICE.txt`](apps/extension/public/video-effects/notices/opus-motion-caveat-NOTICE.txt)
+- Notice SHA-256: `99a057d0f23008fbe33306d351bcfdd0531faba792cf4c359e0fd57177b3fb76`
+- Provenance record: [`apps/extension/public/video-effects/notices/opus-fonts.json`](apps/extension/public/video-effects/notices/opus-fonts.json)
+- Provenance SHA-256: `7e02012daa470663268b9263498ade0b75196f8918e962e5e3fd21c61798ed61`
+- Local changes: Static weight instances with renamed Sniptale family names. Original copyright and OFL records are retained. Font bytes are embedded in self-contained animation packages.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/public/video-effects/animations/arrow.sniptale-animation.json` | https://github.com/google/fonts/tree/main/ofl/caveat | `0bdb6b660482d31531b3945849fba5916b3ef8695da7024a9e6b9ee3c4157988` | `8d7662b65baa97e0407219b121691e793a72dcb7b98d07fb38c08eded2cd13cd` |
+
+## cormorantgaramond renamed static Lottie fonts
+
+- Attribution: Copyright 2015 the Cormorant Project Authors (github.com/CatharsisFonts/Cormorant)
+- Source: https://github.com/google/fonts/tree/main/ofl/cormorantgaramond
+- License: `OFL-1.1`
+- License text: [`apps/extension/public/video-effects/notices/opus-cormorantgaramond-OFL.txt`](apps/extension/public/video-effects/notices/opus-cormorantgaramond-OFL.txt)
+- License SHA-256: `60700d351cac4650c51f3f9db318d2a420f8b45052dba2715eb5fec41f0f6956`
+- Notice text: [`apps/extension/public/video-effects/notices/opus-motion-cormorantgaramond-NOTICE.txt`](apps/extension/public/video-effects/notices/opus-motion-cormorantgaramond-NOTICE.txt)
+- Notice SHA-256: `4f2bb3f7a4ed021b51826eb1f609da6504afad0411df3bc98e6b4d6dea2f2c13`
+- Provenance record: [`apps/extension/public/video-effects/notices/opus-fonts.json`](apps/extension/public/video-effects/notices/opus-fonts.json)
+- Provenance SHA-256: `7e02012daa470663268b9263498ade0b75196f8918e962e5e3fd21c61798ed61`
+- Local changes: Static weight instances with renamed Sniptale family names. Original copyright and OFL records are retained. Font bytes are embedded in self-contained animation packages.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/public/video-effects/animations/interview-center.sniptale-animation.json` | https://github.com/google/fonts/tree/main/ofl/cormorantgaramond | `b20b7d9626dd956b2c5e558692ad328b1f19e3275e2782db4fa07670d83f35e0` | `4a5cbfe04c12fab3543faa7a7d5cc9720d72957e28b0f6cad73fc4cdea92a7be` |
+
+## inter renamed static Lottie fonts
+
+- Attribution: Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter)
+- Source: https://github.com/google/fonts/tree/main/ofl/inter
+- License: `OFL-1.1`
+- License text: [`apps/extension/public/video-effects/notices/opus-inter-OFL.txt`](apps/extension/public/video-effects/notices/opus-inter-OFL.txt)
+- License SHA-256: `5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57`
+- Notice text: [`apps/extension/public/video-effects/notices/opus-motion-inter-NOTICE.txt`](apps/extension/public/video-effects/notices/opus-motion-inter-NOTICE.txt)
+- Notice SHA-256: `99a1068548bd4ee27a8f80de4c358d00ecc590312d54cdf2112b656fb8e28beb`
+- Provenance record: [`apps/extension/public/video-effects/notices/opus-fonts.json`](apps/extension/public/video-effects/notices/opus-fonts.json)
+- Provenance SHA-256: `7e02012daa470663268b9263498ade0b75196f8918e962e5e3fd21c61798ed61`
+- Local changes: Static weight instances with renamed Sniptale family names. Original copyright and OFL records are retained. Font bytes are embedded in self-contained animation packages.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/public/video-effects/animations/chapters.sniptale-animation.json` | https://github.com/google/fonts/tree/main/ofl/inter | `29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031` | `a3e0a09b9f3b8480f1ffbe292996bb6d834dce7b6de8405049511b864414cea7` |
+| `apps/extension/public/video-effects/animations/interview-center.sniptale-animation.json` | https://github.com/google/fonts/tree/main/ofl/inter | `29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031` | `4a5cbfe04c12fab3543faa7a7d5cc9720d72957e28b0f6cad73fc4cdea92a7be` |
+| `apps/extension/public/video-effects/animations/interview-rule.sniptale-animation.json` | https://github.com/google/fonts/tree/main/ofl/inter | `29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031` | `e2451fec7f6b7b4e045ff89f7f6eed80cf5fa28884254c281f1d6e883a90bec5` |
+| `apps/extension/public/video-effects/animations/interview-tag.sniptale-animation.json` | https://github.com/google/fonts/tree/main/ofl/inter | `29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031` | `7b91ef1e0b0bb3d21852ef0b11277a21398afd577d758382d4995eab0383114d` |
+| `apps/extension/public/video-effects/animations/lower-third.sniptale-animation.json` | https://github.com/google/fonts/tree/main/ofl/inter | `29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031` | `4b25c244870d368632e9390c9c33dad1a619f448920d59857a15fce60803aab1` |
+| `apps/extension/public/video-effects/animations/title.sniptale-animation.json` | https://github.com/google/fonts/tree/main/ofl/inter | `29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031` | `ef5c2089af74d188e9d723ff043f0409b07db7218ad9c88452b9ff3ac0f09d40` |
+
+## jetbrainsmono renamed static Lottie fonts
+
+- Attribution: Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
+- Source: https://github.com/google/fonts/tree/main/ofl/jetbrainsmono
+- License: `OFL-1.1`
+- License text: [`apps/extension/public/video-effects/notices/opus-jetbrainsmono-OFL.txt`](apps/extension/public/video-effects/notices/opus-jetbrainsmono-OFL.txt)
+- License SHA-256: `b2fe5e8987594e9ffd1d2ca52a2f5d73eb8335243893c5d6254b5ad69269591d`
+- Notice text: [`apps/extension/public/video-effects/notices/opus-motion-jetbrainsmono-NOTICE.txt`](apps/extension/public/video-effects/notices/opus-motion-jetbrainsmono-NOTICE.txt)
+- Notice SHA-256: `1e1a008f557f30a3a1b603f87883da443db9e1449f120eebffae9cd8b3b1ae4a`
+- Provenance record: [`apps/extension/public/video-effects/notices/opus-fonts.json`](apps/extension/public/video-effects/notices/opus-fonts.json)
+- Provenance SHA-256: `7e02012daa470663268b9263498ade0b75196f8918e962e5e3fd21c61798ed61`
+- Local changes: Static weight instances with renamed Sniptale family names. Original copyright and OFL records are retained. Font bytes are embedded in self-contained animation packages.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/public/video-effects/animations/leader-labels.sniptale-animation.json` | https://github.com/google/fonts/tree/main/ofl/jetbrainsmono | `48715a42ec242c21e9f02692891e147d022299a52e48d5e413e1a942193ffeda` | `d36fbf97defb0bcf8b9a560355228dcd6db4afbb3fa0d5277811da65e75f71eb` |
+
+## Opus Motion animation adaptations
+
+- Attribution: Copyright (c) 2026 Govindu Sasanka
+- Source: https://github.com/GovinduSasanka/opus-motion-library
+- License: `MIT`
+- License text: [`apps/extension/public/video-effects/notices/opus-motion.txt`](apps/extension/public/video-effects/notices/opus-motion.txt)
+- License SHA-256: `277a332d935ce9bd36be0f77d591e6698c328086443c7b7722e7def769a38ca2`
+- Notice text: [`apps/extension/public/video-effects/notices/opus-motion-reference-adaptations-NOTICE.txt`](apps/extension/public/video-effects/notices/opus-motion-reference-adaptations-NOTICE.txt)
+- Notice SHA-256: `0b726c8b6de3e0b005f773036c75476b27e55c27358500e436e6a21789446059`
+- Provenance record: [`apps/extension/public/video-effects/notices/opus-motion-reference-adaptations-identity.json`](apps/extension/public/video-effects/notices/opus-motion-reference-adaptations-identity.json)
+- Provenance SHA-256: `c89b641a89acdbfef9355392558db7fe0b783ed98617ae2b1fcbdf82eb04ce98`
+- Local changes: Adapted reference choreography and layouts to local parameterized Lottie animation packages. No Remotion runtime is included.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/public/video-effects/animations/arrow.sniptale-animation.json` | https://github.com/GovinduSasanka/opus-motion-library | `c2cb9e7c430c51666be1bdb15e0afed1a5be8fd6085dbf3ca5d9a50f847ae4a6` | `8d7662b65baa97e0407219b121691e793a72dcb7b98d07fb38c08eded2cd13cd` |
+| `apps/extension/public/video-effects/animations/chapters.sniptale-animation.json` | https://github.com/GovinduSasanka/opus-motion-library | `7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff` | `a3e0a09b9f3b8480f1ffbe292996bb6d834dce7b6de8405049511b864414cea7` |
+| `apps/extension/public/video-effects/animations/interview-center.sniptale-animation.json` | https://github.com/GovinduSasanka/opus-motion-library | `7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff` | `4a5cbfe04c12fab3543faa7a7d5cc9720d72957e28b0f6cad73fc4cdea92a7be` |
+| `apps/extension/public/video-effects/animations/interview-rule.sniptale-animation.json` | https://github.com/GovinduSasanka/opus-motion-library | `7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff` | `e2451fec7f6b7b4e045ff89f7f6eed80cf5fa28884254c281f1d6e883a90bec5` |
+| `apps/extension/public/video-effects/animations/interview-tag.sniptale-animation.json` | https://github.com/GovinduSasanka/opus-motion-library | `7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff` | `7b91ef1e0b0bb3d21852ef0b11277a21398afd577d758382d4995eab0383114d` |
+| `apps/extension/public/video-effects/animations/leader-labels.sniptale-animation.json` | https://github.com/GovinduSasanka/opus-motion-library | `e09eee6432facf8f5cfa08719a4acb36e0abe807624ec1a810658ade0718f9fd` | `d36fbf97defb0bcf8b9a560355228dcd6db4afbb3fa0d5277811da65e75f71eb` |
+| `apps/extension/public/video-effects/animations/lower-third.sniptale-animation.json` | https://github.com/GovinduSasanka/opus-motion-library | `7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff` | `4b25c244870d368632e9390c9c33dad1a619f448920d59857a15fce60803aab1` |
+| `apps/extension/public/video-effects/animations/title.sniptale-animation.json` | https://github.com/GovinduSasanka/opus-motion-library | `7896424884be0704e586474824f2814a414d5c49a930b1ff5ff9f23583c5d4ff` | `ef5c2089af74d188e9d723ff043f0409b07db7218ad9c88452b9ff3ac0f09d40` |
+
+## Pixi Filters source image kernels v6.1.5
+
+- Attribution: Copyright (c) 2013-2025 Mathew Groves, Chad Engler
+- Source: https://github.com/pixijs/filters/tree/e9d1ca987864f121680bb0d7e9612c05b37748de
+- License: `MIT`
+- License text: [`apps/extension/src/features/image-filters/vendor/pixi-filters/LICENSE`](apps/extension/src/features/image-filters/vendor/pixi-filters/LICENSE)
+- License SHA-256: `d554721b2cd409d9bc075d743bb34f960e05ba55de1818a62fa60caf21ca6188`
+- Notice text: [`apps/extension/src/features/image-filters/vendor/pixi-filters/NOTICE.txt`](apps/extension/src/features/image-filters/vendor/pixi-filters/NOTICE.txt)
+- Notice SHA-256: `7035cbca1a28d7ce44138d9e672106d35854bb8ef7a6b566f34ea434eead220c`
+- Provenance record: [`apps/extension/src/features/image-filters/vendor/pixi-filters/identity.json`](apps/extension/src/features/image-filters/vendor/pixi-filters/identity.json)
+- Provenance SHA-256: `0978ccc5143e059d0b17b93bcaeede34f5c881ecae0113c9301e598f598bd25d`
+- Local changes: Adapt adjustment, clamped Kawase blur and bloom for the existing compositor device. Add Sniptale monochrome, sepia, sharpen, pixelate, vignette and deterministic grain. Reconstruct canonical source texels before interpolation. Use explicit logical coordinates, project time and valid premultiplied alpha. Provide an independent CPU image reference.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/src/features/image-filters/reference.ts` | https://codeload.github.com/pixijs/filters/tar.gz/e9d1ca987864f121680bb0d7e9612c05b37748de | `35a9c08c1a245f97181f62ed89e7ebe06b8559f4973f34abe47dd910a9fcc0b9` | `450a1a4383b8472e4be3fca49ad42c266f0694647d236ce316640a16a7597186` |
+| `apps/extension/src/features/image-filters/shader.ts` | https://codeload.github.com/pixijs/filters/tar.gz/e9d1ca987864f121680bb0d7e9612c05b37748de | `35a9c08c1a245f97181f62ed89e7ebe06b8559f4973f34abe47dd910a9fcc0b9` | `10284e4e4823c336cbf1279fcb93016f16363e5d1d3bd2ad6b7eea5b39a739d5` |
 
 ## Production dependency licenses
 
@@ -259,6 +434,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
 - Repository/source: https://github.com/vercel/ai
 
+### `@antfu/install-pkg` 2.1.0
+
+- Installed path: `node_modules/@antfu/install-pkg`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/@antfu/install-pkg/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@antfu__install-pkg-2.1.0.txt`](LICENSES/dependencies/@antfu__install-pkg-2.1.0.txt)
+- License text SHA-256: `67cd5e903c1f908edfa27c25606fa806ce629d9a8ddb7d83019d9fd1f83f7fde`
+- Repository/source: https://github.com/antfu-collective/install-pkg.git
+
 ### `@fontsource/marck-script` 5.3.0
 
 - Installed path: `node_modules/@fontsource/marck-script`
@@ -309,6 +496,30 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Redistributed license text: [`LICENSES/dependencies/@iconify__types-2.0.0.txt`](LICENSES/dependencies/@iconify__types-2.0.0.txt)
 - License text SHA-256: `045ce74712fc613fdd74d1c55f5140a08d623836ff2aca44132b38d68fbc67ad`
 - Repository/source: https://github.com/iconify/iconify.git
+
+### `@iconify/utils` 3.1.7
+
+- Installed path: `node_modules/@iconify/utils`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/@iconify/utils/license.txt`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@iconify__utils-3.1.7.txt`](LICENSES/dependencies/@iconify__utils-3.1.7.txt)
+- License text SHA-256: `a86793ac023162ce98b91899601c15f6712f44943163c4f92a0a4bf89152b3bf`
+- Repository/source: https://github.com/iconify/iconify.git
+
+### `@lottiefiles/dotlottie-web` 0.82.1
+
+- Installed path: `node_modules/@lottiefiles/dotlottie-web`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/@lottiefiles/dotlottie-web/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@lottiefiles__dotlottie-web-0.82.1.txt`](LICENSES/dependencies/@lottiefiles__dotlottie-web-0.82.1.txt)
+- License text SHA-256: `779cec663b3c6590082566f2a000170d7a4d1a4bfc6f954e61efa4adddc652a8`
+- Repository/source: https://github.com/LottieFiles/dotlottie-web.git
 
 ### `@noble/hashes` 2.4.0
 
@@ -538,6 +749,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `809e66de579fb7d92503848bbe6d1f348f4f6521a71e5d294fe7cc0c87a3b4ff`
 - Repository/source: https://github.com/calvinmetcalf/immediate.git
 
+### `import-meta-resolve` 4.2.0
+
+- Installed path: `node_modules/import-meta-resolve`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/import-meta-resolve/license`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/import-meta-resolve-4.2.0.txt`](LICENSES/dependencies/import-meta-resolve-4.2.0.txt)
+- License text SHA-256: `8770a1a4b69ee722636643e81340ce4a8f0b8415b1c568487edc9062338bfcc7`
+- Repository/source: wooorm/import-meta-resolve
+
 ### `inherits` 2.0.4
 
 - Installed path: `node_modules/inherits`
@@ -666,6 +889,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Redistributed license text: [`LICENSES/dependencies/ollama-ai-provider-v2-4.0.1.txt`](LICENSES/dependencies/ollama-ai-provider-v2-4.0.1.txt)
 - License text SHA-256: `c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4`
 - Repository/source: https://github.com/nordwestt/ollama-ai-provider-v2.git
+
+### `package-manager-detector` 1.9.0
+
+- Installed path: `node_modules/package-manager-detector`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/package-manager-detector/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/package-manager-detector-1.9.0.txt`](LICENSES/dependencies/package-manager-detector-1.9.0.txt)
+- License text SHA-256: `05c365176db3cc00e951c44b921c809c75b8e99d2d724f7daf00381e26fb0850`
+- Repository/source: https://github.com/antfu-collective/package-manager-detector.git
 
 ### `pako` 1.0.11
 
@@ -834,6 +1069,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Redistributed license text: [`LICENSES/dependencies/string_decoder-1.1.1.txt`](LICENSES/dependencies/string_decoder-1.1.1.txt)
 - License text SHA-256: `11f2aafb37d06b3ee5bdaf06e9811141d0da05263c316f3d627f45c20d43261b`
 - Repository/source: https://github.com/nodejs/string_decoder.git
+
+### `tinyexec` 1.3.1
+
+- Installed path: `node_modules/tinyexec`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/tinyexec/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/tinyexec-1.3.1.txt`](LICENSES/dependencies/tinyexec-1.3.1.txt)
+- License text SHA-256: `f95f668fe64081ddb4153b322e34fdd719b991285ed08177d5ad7133b7988d92`
+- Repository/source: https://github.com/tinylibs/tinyexec.git
 
 ### `tsdav` 2.5.0
 

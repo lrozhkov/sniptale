@@ -21,7 +21,15 @@ export function EffectImportControl(props: {
         className="sr-only"
         type="file"
         multiple
-        accept=".sniptale-bundle.zip,.sniptale-effect.json,application/zip,application/json"
+        accept={[
+          '.json',
+          '.lottie',
+          '.sniptale-animation.json',
+          '.sniptale-animations.zip',
+          '.sniptale-gl-preset.json',
+          'application/zip',
+          'application/json',
+        ].join(',')}
         disabled={props.disabled}
         onChange={(event) => {
           const files = Array.from(event.currentTarget.files ?? []);

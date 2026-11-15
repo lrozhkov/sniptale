@@ -1,4 +1,10 @@
 // @vitest-environment jsdom
+import { useGlTransitionCatalog } from '../../../../../composition/gl-transition-presets/catalog';
+import {
+  createGlCatalogFixture,
+  createImportedGlCatalogFixture,
+} from '../../../../../composition/gl-transition-presets/catalog.test-support';
+import { createGlTransitionSelection } from '../../../../../features/video/project/transition/gl-catalog';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -142,7 +148,7 @@ it('refuses a foreign history lease and preserves the accepted recipe for retry'
   expect(host.querySelector('[role="alert"]')).toBeNull();
 });
 
-it('authors a future join recipe without changing existing instances or timeline clips', () => {
+it('authors a future join recipe without changing existing instances or timeline clips', async () => {
   render();
   click('gallery.videoReview.presentationImage');
   click('videoEditor.sidebar.bookendChooseImage');
@@ -164,7 +170,7 @@ it('authors a future join recipe without changing existing instances or timeline
     })
   );
   const before = useVideoEditorStore.getState();
-  click('gallery.videoReview.cutFadeColor');
+  await chooseJoin('gallery.videoReview.cutFadeColor');
   const after = useVideoEditorStore.getState();
   expect(after.project!.bookendPresets!.introTransition).toEqual({
     type: 'fade-black',
@@ -175,7 +181,7 @@ it('authors a future join recipe without changing existing instances or timeline
   expect(after.project!.compositionJoins).toEqual(before.project!.compositionJoins);
   expect(after.project!.clips).toEqual(before.project!.clips);
   expect(after.projectHistory.past).toHaveLength(before.projectHistory.past.length + 1);
-  click('gallery.videoReview.transitionNone');
+  await chooseJoin('gallery.videoReview.transitionNone');
   expect(useVideoEditorStore.getState().project!.bookendPresets!.introTransition).toBeUndefined();
   expect(useVideoEditorStore.getState().project!.compositionJoins).toEqual(
     before.project!.compositionJoins
@@ -229,4 +235,111 @@ it('shows the inherited active edge for a Native preset without an independent f
   expect(current.bookendPresets!.intro.edgeControl?.plain).toEqual(fade);
   expect(current.bookendPresets!.intro.edgeControl?.media).toEqual({ ...fade, audioFade: false });
   expect(current.sceneEdges!.intro).toEqual(fade);
+});
+
+async function importPresetFile(
+  parent: ParentNode,
+  selection: ReturnType<typeof createGlTransitionSelection>,
+  name = 'Imported'
+) {
+  if (!selection) throw new Error('Missing preset selection');
+  const source = JSON.stringify({
+    format: 'sniptale-gl-preset',
+    version: 1,
+    name,
+    transition: selection,
+  });
+  const file = new File([source], 'imported.sniptale-gl-preset.json');
+  Object.defineProperty(file, 'arrayBuffer', {
+    value: async () => new TextEncoder().encode(source).buffer,
+  });
+  const input = parent.querySelector<HTMLInputElement>('input[type=file]');
+  if (!input) throw new Error('Missing preset file input');
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+}
+
+it('imports a named GL preset into the bookend recipe while preserving timing/easing and Undo', async () => {
+  render();
+  click('gallery.videoReview.presentationImage');
+  click('videoEditor.sidebar.bookendChooseImage');
+  click('Card');
+  const project = useVideoEditorStore.getState().project!,
+    initial = {
+      type: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
+      easing: 'EASE_IN_OUT' as const,
+      before: 0.2,
+      after: 0.3,
+    };
+  act(() =>
+    useVideoEditorStore.getState().setProject({
+      ...project,
+      bookendPresets: { ...project.bookendPresets!, introTransition: initial },
+    })
+  );
+  const before = useVideoEditorStore.getState(),
+    selection = createGlTransitionSelection('CrossZoom')!;
+  expect(host.querySelector('[data-gl-preset-owner]')?.getAttribute('data-gl-preset-owner')).toBe(
+    `${project.id}:bookend:intro`
+  );
+  await importPresetFile(host, selection);
+  const after = useVideoEditorStore.getState();
+  expect(after.project!.bookendPresets!.introTransition).toEqual({ ...initial, selection });
+  expect(after.project!.bookendPresets!.outro).toEqual(before.project!.bookendPresets!.outro);
+  expect(after.project!.clips).toEqual(before.project!.clips);
+  act(() => useVideoEditorStore.getState().undoProject());
+  expect(useVideoEditorStore.getState().project!.bookendPresets).toEqual(
+    before.project!.bookendPresets
+  );
+});
+
+async function chooseJoin(label: string) {
+  const trigger = host.querySelector<HTMLButtonElement>(
+    '[data-ui="shared.ui.presentation-join-fields"] button[aria-haspopup="listbox"]'
+  );
+  if (!trigger) throw new Error('Missing transition choice');
+  await act(async () => {
+    trigger.click();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  });
+  const option = [...document.querySelectorAll<HTMLButtonElement>('[role=option]')].find(
+    (item) => item.textContent === label
+  );
+  if (!option) throw new Error(`Missing transition option: ${label}`);
+  await act(async () => option.click());
+}
+
+vi.mock('../../../../../composition/gl-transition-presets/catalog', async () => {
+  const { createGlCatalogFixture } =
+    await import('../../../../../composition/gl-transition-presets/catalog.test-support');
+  return { useGlTransitionCatalog: vi.fn(createGlCatalogFixture) };
+});
+
+it('applies a saved catalogue bookend recipe through history without changing timeline instances', async () => {
+  const { catalog, selection } = createImportedGlCatalogFixture();
+  vi.mocked(useGlTransitionCatalog).mockReturnValue(catalog);
+  try {
+    render();
+    click('gallery.videoReview.presentationImage');
+    click('videoEditor.sidebar.bookendChooseImage');
+    click('Card');
+    const before = useVideoEditorStore.getState();
+    await chooseJoin('Saved zoom');
+    const after = useVideoEditorStore.getState();
+    expect(after.project!.bookendPresets!.introTransition).toEqual({
+      type: 'gl',
+      selection,
+      easing: 'LINEAR',
+      before: 0.2,
+      after: 0.2,
+    });
+    expect(after.project!.clips).toEqual(before.project!.clips);
+    act(() => useVideoEditorStore.getState().undoProject());
+    expect(useVideoEditorStore.getState().project!.bookendPresets).toEqual(
+      before.project!.bookendPresets
+    );
+  } finally {
+    vi.mocked(useGlTransitionCatalog).mockImplementation(createGlCatalogFixture);
+  }
 });

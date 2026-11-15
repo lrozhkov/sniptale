@@ -78,7 +78,9 @@ describe('QA Oxfmt wrapper', () => {
   });
 
   it.each([
-    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conformance.sniptale-effect.json',
+    'packages/runtime-contracts/src/animation-template/lottie-schema.source.json',
+    'packages/runtime-contracts/src/animation-template/lottie-schema.generated.js',
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/corpus/sniptale-effect-v1.schema.json',
     'apps/extension/src/features/video/project/cursor-trajectory/fixtures.json',
     'apps/extension/src/features/video/project/recording-events/fixtures.json',
     'apps/extension/src/features/video/project/recording-events/keyboard-hold-fixtures.json',

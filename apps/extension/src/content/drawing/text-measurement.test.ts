@@ -1,82 +1,128 @@
 // @vitest-environment jsdom
-
 import { afterEach, expect, it, vi } from 'vitest';
-import { measureContentDrawingText, measureDrawingTextFittedWidth } from './text-measurement';
+import {
+  measureContentDrawingText,
+  measureContentDrawingTextLayout,
+  ContentDrawingTextProjection,
+} from './text-measurement';
+import { resolveDrawingTextInkLayout, type DrawingObject } from '../../features/drawing/public';
 
 afterEach(() => {
-  document.body.replaceChildren();
   vi.restoreAllMocks();
+  Reflect.deleteProperty(document, 'fonts');
 });
 
-function setupMeasurement(rewrap = false) {
-  const parent = document.createElement('div');
-  parent.style.transform = 'rotate(45deg)';
-  const element = document.createElement('span');
-  element.textContent = 'Short\nText';
-  element.style.width = '100%';
-  parent.append(element);
-  document.body.append(parent);
-  vi.spyOn(window, 'getComputedStyle').mockReturnValue({ width: '320px' } as CSSStyleDeclaration);
-  vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(new DOMRect(20, 30, 320, 64));
-  const range = document.createRange();
-  Object.defineProperty(range, 'getClientRects', {
-    configurable: true,
-    value: () => {
-      expect(parent.style.transform).toBe('none');
-      return rewrap && element.style.width !== '100%'
-        ? [new DOMRect(26, 32, 30, 20), new DOMRect(26, 52, 20, 20), new DOMRect(26, 72, 20, 20)]
-        : [new DOMRect(26, 32, 50.25, 20), new DOMRect(26, 52, 30, 20)];
-    },
-  });
-  vi.spyOn(document, 'createRange').mockReturnValue(range);
-  return { element, parent };
-}
-
-it('fits the longest rendered line with existing padding and outward rounding', () => {
-  const { element, parent } = setupMeasurement();
-  expect(measureDrawingTextFittedWidth(element, 'Short\nText')).toBe(63);
-  expect(element.textContent).toBe('Short\nText');
-  expect(element.style.width).toBe('100%');
-  expect(parent.style.transform).toBe('rotate(45deg)');
+it('uses the same measured rows, ink bounds and backgrounds as the common layout', () => {
+  const context = document.createElement('canvas').getContext('2d')!;
+  context.font = '24px sans-serif';
+  const args = { text: 'Any font\n123   \n', fontSize: 24, wrapWidth: 140, autoWidth: true };
+  expect(measureContentDrawingTextLayout({ ...args, fontFamilyCss: 'sans-serif' })).toEqual(
+    resolveDrawingTextInkLayout({ ...args, measure: (text) => context.measureText(text) })
+  );
 });
-
-it('retains the original width if fitting changes line wrapping', () => {
-  const { element } = setupMeasurement(true);
-  expect(measureDrawingTextFittedWidth(element, 'Short\nText')).toBe(320);
-  expect(element.style.width).toBe('100%');
-});
-
-it('restores local styles and preserves the draft when browser measurement fails', () => {
-  const { element, parent } = setupMeasurement();
-  vi.spyOn(document, 'createRange').mockImplementation(() => {
-    throw new Error('Unavailable');
-  });
-  expect(measureDrawingTextFittedWidth(element, 'Short\nText')).toBeUndefined();
-  expect(element.style.width).toBe('100%');
-  expect(parent.style.transform).toBe('rotate(45deg)');
-});
-
-it('keeps deterministic measurement when the content runtime canvas is unavailable', () => {
+it('keeps editable source geometry when canvas resources are unavailable', () => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
-
   expect(
     measureContentDrawingText({ fontFamily: 'handwritten', fontSize: 24, line: 'Text' })
   ).toBeCloseTo(52.8);
+  const layout = measureContentDrawingTextLayout({
+    text: 'Keep me',
+    fontSize: 24,
+    wrapWidth: 300,
+    autoWidth: true,
+  });
+  expect(layout.lines.join('\n')).toBe('Keep me');
+  expect(Number.isFinite(layout.height)).toBe(true);
+});
+it('caches derived geometry without changing source identity or authored data', () => {
+  const object: DrawingObject = {
+    id: 'projected',
+    kind: 'text',
+    text: 'Word',
+    fontSize: 24,
+    bounds: { x: 10, y: 20, width: 200, height: 90 },
+    color: '#111111',
+    backgroundColor: null,
+    autoWidth: true,
+    wrapWidth: 400,
+  };
+  const projection = new ContentDrawingTextProjection();
+  const before = JSON.stringify(object);
+  const fitted = projection.resolve(object);
+  expect(fitted).not.toBe(object);
+  expect(fitted.id).toBe(object.id);
+  expect(fitted.kind === 'text' && fitted.bounds.height).toBeLessThan(90);
+  expect(projection.resolve(object)).toBe(fitted);
+  expect(JSON.stringify(object)).toBe(before);
+  projection.dispose();
+});
+it('does not publish late font completion after disposal', async () => {
+  let finish!: (faces: unknown[]) => void;
+  const pending = new Promise<unknown[]>((resolve) => {
+    finish = resolve;
+  });
+  Object.defineProperty(document, 'fonts', {
+    configurable: true,
+    value: { check: () => false, load: () => pending },
+  });
+  const changed = vi.fn();
+  const projection = new ContentDrawingTextProjection(changed);
+  projection.resolve({
+    id: 'late',
+    kind: 'text',
+    text: 'Text',
+    fontSize: 24,
+    color: '#111',
+    backgroundColor: null,
+    bounds: { x: 0, y: 0, width: 100, height: 30 },
+  });
+  projection.dispose();
+  finish([{}]);
+  await pending;
+  await Promise.resolve();
+  expect(changed).not.toHaveBeenCalled();
 });
 
-it('measures the exact committed value and restores the live draft text node', () => {
-  const { element } = setupMeasurement();
-  element.textContent = '          Hi          ';
-  const text = element.firstChild;
-  const original = document.createRange();
-  Object.defineProperty(original, 'getClientRects', {
-    value: () => {
-      expect(element.textContent).toBe('Hi');
-      return [new DOMRect(26, 32, 20, 20)];
-    },
+it('publishes font geometry without an authored commit or recreating a deleted identity', async () => {
+  const { createDrawingSession } = await import('../../features/drawing/public');
+  let ready = false;
+  let finish!: (faces: unknown[]) => void;
+  const pending = new Promise<unknown[]>((resolve) => {
+    finish = resolve;
   });
-  vi.mocked(document.createRange).mockReturnValue(original);
-  expect(measureDrawingTextFittedWidth(element, 'Hi')).toBe(32);
-  expect(element.firstChild).toBe(text);
-  expect(element.textContent).toBe('          Hi          ');
+  Object.defineProperty(document, 'fonts', {
+    configurable: true,
+    value: { check: () => ready, load: () => pending },
+  });
+  const projection = new ContentDrawingTextProjection();
+  const commit = vi.fn(() => true);
+  const session = createDrawingSession({
+    objectProjection: projection,
+    onDocumentCommit: commit,
+    onDispose: () => projection.dispose(),
+  });
+  const listener = vi.fn();
+  session.subscribe(listener);
+  session.commitObject({
+    id: 'font-pending',
+    kind: 'text',
+    text: 'Text',
+    fontSize: 24,
+    color: '#111111',
+    backgroundColor: null,
+    autoWidth: true,
+    wrapWidth: 300,
+    bounds: { x: 10, y: 20, width: 200, height: 90 },
+  });
+  const source = commit.mock.calls.length;
+  const notifications = listener.mock.calls.length;
+  ready = true;
+  finish([{}]);
+  await pending;
+  await Promise.resolve();
+  expect(listener.mock.calls.length).toBeGreaterThan(notifications);
+  expect(commit).toHaveBeenCalledTimes(source);
+  session.deleteObjects(['font-pending']);
+  expect(session.getSnapshot().document.objects).toEqual([]);
+  session.dispose();
 });

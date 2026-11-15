@@ -26,8 +26,10 @@ export function EditorFloatingToolHistoryControls(props: {
   const resetButtonRef = useRef<HTMLButtonElement>(null);
   const runSelectionAwareAction = (label: string, action: () => Promise<void> | void) =>
     fireAndReportEditorAction(label, async () => {
-      props.onBeforeSelectionAwareAction();
-      controller.clearSelection();
+      if (!controller.getRasterRuntime?.()?.getSnapshot().editing) {
+        props.onBeforeSelectionAwareAction();
+        controller.clearSelection();
+      }
       await action();
     });
 

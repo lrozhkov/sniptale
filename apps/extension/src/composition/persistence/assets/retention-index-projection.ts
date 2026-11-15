@@ -1,3 +1,8 @@
+import {
+  parseEditorVectorBacking,
+  EDITOR_VECTOR_OWNER_KIND,
+  isEditorVectorLibraryRow,
+} from '../vector-elements/contracts';
 import { isCursorTrajectoryHead } from '../recordings/cursor-trajectory/guards';
 import { RECORDING_CURSOR_SNAPSHOT_ROLE } from '../recordings/cursor-trajectory/contracts';
 import { isRecordingEventsHead } from '../recordings/recording-events/guards';
@@ -91,6 +96,22 @@ function documentOwners(store: string, raw: unknown): AssetOwner[] | null {
 
 function sourceOwners(store: string, raw: unknown): AssetOwner[] | null {
   switch (store) {
+    case 'editor_vector_library': {
+      const backing = parseEditorVectorBacking(raw);
+      if (isRecord(raw) && raw['kind'] === 'cache') return [];
+      return backing
+        ? [
+            {
+              ownerKind: EDITOR_VECTOR_OWNER_KIND,
+              ownerId: backing.definitionId,
+              role: 'body',
+              assetId: backing.assetId,
+            },
+          ]
+        : isEditorVectorLibraryRow(raw)
+          ? []
+          : null;
+    }
     case 'recording_cursor_trajectories':
     case 'recording_events': {
       const cursor = store === 'recording_cursor_trajectories';

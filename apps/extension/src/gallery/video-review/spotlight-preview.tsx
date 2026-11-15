@@ -29,6 +29,8 @@ import { type SceneSpotlightLayer } from '../../features/video/composition/draw/
 export function ReviewSpotlightPreview(props: {
   region: QuickEditZoomRegion;
   focus?: { regions: readonly QuickEditZoomRegion[]; time: number } | undefined;
+  sourceFilters?: ZoomPreviewGpuInput['sourceFilters'];
+  sourceSize?: ZoomPreviewGpuInput['sourceSize'];
   frame: ZoomPreviewFrame | null;
   live?: boolean;
   liveSource?: ZoomPreviewGpuInput['liveSource'];
@@ -118,6 +120,8 @@ export function ReviewSpotlightPreview(props: {
       />
       {!gpuActive && !framing ? (
         <ReviewMotionBlurPreview
+          sourceFilters={accepted ? accepted.sourceFilters : props.sourceFilters}
+          sourceSize={accepted?.sourceSize ?? props.sourceSize}
           scene={accepted?.auxiliary?.scene}
           focus={accepted ? accepted.auxiliary?.focus : props.focus}
           camera={accepted?.camera ?? props.camera}

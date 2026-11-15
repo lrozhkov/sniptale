@@ -36,7 +36,7 @@ export function VideoEditorEffectsLibraryDock(
               {translate('videoEditor.effectsLibrary.catalogLoadFailed')}
             </p>
           )}
-          <CatalogSection {...props} disabled={disabled} run={run} />
+          {props.content ?? <CatalogSection {...props} disabled={disabled} run={run} />}
           {operationError && operationError !== dismissedError && (
             <div
               role="alert"
@@ -64,12 +64,18 @@ export function VideoEditorEffectsLibraryDock(
             </div>
           )}
         </div>
-        <footer
-          data-ui="video-editor.effects-library.footer"
-          className="shrink-0 border-t border-[var(--sniptale-color-border-soft)] px-2 py-1"
-        >
-          <EffectImportControl disabled={disabled} onImport={props.onImportEffectFiles} run={run} />
-        </footer>
+        {props.showImport !== false && (
+          <footer
+            data-ui="video-editor.effects-library.footer"
+            className="shrink-0 border-t border-[var(--sniptale-color-border-soft)] px-2 py-1"
+          >
+            <EffectImportControl
+              disabled={disabled}
+              onImport={props.onImportEffectFiles}
+              run={run}
+            />
+          </footer>
+        )}
       </div>
     </aside>
   );

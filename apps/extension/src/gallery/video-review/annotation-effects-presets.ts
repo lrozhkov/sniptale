@@ -1,12 +1,10 @@
 import { parseColor } from '@sniptale/foundation/color';
-import {
-  resolveEffectV1ControlDefault,
-  type EffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
+import type { EffectControlSet } from '@sniptale/runtime-contracts/effect-controls';
+import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
 
 /** Controls carry appearance; partial presets can identify it only when exactly one matches. */
 export function reviewAnnotationPresetId(
-  document: EffectV1Document,
+  document: EffectControlSet,
   overrides: Readonly<Record<string, string | number>>,
   locale: string
 ): string {
@@ -14,7 +12,7 @@ export function reviewAnnotationPresetId(
     Object.entries(preset.values).every(([id, expected]) => {
       const control = document.controls.find((item) => item.id === id);
       if (!control) return false;
-      const actual = overrides[id] ?? resolveEffectV1ControlDefault(control, locale);
+      const actual = overrides[id] ?? resolveEffectControlDefault(control, locale);
       if (control.kind !== 'color' || typeof actual !== 'string' || typeof expected !== 'string')
         return actual === expected;
       const a = parseColor(actual),

@@ -59,7 +59,7 @@ function fitsActiveWindow(
   );
 }
 
-export type ReviewFocusType = 'zoom' | 'spotlight' | 'border' | 'lens';
+export type ReviewFocusType = 'zoom' | 'spotlight' | 'border' | 'lens' | '3d';
 
 /** Disposable insertion choice does not alter the stored camera. */
 export function withReviewFocusType(
@@ -71,10 +71,28 @@ export function withReviewFocusType(
     (type === 'lens' && region.spotlight?.effect === 'magnify')
   )
     return region;
-  const { spotlight, border, ...camera } = region;
+  const { spotlight, border, effect: _effect, spatialMotion: _motion, ...camera } = region;
+  if (type === '3d')
+    return {
+      ...camera,
+      effect: '3d',
+      cursorComposition: { mode: 'off', amount: 0.5, smoothness: 0.6 },
+      followCursor: false,
+      transform: { scale: 1, centerX: 0.5, centerY: 0.5 },
+      perspective: region.perspective ?? {
+        enabled: true,
+        rotateX: -12,
+        rotateY: 18,
+        rotateZ: 0,
+        strength: 0.5,
+      },
+      ...(region.spatialMotion ? { spatialMotion: region.spatialMotion } : {}),
+      enter: { type: 'ease-in-out', duration: 0.5 },
+      exit: { type: 'ease-in-out', duration: 0.5 },
+    };
   const area = spotlight ?? border;
   return type === 'zoom'
-    ? camera
+    ? { ...camera, cursorComposition: { ...camera.cursorComposition!, mode: 'off' } }
     : type === 'spotlight' || type === 'lens'
       ? {
           ...camera,
@@ -186,6 +204,7 @@ function resetFocusSettings(zoom: ZoomState, id: string): ZoomState {
   );
   const reset = fitQuickEditZoomTransitions({
     ...defaults,
+    ...(selected.overlapPolicy ? { overlapPolicy: selected.overlapPolicy } : {}),
     ...(selected.followCursor === undefined ? {} : { followCursor: selected.followCursor }),
     ...(selected.dormant !== undefined ? { dormant: selected.dormant } : {}),
     ...(selected.linkTo ? { linkTo: selected.linkTo } : {}),
@@ -381,9 +400,13 @@ function addZoomAt(
 /** Copies authored overlay content through the same history/autosave mutation as other edits. */
 function duplicateFocus(args: ZoomEditorArgs, id: string): string | null {
   const original = args.zoom.regions.find((item) => item.id === id);
-  if (!original || original.dormant || (!original.border && !original.spotlight)) return null;
+  if (!original || original.dormant) return null;
   const { linkTo: _link, linkEasing: _easing, borderClock: _clock, ...values } = original;
-  const copy = { ...structuredClone(values), id: `zoom-${crypto.randomUUID()}` };
+  const copy: QuickEditZoomRegion = {
+    ...structuredClone(values),
+    id: `zoom-${crypto.randomUUID()}`,
+    ...(!original.border && !original.spotlight ? { overlapPolicy: 'suppress' as const } : {}),
+  };
   args.setZoom((zoom) => ({
     ...zoom,
     regions: insertQuickEditZoomRegion(zoom.regions, copy),
@@ -551,14 +574,6 @@ export function useReviewZoomEditor(args: ZoomEditorArgs) {
     revision: focusRevision,
     commitDrag,
     selected,
-    canConvertToZoom: (region: QuickEditZoomRegion) =>
-      fitsActiveWindow(
-        args.zoom,
-        withReviewFocusType(region, 'zoom'),
-        region.start,
-        region.end,
-        region.dormant ? args.timeMap : undefined
-      ),
     preview,
     previewRegion,
     previewChanges: { read: previewChanges.read, subscribe: previewChanges.subscribe },
@@ -579,6 +594,7 @@ function focusRevision(region: QuickEditZoomRegion | undefined): string {
     region.end,
     region.sourceAnchor,
     region.dormant,
+    region.overlapPolicy,
     region.motionBlur,
     region.border,
     region.perspective,

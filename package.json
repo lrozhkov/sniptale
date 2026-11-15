@@ -107,7 +107,10 @@
     "qa:e2e:live": "node tooling/test/e2e/live/run-live.mjs",
     "qa:e2e:preview-performance": "node tooling/test/e2e/run-e2e.mjs --suite preview-performance",
     "simplify:lab": "node tooling/simplify-lab/server.mjs",
-    "simplify:check": "node tooling/simplify-lab/run.mjs"
+    "simplify:check": "node tooling/simplify-lab/run.mjs",
+    "simplify:corpus": "node tooling/simplify-lab/corpus.mjs",
+    "simplify:bench": "node tooling/simplify-lab/bench.mjs",
+    "dev:surface": "node tooling/dev-surface/cli.mjs"
   },
   "dependencies": {
     "@fontsource/marck-script": "5.3.0",
@@ -149,7 +152,9 @@
     "@ai-sdk/zai": "3.0.33",
     "@openrouter/ai-sdk-provider": "3.1.0",
     "ai": "7.0.143",
-    "ollama-ai-provider-v2": "4.0.1"
+    "ollama-ai-provider-v2": "4.0.1",
+    "@lottiefiles/dotlottie-web": "0.82.1",
+    "@iconify/utils": "3.1.7"
   },
   "devDependencies": {
     "@ast-grep/cli": "^0.51.0",
@@ -195,7 +200,12 @@
     "vite": "^8.3.4",
     "vitest": "5.0.5",
     "ws": "^8.22.0",
-    "yaml": "2.9.1"
+    "yaml": "2.9.1",
+    "gl-transitions": "3.2.0",
+    "ajv": "8.20.0",
+    "@grame/faustwasm": "0.20.2",
+    "@jitsi/rnnoise-wasm": "0.2.1",
+    "signalsmith-stretch": "1.3.2"
   },
   "overrides": {
     "oxfmt": {
@@ -236,7 +246,8 @@
     },
     "vitest": {
       "picomatch": "^4.0.7"
-    }
+    },
+    "minimatch@>=7.0.0 <11.0.1": "11.0.1"
   },
   "allowScripts": {
     "canvas@3.2.3": true

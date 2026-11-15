@@ -26,7 +26,12 @@ const itemCollections: ReadonlyArray<{
   },
   { storagePath: 'styles.surfaces.presets', treePath: 'styles.surfaces.items' },
   { storagePath: 'styles.video-effects.items', treePath: 'styles.video-effects.items' },
+  {
+    storagePath: 'styles.video-effects.transitionItems',
+    treePath: 'styles.video-effects.transitionItems',
+  },
   { storagePath: 'styles.gradients.presets', treePath: 'styles.gradients.items' },
+  { storagePath: 'styles.audio-effects.presets', treePath: 'styles.audio-effects.items' },
   { storagePath: 'ai.providers.items', treePath: 'ai.providers.items' },
   { storagePath: 'ai.models.items', treePath: 'ai.models.items' },
   { storagePath: 'ai.prompt-templates.items', treePath: 'ai.prompt-templates.items' },

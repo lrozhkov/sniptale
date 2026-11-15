@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
-import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { startHostServer } from '../support/host-server';
@@ -11,8 +11,72 @@ import { chooseInspectorValue, checkInspectorLabels } from '../support/inspector
 import {
   applyHarnessBootstrap,
   GALLERY_HARNESS_PATH,
+  SETTINGS_HARNESS_PATH,
   VIDEO_EDITOR_HARNESS_PATH,
 } from '../extension-critical.helpers';
+
+function metadataAnimationSource(retainedTitle = false) {
+  const parsed = parseAnimationTemplateSource(
+    readFileSync('tooling/test/e2e/fixtures/lottie/neutral.sniptale-animation.json', 'utf8')
+  );
+  if (!parsed.template) throw new Error('Invalid metadata animation fixture.');
+  const document = parsed.template;
+  document.id = retainedTitle ? 'metadata-title' : 'metadata-probe';
+  document.label = { en: 'Metadata probe', ru: 'Metadata probe' };
+  document.controlGroups = [
+    {
+      id: 'tracing',
+      parentId: 'animation',
+      label: { en: 'Line tracing', ru: 'Прорисовка линии' },
+      order: 1,
+    },
+    { id: 'heading', parentId: 'content', label: { en: 'Heading', ru: 'Заголовок' } },
+  ];
+  document.controls.find((control) => control.id === 'title')!.group = 'heading';
+  document.controls = [
+    ...document.controls,
+    {
+      id: 'entry',
+      kind: 'number',
+      defaultValue: 24,
+      min: 5,
+      max: 40,
+      step: 1,
+      unit: 'percent',
+      group: 'animation',
+      label: { en: 'Entrance duration', ru: 'Длительность входа' },
+    },
+    {
+      id: 'traceShare',
+      kind: 'number',
+      defaultValue: 60,
+      min: 30,
+      max: 85,
+      step: 1,
+      unit: 'percent',
+      group: 'tracing',
+      label: { en: 'Trace share', ru: 'Доля линии' },
+    },
+    {
+      id: 'order',
+      kind: 'number',
+      defaultValue: 1,
+      min: 0,
+      max: 1,
+      step: 1,
+      group: 'animation',
+      label: { en: 'Entrance order', ru: 'Порядок появления' },
+      options: [
+        { value: 0, label: { en: 'Together', ru: 'Одновременно' } },
+        { value: 1, label: { en: 'In sequence', ru: 'Последовательно' } },
+      ],
+    },
+  ];
+  const source = JSON.stringify(document);
+  if (!parseAnimationTemplateSource(source).ok)
+    throw new Error('Invalid authored metadata source.');
+  return source;
+}
 
 async function addAnnotation(
   page: Page,
@@ -102,7 +166,7 @@ async function checkNativeParameters(
   const clip = project?.clips.find((item) => item.type === 'EFFECT');
   if (!project || clip?.type !== 'EFFECT') throw new Error('Missing transferred effect');
   const snapshot = project.effectSnapshots?.[0];
-  const document = parseEffectV1Source(snapshot?.source ?? '').document;
+  const document = parseAnimationTemplateSource(snapshot?.source ?? '').template;
   expect(document?.controlGroups?.[0]?.id).toBe('tracing');
   expect(document?.controls.find((control) => control.id === 'entry')?.unit).toBe('percent');
   expect(project.effectInstances?.[0]?.controls['entry']).toBe(30);
@@ -151,10 +215,7 @@ async function checkRetainedTitle(page: Page, origin: string, locale: 'ru' | 'en
   const project = await readNativeVideoProject(page);
   const clip = project?.clips.find((item) => item.type === 'EFFECT');
   if (!project || !clip) throw new Error('Missing persisted project');
-  const source = readFileSync(
-    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/title.sniptale-effect.json',
-    'utf8'
-  );
+  const source = metadataAnimationSource(true);
   const sha256 = createHash('sha256').update(source).digest('hex');
   // Stop the editor writer before seeding historical data. The transaction orders prior writes.
   await page.goto(`${origin}/manifest.json`);
@@ -192,7 +253,7 @@ async function checkRetainedTitle(page: Page, origin: string, locale: 'ru' | 'en
               {
                 ...snapshot,
                 id: `effect:${sha256}`,
-                documentId: 'sniptale-title',
+                documentId: 'metadata-title',
                 source,
                 sha256,
                 retainedByteLength: new TextEncoder().encode(source).byteLength,
@@ -232,8 +293,13 @@ async function checkRetainedTitle(page: Page, origin: string, locale: 'ru' | 'en
     .poll(
       () =>
         page.locator('[data-preview-stage-canvas]').evaluate((canvas: HTMLCanvasElement) => {
-          const context = canvas.getContext('2d');
-          if (!context || !canvas.width || !canvas.height) return false;
+          if (!canvas.width || !canvas.height) return false;
+          const readback = Object.assign(document.createElement('canvas'), {
+            width: canvas.width,
+            height: canvas.height,
+          });
+          const context = readback.getContext('2d')!;
+          context.drawImage(canvas, 0, 0);
           let colored = 0;
           for (let row = 1; row < 5; row++)
             for (let column = 1; column < 7; column++) {
@@ -273,19 +339,30 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
-      await page.reload();
+      await page.goto(`${host.origin}${SETTINGS_HARNESS_PATH}?section=video-effects`);
+      const chooser = page.waitForEvent('filechooser');
+      await page
+        .locator('[data-ui="settings.video-effects"]')
+        .getByRole('button', { name: label('videoEditor.effectsLibrary.importMany'), exact: true })
+        .click();
+      await (
+        await chooser
+      ).setFiles({
+        name: 'metadata-probe.sniptale-animation.json',
+        mimeType: 'application/json',
+        buffer: Buffer.from(metadataAnimationSource()),
+      });
+      await expect(
+        page.locator('[data-settings-collection-item]').filter({ hasText: 'Metadata probe' })
+      ).toBeVisible();
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('[data-ui="gallery.videoReview.dialog"]');
       await dialog
         .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
         .click();
-      await addAnnotation(
-        page,
-        dialog,
-        label,
-        locale === 'ru' ? 'Пояснение с указателем' : 'Pointer callout'
-      );
+      await addAnnotation(page, dialog, label, 'Metadata probe');
       await checkGalleryParameters(page, dialog, locale, info);
       await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
       await dialog.locator('[data-ui="gallery.videoReview.openVideoEditor"]').click();

@@ -1,3 +1,4 @@
+import { ReviewInteractionProperties, type ReviewInteractionEditor } from './interaction-editor';
 import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
 import { ActionAudioFields } from '../../ui/action-audio/fields';
 import { reviewActionAudioSection } from './action-audio-section';
@@ -39,6 +40,7 @@ const reasonKeys = {
 
 /** Recorded facts stay immutable; shortcuts create separately selected authored elements. */
 export function ReviewActionProperties(props: {
+  interactionEditor?: ReviewInteractionEditor | undefined;
   marker: ReviewTelemetryMarker | undefined;
   plan: Plan | null;
   busy: boolean;
@@ -90,6 +92,9 @@ export function ReviewActionProperties(props: {
           <ArrowLeft size={14} aria-hidden="true" />
           {translate('gallery.videoReview.historyBack')}
         </ReviewButton>
+      ) : null}
+      {props.interactionEditor ? (
+        <ReviewInteractionProperties editor={props.interactionEditor} marker={marker} />
       ) : null}
       {isReviewClick(marker) &&
       (marker.focusPoint || (gestureFeedback && marker.gesture?.path?.length)) ? (

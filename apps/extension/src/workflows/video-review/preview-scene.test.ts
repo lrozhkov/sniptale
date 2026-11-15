@@ -161,3 +161,70 @@ it('captures isolated camera data and invalidates authored path replacements', (
   input.source.width = 10;
   expect(original.source.width).toBe(1904);
 });
+
+function annotationScene(): PreviewScene {
+  return {
+    ...scene(),
+    annotationEffects: {
+      lane: { enabled: true, instances: [] },
+      segments: [],
+      snapshots: [
+        {
+          id: 'snapshot',
+          schemaVersion: 'sniptale.animation.v1',
+          kind: 'standalone',
+          documentId: 'document',
+          sha256: 'a'.repeat(64),
+          source: JSON.stringify({ resource: 'payload'.repeat(16384) }),
+          retainedByteLength: 114702,
+          assets: [],
+        },
+      ],
+    },
+  };
+}
+
+it('compares annotation source text outside repeatedly serialized scene metadata', () => {
+  const input = annotationScene();
+  const first = reviewPreviewSceneKey(input);
+  expect(first.content).not.toContain('payload'.repeat(128));
+  const reordered = structuredClone(input);
+  expect(sameReviewPreviewSceneKey(first, reviewPreviewSceneKey(reordered))).toBe(true);
+  reordered.annotationEffects!.snapshots[0]!.source += ' ';
+  expect(sameReviewPreviewSceneKey(first, reviewPreviewSceneKey(reordered))).toBe(false);
+  expect(sameReviewPreviewSceneKey(first, reviewPreviewSceneKey(input))).toBe(true);
+});
+
+it('keeps annotation metadata source ordering and live context in scene identity', () => {
+  const input = annotationScene();
+  const snapshot = input.annotationEffects!.snapshots[0]!;
+  const first = reviewPreviewSceneKey(input, { width: 100, height: 50 });
+  expect(
+    sameReviewPreviewSceneKey(first, reviewPreviewSceneKey(input, { height: 50, width: 100 }))
+  ).toBe(true);
+  const changed = structuredClone(input);
+  changed.annotationEffects!.snapshots[0]!.assets.push({
+    id: 'image',
+    assetId: 'asset',
+    kind: 'image',
+    mimeType: 'image/png',
+    byteLength: 32,
+    sha256: 'b'.repeat(64),
+  });
+  expect(
+    sameReviewPreviewSceneKey(first, reviewPreviewSceneKey(changed, { width: 100, height: 50 }))
+  ).toBe(false);
+  expect(
+    sameReviewPreviewSceneKey(first, reviewPreviewSceneKey(input, { width: 101, height: 50 }))
+  ).toBe(false);
+  input.annotationEffects = {
+    ...input.annotationEffects!,
+    snapshots: [snapshot, { ...snapshot, id: 'other', source: 'other source' }],
+  };
+  const ordered = reviewPreviewSceneKey(input);
+  input.annotationEffects = {
+    ...input.annotationEffects,
+    snapshots: [...input.annotationEffects.snapshots].reverse(),
+  };
+  expect(sameReviewPreviewSceneKey(ordered, reviewPreviewSceneKey(input))).toBe(false);
+});

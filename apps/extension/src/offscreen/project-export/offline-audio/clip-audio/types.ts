@@ -35,6 +35,8 @@ export type OfflineAudioRenderableClip = (
   | EffectRuntimeAudioPlan
   | SourceVoiceoverAudioPlan
 ) & {
+  /** Export-local allowed source interval retained before selected-range clipping. */
+  audioProcessingSource?: { start: number; duration: number };
   /** Authored result-time phase. The collector replaces imported properties. */
   audioFadePhase?: { offset: number; duration: number };
   /** Derived from a validated clip window when endpoint interpolation would lose a plateau. */

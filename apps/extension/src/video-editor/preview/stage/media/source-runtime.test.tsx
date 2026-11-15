@@ -187,32 +187,44 @@ it('releases a late result after logical project replacement', async () => {
   expect(lease.release).toHaveBeenCalledOnce();
 });
 
-it('primes exact nominal mapping and releases only its own lease', async () => {
-  const { acquire } = mockProvider();
-  const lease = sourceLease();
-  acquire.mockResolvedValueOnce(lease);
-  const params = sourceParams();
-  params.project = createProject([createVideoClip({ sourceStart: 1 })]);
-  let current: NativePreviewSourceRuntime | undefined;
-  await act(async () =>
-    root.render(
-      <SourceHarness
-        params={params}
-        capture={(value) => {
-          current = value;
-        }}
-      />
-    )
-  );
-  const signal = new AbortController().signal;
-  expect(await current!.prepare(2, signal)).toBe('ready');
-  expect(acquire).toHaveBeenCalledWith(
-    [{ id: 'clip-video', url: 'blob:source-fixture', time: 3, rangeStart: 1, rangeEnd: 9 }],
-    signal,
-    { discontinuity: true }
-  );
-  expect(lease.release).toHaveBeenCalledOnce();
-});
+it.each([2, 7.99])(
+  'primes exact nominal mapping at %s with physical EOF hold and releases only its own lease',
+  async (time) => {
+    const { acquire } = mockProvider();
+    const lease = sourceLease();
+    acquire.mockResolvedValueOnce(lease);
+    const params = sourceParams();
+    params.project = createProject([createVideoClip({ sourceStart: 1 })]);
+    let current: NativePreviewSourceRuntime | undefined;
+    await act(async () =>
+      root.render(
+        <SourceHarness
+          params={params}
+          capture={(value) => {
+            current = value;
+          }}
+        />
+      )
+    );
+    const signal = new AbortController().signal;
+    expect(await current!.prepare(time, signal)).toBe('ready');
+    expect(acquire).toHaveBeenCalledWith(
+      [
+        {
+          id: 'clip-video',
+          url: 'blob:source-fixture',
+          time: 1 + time,
+          rangeStart: 1,
+          rangeEnd: 9,
+          holdEnd: true,
+        },
+      ],
+      signal,
+      { discontinuity: true }
+    );
+    expect(lease.release).toHaveBeenCalledOnce();
+  }
+);
 
 it('keeps the managed bank empty through pending HTML admission after upfront decline', async () => {
   const entered = Promise.withResolvers<void>();

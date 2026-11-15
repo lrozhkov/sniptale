@@ -402,3 +402,36 @@ describe('collectNamingViolations', () => {
   );
   it('still checks added workspace paths', verifiesAddedWorkspacePathsStillEnforceNaming);
 });
+
+it('reports distinct cursor owners as topology advice and keeps ambiguous resolution blocking', () => {
+  const root = createTempRoot();
+  const captured = writeFile(
+    root,
+    'apps/extension/src/features/video/project/cursor-trajectory/records.ts',
+    'export const captured = {sourceTime:0,block:1};'
+  );
+  const focus = writeFile(
+    root,
+    'apps/extension/src/features/video/project/cursor-focus-path/geometry.ts',
+    'export const focus = {x:0,y:0};'
+  );
+  const artwork = writeFile(
+    root,
+    'apps/extension/src/features/video/project/cursor-motion/appearance.ts',
+    'export const artwork = {shape:"arrow",size:48};'
+  );
+  const reviewed = runNamingCheck({ files: [captured, focus, artwork], scope: 'explicit' });
+  expect(reviewed.violations).toEqual([]);
+  expect(reviewed.advisories).toContainEqual(
+    expect.objectContaining({ rule: 'repeated-child-prefix-topology' })
+  );
+  const facade = writeFile(
+    root,
+    'apps/extension/src/content/resolve.ts',
+    "export * from './resolve';"
+  );
+  writeFile(root, 'apps/extension/src/content/resolve/index.ts', 'export const b=1;');
+  expect(runNamingCheck({ files: [facade], scope: 'explicit' }).violations).toContainEqual(
+    expect.objectContaining({ rule: 'ambiguous-facade-naming' })
+  );
+});

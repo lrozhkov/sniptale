@@ -1,3 +1,4 @@
+import { appleCursorRaster } from '../../../project/cursor-motion/paint';
 import type { VideoCompositionCursorState } from '../../types';
 
 const ARROW_STROKE_WIDTH = 1.5;
@@ -18,6 +19,13 @@ export function drawCursorCompositionState(
     cursor.scale * resolveCursorAnimationScale(cursor),
     cursor.scale * resolveCursorAnimationScale(cursor)
   );
+
+  if (cursor.artwork) {
+    const raster = appleCursorRaster(cursor.artwork);
+    context.drawImage(raster.canvas, -raster.hotspot[0]!, -raster.hotspot[1]!);
+    context.restore();
+    return;
+  }
 
   if (cursor.shadow) {
     context.shadowBlur = 16;
@@ -47,6 +55,15 @@ export function drawCursorCompositionState(
 export function resolveCursorCompositionPaintBounds(cursor: VideoCompositionCursorState) {
   if (!cursor.visible) return null;
   const scale = cursor.scale * resolveCursorAnimationScale(cursor);
+  if (cursor.artwork) {
+    const raster = appleCursorRaster(cursor.artwork);
+    return {
+      x: cursor.x - raster.hotspot[0]! * scale - 2,
+      y: cursor.y - raster.hotspot[1]! * scale - 2,
+      width: 256 * scale + 4,
+      height: 256 * scale + 4,
+    };
+  }
   // Acute arrow corners extend beyond half the stroke: include the painter's miter limit.
   const glyph =
     cursor.preset === 'ARROW'

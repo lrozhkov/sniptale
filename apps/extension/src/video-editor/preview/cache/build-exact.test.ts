@@ -10,7 +10,7 @@ import { cacheExactVideoPreviewFrame, type FreshVideoPreviewBuildContext } from 
 
 const gpuOutputs = vi.hoisted(() => ({ acquire: vi.fn(), dispose: vi.fn() }));
 const createGpuOutputs = vi.hoisted(() => vi.fn());
-vi.mock('./materializer-gpu-outputs', () => ({
+vi.mock('../../../workflows/video/native-composition/materializer-gpu-outputs', () => ({
   createMaterializerGpuOutputs: createGpuOutputs,
 }));
 

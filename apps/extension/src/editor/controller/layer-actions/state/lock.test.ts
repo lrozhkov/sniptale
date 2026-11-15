@@ -36,6 +36,7 @@ describe('layer action lock state owner', () => {
     expect(toggleLayerLock(canvas as never, 'layer-1', prepareObject)).toBe(object);
 
     expect(object.sniptaleLocked).toBe(true);
+    expect(object).toMatchObject({ sniptaleContentLocked: true });
     expect(prepareObject).toHaveBeenCalledWith(object);
     expect(canvas.discardActiveObject).toHaveBeenCalledOnce();
     expect(canvas.requestRenderAll).toHaveBeenCalledOnce();

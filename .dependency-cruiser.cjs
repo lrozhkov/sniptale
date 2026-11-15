@@ -74,6 +74,7 @@ module.exports = {
         path: '^(?:apps/extension/src|packages/)',
         pathNot: [
           '^packages/platform/src/security/sanitizers/html[.]ts$',
+          '^packages/platform/src/security/sanitizers/svg[.]ts$',
           '(?:^|/)(?:__tests__|test|tests)/|[.](?:test|spec)[.]',
         ],
       },

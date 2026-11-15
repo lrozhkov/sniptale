@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../transition/gl-catalog';
 import { buildReviewTimeMap } from '../../review/timeline';
 import { planReviewCutTransitions } from '../../review/cuts';
 import type { ReviewEdit } from '../../review/types';
@@ -456,4 +457,41 @@ it('retains a cut recipe after ordinary anchor deletion and never redirects it t
   expect(resolveVideoProjectCompositionJoinPlans(next)).toEqual([]);
   expect(isExportReadyVideoProject(next)).toBe(true);
   expect(project.compositionJoins).toEqual([join]);
+});
+
+it('admits exact GL join settings through Native root validation and refuses foreign fields', () => {
+  const project = fixture();
+  const selection = createGlTransitionSelection('BowTie')!;
+  const transition = {
+    type: 'gl' as const,
+    selection,
+    easing: 'EASE_IN_OUT' as const,
+    before: 0.2,
+    after: 0.2,
+  };
+  const valid = {
+    ...project,
+    compositionJoins: project.compositionJoins!.map((join) => ({ ...join, transition })),
+  };
+  expect(isExportReadyVideoProject(valid)).toBe(true);
+  expect(hydrateVideoProject(structuredClone(valid)).compositionJoins).toEqual(
+    valid.compositionJoins
+  );
+  for (const invalid of [
+    { ...transition, shader: 'injected' },
+    { ...transition, selection: { ...selection, wgslSha256: '0'.repeat(64) } },
+    { ...transition, selection: { ...selection, values: {} } },
+  ]) {
+    expect(
+      parseVideoProjectCompositionJoins([{ ...valid.compositionJoins[0], transition: invalid }])
+    ).toBeNull();
+  }
+  expect(
+    parseVideoProjectCompositionJoins([
+      {
+        ...valid.compositionJoins[0],
+        transition: { type: 'dissolve', before: 0.2, after: 0.2, selection },
+      },
+    ])
+  ).toBeNull();
 });

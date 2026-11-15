@@ -117,7 +117,12 @@ module.exports = [
     from: {},
     to: {
       couldNotResolve: true,
-      pathNot: '[?](?:inline|raw|url)$',
+      // Vite embeds the exact declared resource and provides these fixed audio module IDs.
+      pathNot:
+        '[?](?:inline|raw|url)$' +
+        '|^@lottiefiles/dotlottie-web/dotlottie-player[.]wasm[?]url&inline$' +
+        '|^sniptale:audio-runtime/(?:faust|rnnoise|pitch)$' +
+        '|^sniptale:audio-test-assets$',
     },
   },
   {

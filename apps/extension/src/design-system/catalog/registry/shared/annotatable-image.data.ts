@@ -12,8 +12,6 @@ export const SHARED_DESIGN_SYSTEM_ANNOTATABLE_IMAGE_REGISTRY: DesignSystemRegist
     sourceFiles: [
       '@sniptale/ui/annotatable-image-surface',
       'apps/extension/src/design-system/previews/annotatable-image-surface/design-system.tsx',
-      '@sniptale/ui/annotatable-image-surface',
-      'apps/extension/src/design-system/previews/annotatable-image-surface/design-system.tsx',
       'apps/extension/src/design-system/previews/annotatable-image-surface/preview-copy.ts',
     ],
     descriptionRu: [

@@ -1,3 +1,8 @@
+import { createSourceImageFilter } from '../../features/image-filters/contract';
+import { createGlTransitionSelection } from '../../features/video/project/transition/gl-catalog';
+import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
+import * as sourceSampling from './export-source-sampling';
+import { planReviewExportSource } from './export-source-plan';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createReviewGpuPreview, reviewGpuPreviewConcurrency } from './gpu-preview';
 import type { createReviewBackgroundPainter } from './scene-background';
@@ -60,8 +65,13 @@ function fixture(maximumInFlight: 1 | 2 = 1) {
   const released = vi.fn();
   const ctx = () => ({
     translate: vi.fn(),
+    arc: vi.fn(),
+    moveTo: vi.fn(),
+    stroke: vi.fn(),
     beginPath: vi.fn(),
     roundRect: vi.fn(),
+    rect: vi.fn(),
+    clip: vi.fn(),
     fill: vi.fn(),
     clearRect: vi.fn(),
     save: vi.fn(),
@@ -157,7 +167,7 @@ it.each(['scene', 'dispose', 'device'] as const)(
         : expect(b).rejects.toMatchObject({ name: 'AbortError' });
     second.resolve(f.bitmap);
     await bProof;
-    expect(f.released).toHaveBeenCalledTimes(6);
+    expect(f.released).toHaveBeenCalledTimes(2);
     for (const painter of f.painters) expect(painter.dispose).toHaveBeenCalledTimes(1);
     expect(f.context.drawImage).not.toHaveBeenCalled();
     f.owner.dispose();
@@ -313,7 +323,7 @@ it.each([1, 2] as const)(
       expect(secondContext.drawImage).toHaveBeenCalledWith(f.bitmap, 0, 0);
     }
     f.owner.dispose();
-    expect(f.released).toHaveBeenCalledTimes(maximumInFlight * 3);
+    expect(f.released).toHaveBeenCalledTimes(maximumInFlight);
   }
 );
 
@@ -347,7 +357,7 @@ it('binds immutable scene inputs and keeps unsafe requests out of live artwork',
       f.owner.render({ ...f.input, [field]: { width: 20, height: 10 } as ImageBitmap })
     ).rejects.toThrow('overlap');
   }
-  expect(f.allocate).toHaveBeenCalledTimes(3);
+  expect(f.allocate).toHaveBeenCalledTimes(1);
   completion.resolve(f.bitmap);
   await pending;
   f.owner.dispose();
@@ -415,7 +425,7 @@ it('keeps pending authored drift and zoom frames in distinct artwork destination
     f.allocate.mock.calls.filter(([role]) =>
       ['preview-gpu-background', 'preview-gpu-decoration', 'preview-gpu-captions'].includes(role)
     )
-  ).toHaveLength(6);
+  ).toHaveLength(2);
   expect(f.painters).toHaveLength(2);
   f.owner.dispose();
   for (const painter of f.painters) expect(painter.dispose).toHaveBeenCalledTimes(1);
@@ -444,12 +454,12 @@ it('borrows the unmodified frame through GPU completion and closes only the comp
   expect(f.frame.close).not.toHaveBeenCalled();
   expect(f.context.drawImage).toHaveBeenCalledWith(f.bitmap, 0, 0);
   expect(f.bitmap.close).toHaveBeenCalledOnce();
-  expect(f.allocate).toHaveBeenCalledTimes(3);
+  expect(f.allocate).toHaveBeenCalledTimes(1);
   await f.owner.render({ ...f.input, geometry: reviewPresentedGeometry(scene, dimensions, 3) });
-  expect(f.allocate).toHaveBeenCalledTimes(3);
+  expect(f.allocate).toHaveBeenCalledTimes(1);
   expect(f.input.painter.draw).toHaveBeenCalledOnce();
   f.owner.dispose();
-  expect(f.released).toHaveBeenCalledTimes(3);
+  expect(f.released).toHaveBeenCalledTimes(1);
 });
 
 it('retains the Canvas path when no adapter is available without allocating GPU artwork', async () => {
@@ -478,7 +488,7 @@ it('refreshes pooled scene artwork without reusing a previous texture revision',
   let next = 0;
   f.allocate.mockImplementation(() => pooled[next++ % pooled.length]!);
   f.owner.releaseScene();
-  expect(f.released).toHaveBeenCalledTimes(3);
+  expect(f.released).toHaveBeenCalledTimes(1);
   expect(io.dispose).not.toHaveBeenCalled();
   const image = { width: 320, height: 180 } as ImageBitmap;
   await f.owner.render({ ...f.input, image });
@@ -488,11 +498,11 @@ it('refreshes pooled scene artwork without reusing a previous texture revision',
   const nextRevisions = revisions(io.render.mock.calls[1]![0].layers).filter(
     (value) => typeof value === 'number'
   );
-  expect(previousRevisions).toHaveLength(2);
-  expect(nextRevisions).toHaveLength(2);
+  expect(previousRevisions).toHaveLength(1);
+  expect(nextRevisions).toHaveLength(1);
   expect(nextRevisions.every((value) => !previousRevisions.includes(value))).toBe(true);
   f.owner.dispose();
-  expect(f.released).toHaveBeenCalledTimes(6);
+  expect(f.released).toHaveBeenCalledTimes(2);
 });
 
 it('retains released scene artwork until the active GPU render settles', async () => {
@@ -511,7 +521,7 @@ it('retains released scene artwork until the active GPU render settles', async (
   expect(io.dispose).not.toHaveBeenCalled();
   completion.resolve(f.bitmap);
   await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
-  expect(f.released).toHaveBeenCalledTimes(3);
+  expect(f.released).toHaveBeenCalledTimes(1);
   expect(f.context.drawImage).not.toHaveBeenCalled();
   expect(f.bitmap.close).toHaveBeenCalledOnce();
   expect(await f.owner.render(f.input)).toBe(true);
@@ -563,7 +573,7 @@ it('falls back after GPU failure and releases artwork while preserving the borro
   const f = fixture();
   io.render.mockRejectedValue(new GpuPreviewDeviceError('Device lost'));
   expect(await f.owner.render(f.input)).toBe(false);
-  expect(f.released).toHaveBeenCalledTimes(3);
+  expect(f.released).toHaveBeenCalledTimes(1);
   expect(f.frame.close).not.toHaveBeenCalled();
   f.owner.releaseScene();
   expect(await f.owner.render(f.input)).toBe(false);
@@ -708,8 +718,8 @@ it('preserves exposure quantization while removing the extra composed-scene iden
   expect(depth.depth.frame).toBe(camera.spatial);
   expect(depth.blend ?? 'over').toBe('over');
   expect(depth.source.output).toEqual(dimensions.canonical);
-  expect(depth.source.layers).toHaveLength(2);
-  expect(depth.source.layers[1].source).toBe(f.frame);
+  expect(depth.source.layers).toHaveLength(1);
+  expect(depth.source.layers[0].source).toBe(f.frame);
   f.owner.dispose();
 });
 
@@ -826,7 +836,7 @@ it('moves the cached shadow with a non-3D following window', async () => {
       type: 'solid',
       color: '#000000',
       zoomBehavior: 'window',
-      layout: { padding: 12, cornerRadius: 0, shadow: { intensity: 0, color: '#000000' } },
+      layout: { padding: 12, cornerRadius: 0, shadow: { intensity: 30, color: '#000000' } },
     },
   };
   const camera = { scale: 2, centerX: 0.6, centerY: 0.4 };
@@ -1365,7 +1375,7 @@ it('retains a direct front provider after adapter disposal until its receipt rel
   expect(completed.isRetiredProvider()).toBe(true);
   await Promise.resolve();
   expect(io.dispose).not.toHaveBeenCalled();
-  expect(f.released).toHaveBeenCalledTimes(3);
+  expect(f.released).toHaveBeenCalledTimes(1);
   expect(f.owner.allocatedBytes).toBe(256);
   expect(await f.owner.renderPresentation(f.input)).toBe(false);
   completed.release();
@@ -1838,6 +1848,7 @@ it('prepares annotation descriptors after output and releases the marker before 
       independent: true,
     }),
     warmUpcomingGpu,
+    setGeometryPreview: vi.fn(),
     maximumInFlight: 1,
     cancelWarm: vi.fn(),
     counters: () => ({ liveDecodedRasterBytes: 0, liveRasterResources: 0 }),
@@ -1912,4 +1923,334 @@ it('prepares annotation descriptors after output and releases the marker before 
     vi.unstubAllGlobals();
     f.owner.dispose();
   }
+});
+
+it('does not allocate absent shadow or caption artwork for a bare scene', async () => {
+  const f = fixture();
+  try {
+    await f.owner.render(f.input);
+    expect(f.allocate.mock.calls.map(([role]) => role)).not.toContain('preview-gpu-decoration');
+    expect(f.allocate.mock.calls.map(([role]) => role)).not.toContain('preview-gpu-captions');
+  } finally {
+    f.owner.dispose();
+  }
+});
+
+it('allocates captions lazily and redraws a retained cue after leaving its interval', async () => {
+  const f = fixture();
+  const draw = vi.fn();
+  const captions: NonNullable<Parameters<typeof f.owner.render>[0]['captions']> = {
+    plan: {
+      conflicts: [],
+      cues: [
+        {
+          id: 'cue',
+          fragmentId: 'fragment',
+          start: 1,
+          end: 3,
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 30,
+          lines: ['Caption'],
+          pixels: 16,
+          padding: 2,
+          lineHeight: 18,
+          style: { position: 'bottom', fontSize: 0.04, color: '#ffffff', background: '#000000' },
+        },
+      ],
+    },
+    draw,
+    assertExportable() {},
+  };
+  const render = (time: number) =>
+    f.owner.render({
+      ...f.input,
+      captions,
+      geometry: reviewPresentedGeometry(scene, dimensions, time),
+      sourceTime: time,
+    });
+  try {
+    await render(0);
+    expect(f.allocate.mock.calls.some(([role]) => role === 'preview-gpu-captions')).toBe(false);
+    await render(2);
+    expect(draw).toHaveBeenCalledTimes(1);
+    await render(4);
+    expect(draw).toHaveBeenCalledTimes(1);
+    await render(2);
+    expect(draw).toHaveBeenCalledTimes(2);
+    expect(f.allocate.mock.calls.filter(([role]) => role === 'preview-gpu-captions')).toHaveLength(
+      1
+    );
+  } finally {
+    f.owner.dispose();
+  }
+});
+
+it.each([false, true])(
+  'retains enhanced source tiles until GPU completion (cancel %s)',
+  async (cancel) => {
+    const f = fixture();
+    const sourceSize = f.input.scene.source;
+    const tile = { width: 1280, height: 720 } as HTMLCanvasElement;
+    const plan = planReviewExportSource({
+      scene: { ...f.input.scene, sourceSize },
+      output: { width: 1280, height: 720 },
+      identity: { sourceKey: tile, sourceSize, sourceTime: 2, passTime: 2 },
+      resultTime: 2,
+    });
+    const dispose = vi.fn();
+    const prepare = vi
+      .spyOn(sourceSampling, 'prepareReviewExportSourceSampling')
+      .mockResolvedValue({
+        plan,
+        dispose,
+        original: { draw: vi.fn() },
+        sampling: {
+          ...plan.identity,
+          drawPrepared: vi.fn(),
+          visitPreparedTiles: (id, consume) => {
+            expect(id).toBe('body:0');
+            consume({
+              image: tile,
+              physicalSourceRect: { x: 0, y: 0, width: 1280, height: 720 },
+              originalPixelROI: { x: 0, y: 0, ...sourceSize },
+            });
+            return true;
+          },
+        },
+      });
+    const finished = Promise.withResolvers<typeof f.bitmap>();
+    io.render.mockImplementationOnce(() => finished.promise);
+    const pending = f.owner.render({
+      ...f.input,
+      exportEnhancer: { withEnhancedRegion: vi.fn(), dispose: vi.fn() },
+      sourceSample: { timestamp: 2, draw: vi.fn() },
+    });
+    try {
+      await vi.waitFor(() => expect(io.render).toHaveBeenCalledOnce());
+      const leaves = (layers: readonly GpuPreviewLayer[]): GpuPreviewLayer[] =>
+        layers.flatMap((layer) =>
+          'kind' in layer.source && layer.source.kind === 'group'
+            ? leaves(layer.source.layers)
+            : [layer]
+        );
+      expect(
+        leaves(io.render.mock.calls[0]![0].layers).some((layer) => layer.source === tile)
+      ).toBe(true);
+      expect(
+        leaves(io.render.mock.calls[0]![0].layers).some((layer) => layer.source === f.frame)
+      ).toBe(false);
+      if (cancel) f.owner.dispose();
+      expect(dispose).not.toHaveBeenCalled();
+      finished.resolve(f.bitmap);
+      if (cancel) await expect(pending).rejects.toThrow();
+      else await expect(pending).resolves.toBe(true);
+      expect(dispose).toHaveBeenCalledOnce();
+    } finally {
+      prepare.mockRestore();
+      f.owner.dispose();
+    }
+  }
+);
+
+it('selects separate prepared source demands for body, scene lens and pointer lens', async () => {
+  vi.stubGlobal(
+    'Path2D',
+    class {
+      moveTo() {}
+      lineTo() {}
+      closePath() {}
+    }
+  );
+  const f = fixture();
+  const current: PreviewScene = {
+    ...scene,
+    zoomRegions: [
+      {
+        ...createQuickEditZoomRegion({ id: 'lens', at: 0, duration: 4 }),
+        transform: { scale: 1, centerX: 0.5, centerY: 0.5 },
+        spotlight: {
+          effect: 'magnify',
+          area: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 },
+          magnification: 3,
+          strength: 0,
+          blur: 0,
+          roundness: 0,
+          reveal: 'fade',
+          exitReveal: 'fade',
+        },
+      },
+    ],
+    clicks: [
+      {
+        settings: { ...REVIEW_CLICK_DEFAULT, effect: 'magnify', magnification: 3 },
+        point: { x: 0.5, y: 0.5 },
+        anchor: 1.9,
+        start: 1.9,
+        end: 2.5,
+      },
+    ],
+  };
+  const tile = { width: 1280, height: 720 } as HTMLCanvasElement;
+  const plan = planReviewExportSource({
+    scene: { ...current, sourceSize: scene.source, clickCues: current.clicks },
+    output: dimensions.backing,
+    identity: { sourceKey: tile, sourceSize: scene.source, sourceTime: 2, passTime: 2 },
+    resultTime: 2,
+  });
+  const requested: string[] = [];
+  const prepare = vi.spyOn(sourceSampling, 'prepareReviewExportSourceSampling').mockResolvedValue({
+    plan,
+    dispose: vi.fn(),
+    original: { draw: vi.fn() },
+    sampling: {
+      ...plan.identity,
+      drawPrepared: vi.fn(),
+      visitPreparedTiles: (id, consume) => {
+        requested.push(id);
+        const demand = plan.demands.find((item) => item.id === id)!;
+        consume({
+          image: tile,
+          physicalSourceRect: { x: 0, y: 0, width: 1280, height: 720 },
+          originalPixelROI: demand.originalPixelROI,
+        });
+        return true;
+      },
+    },
+  });
+  try {
+    expect(
+      await f.owner.render({
+        ...f.input,
+        scene: current,
+        geometry: reviewPresentedGeometry(current, dimensions, 2),
+        exportEnhancer: { withEnhancedRegion: vi.fn(), dispose: vi.fn() },
+        sourceSample: { timestamp: 2, draw: vi.fn() },
+      })
+    ).toBe(true);
+    expect(new Set(requested)).toEqual(new Set(['body:0', 'scene:0', 'click:0']));
+  } finally {
+    prepare.mockRestore();
+    f.owner.dispose();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('submits both decorated cut endpoints as one pinned GL operation without alpha-dissolve substitution', async () => {
+  const f = fixture();
+  const input = await dissolveInput(f);
+  const selection = createGlTransitionSelection('BowTie')!;
+  const { color: _color, ...timing } = input.transition.blend.plan;
+  const plan = { ...timing, type: 'gl' as const, selection, easing: 'LINEAR' as const };
+  const sceneAt = vi.fn(async () => scene);
+  const output = await f.owner.render({
+    ...input,
+    sceneAt,
+    transition: { ...input.transition, blend: { ...input.transition.blend, plan } },
+  });
+  expect(io.render).toHaveBeenCalledOnce();
+  expect(sceneAt).toHaveBeenCalledTimes(2);
+  const main = io.render.mock.calls[0]![0].layers[0]!.source;
+  if (!('kind' in main) || main.kind !== 'group') throw new Error('Expected GL group');
+  expect(main.composition).toEqual({
+    kind: 'gl-transition',
+    selection,
+    progress: input.transition.blend.incoming,
+  });
+  expect(main.layers).toHaveLength(2);
+  expect(main.layers.map((layer: GpuPreviewLayer) => layer.opacity)).toEqual([1, 1]);
+  expect(output).toBe(true);
+  f.owner.dispose();
+});
+
+it(
+  'refuses a mismatched GL implementation before GPU submission ' +
+    'instead of taking another transition route',
+  async () => {
+    const f = fixture();
+    const input = await dissolveInput(f);
+    const selection = { ...createGlTransitionSelection('BowTie')!, wgslSha256: '0'.repeat(64) };
+    const { color: _color, ...timing } = input.transition.blend.plan;
+    const plan = { ...timing, type: 'gl' as const, selection, easing: 'LINEAR' as const };
+    await expect(
+      f.owner.render({
+        ...input,
+        transition: { ...input.transition, blend: { ...input.transition.blend, plan } },
+      })
+    ).rejects.toThrow('GL transition settings are unavailable');
+    expect(io.render).not.toHaveBeenCalled();
+    expect(f.frame.close).not.toHaveBeenCalled();
+    f.owner.dispose();
+  }
+);
+
+it('keeps source image filters on the Gallery video plane and leaves independent artwork unfiltered', async () => {
+  const f = fixture();
+  const filters = { version: 1 as const, filters: [createSourceImageFilter('blur', 'blur')] };
+  const captured: { request?: Parameters<GpuPreviewRenderer['render']>[0] } = {};
+  io.render.mockImplementationOnce((request: Parameters<GpuPreviewRenderer['render']>[0]) => {
+    captured.request = request;
+    return Promise.resolve(f.bitmap);
+  });
+  await expect(
+    f.owner.render({ ...f.input, scene: { ...f.input.scene, sourceFilters: filters } })
+  ).resolves.toBe(true);
+  const layers: GpuPreviewLayer[] = [],
+    seen = new Set<object>();
+  const visit = (items: readonly GpuPreviewLayer[]) => {
+    for (const layer of items) {
+      layers.push(layer);
+      if ('kind' in layer.source && layer.source.kind === 'group' && !seen.has(layer.source)) {
+        seen.add(layer.source);
+        visit(layer.source.layers);
+      }
+    }
+  };
+  if (!captured.request) throw new Error('Expected production GPU request');
+  visit(captured.request.layers);
+  const filtered = layers.filter((layer) => layer.imageFilters);
+  expect(filtered).toHaveLength(1);
+  expect(filtered[0]!.source).toBe(f.frame);
+  expect(filtered[0]!.imageFilters).toEqual({
+    stack: filters,
+    logical: f.input.scene.source,
+    projectTime: f.input.geometry.resultTime,
+  });
+  expect(
+    layers.filter((layer) => layer.source !== f.frame).every((layer) => !layer.imageFilters)
+  ).toBe(true);
+  f.owner.dispose();
+});
+
+it('uses the original source filter axes before a Gallery quarter-turn', async () => {
+  const f = fixture();
+  const filters = { version: 1 as const, filters: [createSourceImageFilter('bloom', 'bloom')] };
+  const rotated = { ...f.input.scene, source: { width: 360, height: 640 }, sourceFilters: filters };
+  const captured: { request?: Parameters<GpuPreviewRenderer['render']>[0] } = {};
+  io.render.mockImplementationOnce((request: Parameters<GpuPreviewRenderer['render']>[0]) => {
+    captured.request = request;
+    return Promise.resolve(f.bitmap);
+  });
+  await f.owner.render({
+    ...f.input,
+    scene: rotated,
+    geometry: reviewPresentedGeometry(rotated, dimensions, 2),
+    orientation: { rotation: 90, flip: false },
+  });
+  const seen = new Set<object>();
+  let found: GpuPreviewLayer | undefined;
+  const visit = (layers: readonly GpuPreviewLayer[]) => {
+    for (const layer of layers) {
+      if (layer.source === f.frame) found = layer;
+      else if ('kind' in layer.source && layer.source.kind === 'group' && !seen.has(layer.source)) {
+        seen.add(layer.source);
+        visit(layer.source.layers);
+      }
+    }
+  };
+  if (!captured.request) throw new Error('Expected request');
+  visit(captured.request.layers);
+  expect(found?.imageFilters?.logical).toEqual({ width: 640, height: 360 });
+  f.owner.dispose();
 });

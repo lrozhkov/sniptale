@@ -1,5 +1,5 @@
-import { parseEffectLogicalDimensions } from '../../contracts/effect-runtime/dimensions';
-import type { EffectV1Document } from '@sniptale/runtime-contracts/effect-v1';
+import { parseRuntimeAnimationFrame } from '../../contracts/effect-runtime/animation';
+import type { AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
 
 import { createEffectRuntimeAssetSelectionId } from '../../contracts/effect-runtime/immutable-refs';
 import {
@@ -16,14 +16,8 @@ import {
 } from '../../contracts/effect-runtime/types';
 import type { EffectRuntimeAssetSelectionCache } from './cache/asset-selections';
 import type { EffectRuntimeDocumentCache } from './cache/documents';
-import { parseVisualAssets } from './request-assets';
-import { parseAndVerifyEffectDocument } from './request-document';
-import {
-  parseControls,
-  parseInputFrames,
-  parseRenderDimensions,
-  parseTiming,
-} from './request-fields';
+import { verifyRuntimeAnimationSource } from '../../contracts/effect-runtime/animation';
+import { parseRenderDimensions } from './request-fields';
 
 export type EffectRuntimeRequestParseResult =
   | { ok: true; request: EffectRuntimeRenderRequest }
@@ -52,19 +46,19 @@ function createCacheMiss(
 async function resolveDocument(
   ref: { id: string; source?: string },
   cache: EffectRuntimeDocumentCache
-): Promise<{ document: EffectV1Document } | 'cacheMiss' | null> {
+): Promise<{ document: AnimationTemplate } | 'cacheMiss' | null> {
   if (ref.source === undefined) {
     const cached = cache.get(ref.id);
     return cached ? { document: cached.document } : 'cacheMiss';
   }
-  const document = await parseAndVerifyEffectDocument(ref.source, ref.id);
+  const document = await verifyRuntimeAnimationSource(ref.source, ref.id);
   if (!document || !cache.set({ document, id: ref.id, source: ref.source })) return null;
   return { document };
 }
 
 async function resolveAssetSelection(params: {
   cache: EffectRuntimeAssetSelectionCache;
-  document: EffectV1Document;
+  document: AnimationTemplate;
   identity: ResolveEffectRuntimeRequestPayloadParams['identity'];
   ref: { assets?: unknown; id: string };
 }): Promise<
@@ -72,19 +66,19 @@ async function resolveAssetSelection(params: {
   | EffectRuntimeRequestParseResult
 > {
   const expectedId = await createEffectRuntimeAssetSelectionId(
-    params.document.assets.filter(
-      (asset): asset is typeof asset & { sha256: string } =>
-        asset.kind !== 'audio' && typeof asset.sha256 === 'string'
-    )
+    params.document.resources.map(({ path, sha256 }) => ({ id: path, sha256 }))
   );
   if (params.ref.id !== expectedId) return reject(params.identity);
   if (params.ref.assets === undefined && !params.cache.has(params.ref.id)) {
     return { failure: createCacheMiss(params.identity, 'assetSelection'), ok: false };
   }
-  const assets = params.ref.assets
-    ? await parseVisualAssets(params.ref.assets, params.document)
-    : [];
-  if (!assets) return reject(params.identity);
+  if (
+    params.ref.assets !== undefined &&
+    (!Array.isArray(params.ref.assets) || params.ref.assets.length !== 0)
+  ) {
+    return reject(params.identity);
+  }
+  const assets: EffectRuntimeRenderRequest['assets'] = [];
   if (params.ref.assets !== undefined) params.cache.set(params.ref.id);
   return { assets, payloadIncluded: params.ref.assets !== undefined };
 }
@@ -95,7 +89,7 @@ function createAcceptedRequest(args: {
   assets: EffectRuntimeRenderRequest['assets'];
   controls: EffectRuntimeRenderRequest['controls'];
   dimensions: { height: number; width: number };
-  document: EffectV1Document;
+  document: AnimationTemplate;
   documentId: string;
   documentPayloadIncluded: boolean;
   identity: ResolveEffectRuntimeRequestPayloadParams['identity'];
@@ -127,19 +121,15 @@ function createAcceptedRequest(args: {
   };
 }
 
-function parseResolvedRequestFields(value: Record<string, unknown>, document: EffectV1Document) {
-  const dimensions = parseEffectLogicalDimensions(value['width'], value['height']);
+function parseResolvedRequestFields(value: Record<string, unknown>, document: AnimationTemplate) {
+  const frame = parseRuntimeAnimationFrame(value, document);
+  if (!frame) return null;
   const renderDimensions = parseRenderDimensions(
     value['renderWidth'],
     value['renderHeight'],
-    dimensions
+    frame.dimensions
   );
-  const timing = parseTiming(value, document.duration);
-  const controls = parseControls(value['controls'], document);
-  const inputFrames = parseInputFrames(value['inputFrames'], document, renderDimensions);
-  return dimensions && renderDimensions && timing && controls && inputFrames
-    ? { controls, dimensions, inputFrames, renderDimensions, timing }
-    : null;
+  return renderDimensions ? { ...frame, inputFrames: frame.inputs, renderDimensions } : null;
 }
 
 export async function resolveEffectRuntimeRequestPayload(

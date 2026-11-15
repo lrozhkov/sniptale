@@ -45,7 +45,7 @@ function createArgs() {
     loadedImages: {},
     pipeline: {},
     project: { ...createEmptyVideoProject('Export'), duration: 4 },
-    settings: { fps: 30, format: 'MP4' },
+    settings: { fps: 30, format: 'MP4', detailEnhancement: 'bicubic-sharpen' },
     throwIfPipelineFailed: vi.fn(),
     videoEncoder: { encode: vi.fn() },
   };
@@ -167,24 +167,51 @@ it('rethrows abort-like clean-span failures', async () => {
   expect(runFrameDrivenCompositeRenderLoopMock).not.toHaveBeenCalled();
 });
 
-it('renders accelerated composite spans without frame-driven fallback', async () => {
-  const acceleratedSpan = {
-    kind: 'accelerated-composite',
-    reason: 'webm-frame-provider',
-    start: 0,
-    end: 2,
-  };
-  planMp4VideoRenderSpansMock.mockReturnValue([acceleratedSpan]);
-  const args = createArgs();
+it.each(['off', 'bicubic-sharpen'])(
+  'selects the common or legacy enhanced image producer for an admitted accelerated span (%s)',
+  async (mode) => {
+    const acceleratedSpan = {
+      kind: 'accelerated-composite',
+      reason: 'webm-frame-provider',
+      start: 0,
+      end: 2,
+    };
+    planMp4VideoRenderSpansMock.mockReturnValue([acceleratedSpan]);
+    const args = createArgs();
+    args.settings.detailEnhancement = mode;
 
-  await runMp4HybridVideoPipeline(args as never);
+    await runMp4HybridVideoPipeline(args as never);
 
-  expect(renderAcceleratedCompositeWebmSpanMock).toHaveBeenCalledWith(
-    expect.objectContaining({ span: acceleratedSpan, videoEncoder: args.videoEncoder })
-  );
-  expect(encodeCleanSourceMp4SpanMock).not.toHaveBeenCalled();
-  expect(runFrameDrivenCompositeRenderLoopMock).not.toHaveBeenCalled();
-});
+    if (mode === 'off') {
+      expect(renderAcceleratedCompositeWebmSpanMock).not.toHaveBeenCalled();
+      expect(runFrameDrivenCompositeRenderLoopMock).toHaveBeenCalledOnce();
+      expect(runFrameDrivenCompositeRenderLoopMock).toHaveBeenCalledWith(
+        args.job,
+        args.project,
+        expect.objectContaining({
+          detailEnhancement: 'off',
+          rangeStartSeconds: 0,
+          rangeEndSeconds: 2,
+        }),
+        args.canvas,
+        args.context,
+        args.loadedImages,
+        args.videoEncoder,
+        args.throwIfPipelineFailed,
+        undefined,
+        0,
+        expect.any(String)
+      );
+      expect(encodeCleanSourceMp4SpanMock).not.toHaveBeenCalled();
+      return;
+    }
+    expect(renderAcceleratedCompositeWebmSpanMock).toHaveBeenCalledWith(
+      expect.objectContaining({ span: acceleratedSpan, videoEncoder: args.videoEncoder })
+    );
+    expect(encodeCleanSourceMp4SpanMock).not.toHaveBeenCalled();
+    expect(runFrameDrivenCompositeRenderLoopMock).not.toHaveBeenCalled();
+  }
+);
 
 it('falls back to frame-driven rendering when accelerated composite is unavailable', async () => {
   const acceleratedSpan = {

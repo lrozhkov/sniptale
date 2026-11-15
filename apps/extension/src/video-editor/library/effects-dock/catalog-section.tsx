@@ -1,6 +1,5 @@
 import { readCatalogPresentation } from '../../../features/video/project/effect-bundle/catalog/presentation';
 import { AnnotationSourcePreview } from './source-preview';
-import { CompactSelect } from '../../../ui/compact-inspector-controls';
 import { useWorkspacePreference } from '../../runtime/controller/workspace-preferences';
 import { useEffectDocumentDrag } from '../../chrome/effect-document-drag';
 import {
@@ -49,42 +48,13 @@ export function CatalogSection(
       ...current,
       [key]: { query: next.query.slice(0, 256), theme: next.theme },
     }));
-  const [scope, setScope] = useState<'selection' | 'clip' | 'track' | 'video-group'>('selection');
-  const targetScope =
-    scope === 'selection'
-      ? props.selectedClipId
-        ? 'clip'
-        : props.selectedTrackId
-          ? 'track'
-          : props.effectTarget?.kind === 'video-group'
-            ? 'video-group'
-            : 'clip'
-      : scope;
-  const effectTarget: VideoProjectEffectTarget | null =
-    targetScope === 'clip'
-      ? props.selectedClipId
-        ? { kind: 'clip', clipId: props.selectedClipId }
-        : null
-      : targetScope === 'track'
-        ? props.selectedTrackId
-          ? { kind: 'track', trackId: props.selectedTrackId }
-          : null
-        : { kind: 'video-group' };
   const catalogs = props.catalogs.flatMap((item) =>
     item.status === 'ready' && item.catalog.enabled ? [item.catalog] : []
   );
-  const themes = getEffectCatalogThemes(
-    catalogs.map((catalog) => ({
-      ...catalog,
-      documents: catalog.documents.filter(
-        (document) => !props.kind || document.kind === props.kind
-      ),
-    })),
-    getCurrentLocale()
-  );
+  const themes = getEffectCatalogThemes(catalogs, getCurrentLocale());
   const effectiveFilter: EffectCatalogFilter = {
     ...filter,
-    kind: props.kind ?? filter.kind,
+    kind: 'standalone',
     theme: themes.some((theme) => theme.value === filter.theme) ? filter.theme : 'all',
   };
   const visibleCatalogs = catalogs.filter(
@@ -112,39 +82,7 @@ export function CatalogSection(
               disabled={props.disabled}
             />
           </div>
-          {props.kind === 'targetEffect' && (
-            <label
-              className={[
-                'flex flex-wrap items-center gap-2 border-b px-2 py-1 text-[13px]',
-                'border-[var(--sniptale-color-border-soft)]',
-              ].join(' ')}
-            >
-              <span>{translate('videoEditor.effectsLibrary.applyTo')}</span>
-              <CompactSelect
-                appearance="plain"
-                value={targetScope}
-                containerClassName="min-w-0 flex-1"
-                aria-label={translate('videoEditor.effectsLibrary.applyTo')}
-                onChange={setScope}
-                options={[
-                  {
-                    value: 'clip',
-                    label: translate('videoEditor.effectsLibrary.selectedClip'),
-                    disabled: !props.selectedClipId,
-                  },
-                  {
-                    value: 'track',
-                    label: translate('videoEditor.effectsLibrary.selectedTrack'),
-                    disabled: !props.selectedTrackId,
-                  },
-                  {
-                    value: 'video-group',
-                    label: translate('videoEditor.effectsLibrary.wholeVideo'),
-                  },
-                ]}
-              />
-            </label>
-          )}
+
           <div
             className={[
               'grid min-h-0 flex-1 grid-cols-[repeat(auto-fit,minmax(128px,1fr))] content-start',
@@ -171,7 +109,6 @@ export function CatalogSection(
                 {...props}
                 onPreview={(document) => setSourcePreview({ catalog, document })}
                 filter={effectiveFilter}
-                effectTarget={effectTarget}
               />
             ))}
           </div>
@@ -223,7 +160,7 @@ function CatalogDocument(
   }
 ): React.JSX.Element {
   const drag = useEffectDocumentDrag();
-  const target = resolveDocumentTarget(props.document.kind, props);
+  const target: VideoProjectEffectTarget = { kind: 'scene' };
   const metadata = describeCatalogDocument(props.document, getCurrentLocale());
   const applyDocument = (startTime: number, trackId?: string | null) =>
     target &&
@@ -287,8 +224,8 @@ function CatalogDocument(
           )}
           <EditorIconButton
             className="!h-6 !w-6 !min-w-6"
-            title={getDocumentActionLabel(props.document.kind, target)}
-            aria-label={getDocumentActionLabel(props.document.kind, target)}
+            title={translate('videoEditor.effectsLibrary.applyToScene')}
+            aria-label={translate('videoEditor.effectsLibrary.applyToScene')}
             disabled={props.disabled || !target}
             onClick={() =>
               applyDocument(
@@ -323,54 +260,9 @@ function CatalogDocument(
           {[metadata.themeLabel, metadata.styleLabel].filter(Boolean).join(' · ')}
         </span>
       )}
-      <EffectCatalogPreview
-        catalog={props.catalog}
-        document={props.document}
-        captureFrame={props.capturePreviewFrame}
-      />
+      <EffectCatalogPreview catalog={props.catalog} document={props.document} />
     </div>
   );
-}
-
-function getDocumentActionLabel(
-  kind: EffectBundleCatalogEntry['documents'][number]['kind'],
-  target: VideoProjectEffectTarget | null
-): string {
-  if (!target) {
-    return kind === 'targetEffect'
-      ? translate('videoEditor.effectsLibrary.selectClipTarget')
-      : translate('videoEditor.effectsLibrary.selectTransitionTarget');
-  }
-  if (kind === 'standalone') return translate('videoEditor.effectsLibrary.applyToScene');
-  if (kind === 'targetEffect')
-    return translate(
-      target?.kind === 'track'
-        ? 'videoEditor.effectsLibrary.selectedTrack'
-        : target?.kind === 'video-group'
-          ? 'videoEditor.effectsLibrary.wholeVideo'
-          : 'videoEditor.effectsLibrary.applyToClip'
-    );
-  return translate('videoEditor.effectsLibrary.applyToTransition');
-}
-
-function resolveDocumentTarget(
-  kind: EffectBundleCatalogEntry['documents'][number]['kind'],
-  props: Pick<
-    VideoEditorEffectsLibraryDockProps,
-    'selectedClipId' | 'selectedTransitionId' | 'effectTarget'
-  >
-): VideoProjectEffectTarget | null {
-  if (kind === 'standalone') return { kind: 'scene' };
-  if (kind === 'targetEffect') {
-    return props.effectTarget === undefined
-      ? props.selectedClipId
-        ? { clipId: props.selectedClipId, kind: 'clip' }
-        : null
-      : props.effectTarget;
-  }
-  return props.selectedTransitionId
-    ? { kind: 'transition', transitionId: props.selectedTransitionId }
-    : null;
 }
 
 function readLocalized(value: { en: string; ru: string }): string {

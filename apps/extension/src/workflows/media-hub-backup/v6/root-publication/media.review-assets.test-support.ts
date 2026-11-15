@@ -3,11 +3,10 @@ import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { materializeWorkspaceStorage } from '../../../../composition/persistence/review-workspaces/storage-format';
 import { createMediaLibraryEntry } from '../../../../composition/persistence/projects/index.test-support';
 import { materializeVideoWorkspaceProject } from '../../../../composition/persistence/review-workspaces/project-metadata';
-import { readFileSync } from 'node:fs';
-import {
-  sha256EffectV1Bytes,
-  validateEffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
+import { readValidAnimationSourceEntry } from '../../../../composition/persistence/effect-bundles/fixture.test-support';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import { reviewAdvancedContentBaseline } from '../../../../features/video/review/document';
 import type { ReviewAnnotationEffectSnapshot } from '../../../../features/video/review/annotation-effects/types';
 import type {
@@ -290,45 +289,27 @@ export function portableJson(value: unknown): JsonValue {
 }
 
 export async function annotationReviewFixture() {
-  const result = validateEffectV1Document(
-    JSON.parse(
-      readFileSync(
-        'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conformance.sniptale-effect.json',
-        'utf8'
-      )
-    )
-  );
-  if (!result.ok || !result.document) throw new Error('Invalid annotation fixture');
+  const entry = await readValidAnimationSourceEntry(),
+    parsed = parseAnimationTemplateSource(entry.documents[0]!.source);
+  if (!parsed.ok) throw Error('Invalid Lottie annotation fixture');
+  const template = { ...parsed.template, label: { en: 'Neutral runtime conformance' } },
+    resource = template.resources.find((resource) => resource.mimeType === 'font/ttf');
+  if (!resource) throw Error('Missing shipped font resource');
   const blob = new Blob(
-    ['<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>'],
-    { type: 'image/svg+xml' }
+    [Uint8Array.from(atob(resource.base64), (character) => character.charCodeAt(0))],
+    { type: resource.mimeType }
   );
-  const resourceHash = await sha256EffectV1Bytes(new Uint8Array(await blob.arrayBuffer()));
-  const resource = result.document.assets[0];
-  if (!resource) throw new Error('Missing fixture resource');
-  const source = JSON.stringify({
-    ...result.document,
-    assets: [{ ...resource, sha256: resourceHash, byteLength: blob.size }],
-  });
-  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(source));
+  const source = JSON.stringify(template),
+    digest = bytesToHex(sha256(new TextEncoder().encode(source)));
   const snapshot: ReviewAnnotationEffectSnapshot = {
-    id: `effect:${sha256}`,
-    schemaVersion: 'sniptale.effect.v1',
+    id: `effect:${digest}`,
+    schemaVersion: 'sniptale.animation.v1',
     kind: 'standalone',
-    documentId: result.document.id,
-    sha256,
+    documentId: template.id,
+    sha256: digest,
     source,
-    retainedByteLength: new TextEncoder().encode(source).byteLength + blob.size,
-    assets: [
-      {
-        id: resource.id,
-        assetId: 'project-asset:mark',
-        kind: 'svg',
-        mimeType: blob.type,
-        byteLength: blob.size,
-        sha256: resourceHash,
-      },
-    ],
+    retainedByteLength: new TextEncoder().encode(source).byteLength,
+    assets: [],
   };
   const base = reviewFixture();
   const advanced = {
@@ -344,7 +325,10 @@ export async function annotationReviewFixture() {
     end: 1,
     attachment: 'viewport' as const,
     transform: { x: 0, y: 0, width: 1, height: 1, rotation: 0 },
-    controls: { accent: '#7cf7ff', intensity: 0.8 },
+    controls: {},
+    anchors: Object.fromEntries(
+      (template.objectLayout?.handles ?? []).map((handle) => [handle.id, { x: 0.5, y: 0.5 }])
+    ),
     order: 0,
   };
   const operation: ReviewOperation = {
@@ -504,4 +488,39 @@ export function nestedMediaReviewFixture(cycle: boolean) {
     ...rows.assets.map((asset) => ({ objectId: `${asset.id}-object`, ref: reference(asset.id) })),
   ];
   return { rows, metadata, staged };
+}
+
+export async function corruptAnnotationFixtureResource(
+  fixture: Awaited<ReturnType<typeof annotationReviewFixture>>,
+  mode: 'resource-hash' | 'mime' | 'signature' | 'unsafe-svg'
+) {
+  const parsed = parseAnimationTemplateSource(fixture.snapshot.source);
+  if (!parsed.ok) throw Error('Invalid source fixture');
+  const document = parsed.template,
+    resource = document.resources[0];
+  if (!resource) throw Error('Missing embedded resource');
+  if (mode === 'resource-hash') resource.sha256 = '0'.repeat(64);
+  else if (mode === 'mime') resource.mimeType = 'font/otf';
+  else {
+    const bytes =
+      mode === 'signature'
+        ? new Uint8Array(resource.byteLength).fill(120)
+        : new TextEncoder().encode(
+            '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'
+          );
+    resource.base64 = Buffer.from(bytes).toString('base64');
+    resource.byteLength = bytes.byteLength;
+    resource.sha256 = bytesToHex(sha256(bytes));
+  }
+  const oldId = fixture.snapshot.id,
+    source = JSON.stringify(document),
+    digest = bytesToHex(sha256(new TextEncoder().encode(source)));
+  fixture.snapshot.source = source;
+  fixture.snapshot.sha256 = digest;
+  fixture.snapshot.id = `effect:${digest}`;
+  fixture.snapshot.retainedByteLength = new TextEncoder().encode(source).byteLength;
+  for (const operation of fixture.review.workspace.history)
+    if (operation.target === 'advancedContent')
+      for (const instance of operation.after.annotationEffects?.instances ?? [])
+        if (instance.snapshotId === oldId) instance.snapshotId = fixture.snapshot.id;
 }

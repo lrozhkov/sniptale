@@ -1,4 +1,4 @@
-import { EXPECTED_EFFECT_SANDBOX_CSP } from './sandbox-policy.mjs';
+import { EXPECTED_EFFECT_SANDBOX_CSP, EXPECTED_TOUR_SANDBOX_CSP } from './sandbox-policy.mjs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -128,7 +128,9 @@ function createFiles({
         ]
       : []),
     {
-      contents: Buffer.from('<!doctype html>'),
+      contents: Buffer.from(
+        `<meta http-equiv="Content-Security-Policy" content="${EXPECTED_TOUR_SANDBOX_CSP}">`
+      ),
       relativePath: 'apps/extension/src/tour-preview-sandbox/index.html',
     },
     ...extraFiles.map((file: { relativePath: string; text: string }) => ({
@@ -474,7 +476,7 @@ it('rejects effect runtime sandbox CSP drift', async () => {
         content_security_policy: {
           ...baseManifest.content_security_policy,
           sandbox: baseManifest.content_security_policy.sandbox.replace(
-            "connect-src 'none'",
+            'connect-src data:',
             'connect-src https:'
           ),
         },
@@ -594,4 +596,44 @@ it.each([
   'node_modules/dependency/index.js',
 ])('rejects repository-only directories in the installer: %s', (name) => {
   expect(getForbiddenReleaseArtifactPathReason(name)).toBe('repository-only directory');
+});
+
+it.each(['missing', 'wasm', 'connection'] as const)(
+  'rejects %s tour head policy while effect WASM remains allowed',
+  async (mode) => {
+    const repoRoot = await createRepoRoot(),
+      files = createFiles();
+    const tour = files.find(
+      (file) => file.relativePath === 'apps/extension/src/tour-preview-sandbox/index.html'
+    )!;
+    let policy = EXPECTED_TOUR_SANDBOX_CSP;
+    if (mode === 'wasm')
+      policy = policy.replace(
+        "script-src 'self' 'unsafe-inline'",
+        "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'"
+      );
+    if (mode === 'connection') policy = policy.replace("connect-src 'none'", 'connect-src data:');
+    tour.contents = Buffer.from(
+      mode === 'missing'
+        ? '<!doctype html>'
+        : `<meta http-equiv="Content-Security-Policy" content="${policy}">`
+    );
+    await expect(verifyReleaseArtifactFiles({ files, repoRoot })).rejects.toThrow(
+      'tour sandbox is missing its strict head CSP'
+    );
+  }
+);
+
+it('accepts fixed local audio WASM while retaining all forbidden JavaScript and remote CSP checks', async () => {
+  const repoRoot = await createRepoRoot();
+  const manifest = {
+    ...baseManifest,
+    content_security_policy: {
+      ...baseManifest.content_security_policy,
+      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';",
+    },
+  };
+  await expect(
+    verifyReleaseArtifactFiles({ files: createFiles({ manifest }), repoRoot })
+  ).resolves.toBeUndefined();
 });

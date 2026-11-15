@@ -95,3 +95,41 @@ it('keeps a reused canvas asset when restoring it as the source image', async ()
   expect(refs.has('restored-source')).toBe(true);
   expect(refs.has('old-source')).toBe(false);
 });
+
+it('retains shared originals and assigns each retained slot without deleting its byte owner', async () => {
+  const document = createPersistedEditorDocumentFixture(createEditorDocumentFixture(), 'original');
+  const fields = [
+    'sniptaleRasterOriginalData',
+    'sniptaleRasterColorData',
+    'sniptaleRasterVisibilityData',
+    'sniptaleRasterKeyData',
+  ];
+  const nextDocument = {
+    ...document,
+    version: 4 as const,
+    assets: [
+      ...document.assets,
+      ...fields.map((field) => ({ assetId: 'original', role: `canvas:$.objects[0].${field}` })),
+    ],
+  };
+  const physicalDelete = buildPhysicalDeleteOperation([]);
+  const put = vi.fn();
+  const remove = vi.fn();
+  await replaceEditorDocumentAssetOwnership({
+    nextDocument,
+    previousDocument: document,
+    nextRefs: [ref('original')],
+    ownerId: 'image-1',
+    ownerKind: 'image-workspace',
+    physicalDelete,
+    stores: {
+      owners: { put, delete: remove, index: () => ({ count: async () => 1 }) },
+      refs: { put: vi.fn(), delete: remove },
+    },
+  });
+  expect(put.mock.calls.map(([owner]) => owner.role)).toEqual(
+    nextDocument.assets.map(({ role }) => role)
+  );
+  expect(remove).not.toHaveBeenCalled();
+  expect(physicalDelete.assetIds).toEqual([]);
+});

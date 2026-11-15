@@ -1,120 +1,195 @@
 import { returnEffectRuntimeRetryInputs } from '../../contracts/effect-runtime/retry-inputs';
-import { createEffectRuntimeFailure } from '../../contracts/effect-runtime/identity';
-import { closeEffectRuntimeBitmaps } from '../../contracts/effect-runtime/bitmap-lifetime';
-import type { EffectRuntimeWorkerResult } from '../../contracts/effect-runtime/types';
-import { drawImageAsset } from './assets/render-assets';
-import { createEffectRuntimeWorkerAssetCache } from './cache/assets';
-import { createEffectRuntimePreparedModelCache } from './cache/models';
-import { createEffectRuntimeCanvasPool, type EffectRuntimeCanvasPool } from './canvas/pool';
-import { createEffectV1GraphRenderer } from './interpreter/graph-renderer';
-import type { EffectRuntimeInterpreter } from './interpreter/model';
-import type { RuntimeCanvas } from './model/types';
-import { resolveEffectRuntimeWorkerRequest } from './protocol/request';
-import { prepareEffectRuntimeRenderModel } from './render-context';
 import {
-  executePreparedEffectRuntimeWorkerRequest,
-  type PreparedEffectRuntimeModel,
-} from './render-frame';
-import { createSvgPartTransform } from './svg/part-transform';
-import { drawSvgVectorAsset } from './svg/vector-renderer';
-import { clearSvgVectorCache } from './svg/vector-parser';
+  createEffectRuntimeFailure,
+  getEffectRuntimeIdentity,
+} from '../../contracts/effect-runtime/identity';
+import { closeEffectRuntimeBitmaps } from '../../contracts/effect-runtime/bitmap-lifetime';
+import type {
+  EffectRuntimeWorkerResult,
+  EffectRuntimeWorkerRequest,
+} from '../../contracts/effect-runtime/types';
+import { createEffectRuntimePreparedModelCache } from './cache/models';
+import { resolveEffectRuntimeWorkerRequest } from './protocol/request';
+import { createLottieFrameRenderer, LottieResourceIdentityError } from './lottie';
+import { EFFECT_RUNTIME_RESOURCE_LIMITS, EffectRuntimeResourceError } from './resource-policy';
 
-interface EffectRuntimeWorkerExecutionDependencies {
-  createCanvas(width: number, height: number): RuntimeCanvas;
+type Renderer = Awaited<ReturnType<typeof createLottieFrameRenderer>>;
+interface PreparedModel {
+  documentId: string;
+  document: EffectRuntimeWorkerRequest['document'];
+  sourceBytes: number;
+  retainedBytes: number;
+  renderer: Renderer | null;
+  loading: Promise<Renderer> | null;
+  retired: boolean;
+  lastRenderSucceeded: boolean;
 }
-
-interface EffectRuntimeWorkerExecutionResources {
-  assets: ReturnType<typeof createEffectRuntimeWorkerAssetCache>;
-  canvases: EffectRuntimeCanvasPool;
-  models: ReturnType<typeof createEffectRuntimePreparedModelCache<PreparedEffectRuntimeModel>>;
-  runtime: EffectRuntimeInterpreter;
+interface ExecutionDependencies {
+  createRenderer: typeof createLottieFrameRenderer;
 }
+const defaultDependencies: ExecutionDependencies = { createRenderer: createLottieFrameRenderer };
 
-interface EffectRuntimeWorkerExecutionState {
-  dispose(): void;
-  execute(value: unknown): Promise<EffectRuntimeWorkerResult>;
-  snapshot(): {
-    assets: { bytes: number; entries: number; selections: number };
-    canvases: { entries: number; leases: number };
-    models: { entries: number };
-  };
-}
-
+/** A worker serializes mutable Lottie players; the parent still owns stale publication and timeout termination. */
 export function createEffectRuntimeWorkerExecutionState(
-  dependencies: EffectRuntimeWorkerExecutionDependencies = {
-    createCanvas: (width, height) => new OffscreenCanvas(width, height),
-  }
-): EffectRuntimeWorkerExecutionState {
-  const runtime: EffectRuntimeInterpreter = {
-    drawImageAsset,
-    drawSvgVectorAsset,
-    svgPartTransform: createSvgPartTransform,
+  dependencies: ExecutionDependencies = defaultDependencies
+) {
+  let disposed = false;
+  const lifetime = new AbortController();
+  const models = createEffectRuntimePreparedModelCache<PreparedModel>({
+    dispose(model) {
+      model.retired = true;
+      model.renderer?.dispose();
+    },
+    weight: (model) => model.sourceBytes + model.retainedBytes,
+    maximumWeight: EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterBytes,
+  });
+  const assets = new Map<string, Record<string, never>>();
+  let queue: Promise<void> = Promise.resolve();
+  const execute = async (value: unknown): Promise<EffectRuntimeWorkerResult> => {
+    if (disposed) {
+      closeEffectRuntimeBitmaps(value);
+      return createEffectRuntimeFailure(value, 'stale');
+    }
+    try {
+      const resolution = resolveEffectRuntimeWorkerRequest(value, {
+        getAssets: (id) => assets.get(id) ?? null,
+        getDocument: (id) => models.find((model) => model.documentId === id)?.document ?? null,
+        setAssets(id, supplied) {
+          if (Object.keys(supplied).length) return false;
+          assets.delete(id);
+          while (assets.size >= 8) {
+            const oldest = assets.keys().next().value;
+            if (oldest === undefined) return false;
+            assets.delete(oldest);
+          }
+          assets.set(id, {});
+          return true;
+        },
+        setDocument(id, supplied) {
+          const retained = models.find((model) => model.documentId === id);
+          // Concurrent first frames can repeat a full payload before its acknowledgement returns.
+          // Failed instances still require the existing full-replacement recovery.
+          if (
+            retained &&
+            !models.find((model) => model.documentId === id && !model.lastRenderSucceeded) &&
+            JSON.stringify(retained.document) === JSON.stringify(supplied)
+          )
+            return;
+          models.deleteWhere((model) => model.documentId === id);
+        },
+      });
+      if (!resolution.ok) {
+        if (resolution.code === 'cacheMiss')
+          return returnEffectRuntimeRetryInputs(value, resolution.missingRef);
+        closeEffectRuntimeBitmaps(value);
+        return createEffectRuntimeFailure(value, resolution.code);
+      }
+      const request = resolution.request;
+      const modelKey = JSON.stringify([request.documentId, request.effectInstanceId]);
+      const retained = models.get(modelKey);
+      // Count shared document bytes per instance conservatively within the existing total budget.
+      const model: PreparedModel = retained ?? {
+        documentId: request.documentId,
+        document: request.document,
+        sourceBytes: new TextEncoder().encode(JSON.stringify(request.document)).byteLength,
+        retainedBytes: 0,
+        renderer: null,
+        loading: null,
+        retired: false,
+        lastRenderSucceeded: false,
+      };
+      model.lastRenderSucceeded = false;
+      const previousBytes = model.retainedBytes;
+      model.retainedBytes = request.renderWidth * request.renderHeight * 4;
+      if (!models.set(modelKey, model)) {
+        model.retainedBytes = previousBytes;
+        throw new EffectRuntimeResourceError();
+      }
+      model.loading ??= dependencies.createRenderer(model.document).then((renderer) => {
+        if (disposed || model.retired) {
+          renderer.dispose();
+          throw new DOMException('Animation model was retired.', 'AbortError');
+        }
+        model.renderer = renderer;
+        return renderer;
+      });
+      const renderer = await model.loading;
+      lifetime.signal.throwIfAborted();
+      const bitmap = await renderer.render({
+        time: request.time,
+        width: request.renderWidth,
+        height: request.renderHeight,
+        values: request.controls,
+        signal: lifetime.signal,
+      });
+      if (disposed || model.retired) {
+        bitmap.close();
+        return createEffectRuntimeFailure(request, 'stale');
+      }
+      if (bitmap.width !== request.renderWidth || bitmap.height !== request.renderHeight) {
+        bitmap.close();
+        return createEffectRuntimeFailure(request, 'outputRejected');
+      }
+      model.lastRenderSucceeded = true;
+      return {
+        ...getEffectRuntimeIdentity(request),
+        kind: 'frame',
+        bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        acknowledged: {
+          documentId: request.documentId,
+          assetSelectionId: request.assetSelectionId,
+        },
+      };
+    } catch (error) {
+      closeEffectRuntimeBitmaps(value);
+      return createEffectRuntimeFailure(
+        value,
+        disposed
+          ? 'stale'
+          : error instanceof LottieResourceIdentityError
+            ? 'inputRejected'
+            : error instanceof EffectRuntimeResourceError
+              ? 'resourceLimit'
+              : 'outputRejected'
+      );
+    }
   };
-  const assets = createEffectRuntimeWorkerAssetCache();
-  const models = createEffectRuntimePreparedModelCache<PreparedEffectRuntimeModel>();
-  const canvases = createEffectRuntimeCanvasPool({ createCanvas: dependencies.createCanvas });
-  const resources = { assets, canvases, models, runtime };
   return {
-    dispose: () => disposeExecutionResources(resources),
-    execute: (value) => executeWithResources(value, resources),
+    execute(value: unknown): Promise<EffectRuntimeWorkerResult> {
+      const result = queue.then(() => execute(value));
+      queue = result.then(
+        () => undefined,
+        () => undefined
+      );
+      return result;
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      lifetime.abort();
+      models.clear();
+      assets.clear();
+    },
     snapshot: () => ({
-      assets: assets.snapshot(),
-      canvases: canvases.snapshot(),
       models: models.snapshot(),
+      assets: { entries: assets.size, bytes: 0 },
+      canvases: { entries: models.snapshot().entries },
     }),
   };
 }
 
-function disposeExecutionResources(resources: EffectRuntimeWorkerExecutionResources): void {
-  resources.assets.clear();
-  resources.models.clear();
-  resources.canvases.clear();
-  clearSvgVectorCache();
-}
-
-async function executeWithResources(
+export async function executeEffectRuntimeWorkerRequest(
   value: unknown,
-  resources: EffectRuntimeWorkerExecutionResources
-): Promise<EffectRuntimeWorkerResult> {
-  const resolution = resolveEffectRuntimeWorkerRequest(value, {
-    getAssets: (id) => resources.assets.get(id),
-    getDocument: (id) => resources.models.get(id)?.document ?? null,
-    setAssets: (id, assets) => resources.assets.set(id, assets),
-    setDocument(id, document) {
-      resources.models.set(id, {
-        document,
-        normalized: prepareEffectRuntimeRenderModel(document),
-        renderer: createEffectV1GraphRenderer(document, resources.runtime),
-      });
-    },
-  });
-  if (!resolution.ok) return createResolutionFailure(value, resolution);
-  const model = resources.models.get(resolution.request.documentId);
-  if (!model) {
-    closeEffectRuntimeBitmaps(resolution.request.inputFrames);
-    return createEffectRuntimeFailure(resolution.request, 'crashed');
-  }
-  return executePreparedEffectRuntimeWorkerRequest(resolution.request, model, resources.canvases);
-}
-
-function createResolutionFailure(
-  value: unknown,
-  resolution: Exclude<ReturnType<typeof resolveEffectRuntimeWorkerRequest>, { ok: true }>
-): EffectRuntimeWorkerResult {
-  if (resolution.code === 'cacheMiss')
-    return returnEffectRuntimeRetryInputs(value, resolution.missingRef);
-  closeEffectRuntimeBitmaps(value);
-  return createEffectRuntimeFailure(value, resolution.code);
-}
-
-export function executeEffectRuntimeWorkerRequest(
-  value: unknown,
-  dependencies: EffectRuntimeWorkerExecutionDependencies = {
-    createCanvas: (width, height) => new OffscreenCanvas(width, height),
-  },
-  state?: EffectRuntimeWorkerExecutionState
+  dependencies: ExecutionDependencies = defaultDependencies,
+  state?: ReturnType<typeof createEffectRuntimeWorkerExecutionState>
 ): Promise<EffectRuntimeWorkerResult> {
   if (state) return state.execute(value);
-  const ownedState = createEffectRuntimeWorkerExecutionState(dependencies);
-  return ownedState.execute(value).finally(() => ownedState.dispose());
+  const owned = createEffectRuntimeWorkerExecutionState(dependencies);
+  try {
+    return await owned.execute(value);
+  } finally {
+    owned.dispose();
+  }
 }

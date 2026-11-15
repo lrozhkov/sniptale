@@ -58,7 +58,14 @@ it('samples the selected output range at final dimensions and disposes its isola
     },
     signal: new AbortController().signal,
   });
-  expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ sampleFps: 30 }));
+  expect(mocks.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      sampleFps: 30,
+      sceneOutput: { width: 1904, height: 1064, resolution: '1080P', includeSubtitles: false },
+      sourceDiscontinuity: false,
+      assertCaptions: expect.any(Function),
+    })
+  );
   expect(project.fps).toBe(24);
   expect(mocks.renderFrame).toHaveBeenCalledTimes(60);
   expect(mocks.renderFrame.mock.calls[0]?.[0]).toBe(3);

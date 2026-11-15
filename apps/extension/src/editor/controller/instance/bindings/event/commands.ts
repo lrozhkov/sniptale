@@ -1,3 +1,4 @@
+import { syncEditorHistoryRuntimeState } from '../../../runtime';
 import { fireAndReportEditorAction } from '../../../../runtime/async-actions';
 import type { EditorSelectionNudge } from '../../../tools/nudge';
 import type { EditorControllerInstance } from '../../types';
@@ -21,6 +22,12 @@ export function createEditorControllerEventCommandBindings(controller: EditorCon
       ),
     applyTextSelectionStyle: (command: Parameters<typeof controller.applyTextSelectionStyle>[0]) =>
       controller.applyTextSelectionStyle(command),
+    syncHistoryState: () => syncEditorHistoryRuntimeState(controller.canvas, controller.history),
+    beginFreehandCompletion: () => {
+      const service = controller.autosaveService;
+      service?.setPendingCompletionActive(true);
+      return () => service?.setPendingCompletionActive(false);
+    },
     commitHistory: () => controller.commitHistory(),
     syncRuntimeState: () => controller.syncRuntimeState(),
     syncViewportState: () => controller.syncViewportState(),

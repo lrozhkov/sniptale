@@ -1,3 +1,4 @@
+import { createSourceImageFilter } from '../../../image-filters/contract';
 import { createQuickEditWatermark } from '../../project/scene/watermark';
 import { loadQuickEditAdvancedState, loadQuickEditAdvancedContentState } from './validation';
 import { reviewAdvancedContentBaseline } from '../document';
@@ -134,7 +135,7 @@ it('keeps track visibility independent of mode and suppresses effects in basic m
   });
   expect(basic).toMatchObject({
     mode: 'basic',
-    actionsTrackVisible: true,
+    actionsTrackVisible: false,
     zoomTrackVisible: false,
     audioTrackVisible: false,
     overlaysVisible: false,
@@ -556,7 +557,7 @@ it('suppresses action presentations independently of their visible lane and keep
   state.ui.tracks.actions = false;
   expect(resolveQuickEditEffectiveFeatures(state)).toMatchObject({
     actionsApplied: false,
-    actionsTrackVisible: false,
+    actionsTrackVisible: true,
   });
   state.ui.tracks.actions = true;
   state.ui.mode = 'basic';
@@ -803,4 +804,157 @@ it('admits alpha replacement metadata without another audio lane or implicit gai
     ).toEqual({ kind: 'ready', video: 'copy', audio: 'copy', reasons: [] });
     expect(state.audio).toEqual(before.audio);
   }
+});
+
+it.each(['basic', 'advanced'] as const)(
+  'applies source color independently of %s presentation and forces rendered export only for active filters',
+  (mode) => {
+    const state = createQuickEditAdvancedState();
+    state.ui.mode = mode;
+    const color = createSourceImageFilter('color', 'color');
+    if (color.kind !== 'color') throw new Error('Expected color.');
+    state.sourceFilters = { version: 1, filters: [color] };
+    const document = { edits: [], canvasComments: [] };
+    expect(resolveQuickEditEffectiveState(state).sourceFilters).toEqual(state.sourceFilters);
+    expect(resolveQuickEditExportPlan({ advanced: state, document })).toEqual({
+      kind: 'ready',
+      video: 'copy',
+      audio: 'copy',
+      reasons: [],
+    });
+    color.parameters.exposure = 1;
+    expect(resolveQuickEditExportPlan({ advanced: state, document })).toEqual({
+      kind: 'ready',
+      video: 'render',
+      audio: 'copy',
+      reasons: ['source-filters'],
+    });
+    expect(
+      resolveQuickEditExportPlan({ advanced: state, document, videoRenderAvailable: false })
+    ).toMatchObject({ kind: 'unavailable' });
+    color.enabled = false;
+    expect(resolveQuickEditExportPlan({ advanced: state, document })).toEqual({
+      kind: 'ready',
+      video: 'copy',
+      audio: 'copy',
+      reasons: [],
+    });
+  }
+);
+
+it('requires audio encoding for active original processing and preserves packet-copy for explicit bypass', async () => {
+  const { createAudioEffectInstance } = await import('../../audio/effects/catalog');
+  const advanced = createQuickEditAdvancedState();
+  advanced.audio.original.audioProcessing = {
+    version: 1,
+    bypassed: false,
+    effects: [createAudioEffectInstance('eq', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1')],
+  };
+  const document = { edits: [], canvasComments: [] };
+  expect(
+    resolveQuickEditExportPlan({ document, advanced, audioProcessingAvailable: true })
+  ).toMatchObject({ audio: 'process' });
+  advanced.audio.original.audioProcessing.bypassed = true;
+  expect(
+    resolveQuickEditExportPlan({ document, advanced, audioProcessingAvailable: true })
+  ).toMatchObject({ audio: 'copy' });
+});
+
+it('prepares cursor observations for independent 3D while zoom following remains disabled', async () => {
+  const { createQuickEditZoomRegion } = await import('./zoom');
+  const { evaluateQuickEditCameraAtTime } = await import('./scene');
+  const state = createQuickEditAdvancedState();
+  state.ui.mode = 'advanced';
+  state.ui.tracks.zoom = true;
+  state.cursorFocusPath = {
+    version: 1,
+    mode: 'fixed',
+    smoothing: 0,
+    sensitivity: 0.5,
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'cursor',
+        binding: { kind: 'project' },
+        start: 0,
+        end: 4,
+        keys: [
+          {
+            id: 'left',
+            time: 0,
+            x: 0.1,
+            y: 0.5,
+            anchor: 'manual',
+            authored: true,
+            interpolation: 'linear',
+          },
+          {
+            id: 'right',
+            time: 4,
+            x: 0.9,
+            y: 0.5,
+            anchor: 'manual',
+            authored: true,
+            interpolation: 'linear',
+          },
+        ],
+      },
+    ],
+  };
+  state.zoom = {
+    enabled: true,
+    regions: [
+      {
+        ...createQuickEditZoomRegion({ id: '3d', at: 0, duration: 4 }),
+        effect: '3d',
+        followCursor: false,
+        cursorComposition: { mode: 'orbit', amount: 0.5, smoothness: 0 },
+      },
+    ],
+  };
+  const effective = resolveQuickEditEffectiveState(state);
+  expect(effective.zoomRegions[0]?.cursorFocus).toBeDefined();
+  const left = evaluateQuickEditCameraAtTime(effective.zoomRegions, 1),
+    right = evaluateQuickEditCameraAtTime(effective.zoomRegions, 3);
+  expect(left.scale).toBe(1);
+  expect(right.scale).toBe(1);
+  expect(left.spatial?.rotation).toBeDefined();
+  expect(left.spatial?.rotation).not.toEqual(right.spatial?.rotation);
+  const zero = {
+    ...effective.zoomRegions[0]!,
+    cursorComposition: { mode: 'orbit' as const, amount: 0, smoothness: 0 },
+    perspective: { enabled: true, rotateX: 20, rotateY: 30, rotateZ: 0, strength: 1 },
+  };
+  expect(evaluateQuickEditCameraAtTime([zero], 2).spatial).toBeUndefined();
+});
+
+it('requires frame rendering for a freeze even when insertion is a packet-copy boundary', () => {
+  const advanced = createQuickEditAdvancedState();
+  const document = {
+    canvasComments: [],
+    edits: [
+      {
+        id: 'hold',
+        kind: 'freeze' as const,
+        start: 2,
+        end: 2,
+        requestedStart: 2,
+        requestedEnd: 2,
+        duration: 2,
+        frameTime: 2,
+        frameDuration: 0.04,
+      },
+    ],
+  };
+  const args = { advanced, document, videoCopyBoundaries: [0, 2, 4] };
+  expect(resolveQuickEditExportPlan(args)).toMatchObject({
+    kind: 'ready',
+    video: 'render',
+    audio: 'copy',
+    reasons: ['freeze-frame'],
+  });
+  expect(resolveQuickEditExportPlan({ ...args, videoRenderAvailable: false })).toMatchObject({
+    kind: 'unavailable',
+    reasons: ['video-encoder'],
+  });
 });

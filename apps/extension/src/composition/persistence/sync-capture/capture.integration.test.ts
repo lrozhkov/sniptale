@@ -1,3 +1,4 @@
+import { createImageReceiptFixture } from './test-support/image-receipt.test-support';
 import { enqueueSyncQueueOperation, beginSyncQueueRun, completeSyncQueueRun } from './queue';
 import { CaptureMode, VideoDisplaySurface } from '@sniptale/runtime-contracts/video/types/types';
 import { commitPreparedOutgoingOperation, preparedOutgoingOperationKey } from './outgoing';
@@ -1684,128 +1685,11 @@ it(
   }
 );
 
-async function imageReceiptWriter(source: 'screenshot' | 'project-asset' = 'screenshot') {
-  const assets = await import('../assets');
-  const documents = await import('../document-assets');
-  const { createEditorDocumentFixture } =
-    await import('../../../editor/document/page-session/document.test-support');
-  const { createPersistedEditorDocumentFixture } = await import('../document-assets/test-support');
-  const { saveScreenshotMediaAsset } = await import('../media-library/index.screenshots');
-  const mutations = await import('../image-aggregates/mutations');
-  const original = new Blob(['image-receipt-original'], { type: 'image/png' });
-  const { createMediaLibraryEntry, createProjectAssetEntry } =
-    await import('../projects/index.test-support');
-  const media =
-    source === 'screenshot'
-      ? await saveScreenshotMediaAsset({
-          id: 'image-native-receipt',
-          filename: 'receipt.png',
-          blob: original,
-          storageClass: 'library',
-        })
-      : createMediaLibraryEntry({
-          id: 'project-asset:imported-image-native-receipt',
-          source: { kind: 'project-asset', projectAssetId: 'imported-image-native-receipt' },
-          filename: 'imported.png',
-          originalFilename: 'imported.png',
-          size: original.size,
-          width: 100,
-          height: 80,
-          workspaceRevision: 0,
-          lifecycle: { storageClass: 'library', updatedAt: 1, savedAt: 1 },
-        });
-  const ref: AssetRef = {
-    assetId: 'receipt-source',
-    createdAt: 1,
-    location: { kind: 'opfs', objectKey: 'objects/receipt-source' },
-    mimeType: 'image/png',
-    size: original.size,
-    sha256: null,
-  };
-  const document = createEditorDocumentFixture();
-  table('asset_refs').set(ref.assetId, ref);
-  if (media.source.kind === 'project-asset') {
-    table('project_assets').set(
-      media.source.projectAssetId,
-      createProjectAssetEntry({
-        id: media.source.projectAssetId,
-        assetId: ref.assetId,
-        size: ref.size,
-        mimeType: ref.mimeType,
-      })
-    );
-    table('asset_owners').set(
-      JSON.stringify(['project-asset', media.source.projectAssetId, 'body']),
-      {
-        assetId: ref.assetId,
-        ownerKind: 'project-asset',
-        ownerId: media.source.projectAssetId,
-        role: 'body',
-      }
-    );
-    table('media_library').set(media.id, media);
-    const initial = await runWithIndexedDbMutation(async (db) => {
-      const { tx } = createProjectMutationStores(db);
-      const captured = await captureMediaInTransaction(tx, media.id, { checkpoint: 'freeze' });
-      await tx.done;
-      return captured;
-    });
-    if (initial?.phase !== 'native') throw new Error('Imported source capture is missing');
-    await publishCapture(initial);
-  }
-  table('asset_owners').set(JSON.stringify(['image-workspace', media.id, 'source-image']), {
-    assetId: ref.assetId,
-    ownerKind: 'image-workspace',
-    ownerId: media.id,
-    role: 'source-image',
-  });
-  table('media_library').set(media.id, { ...media, workspaceRevision: 1 });
-  table('image_workspaces').set(media.id, {
-    aggregateId: media.id,
-    document: createPersistedEditorDocumentFixture(document, ref.assetId),
-    revision: 1,
-    createdAt: media.createdAt,
-    updatedAt: media.updatedAt,
-    sourceTitle: null,
-    sourceUrl: null,
-  });
-  table('sync_capture').set('profile', { ...profile(), checkpointIntervalMs: 300000 });
-  vi.spyOn(documents, 'preparePersistedEditorDocument').mockImplementation(async (input) => ({
-    document: createPersistedEditorDocumentFixture(input, ref.assetId),
-    refs: [ref],
-    objects: [],
-    runtimeAssetsByUrl: new Map([['runtime-source', ref]]),
-  }));
-  const journal = vi
-    .spyOn(assets, 'createAssetPublicationJournal')
-    .mockImplementation(async (args) => ({
-      assetRefs: args.assetRefs,
-      createdAt: 1,
-      domain: args.domain,
-      journalId: crypto.randomUUID(),
-      payload: args.payload,
-    }));
-  vi.spyOn(assets, 'recoverStandaloneAssetPublications').mockResolvedValue(0);
-  vi.spyOn(assets, 'releaseAssetReadyProtection').mockResolvedValue(undefined);
-  vi.spyOn(assets, 'publishReadyJournalWithRetry').mockImplementation(async (ready, publish) => {
-    await publish(ready);
-  });
-  const save = (revision: number, padding: number) =>
-    mutations.commitImageWorkspace({
-      aggregateId: media.id,
-      expectedRevision: revision,
-      requireExistingRoot: true,
-      reusableAssetsByRuntimeUrl: new Map([[document.sourceImageData, ref]]),
-      document: { ...document, frame: { ...document.frame, paddingLeft: padding } },
-    });
-  return { media, original, document, ref, journal, save, mutations };
-}
-
 it(
   'defers a real imported project-asset Image workspace save without changing its ' +
     'original child ref or body owner',
   async () => {
-    const f = await imageReceiptWriter('project-asset');
+    const f = await createImageReceiptFixture({ table, profile, publishCapture }, 'project-asset');
     if (f.media.source.kind !== 'project-asset') throw new Error('Expected imported Image fixture');
     const childId = f.media.source.projectAssetId;
     const child = structuredClone(table('project_assets').get(childId));
@@ -1856,7 +1740,7 @@ it(
 );
 
 it('returns each real image native save receipt without persisting it in rows or journal payloads', async () => {
-  const f = await imageReceiptWriter();
+  const f = await createImageReceiptFixture({ table, profile, publishCapture });
   const first = await f.save(1, 10);
   const firstPending = await pendingSelection('media', f.media.id);
   expect(first.checkpointReceipt).toEqual({
@@ -1884,7 +1768,7 @@ it('returns each real image native save receipt without persisting it in rows or
 });
 
 it('does not acknowledge an image checkpoint receipt before native transaction commit', async () => {
-  const f = await imageReceiptWriter();
+  const f = await createImageReceiptFixture({ table, profile, publishCapture });
   let commit!: () => void;
   let entered!: () => void;
   const held = new Promise<void>((resolve) => {
@@ -1925,7 +1809,7 @@ it(
   'rejects image capture failure and stale CAS without acknowledging or retaining an ' +
     'uncommitted receipt',
   async () => {
-    const f = await imageReceiptWriter();
+    const f = await createImageReceiptFixture({ table, profile, publishCapture });
     const before = structuredClone(fixture.rows);
     failCaptureWrite = true;
     await expect(f.save(1, 10)).rejects.toThrow();
@@ -1943,7 +1827,7 @@ it(
   'retains the document receipt across presentation, omits replay receipt, and ' +
     'refuses old replay after a new edit',
   async () => {
-    const f = await imageReceiptWriter();
+    const f = await createImageReceiptFixture({ table, profile, publishCapture });
     const saved = await f.save(1, 10);
     const journal = await f.journal.mock.results[0]!.value;
     await f.mutations.commitImagePresentation({
@@ -1971,7 +1855,7 @@ it(
 );
 
 it('omits an image native receipt when canonical source admission creates its first immediate capture', async () => {
-  const f = await imageReceiptWriter();
+  const f = await createImageReceiptFixture({ table, profile, publishCapture });
   table('sync_capture').clear();
   table('sync_capture').set('profile', { ...profile(), checkpointIntervalMs: 300000 });
   const initial = await f.save(1, 10);
@@ -1992,7 +1876,7 @@ it.each(['image', 'review', 'scenario', 'montage'] as const)(
     let rootId: string;
     let write: () => Promise<unknown>;
     if (kind === 'image') {
-      const f = await imageReceiptWriter();
+      const f = await createImageReceiptFixture({ table, profile, publishCapture });
       rootKind = 'media';
       rootId = f.media.id;
       write = () => f.save(1, 10);
@@ -2055,7 +1939,7 @@ it.each(['image', 'review', 'scenario', 'montage'] as const)(
 );
 
 it('coalesces ten imported Image background saves into one complete due checkpoint', async () => {
-  const f = await imageReceiptWriter('project-asset');
+  const f = await createImageReceiptFixture({ table, profile, publishCapture }, 'project-asset');
   const beforeRefs = structuredClone(table('asset_refs'));
   const beforeChildren = structuredClone(table('project_assets'));
   let firstDue: number | undefined;
@@ -2084,7 +1968,7 @@ it(
   'keeps imported Image native rows and pending intent unchanged after transaction ' +
     'failure and admits one retry',
   async () => {
-    const f = await imageReceiptWriter('project-asset');
+    const f = await createImageReceiptFixture({ table, profile, publishCapture }, 'project-asset');
     const before = structuredClone(fixture.rows);
     failCaptureWrite = true;
     await expect(f.save(1, 10)).rejects.toThrow();
@@ -2101,7 +1985,7 @@ it(
   'refuses a stale imported Image writer after an accepted competing save without ' +
     'changing its pending revision',
   async () => {
-    const f = await imageReceiptWriter('project-asset');
+    const f = await createImageReceiptFixture({ table, profile, publishCapture }, 'project-asset');
     await f.save(1, 10);
     const before = structuredClone(fixture.rows);
     await expect(f.save(1, 20)).rejects.toMatchObject({ name: 'StaleImageWorkspaceError' });

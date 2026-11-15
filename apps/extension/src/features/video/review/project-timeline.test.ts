@@ -6,7 +6,7 @@ import {
   createVideoClip,
   createProject,
 } from '../project/timeline/project-meta.test.helpers';
-import { getMediaClipSourceTime } from '../project/timeline/rate';
+import { getMediaClipSourceTime, getVideoClipSourceTime } from '../project/timeline/rate';
 import { planReviewCutTransitions } from './cuts';
 import { REVIEW_SPEED_RATES } from './speed';
 import { buildReviewTimeMap, sourceToReviewResult } from './timeline';
@@ -292,4 +292,44 @@ it('projects source text once when video and original audio share immutable byte
   expect(
     projectVideoProjectTextFragment(project, entry, entry.document.fragments[0]!).ranges
   ).toEqual([{ start: 1, end: 2 }]);
+});
+
+it('transfers an original decoded frame as a held Native clip with silence and reversible timing', () => {
+  const input = fixture();
+  input.edits = [
+    {
+      id: 'hold',
+      kind: 'freeze',
+      start: 4,
+      end: 4,
+      requestedStart: 4,
+      requestedEnd: 4,
+      duration: 2,
+      frameTime: 3.98,
+      frameDuration: 0.04,
+    },
+  ];
+  const before = structuredClone(input);
+  const plan = planReviewProjectTimeline(input);
+  expect(plan.duration).toBe(10);
+  expect(plan.videoClips).toHaveLength(3);
+  const held = plan.videoClips[1]!;
+  expect(held).toMatchObject({
+    startTime: 4,
+    duration: 2,
+    sourceStart: 3.98,
+    sourceDuration: 0.04,
+    playbackRate: 1,
+    playbackWindow: { offset: 0, extent: 2, holdAt: 0 },
+    groupId: null,
+    muted: true,
+  });
+  for (const time of [4, 4.5, 5.99]) expect(getVideoClipSourceTime(held, time)).toBe(3.98);
+  expect(plan.audioClips).toHaveLength(2);
+  expect(plan.audioClips.map((clip) => [clip.startTime, clip.duration, clip.sourceStart])).toEqual([
+    [0, 4, 0],
+    [6, 4, 4],
+  ]);
+  expect(input).toEqual(before);
+  expect(planReviewProjectTimeline({ ...input, edits: [] }).duration).toBe(8);
 });

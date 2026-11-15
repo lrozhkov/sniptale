@@ -11,7 +11,7 @@ import {
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import type { ReviewEdit, ReviewOperation } from '../../features/video/review/types';
 import { readFileSync } from 'node:fs';
-import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
+import { createHash } from 'node:crypto';
 import { readReviewAnnotationEffectDocument } from '../../features/video/review/annotation-effects/validation';
 import type { ReviewAnnotationEffectSnapshot } from '../../features/video/review/annotation-effects/types';
 import { createHistoryRetentionWorkspace } from '../../composition/persistence/review-workspaces/history-retention.test-support';
@@ -109,16 +109,16 @@ it('resets a complete retained baseline without carrying old Cuts or content int
 it('applies locally with Undo/Redo and clears only discarded resources', async () => {
   const opened = initial();
   const source = readFileSync(
-    'apps/extension/public/video-effects/effects/annotations/sniptale-title/effect.sniptale-effect.json',
+    'apps/extension/public/video-effects/animations/title.sniptale-animation.json',
     'utf8'
   );
-  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(source));
+  const sha256 = createHash('sha256').update(source).digest('hex');
   const effect = readReviewAnnotationEffectDocument(source)!;
   const retained: ReviewAnnotationEffectSnapshot = {
     id: `effect:${sha256}`,
     sha256,
     source,
-    schemaVersion: 'sniptale.effect.v1',
+    schemaVersion: 'sniptale.animation.v1',
     kind: 'standalone',
     documentId: effect.id,
     retainedByteLength: new TextEncoder().encode(source).byteLength,

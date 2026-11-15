@@ -7,6 +7,7 @@ export type CapabilityScope =
   | 'llm:content-ai-pick'
   | 'llm:scenario-editor'
   | 'llm:review-text'
+  | 'llm:image-editor'
   | 'offscreen:command'
   | 'offscreen:runtime';
 

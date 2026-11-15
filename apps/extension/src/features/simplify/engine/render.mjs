@@ -262,7 +262,17 @@ export function render(ctx, source, catalog, settings, roi = null) {
   const boxes = choose(catalog, settings).sort(
     (a, b) => rank[a.shape] - rank[b.shape] || a.y - b.y || a.x - b.x
   );
-  for (const box of boxes) if (box.shape !== 'image') eraseOwned(ctx, box);
+  for (const box of boxes) {
+    if (settings.erase && (box.shape === 'image' || box.shape === 'graphic')) {
+      const bounds = box.paintBounds || box;
+      ctx.fillStyle = `rgb(${box.bg.join(',')})`;
+      ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
+    } else if (box.shape !== 'image') eraseOwned(ctx, box);
+  }
+  if (settings.erase) {
+    ctx.restore();
+    return;
+  }
   const contours = new Map(),
     presentation = presentationFor(catalog, source.width, source.height);
   for (const box of boxes) {

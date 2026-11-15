@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../../features/video/project/transition/gl-catalog';
 import { projectRecordingEventAction } from '../../features/video/project/recording-events/project-facts';
 import type { RecordingEventRecord } from '../../features/video/project/recording-events/types';
 import { applyVideoProjectMutationPatch } from '../../features/video/project/mutation';
@@ -100,7 +101,8 @@ function verifyDirectActionOwnerRouting() {
       duration: 0.6,
       easing: 'LINEAR',
       id: 'transition-1',
-      kind: 'CROSSFADE',
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       leadingClipId: 'missing-a',
       trailingClipId: 'missing-b',
     },

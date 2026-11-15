@@ -38,6 +38,7 @@ interface RenderProject extends VideoProject {
     assets: VideoProject['assets'];
     duration: number;
     reach: readonly (number | undefined)[];
+    sourceInteractions: VideoProject['sourceInteractionDocuments'];
   };
 }
 const refKey = (kind: 'action' | 'signal', id: string) => JSON.stringify([kind, id]);
@@ -229,6 +230,7 @@ export function attachRecordingEventGroups(
       assets: project.assets,
       duration: project.duration,
       reach: feedbackReach(project),
+      sourceInteractions: project.sourceInteractionDocuments,
     },
   };
   return result;
@@ -257,6 +259,7 @@ function windowFor(project: RenderProject) {
   const window = project[windowsKey];
   return window &&
     window.clips === project.clips &&
+    window.sourceInteractions === project.sourceInteractionDocuments &&
     window.assets === project.assets &&
     window.duration === project.duration &&
     window.reach.every((value, index) => value === feedbackReach(project)[index])

@@ -2,7 +2,8 @@ import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { ReviewEdit } from '../../features/video/review/types';
 
-vi.mock('../../features/video/composition/draw/spotlight', () => ({
+vi.mock('../../features/video/composition/draw/spotlight', async (original) => ({
+  ...(await original<typeof import('../../features/video/composition/draw/spotlight')>()),
   drawSceneSpotlights: vi.fn(),
 }));
 vi.mock('./window-header', async (importOriginal) => ({
@@ -43,6 +44,13 @@ vi.mock('mediabunny', async (importOriginal) => {
     height: number;
     close = vi.fn();
     draw = vi.fn();
+    allocationSize = () => state.sourceWidth * state.sourceHeight * 4;
+    toVideoFrame() {
+      const canvas = document.createElement('canvas');
+      canvas.width = state.sourceWidth;
+      canvas.height = state.sourceHeight;
+      return new VideoFrame(canvas, { timestamp: this.timestamp * 1_000_000 });
+    }
     constructor(source: HTMLCanvasElement | null, init: { timestamp: number; duration?: number }) {
       this.timestamp = init.timestamp;
       this.duration = init.duration ?? 0;
@@ -52,6 +60,8 @@ vi.mock('mediabunny', async (importOriginal) => {
   }
   class VideoSampleSink {
     async getSample(time: number) {
+      state.sampleTimes.push(time);
+      if (time < state.firstTimestamp) return null;
       const sample = new VideoSample(null, { timestamp: Math.floor(time * 2) / 2 });
       state.drawn.push({ draw: sample.draw, close: sample.close });
       return sample;

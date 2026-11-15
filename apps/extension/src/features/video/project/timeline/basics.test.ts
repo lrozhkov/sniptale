@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../transition/gl-catalog';
 import { describe, expect, it, vi } from 'vitest';
 import {
   calculateProjectDuration,
@@ -28,7 +29,6 @@ import {
   type VideoProjectVideoClip,
   VideoTimelinePlacementMode,
   VideoTrackKind,
-  VideoTransitionKind,
 } from '../types/index';
 function createTransform() {
   return {
@@ -243,7 +243,8 @@ function verifyDurationSync(): void {
       duration: 11,
       transitions: [
         expect.objectContaining({
-          kind: VideoTransitionKind.CROSSFADE,
+          kind: 'gl' as const,
+          selection: createGlTransitionSelection('Fade')!,
           leadingClipId: 'clip-video',
           trailingClipId: 'clip-image',
         }),

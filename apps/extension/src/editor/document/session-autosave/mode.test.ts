@@ -4,9 +4,42 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   activate,
   createDocument,
+  createWorkspaceCommitResult,
   commitPresentationMock,
   commitWorkspaceMock,
 } from './autosave.test-support';
+
+it('keeps an Undo result dirty while an older save acknowledges, then saves the newer revision', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const { useEditorStore } = await import('../../state/useEditorStore');
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  let release: () => void = () => undefined;
+  commitWorkspaceMock.mockImplementationOnce(
+    (input) =>
+      new Promise((resolve) => {
+        release = () => resolve(createWorkspaceCommitResult(input.expectedRevision + 1));
+      })
+  );
+  const saving = autosave.saveNow(() => createDocument('before-undo'));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(commitWorkspaceMock).toHaveBeenCalledOnce();
+  autosave.scheduleAutosave(createDocument('after-undo'));
+  release();
+  await saving;
+  expect(autosave.hasUnsavedChanges()).toBe(true);
+  expect(useEditorStore.getState().saveState).not.toBe('saved');
+  await autosave.flushAutosave(() => createDocument('after-undo'));
+  expect(commitWorkspaceMock.mock.calls.map(([input]) => input.document.sourceImageData)).toEqual([
+    'before-undo',
+    'after-undo',
+  ]);
+  expect(commitWorkspaceMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ expectedRevision: 1 })
+  );
+  expect(autosave.hasUnsavedChanges()).toBe(false);
+  autosave.dispose();
+});
 
 describe('image autosave ordered snapshot barriers', () => {
   it.each(['saveNow', 'persistSnapshot'] as const)(
@@ -20,7 +53,7 @@ describe('image autosave ordered snapshot barriers', () => {
         await new Promise<void>((resolve) => {
           release = resolve;
         });
-        return { revision: 1, documentAssetsByRuntimeUrl: new Map() };
+        return createWorkspaceCommitResult(1);
       });
       autosave.scheduleAutosave(createDocument('first'));
       await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
@@ -65,14 +98,13 @@ describe('image autosave ordered snapshot barriers', () => {
         .mockImplementationOnce(
           () =>
             new Promise((resolve) => {
-              releaseFirst = () => resolve({ revision: 1, documentAssetsByRuntimeUrl: new Map() });
+              releaseFirst = () => resolve(createWorkspaceCommitResult(1));
             })
         )
         .mockImplementationOnce(
           () =>
             new Promise((resolve, reject) => {
-              releaseExplicit = () =>
-                resolve({ revision: 2, documentAssetsByRuntimeUrl: new Map() });
+              releaseExplicit = () => resolve(createWorkspaceCommitResult(2));
               rejectExplicit = reject;
             })
         );
@@ -150,7 +182,7 @@ describe('image autosave latest flush', () => {
       await new Promise<void>((resolve) => {
         release = resolve;
       });
-      return { revision: 1, documentAssetsByRuntimeUrl: new Map() };
+      return createWorkspaceCommitResult(1);
     });
     autosave.scheduleAutosave(createDocument('acquired'));
     await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
@@ -192,7 +224,7 @@ describe('image autosave latest flush', () => {
       await new Promise<void>((resolve) => {
         release = resolve;
       });
-      return { revision: 1, documentAssetsByRuntimeUrl: new Map() };
+      return createWorkspaceCommitResult(1);
     });
     autosave.scheduleAutosave(createDocument('accepted'));
     await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
@@ -232,7 +264,7 @@ describe('image autosave latest flush', () => {
         await new Promise<void>((resolve) => {
           release = resolve;
         });
-        return { revision: 1, documentAssetsByRuntimeUrl: new Map() };
+        return createWorkspaceCommitResult(1);
       });
       autosave.scheduleAutosave(createDocument('first'));
       await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
@@ -287,7 +319,7 @@ describe('image autosave latest flush', () => {
       commitWorkspaceMock.mockImplementationOnce(
         () =>
           new Promise((resolve, fail) => {
-            release = () => resolve({ revision: 1, documentAssetsByRuntimeUrl: new Map() });
+            release = () => resolve(createWorkspaceCommitResult(1));
             reject = fail;
           })
       );
@@ -374,7 +406,7 @@ describe('image autosave mode', () => {
       await new Promise<void>((resolve) => {
         release = resolve;
       });
-      return { revision: input.expectedRevision + 1, documentAssetsByRuntimeUrl: new Map() };
+      return createWorkspaceCommitResult(input.expectedRevision + 1);
     });
     const first = autosave.saveNow(() => createDocument('first explicit'));
     const second = autosave.saveNow(() => createDocument('second explicit'));
@@ -406,7 +438,7 @@ describe('image autosave mode', () => {
       await new Promise<void>((resolve) => {
         release = resolve;
       });
-      return { revision: 1, documentAssetsByRuntimeUrl: new Map() };
+      return createWorkspaceCommitResult(1);
     });
     autosave.scheduleAutosave(createDocument('first'));
     await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
@@ -675,5 +707,48 @@ it('recovers a restored preview without marking its saved document failed', asyn
     expect.objectContaining({ expectedWorkspaceRevision: 4 })
   );
   expect(commitWorkspaceMock).not.toHaveBeenCalled();
+  autosave.dispose();
+});
+
+it('retains deferred completion protection independently of physical input activity', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  autosave.setPendingCompletionActive(true);
+  autosave.setInteractionActive(false);
+  expect(autosave.hasUnsavedChanges()).toBe(true);
+  autosave.setInteractionActive(true);
+  autosave.setPendingCompletionActive(false);
+  expect(autosave.hasUnsavedChanges()).toBe(true);
+  autosave.setInteractionActive(false);
+  expect(autosave.hasUnsavedChanges()).toBe(true);
+  await autosave.saveNow(() => createDocument('completed'));
+  expect(autosave.hasUnsavedChanges()).toBe(false);
+  autosave.dispose();
+});
+
+it('does not mark an accepted deferred completion clean when an older save acknowledges', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const { useEditorStore } = await import('../../state/useEditorStore');
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  let release: () => void = () => undefined;
+  commitWorkspaceMock.mockImplementationOnce(
+    (input) =>
+      new Promise((resolve) => {
+        release = () => resolve(createWorkspaceCommitResult(input.expectedRevision + 1));
+      })
+  );
+  const saving = autosave.saveNow(() => createDocument('older'));
+  await vi.advanceTimersByTimeAsync(0);
+  autosave.setPendingCompletionActive(true);
+  release();
+  await saving;
+  expect(autosave.hasUnsavedChanges()).toBe(true);
+  expect(useEditorStore.getState().saveState).not.toBe('saved');
+  autosave.scheduleAutosave(createDocument('completed'));
+  autosave.setPendingCompletionActive(false);
+  await autosave.flushAutosave(() => createDocument('completed'));
+  expect(autosave.hasUnsavedChanges()).toBe(false);
   autosave.dispose();
 });

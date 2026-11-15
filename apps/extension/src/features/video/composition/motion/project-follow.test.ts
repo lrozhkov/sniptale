@@ -829,3 +829,56 @@ it('uses continuous centering for cursor composition even with its 3D mode off',
       resolveProjectFollowingCamera(changed, following, 0.6).focusPoint.x
   ).toBeGreaterThan(30);
 });
+
+it.each(['embedded-fallback', 'separate'] as const)(
+  'ignores captured pointer containment while a custom cursor overrides it (%s)',
+  (captureMode) => {
+    const { project, region } = fixture();
+    const clip = project.clips.find((clip) => clip.type === 'VIDEO')!;
+    project.version = 54;
+    project.cursorTrack!.captureMode = captureMode;
+    project.sourceInteractionDocuments = [
+      {
+        id: 'custom',
+        binding: { assetId: clip.assetId, sourceInstanceId: clip.sourceInstanceId! },
+        cursorEnabled: true,
+        keyboardEnabled: true,
+        mouseEnabled: true,
+        timeline: { presses: [], overrides: [] },
+        cursorMotions: [
+          {
+            id: 'motion',
+            start: 0,
+            end: 3,
+            enabled: true,
+            shape: 'arrow',
+            size: 48,
+            color: '#eeeeee',
+            outline: '#222222',
+            shadow: true,
+            easing: 'linear',
+            points: [
+              { id: 'a', at: 0, x: 0.8, y: 0.5 },
+              { id: 'b', at: 1, x: 0.8, y: 0.5 },
+            ],
+          },
+        ],
+      },
+    ];
+    const movedFacts = {
+      ...project,
+      cursorTrack: {
+        ...project.cursorTrack!,
+        samples: project.cursorTrack!.samples.map((sample) => ({
+          ...sample,
+          x: 100,
+          recordingPoint: { x: 0.1, y: 0.5 },
+        })),
+      },
+    };
+    const primary = resolveProjectFollowingCamera(project, region, 1.5);
+    const changed = resolveProjectFollowingCamera(movedFacts, region, 1.5);
+    expect(changed.focusPoint).toEqual(primary.focusPoint);
+    expect(changed.pan).toEqual(primary.pan);
+  }
+);

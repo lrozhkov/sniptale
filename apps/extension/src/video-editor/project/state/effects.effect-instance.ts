@@ -1,3 +1,4 @@
+import { animationRuntimeDuration } from '../../../contracts/effect-runtime/animation';
 import {
   resolveEffectSourceInterval,
   activateRetainedEffectHost,
@@ -19,10 +20,7 @@ import type { VideoProject, VideoProjectEffectClip } from '../../../features/vid
 import { isExportReadyVideoProject } from '../../../features/video/project/validation/root';
 import { resolveEffectApplicationTarget } from './effects.junction';
 import { resolveEffectOwner } from '../../../features/video/project/effect-instance/owner';
-import {
-  isEffectInstanceEditable,
-  resizeClipEffectInterval,
-} from '../../../features/video/project/effect-instance/editing';
+import { isEffectInstanceEditable } from '../../../features/video/project/effect-instance/editing';
 import { applyEffectCatalogDocument } from '../../../features/video/project/effect-instance/apply';
 import type { VideoProjectEffectInstance } from '../../../features/video/project/effect-instance/types';
 import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
@@ -246,31 +244,14 @@ function createDuplicateEffectInstance(
         const instances = project.effectInstances ?? [];
         const index = instances.findIndex(({ id }) => id === instanceId);
         const source = instances[index];
-        if (!source || source.kind === 'transition' || !isEffectInstanceEditable(project, source))
-          return project;
-        if (source.kind === 'standalone') {
-          const host = project.clips.find(
-            (clip) => 'effectInstanceId' in clip && clip.effectInstanceId === source.id
-          );
-          if (!host) return project;
-          const duplicated = duplicateStandaloneEffectHost(project, host.id);
-          duplicateId = duplicated?.effectInstanceId ?? null;
-          return duplicated?.project ?? project;
-        }
-        const duplicate: VideoProjectEffectInstance = {
-          ...source,
-          controls: { ...source.controls },
-          id: crypto.randomUUID(),
-          startTime: source.startTime,
-        };
-        duplicateId = duplicate.id;
-        return applyVideoProjectMutationPatch(project, {
-          effectInstances: [
-            ...instances.slice(0, index + 1),
-            duplicate,
-            ...instances.slice(index + 1),
-          ],
-        });
+        if (!source || !isEffectInstanceEditable(project, source)) return project;
+        const host = project.clips.find(
+          (clip) => 'effectInstanceId' in clip && clip.effectInstanceId === source.id
+        );
+        if (!host) return project;
+        const duplicated = duplicateStandaloneEffectHost(project, host.id);
+        duplicateId = duplicated?.effectInstanceId ?? null;
+        return duplicated?.project ?? project;
       })
     );
     return duplicateId;
@@ -320,12 +301,8 @@ function updateMatchingEffectInstance(
   patch: Parameters<EffectInstanceActions['updateEffectInstance']>[1]
 ): VideoProjectEffectInstance {
   if (instance.id !== instanceId || !isEffectInstanceEditable(project, instance)) return instance;
-  const timed =
-    patch.startTime !== undefined || patch.duration !== undefined || patch.rangeMode !== undefined
-      ? resizeClipEffectInterval(project, instance, patch)
-      : instance;
   return {
-    ...timed,
+    ...instance,
     ...(patch.sceneAnchors ? { sceneAnchors: structuredClone(patch.sceneAnchors) } : {}),
     ...(patch.controls ? { controls: mergeControls(instance.controls, patch.controls) } : {}),
     ...(patch.enabled === undefined ? {} : { enabled: patch.enabled }),
@@ -511,7 +488,7 @@ export function planEffectSourceRangeRestore(project: VideoProject, instanceId: 
   const document = snapshot && readEffectPresentationDocument(snapshot.source).document;
   if (!interval || !document) return null;
   const duration = interval.end - interval.start;
-  const playbackRate = document.duration / duration;
+  const playbackRate = animationRuntimeDuration(document) / duration;
   if (
     !host.sourceRange.dormant &&
     Math.abs(host.startTime - interval.start) <= 1e-7 &&

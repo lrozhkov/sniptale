@@ -1,12 +1,16 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-
 import { describe, expect, it } from 'vitest';
-import { resolveEffectV1ObjectRenderBounds } from '@sniptale/runtime-contracts/effect-v1';
-import { parseEffectRuntimeSnapshotDocument } from '../runtime/snapshot-document';
-
+import {
+  parseAnimationTemplateSource,
+  resolveAnimationObjectRenderBounds,
+} from '@sniptale/runtime-contracts/animation-template';
+import { parseRuntimeAnimationDocument } from '../../../../../contracts/effect-runtime/animation';
+import { createGlTransitionSelection } from '../../../project/transition/gl-catalog';
 import {
   createEmptyVideoProject,
   createVideoProjectTrack,
+  createVideoProjectAsset,
 } from '../../../project/factories/creation';
 import { createEffectHostClip } from '../../../project/factories/overlay-clip';
 import {
@@ -16,7 +20,6 @@ import {
   VideoMediaFitMode,
   VideoProjectClipType,
   VideoTransitionEasing,
-  VideoTransitionKind,
   type VideoProject,
   type VideoProjectClip,
 } from '../../../project/types/index';
@@ -26,17 +29,134 @@ import {
   createRecordingBaseClip,
   createRecordingProjectAsset,
 } from '../../../project/factories/recording';
+import { isHydratableVideoProject } from '../../../project/validation/root';
+import { hydrateVideoProject } from '../../../project/hydration';
+import { parseEffectRuntimeSnapshotDocument } from '../runtime/snapshot-document';
 import { resolveEffectRuntimeFramePlans } from './plan';
 
-describe('shared EffectV1 preview/export frame plan', () => {
+function createSnapshot(name?: string) {
+  const neutral = parseRuntimeAnimationDocument({
+    format: 'sniptale-animation',
+    version: 1,
+    id: 'neutral-standalone',
+    label: { en: 'Neutral' },
+    resources: [],
+    controls: [],
+    bindings: [],
+    animation: { v: '5.12.2', w: 320, h: 180, fr: 30, ip: 30, op: 120, layers: [], assets: [] },
+  });
+  if (!neutral) throw new Error('Invalid neutral animation fixture');
+  const source = name
+    ? readFileSync(
+        name === 'callout'
+          ? 'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
+          : `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
+        'utf8'
+      )
+    : JSON.stringify(neutral);
+  const accepted = parseAnimationTemplateSource(source);
+  if (!accepted.ok) throw new Error(JSON.stringify(accepted.diagnostics));
+  const hash = createHash('sha256').update(source).digest('hex');
+  return {
+    assets: [],
+    documentId: accepted.template.id,
+    id: `effect:${hash}`,
+    kind: 'standalone' as const,
+    retainedByteLength: Buffer.byteLength(source),
+    schemaVersion: 'sniptale.animation.v1' as const,
+    sha256: hash,
+    source,
+  };
+}
+function replaceSnapshot(project: VideoProject, name?: string) {
+  const snapshot = createSnapshot(name),
+    document = parseEffectRuntimeSnapshotDocument(snapshot);
+  project.effectSnapshots = [snapshot];
+  project.effectInstances![0]!.snapshotId = snapshot.id;
+  project.effectInstances![0]!.controls = Object.fromEntries(
+    document.controls.map((control) => [control.id, control.defaultValue])
+  );
+  for (const handle of document.objectLayout?.handles ?? []) {
+    delete project.effectInstances![0]!.controls[handle.xControl];
+    delete project.effectInstances![0]!.controls[handle.yControl];
+  }
+  return document;
+}
+function createProject(): VideoProject {
+  const project = createEmptyVideoProject('Animation runtime', 1280, 720);
+  project.version = 52;
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
+  const trackId = project.tracks[0]!.id;
+  project.duration = 5;
+  project.clips = [createClip('clip-a', trackId, 0), createClip('clip-b', trackId, 2)];
+  project.assets = ['clip-a', 'clip-b'].map((id) => ({
+    ...createVideoProjectAsset(
+      id,
+      'IMAGE',
+      { kind: 'project-asset', projectAssetId: `${id}-material` },
+      {
+        width: 200,
+        height: 100,
+        duration: null,
+        mimeType: 'image/png',
+        size: 24,
+        hasAudio: false,
+        audioPeaks: null,
+      }
+    ),
+    id: `${id}-asset`,
+  }));
+  project.transitions = [
+    {
+      duration: 1,
+      easing: VideoTransitionEasing.LINEAR,
+      id: 'transition-1',
+      kind: 'gl',
+      selection: createGlTransitionSelection('Fade')!,
+      leadingClipId: 'clip-a',
+      trailingClipId: 'clip-b',
+    },
+  ];
+  const snapshot = createSnapshot();
+  project.effectSnapshots = [snapshot];
+  project.effectInstances = [
+    {
+      controls: {},
+      duration: 3,
+      enabled: true,
+      id: 'standalone-1',
+      kind: 'standalone',
+      playbackRate: 1,
+      snapshotId: snapshot.id,
+      startTime: 0,
+      target: { kind: 'scene' },
+    },
+  ];
+  const host = createEffectHostClip({
+    duration: 3,
+    effectInstanceId: 'standalone-1',
+    name: 'Standalone',
+    projectHeight: 720,
+    projectWidth: 1280,
+    startTime: 0,
+    trackId: project.tracks[1]!.id,
+  });
+  host.id = 'standalone-host';
+  host.transform = { height: 180, width: 320, opacity: 1, rotation: 0, x: 40, y: 50 };
+  project.clips.push(host);
+  return project;
+}
+
+describe('shared Lottie preview/export frame plan', () => {
   it('continues a standalone document subrange at its retained phase', () => {
-    const project = createProject();
-    const instance = project.effectInstances!.find(({ id }) => id === 'standalone-1')!;
+    const project = createProject(),
+      instance = project.effectInstances![0]!;
     Object.assign(instance, { sourceStart: 2, startTime: 9, duration: 1 });
     Object.assign(
-      project.clips.find(({ id }) => id === 'standalone-host')!,
+      project.clips.find((clip) => clip.id === 'standalone-host')!,
       { startTime: 9, duration: 1 }
     );
+    project.duration = 10;
     expect(resolveEffectRuntimeFramePlans(project, 9.5)).toEqual([
       expect.objectContaining({ effectInstanceId: instance.id, time: 2.5 }),
     ]);
@@ -44,212 +164,61 @@ describe('shared EffectV1 preview/export frame plan', () => {
   it.each([-1, NaN, Infinity, 3])('rejects invalid retained frame range %s', (sourceStart) => {
     const project = createProject();
     Object.assign(project.effectInstances![0]!, { sourceStart, duration: 1 });
+    Object.assign(
+      project.clips.find((clip) => clip.id === 'standalone-host')!,
+      { duration: 1 }
+    );
     expect(() => resolveEffectRuntimeFramePlans(project, 0.5)).toThrow(
       expect.objectContaining({ code: 'effectPlanIntegrityFailure' })
     );
   });
-  it('owns standalone, stable target chains, and transition timing without fallback', () => {
+  it('owns the animation clock independently from the GL source transition', () => {
     const plans = resolveEffectRuntimeFramePlans(createProject(), 2.5);
-
-    expect(plans.map(({ effectInstanceId }) => effectInstanceId)).toEqual([
-      'standalone-1',
-      'target-1',
-      'target-2',
-      'transition-1',
-    ]);
-    expectStandalonePlan(plans[0]);
-    expectTargetPlans(plans[1], plans[2]);
-    expectTransitionPlan(plans[3]);
+    expect(plans).toHaveLength(1);
+    expect(plans[0]).toMatchObject({
+      effectInstanceId: 'standalone-1',
+      dimensions: { width: 320, height: 180 },
+      kind: 'standalone',
+      target: { kind: 'scene', clipId: 'standalone-host' },
+      time: 2.5,
+      duration: 3,
+    });
   });
-
-  it('fails typed when persisted transition timing diverges from its owner segment', () => {
-    const project = createProject();
-    project.effectInstances![3] = { ...project.effectInstances![3]!, startTime: 1.5 };
-
-    expect(() => resolveEffectRuntimeFramePlans(project, 2.25)).toThrow(
-      expect.objectContaining({ code: 'effectTransitionTimingMismatch' })
-    );
+  it.each(['targetEffect', 'transition'] as const)(
+    'refuses retired %s annotation execution instead of selecting a fallback',
+    (kind) => {
+      const project = createProject();
+      Reflect.set(project.effectInstances![0]!, 'kind', kind);
+      Reflect.set(project.effectSnapshots![0]!, 'kind', kind);
+      expect(() => resolveEffectRuntimeFramePlans(project, 2.5)).toThrow(
+        expect.objectContaining({ code: 'effectPlanIntegrityFailure' })
+      );
+    }
+  );
+  it('does not request an annotation frame at its half-open interval end', () => {
+    expect(resolveEffectRuntimeFramePlans(createProject(), 3)).toEqual([]);
   });
-
-  it('does not request transition inputs at the half-open segment end', () => {
-    const project = createProject();
-
-    expect(resolveEffectRuntimeFramePlans(project, 3)).toEqual([]);
-  });
-
-  it('keeps both pre-effect transition rasters available at the transparent segment start', () => {
+  it('keeps canonical GL sources while the annotation owns no source-frame inputs', () => {
     const frame = resolveVideoCompositionFrame(createProject(), 2);
-
-    expect(frame.visualLayers.map(({ clipId }) => clipId)).not.toContain('clip-b');
-    expect(frame.effectInputLayers.map(({ clipId }) => clipId)).toEqual(['clip-a', 'clip-b']);
-    expect(frame.effectRuntimePlans.some(({ kind }) => kind === 'transition')).toBe(true);
+    expect(frame.visualLayers.map((layer) => layer.clipId)).toEqual(
+      expect.arrayContaining(['clip-a', 'clip-b', 'standalone-host'])
+    );
+    expect(frame.glTrackPlans?.size).toBe(1);
+    expect(frame.effectInputLayers).toEqual([]);
+    expect(frame.effectRuntimePlans.map((plan) => plan.kind)).toEqual(['standalone']);
   });
-
-  it('does not request target or transition work from hidden tracks', () => {
+  it('keeps annotation visibility independent from source tracks and editing locks', () => {
     const project = createProject();
     project.tracks[0]!.visible = false;
-
     expect(
-      resolveEffectRuntimeFramePlans(project, 2.5).map(({ effectInstanceId }) => effectInstanceId)
+      resolveEffectRuntimeFramePlans(project, 2.5).map((plan) => plan.effectInstanceId)
     ).toEqual(['standalone-1']);
+    project.tracks[1]!.locked = true;
+    expect(resolveEffectRuntimeFramePlans(project, 2.5)).toHaveLength(1);
+    project.tracks[1]!.visible = false;
+    expect(resolveEffectRuntimeFramePlans(project, 2.5)).toEqual([]);
   });
 });
-
-function expectStandalonePlan(plan: unknown): void {
-  expect(plan).toMatchObject({
-    dimensions: { height: 180, width: 320 },
-    kind: 'standalone',
-    target: { clipId: 'standalone-host', kind: 'scene' },
-    time: 2.5,
-  });
-}
-
-function expectTargetPlans(firstPlan: unknown, secondPlan: unknown): void {
-  expect(firstPlan).toMatchObject({
-    dimensions: { height: 100, width: 200 },
-    kind: 'targetEffect',
-    target: { chainIndex: 0, clipId: 'clip-a', kind: 'clip' },
-  });
-  expect(secondPlan).toMatchObject({
-    target: { chainIndex: 1, clipId: 'clip-a', kind: 'clip' },
-  });
-}
-
-function expectTransitionPlan(plan: unknown): void {
-  expect(plan).toMatchObject({
-    dimensions: { height: 720, width: 1280 },
-    kind: 'transition',
-    progress: 0.5,
-    target: {
-      kind: 'transition',
-      leadingClipId: 'clip-a',
-      trailingClipId: 'clip-b',
-      transitionId: 'transition-1',
-    },
-    time: 1.5,
-  });
-}
-
-function createProject(): VideoProject {
-  const project = createEmptyVideoProject('Effect runtime', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
-  const trackId = project.tracks[0]!.id;
-  project.duration = 5;
-  project.clips = [createClip('clip-a', trackId, 0), createClip('clip-b', trackId, 2)];
-  project.transitions = [
-    {
-      duration: 1,
-      easing: VideoTransitionEasing.LINEAR,
-      id: 'transition-1',
-      kind: VideoTransitionKind.CROSSFADE,
-      leadingClipId: 'clip-a',
-      trailingClipId: 'clip-b',
-    },
-  ];
-  attachEffectRuntimeState(project);
-  return project;
-}
-
-function attachEffectRuntimeState(project: VideoProject): void {
-  const standalone = createSnapshot('standalone', 1);
-  const target = createSnapshot('targetEffect', 2);
-  const transition = createSnapshot('transition', 3);
-  project.effectSnapshots = [standalone, target, transition];
-  project.clips.push(createStandaloneHost(project));
-  project.effectInstances = [
-    {
-      controls: readDefaults(standalone.source),
-      duration: 3,
-      enabled: true,
-      id: 'standalone-1',
-      kind: 'standalone',
-      playbackRate: 1,
-      snapshotId: standalone.id,
-      startTime: 0,
-      target: { kind: 'scene' },
-    },
-    ...['target-1', 'target-2'].map((id) => ({
-      controls: readDefaults(target.source),
-      duration: 3,
-      enabled: true,
-      id,
-      kind: 'targetEffect' as const,
-      playbackRate: 1,
-      snapshotId: target.id,
-      startTime: 0,
-      target: { clipId: 'clip-a', kind: 'clip' as const },
-    })),
-    {
-      controls: readDefaults(transition.source),
-      duration: 1,
-      enabled: true,
-      id: 'transition-1',
-      kind: 'transition',
-      playbackRate: 3,
-      snapshotId: transition.id,
-      startTime: 2,
-      target: { kind: 'transition', transitionId: 'transition-1' },
-    },
-  ];
-}
-
-function createStandaloneHost(project: VideoProject) {
-  const trackId = project.tracks.find(({ name }) => name === 'Annotations')?.id;
-  if (!trackId) throw new Error('Expected overlay track');
-  const host = createEffectHostClip({
-    duration: 3,
-    effectInstanceId: 'standalone-1',
-    name: 'standalone',
-    projectHeight: project.height,
-    projectWidth: project.width,
-    startTime: 0,
-    trackId,
-  });
-  host.id = 'standalone-host';
-  host.transform = {
-    height: 180,
-    opacity: 1,
-    rotation: 0,
-    width: 320,
-    x: 40,
-    y: 50,
-  };
-  return host;
-}
-
-function createSnapshot(kind: 'standalone' | 'targetEffect' | 'transition', index: number) {
-  const fileName =
-    kind === 'targetEffect'
-      ? 'neutral-target-effect.sniptale-effect.json'
-      : `neutral-${kind}.sniptale-effect.json`;
-  const source = readFileSync(
-    new URL(
-      `../../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/valid/${fileName}`,
-      import.meta.url
-    ),
-    'utf8'
-  );
-  const parsed = JSON.parse(source) as { id: string };
-  const sha256 = String(index).repeat(64);
-  return {
-    assets: [],
-    documentId: parsed.id,
-    id: `effect:${sha256}`,
-    kind,
-    retainedByteLength: new TextEncoder().encode(source).byteLength,
-    schemaVersion: 'sniptale.effect.v1' as const,
-    sha256,
-    source,
-  };
-}
-
-function readDefaults(source: string): Record<string, number | string> {
-  const parsed = JSON.parse(source) as {
-    controls: Array<{ defaultValue: number | string; id: string }>;
-  };
-  return Object.fromEntries(parsed.controls.map(({ defaultValue, id }) => [id, defaultValue]));
-}
-
 function createClip(id: string, trackId: string, startTime: number): VideoProjectClip {
   return {
     assetId: `${id}-asset`,
@@ -272,124 +241,79 @@ function createClip(id: string, trackId: string, startTime: number): VideoProjec
   };
 }
 
-it('separates extended negative raster bounds from rotated body placement and stable local time', () => {
-  const project = createProject();
-  const snapshot = project.effectSnapshots![0]!;
-  const source = readFileSync(
-    new URL(
-      '../../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/' +
-        'sniptale-callout.sniptale-effect.json',
-      import.meta.url
-    ),
-    'utf8'
-  );
-  snapshot.source = source;
-  snapshot.documentId = 'sniptale-callout';
-  const instance = project.effectInstances![0]!;
-  instance.controls = {};
+it('separates negative object bounds from rotated body placement and the local source clock', () => {
+  const project = createProject(),
+    document = replaceSnapshot(project, 'callout'),
+    instance = project.effectInstances![0]!;
   instance.sceneAnchors = { tip: { x: 0, y: 0 } };
-  const host = project.clips.find((c) => c.id === 'standalone-host')!;
-  host.transform = { ...host.transform, x: 600, y: 400, width: 760, height: 240, rotation: 37 };
-  const plan = resolveEffectRuntimeFramePlans(project, 1).find(
-    (p) => p.effectInstanceId === instance.id
+  const host = project.clips.find((clip) => clip.id === 'standalone-host')!;
+  host.transform = { ...host.transform, x: 600, y: 400, width: 760, height: 427.5, rotation: 37 };
+  const plan = resolveEffectRuntimeFramePlans(project, 1)[0]!;
+  const layer = resolveVideoCompositionFrame(project, 1).visualLayers.find(
+    (layer) => layer.clipId === host.id
   )!;
-  expect(plan.target).toMatchObject({ placement: host.transform });
-  expect(plan.controls['anchorX']).toBeLessThan(0);
+  expect(layer.kind).toBe('effect');
+  if (layer.kind !== 'effect') throw new Error('Missing supported annotation layer');
+  expect(layer.clip.transform).toEqual(host.transform);
+  expect(plan.target).toEqual({ kind: 'scene', clipId: host.id });
+  expect(plan.controls['tipX']).toBeLessThan(0);
   expect(plan.bitmapBounds!.x).toBeLessThan(0);
-  expect(plan.dimensions.width).toBeCloseTo(host.transform.width * plan.bitmapBounds!.width, 8);
-  expect(plan.renderDimensions.width * plan.renderDimensions.height).toBeLessThanOrEqual(8_388_608);
-  expect(
-    resolveEffectRuntimeFramePlans(project, 0).find((p) => p.effectInstanceId === instance.id)!
-      .bitmapBounds
-  ).toEqual(plan.bitmapBounds);
-  expect(
-    resolveEffectRuntimeFramePlans(project, 1).find((p) => p.effectInstanceId === instance.id)
-  ).toEqual(plan);
+  expect(plan.dimensions.width).toBeCloseTo(document.animation.w * plan.bitmapBounds!.width, 8);
+  expect(plan.renderDimensions.width * plan.renderDimensions.height).toBeLessThanOrEqual(8388608);
+  const start = resolveEffectRuntimeFramePlans(project, 0)[0]!;
+  expect(start.bitmapBounds).toEqual(plan.bitmapBounds);
+  expect(start.time).toBe(0);
+  expect(plan.time).toBe(1);
 });
-
-it('preserves an external callout pointer through its clip FX chain', () => {
+it('preserves external annotation coverage while GL transitions compose the ordinary source track', () => {
   const project = createProject();
-  const source = readFileSync(
-    'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-callout.sniptale-effect.json',
-    'utf8'
-  );
-  Object.assign(project.effectSnapshots![0]!, { source, documentId: 'sniptale-callout' });
-  Object.assign(project.effectInstances![0]!, {
-    controls: {},
-    sceneAnchors: { tip: { x: -200, y: -100 } },
-  });
-  for (const instance of project.effectInstances!.filter((item) => item.kind === 'targetEffect'))
-    instance.target = { kind: 'clip', clipId: 'standalone-host' };
-  const plans = resolveEffectRuntimeFramePlans(project, 1);
-  const host = plans.find((plan) => plan.kind === 'standalone')!;
-  expect(host.bitmapBounds!.x).toBeLessThan(0);
-  for (const fx of plans.filter((plan) => plan.kind === 'targetEffect')) {
-    expect(fx.bitmapBounds).toEqual(host.bitmapBounds);
-    expect(fx.dimensions).toEqual(host.dimensions);
-    expect(fx.renderDimensions).toEqual(host.renderDimensions);
-  }
+  replaceSnapshot(project, 'callout');
+  project.effectInstances![0]!.sceneAnchors = { tip: { x: -200, y: -100 } };
+  const before = resolveEffectRuntimeFramePlans(project, 1)[0]!,
+    frame = resolveVideoCompositionFrame(project, 2.5);
+  expect(before.bitmapBounds!.x).toBeLessThan(0);
+  expect(frame.glTrackPlans?.size).toBe(1);
+  expect(frame.effectRuntimePlans).toHaveLength(1);
+  expect(frame.effectRuntimePlans[0]!.bitmapBounds).toEqual(before.bitmapBounds);
+  expect(frame.effectRuntimePlans[0]!.dimensions).toEqual(before.dimensions);
 });
-
 it.each(['title', 'callout', 'corners', 'frame'])(
-  'keeps %s annotation geometry and current frame at fractional time',
+  'keeps %s geometry and the current frame at fractional time',
   (name) => {
-    const project = createProject();
-    const snapshot = project.effectSnapshots![0]!;
-    const source = readFileSync(
-      `apps/extension/public/video-effects/effects/annotations/sniptale-${name}/effect.sniptale-effect.json`,
-      'utf8'
-    );
-    snapshot.source = source;
-    const document = parseEffectRuntimeSnapshotDocument(snapshot);
-    snapshot.documentId = document.id;
-    const instance = project.effectInstances![0]!;
-    instance.controls = Object.fromEntries(
-      document.controls.map((control) => [control.id, control.defaultValue])
-    );
-    instance.sceneAnchors = { tip: { x: -100, y: -70 } };
+    const project = createProject(),
+      document = replaceSnapshot(project, name),
+      instance = project.effectInstances![0]!;
+    if (document.objectLayout?.handles?.length)
+      instance.sceneAnchors = { tip: { x: -100, y: -70 } };
     const host = project.clips.find((clip) => clip.id === 'standalone-host')!;
     host.transform = {
       ...host.transform,
-      width: document.objectLayout!.width * 2,
-      height: document.objectLayout!.height * 2,
+      width: document.animation.w * 2,
+      height: document.animation.h * 2,
       rotation: 23,
     };
-    const plan = resolveEffectRuntimeFramePlans(project, 1.019).find(
-      (entry) => entry.effectInstanceId === instance.id
-    )!;
-    const layout = document.objectLayout!;
-    const local =
-      layout.resize === 'reflow'
-        ? { ...layout, width: host.transform.width, height: host.transform.height }
-        : layout;
-    const bounds = resolveEffectV1ObjectRenderBounds(local, plan.controls);
-    expect(plan.dimensions.width).toBeCloseTo(
-      (host.transform.width * bounds.width) / local.width,
-      7
-    );
-    expect(plan.dimensions.height).toBeCloseTo(
-      (host.transform.height * bounds.height) / local.height,
-      7
-    );
-    expect(plan.bitmapBounds ?? { x: 0, y: 0, width: 1, height: 1 }).toEqual({
-      x: bounds.x / local.width,
-      y: bounds.y / local.height,
-      width: bounds.width / local.width,
-      height: bounds.height / local.height,
+    const plan = resolveEffectRuntimeFramePlans(project, 1.019)[0]!,
+      bounds = resolveAnimationObjectRenderBounds(document, plan.controls);
+    expect(plan.dimensions.width).toBeCloseTo(bounds.width, 7);
+    expect(plan.dimensions.height).toBeCloseTo(bounds.height, 7);
+    expect(plan.bitmapBounds).toEqual({
+      x: bounds.x / document.animation.w,
+      y: bounds.y / document.animation.h,
+      width: bounds.width / document.animation.w,
+      height: bounds.height / document.animation.h,
     });
     expect(plan.renderDimensions.width).toBeCloseTo(
-      Math.floor((host.transform.width * bounds.width) / local.width),
+      Math.floor((host.transform.width * bounds.width) / document.animation.w),
       0
     );
     expect(plan.renderDimensions.height).toBeCloseTo(
-      Math.floor((host.transform.height * bounds.height) / local.height),
+      Math.floor((host.transform.height * bounds.height) / document.animation.h),
       0
     );
     expect(plan.time).toBeCloseTo(1.019, 7);
     expect(plan.frameIndex).toBe(Math.floor(plan.time * project.fps));
   }
 );
-
 it('projects an ordinary effect onto its exact source and keeps missing placements dormant', () => {
   const project = createProject();
   const asset = createRecordingProjectAsset({
@@ -471,20 +395,23 @@ it('retains a standalone content clock through a held placement and reopen', () 
   const project = createProject();
   const host = project.clips.find(({ id }) => id === 'standalone-host')!;
   Object.assign(host, { duration: 3.3, playbackWindow: { offset: 0, holdAt: 2.9 } });
-  project.version = 43;
+  project.version = 52;
   const before = resolveEffectRuntimeFramePlans(project, 3.2);
   expect(before).toEqual([
     expect.objectContaining({ effectInstanceId: 'standalone-1', time: 2.9 }),
   ]);
   expect(resolveEffectRuntimeFramePlans(project, 3.3)).toEqual([]);
-  const reopened = JSON.parse(JSON.stringify(project));
+  const candidate: unknown = JSON.parse(JSON.stringify(project));
+  expect(isHydratableVideoProject(candidate)).toBe(true);
+  if (!isHydratableVideoProject(candidate)) throw new Error('Invalid supported reopen fixture');
+  const reopened = hydrateVideoProject(candidate);
   expect(resolveEffectRuntimeFramePlans(reopened, 3.2)).toEqual([
     expect.objectContaining({ time: 2.9 }),
   ]);
 });
 it('changes physical extent and retains logical target and external bounds', async () => {
   const { applyEffectRuntimeRasterDimensions } = await import('./plan');
-  const plan = resolveEffectRuntimeFramePlans(createProject(), 2.5)[1]!;
+  const plan = resolveEffectRuntimeFramePlans(createProject(), 2.5)[0]!;
   const original = structuredClone(plan);
   const physical = applyEffectRuntimeRasterDimensions(plan, { width: 3200, height: 1800 });
   expect(physical.renderDimensions).toEqual({ width: 3200, height: 1800 });

@@ -1,4 +1,8 @@
-import { EFFECT_V1_GRAPH_LIMITS } from '@sniptale/runtime-contracts/effect-v1';
+import {
+  EFFECT_RUNTIME_GPU_PAINT_LIMITS,
+  parseEffectRuntimeGpuPaint,
+} from '../../../../../contracts/effect-runtime/gpu-plan';
+import { EFFECT_RUNTIME_GPU_PLAN_LIMITS } from '../../../../../contracts/effect-runtime/gpu-plan';
 import { EFFECT_SVG_VECTOR_LIMITS } from '../../../../../contracts/effect-runtime/svg-vector';
 import { isImageBitmap } from '../../../../../contracts/effect-runtime/bitmap-lifetime';
 import {
@@ -40,10 +44,10 @@ type PlanExpectation = Pick<
 
 // Scalar commands can emit fill and stroke for every admitted SVG part.
 const MAX_NATIVE_PAINTS =
-  EFFECT_V1_GRAPH_LIMITS.expandedCommands * 2 * EFFECT_SVG_VECTOR_LIMITS.maxParts;
+  EFFECT_RUNTIME_GPU_PLAN_LIMITS.scalarOperations * 2 * EFFECT_SVG_VECTOR_LIMITS.maxParts;
 const MAX_PLAN_RESOURCES =
   MAX_NATIVE_PAINTS +
-  EFFECT_V1_GRAPH_LIMITS.expandedCommands +
+  EFFECT_RUNTIME_GPU_PLAN_LIMITS.scalarOperations +
   EFFECT_RUNTIME_RESOURCE_LIMITS.maxInputFrames +
   EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterEntries +
   1;
@@ -127,7 +131,41 @@ function parseResources(value: unknown): EffectRuntimeGpuResource[] | null {
   const ids = new Set<number>();
   const handles = new Set<ImageBitmap>();
   let bytes = 0;
+  let paintBytes = 0;
   for (const resource of value) {
+    if (isRecord(resource) && resource['kind'] === 'paint') {
+      const paint = parseEffectRuntimeGpuPaint(resource['paint']);
+      if (
+        !hasExactKeys(resource, [
+          'id',
+          'kind',
+          'width',
+          'height',
+          'paint',
+          ...(Object.hasOwn(resource, 'coverage') ? ['coverage'] : []),
+        ]) ||
+        (Object.hasOwn(resource, 'coverage') && resource['coverage'] !== true) ||
+        !id(resource['id']) ||
+        ids.has(resource['id']) ||
+        !physical(resource['width'], resource['height']) ||
+        !paint
+      )
+        return null;
+      paintBytes += JSON.stringify(paint).length * 2;
+      if (paintBytes > EFFECT_RUNTIME_GPU_PAINT_LIMITS.bytesPerPlan) return null;
+      bytes += (resource['width'] as number) * (resource['height'] as number) * 4;
+      if (bytes > EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterBytes) return null;
+      ids.add(resource['id']);
+      resources.push({
+        id: resource['id'],
+        kind: 'paint',
+        width: resource['width'] as number,
+        height: resource['height'] as number,
+        ...(resource['coverage'] === true ? { coverage: true as const } : {}),
+        paint,
+      });
+      continue;
+    }
     if (
       !isRecord(resource) ||
       !hasExactKeys(resource, ['id', 'kind', 'bitmap', 'width', 'height']) ||
@@ -195,7 +233,7 @@ function parsePasses(
   if (
     !Array.isArray(value) ||
     value.length === 0 ||
-    value.length > EFFECT_V1_GRAPH_LIMITS.expandedCommands
+    value.length > EFFECT_RUNTIME_GPU_PLAN_LIMITS.scalarOperations
   )
     return null;
   const resourcesById = new Map(resources.map((resource) => [resource.id, resource]));
@@ -241,7 +279,7 @@ function parsePasses(
         const coverage = resourcesById.get(operation.coverage);
         if (
           !coverage ||
-          coverage.kind !== 'coverage' ||
+          (coverage.kind !== 'coverage' && !(coverage.kind === 'paint' && coverage.coverage)) ||
           coverage.width !== pass['width'] ||
           coverage.height !== pass['height']
         )
@@ -250,9 +288,14 @@ function parsePasses(
       if (operation.op === 'draw') {
         if (operation.source.kind === 'resource') {
           const resource = resourcesById.get(operation.source.id);
-          if (!resource || resource.kind === 'coverage') return null;
-          if (resource.kind === 'primitive') {
-            // Each native paint transfers one fresh bitmap; immutable snapshots are emitted once.
+          if (
+            !resource ||
+            resource.kind === 'coverage' ||
+            (resource.kind === 'paint' && resource.coverage)
+          )
+            return null;
+          if (resource.kind === 'primitive' || resource.kind === 'paint') {
+            // Native paints have one draw owner; coverage and immutable pass snapshots can be reused.
             if (usedPrimitives.has(resource.id)) return null;
             usedPrimitives.add(resource.id);
           } else scalarOperations += 1;
@@ -264,10 +307,10 @@ function parsePasses(
         }
       }
       if (operation.op === 'clear') scalarOperations += 1;
-      if (scalarOperations > EFFECT_V1_GRAPH_LIMITS.expandedCommands) return null;
+      if (scalarOperations > EFFECT_RUNTIME_GPU_PLAN_LIMITS.scalarOperations) return null;
       parsed.push(operation);
     }
-    if (depth > EFFECT_V1_GRAPH_LIMITS.graphDepth) return null;
+    if (depth > EFFECT_RUNTIME_GPU_PLAN_LIMITS.depth) return null;
     depths.set(pass['id'], depth);
     passes.push({
       id: pass['id'],

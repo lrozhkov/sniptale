@@ -1,3 +1,5 @@
+import { Rect } from 'fabric';
+import { createEditorVectorInstance } from '../../../features/editor/document/vector-element';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -104,6 +106,7 @@ describe('editor-controller selection sync drawing dispatch', () => {
 
     expect(mocks.updateSelectionDrawingToolSettings).toHaveBeenCalledExactlyOnceWith('blur', {
       amount: 10,
+      clean: false,
     });
   });
 
@@ -117,4 +120,18 @@ describe('editor-controller selection sync drawing dispatch', () => {
     expect(mocks.syncStepSelectionSettings).toHaveBeenCalledWith(step);
     expect(mocks.syncRichShapeSelectionSettings).toHaveBeenCalledWith(richShape);
   });
+});
+
+it('does not overwrite ordinary selection tool settings from a vector instance', () => {
+  vi.clearAllMocks();
+  const object = new Rect({ fill: '#ff0000', stroke: '#0000ff' });
+  object.sniptaleType = 'vector-element';
+  object.sniptaleVectorElement = createEditorVectorInstance('a'.repeat(64));
+  const instance = structuredClone(object.sniptaleVectorElement);
+  syncSelectionToolSettingsFromObject(object, 'vector-element');
+  expect(object.sniptaleVectorElement).toEqual(instance);
+  expect(mocks.readEditorDrawingObject).not.toHaveBeenCalled();
+  expect(mocks.updateSelectionDrawingToolSettings).not.toHaveBeenCalled();
+  expect(mocks.syncRichShapeSelectionSettings).not.toHaveBeenCalled();
+  expect(mocks.syncStepSelectionSettings).not.toHaveBeenCalled();
 });

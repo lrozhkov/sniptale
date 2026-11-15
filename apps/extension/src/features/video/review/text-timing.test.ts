@@ -288,3 +288,39 @@ it.each(['source', 'result'] as const)(
     }
   }
 );
+
+it('saves a moved Speed after manually extending result text across its fractional boundary, and replays Undo', () => {
+  const videoSource = { ...source, duration: 70 };
+  const early = { ...speed(0.11496873836120566, 13.106436173177446), id: 'early' };
+  const before = { ...speed(39.16601686838407, 56.33468179699078), id: 'later' };
+  const { words: _words, ...manual } = phrase();
+  const document = baseline({
+    ...manual,
+    alignment: 'manual',
+    start: 25.984308908076937,
+    end: 41.25461561527931,
+  });
+  document.edits = [early, before];
+  const change: ReviewOperation = {
+    id: 'move-speed',
+    at: 1,
+    target: 'edit',
+    before,
+    after: {
+      ...before,
+      start: before.start + 1,
+      end: before.end + 1,
+      requestedStart: before.start + 1,
+      requestedEnd: before.end + 1,
+    },
+    preserveTextAnchors: true,
+    preserveVoiceoverAnchors: true,
+    normalizeVoiceoverTempo: true,
+  };
+  const moved = applyReviewOperation(document, change, videoSource);
+  expect(loadQuickEditAdvancedContentState(moved.advancedContent)).not.toBeNull();
+  expect(moved.edits[1]!.start).toBe(before.start + 1);
+  expect(moved.advancedContent.text!.fragments[0]!.text).toBe(manual.text);
+  expect(replayReviewHistory([change], 1, videoSource, document)).toEqual(moved);
+  expect(replayReviewHistory([change], 0, videoSource, document)).toEqual(document);
+});

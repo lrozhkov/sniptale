@@ -1,15 +1,10 @@
-import {
-  DEFAULT_VIDEO_TRANSITION_RENDER_KIND,
-  DEFAULT_VIDEO_TRANSITION_TEMPLATE,
-} from '../defaults';
 import { applyVideoProjectMutationPatch } from '../mutation';
-import { getClipEndTime, getTrackJunctions, type TrackJunction } from './junctions';
+import { getClipEndTime, getTrackJunctions } from './junctions';
 import { canCreateTransitionBoundary } from './rules';
-import { normalizeVideoProjectTransition } from './template';
+import { createDefaultVideoProjectTransition, parseVideoProjectTransition } from './contract';
 import {
   VideoClipTransitionKind,
   VideoTransitionEasing,
-  VideoTransitionKind,
   type VideoProject,
   type VideoProjectClip,
   type VideoProjectTransitionSegment,
@@ -17,52 +12,13 @@ import {
 } from '../types/index';
 
 function buildPairKey(leadingClipId: string, trailingClipId: string): string {
-  return `${leadingClipId}:${trailingClipId}`;
+  return JSON.stringify([leadingClipId, trailingClipId]);
 }
 
-function buildLegacyTransitionMap(project: VideoProject): Map<string, VideoProjectTransition> {
-  const legacyTransitions = new Map<string, VideoProjectTransition>();
-
-  for (const junction of getTrackJunctions(project)) {
-    if (
-      junction.leadingClip.transitionOut !== VideoClipTransitionKind.CROSSFADE &&
-      junction.trailingClip.transitionIn !== VideoClipTransitionKind.CROSSFADE
-    ) {
-      continue;
-    }
-
-    legacyTransitions.set(buildPairKey(junction.leadingClip.id, junction.trailingClip.id), {
-      duration: junction.duration,
-      easing: VideoTransitionEasing.LINEAR,
-      id: crypto.randomUUID(),
-      kind: VideoTransitionKind.CROSSFADE,
-      leadingClipId: junction.leadingClip.id,
-      trailingClipId: junction.trailingClip.id,
-    });
-  }
-
-  return legacyTransitions;
-}
-
-function createLegacySegmentTransition(junction: TrackJunction): VideoProjectTransition | null {
-  if (
-    junction.leadingClip.transitionOut !== VideoClipTransitionKind.CROSSFADE &&
-    junction.trailingClip.transitionIn !== VideoClipTransitionKind.CROSSFADE
-  ) {
-    return null;
-  }
-
-  return normalizeVideoProjectTransition({
-    duration: junction.duration,
-    easing: VideoTransitionEasing.LINEAR,
-    id: `legacy:${buildPairKey(junction.leadingClip.id, junction.trailingClip.id)}`,
-    kind: VideoTransitionKind.CROSSFADE,
-    leadingClipId: junction.leadingClip.id,
-    trailingClipId: junction.trailingClip.id,
-  });
-}
-
-export function syncProjectTransitions(project: VideoProject): VideoProject {
+export function syncProjectTransitions(
+  project: VideoProject,
+  options: { createMissingTransitions?: boolean } = {}
+): VideoProject {
   const junctions = getTrackJunctions(project);
   const transitionByPair = new Map(
     (project.transitions ?? []).map((transition) => [
@@ -70,35 +26,39 @@ export function syncProjectTransitions(project: VideoProject): VideoProject {
       transition,
     ])
   );
-  const legacyTransitions = buildLegacyTransitionMap(project);
 
-  const transitions = junctions.map((junction) => {
-    const existing =
-      transitionByPair.get(buildPairKey(junction.leadingClip.id, junction.trailingClip.id)) ??
-      legacyTransitions.get(buildPairKey(junction.leadingClip.id, junction.trailingClip.id));
+  const transitions = junctions
+    .filter(
+      (junction) =>
+        options.createMissingTransitions !== false ||
+        transitionByPair.has(buildPairKey(junction.leadingClip.id, junction.trailingClip.id))
+    )
+    .map((junction) => {
+      const existing = transitionByPair.get(
+        buildPairKey(junction.leadingClip.id, junction.trailingClip.id)
+      );
 
-    const normalized = normalizeVideoProjectTransition({
-      duration: junction.duration,
-      easing: existing?.easing ?? VideoTransitionEasing.LINEAR,
-      id: existing?.id ?? crypto.randomUUID(),
-      kind: existing?.kind ?? VideoTransitionKind.CROSSFADE,
-      leadingClipId: junction.leadingClip.id,
-      renderKind: existing?.renderKind ?? DEFAULT_VIDEO_TRANSITION_RENDER_KIND,
-      templateKind: existing?.templateKind ?? DEFAULT_VIDEO_TRANSITION_TEMPLATE,
-      trailingClipId: junction.trailingClip.id,
-      ...(existing?.direction ? { direction: existing.direction } : {}),
-      ...(existing?.highlightColor ? { highlightColor: existing.highlightColor } : {}),
-      ...(existing?.intensity ? { intensity: existing.intensity } : {}),
+      if (existing) {
+        if (!parseVideoProjectTransition(existing))
+          throw new Error('Unsupported explicit project transition.');
+        const audio = junction.leadingClip.type === 'AUDIO';
+        if ((existing.kind === 'audio') !== audio)
+          throw new Error('Project transition does not match its media boundary.');
+        return existing.duration === junction.duration
+          ? existing
+          : { ...existing, duration: junction.duration };
+      }
+      return createDefaultVideoProjectTransition(
+        {
+          duration: junction.duration,
+          easing: VideoTransitionEasing.LINEAR,
+          id: crypto.randomUUID(),
+          leadingClipId: junction.leadingClip.id,
+          trailingClipId: junction.trailingClip.id,
+        },
+        junction.leadingClip.type === 'AUDIO'
+      );
     });
-    const fields = new Map(Object.entries(normalized));
-    return existing &&
-      Object.keys(existing).length === fields.size &&
-      Object.entries(existing).every(
-        ([key, value]) => fields.has(key) && Object.is(fields.get(key), value)
-      )
-      ? existing
-      : normalized;
-  });
 
   const trailingTransitionIds = new Set(transitions.map((transition) => transition.trailingClipId));
   const leadingTransitionIds = new Set(transitions.map((transition) => transition.leadingClipId));
@@ -172,39 +132,9 @@ function buildExplicitTransitionSegments(project: VideoProject): VideoProjectTra
   });
 }
 
-function buildLegacyFallbackTransitionSegments(
-  project: VideoProject,
-  explicitPairKeys: ReadonlySet<string>
-): VideoProjectTransitionSegment[] {
-  const seenFallbackPairs = new Set<string>();
-
-  return getTrackJunctions(project).flatMap((junction) => {
-    const pairKey = buildPairKey(junction.leadingClip.id, junction.trailingClip.id);
-    if (explicitPairKeys.has(pairKey) || seenFallbackPairs.has(pairKey)) {
-      return [];
-    }
-
-    const transition = createLegacySegmentTransition(junction);
-    if (!transition) {
-      return [];
-    }
-
-    seenFallbackPairs.add(pairKey);
-    return createTransitionSegment(junction.leadingClip, junction.trailingClip, transition);
-  });
-}
-
+/** Rendering consumes explicit project entities; clip flags do not synthesize transitions. */
 export function buildProjectTransitionSegments(
   project: VideoProject
 ): VideoProjectTransitionSegment[] {
-  const explicitPairKeys = new Set(
-    (project.transitions ?? []).map((transition) =>
-      buildPairKey(transition.leadingClipId, transition.trailingClipId)
-    )
-  );
-
-  return [
-    ...buildExplicitTransitionSegments(project),
-    ...buildLegacyFallbackTransitionSegments(project, explicitPairKeys),
-  ];
+  return buildExplicitTransitionSegments(project);
 }

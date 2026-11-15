@@ -89,10 +89,6 @@ function renderRow(layerName = 'Layer 1') {
       <LayerRow
         locale="en"
         layer={{ ...BASE_LAYER, name: layerName } as never}
-        dragOverLayerId={null}
-        setDraggedLayerId={vi.fn() as never}
-        setDragOverLayerId={vi.fn() as never}
-        onDrop={vi.fn()}
         onOpenLayerEffects={vi.fn()}
       />
     );
@@ -169,10 +165,6 @@ it('passes enabled viewport navigation through layer selection actions', () => {
         locale="en"
         layer={BASE_LAYER as never}
         autoNavigateSelectedLayer
-        dragOverLayerId={null}
-        setDraggedLayerId={vi.fn() as never}
-        setDragOverLayerId={vi.fn() as never}
-        onDrop={vi.fn()}
         onOpenLayerEffects={vi.fn()}
       />
     );
@@ -218,48 +210,28 @@ it('starts inline renaming from the keyboard on the trigger button', () => {
   expect(editableNameMocks.startEditing).toHaveBeenCalledOnce();
 });
 
-it('forwards drag events for mutable layers', () => {
-  const setDraggedLayerId = vi.fn();
-  const setDragOverLayerId = vi.fn();
-  const onDrop = vi.fn();
-
-  container = document.createElement('div');
-  document.body.appendChild(container);
-  root = createRoot(container);
-  act(() => {
+it('uses a pointer grip without a native transparent drag image', () => {
+  const onPointerStart = vi.fn();
+  renderRow();
+  act(() =>
     root?.render(
       <LayerRow
         locale="en"
-        layer={BASE_LAYER as never}
-        dragOverLayerId={null}
-        setDraggedLayerId={setDraggedLayerId as never}
-        setDragOverLayerId={setDragOverLayerId as never}
-        onDrop={onDrop}
+        layer={{ ...BASE_LAYER, selected: true, effects: [] }}
+        onPointerStart={onPointerStart}
         onOpenLayerEffects={vi.fn()}
       />
-    );
-  });
-
-  const trigger = container?.querySelector('button[title="Layer 1"]') as HTMLButtonElement | null;
-  const row = trigger?.parentElement as HTMLDivElement | null;
-  const dragOverEvent = new Event('dragover', { bubbles: true });
-  const dropEvent = new Event('drop', { bubbles: true });
-  Object.defineProperty(dragOverEvent, 'preventDefault', { value: vi.fn() });
-  Object.defineProperty(dropEvent, 'preventDefault', { value: vi.fn() });
-
+    )
+  );
+  const grip = container?.querySelector<HTMLButtonElement>('[data-ui="editor.layers.drag-handle"]');
+  expect(grip?.draggable).toBe(false);
+  const drag = new Event('dragstart', { bubbles: true, cancelable: true });
   act(() => {
-    trigger?.dispatchEvent(new Event('dragstart', { bubbles: true }));
-    row?.dispatchEvent(dragOverEvent);
-    row?.dispatchEvent(dropEvent);
-    trigger?.dispatchEvent(new Event('dragend', { bubbles: true }));
+    grip?.dispatchEvent(drag);
+    grip?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
   });
-
-  expect(trigger?.draggable).toBe(true);
-  expect(setDraggedLayerId).toHaveBeenNthCalledWith(1, 'layer-1');
-  expect(setDraggedLayerId).toHaveBeenNthCalledWith(2, null);
-  expect(setDragOverLayerId).toHaveBeenNthCalledWith(1, 'layer-1');
-  expect(setDragOverLayerId).toHaveBeenNthCalledWith(2, null);
-  expect(onDrop).toHaveBeenCalledWith('layer-1');
+  expect(drag.defaultPrevented).toBe(true);
+  expect(onPointerStart).toHaveBeenCalledWith('layer-1', expect.anything());
 });
 
 it('keeps immutable rows non-draggable and skips drag updates', () => {
@@ -271,10 +243,6 @@ it('keeps immutable rows non-draggable and skips drag updates', () => {
         layer={
           { ...BASE_LAYER, id: 'source-image', immutable: true, name: 'Immutable Layer' } as never
         }
-        dragOverLayerId={null}
-        setDraggedLayerId={vi.fn() as never}
-        setDragOverLayerId={vi.fn() as never}
-        onDrop={vi.fn()}
         onOpenLayerEffects={vi.fn()}
       />
     );

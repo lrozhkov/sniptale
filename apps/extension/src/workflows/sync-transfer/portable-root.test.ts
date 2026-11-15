@@ -15,11 +15,7 @@ import {
 } from './prepared-root';
 import { parsePortableVideoProjectMetadata } from '../media-hub-backup/v6/root-codecs/projects';
 
-import {
-  EFFECT_BUNDLE_CORPUS,
-  readEffectBundleCorpusArchive,
-} from '../../../../../tooling/test/support/effect-v1-corpus.test-support';
-import { importEffectBundleZip } from '../../features/video/project/effect-bundle/import/zip';
+import { readValidAnimationSnapshot } from '../../composition/persistence/effect-bundles/fixture.test-support';
 
 import { ref, mediaRows, capture, admission, projectRows } from './portable-root.test-support';
 
@@ -35,98 +31,25 @@ beforeEach(() => {
       new File([new Uint8Array(ref.size)], name, { type: ref.mimeType })
   );
 });
-it('binds portable effect slots to staged refs while retaining only native JSON snapshot metadata', async () => {
-  const corpus = EFFECT_BUNDLE_CORPUS.find(
-    ({ accepted, artifact }) => accepted && artifact.includes('asset-bearing-conformance')
-  );
-  if (!corpus) throw new Error('Missing asset-bearing effect fixture.');
-  const imported = await importEffectBundleZip(readEffectBundleCorpusArchive(corpus));
-  if (!imported.ok) throw new Error('Invalid effect fixture.');
-  const document = imported.bundle.documents[0]!;
+it('prepares self-contained animation metadata and binds only the native video source', async () => {
   const encoded = await encodeCapturedPortableRoot(
     capture({ kind: 'video-project', rows: projectRows() })
   );
   const metadata = parsePortableVideoProjectMetadata(encoded.envelope.metadata);
-  const snapshotId = `effect:${document.sha256}`;
-  metadata.entry.project.effectSnapshots = [
-    {
-      id: snapshotId,
-      documentId: document.document.id,
-      kind: document.document.kind,
-      schemaVersion: 'sniptale.effect.v1',
-      sha256: document.sha256,
-      source: document.source,
-      retainedByteLength:
-        new TextEncoder().encode(document.source).byteLength +
-        document.assets.reduce((sum, asset) => sum + asset.byteLength, 0),
-      assets: document.assets.map((asset, index) => ({
-        objectId: `effect-${index}`,
-        id: asset.id,
-        kind: asset.kind,
-        byteLength: asset.byteLength,
-        mimeType: asset.mimeType,
-        sha256: asset.sha256,
-      })),
-    },
-  ];
-  const effectObjects = document.assets.map((asset, index) => ({
-    objectId: `effect-${index}`,
-    path: `_sniptale/assets/effect-${index}/effect.bin`,
-    filename: 'effect.bin',
-    mimeType: asset.mimeType,
-    size: asset.byteLength,
-  }));
-  const envelope = {
-    ...encoded.envelope,
-    metadata: JSON.parse(JSON.stringify(metadata)),
-    objects: [...encoded.envelope.objects, ...effectObjects],
-    descriptor: {
-      ...encoded.envelope.descriptor,
-      objectCount: 1 + effectObjects.length,
-      totalBytes: 1024 + effectObjects.reduce((sum, object) => sum + object.size, 0),
-    },
-  };
+  const snapshot = await readValidAnimationSnapshot();
+  metadata.entry.project.effectSnapshots = [snapshot];
+  const envelope = { ...encoded.envelope, metadata: JSON.parse(JSON.stringify(metadata)) };
   const sourceObjectId = encoded.envelope.objects[0]!.objectId;
-  const verifiedObjects = new Map([
-    [sourceObjectId, ref('native-source')],
-    ...effectObjects.map((object): [string, AssetRef] => [
-      object.objectId,
-      {
-        ...ref(`staged-${object.objectId}`),
-        size: object.size,
-        mimeType: object.mimeType,
-        sha256: null,
-      },
-    ]),
-  ]);
+  const verifiedObjects = new Map([[sourceObjectId, ref('native-source')]]);
   const parsed = await parsePortableSyncRoot(envelope);
-  expect(portableSyncEditingObjectIds(parsed)).toEqual([
-    sourceObjectId,
-    ...effectObjects.map((object) => object.objectId),
-  ]);
+  expect(portableSyncEditingObjectIds(parsed)).toEqual([sourceObjectId]);
   const args = { envelope, verifiedObjects, senderDependencies: [], admission: admission() };
   const payload = await preparePortableReplica(args);
-  if (payload.kind !== 'video-project') throw new Error('Expected project.');
-  expect(payload.input.root.snapshotRefs).toEqual(
-    document.assets.map((asset, index) => ({
-      snapshotId,
-      assetId: asset.id,
-      ref: verifiedObjects.get(`effect-${index}`),
-    }))
-  );
-  const slots = payload.input.root.entry.project.effectSnapshots![0]!.assets;
-  expect(slots).toEqual(
-    document.assets.map((asset) => ({
-      id: asset.id,
-      kind: asset.kind,
-      byteLength: asset.byteLength,
-      mimeType: asset.mimeType,
-      sha256: asset.sha256,
-    }))
-  );
+  if (payload.kind !== 'video-project') throw Error('Expected project');
+  expect(payload.input.root.entry.project.effectSnapshots).toEqual([snapshot]);
+  expect(payload.input.root.snapshotRefs ?? []).toEqual([]);
   expect(JSON.stringify(payload.input.root.entry)).not.toContain('"objectId"');
-  expect(slots.every((asset) => !('blob' in asset))).toBe(true);
-  verifiedObjects.delete(effectObjects[0]!.objectId);
+  verifiedObjects.delete(sourceObjectId);
   await expect(preparePortableReplica(args)).rejects.toThrow('binding');
 });
 it('encodes a frozen original and binds verified target bytes through the existing native row parser', async () => {

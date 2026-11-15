@@ -1,7 +1,10 @@
 import { Point, util, type Control } from 'fabric';
+import { isDrawingControlCaptured } from '../../drawing/object/controls/chrome';
+import { renderCanvasSelectionHandle } from '../../../ui/drawing-tools/selection-chrome';
 
-const EDITOR_BORDER_RESIZE_HIT_DISTANCE = 10;
-const EDITOR_BORDER_RESIZE_CORNER_GUARD = 22;
+import { createCornerCursorStyleHandler } from '../../drawing/object/controls/corner-cursor';
+
+const patchedEdgeCursors = new WeakSet<Control>();
 const EDITOR_EDGE_CONTROL_HIT_SIZE = 22;
 
 export const DEFAULT_EDGE_CONTROLS = ['mt', 'mr', 'mb', 'ml'] as const;
@@ -9,10 +12,6 @@ export const DEFAULT_EDGE_CONTROLS = ['mt', 'mr', 'mb', 'ml'] as const;
 type ControlActivationTarget = Parameters<Control['shouldActivate']>[1];
 type EdgeControlKey = (typeof DEFAULT_EDGE_CONTROLS)[number];
 type ScenePoint = { x: number; y: number };
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
 
 function renderHiddenEdgeControl(): void {
   // Edge resize remains targetable through Fabric controls, but the visual language stays corner-only.
@@ -24,36 +23,6 @@ export function isEditorHiddenEdgeControl(control: Control | undefined): boolean
 
 function distanceBetweenPoints(first: ScenePoint, second: ScenePoint): number {
   return Math.hypot(first.x - second.x, first.y - second.y);
-}
-
-function getPointToSegmentHitState(
-  point: ScenePoint,
-  start: ScenePoint,
-  end: ScenePoint
-): { distance: number; startDistance: number; endDistance: number } | null {
-  const segmentX = end.x - start.x;
-  const segmentY = end.y - start.y;
-  const segmentLengthSquared = segmentX * segmentX + segmentY * segmentY;
-
-  if (segmentLengthSquared <= 0) {
-    return null;
-  }
-
-  const progress = clamp(
-    ((point.x - start.x) * segmentX + (point.y - start.y) * segmentY) / segmentLengthSquared,
-    0,
-    1
-  );
-  const projected = {
-    x: start.x + segmentX * progress,
-    y: start.y + segmentY * progress,
-  };
-
-  return {
-    distance: distanceBetweenPoints(point, projected),
-    startDistance: distanceBetweenPoints(projected, start),
-    endDistance: distanceBetweenPoints(projected, end),
-  };
 }
 
 function getEdgeSegment(
@@ -89,15 +58,27 @@ function isPointOnResizableBorder(
     return false;
   }
 
-  const hitState = getPointToSegmentHitState(point, segment[0], segment[1]);
+  const center = { x: (segment[0].x + segment[1].x) / 2, y: (segment[0].y + segment[1].y) / 2 };
   const transform = object.canvas?.viewportTransform;
-  const zoom = transform ? Math.hypot(transform[0], transform[1]) : 1;
-
-  return Boolean(
-    hitState &&
-    hitState.distance <= EDITOR_BORDER_RESIZE_HIT_DISTANCE / zoom &&
-    hitState.startDistance >= EDITOR_BORDER_RESIZE_CORNER_GUARD / zoom &&
-    hitState.endDistance >= EDITOR_BORDER_RESIZE_CORNER_GUARD / zoom
+  const canvasZoom = transform ? Math.hypot(transform[0], transform[1]) : 1;
+  const canvas = object.canvas;
+  const cssScale =
+    canvas && canvas.getWidth?.() > 0
+      ? (canvas.upperCanvasEl?.getBoundingClientRect().width || canvas.getWidth()) /
+        canvas.getWidth()
+      : 1;
+  const hitDistance = distanceBetweenPoints(point, center);
+  const corners = object.getCoords();
+  const candidates = [
+    ...corners,
+    ...corners.map((corner, index) => {
+      const next = corners[(index + 1) % corners.length]!;
+      return { x: (corner.x + next.x) / 2, y: (corner.y + next.y) / 2 };
+    }),
+  ];
+  return (
+    hitDistance <= 11 / (canvasZoom * cssScale) &&
+    candidates.every((candidate) => hitDistance <= distanceBetweenPoints(point, candidate) + 1e-6)
   );
 }
 
@@ -114,13 +95,34 @@ function createEdgeControlShouldActivate(controlKey: EdgeControlKey): Control['s
   };
 }
 
-export function patchEdgeControl(control: Control | undefined, key: EdgeControlKey): void {
+export function patchEdgeControl(
+  control: Control | undefined,
+  key: EdgeControlKey,
+  hidden = false
+): void {
   if (!control) {
     return;
   }
 
+  if (!patchedEdgeCursors.has(control)) {
+    control.cursorStyleHandler = createCornerCursorStyleHandler(control.cursorStyleHandler);
+    patchedEdgeCursors.add(control);
+  }
   control.sizeX = EDITOR_EDGE_CONTROL_HIT_SIZE;
   control.sizeY = EDITOR_EDGE_CONTROL_HIT_SIZE;
   control.shouldActivate = createEdgeControlShouldActivate(key);
-  control.render = renderHiddenEdgeControl;
+  control.render = hidden
+    ? renderHiddenEdgeControl
+    : function (ctx, left, top, _override, object) {
+        renderCanvasSelectionHandle(
+          ctx,
+          left,
+          top,
+          key === 'ml' || key === 'mr' ? 'vertical' : 'horizontal',
+          {
+            color: object.cornerStrokeColor || '#2563eb',
+            active: isDrawingControlCaptured(object, key),
+          }
+        );
+      };
 }

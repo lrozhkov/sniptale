@@ -1,3 +1,8 @@
+import { AnimationSlotMappingDialog } from './slot-mapping-dialog';
+import { GlCatalogSettings } from './gl-catalog';
+import { SettingsSubpageTabs } from '../../../section-surface';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { Download } from 'lucide-react';
 import {
   EffectCatalogPreview,
   EffectCatalogPreviewProvider,
@@ -26,6 +31,25 @@ interface EffectSettingsItem extends SettingsCollectionItem {
 }
 
 export function VideoEffectsSection() {
+  useAppLocale();
+  const [category, setCategory] = useState('animation');
+  return (
+    <div className="space-y-3">
+      <SettingsSubpageTabs
+        activeId={category}
+        ariaLabel={translate('settings.navigation.videoEffects')}
+        items={[
+          { id: 'animation', label: translate('videoEditor.effectsLibrary.lottieCatalog') },
+          { id: 'transition', label: translate('videoEditor.effectsLibrary.glCatalog') },
+        ]}
+        onChange={setCategory}
+      />
+      {category === 'transition' ? <GlCatalogSettings /> : <AnimationEffectsSection />}
+    </div>
+  );
+}
+
+function AnimationEffectsSection() {
   const locale = useAppLocale();
   const controller = useVideoEffectsSettings();
   const input = useRef<HTMLInputElement>(null);
@@ -78,9 +102,27 @@ export function VideoEffectsSection() {
             if (!item) return;
             if (action.type === 'toggle' && item.documentId)
               void controller.toggle(item.packId, item.documentId, action.nextChecked);
+            if (action.type === 'edit' && item.documentId)
+              void controller.configure(
+                item.packId,
+                item.documentId,
+                document.activeElement instanceof HTMLElement ? document.activeElement : null
+              );
             if (action.type === 'delete') setDeleting({ id: item.packId, name: item.packName });
           }}
         />
+        {controller.mapping ? (
+          <AnimationSlotMappingDialog
+            key={controller.mapping.copyId}
+            template={controller.mapping.template}
+            copyId={controller.mapping.copyId}
+            anchor={controller.mapping.anchor}
+            busy={controller.busy}
+            error={controller.error}
+            onCancel={controller.closeMapping}
+            onSave={controller.saveMapping}
+          />
+        ) : null}
         <ProductConfirmDialog
           isOpen={deleting !== null}
           isLoading={controller.busy}
@@ -120,7 +162,7 @@ function resolveCollectionView(
 }
 
 function buildCollectionItems(
-  controller: Pick<ReturnType<typeof useVideoEffectsSettings>, 'entries' | 'busy'>,
+  controller: Pick<ReturnType<typeof useVideoEffectsSettings>, 'entries' | 'busy' | 'download'>,
   filter: EffectCatalogFilter,
   locale: 'ru' | 'en'
 ): EffectSettingsItem[] {
@@ -156,7 +198,26 @@ function buildCollectionItems(
         preview: <EffectCatalogPreview catalog={entry.entry} document={document} />,
         busy: controller.busy,
         meta: metadata.themeLabel || entry.label[locale],
-        capabilities: { toggle: true, delete: entry.source !== 'builtin' },
+        capabilities: {
+          toggle: true,
+          edit: entry.source !== 'builtin',
+          delete: entry.source !== 'builtin',
+        },
+        actions:
+          entry.source !== 'builtin' && document.kind === 'standalone' ? (
+            <ContentToolbarButton
+              tone="utility"
+              type="button"
+              className="!h-8 !w-8 !p-0"
+              aria-label={translate('videoEditor.effectsLibrary.downloadPack')}
+              title={translate('videoEditor.effectsLibrary.downloadPack')}
+              disabled={controller.busy}
+              data-collection-inline-action="download"
+              onClick={() => void controller.download(entry.packId)}
+            >
+              <Download size={14} />
+            </ContentToolbarButton>
+          ) : undefined,
       };
     });
   });
@@ -173,7 +234,7 @@ function EffectFileInput(props: {
       type="file"
       multiple
       className="sr-only"
-      accept=".sniptale-effect.json,.sniptale-bundle.zip,application/json,application/zip"
+      accept=".json,.lottie,.sniptale-animation.json,.sniptale-animations.zip,application/json,application/zip"
       disabled={props.busy}
       onChange={(event) => {
         const files = Array.from(event.currentTarget.files ?? []);

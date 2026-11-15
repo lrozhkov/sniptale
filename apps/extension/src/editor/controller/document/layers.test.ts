@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { FabricImage } from 'fabric';
+import { FabricImage, Group, Rect } from 'fabric';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   collectLayers,
+  findRasterContentObject,
   findObjectById,
   getLayerObjects,
   getObjectDimensions,
@@ -300,4 +301,199 @@ it('does not serialize canvas layers while collecting the list', () => {
     })
   );
   expect(toDataUrl).not.toHaveBeenCalled();
+});
+
+it('admits content permission independently of movement and refuses locked ancestors', () => {
+  const image = new FabricImage(document.createElement('canvas'));
+  image.sniptaleId = 'content';
+  image.sniptaleType = 'image';
+  image.sniptaleLocked = true;
+  image.set({ lockMovementX: true, lockMovementY: true });
+  const canvas = createCanvas([image]);
+  expect(findRasterContentObject(canvas, 'content')).toBeNull();
+  image.sniptaleContentLocked = false;
+  expect(findRasterContentObject(canvas, 'content')).toBe(image);
+  expect(image.lockMovementX).toBe(true);
+  image.sniptaleContentLocked = true;
+  image.sniptaleLocked = false;
+  expect(findRasterContentObject(canvas, 'content')).toBeNull();
+  image.sniptaleContentLocked = false;
+  const group = new Group([image]);
+  group.sniptaleLocked = true;
+  expect(findRasterContentObject(createCanvas([group]), 'content')).toBeNull();
+  group.sniptaleLocked = false;
+  group.visible = false;
+  expect(findRasterContentObject(createCanvas([group]), 'content')).toBeNull();
+  group.visible = true;
+  expect(findRasterContentObject(createCanvas([group]), 'content')).toBe(image);
+});
+
+it('admits managed tile backgrounds and excludes non-image backgrounds', () => {
+  const object = new Rect({ width: 10, height: 10 });
+  object.sniptaleId = 'bg';
+  object.sniptaleRole = 'background';
+  object.sniptaleBackgroundMode = 'image';
+  object.sniptaleLocked = true;
+  object.sniptaleContentLocked = false;
+  expect(findRasterContentObject(createCanvas([object]), 'bg')).toBe(object);
+  object.sniptaleBackgroundMode = 'color';
+  expect(findRasterContentObject(createCanvas([object]), 'bg')).toBeNull();
+});
+
+it('resolves nested inserted content through visible groups and refuses each ancestor boundary', () => {
+  const image = new FabricImage(document.createElement('canvas'), {
+    width: 24,
+    height: 16,
+    lockMovementX: true,
+    lockMovementY: true,
+    lockScalingX: true,
+    lockScalingY: true,
+    lockRotation: true,
+  });
+  image.sniptaleId = 'nested-image';
+  image.sniptaleLabel = 'Nested image';
+  image.sniptaleType = 'image';
+  image.sniptaleRole = 'annotation';
+  image.sniptaleLocked = true;
+  image.sniptaleContentLocked = false;
+  const vector = new Rect({ width: 10, height: 8, fill: '#00aa77' });
+  vector.sniptaleId = 'nested-vector';
+  vector.sniptaleType = 'shape';
+  const inner = new Group([image, vector]);
+  inner.sniptaleId = 'inner-group';
+  inner.sniptaleType = 'group';
+  const outer = new Group([inner]);
+  outer.sniptaleId = 'outer-group';
+  outer.sniptaleType = 'group';
+  const canvas = createCanvas([outer], [image]);
+
+  expect(findRasterContentObject(canvas, 'nested-image')).toBe(image);
+  expect(findRasterContentObject(canvas, 'nested-vector')).toBeNull();
+  expect(findRasterContentObject(canvas, 'inner-group')).toBeNull();
+  expect(findRasterContentObject(canvas, 'missing')).toBeNull();
+  const [layer] = collectLayers(canvas);
+  expect(layer).toMatchObject({
+    id: 'outer-group',
+    type: 'group',
+    groupSize: 1,
+    containsSelection: true,
+  });
+  expect(layer?.groupChildren?.[0]).toMatchObject({
+    id: 'inner-group',
+    type: 'group',
+    locked: false,
+    visible: true,
+    containsSelection: true,
+  });
+  expect(layer?.groupChildren?.[0]?.groupChildren).toEqual([
+    expect.objectContaining({
+      id: 'nested-vector',
+      type: 'shape',
+      selected: false,
+      locked: false,
+      visible: true,
+    }),
+    expect.objectContaining({
+      id: 'nested-image',
+      type: 'image',
+      name: 'Nested image',
+      selected: true,
+      locked: true,
+      visible: true,
+    }),
+  ]);
+
+  inner.sniptaleContentLocked = true;
+  expect(findRasterContentObject(canvas, 'nested-image')).toBeNull();
+  inner.sniptaleContentLocked = false;
+  inner.sniptaleLocked = true;
+  expect(findRasterContentObject(canvas, 'nested-image')).toBeNull();
+  inner.sniptaleLocked = false;
+  inner.visible = false;
+  expect(findRasterContentObject(canvas, 'nested-image')).toBeNull();
+  inner.visible = true;
+  outer.sniptaleContentLocked = true;
+  expect(findRasterContentObject(canvas, 'nested-image')).toBeNull();
+  outer.sniptaleContentLocked = false;
+  outer.sniptaleLocked = true;
+  expect(findRasterContentObject(canvas, 'nested-image')).toBeNull();
+  outer.sniptaleLocked = false;
+  outer.visible = false;
+  expect(findRasterContentObject(canvas, 'nested-image')).toBeNull();
+  outer.visible = true;
+  expect(findRasterContentObject(canvas, 'nested-image')).toBe(image);
+  expect(image).toMatchObject({
+    sniptaleLocked: true,
+    sniptaleContentLocked: false,
+    lockMovementX: true,
+    lockMovementY: true,
+    lockScalingX: true,
+    lockScalingY: true,
+    lockRotation: true,
+  });
+  image.sniptaleLocked = false;
+  delete image.sniptaleContentLocked;
+  image.set({
+    lockMovementX: false,
+    lockMovementY: false,
+    lockScalingX: false,
+    lockScalingY: false,
+    lockRotation: false,
+  });
+  expect(findRasterContentObject(canvas, 'nested-image')).toBe(image);
+  expect(image).toMatchObject({
+    lockMovementX: false,
+    lockMovementY: false,
+    lockScalingX: false,
+    lockScalingY: false,
+    lockRotation: false,
+  });
+});
+
+it('distinguishes unlocked inserted image content from ordinary vector and absent targets', () => {
+  const image = new FabricImage(document.createElement('canvas'), { width: 12, height: 8 });
+  image.sniptaleId = 'inserted';
+  image.sniptaleType = 'image';
+  image.sniptaleRole = 'annotation';
+  const vector = new Rect({ width: 12, height: 8 });
+  vector.sniptaleId = 'vector';
+  vector.sniptaleType = 'shape';
+  const canvas = createCanvas([vector, image]);
+  expect(findRasterContentObject(canvas, 'inserted')).toBe(image);
+  expect(findObjectById(canvas, 'inserted')).toBe(image);
+  expect(findRasterContentObject(canvas, 'vector')).toBeNull();
+  expect(findRasterContentObject(canvas, 'missing')).toBeNull();
+  expect(findRasterContentObject(null, 'inserted')).toBeNull();
+  image.visible = false;
+  expect(findRasterContentObject(canvas, 'inserted')).toBeNull();
+  image.visible = true;
+  image.sniptaleContentLocked = true;
+  expect(findRasterContentObject(canvas, 'inserted')).toBeNull();
+  image.sniptaleContentLocked = false;
+  expect(findRasterContentObject(canvas, 'inserted')).toBe(image);
+  expect(image).toMatchObject({
+    lockMovementX: false,
+    lockMovementY: false,
+    lockScalingX: false,
+    lockScalingY: false,
+    lockRotation: false,
+  });
+});
+
+it('projects nested child effects without flattening or sharing the native effect objects', () => {
+  const image = new FabricImage(document.createElement('canvas'));
+  image.sniptaleId = 'effect-child';
+  image.sniptaleType = 'image';
+  image.sniptaleLabel = 'Child image';
+  const effect = { id: 'brightness' as const, enabled: true, amount: 0.6 };
+  image.sniptaleEffects = [effect];
+  const group = new Group([image]);
+  group.sniptaleId = 'effect-group';
+  group.sniptaleType = 'group';
+  const layers = collectLayers(createCanvas([group], [image]));
+  expect(layers).toHaveLength(1);
+  expect(layers[0]?.id).toBe('effect-group');
+  const child = layers[0]?.groupChildren?.[0];
+  expect(child).toMatchObject({ id: 'effect-child', name: 'Child image', effects: [effect] });
+  expect(child?.effects?.[0]).not.toBe(effect);
 });

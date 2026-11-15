@@ -2,6 +2,7 @@ import type { SimplifyPixelSource, SimplifyPaintContext, SimplifyCanvasSource } 
 
 interface PaintSettings {
   content: 'text' | 'all';
+  erase?: boolean;
   sensitivity: number;
   thickness: number;
   color: 'auto' | 'custom';

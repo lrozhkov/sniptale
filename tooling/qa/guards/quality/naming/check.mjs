@@ -310,6 +310,14 @@ export function collectNamingViolations(
   ];
 }
 
+/** Path tokens can request owner review, but cannot establish an ownership violation. */
+function partitionNamingFindings(findings) {
+  return {
+    violations: findings.filter((finding) => finding.rule !== 'repeated-child-prefix-topology'),
+    advisories: findings.filter((finding) => finding.rule === 'repeated-child-prefix-topology'),
+  };
+}
+
 export function runNamingCheck({ files = [], repoWide = false, scope = 'workspace' } = {}) {
   if (!repoWide && scope === 'workspace') {
     const delta = collectWorkspaceNamingDelta();
@@ -320,14 +328,16 @@ export function runNamingCheck({ files = [], repoWide = false, scope = 'workspac
       collectNamingEntries(delta.currentFiles),
       collectNamingEntries(delta.previousFiles)
     );
-    return { files: delta.pathFiles, violations: [...pathViolations, ...topologyViolations] };
+    return { files: delta.pathFiles, violations: pathViolations, advisories: topologyViolations };
   }
   const namingFiles = files.length > 0 ? files : collectCodeFiles();
   return {
     files: namingFiles.map(toRelativePath),
-    violations: collectNamingViolations(namingFiles, {
-      includeRepeatedPrefix: files.length > 0 || repoWide,
-    }),
+    ...partitionNamingFindings(
+      collectNamingViolations(namingFiles, {
+        includeRepeatedPrefix: files.length > 0 || repoWide,
+      })
+    ),
   };
 }
 
@@ -337,19 +347,21 @@ export function runChangedNamingCheck({ files = [] } = {}) {
 
 export function runRepositoryNamingCheck() {
   const namingFiles = collectCodeFiles();
-  const findings = collectNamingViolations(namingFiles, { includeRepeatedPrefix: true });
+  const findings = partitionNamingFindings(
+    collectNamingViolations(namingFiles, { includeRepeatedPrefix: true })
+  );
   const baseline = applyRepositoryFindingBaseline({
     baselinePath: REPOSITORY_BASELINE_PATH,
     controlId: 'qa.rule.naming',
     findingKey,
-    findings,
+    findings: findings.violations,
     isAcceptedFinding: (current, accepted) => findingKey(current) === findingKey(accepted),
   });
   return {
     files: namingFiles.map(toRelativePath),
     scope: 'repo-wide',
     violations: baseline.violations,
-    advisories: baseline.advisories,
+    advisories: [...findings.advisories, ...baseline.advisories],
   };
 }
 
@@ -362,6 +374,7 @@ if (isExecutedAsScript(import.meta.url)) {
     ? runRepositoryNamingCheck()
     : runNamingCheck({ files, scope: files.length > 0 ? 'explicit' : 'workspace' });
 
+  if (result.advisories?.length) printViolations('Naming topology advisories:', result.advisories);
   if (result.violations.length > 0) {
     printViolations('Naming violations found:', result.violations);
     process.exit(reportOnly ? 0 : 1);

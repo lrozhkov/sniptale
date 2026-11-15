@@ -1,4 +1,4 @@
-import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import { buildReviewTimeMap, createReviewDisplayMap } from '../../features/video/review/timeline';
 import type { ReviewEdit } from '../../features/video/review/types';
 
 /** Navigation stays on the source axis while skipping removed head and tail spans. */
@@ -82,9 +82,27 @@ function createTimelineAxis(duration: number, edits: readonly ReviewEdit[]) {
 }
 /** Focus gestures use the original source clock, independent of cuts and video Speed. */
 export function createTrackProjection(duration: number, edits: readonly ReviewEdit[]) {
+  const base = createTimelineAxis(duration, edits);
+  const display = createReviewDisplayMap(duration, edits);
+  const focus = createTimelineAxis(duration, []);
+  const displacedSource = (at: number, pixels: number, width: number) =>
+    display.displayToSource(display.sourceToDisplay(at) + (pixels / width) * display.duration);
   return {
-    ...createTimelineAxis(duration, edits),
-    focus: createTimelineAxis(duration, []),
+    ...base,
+    display,
+    fromDisplay: display.displayToResult,
+    originalDuration: duration,
+    rawSource: base.source,
+    position: (time: number, edge?: 'start' | 'end') =>
+      display.resultToDisplay(time, edge) / display.duration,
+    delta: (at: number, pixels: number, width: number) =>
+      base.output(displacedSource(at, pixels, width)) - base.output(at),
+    focus: {
+      ...focus,
+      position: (time: number, edge?: 'start' | 'end') =>
+        display.sourceToDisplay(time, edge) / display.duration,
+      delta: (at: number, pixels: number, width: number) => displacedSource(at, pixels, width) - at,
+    },
   };
 }
 export type ReviewTrackProjection = ReturnType<typeof createTrackProjection>;
@@ -102,4 +120,17 @@ export function reviewAudioClipRows(
     rows.set(range.id, row);
   }
   return rows;
+}
+
+/** Maps a lane pointer through inserted display time, with a source-axis fallback. */
+export function reviewTimelinePointerSource(
+  clientX: number,
+  rect: { left: number; width: number },
+  duration: number,
+  projection: ReviewTrackProjection | undefined
+): number {
+  const position = (clientX - rect.left) / rect.width;
+  return projection
+    ? projection.display.displayToSource(position * projection.display.duration)
+    : position * duration;
 }

@@ -1,6 +1,9 @@
 import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../../features/video/project/effect-instance/integrity';
 import { parseVideoProjectEntry } from '../../../../composition/persistence/projects/read-guards';
-import { annotationReviewFixture } from './media.review-assets.test-support';
+import {
+  annotationReviewFixture,
+  corruptAnnotationFixtureResource,
+} from './media.review-assets.test-support';
 import { encodePortableReviewAssetRefs } from '../../../../composition/persistence/review-workspaces/asset-refs';
 import { materializeWorkspaceStorage } from '../../../../composition/persistence/review-workspaces/storage-format';
 import { parseVideoWorkspace } from '../../../../composition/persistence/review-workspaces/parser';
@@ -469,22 +472,14 @@ it.each(
   )
 )('checks retained annotation before nested $kind restore: $mode', async ({ kind, mode }) => {
   const fixture = await annotationReviewFixture();
+  if (mode === 'resource-hash') await corruptAnnotationFixtureResource(fixture, 'resource-hash');
   if (mode === 'source-hash')
     fixture.snapshot.source = fixture.snapshot.source.replace(
       'Neutral runtime conformance',
       'Mutated runtime conformance'
     );
   const { readAssetFile } = await import('../../../../composition/persistence/assets');
-  const blob =
-    mode === 'resource-hash'
-      ? new Blob([(await fixture.blob.text()).replace('width="1"', 'width="2"')], {
-          type: fixture.blob.type,
-        })
-      : fixture.blob;
-  vi.mocked(readAssetFile).mockImplementation(async (reference) => {
-    if (reference.assetId !== 'mark-bytes') throw new Error('Unexpected prepared read');
-    return new File([blob], 'mark.svg', { type: blob.type });
-  });
+  vi.mocked(readAssetFile).mockClear();
   const aggregateId = kind === 'asset' ? 'project-asset:clip' : 'export:e';
   const review = encodePortableReviewAssetRefs({
     ...fixture.review,
@@ -511,12 +506,6 @@ it.each(
   const metadata = {
     entry,
     projectAssets: [
-      {
-        entry: { id: 'mark', mimeType: 'image/svg+xml', size: fixture.blob.size, createdAt: 1 },
-        filename: 'mark.svg',
-        objectId: 'mark-object',
-        publishToLibrary: false,
-      },
       ...(kind === 'asset'
         ? [
             {
@@ -552,10 +541,7 @@ it.each(
   };
   assertPortableJson(metadata);
   const pending = videoProjectRootPublisher.publish(
-    publishArgs(metadata, [
-      stagedObject('o', 'new-local', 'video/webm', 6),
-      stagedObject('mark-object', 'mark-bytes', 'image/svg+xml', fixture.blob.size),
-    ])
+    publishArgs(metadata, [stagedObject('o', 'new-local', 'video/webm', 6)])
   );
   if (mode !== 'valid') {
     await expect(pending).rejects.toMatchObject({
@@ -567,143 +553,112 @@ it.each(
     await expect(pending).resolves.toMatchObject({ imported: true });
     const restored = logicalRestoredWorkspaces(values)[0];
     expect(restored?.cursor).toBe(0);
-    expect(restored?.effectSnapshots?.[0]?.assets[0]?.assetId).not.toBe('project-asset:mark');
-    expect(vi.mocked(readAssetFile)).toHaveBeenCalledOnce();
+    expect(restored?.effectSnapshots?.[0]?.assets).toEqual([]);
+    expect(restored?.effectSnapshots?.[0]?.source).toBe(fixture.snapshot.source);
+    expect(vi.mocked(readAssetFile)).not.toHaveBeenCalled();
   }
 });
 
-it('restores Native effect snapshot resource bytes without passing Blobs through the JSON decoder', async () => {
-  const fixture = await annotationReviewFixture();
-  const { assets, ...snapshot } = fixture.snapshot;
-  const resource = assets[0]!;
-  const { assetId: _assetId, ...resourceMetadata } = resource;
-  const file = new File([fixture.blob], 'mark.svg', { type: fixture.blob.type });
-  const nativeSnapshot = { ...snapshot, assets: [{ ...resourceMetadata, blob: file }] };
-  const entry = createVideoProjectEntry(
-    { id: 'p', effectSnapshots: [nativeSnapshot] },
-    { id: 'p' }
-  );
+it('restores embedded Native snapshot resources without staged Blob reads', async () => {
+  const fixture = await annotationReviewFixture(),
+    entry = createVideoProjectEntry(
+      { id: 'p', effectSnapshots: [{ ...fixture.snapshot, assets: [] }] },
+      { id: 'p' }
+    );
   expect(parseVideoProjectEntry(entry)).not.toBeNull();
   await verifyVideoProjectEffectSnapshotIntegrity(entry.project);
-  const portableProject = encodePortableVideoProjectAssetRefs({
-    ...entry.project,
-    effectSnapshots: [],
-  });
-  if (!isRecord(portableProject)) throw new Error('Invalid portable project fixture');
   const metadata = {
-    entry: {
-      ...entry,
-      project: {
-        ...portableProject,
-        effectSnapshots: [
-          { ...snapshot, assets: [{ ...resourceMetadata, objectId: 'mark-object' }] },
-        ],
-      },
-    },
+    entry: { ...entry, project: encodePortableVideoProjectAssetRefs(entry.project) },
     projectAssets: [],
     projectExports: [],
   };
   assertPortableJson(metadata);
   const { readAssetFile } = await import('../../../../composition/persistence/assets');
-  vi.mocked(readAssetFile).mockResolvedValue(file);
+  vi.mocked(readAssetFile).mockClear();
   const values = new Map<string, unknown[]>();
   mocks.mutate.mockImplementation(async (callback) => callback(publisherDatabase(values)));
-  await videoProjectRootPublisher.publish(
-    publishArgs(metadata, [stagedObject('mark-object', 'mark-bytes', file.type, file.size)])
-  );
+  await videoProjectRootPublisher.publish(publishArgs(metadata, []));
   const restored = parseVideoProjectEntry(values.get('video_projects')?.[0]);
   expect(restored).not.toBeNull();
-  const restoredBlob = restored!.project.effectSnapshots![0]!.assets[0]!.blob;
-  expect(restoredBlob).toBeInstanceOf(Blob);
   await verifyVideoProjectEffectSnapshotIntegrity(restored!.project);
-  expect(await restoredBlob.arrayBuffer()).toEqual(await file.arrayBuffer());
-  expect(restored!.project.effectSnapshots![0]).toMatchObject({
-    ...snapshot,
-    assets: [resourceMetadata],
-  });
-  expect(entry.project.effectSnapshots![0]!.assets[0]!.blob).toBe(file);
-  const originalBytes = await file.arrayBuffer();
-  vi.spyOn(file, 'arrayBuffer').mockRejectedValue(
-    new DOMException('Staging file removed', 'NotFoundError')
-  );
-  expect(await restoredBlob.arrayBuffer()).toEqual(originalBytes);
+  expect(restored!.project.effectSnapshots![0]).toEqual(fixture.snapshot);
+  expect(vi.mocked(readAssetFile)).not.toHaveBeenCalled();
   expect(mocks.checkpoint).toHaveBeenCalledOnce();
 });
-
 it.each(['resource', 'source', 'closure'] as const)(
   'refuses direct Native snapshot %s corruption before replacing the existing project',
   async (mode) => {
-    const fixture = await annotationReviewFixture();
-    const { assets, ...snapshot } = fixture.snapshot;
-    const { assetId: _assetId, ...resource } = assets[0]!;
-    const originalFile = new File([fixture.blob], 'mark.svg', { type: fixture.blob.type });
-    const original = createVideoProjectEntry(
-      {
-        id: 'p',
-        effectSnapshots: [{ ...snapshot, assets: [{ ...resource, blob: originalFile }] }],
-      },
-      { id: 'p' }
-    );
+    const fixture = await annotationReviewFixture(),
+      original = createVideoProjectEntry(
+        { id: 'p', effectSnapshots: [{ ...structuredClone(fixture.snapshot), assets: [] }] },
+        { id: 'p' }
+      );
     await verifyVideoProjectEffectSnapshotIntegrity(original.project);
-    const source =
-      mode === 'source'
-        ? snapshot.source.replace('Neutral runtime conformance', 'Neutram runtime conformance')
-        : snapshot.source;
-    if (mode === 'source') expect(source).not.toBe(snapshot.source);
-    const resourceMetadata = {
-      ...resource,
-      ...(mode === 'closure' ? { id: 'different-resource' } : {}),
-    };
-    const file =
-      mode === 'resource'
-        ? new File([(await fixture.blob.text()).replace('width="1"', 'width="2"')], 'mark.svg', {
-            type: fixture.blob.type,
-          })
-        : originalFile;
+    if (mode === 'resource') await corruptAnnotationFixtureResource(fixture, 'resource-hash');
+    if (mode === 'source')
+      fixture.snapshot.source = fixture.snapshot.source.replace(
+        'Neutral runtime conformance',
+        'Neutram runtime conformance'
+      );
+    if (mode === 'closure') fixture.snapshot.documentId = 'different-document';
     const candidate = {
       ...original,
-      project: {
-        ...original.project,
-        effectSnapshots: [{ ...snapshot, source, assets: [{ ...resourceMetadata, blob: file }] }],
-      },
+      project: { ...original.project, effectSnapshots: [{ ...fixture.snapshot, assets: [] }] },
     };
-    expect(parseVideoProjectEntry(candidate)).not.toBeNull();
+    if (mode === 'closure') expect(parseVideoProjectEntry(candidate)).toBeNull();
+    else expect(parseVideoProjectEntry(candidate)).not.toBeNull();
     await expect(
       verifyVideoProjectEffectSnapshotIntegrity(candidate.project)
     ).rejects.toMatchObject({ code: 'effectSnapshotIntegrityFailure' });
-    const portable = encodePortableVideoProjectAssetRefs({
-      ...candidate.project,
-      effectSnapshots: [],
-    });
-    if (!isRecord(portable)) throw new Error('Invalid portable corruption fixture');
     const metadata = {
-      entry: {
-        ...candidate,
-        project: {
-          ...portable,
-          effectSnapshots: [
-            { ...snapshot, source, assets: [{ ...resourceMetadata, objectId: 'direct-resource' }] },
-          ],
-        },
-      },
+      entry: { ...candidate, project: encodePortableVideoProjectAssetRefs(candidate.project) },
       projectAssets: [],
       projectExports: [],
     };
     assertPortableJson(metadata);
-    const { readAssetFile } = await import('../../../../composition/persistence/assets');
-    vi.mocked(readAssetFile).mockResolvedValue(file);
     const values = new Map<string, unknown[]>([['video_projects', [original]]]);
     mocks.mutate.mockImplementation(async (callback) => callback(publisherDatabase(values)));
-    const args = publishArgs(metadata, [
-      stagedObject('direct-resource', 'direct-bytes', file.type, file.size),
-    ]);
+    const args = publishArgs(metadata, []);
     args.session = { ...args.session, strategy: 'replace' };
-    await expect(videoProjectRootPublisher.publish(args)).rejects.toMatchObject({
-      code: 'effectSnapshotIntegrityFailure',
-    });
+    if (mode === 'closure')
+      await expect(videoProjectRootPublisher.publish(args)).rejects.toThrow(
+        'Restored video project metadata is invalid.'
+      );
+    else
+      await expect(videoProjectRootPublisher.publish(args)).rejects.toMatchObject({
+        code: 'effectSnapshotIntegrityFailure',
+      });
     expect(mocks.mutate).not.toHaveBeenCalled();
     expect(mocks.checkpoint).not.toHaveBeenCalled();
     expect(values.get('video_projects')).toEqual([original]);
     await verifyVideoProjectEffectSnapshotIntegrity(original.project);
   }
 );
+it('refuses detached external resources instead of admitting an obsolete Blob snapshot', async () => {
+  const fixture = await annotationReviewFixture();
+  const entry = createVideoProjectEntry(
+    {
+      id: 'p',
+      effectSnapshots: [
+        {
+          ...fixture.snapshot,
+          assets: [
+            {
+              id: 'external',
+              kind: 'svg',
+              mimeType: 'image/svg+xml',
+              byteLength: fixture.blob.size,
+              sha256: 'a'.repeat(64),
+              blob: fixture.blob,
+            },
+          ],
+        },
+      ],
+    },
+    { id: 'p' }
+  );
+  expect(parseVideoProjectEntry(entry)).toBeNull();
+  await expect(verifyVideoProjectEffectSnapshotIntegrity(entry.project)).rejects.toMatchObject({
+    code: 'effectSnapshotIntegrityFailure',
+  });
+});

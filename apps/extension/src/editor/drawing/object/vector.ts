@@ -11,20 +11,23 @@ import {
   getDrawingShapePoints,
   isDrawingTextStencil,
   DRAWING_TEXT_LINE_HEIGHT_FACTOR,
-  DRAWING_TEXT_VERTICAL_PADDING,
-  resolveDrawingTextMeasuredNaturalWidth,
-  resolveDrawingTextHeight,
   traceDrawingTextBackground,
+  resolveDrawingTextRuns,
+  resolveDrawingTextTabAdvance,
   transformDrawingPoint,
   resolveDrawingTextFontFamily,
   type DrawingObject,
   type DrawingPoint,
 } from '../../../features/drawing/public';
+import { EditorDrawingTextInput } from './text-input';
+import { EditorTextInkGeometry } from './text-geometry';
 import { createObjectLabel } from '../../document/model';
 import { createEditorDrawingSimplifyObject } from './simplify';
 import { stageEditorDrawingObject, writeEditorDrawingObject } from './metadata';
 
 type TextboxVisualAdapter = {
+  geometry: EditorTextInkGeometry;
+  input: EditorDrawingTextInput;
   getCursorRenderingData: Textbox['getCursorRenderingData'];
   getLineLeftOffset: Textbox['_getLineLeftOffset'];
   getTopOffset: Textbox['_getTopOffset'];
@@ -32,6 +35,7 @@ type TextboxVisualAdapter = {
   render: Textbox['_render'];
   renderTextFill: Textbox['_renderTextFill'];
   stencilContext: CanvasRenderingContext2D | null;
+  measurementContext: CanvasRenderingContext2D | null;
 };
 
 const textboxVisualAdapters = new WeakMap<Textbox, TextboxVisualAdapter>();
@@ -156,7 +160,8 @@ function createShapeObject(
 
 function createTextObject(
   drawing: Extract<DrawingObject, { kind: 'text' }>,
-  minimumWidth: number
+  minimumWidth: number,
+  options: { textAutoWidth?: boolean; textMaxWidth?: number }
 ): FabricObject {
   const textbox = new Textbox(drawing.text, {
     fill: drawing.color,
@@ -171,6 +176,9 @@ function createTextObject(
     textBackgroundColor: drawing.backgroundColor ?? '',
     width: Math.max(minimumWidth, drawing.bounds.width),
   });
+  textbox.sniptaleDrawingTextAutoWidth = options.textAutoWidth ?? drawing.autoWidth ?? true;
+  textbox.sniptaleDrawingTextMaxWidth =
+    options.textMaxWidth ?? drawing.wrapWidth ?? Math.max(1, drawing.bounds.width);
   applyEditorDrawingTextVisuals(textbox);
   return textbox;
 }
@@ -187,14 +195,17 @@ export function renderEditorDrawingTextBackground(
   context.fillStyle = textbox.textBackgroundColor;
   const left = textbox._getLeftOffset();
   let top = textbox._getTopOffset();
-  const lines = textbox._textLines.map((_line, index) => {
-    const advance = textbox.getHeightOfLine(index);
-    const height = index === textbox._textLines.length - 1 ? advance / textbox.lineHeight : advance;
-    const width = Math.min(textbox.width, Math.max(12, textbox.getLineWidth(index) + 12));
-    const rect = { left, top, width, height };
-    top += advance;
-    return rect;
-  });
+  const lines =
+    textboxVisualAdapters.get(textbox)?.geometry.background() ??
+    textbox._textLines.flatMap((line, index) => {
+      const advance = textbox.getHeightOfLine(index);
+      const nextHasText = Boolean(textbox._textLines[index + 1]?.join('').trim());
+      const height = nextHasText ? advance : advance / textbox.lineHeight;
+      const width = Math.min(textbox.width, Math.max(12, textbox.getLineWidth(index) + 12));
+      const rect = { left, top, width, height };
+      top += advance;
+      return line.join('').trim() ? [rect] : [];
+    });
   context.beginPath();
   traceDrawingTextBackground(context, lines);
   context.fill();
@@ -260,11 +271,54 @@ function renderEditorDrawingTextStencil(
   }
 }
 
+function resolveTextCaretLeft(
+  textbox: Textbox,
+  adapter: TextboxVisualAdapter,
+  cursor: ReturnType<Textbox['getCursorRenderingData']>,
+  selectionStart: number
+): number {
+  const { lineIndex, charIndex } = textbox.get2DCursorLocation(selectionStart);
+  const line = textbox._textLines[lineIndex] ?? [];
+  const edge = line.length === 0 ? 0 : charIndex === 0 ? -1 : charIndex === line.length ? 1 : 0;
+  const gap = (cursor.width / textbox.cursorWidth) * 2;
+  const fallback = cursor.left + edge * (textbox.direction === 'rtl' ? -1 : 1) * gap;
+  if (
+    !edge ||
+    textbox.direction === 'rtl' ||
+    textbox.charSpacing !== 0 ||
+    textbox.path ||
+    textbox.textAlign.includes('justify') ||
+    !textbox.isEmptyStyles(lineIndex) ||
+    !(edge < 0 ? line[0] : line.at(-1))?.trim()
+  )
+    return fallback;
+  try {
+    const context = adapter.measurementContext ?? document.createElement('canvas').getContext('2d');
+    if (!context) return fallback;
+    adapter.measurementContext = context;
+    context.font = textbox._getFontDeclaration();
+    context.textAlign = 'left';
+    context.direction = 'ltr';
+    const metrics = context.measureText(line.join(''));
+    const origin = textbox._getLeftOffset() + textbox._getLineLeftOffset(lineIndex);
+    if (edge > 0 && Number.isFinite(metrics.actualBoundingBoxRight))
+      return origin + metrics.actualBoundingBoxRight + gap;
+    if (edge < 0 && Number.isFinite(metrics.actualBoundingBoxLeft))
+      return origin - metrics.actualBoundingBoxLeft - gap - cursor.width;
+  } catch {
+    // Cursor measurement must not interrupt text input when canvas resources are unavailable.
+  }
+  return fallback;
+}
+
 export function applyEditorDrawingTextVisuals(textbox: Textbox): void {
   textbox.cursorColor = DEFAULT_COLOR_INFO_STRONG;
   textbox.cursorWidth = 1.5;
   if (!textboxVisualAdapters.has(textbox)) {
+    const geometry = new EditorTextInkGeometry(textbox);
     const adapter: TextboxVisualAdapter = {
+      geometry,
+      input: new EditorDrawingTextInput(textbox, () => geometry.inkLayout),
       getCursorRenderingData: textbox.getCursorRenderingData.bind(textbox),
       getLineLeftOffset: textbox._getLineLeftOffset.bind(textbox),
       getTopOffset: textbox._getTopOffset.bind(textbox),
@@ -272,28 +326,62 @@ export function applyEditorDrawingTextVisuals(textbox: Textbox): void {
       render: textbox._render.bind(textbox),
       renderTextFill: textbox._renderTextFill.bind(textbox),
       stencilContext: null,
+      measurementContext: null,
     };
     textboxVisualAdapters.set(textbox, adapter);
     textbox.getCursorRenderingData = (selectionStart = textbox.selectionStart, boundaries) => {
       const cursor = adapter.getCursorRenderingData(selectionStart, boundaries);
-      const { lineIndex, charIndex } = textbox.get2DCursorLocation(selectionStart);
-      const lineLength = textbox._textLines[lineIndex]?.length ?? 0;
-      const edge = lineLength === 0 ? 0 : charIndex === 0 ? -1 : charIndex === lineLength ? 1 : 0;
-      const direction = textbox.direction === 'rtl' ? -1 : 1;
-      const gap = (cursor.width / textbox.cursorWidth) * 2;
       return {
         ...cursor,
-        left: cursor.left + edge * direction * gap,
+        left: resolveTextCaretLeft(textbox, adapter, cursor, selectionStart),
         top: cursor.top + cursor.height * 0.1,
         height: cursor.height * 0.8,
       };
     };
     textbox._getLineLeftOffset = (lineIndex) =>
-      adapter.getLineLeftOffset(lineIndex) + DRAWING_TEXT_HORIZONTAL_PADDING / 2;
-    textbox._getTopOffset = () => adapter.getTopOffset() + DRAWING_TEXT_VERTICAL_PADDING;
+      adapter.getLineLeftOffset(lineIndex) + adapter.geometry.x;
+    textbox._getTopOffset = () => adapter.getTopOffset() + adapter.geometry.y;
     textbox._wrapText = (lines, width) =>
+      adapter.geometry.wrapText(lines, width) ??
       adapter.wrapText(lines, Math.max(1, width - DRAWING_TEXT_HORIZONTAL_PADDING));
-    textbox._render = (context) => renderEditorDrawingTextStencil(textbox, adapter, context);
+    textbox._measureChar = (...args) => adapter.geometry.measureChar(...args);
+    const graphemeBox = textbox._getGraphemeBox.bind(textbox);
+    textbox._getGraphemeBox = (...args) => {
+      const box = graphemeBox(...args);
+      if (args[0] === '\t' && !args[4]) {
+        const style = textbox.getCompleteStyleDeclaration(args[1], args[2]);
+        const space = adapter.geometry.measureChar(' ', style, undefined, {}).width;
+        box.width = box.kernedWidth = resolveDrawingTextTabAdvance(box.left, space);
+      }
+      return box;
+    };
+    const renderChars = textbox._renderChars.bind(textbox);
+    textbox._renderChars = (method, context, line, left, top, lineIndex) => {
+      if (!line.includes('\t')) {
+        renderChars(method, context, line, left, top, lineIndex);
+        return;
+      }
+      context.save();
+      context.font = textbox._getFontDeclaration();
+      const runs = resolveDrawingTextRuns(line.join(''), (part) => context.measureText(part));
+      for (const run of runs) {
+        renderChars(
+          method,
+          context,
+          textbox.graphemeSplit(run.text),
+          left + run.left,
+          top,
+          lineIndex
+        );
+      }
+      context.restore();
+    };
+
+    textbox.initDimensions = () => adapter.geometry.initDimensions();
+    textbox._render = (context) => {
+      if (context === textbox.canvas?.getContext()) adapter.input.update();
+      renderEditorDrawingTextStencil(textbox, adapter, context);
+    };
     textbox._renderTextFill = (context) => {
       if (context !== adapter.stencilContext) {
         adapter.renderTextFill(context);
@@ -311,7 +399,11 @@ export function applyEditorDrawingTextVisuals(textbox: Textbox): void {
       }
     };
   }
-  textbox.set({ lineHeight: DRAWING_TEXT_LINE_HEIGHT_FACTOR, strokeWidth: 0 });
+  // Fabric multiplies its lineHeight by the font box factor; the drawing policy is in ems.
+  textbox.set({
+    lineHeight: DRAWING_TEXT_LINE_HEIGHT_FACTOR / textbox._fontSizeMult,
+    strokeWidth: 0,
+  });
   textbox._renderTextLinesBackground = (context) =>
     renderEditorDrawingTextBackground(textbox, context);
   textbox.initDimensions();
@@ -319,43 +411,25 @@ export function applyEditorDrawingTextVisuals(textbox: Textbox): void {
 }
 
 export function synchronizeEditorDrawingTextLayout(textbox: Textbox): boolean {
-  const maxWidth = Math.max(80, textbox.sniptaleDrawingTextMaxWidth ?? 640);
-  const context =
-    typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
-  if (context) context.font = `${textbox.fontSize}px ${textbox.fontFamily}`;
-  const measure = (line: string) =>
-    context?.measureText(line).width ?? line.length * textbox.fontSize * 0.55;
-  const width = textbox.sniptaleDrawingTextAutoWidth
-    ? resolveDrawingTextMeasuredNaturalWidth(
-        textbox.text ?? '',
-        textbox.fontSize,
-        maxWidth,
-        measure
-      )
-    : textbox.width;
-  const widthChanged = Math.abs(textbox.width - width) >= 0.5;
-  if (widthChanged) {
-    textbox.set({ width });
-    textbox.initDimensions();
-  }
-  const height = Math.max(
-    resolveDrawingTextHeight(textbox.text ?? '', textbox.fontSize, width, measure),
-    textbox.calcTextHeight() + DRAWING_TEXT_VERTICAL_PADDING * 2
-  );
-  const heightChanged = Math.abs(textbox.height - height) >= 0.5;
-  if (!widthChanged && !heightChanged) {
-    return false;
-  }
-  if (heightChanged) textbox.set({ height });
+  const width = textbox.width;
+  const height = textbox.height;
+  textbox.initDimensions();
+  const changed =
+    Math.abs(textbox.width - width) >= 0.01 || Math.abs(textbox.height - height) >= 0.01;
   textbox.setCoords();
   textbox.canvas?.requestRenderAll();
-  return true;
+  return changed;
 }
 
 export function createEditorDrawingFabricObject(
   drawing: Exclude<DrawingObject, { kind: 'blur' }>,
   labelIndex: number,
-  options: { preview?: boolean; preserveTextWidth?: boolean } = {}
+  options: {
+    preview?: boolean;
+    preserveTextWidth?: boolean;
+    textAutoWidth?: boolean;
+    textMaxWidth?: number;
+  } = {}
 ): FabricObject {
   if (drawing.kind === 'simplify') return createEditorDrawingSimplifyObject(drawing, labelIndex);
   const object =
@@ -364,16 +438,20 @@ export function createEditorDrawingFabricObject(
       : drawing.kind === 'arrow'
         ? createArrowObject(drawing)
         : drawing.kind === 'text'
-          ? createTextObject(drawing, options.preserveTextWidth ? 1 : 40)
+          ? createTextObject(drawing, drawing.text.trim() ? 1 : 40, options)
           : createShapeObject(drawing);
   const normalizedDrawing =
     drawing.kind === 'text'
       ? (() => {
           const height = Math.max(1, object.height);
-          const width = Math.max(options.preserveTextWidth ? 1 : 40, object.width);
+          const width = Math.max(1, object.width);
           const center = getDrawingBoundsCenter(drawing.bounds);
           return {
             ...drawing,
+            autoWidth: object.sniptaleDrawingTextAutoWidth ?? false,
+            wrapWidth: object.sniptaleDrawingTextAutoWidth
+              ? (object.sniptaleDrawingTextMaxWidth ?? width)
+              : width,
             bounds: {
               ...drawing.bounds,
               height,
@@ -467,7 +545,14 @@ export function replaceEditorDrawingFabricGeometry(
   current: FabricObject,
   drawing: Exclude<DrawingObject, { kind: 'blur' }>
 ): FabricObject {
-  const next = createEditorDrawingFabricObject(drawing, 1);
+  const next = createEditorDrawingFabricObject(drawing, 1, {
+    ...(current.sniptaleDrawingTextAutoWidth !== undefined
+      ? { textAutoWidth: current.sniptaleDrawingTextAutoWidth }
+      : {}),
+    ...(current.sniptaleDrawingTextMaxWidth !== undefined
+      ? { textMaxWidth: current.sniptaleDrawingTextMaxWidth }
+      : {}),
+  });
   if (current.sniptaleLabel !== undefined) next.sniptaleLabel = current.sniptaleLabel;
   if (current.sniptaleLocked !== undefined) next.sniptaleLocked = current.sniptaleLocked;
   next.visible = current.visible;

@@ -1,3 +1,5 @@
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
+import { createDefaultRichShapeObject } from '../../../features/editor/document/rich-shape';
 import { expect, it, vi } from 'vitest';
 import { crc32 } from 'node:zlib';
 
@@ -20,7 +22,7 @@ import {
   redoEditorControllerSnapshot,
 } from '../public-api/document/history';
 import {
-  createEditorSnapshotHistory,
+  createEditorSnapshotHistory as createImageHistory,
   pushEditorSnapshotHistory,
   redoEditorSnapshot,
   resetEditorSnapshotHistory,
@@ -28,6 +30,10 @@ import {
   readCurrentEditorSnapshot,
   undoEditorSnapshot,
 } from './';
+
+// Keep small-budget retention cases independent of the Image Editor product default.
+const createEditorSnapshotHistory = (document: EditorDocument) =>
+  createImageHistory(document, EDITOR_HISTORY_LIMITS);
 
 it('round-trips editor documents through snapshot history', () => {
   const first = createMockDocument();
@@ -557,4 +563,226 @@ it('restores the visible document and cursor after failed Undo with a large pool
   expect(displayed).toEqual(first);
   await redoEditorControllerSnapshot(controller);
   expect(displayed).toEqual(second);
+});
+
+it('pools every retained raster slot and restores full metadata through undo and redo', () => {
+  const image = `data:image/png;base64,${'A'.repeat(8192)}`;
+  const object = {
+    sniptaleRasterState: {
+      version: 1,
+      width: 12,
+      height: 8,
+      crop: { x: 2, y: 1, width: 8, height: 6 },
+    },
+    sniptaleRasterOriginalData: image,
+    sniptaleRasterColorData: image,
+    sniptaleRasterVisibilityData: image,
+    sniptaleRasterKeyData: image,
+  };
+  const first: EditorDocument = {
+    ...createMockDocument(),
+    version: 3,
+    canvasJson: JSON.stringify({ objects: [object] }),
+  };
+  const second: EditorDocument = { ...first, sourceName: 'next.png' };
+  const history = createEditorSnapshotHistory(first);
+  pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => second });
+  expect(history.getSnapshots().every((snapshot) => !snapshot.includes(image))).toBe(true);
+  expect(undoEditorSnapshot(history)).toEqual(first);
+  expect(redoEditorSnapshot(history)).toEqual(second);
+});
+
+it('retains 100 transitions under the Image Editor default without changing other history policies', () => {
+  const first = createMockDocument();
+  const history = createImageHistory(first);
+  for (let index = 1; index <= 120; index++)
+    pushEditorSnapshotHistory({
+      history,
+      muted: false,
+      exportDocument: () => ({ ...first, sourceName: `edit-${index}` }),
+    });
+  expect(history.getSnapshots()).toHaveLength(101);
+  for (let index = 119; index >= 20; index--)
+    expect(undoEditorSnapshot(history)?.sourceName).toBe(`edit-${index}`);
+  expect(undoEditorSnapshot(history)).toBeNull();
+});
+
+it('stores each object version once and keeps only ordered references in subsequent steps', () => {
+  const first = {
+    ...createMockDocument(),
+    canvasJson: JSON.stringify({
+      objects: [
+        { type: 'rect', left: 10, top: 20, width: 40, height: 30, fill: '#123456' },
+        { type: 'rect', left: 90, top: 20, width: 40, height: 30, fill: '#abcdef' },
+      ],
+    }),
+  };
+  const second = {
+    ...first,
+    canvasJson: JSON.stringify({
+      objects: [
+        { type: 'rect', left: 15, top: 20, width: 40, height: 30, fill: '#123456' },
+        { type: 'rect', left: 90, top: 20, width: 40, height: 30, fill: '#abcdef' },
+      ],
+    }),
+  };
+  const history = createImageHistory(first);
+  const references = (snapshot: string): unknown[] =>
+    JSON.parse(JSON.parse(snapshot).canvasJson).objects;
+  const original = references(history.getCurrent());
+  pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => second });
+  const changed = references(history.getCurrent());
+  expect(original.every((value) => typeof value === 'string')).toBe(true);
+  expect(changed[0]).not.toBe(original[0]);
+  expect(changed[1]).toBe(original[1]);
+  expect(undoEditorSnapshot(history)).toEqual(first);
+  expect(redoEditorSnapshot(history)).toEqual(second);
+});
+
+it('reuses nested group members under a small additional-history budget', () => {
+  const paths = Array.from({ length: 32 }, (_, child) => ({
+    type: 'Path',
+    left: child,
+    top: 0,
+    path: Array.from({ length: 320 }, (_, index) => [index ? 'L' : 'M', index, index % 40]),
+  }));
+  const base = createMockDocument();
+  const document = (index: number) => ({
+    ...base,
+    sourceName: `step-${index}`,
+    canvasJson: JSON.stringify({
+      objects: [
+        {
+          type: 'Group',
+          objects: [...paths, { type: 'Rect', left: index, top: 0, width: 20, height: 20 }],
+        },
+      ],
+    }),
+  });
+  const history = createImageHistory(document(0), { maxActions: 100, maxBytes: 512 * 1024 });
+  for (let index = 1; index <= 120; index++)
+    pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => document(index) });
+  expect(history.getSnapshots()).toHaveLength(101);
+  expect(undoEditorSnapshot(history)).toEqual(document(119));
+  expect(redoEditorSnapshot(history)).toEqual(document(120));
+});
+
+it('round-trips separate rich-shape versions through the same object table', () => {
+  const shape = createDefaultRichShapeObject({ id: 'rich', shapeKind: 'rectangle' });
+  const first = { ...createMockDocument(), richShapes: [shape] };
+  const second = { ...first, richShapes: [{ ...shape, rotation: 17 }] };
+  const history = createImageHistory(first);
+  expect(typeof JSON.parse(history.getCurrent()).richShapes[0]).toBe('string');
+  pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => second });
+  expect(undoEditorSnapshot(history)).toEqual(first);
+  expect(redoEditorSnapshot(history)).toEqual(second);
+});
+
+it('shares unchanged canonical stroke payloads across steps without restoring token-like user text', () => {
+  const stroke = JSON.stringify({
+    version: 1,
+    object: {
+      kind: 'pencil',
+      id: 'shared',
+      color: '#000000',
+      width: 4,
+      samples: Array.from({ length: 400 }, (_, index) => ({ x: index, y: index % 40, t: index })),
+    },
+  });
+  const first = {
+    ...createMockDocument(),
+    canvasJson: JSON.stringify({
+      objects: [
+        { type: 'Path', sniptaleType: 'pencil', sniptaleDrawingJson: stroke, path: [['M', 0, 0]] },
+        { type: 'Textbox', text: 'sniptale-history-asset:0' },
+      ],
+    }),
+  };
+  const history = createImageHistory(first);
+  pushEditorSnapshotHistory({
+    history,
+    muted: false,
+    exportDocument: () => ({ ...first, sourceName: 'next' }),
+  });
+  expect(history.getCurrent()).not.toContain(stroke);
+  expect(history.getCurrent().length).toBeLessThan(stroke.length);
+  expect(undoEditorSnapshot(history)).toEqual(first);
+  expect(redoEditorSnapshot(history)).toEqual({ ...first, sourceName: 'next' });
+});
+
+it('interns immutable vector definitions separately from 100 instance versions and restores before admission', () => {
+  const id = 'a'.repeat(64);
+  const definition = {
+    version: 1 as const,
+    id,
+    viewBox: { minX: 0, minY: 0, width: 24, height: 24 },
+    svg: `<svg xmlns="http://www.w3.org/2000/svg">${' '.repeat(90_000)}</svg>`,
+    slots: [
+      {
+        id: 'c0',
+        kind: 'explicit-color' as const,
+        originalColor: '#ff0000',
+        bindings: [{ nodeId: 'v2', attribute: 'fill' as const }],
+      },
+    ],
+    capabilities: { palette: true, strokeScale: false },
+    provenance: {
+      sourceId: 'local',
+      prefix: null,
+      name: null,
+      author: null,
+      authorUrl: null,
+      license: null,
+      licenseUrl: null,
+    },
+  };
+  const document = (color: string): EditorDocument => ({
+    ...createMockDocument(),
+    version: 4,
+    vectorDefinitions: { [id]: definition },
+    canvasJson: JSON.stringify({
+      objects: [
+        {
+          type: 'Group',
+          objects: Array.from({ length: 100 }, (_, index) => ({
+            type: 'Group',
+            left: index,
+            objects: [],
+            sniptaleType: 'vector-element',
+            sniptaleVectorElement: {
+              version: 1,
+              definitionId: id,
+              overrides: { colors: { c0: color }, strokeScale: 1 },
+            },
+          })),
+        },
+      ],
+    }),
+  });
+  const first = document('#ff0000');
+  const history = createImageHistory(first, { maxActions: 100, maxBytes: 300_000 });
+  const token = JSON.parse(history.getCurrent()).vectorDefinitions[id];
+  expect(token).toMatch(/^sniptale-history-asset:/u);
+  for (let index = 1; index <= 10; index++) {
+    pushEditorSnapshotHistory({
+      history,
+      muted: false,
+      exportDocument: () => document(`#${index.toString(16).padStart(6, '0')}`),
+    });
+    expect(JSON.parse(history.getCurrent()).vectorDefinitions).toEqual({ [id]: token });
+    expect(history.getCurrent()).not.toContain('<svg');
+    expect(history.getCurrent().length).toBeLessThan(1500);
+  }
+  expect(history.getSnapshots()).toHaveLength(11);
+  expect(undoEditorSnapshot(history)).toEqual(document('#000009'));
+  expect(redoEditorSnapshot(history)).toEqual(document('#00000a'));
+  undoEditorSnapshot(history);
+  pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => first });
+  expect(redoEditorSnapshot(history)).toBeNull();
+  expect(readCurrentEditorSnapshot(history)).toEqual(first);
+  resetEditorSnapshotHistory(history, createMockDocument());
+  pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => first });
+  expect(JSON.parse(history.getCurrent()).vectorDefinitions[id]).not.toBe(token);
+  expect(undoEditorSnapshot(history)).toEqual(createMockDocument());
+  expect(redoEditorSnapshot(history)).toEqual(first);
 });

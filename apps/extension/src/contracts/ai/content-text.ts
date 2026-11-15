@@ -1,6 +1,6 @@
 import { isAIConnectionReason, type AIConnectionReason } from '../settings/ai-catalog';
 import { z } from 'zod';
-import { SHA256_DIGEST_PATTERN } from '@sniptale/runtime-contracts/protocol/digest';
+import { aiJobControlSchemas, aiJobRequestIdSchema, approvedAiStartSchema } from './job-command';
 import { CONTENT_AI_PAYLOAD_LIMITS } from '@sniptale/runtime-contracts/ai/payload-policy';
 import { processWithLlmMessageSchema } from '../messaging/contracts/llm-schemas';
 
@@ -29,39 +29,23 @@ export const CONTENT_TEXT_SYSTEM_PROMPT = [
   'The required response format is plain text, even if earlier instructions request another format.',
 ].join('\n');
 
-const id = z
-  .string()
-  .min(1)
-  .max(256)
-  .refine((value) => value.trim() === value);
-const requestId = z.string().uuid();
+const requestId = aiJobRequestIdSchema;
 const text = z
   .string()
   .min(1)
   .max(CONTENT_TEXT_MAX_CHARS)
   .refine((value) => value.trim().length > 0);
-const startSchema = z
-  .object({
-    type: z.literal('start'),
-    requestId,
+const startSchema = approvedAiStartSchema
+  .extend({
     text,
     prompt: z.string().trim().min(1).max(CONTENT_AI_PAYLOAD_LIMITS.maxPromptChars),
-    modelId: id,
-    approvedProviderId: id,
-    approvedDestination: z.string().regex(SHA256_DIGEST_PATTERN),
-    approvedModelCode: id,
-    llmSessionToken: z.string().min(1).max(512),
     privacyProof: processWithLlmMessageSchema.shape.privacyProof.extend({
       generation: z.string().min(1).max(256),
       sourceOrigin: z.string().max(2048).nullable().optional(),
     }),
   })
   .strict();
-const clientSchema = z.discriminatedUnion('type', [
-  startSchema,
-  z.object({ type: z.literal('cancel'), requestId }).strict(),
-  z.object({ type: z.literal('keepalive'), requestId }).strict(),
-]);
+const clientSchema = z.discriminatedUnion('type', [startSchema, ...aiJobControlSchemas]);
 const serverSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('progress'), requestId }).strict(),
   z.object({ type: z.literal('result'), requestId, text }).strict(),

@@ -32,9 +32,11 @@ const controller = {
   },
 };
 beforeEach(() => {
-  mocks.commit
-    .mockReset()
-    .mockResolvedValue({ revision: 2, documentAssetsByRuntimeUrl: new Map() });
+  mocks.commit.mockReset().mockResolvedValue({
+    revision: 2,
+    documentAssetsByRuntimeUrl: new Map(),
+    documentAssetsByVectorDefinitionId: new Map(),
+  });
   autosave = createEditorSessionAutosaveService();
   autosave.activate({
     aggregateId: 'image-1',
@@ -96,7 +98,11 @@ it('does not publish an old completion after an A to B to A document switch', as
   mocks.commit.mockImplementationOnce(() =>
     new Promise<void>((done) => {
       resolve = done;
-    }).then(() => ({ revision: 2, documentAssetsByRuntimeUrl: new Map() }))
+    }).then(() => ({
+      revision: 2,
+      documentAssetsByRuntimeUrl: new Map(),
+      documentAssetsByVectorDefinitionId: new Map(),
+    }))
   );
   const result = renameEditorImage(controller, 'image-1', 'Stale');
   await Promise.resolve();

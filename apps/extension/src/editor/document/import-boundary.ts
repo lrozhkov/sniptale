@@ -1,3 +1,5 @@
+import { inspectEditorRasterCanvas } from '../../features/editor/document/raster-state';
+import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
 import { isValidScenarioBlurCanvasObject } from './scenario-blur-metadata';
 // policyStateIds: [] - parser sets and resource ceilings are immutable document import policy,
 // not mutable authority or capability state.
@@ -169,6 +171,9 @@ function isDrawingObject(value: unknown): value is DrawingObject {
         value['fontFamily'] === 'serif' ||
         value['fontFamily'] === 'mono' ||
         value['fontFamily'] === 'handwritten') &&
+      (value['autoWidth'] === undefined || typeof value['autoWidth'] === 'boolean') &&
+      (value['wrapWidth'] === undefined ||
+        (isFiniteBoundedNumber(value['wrapWidth']) && value['wrapWidth'] > 0)) &&
       isPositiveSize(value['fontSize']) &&
       hasValidRotation(value)
     );
@@ -210,6 +215,12 @@ export function parseEditorDrawingMetadata(value: unknown): DrawingObject | null
 }
 
 function assertDrawingFabricObject(value: UnknownRecord): void {
+  if (
+    value['sniptaleContentLocked'] !== undefined &&
+    typeof value['sniptaleContentLocked'] !== 'boolean'
+  ) {
+    throw new Error('Invalid editor content permission');
+  }
   const objectType = value['sniptaleType'];
   if (
     REMOVED_EDITOR_OBJECT_TYPES.has(String(objectType)) ||
@@ -233,6 +244,15 @@ function assertDrawingFabricObject(value: UnknownRecord): void {
   const drawing = parseEditorDrawingMetadata(serializedMetadata);
   if (!drawing) {
     throw new Error('Invalid editor drawing metadata');
+  }
+  if (drawing.kind === 'text') {
+    const automatic = value['sniptaleDrawingTextAutoWidth'];
+    const maxWidth = value['sniptaleDrawingTextMaxWidth'];
+    if (
+      (automatic !== undefined && typeof automatic !== 'boolean') ||
+      (maxWidth !== undefined && (!isFiniteBoundedNumber(maxWidth) || maxWidth <= 0))
+    )
+      throw new Error('Invalid text layout metadata');
   }
   if (drawing.kind === 'simplify') {
     const result = parseDrawingSimplifySnapshot({
@@ -264,7 +284,8 @@ function assertDrawingFabricObject(value: UnknownRecord): void {
   }
   if (
     value['sniptaleId'] !== drawing.id ||
-    String(objectType) !== expectedObjectType(drawing.kind)
+    (String(objectType) !== expectedObjectType(drawing.kind) &&
+      !(objectType === 'blur' && drawing.kind === 'simplify' && drawing.settings.erase === true))
   ) {
     throw new Error('Mismatched editor drawing metadata');
   }
@@ -307,4 +328,10 @@ export function assertValidEditorDrawingCanvasJson(canvasJson: string): void {
     throw new Error('Invalid editor canvas objects');
   }
   assertDrawingFabricObjectTree(parsed['objects']);
+  const raster = inspectEditorRasterCanvas(
+    parsed,
+    (value, kind): value is string =>
+      isImageDataUrl(value) && (kind === 'image' || value.startsWith('data:image/png;'))
+  );
+  if (!raster.valid) throw new Error('Invalid editor raster metadata');
 }

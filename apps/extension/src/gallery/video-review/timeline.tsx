@@ -1,23 +1,25 @@
+import { ReviewPlaybackPresentationClockContext } from './playback-presentation-clock';
+import { createReviewDisplayMap } from '../../features/video/review/timeline';
+import { Keyboard, Mouse } from 'lucide-react';
+import { reviewInteractionFamily } from '../../features/video/review/interaction-timeline';
+
 import { ReviewTrackVisibilityButton } from './track-row';
 import { ReviewTimelinePanes } from './timeline-panes';
 import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import type { RecordingTelemetryCapabilities } from '../../features/video/project/types';
-import { Fragment, useCallback, useEffect, useState, useMemo } from 'react';
+import { useContext, Fragment, useCallback, useEffect, useMemo } from 'react';
 import { REVIEW_TRACK_ORDER } from './track-order';
 import type { QuickEditTrack } from '../../features/video/review/advanced/types';
-import {
-  ReviewButton,
-  reviewIconButtonClassName,
-  reviewTrackStatusButtonClassName,
-} from './controls';
+import { reviewTrackStatusButtonClassName } from './controls';
 import type { ReviewClickAnimation } from '../../features/video/review/advanced/click-animation';
 import { ReviewPlaybackRangeOverlay, useReviewRulerRange } from './ruler-range';
 import type { ReviewPlaybackRange } from './playback-range';
 import type { ReviewBeforeAction } from './note-transitions';
-import { Activity, Filter, Eye, EyeOff } from 'lucide-react';
-import { ReviewTrackRow } from './track-row';
+import { Eye, EyeOff } from 'lucide-react';
+import { ReviewTrackRow, ReviewTrackCuts, reviewTrackMetrics } from './track-row';
+import { createTrackProjection } from './track-projection';
 import { ReviewPlayhead, ReviewRulerRow, ReviewToolbar } from './timeline-chrome';
-import { ReviewSourceLane } from './timeline-selection';
+import { ReviewSourceLane, ReviewEditBlock } from './timeline-selection';
 import type { ReactNode, CSSProperties } from 'react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
@@ -34,9 +36,15 @@ import { reviewTimeLabel } from './controls';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 
 type TimelineProps = ReviewCursorTimelineInteractions & {
+  onHoverIntent?: ((starting: boolean) => void) | undefined;
+  onHoverTime?: ((time: number | null) => void) | undefined;
   onHistoryRange?: ((range: { start: number; end: number }) => void) | undefined;
   cursorArchiveAvailable?: boolean | undefined;
   sourceId?: string | undefined;
+  interactionEditor?: import('./interaction-editor').ReviewInteractionEditor | undefined;
+  keyboardEnabled?: boolean | undefined;
+  mouseEnabled?: boolean | undefined;
+  onToggleFamily?(family: 'keyboard' | 'mouse'): void;
   actionsEnabled?: boolean | undefined;
   onToggleActions?: (() => void) | undefined;
   keyAnimations?:
@@ -55,6 +63,12 @@ type TimelineProps = ReviewCursorTimelineInteractions & {
   sourceRangeTool?: boolean;
   sourceRangeKind?: 'cut' | 'speed' | undefined;
   duration: number;
+  resultTime?: number | null;
+  resultDuration?: number;
+  onSeekResult?: ((time: number) => void) | undefined;
+  onFreezeDurationChange?: ((edit: ReviewEdit, duration: number) => unknown) | undefined;
+  sourceInsertions?: ReactNode;
+  snapClock?: { output(time: number): number; fromDisplay?(time: number): number } | undefined;
   time: number;
   playing: boolean;
   navigationRevision?: number | undefined;
@@ -65,9 +79,12 @@ type TimelineProps = ReviewCursorTimelineInteractions & {
   zoomAnchor?: number | null | undefined;
   historyControls?: ReactNode;
   utilityControls?: ReactNode;
+  modeControl?: ReactNode;
+  inspectorControls?: ReactNode;
   tools?: ReactNode;
   trackControls?: ReactNode;
   expandedTools?: boolean;
+  cursorMotionTrack?: ReactNode;
   zoomTrack?: ReactNode;
   webcamTrack?: ReactNode;
   audioTracks?: Partial<Record<'originalAudio' | 'voiceover' | 'music', ReactNode>>;
@@ -101,7 +118,7 @@ type TimelineProps = ReviewCursorTimelineInteractions & {
 };
 
 /** One source lane, with an independent ruler/playhead rather than browser slider chrome. */
-export function ReviewTimeline(props: TimelineProps) {
+function ReviewTimelineSurface(props: TimelineProps) {
   const { viewport, gutter, width } = useReviewTimelineGeometry();
   const { zoom, navigation, navigate, onZoom, wheelTarget, follow } = useReviewTimelineNavigation(
     props,
@@ -139,6 +156,7 @@ export function ReviewTimeline(props: TimelineProps) {
   });
   const plane = useReviewTimelinePlaneDrag({ ...props, gutter });
   const hover = useReviewTimelineHover({
+    onPreview: props.onHoverTime,
     placementHints: props.placementHints,
     busy: !!props.busy,
     duration: props.duration,
@@ -153,7 +171,8 @@ export function ReviewTimeline(props: TimelineProps) {
     boundaries: props.boundaries,
   });
   const rows: Partial<Record<QuickEditTrack, ReactNode>> = {
-    actions: <ReviewTimelineEvents {...props} width={width} zoom={zoom} />,
+    keyboard: <ReviewTimelineEvents {...props} family="keyboard" width={width} zoom={zoom} />,
+    mouse: <ReviewTimelineEvents {...props} family="mouse" width={width} zoom={zoom} />,
     source: (
       <ReviewSourceLane
         {...props}
@@ -165,6 +184,7 @@ export function ReviewTimeline(props: TimelineProps) {
     ),
     webcam: props.webcamTrack,
     zoom: props.zoomTrack,
+    cursorMotion: props.cursorMotionTrack,
     text: props.textTrack,
     annotationEffects: props.annotationEffectsTrack,
     ...props.audioTracks,
@@ -183,7 +203,10 @@ export function ReviewTimeline(props: TimelineProps) {
         onClearPlaybackRange={ruler.clear}
         navigation={navigation}
         onNavigate={navigate}
-        resultDuration={createReviewTimeMap(props.duration, props.edits ?? []).getDuration()}
+        resultDuration={
+          props.resultDuration ??
+          createReviewTimeMap(props.duration, props.edits ?? []).getDuration()
+        }
         zoom={zoom}
         onPlay={() => (props.beforeAction ?? ((action) => action()))(props.onPlay)}
         onZoom={onZoom}
@@ -225,8 +248,10 @@ export function ReviewTimeline(props: TimelineProps) {
               } as CSSProperties
             }
             onPointerDownCapture={(event) => {
-              if (event.target instanceof Node && event.currentTarget.contains(event.target))
+              if (event.target instanceof Node && event.currentTarget.contains(event.target)) {
+                if (event.button === 0) props.onHoverIntent?.(true);
                 hover.clear();
+              }
             }}
             onPointerDown={plane.onPointerDown}
             onPointerMoveCapture={(event) => {
@@ -246,10 +271,12 @@ export function ReviewTimeline(props: TimelineProps) {
             }}
             onPointerUp={(event) => {
               plane.onPointerUp(event);
+              props.onHoverIntent?.(false);
               hover.clear();
             }}
             onPointerCancel={() => {
               plane.onPointerCancel();
+              props.onHoverIntent?.(false);
               hover.clear();
             }}
             onPointerLeave={hover.clear}
@@ -313,94 +340,57 @@ function reviewTimelineHeightClass(
     : 'max-h-[min(42dvh,calc(100dvh-420px))]';
 }
 
-/** Telemetry row presentation is independent of ruler gestures and transport. */
+/** Independent semantic rows retain the compact capture-event presentation. */
 function ReviewTimelineEvents(
-  props: Pick<
-    TimelineProps,
-    | 'markers'
-    | 'captureCapabilities'
-    | 'actionsTrackVisible'
-    | 'cursorFocusKeys'
-    | 'selectedCursorFocusId'
-    | 'onCursorFocusKey'
-    | 'onNavigateCursorFocus'
-    | 'onMoveCursorFocus'
-    | 'playing'
-    | 'onAddCursorFocusKey'
-    | 'duration'
-    | 'time'
-    | 'selectedTelemetryRef'
-    | 'onMarker'
-    | 'actionsEnabled'
-    | 'onToggleActions'
-    | 'keyAnimations'
-    | 'clickAnimations'
-    | 'cursorArchiveAvailable'
-    | 'sourceId'
-  > & { width: number; zoom: number }
+  props: TimelineProps & { family: 'keyboard' | 'mouse'; width: number; zoom: number }
 ) {
-  const [animatedOnly, setAnimatedOnly] = useState(false);
   const animated = useMemo(
     () =>
       new Set([
-        ...(props.clickAnimations ?? [])
-          .filter((item) => item.effect !== 'off')
-          .map((item) => item.id),
-        ...(props.keyAnimations ?? []).filter((item) => item.enabled).map((item) => item.id),
+        ...(props.clickAnimations ?? []).filter((p) => p.effect !== 'off').map((p) => p.id),
+        ...(props.keyAnimations ?? []).filter((p) => p.enabled).map((p) => p.id),
       ]),
     [props.clickAnimations, props.keyAnimations]
   );
   const markers = useMemo(
-    () =>
-      animatedOnly
-        ? props.markers.filter(
-            (marker) => marker.ref.kind === 'action' && animated.has(marker.ref.id)
-          )
-        : props.markers,
-    [animatedOnly, props.markers, animated]
+    () => props.markers.filter((m) => reviewInteractionFamily(m) === props.family),
+    [props.markers, props.family]
   );
-  return props.actionsTrackVisible !== false &&
-    (props.markers.length || props.onAddCursorFocusKey || props.cursorArchiveAvailable) ? (
+  if (props.actionsTrackVisible === false) return null;
+  const enabled =
+    props.family === 'keyboard' ? props.keyboardEnabled !== false : props.mouseEnabled !== false;
+  return (
     <ReviewTrackRow
-      track="actions"
-      muted={props.actionsEnabled === false}
-      label={translate('gallery.videoReview.telemetry')}
-      icon={<Activity size={14} aria-hidden="true" />}
+      track={props.family}
+      muted={!enabled}
+      label={translate(
+        props.family === 'keyboard'
+          ? 'gallery.videoReview.historyKeyboard'
+          : 'gallery.videoReview.historyMouse'
+      )}
+      icon={props.family === 'keyboard' ? <Keyboard size={14} /> : <Mouse size={14} />}
       controls={
         <>
-          <ReviewButton
-            label={translate('gallery.videoReview.historyAnimatedOnly')}
-            className={reviewIconButtonClassName}
-            aria-pressed={animatedOnly}
-            onClick={() => setAnimatedOnly((value) => !value)}
+          <ReviewTrackVisibilityButton
+            track={props.family}
+            label={translate('gallery.videoReview.historyEffectsEnabled')}
+            className={reviewTrackStatusButtonClassName}
+            aria-pressed={enabled}
+            onClick={() => props.onToggleFamily?.(props.family)}
           >
-            <Filter size={14} aria-hidden="true" />
-          </ReviewButton>
-          {props.onToggleActions ? (
-            <ReviewTrackVisibilityButton
-              track={'actions'}
-              label={translate('gallery.videoReview.historyEffectsEnabled')}
-              className={reviewTrackStatusButtonClassName}
-              aria-pressed={props.actionsEnabled !== false}
-              onClick={props.onToggleActions}
-            >
-              {props.actionsEnabled === false ? <EyeOff size={14} /> : <Eye size={14} />}
-            </ReviewTrackVisibilityButton>
-          ) : null}
+            {enabled ? <Eye size={14} /> : <EyeOff size={14} />}
+          </ReviewTrackVisibilityButton>
         </>
       }
     >
-      <div className="min-h-7" data-ui="gallery.videoReview.historyTrack">
-        {props.cursorArchiveAvailable ? (
-          <div
-            data-ui="gallery.videoReview.archivedCursorHistory"
-            className="text-xs text-[var(--sniptale-color-text-secondary)]"
-          >
-            {translate('gallery.videoReview.recordingCursorArchived')}
-          </div>
-        ) : null}
+      <div
+        className="relative rounded bg-[var(--sniptale-color-surface-hover)]"
+        style={{ height: reviewTrackMetrics(true).step }}
+        data-ui={`gallery.videoReview.${props.family}Track`}
+      >
         <ReviewTelemetryStrip
-          cursorArchiveAvailable={props.cursorArchiveAvailable}
+          family={props.family}
+          interactionEditor={props.interactionEditor}
           sourceId={props.sourceId}
           captureCapabilities={props.captureCapabilities}
           markers={markers}
@@ -409,23 +399,230 @@ function ReviewTimelineEvents(
           time={props.time}
           width={props.width}
           zoom={props.zoom}
-          {...(props.selectedTelemetryRef
-            ? { selectedTelemetryRef: props.selectedTelemetryRef }
-            : {})}
+          selectedTelemetryRef={props.selectedTelemetryRef}
           onMarker={props.onMarker}
-          {...(props.cursorFocusKeys ? { cursorFocusKeys: props.cursorFocusKeys } : {})}
-          {...(props.selectedCursorFocusId
-            ? { selectedCursorFocusId: props.selectedCursorFocusId }
-            : {})}
-          {...(props.onCursorFocusKey ? { onCursorFocusKey: props.onCursorFocusKey } : {})}
-          playing={props.playing}
-          {...(props.onNavigateCursorFocus
-            ? { onNavigateCursorFocus: props.onNavigateCursorFocus }
-            : {})}
-          {...(props.onMoveCursorFocus ? { onMoveCursorFocus: props.onMoveCursorFocus } : {})}
-          {...(props.onAddCursorFocusKey ? { onAddCursorFocusKey: props.onAddCursorFocusKey } : {})}
         />
+        <ReviewTrackCuts projection={createTrackProjection(props.duration, props.edits ?? [])} />
       </div>
     </ReviewTrackRow>
-  ) : null;
+  );
+}
+
+/** All visible source lanes share inserted display time; durable edits keep original source coordinates. */
+export function ReviewTimeline(props: TimelineProps) {
+  const display = useMemo(
+    () => createReviewDisplayMap(props.duration, props.edits ?? []),
+    [props.duration, props.edits]
+  );
+  const clock = useContext(ReviewPlaybackPresentationClockContext);
+  const range = (value: ReviewAnchor, inverse = false): ReviewAnchor => {
+    const map = inverse ? display.displayToSource : display.sourceToDisplay;
+    return value.kind === 'point'
+      ? { kind: 'point', time: map(value.time) }
+      : {
+          kind: 'range',
+          start: map(value.start),
+          end: inverse ? map(value.end) : display.sourceToDisplay(value.end, 'end'),
+        };
+  };
+  if (!display.parts.some((part) => part.segment.kind === 'freeze'))
+    return (
+      <ReviewPlaybackPresentationClockContext.Provider value={clock}>
+        <ReviewTimelineSurface {...props} />
+      </ReviewPlaybackPresentationClockContext.Provider>
+    );
+  const seek = (time: number, snap?: boolean) => {
+    const part = display.parts.find((part) => time >= part.start && time < part.end);
+    if (part?.segment.kind === 'freeze' && props.onSeekResult)
+      props.onSeekResult(display.displayToResult(time));
+    else props.onSeek(display.displayToSource(time), snap);
+  };
+  const originalEdit = (edit: ReviewEdit) =>
+    props.edits?.find((item) => item.id === edit.id) ?? edit;
+  const current =
+    props.resultTime == null
+      ? display.sourceToDisplay(props.time)
+      : display.resultToDisplay(props.resultTime);
+  const mappedEdits = (props.edits ?? [])
+    .filter((edit) => edit.kind !== 'freeze')
+    .map((edit) => ({
+      ...edit,
+      start: display.sourceToDisplay(edit.start),
+      end: display.sourceToDisplay(edit.end, 'end'),
+    }));
+  const insertions = display.parts
+    .filter((part) => part.segment.kind === 'freeze')
+    .map((part) => {
+      const edit = props.edits?.find((edit) => edit.id === part.segment.freezeId);
+      if (!edit) return null;
+      return (
+        <ReviewEditBlock
+          key={edit.id}
+          edit={{ ...edit, start: part.start, end: part.end }}
+          edits={mappedEdits}
+          duration={display.duration}
+          time={current}
+          selection={range(props.selection)}
+          annotations={[]}
+          selectedEditId={props.selectedEditId}
+          beforeAction={props.beforeAction}
+          snapClock={{ output: display.sourceToDisplay, fromDisplay: (time) => time }}
+          rangeEnabled={!props.busy}
+          onSnap={() => {}}
+          onEdit={(view) => {
+            props.onEdit?.(originalEdit(view));
+            props.onSeekResult?.(part.segment.resultStart);
+          }}
+          onChangeEdit={async (_view, value) => {
+            if (value.kind === 'range')
+              await props.onFreezeDurationChange?.(edit, value.end - value.start);
+          }}
+          onSeek={seek}
+          onSelect={props.onSelect}
+          onComment={props.onComment}
+        />
+      );
+    });
+  const mappedClock = clock
+    ? {
+        ...clock,
+        read: () => {
+          const hold = display.parts.find(
+            (part) =>
+              part.segment.kind === 'freeze' &&
+              props.resultTime != null &&
+              props.resultTime >= part.segment.resultStart &&
+              props.resultTime < part.segment.resultEnd
+          );
+          return hold ? current : display.sourceToDisplay(clock.read());
+        },
+      }
+    : null;
+  return (
+    <ReviewPlaybackPresentationClockContext.Provider value={mappedClock}>
+      <ReviewTimelineSurface
+        {...props}
+        interactionEditor={
+          props.interactionEditor
+            ? {
+                ...props.interactionEditor,
+                update: (marker, start, end, enabled) =>
+                  props.interactionEditor!.update(
+                    props.markers.find(
+                      (item) => item.ref.kind === marker.ref.kind && item.ref.id === marker.ref.id
+                    ) ?? marker,
+                    display.displayToSource(start),
+                    display.displayToSource(end),
+                    enabled
+                  ),
+              }
+            : undefined
+        }
+        duration={display.duration}
+        snapClock={{ output: display.sourceToDisplay, fromDisplay: (time) => time }}
+        time={current}
+        sourceInsertions={insertions}
+        edits={mappedEdits}
+        selection={range(props.selection)}
+        playbackRange={
+          props.playbackRange
+            ? {
+                start: display.sourceToDisplay(props.playbackRange.start),
+                end: display.sourceToDisplay(props.playbackRange.end, 'end'),
+              }
+            : props.playbackRange
+        }
+        {...(props.boundaries
+          ? { boundaries: props.boundaries.map((time) => display.sourceToDisplay(time)) }
+          : {})}
+        snapTimes={props.snapTimes?.map((time) => display.sourceToDisplay(time))}
+        zoomAnchor={
+          props.zoomAnchor == null ? props.zoomAnchor : display.sourceToDisplay(props.zoomAnchor)
+        }
+        markers={props.markers.map((marker) => ({
+          ...marker,
+          start: display.sourceToDisplay(marker.start),
+          end: display.sourceToDisplay(marker.end, 'end'),
+        }))}
+        annotations={props.annotations.map((note) => ({ ...note, anchor: range(note.anchor) }))}
+        onSeek={seek}
+        onSelect={(value) => props.onSelect(range(value, true))}
+        {...(props.onEdit
+          ? { onEdit: (edit: ReviewEdit) => props.onEdit!(originalEdit(edit)) }
+          : {})}
+        {...(props.onChangeEdit
+          ? {
+              onChangeEdit: (edit: ReviewEdit, value: ReviewAnchor) =>
+                props.onChangeEdit!(originalEdit(edit), range(value, true)),
+            }
+          : {})}
+        {...(props.onRangeCommit
+          ? { onRangeCommit: (value: ReviewAnchor) => props.onRangeCommit!(range(value, true)) }
+          : {})}
+        onTrackRangeCommit={
+          props.onTrackRangeCommit
+            ? (value) => {
+                const next = range(value, true);
+                if (next.kind === 'range') props.onTrackRangeCommit!(next);
+              }
+            : undefined
+        }
+        onTextRangeCommit={
+          props.onTextRangeCommit
+            ? (value) => {
+                const next = range(value, true);
+                if (next.kind === 'range') props.onTextRangeCommit!(next);
+              }
+            : undefined
+        }
+        onFocusRangeCommit={
+          props.onFocusRangeCommit
+            ? (value) => props.onFocusRangeCommit!(range(value, true))
+            : undefined
+        }
+        onFocusRangePreview={
+          props.onFocusRangePreview
+            ? (value) => props.onFocusRangePreview!(value ? range(value, true) : null)
+            : undefined
+        }
+        onPlaybackRange={
+          props.onPlaybackRange
+            ? (value) =>
+                props.onPlaybackRange!(
+                  value
+                    ? {
+                        start: display.displayToSource(value.start),
+                        end: display.displayToSource(value.end),
+                      }
+                    : null
+                )
+            : undefined
+        }
+        onHoverTime={
+          props.onHoverTime
+            ? (value) => props.onHoverTime!(value === null ? null : display.displayToSource(value))
+            : undefined
+        }
+        onHistoryRange={
+          props.onHistoryRange
+            ? (value) =>
+                props.onHistoryRange!({
+                  start: display.displayToSource(value.start),
+                  end: display.displayToSource(value.end),
+                })
+            : undefined
+        }
+        onMarker={(marker) =>
+          props.onMarker(
+            props.markers.find(
+              (item) => item.ref.kind === marker.ref.kind && item.ref.id === marker.ref.id
+            ) ?? marker
+          )
+        }
+        onComment={(note) =>
+          props.onComment(props.annotations.find((item) => item.id === note.id) ?? note)
+        }
+      />
+    </ReviewPlaybackPresentationClockContext.Provider>
+  );
 }

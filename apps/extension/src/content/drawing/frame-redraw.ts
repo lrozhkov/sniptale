@@ -75,10 +75,7 @@ export function useDrawingFrameRedraw(args: {
         bendOnly: !showSelectionChrome,
         renderObjects: false,
         hoverBend: args.hoverBendRef.current,
-        hoverPoint:
-          controller.session.getSnapshot().activeTool === 'select'
-            ? args.hoverPointRef.current
-            : null,
+        hoverPoint: args.hoverPointRef.current,
         ...(controller.getObjectAnchor ? { getObjectAnchor: controller.getObjectAnchor } : {}),
       });
   }, [
@@ -97,6 +94,7 @@ export function useDrawingFrameRedraw(args: {
   ]);
 
   const latestRedraw = useRef(redraw);
+  const previousChromeHidden = useRef(false);
   const frameRef = useRef<number | null>(null);
   const pendingRef = useRef(false);
   const schedule = useCallback(() => {
@@ -111,8 +109,11 @@ export function useDrawingFrameRedraw(args: {
 
   useLayoutEffect(() => {
     latestRedraw.current = redraw;
-    schedule();
-  }, [redraw, draftRevision, args.visualRevision, schedule]);
+    // Clear service paint in the same commit that hides it; admission waits for the next paint.
+    if (chromeHidden && !previousChromeHidden.current) redraw();
+    else schedule();
+    previousChromeHidden.current = chromeHidden;
+  }, [redraw, chromeHidden, draftRevision, args.visualRevision, schedule]);
 
   useLayoutEffect(() => {
     const scrollRoot = controller.getScrollRoot();

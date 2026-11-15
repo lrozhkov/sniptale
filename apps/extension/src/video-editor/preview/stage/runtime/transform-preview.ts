@@ -68,6 +68,14 @@ export function usePreviewStageTransientTransform(
       }),
     };
   }, [project, transient, frozenTime, currentTime]);
+  const transformClipId = transient && 'clipId' in transient ? transient.clipId : null;
+  const transformInteraction = useMemo(
+    () =>
+      cacheBypass && frozenTime !== null && transformClipId
+        ? { clipId: transformClipId, project }
+        : undefined,
+    [project, cacheBypass, frozenTime, transformClipId]
+  );
   const gestureHooks = useMemo<PreviewTransformGestureHooks>(
     () => ({
       onActivate: () => {
@@ -119,5 +127,6 @@ export function usePreviewStageTransientTransform(
     currentTime: frozenTime ?? currentTime,
     gestureHooks,
     previewProject,
+    transformInteraction,
   };
 }

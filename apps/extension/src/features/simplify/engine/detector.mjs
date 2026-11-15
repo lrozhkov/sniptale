@@ -127,7 +127,12 @@ export function buildDetectionCatalog(image) {
 export function selectDetection(catalog, detail = 55) {
   const value = clamp(detail, 10, 90);
   const threshold = value <= 55 ? 92 - ((value - 10) * 44) / 45 : 48 - ((value - 55) * 28) / 35;
-  return catalog.filter((box) => box.contrast >= threshold);
+  return catalog.filter(
+    (box) =>
+      box.contrast >= threshold ||
+      // The faint catalog pass has already established glyph evidence for these rows.
+      (value >= 55 && box.shape === 'text' && box.textConfidence === true)
+  );
 }
 
 export function detect(image, detail = 55) {

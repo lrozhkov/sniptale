@@ -100,6 +100,9 @@ export function getProjectExportWatermarkRenderer(
 }
 
 export function cleanupJob(job: ProjectExportRuntimeState): void {
+  const composition = job.sharedComposition;
+  delete job.sharedComposition;
+  composition?.dispose();
   const joins = job.compositionJoinRenderer;
   delete job.compositionJoinRenderer;
   joins?.dispose();

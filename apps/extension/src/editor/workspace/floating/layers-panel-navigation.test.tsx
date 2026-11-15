@@ -16,6 +16,8 @@ vi.mock('../../inspector/layers/file-input', () => ({
 
 it('maps only owned settings inspectors into the unified layers panel', () => {
   expect(resolveEditorLayersPanelMode('tool')).toBe('layers');
+  expect(resolveEditorLayersPanelMode('ai')).toBe('ai');
+  expect(resolveEditorLayersPanelMode('elements')).toBe('elements');
   expect(resolveEditorLayersPanelMode('layer-effects')).toBe('layers');
   expect(resolveEditorLayersPanelMode('workspace')).toBe('layers');
   expect(resolveEditorLayersPanelMode('frame')).toBe('frame');
@@ -32,13 +34,27 @@ it('keeps modes available without image insertion when collapsed', () => {
 
   expect(markup).toContain('role="toolbar"');
   expect(markup).toContain('editor.floating.layers.mode.layers');
+  expect(markup).toContain('editor.floating.layers.mode.elements');
   expect(markup).toContain('editor.floating.layers.mode.frame');
   expect(markup).toContain('editor.floating.layers.mode.browser-frame');
   expect(markup).toContain('editor.floating.layers.mode.meta');
   expect(markup).toContain('editor.floating.layers.mode.image-size');
   expect(markup).toContain('editor.floating.layers.mode.canvas-size');
   expect(markup).not.toContain('aria-pressed="true"');
-  expect(markup.match(/aria-pressed="false"/g)).toHaveLength(6);
+  expect(
+    [...markup.matchAll(/data-ui="editor\.floating\.layers\.mode\.([^"]+)"/g)].map(
+      (match) => match[1]
+    )
+  ).toEqual([
+    'layers',
+    'elements',
+    'frame',
+    'browser-frame',
+    'ai',
+    'meta',
+    'image-size',
+    'canvas-size',
+  ]);
   expect(markup).not.toContain('mock.insert-image');
   expect(markup).toContain('pointer-events-auto flex shrink-0 items-center');
   expect(markup).toContain('flex-row rounded-[4px]');
@@ -65,8 +81,10 @@ it('keeps the canonical header order when expanded', () => {
 function expectToolbarOrder(markup: string, includeCollapse: boolean) {
   const selectors = [
     'editor.floating.layers.mode.layers',
+    'editor.floating.layers.mode.elements',
     'editor.floating.layers.mode.frame',
     'editor.floating.layers.mode.browser-frame',
+    'editor.floating.layers.mode.ai',
     'editor.floating.layers.mode.meta',
     'editor.floating.layers.mode.image-size',
     'editor.floating.layers.mode.canvas-size',

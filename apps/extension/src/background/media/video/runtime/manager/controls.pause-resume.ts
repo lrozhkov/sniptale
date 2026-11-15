@@ -1,9 +1,13 @@
+import { loadVideoSettings } from '../../../../../composition/persistence/capture-settings';
+import { createVideoRecordingSurfaceSnapshot } from '../../content-surface/snapshot';
+import { prepareVideoRecordingSurfaceCapture } from '../../content-surface/runtime-state-sync';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import {
   getVideoRecordingCaptureMode,
+  getVideoRecordingId,
   getVideoRecordingTabId,
   hasActiveVideoRecordingSession,
   isControlledCursorCaptureEnabled,
@@ -120,13 +124,27 @@ export async function resumeRecording(): Promise<RecordingControlResult> {
     return { result: 'blocked' };
   }
 
+  let restoreDrawingUi: (() => Promise<void>) | undefined;
   try {
+    restoreDrawingUi = await prepareVideoRecordingSurfaceCapture(
+      {
+        captureMode: getVideoRecordingCaptureMode(),
+        recordingId: getVideoRecordingId(),
+        tabId: getVideoRecordingTabId(),
+      },
+      async (lease) => createVideoRecordingSurfaceSnapshot(lease, await loadVideoSettings())
+    );
+    if (shouldBlockControlledCursorResume() || isTabRecordingNavigationPending()) {
+      await restoreDrawingUi();
+      return { result: 'blocked' };
+    }
     await Promise.all([
       sendRecordingCommand(VideoMessageType.OFFSCREEN_RESUME_RECORDING, 'resume'),
       syncControlledCursorCaptureState('resume'),
     ]);
     return { result: 'accepted' };
   } catch (error) {
+    await restoreDrawingUi?.().catch(() => undefined);
     return { error: error instanceof Error ? error.message : String(error), result: 'failed' };
   }
 }

@@ -81,9 +81,13 @@ function captureBounds(
   return needed;
 }
 
-export function captureSource(canvas: Canvas, object: FabricObject): DrawingSimplifySource {
+export function captureSource(
+  canvas: Canvas,
+  object: FabricObject,
+  replacement?: DrawingSimplifyObject
+): DrawingSimplifySource {
   const size = getEditorEditingDocumentSize(canvas);
-  const drawing = readEditorDrawingObject(object);
+  const drawing = replacement ?? readEditorDrawingObject(object);
   if (!size || drawing?.kind !== 'simplify') throw new Error('Simplify source is unavailable.');
   const bounds = captureBounds(size, drawing);
   const width = Math.ceil(bounds.width);

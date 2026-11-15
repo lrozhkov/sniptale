@@ -1,6 +1,9 @@
 import { Point, Textbox, type Canvas, type FabricObject } from 'fabric';
 import { synchronizeEditorDrawingObjectFromFabric } from '../../drawing/object/metadata';
-import { applyEditorDrawingTextVisuals } from '../../drawing/object/vector';
+import {
+  applyEditorDrawingTextVisuals,
+  synchronizeEditorDrawingTextLayout,
+} from '../../drawing/object/vector';
 import { normalizeFrameAnnotationProxyGeometry } from '../../frame-annotation/proxy';
 
 import type { SourceState } from '../../document/model/source-state';
@@ -56,7 +59,8 @@ function synchronizeSceneDrawing(
   const drawing = synchronizeEditorDrawingObjectFromFabric(object, transform);
   if (drawing?.kind !== 'text' || !isSceneTextBox(object)) return;
   const center = object.getCenterPoint();
-  const automaticWidth = object.sniptaleDrawingTextAutoWidth;
+  const automaticWidth = drawing.autoWidth ?? object.sniptaleDrawingTextAutoWidth;
+  object.sniptaleDrawingTextAutoWidth = false;
   object.set({
     fontSize: drawing.fontSize,
     width: Math.max(1, drawing.bounds.width),
@@ -70,7 +74,9 @@ function synchronizeSceneDrawing(
   } finally {
     if (automaticWidth === undefined) delete object.sniptaleDrawingTextAutoWidth;
     else object.sniptaleDrawingTextAutoWidth = automaticWidth;
+    if (drawing.wrapWidth !== undefined) object.sniptaleDrawingTextMaxWidth = drawing.wrapWidth;
   }
+  if (automaticWidth) synchronizeEditorDrawingTextLayout(object);
   if (drawing.rotation)
     object.setPositionByOrigin(new Point(center.x, center.y), 'center', 'center');
   else object.set({ left: drawing.bounds.x, top: drawing.bounds.y });

@@ -237,3 +237,9 @@ it('selects full type proof when canonical JSON translation keys change', () => 
     resolveAffectedTypecheckProjects(['apps/extension/src/platform/i18n/catalogs/en.json']).mode
   ).toBe('full');
 });
+
+it('uses complete runtime declarations for the development surface page loader', () => {
+  expect(resolveAffectedTypecheckProjects(['tooling/test/harness/dev-surface.ts'])).toMatchObject({
+    mode: 'full',
+  });
+});

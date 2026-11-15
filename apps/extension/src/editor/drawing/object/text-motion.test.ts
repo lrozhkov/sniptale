@@ -5,7 +5,7 @@ import { expect, it } from 'vitest';
 import { canonicalizeModifiedEditorDrawingSelection } from './canonicalize';
 import { createEditorDrawingFabricObject } from './vector';
 
-it('keeps the rendered text position and pixels stable when a move is committed', () => {
+it.each([0, 27])('keeps text pixels stable when a move at %s degrees is committed', (angle) => {
   const canvas = new Canvas(document.createElement('canvas'));
   const object = createEditorDrawingFabricObject(
     {
@@ -22,7 +22,7 @@ it('keeps the rendered text position and pixels stable when a move is committed'
   );
   if (!(object instanceof Textbox)) throw new Error('Expected text object');
   canvas.add(object);
-  object.set({ left: 80, top: 105 });
+  object.set({ angle, left: 80, top: 105 });
   object.setCoords();
   const glyphTop = object.getCenterPoint().y + object._getTopOffset();
   const height = object.height;
@@ -42,7 +42,8 @@ it('keeps the rendered text position and pixels stable when a move is committed'
     }) ?? [];
   if (!(replacement instanceof Textbox)) throw new Error('Expected text replacement');
 
-  expect(replacement.top).toBeCloseTo(object.top, 4);
+  expect(replacement.getCenterPoint().x).toBeCloseTo(object.getCenterPoint().x, 4);
+  expect(replacement.getCenterPoint().y).toBeCloseTo(object.getCenterPoint().y, 4);
   expect(replacement.height).toBeCloseTo(height, 4);
   expect(replacement.width).toBeCloseTo(width, 4);
   expect(replacement.fontSize).toBe(fontSize);

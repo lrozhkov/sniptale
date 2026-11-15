@@ -1,3 +1,4 @@
+import { ContentDrawingTextProjection } from '../../../drawing/text-measurement';
 import { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
 import {
   createDrawingSession,
@@ -34,7 +35,9 @@ export function createCropDrawingHistory() {
     else snapshots.redo();
     publish();
   };
+  const textProjection = new ContentDrawingTextProjection();
   const session = createDrawingSession({
+    objectProjection: textProjection,
     onDocumentCommit(commit) {
       if (disposed) return false;
       replay = commit.replay;
@@ -44,6 +47,7 @@ export function createCropDrawingHistory() {
       return true;
     },
     onDispose() {
+      textProjection.dispose();
       disposed = true;
       replay = null;
       snapshots.reset(empty);

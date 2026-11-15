@@ -1,12 +1,12 @@
+import { createGlTransitionCanvas } from '../../features/video/composition/canvas/gl-transition';
+import { createGlTransitionSelection } from '../../features/video/project/transition/gl-catalog';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
 import { readFileSync } from 'node:fs';
-import {
-  resolveEffectV1ControlDefault,
-  sha256EffectV1Bytes,
-} from '@sniptale/runtime-contracts/effect-v1';
+import { createHash } from 'node:crypto';
+import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
 import type {
   EffectRuntimeFrameResult,
   EffectRuntimeRenderCommand,
@@ -28,6 +28,7 @@ import { reviewPresentedGeometry } from './gpu-preview-geometry';
 
 const io = vi.hoisted(() => ({
   order: [] as string[],
+  gl: vi.fn(),
   frame: vi.fn(),
   overlays: vi.fn(),
   webcam: vi.fn(),
@@ -41,6 +42,15 @@ const io = vi.hoisted(() => ({
   captionPreparation: vi.fn(),
   gpu: vi.fn(),
 }));
+vi.mock('../../features/video/composition/canvas/gl-transition', async (original) => {
+  const actual =
+    await original<typeof import('../../features/video/composition/canvas/gl-transition')>();
+  return {
+    ...actual,
+    createGlTransitionCanvas: (args: Parameters<typeof actual.createGlTransitionCanvas>[0]) =>
+      actual.createGlTransitionCanvas(args, io.gl),
+  };
+});
 vi.mock('./gpu-preview', async (original) => ({
   ...(await original<typeof import('./gpu-preview')>()),
   createReviewGpuPreview: (...args: unknown[]) => io.gpu(...args),
@@ -139,11 +149,11 @@ function setup() {
 async function annotationsFixture() {
   const input = scene();
   const source = readFileSync(
-    'apps/extension/public/video-effects/effects/annotations/sniptale-title/effect.sniptale-effect.json',
+    'apps/extension/public/video-effects/animations/title.sniptale-animation.json',
     'utf8'
   );
   const document = readReviewAnnotationEffectDocument(source)!;
-  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(source));
+  const sha256 = createHash('sha256').update(source).digest('hex');
   input.annotationEffects = {
     lane: {
       enabled: true,
@@ -159,7 +169,7 @@ async function annotationsFixture() {
         controls: Object.fromEntries(
           document.controls.map((control) => [
             control.id,
-            resolveEffectV1ControlDefault(control, 'en'),
+            resolveEffectControlDefault(control, 'en'),
           ])
         ),
       })),
@@ -170,7 +180,7 @@ async function annotationsFixture() {
         sha256,
         source,
         documentId: document.id,
-        schemaVersion: 'sniptale.effect.v1',
+        schemaVersion: 'sniptale.animation.v1',
         kind: 'standalone',
         retainedByteLength: new TextEncoder().encode(source).byteLength,
         assets: [],
@@ -219,6 +229,8 @@ it('awaits plans, accounts for unique sources/outputs and releases them after pa
     f.input.annotationEffects!.snapshots[0]!.retainedByteLength
   );
   const output = await renderer.render(prepared, frame());
+  expect(output.context.imageSmoothingEnabled).toBe(true);
+  expect(output.context.imageSmoothingQuality).toBe('high');
   expect(f.executor.renderFrame.mock.calls.map(([request]) => request.effectInstanceId)).toEqual([
     'annotation-content',
     'annotation-viewport',
@@ -258,8 +270,9 @@ it('refuses parent annotation bitmap admission before sandbox execution and rele
     allocation: { describe: allocationInput, replaceLimits },
   });
   const prepared = await renderer.prepare(f.input, dimensions, new AbortController().signal);
-  replaceLimits.mockImplementation((limits) => {
-    if (limits.maximumManagedBytes > 1_000_000) throw new Error('annotation admission refused');
+  replaceLimits.mockImplementation(() => {
+    // Refuse bitmap admission after staging exists, independently of embedded font byte size.
+    if (leases.length > 0) throw new Error('annotation admission refused');
   });
   await expect(renderer.render(prepared, frame())).rejects.toThrow('admission refused');
   expect(f.executor.renderFrame).not.toHaveBeenCalled();
@@ -2681,4 +2694,235 @@ it('preserves enhancement preparation estimates but refuses an unknown source PT
   );
   expect(enhancer.withEnhancedRegion).not.toHaveBeenCalled();
   renderer.dispose();
+});
+
+it('admits the GPU resource ledger for an enhanced export before submitting its frame', async () => {
+  const { createPreviewRenderResources } = await import('./preview-render-resources');
+  const { resources } = setup();
+  const ledger = createPreviewRenderResources({ maximumManagedBytes: 1, maximumCanvases: 1 });
+  const reservation = vi.fn(() => ledger.bytes('gpu-targets', 256 * 1024 * 1024));
+  const gpu = {
+    allocatedBytes: 0,
+    render: vi.fn(async () => {
+      const lease = reservation();
+      lease.release();
+      return true;
+    }),
+    releaseScene: vi.fn(),
+    dispose: vi.fn(),
+  };
+  io.gpu.mockReturnValue(gpu);
+  vi.stubGlobal('navigator', { gpu: {} });
+  const enhancer = {
+    mode: 'bicubic-sharpen' as const,
+    withEnhancedRegion: vi.fn(),
+    dispose: vi.fn(),
+  };
+  const renderer = createReviewPreviewRenderer({
+    resources,
+    exportEnhancer: enhancer,
+    allocation: {
+      describe: allocationInput,
+      replaceLimits: (limits) => ledger.replaceLimits(limits),
+    },
+  });
+  try {
+    const signal = new AbortController().signal;
+    const prepared = await renderer.prepare(scene(), dimensions, signal);
+    const output = await renderer.render(
+      prepared,
+      {
+        ...frame(),
+        source: { ...frame().source, videoFrame: () => ({}) as VideoFrame },
+      },
+      signal
+    );
+    expect(output.renderer.backend).toBe('gpu');
+    expect(reservation).toHaveBeenCalledOnce();
+    expect(io.frame).not.toHaveBeenCalled();
+    output.release();
+  } finally {
+    renderer.dispose();
+    ledger.dispose();
+  }
+});
+
+it('reuses the pinned GLSL fallback for decorated endpoints and releases it with the scene', async () => {
+  const { resources } = setup();
+  const lose = vi.fn();
+  const getExtension = vi.fn(() => ({ loseContext: lose }));
+  const glCanvas = { width: 0, height: 0, getContext: vi.fn(() => ({ getExtension })) };
+  vi.stubGlobal('document', { fonts: document.fonts, createElement: vi.fn(() => glCanvas) });
+  const backend = {
+    render: vi.fn(async (_request: unknown) => undefined),
+    dispose: vi.fn(async () => undefined),
+  };
+  io.gl.mockReturnValue(backend);
+  const renderer = createReviewPreviewRenderer({ resources, renderer: 'legacy' });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(scene(), dimensions, signal);
+  const selection = createGlTransitionSelection('BowTie')!;
+  const blend = reviewCutTransitionAt(1.8, [
+    {
+      id: 'cut',
+      type: 'gl',
+      selection,
+      easing: 'LINEAR',
+      before: 0.5,
+      after: 0.5,
+      seam: 2,
+      left: { start: 0, end: 2 },
+      right: { start: 4, end: 6 },
+    },
+  ])!;
+  const endpoint = { timestamp: 1.9, draw: vi.fn(), close: vi.fn() };
+  const input = {
+    ...frame(),
+    resultTime: 1.8,
+    sourceTime: 1.8,
+    source: { ...frame().source, timestamp: 1.8 },
+    transition: { blend, frames: { left: endpoint, right: { ...endpoint, timestamp: 4 } } },
+  };
+  for (let i = 0; i < 2; i++) {
+    const output = await renderer.render(prepared, input, signal);
+    output.release();
+  }
+  expect(io.gl).toHaveBeenCalledOnce();
+  expect(backend.render).toHaveBeenCalledTimes(2);
+  expect(backend.render.mock.calls[0]![0]).toMatchObject({
+    selection,
+    progress: blend.incoming,
+    ratio: 16 / 9,
+    width: 640,
+    height: 360,
+  });
+  expect(io.frame).toHaveBeenCalledTimes(4);
+  expect(io.transition).not.toHaveBeenCalled();
+  expect(resources.bytes).toHaveBeenCalledWith('preview-gl-transition', 640 * 360 * 12 + 32768);
+  expect(lose).not.toHaveBeenCalled();
+  renderer.dispose();
+  await vi.waitFor(() => expect(lose).toHaveBeenCalledOnce());
+  expect(backend.dispose).toHaveBeenCalledOnce();
+});
+
+it.each(['abort', 'dispose'] as const)(
+  'retains GL resources during pending execution and refuses late publication after %s',
+  async (kind) => {
+    const { resources, leases, reservations } = setup();
+    const lose = vi.fn();
+    const glCanvas = {
+      width: 0,
+      height: 0,
+      getContext: vi.fn(() => ({ getExtension: () => ({ loseContext: lose }) })),
+    };
+    vi.stubGlobal('document', { fonts: document.fonts, createElement: vi.fn(() => glCanvas) });
+    let started!: () => void, finish!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const pending = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const backend = {
+      render: vi.fn(async () => {
+        started();
+        await pending;
+      }),
+      dispose: vi.fn(async () => undefined),
+    };
+    io.gl.mockReturnValue(backend);
+    const renderer = createReviewPreviewRenderer({ resources, renderer: 'legacy' });
+    const prepared = await renderer.prepare(scene(), dimensions, new AbortController().signal);
+    const selection = createGlTransitionSelection('BowTie')!;
+    const blend = reviewCutTransitionAt(1.8, [
+      {
+        id: 'cut',
+        type: 'gl',
+        selection,
+        easing: 'LINEAR',
+        before: 0.5,
+        after: 0.5,
+        seam: 2,
+        left: { start: 0, end: 2 },
+        right: { start: 4, end: 6 },
+      },
+    ])!;
+    const endpoint = { timestamp: 1.9, draw: vi.fn(), close: vi.fn() };
+    const controller = new AbortController();
+    const rendering = renderer.render(
+      prepared,
+      {
+        ...frame(),
+        resultTime: 1.8,
+        sourceTime: 1.8,
+        source: { ...frame().source, timestamp: 1.8 },
+        transition: { blend, frames: { left: endpoint, right: { ...endpoint, timestamp: 4 } } },
+      },
+      controller.signal
+    );
+    const rejected = expect(rendering).rejects.toThrow();
+    await entered;
+    const reservation = reservations.at(-1)!;
+    if (kind === 'abort') controller.abort();
+    else renderer.dispose();
+    expect(lose).not.toHaveBeenCalled();
+    expect(reservation).not.toHaveBeenCalled();
+    finish();
+    await rejected;
+    expect(
+      leases.some((lease) =>
+        vi.mocked(lease.context.drawImage).mock.calls.some((call) => Object.is(call[0], glCanvas))
+      )
+    ).toBe(false);
+    renderer.dispose();
+    await vi.waitFor(() => expect(lose).toHaveBeenCalledOnce());
+    expect(reservation).toHaveBeenCalledOnce();
+    expect(backend.dispose).toHaveBeenCalledOnce();
+  }
+);
+
+it('releases a refused GL context allocation and retries without leaking its reservation', async () => {
+  const { resources, reservations, leases } = setup();
+  const lose = vi.fn();
+  const glCanvas = {
+    width: 0,
+    height: 0,
+    getContext: vi.fn(() => ({ getExtension: () => ({ loseContext: lose }) })),
+  };
+  const createElement = vi
+    .fn()
+    .mockImplementationOnce(() => {
+      throw new Error('Controlled context refusal');
+    })
+    .mockReturnValue(glCanvas);
+  vi.stubGlobal('document', { createElement });
+  const backend = { render: vi.fn(async () => undefined), dispose: vi.fn(async () => undefined) };
+  io.gl.mockReturnValue(backend);
+  const output = resources.canvas('test-output', { width: 8, height: 4 });
+  const runtime = createGlTransitionCanvas({
+    ownerDocument: document,
+    reserve: (bytes) => resources.bytes('test-gl', bytes),
+  });
+  const request = {
+    context: output.context,
+    from: output.canvas,
+    to: output.canvas,
+    width: 8,
+    height: 4,
+    selection: createGlTransitionSelection('Fade')!,
+    progress: 0.5,
+    ratio: 2,
+    signal: new AbortController().signal,
+  };
+  await expect(runtime.render(request)).rejects.toThrow('Controlled context refusal');
+  expect(reservations[0]).toHaveBeenCalledOnce();
+  expect(io.gl).not.toHaveBeenCalled();
+  await runtime.render(request);
+  expect(backend.render).toHaveBeenCalledOnce();
+  expect(leases[0]!.context.drawImage).toHaveBeenCalledWith(glCanvas, 0, 0);
+  expect(reservations[1]).not.toHaveBeenCalled();
+  runtime.dispose();
+  await vi.waitFor(() => expect(lose).toHaveBeenCalledOnce());
+  expect(reservations[1]).toHaveBeenCalledOnce();
+  output.release();
 });

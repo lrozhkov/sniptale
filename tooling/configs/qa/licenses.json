@@ -43,6 +43,17 @@
       "approvalOwner": "repository-owner",
       "expiresOn": "2027-07-12",
       "debtId": "accepted.license.eslint-plugin-sonarjs"
+    },
+    {
+      "packageName": "@grame/faustwasm",
+      "resolvedVersion": "0.20.2",
+      "dependencyScope": "direct-development",
+      "artifactInclusion": "development-only",
+      "licenseExpression": "LGPL-2.1",
+      "reason": "The pinned compiler is a build dependency. Release generation emits fixed DSP and a separately inventoried LGPL runtime subset with notices and source provenance. The compiler and its data files do not ship.",
+      "approvalOwner": "repository-owner",
+      "expiresOn": "2027-05-12",
+      "debtId": "accepted.license.faustwasm-0.20.2"
     }
   ]
 }

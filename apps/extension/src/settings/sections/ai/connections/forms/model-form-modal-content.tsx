@@ -15,6 +15,7 @@ import type {
   AIModelCapabilities,
   AIModelLifecycle,
 } from '../../../../../contracts/settings/ai-catalog';
+import { AI_MODEL_OPERATIONS } from '../../../../../contracts/settings/ai-catalog';
 import type { AIModel, AIProvider } from '../../../../../contracts/settings';
 import { formatDateTime, getCurrentLocale, translate } from '../../../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -324,7 +325,7 @@ function ModelFormModalBody(props: ModelFormModalContentProps) {
   const [parametersOpen, setParametersOpen] = useState(manual);
   const hasModel = manual || Boolean(props.catalog.selected);
   const availableOperations = props.formData.capabilities
-    ? (['text', 'transcription', 'speech'] as const).filter(
+    ? AI_MODEL_OPERATIONS.filter(
         (operation) => props.formData.capabilities?.operations[operation] === 'supported'
       )
     : undefined;

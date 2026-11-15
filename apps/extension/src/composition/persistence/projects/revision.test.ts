@@ -1,9 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  EFFECT_BUNDLE_CORPUS,
-  readEffectBundleCorpusArchive,
-} from '../../../../../../tooling/test/support/effect-v1-corpus.test-support';
-import { importEffectBundleZip } from '../../../features/video/project/effect-bundle/import/zip';
+import { readValidAnimationSnapshot } from '../effect-bundles/fixture.test-support';
 import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../features/video/project/effect-instance/integrity';
 import {
   createVideoProjectEntry,
@@ -174,35 +170,8 @@ describe('isCurrentVideoProjectSnapshot', () => {
   });
 
   it('compares effect source and digest metadata after full validation without reading Blob bytes or hashing', async () => {
-    const corpus = EFFECT_BUNDLE_CORPUS.find(
-      ({ accepted, artifact }) => accepted && artifact.includes('asset-bearing-conformance')
-    );
-    if (!corpus) throw new Error('Missing asset-bearing effect fixture');
-    const imported = await importEffectBundleZip(readEffectBundleCorpusArchive(corpus));
-    if (!imported.ok) throw new Error('Invalid effect fixture');
-    const document = imported.bundle.documents[0]!;
     const entry = createVideoProjectEntry({
-      effectSnapshots: [
-        {
-          id: `effect:${document.sha256}`,
-          documentId: document.document.id,
-          kind: document.document.kind,
-          schemaVersion: 'sniptale.effect.v1',
-          sha256: document.sha256,
-          source: document.source,
-          retainedByteLength:
-            new TextEncoder().encode(document.source).byteLength +
-            document.assets.reduce((total, asset) => total + asset.byteLength, 0),
-          assets: document.assets.map((asset) => ({
-            blob: new Blob([Uint8Array.from(asset.bytes).buffer], { type: asset.mimeType }),
-            id: asset.id,
-            kind: asset.kind,
-            byteLength: asset.byteLength,
-            mimeType: asset.mimeType,
-            sha256: asset.sha256,
-          })),
-        },
-      ],
+      effectSnapshots: [await readValidAnimationSnapshot()],
     });
     await verifyVideoProjectEffectSnapshotIntegrity(entry.project);
     const snapshot = structuredClone(entry.project);
@@ -214,7 +183,7 @@ describe('isCurrentVideoProjectSnapshot', () => {
     effect.source += ' ';
     await expect(isCurrentVideoProjectSnapshot(snapshot, 0)).resolves.toBe(false);
     effect.source = snapshot.effectSnapshots![0]!.source;
-    effect.assets[0]!.sha256 = '0'.repeat(64);
+    effect.sha256 = '0'.repeat(64);
     await expect(isCurrentVideoProjectSnapshot(snapshot, 0)).resolves.toBe(false);
     expect(readBytes).not.toHaveBeenCalled();
     expect(digest).not.toHaveBeenCalled();

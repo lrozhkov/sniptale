@@ -27,7 +27,34 @@ export function ReviewWebcamTrack(props: {
   projection: ReviewTrackProjection;
   beforeAction?: ReviewBeforeAction | undefined;
 }) {
-  const { editor, projection } = props;
+  const { projection } = props;
+  const original = props.editor;
+  const display = projection.display;
+  const sourceRange = (range: Range) => ({
+    start: display.displayToSource(range.start),
+    end: display.displayToSource(range.end),
+  });
+  const editor: typeof original = {
+    ...original,
+    camera: original.camera
+      ? {
+          ...original.camera,
+          hiddenRanges: original.camera.hiddenRanges.map((range) => ({
+            ...range,
+            start: display.sourceToDisplay(range.start),
+            end: display.sourceToDisplay(range.end, 'end'),
+          })),
+          positions: original.camera.positions.map((position) => ({
+            ...position,
+            time: display.sourceToDisplay(position.time),
+          })),
+        }
+      : original.camera,
+    hide: (range) => original.hide(sourceRange(range)),
+    resizeHidden: (id, range) => original.resizeHidden(id, sourceRange(range)),
+    canResizeHidden: (id, range) => original.canResizeHidden(id, sourceRange(range)),
+    movePosition: (id, time) => original.movePosition(id, display.displayToSource(time)),
+  };
   const camera = editor.camera;
   const compact = props.compact ?? false;
   const metrics = reviewTrackMetrics(compact);
@@ -69,8 +96,8 @@ export function ReviewWebcamTrack(props: {
         Math.max(
           0,
           Math.min(
-            projection.duration,
-            ((event.clientX - rect.left) / Math.max(1, rect.width)) * projection.duration
+            projection.display.duration,
+            ((event.clientX - rect.left) / Math.max(1, rect.width)) * projection.display.duration
           )
         ) * 1000
       ) / 1000
@@ -98,6 +125,7 @@ export function ReviewWebcamTrack(props: {
     >
       <div
         data-ui="gallery.videoReview.webcamTrack"
+        data-review-snap-domain="display"
         className="relative rounded bg-[var(--sniptale-color-surface-hover)]"
         style={{ height: metrics.step, touchAction: 'none' }}
         onPointerDown={(event) => {
@@ -148,7 +176,7 @@ export function ReviewWebcamTrack(props: {
         <ReviewTrackCuts projection={projection} />
         <ReviewWebcamTrackMarkers
           editor={editor}
-          duration={projection.duration}
+          duration={projection.display.duration}
           admit={admit}
           compact={compact}
         />
@@ -159,8 +187,8 @@ export function ReviewWebcamTrack(props: {
             style={{
               top: metrics.inset,
               height: metrics.body,
-              left: `${(preview.start / projection.duration) * 100}%`,
-              width: `${((preview.end - preview.start) / projection.duration) * 100}%`,
+              left: `${(preview.start / projection.display.duration) * 100}%`,
+              width: `${((preview.end - preview.start) / projection.display.duration) * 100}%`,
               opacity: editor.canHide(preview) ? 1 : 0.4,
             }}
           >

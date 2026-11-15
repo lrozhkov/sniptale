@@ -158,3 +158,53 @@ it('preserves a legacy empty base recording identity in the conservative locator
     })
   ).toContain('recording:');
 });
+
+it('projects retained and detached vector backing as authoritative immutable asset owners', () => {
+  const definitionId = 'a'.repeat(64);
+  for (const retained of [true, false]) {
+    const backing = {
+      key: `definition:${definitionId}`,
+      kind: 'definition',
+      definitionId,
+      assetId: 'vector-bytes',
+      incarnation: 'incarnation',
+      retained,
+    };
+    expect(projectRetentionRow('editor_vector_library', backing)).toMatchObject({
+      valid: true,
+      owners: [
+        {
+          ownerKind: 'editor-vector-definition',
+          ownerId: definitionId,
+          role: 'body',
+          assetId: 'vector-bytes',
+        },
+      ],
+    });
+    expect(projectRowReferenceKeys('editor_vector_library', backing)).toEqual([
+      'asset:vector-bytes',
+    ]);
+  }
+  expect(projectRetentionRow('editor_vector_library', { kind: 'definition' }).valid).toBe(false);
+});
+
+it('keeps library metadata and malformed advisory cache rows free of byte ownership claims', () => {
+  const settings = {
+    key: 'settings',
+    kind: 'settings',
+    incarnation: 'source',
+    revision: 1,
+    baseUrl: 'https://api.iconify.design/',
+    networkEnabled: false,
+    disclosureAccepted: false,
+    sourceGeneration: 1,
+  };
+  expect(projectRetentionRow('editor_vector_library', settings)).toMatchObject({
+    valid: true,
+    owners: [],
+  });
+  expect(
+    projectRetentionRow('editor_vector_library', { kind: 'cache', payload: 'corrupt' })
+  ).toMatchObject({ valid: true, owners: [] });
+  expect(projectRetentionRow('editor_vector_library', { kind: 'unknown' }).valid).toBe(false);
+});

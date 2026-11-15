@@ -10,6 +10,11 @@ import { createQuickEditAdvancedState } from '../../features/video/review/advanc
 import { parseReviewOperation } from '../../features/video/review/validation';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import { useReviewAdvancedContent } from './use-advanced-content';
+import { useReviewAudio } from './use-review-audio';
+import { createQuickEditAudioClip } from '../../features/video/review/advanced/audio';
+vi.mock('../../composition/persistence/media-library', () => ({
+  listMediaLibrary: vi.fn(async () => []),
+}));
 import { useReviewSnapshot } from './use-session';
 import {
   patchReviewActionAudio,
@@ -272,3 +277,101 @@ it('retries an older failed capture before a later closed command group', async 
   expect(content.saveFailed).toBe(false);
   expect(commit).toHaveBeenCalledTimes(3);
 });
+
+it('persists cursor motion visibility with the path and preserves unrelated content', async () => {
+  const { session, commit } = setup();
+  const motion = {
+    id: 'motion',
+    start: 0,
+    end: 3,
+    enabled: true,
+    shape: 'arrow' as const,
+    size: 48,
+    color: '#000000',
+    outline: '#ffffff',
+    shadow: true,
+    easing: 'smooth' as const,
+    points: [
+      { id: 'a', at: 0, x: 0.2, y: 0.3 },
+      { id: 'b', at: 1, x: 0.8, y: 0.6 },
+    ],
+  };
+  act(() => content.commands.setCursorMotions([motion]));
+  await act(async () => content.flush());
+  act(() => content.commands.setCursorMotionEnabled(false));
+  await act(async () => content.flush());
+  expect(content.content.cursorMotionEnabled).toBe(false);
+  expect(content.content.cursorMotions).toEqual([motion]);
+  expect(commit.mock.calls[1]?.[0].operation).toMatchObject({
+    before: { cursorMotions: [motion] },
+    after: { cursorMotionEnabled: false, cursorMotions: [motion] },
+  });
+  const snapshot = session.getSnapshot();
+  expect(snapshot.document.advancedContent.audio.original).toEqual({ muted: false, volume: 1 });
+  act(() => content.commands.setCursorMotionEnabled(true));
+  await act(async () => content.flush());
+  expect(content.content.cursorMotions).toEqual([motion]);
+  expect(content.content.cursorMotionEnabled).toBe(true);
+});
+
+it.each(['original', 'voiceover', 'music'] as const)(
+  'retains each completed %s audio processing choice as a separate Undo operation before autosave',
+  async (lane) => {
+    const { session, commit } = setup();
+    let audio!: ReturnType<typeof useReviewAudio>;
+    function AudioHarness() {
+      const snapshot = useReviewSnapshot(session);
+      content = useReviewAdvancedContent(session, snapshot.document.advancedContent);
+      audio = useReviewAudio({
+        audio: content.content.audio,
+        setAudio: content.commands.setAudio,
+        timelineDuration: 4,
+      });
+      return null;
+    }
+    act(() => root.render(<AudioHarness />));
+    if (lane !== 'original') {
+      act(() =>
+        audio.addImported(
+          createQuickEditAudioClip({
+            id: 'processing-clip',
+            assetId: 'asset:processing',
+            timelineStart: 0,
+            duration: 2,
+            endMax: 4,
+          }),
+          lane
+        )
+      );
+      await act(async () => content.flush());
+      commit.mockClear();
+    }
+    for (const bypassed of [false, true]) {
+      const patch = { audioProcessing: { version: 1 as const, bypassed, effects: [] } };
+      act(() =>
+        lane === 'original'
+          ? audio.setOriginal(patch)
+          : audio.patchClip(lane, 'processing-clip', patch)
+      );
+    }
+    await act(async () => content.flush());
+    expect(commit).toHaveBeenCalledTimes(2);
+    const bypass = (audio: typeof content.content.audio) =>
+      lane === 'original'
+        ? audio.original.audioProcessing?.bypassed
+        : audio[lane][0]?.audioProcessing?.bypassed;
+    expect(
+      session
+        .getSnapshot()
+        .snapshot.workspace.history.slice(-2)
+        .map((operation) =>
+          operation.target === 'advancedContent'
+            ? [bypass(operation.before.audio), bypass(operation.after.audio)]
+            : null
+        )
+    ).toEqual([
+      [undefined, false],
+      [false, true],
+    ]);
+  }
+);

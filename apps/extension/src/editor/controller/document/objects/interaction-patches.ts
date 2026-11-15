@@ -1,10 +1,8 @@
+import { DEFAULT_COLOR_CANVAS_SELECTION } from '@sniptale/ui/default-colors/constants';
 import type { FabricObject } from 'fabric';
 import { isEditableObject } from '../../../document/model';
 import { isBlurObject } from '../../../objects/annotation/blur/object';
-import {
-  EDITOR_CANVAS_ACCENT,
-  EDITOR_CANVAS_CONTROL_SURFACE,
-} from '../../../color/palette/constants';
+import { EDITOR_CANVAS_CONTROL_SURFACE } from '../../../color/palette/constants';
 
 function getStepInteractionPatch(object: FabricObject) {
   if (object.sniptaleType !== 'step') {
@@ -51,9 +49,9 @@ export function applyBaseInteractionPatch(
 ): void {
   object.set({
     transparentCorners: false,
-    borderColor: EDITOR_CANVAS_ACCENT,
+    borderColor: DEFAULT_COLOR_CANVAS_SELECTION,
     cornerColor: EDITOR_CANVAS_CONTROL_SURFACE,
-    cornerStrokeColor: EDITOR_CANVAS_ACCENT,
+    cornerStrokeColor: DEFAULT_COLOR_CANVAS_SELECTION,
     objectCaching: false,
     selectable: isEditableObject(object) && !options.locked,
     evented: isEditableObject(object) && !options.locked,

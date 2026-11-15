@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../transition/gl-catalog';
 import { expect, it } from 'vitest';
 import {
   createEmptyVideoProject,
@@ -182,7 +183,8 @@ it('retains the existing crossfade multiplier as a separate gain factor', () => 
       leadingClipId: source.id,
       trailingClipId: incoming.id,
       duration: 1,
-      kind: 'CROSSFADE',
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       easing: 'LINEAR',
     },
   ];

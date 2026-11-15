@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { createQuickEditSpotlight } from '../../features/video/project/scene/focus-appearance';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { drawReviewSceneFrame } from './scene-frame';
@@ -6,16 +9,46 @@ import { computeQuickEditSceneLayout } from '../../features/video/review/advance
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 
 import { drawSceneSpotlights } from '../../features/video/composition/draw/spotlight';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ReviewEdit } from '../../features/video/review/types';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createCanvasComment } from '../../features/video/review/comments';
-import { drainSegmentAudio, renderRenderWindowFrames, writeReviewFrames } from './render-export';
+import { drainSegmentAudio, writeReviewFrames } from './render-export';
+import { renderRenderWindowFrames } from './render-export-composition.test-support';
 import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
+
+const FRAME_SOURCE = readFileSync(
+  'apps/extension/public/video-effects/animations/frame.sniptale-animation.json',
+  'utf8'
+);
+const FRAME_DOCUMENT = parseAnimationTemplateSource(FRAME_SOURCE);
+if (!FRAME_DOCUMENT.ok) throw new Error('Expected valid shipped frame animation.');
+const FRAME_HASH = createHash('sha256').update(FRAME_SOURCE).digest('hex');
+const FRAME_SNAPSHOT = {
+  id: `effect:${FRAME_HASH}`,
+  schemaVersion: 'sniptale.animation.v1' as const,
+  kind: 'standalone' as const,
+  documentId: FRAME_DOCUMENT.template.id,
+  sha256: FRAME_HASH,
+  source: FRAME_SOURCE,
+  retainedByteLength: Buffer.byteLength(FRAME_SOURCE),
+  assets: [],
+};
 const presentationExport = vi.hoisted(() => vi.fn());
 const annotationMain = vi.hoisted(() => ({ open: vi.fn() }));
-vi.mock('./presentation-main', () => ({ createReviewPresentationMain: annotationMain.open }));
+vi.mock('./presentation-main', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./presentation-main')>();
+  return {
+    createReviewPresentationMain: (
+      ...args: Parameters<typeof actual.createReviewPresentationMain>
+    ) =>
+      annotationMain.open.getMockImplementation()
+        ? annotationMain.open(...args)
+        : actual.createReviewPresentationMain(...args),
+  };
+});
+afterEach(() => annotationMain.open.mockReset());
 vi.mock('./render-presentation-export', () => ({
   writeReviewPresentationFrames: presentationExport,
 }));
@@ -49,7 +82,7 @@ function annotationExportArgs() {
     instances: [
       {
         id: 'frame',
-        snapshotId: 'effect:frame',
+        snapshotId: FRAME_SNAPSHOT.id,
         enabled: true,
         start: 0,
         end: 2,
@@ -62,6 +95,30 @@ function annotationExportArgs() {
   };
   return args;
 }
+
+it('uses the shared compositor for a frame export without annotations', async () => {
+  const args = argsFixture({ frameRate: 2 });
+  const release = vi.fn();
+  const main = {
+    renderAtTime: vi.fn(async () => ({
+      canvas: { width: 320, height: 180 } as HTMLCanvasElement,
+      context: contextFixture(),
+      release,
+    })),
+    dispose: vi.fn(),
+  };
+  annotationMain.open.mockReset().mockResolvedValue(main);
+  try {
+    await writeReviewFrames(args);
+    expect(annotationMain.open).toHaveBeenCalledOnce();
+    expect(main.renderAtTime.mock.calls).toEqual([[0], [0.5], [1], [1.5]]);
+    expect(state.encoded.map((sample) => sample.timestamp)).toEqual([0, 0.5, 1, 1.5]);
+    expect(release).toHaveBeenCalledTimes(4);
+    expect(main.dispose).toHaveBeenCalledOnce();
+  } finally {
+    annotationMain.open.mockReset();
+  }
+});
 
 it('composes annotations without extra decoding and preserves fractional cadence', async () => {
   const args = annotationExportArgs();
@@ -77,18 +134,7 @@ it('composes annotations without extra decoding and preserves fractional cadence
     dispose: vi.fn(),
   };
   annotationMain.open.mockReset().mockResolvedValue(main);
-  const effectSnapshots = [
-    {
-      id: 'effect:frame',
-      schemaVersion: 'sniptale.effect.v1' as const,
-      kind: 'standalone' as const,
-      documentId: 'frame',
-      sha256: '0'.repeat(64),
-      source: '{}',
-      retainedByteLength: 2,
-      assets: [],
-    },
-  ];
+  const effectSnapshots = [{ ...FRAME_SNAPSHOT }];
   const fullMap = buildReviewTimeMap(10, []);
   const receipt = await writeReviewFrames({
     ...args,
@@ -412,7 +458,7 @@ describe('writeReviewFrames', () => {
 
 describe('writeReviewFrames background lifecycle', () => {
   it('closes a decoded background image after a successful render', async () => {
-    const bitmap = { close: vi.fn() } as unknown as ImageBitmap;
+    const bitmap = { width: 320, height: 180, close: vi.fn() } as unknown as ImageBitmap;
     vi.stubGlobal(
       'createImageBitmap',
       vi.fn(async () => bitmap)
@@ -431,7 +477,7 @@ describe('writeReviewFrames background lifecycle', () => {
   });
 
   it('closes a decoded background image when rendering throws', async () => {
-    const bitmap = { close: vi.fn() } as unknown as ImageBitmap;
+    const bitmap = { width: 320, height: 180, close: vi.fn() } as unknown as ImageBitmap;
     vi.stubGlobal(
       'createImageBitmap',
       vi.fn(async () => bitmap)
@@ -456,8 +502,8 @@ describe('writeReviewFrames background lifecycle', () => {
     expect(bitmap.close).toHaveBeenCalledTimes(1);
   });
 
-  it('closes a decoded background image when source acquisition later fails', async () => {
-    const bitmap = { close: vi.fn() } as unknown as ImageBitmap;
+  it('fails source acquisition before allocating optional background resources', async () => {
+    const bitmap = { width: 320, height: 180, close: vi.fn() } as unknown as ImageBitmap;
     vi.stubGlobal(
       'createImageBitmap',
       vi.fn(async () => bitmap)
@@ -483,7 +529,10 @@ describe('writeReviewFrames background lifecycle', () => {
     };
     args.readProjectAsset.mockResolvedValue(new Blob(['image']));
     await expect(writeReviewFrames(args)).rejects.toThrow('sample rate failed');
-    expect(bitmap.close).toHaveBeenCalledTimes(1);
+    expect(args.readProjectAsset).not.toHaveBeenCalled();
+    expect(createImageBitmap).not.toHaveBeenCalled();
+    expect(bitmap.close).not.toHaveBeenCalled();
+    expect(state.encoded).toEqual([]);
   });
 });
 
@@ -553,13 +602,13 @@ it('encodes the selected portrait canvas while fitting the native landscape sour
   await writeReviewFrames(argsFixture({ advanced }));
   expect(state.encoded.length).toBeGreaterThan(0);
   expect(state.encoded.every((frame) => frame.width === 1080 && frame.height === 1920)).toBe(true);
-  expect(state.composited).toContainEqual([
-    expect.objectContaining({ width: 320, height: 180 }),
+  expect(state.drawn[0]!.draw).toHaveBeenCalledWith(
+    expect.objectContaining({ imageSmoothingQuality: 'high' }),
     0,
     656.25,
     1080,
-    607.5,
-  ]);
+    607.5
+  );
 });
 
 it('shares the rational Current rate with the output profile', async () => {
@@ -591,17 +640,17 @@ it('renders exact non-keyframe cuts while keeping output timestamps continuous',
   expect(state.encoded.map((sample) => sample.timestamp)).toEqual([0, 0.5, 1]);
 });
 
-it('isolates the visible source pixels before filtering a scaled composition', async () => {
+it('filters the shared normalized source at the requested composition size', async () => {
   state.drawn.length = 0;
   const args = argsFixture();
   args.advanced.canvas = { width: 1920, height: 1080 };
   await writeReviewFrames(args);
   expect(state.drawn[0]!.draw).toHaveBeenCalledWith(
-    expect.objectContaining({ imageSmoothingEnabled: false }),
+    expect.objectContaining({ imageSmoothingEnabled: true, imageSmoothingQuality: 'high' }),
     0,
     0,
-    320,
-    180
+    1920,
+    1080
   );
 });
 

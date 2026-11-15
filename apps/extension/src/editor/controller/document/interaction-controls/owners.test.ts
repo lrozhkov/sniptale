@@ -1,10 +1,12 @@
+// @vitest-environment jsdom
 import { Control } from 'fabric';
 import { describe, expect, it, vi } from 'vitest';
 
 import { applyEditorObjectInteractionControls } from './apply';
 import { applyEditorObjectControlDefaults } from './base';
-import { patchCornerControl, resolveCornerVisualSize } from './corner';
+import { patchCornerControl } from './corner';
 import { patchRotateControl } from './rotate';
+import { patchEdgeControl } from '../interaction-border-controls';
 
 function createControlSet() {
   return {
@@ -27,7 +29,7 @@ describe('editor object interaction control owners', () => {
     applyEditorObjectControlDefaults(object as never);
 
     expect(object.set).toHaveBeenCalledWith(
-      expect.objectContaining({ borderScaleFactor: 1.35, cornerStyle: 'circle' })
+      expect.objectContaining({ borderScaleFactor: 1.25, cornerStyle: 'circle' })
     );
   });
 
@@ -35,14 +37,13 @@ describe('editor object interaction control owners', () => {
     const corner = new Control();
     const rotate = new Control({ withConnection: true });
 
-    expect(resolveCornerVisualSize({ width: 24, height: 24 } as never, false)).toBe(9);
     patchCornerControl(corner, 'tl');
     patchRotateControl(rotate);
 
-    expect(corner.sizeX).toBe(17);
+    expect(corner.sizeX).toBe(22);
     expect(corner.render).toBeTypeOf('function');
     expect(rotate.withConnection).toBe(false);
-    expect(rotate.offsetY).toBe(-32);
+    expect(rotate.offsetY).toBe(-20);
   });
 
   it('applies owner patches only when the object has the default box control surface', () => {
@@ -55,4 +56,50 @@ describe('editor object interaction control owners', () => {
     expect(controls.mt.shouldActivate).toBeTypeOf('function');
     expect(controls.mtr.render).toBeTypeOf('function');
   });
+});
+
+it.each(['tl', 'mr'] as const)('keeps captured %s blue when hover identity changes', (key) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 40;
+  const context = canvas.getContext('2d')!;
+  const control = new Control();
+  if (key === 'tl') patchCornerControl(control, key);
+  else patchEdgeControl(control, key);
+  const object = {
+    controls: { [key]: control },
+    __corner: '',
+    canvas: { _currentTransform: null as unknown },
+  };
+  const core = () => {
+    context.clearRect(0, 0, 40, 40);
+    control.render.call(control, context, 20, 20, {}, object as never);
+    return [...context.getImageData(20, 20, 1, 1).data];
+  };
+  expect(core()).toEqual([255, 255, 255, 255]);
+  object.canvas._currentTransform = { target: object, corner: key };
+  expect(core()).toEqual([37, 99, 235, 255]);
+  object.__corner = 'another-handle';
+  expect(core()).toEqual([37, 99, 235, 255]);
+  object.canvas._currentTransform = null;
+  expect(core()).toEqual([255, 255, 255, 255]);
+});
+
+it('keeps the painted corner identical before and during hover for every object size', () => {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 40;
+  const context = canvas.getContext('2d')!;
+  for (const size of [4, 24, 58, 300]) {
+    const controls = createControlSet();
+    const object = { width: size, height: size, controls, set: vi.fn(), __corner: '' };
+    applyEditorObjectInteractionControls(object as never);
+    const paint = () => {
+      context.clearRect(0, 0, 40, 40);
+      controls.tl.render.call(controls.tl, context, 20, 20, {}, object as never);
+      return [...context.getImageData(0, 0, 40, 40).data];
+    };
+    const before = paint();
+    object.__corner = 'tl';
+    expect(paint()).toEqual(before);
+    expect(before.some((channel) => channel > 0)).toBe(true);
+  }
 });

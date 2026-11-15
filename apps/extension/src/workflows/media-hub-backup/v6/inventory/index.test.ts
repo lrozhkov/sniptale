@@ -1,3 +1,4 @@
+import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -255,12 +256,6 @@ it.each(['all', 'selected'] as const)(
   async (scope) => {
     vi.stubGlobal('chrome', { runtime: { id: 'offscreen-fixture' } });
     try {
-      const { readEffectCatalogPreferences } = await vi.importActual<
-        typeof import('../../../../composition/persistence/effect-bundles/preferences')
-      >('../../../../composition/persistence/effect-bundles/preferences');
-      await expect(readEffectCatalogPreferences()).rejects.toThrow(
-        'chrome.storage.local is unavailable'
-      );
       const { buildEffectBundleRootInventory } =
         await vi.importActual<typeof import('./effect-bundles')>('./effect-bundles');
       mocks.buildEffects.mockImplementation(buildEffectBundleRootInventory);
@@ -286,18 +281,21 @@ it.each(['all', 'selected'] as const)(
     }
   }
 );
-it('full archive creation still refuses unavailable effect preferences instead of inventing an empty settings snapshot', async () => {
+it('full archive creation refuses unavailable native visual preferences instead of inventing an empty snapshot', async () => {
   vi.stubGlobal('chrome', { runtime: { id: 'offscreen-fixture' } });
   try {
     mocks.db.getAll.mockResolvedValue([]);
     const { buildEffectBundleRootInventory } =
       await vi.importActual<typeof import('./effect-bundles')>('./effect-bundles');
     mocks.buildEffects.mockImplementation(buildEffectBundleRootInventory);
+    mocks.db.transaction.mockImplementation(() => {
+      throw new Error('Native visual preferences unavailable');
+    });
     await expect(
       buildMediaHubBackupExportPlanFromLibraryV6(
         createMediaHubBackupExportOptions({ scope: 'all' })
       )
-    ).rejects.toThrow('chrome.storage.local is unavailable');
+    ).rejects.toThrow('Native visual preferences unavailable');
   } finally {
     vi.unstubAllGlobals();
   }
@@ -320,3 +318,44 @@ it.each(['mediaAssetIds', 'scenarioProjectIds', 'videoProjectIds'] as const)(
     ).rejects.toThrow('selected backup item');
   }
 );
+
+it('does not inspect unrelated visual catalogue for an explicitly selected supported video project', async () => {
+  const project = createEmptyVideoProject('Selected supported project');
+  project.id = 'selected';
+  const entry = createVideoProjectEntry(project);
+  mocks.db.getAll.mockResolvedValue([]);
+  mocks.buildEffects.mockRejectedValue(
+    new Error('Unsupported legacy effect catalog entries: unrelated')
+  );
+  mocks.buildVideoProjects.mockResolvedValue([
+    {
+      descriptor: {
+        metadataPath: '_sniptale/metadata/video-projects/selected.json',
+        rootId: 'selected',
+        rootKind: 'video-project',
+        objectCount: 0,
+        totalBytes: 0,
+      },
+      load: async () => ({
+        metadata: { entry, projectAssets: [], projectExports: [] },
+        objects: [],
+      }),
+      summary: {
+        draftCount: 0,
+        recordingCount: 0,
+        sourceMetadataCount: 0,
+        telemetryCount: 0,
+        thumbnailCount: 0,
+        webSnapshotCount: 0,
+      },
+    },
+  ]);
+  const result = await buildMediaHubBackupExportPlanFromLibraryV6(
+    createMediaHubBackupExportOptions({
+      scope: 'selected',
+      selected: { mediaAssetIds: [], scenarioProjectIds: [], videoProjectIds: ['selected'] },
+    })
+  );
+  expect(result.roots).toHaveLength(1);
+  expect(mocks.buildEffects).not.toHaveBeenCalled();
+});

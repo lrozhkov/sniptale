@@ -1,11 +1,23 @@
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import {
   EFFECT_RUNTIME_PROTOCOL_VERSION,
   EFFECT_RUNTIME_WORKER_REQUEST,
   type EffectRuntimeWorkerMessage,
 } from '../../contracts/effect-runtime/types';
-import { createDocument, createPassContext } from './interpreter/support.test-support';
+import { parseRuntimeAnimationDocument } from '../../contracts/effect-runtime/animation';
+
+const initialization = vi.hoisted(() => ({ preload: vi.fn(async () => undefined) }));
+vi.mock('./lottie', async (original) => ({
+  ...(await original<typeof import('./lottie')>()),
+  initializeLottieRuntime: () => initialization.preload(),
+  createLottieFrameRenderer: async () => ({
+    render: async ({ width, height }: { width: number; height: number }) =>
+      new FakeBitmap(width, height),
+    dispose: vi.fn(),
+  }),
+}));
+beforeEach(() => initialization.preload.mockReset());
 
 class FakeBitmap implements ImageBitmap {
   readonly close = vi.fn();
@@ -13,20 +25,6 @@ class FakeBitmap implements ImageBitmap {
     readonly width: number,
     readonly height: number
   ) {}
-}
-
-class FakeCanvas {
-  readonly context = createPassContext();
-  constructor(
-    readonly width: number,
-    readonly height: number
-  ) {}
-  getContext() {
-    return this.context;
-  }
-  transferToImageBitmap(): ImageBitmap {
-    return new FakeBitmap(this.width, this.height);
-  }
 }
 
 afterEach(() => {
@@ -61,7 +59,6 @@ it('transfers a successful frame from the installed worker boundary', async () =
   } = { onmessage: null, postMessage };
   vi.stubGlobal('self', scope);
   vi.stubGlobal('ImageBitmap', FakeBitmap);
-  vi.stubGlobal('OffscreenCanvas', FakeCanvas);
   await import('./index');
 
   scope.onmessage?.(new MessageEvent('message', { data: createRequest() }));
@@ -85,7 +82,7 @@ it('disposes a successful frame when the final worker transfer fails', async () 
       message.result !== null &&
       'bitmap' in message.result
     ) {
-      transferredBitmap = message.result.bitmap as FakeBitmap;
+      if (message.result.bitmap instanceof FakeBitmap) transferredBitmap = message.result.bitmap;
     }
     throw new Error('transfer failed');
   });
@@ -95,7 +92,6 @@ it('disposes a successful frame when the final worker transfer fails', async () 
   } = { onmessage: null, postMessage };
   vi.stubGlobal('self', scope);
   vi.stubGlobal('ImageBitmap', FakeBitmap);
-  vi.stubGlobal('OffscreenCanvas', FakeCanvas);
   await import('./index');
 
   scope.onmessage?.(new MessageEvent('message', { data: createRequest() }));
@@ -143,7 +139,6 @@ it('rejects messages carrying a window origin', async () => {
   } = { onmessage: null, postMessage };
   vi.stubGlobal('self', scope);
   vi.stubGlobal('ImageBitmap', FakeBitmap);
-  vi.stubGlobal('OffscreenCanvas', FakeCanvas);
   await import('./index');
 
   scope.onmessage?.(
@@ -162,10 +157,21 @@ it('rejects messages carrying a window origin', async () => {
 
 function createRequest(): EffectRuntimeWorkerMessage {
   const documentId = 'c'.repeat(64);
+  const document = parseRuntimeAnimationDocument({
+    format: 'sniptale-animation',
+    version: 1,
+    id: 'worker-proof',
+    label: { en: 'Worker proof' },
+    controls: [],
+    bindings: [],
+    resources: [],
+    animation: { v: '5.12.2', w: 10, h: 10, fr: 30, ip: 0, op: 60, layers: [], assets: [] },
+  });
+  if (!document) throw new Error('Invalid fixture.');
   return {
     assetSelectionRef: { assets: {}, id: 'd'.repeat(64) },
     controls: {},
-    documentRef: { document: createDocument([{ op: 'clear' }]), id: documentId },
+    documentRef: { document, id: documentId },
     duration: 2,
     effectInstanceId: 'instance',
     fps: 30,
@@ -184,3 +190,24 @@ function createRequest(): EffectRuntimeWorkerMessage {
     width: 10,
   };
 }
+
+it('installs guards after failed preload and returns a classified failure without an unhandled rejection', async () => {
+  vi.resetModules();
+  initialization.preload.mockRejectedValueOnce(new Error('WASM unavailable'));
+  const postMessage = vi.fn();
+  const scope: {
+    onmessage: ((event: MessageEvent<unknown>) => void) | null;
+    postMessage: typeof postMessage;
+  } = { onmessage: null, postMessage };
+  vi.stubGlobal('self', scope);
+  await import('./index');
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(() => Reflect.get(scope, 'fetch')).toThrow('SNIPTALE_EFFECT_RUNTIME_API_DENIED');
+  scope.onmessage?.(new MessageEvent('message', { data: createRequest() }));
+  await vi.waitFor(() => expect(postMessage).toHaveBeenCalledOnce());
+  expect(postMessage).toHaveBeenCalledWith(
+    expect.objectContaining({ result: expect.objectContaining({ code: 'crashed' }) }),
+    { transfer: [] }
+  );
+});

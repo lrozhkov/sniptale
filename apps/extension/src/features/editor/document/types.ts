@@ -1,3 +1,4 @@
+import type { EditorVectorDefinition } from './vector-element';
 import type { LinearGradient } from '@sniptale/foundation/paint';
 import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import type { BorderPreset } from '../../highlighter/contracts';
@@ -37,6 +38,7 @@ export type EditorObjectType =
   | 'browser-frame'
   | 'meta-stamp'
   | 'rich-shape'
+  | 'vector-element'
   | 'group';
 
 type BrowserFrameCanvasMode = 'resize' | 'keep-size';
@@ -119,8 +121,7 @@ export interface EditorShapeSettings {
   inheritCustomCss: boolean;
 }
 
-interface EditorDocumentVersion2 {
-  version: 2;
+interface EditorDocumentBase {
   sourceImageData: string;
   sourceName: string | null;
   /** Editable document caption; legacy workspaces retain their aggregate caption. */
@@ -138,9 +139,24 @@ interface EditorDocumentVersion2 {
   compositionBase?: EditorCompositionBase;
   canvasJson: string;
   richShapes?: EditorRichShapeDocumentObject[];
+  vectorDefinitions?: Record<string, EditorVectorDefinition>;
 }
 
-export type EditorDocument = EditorDocumentVersion2;
+export type EditorDocument = EditorDocumentBase &
+  ({ version: 2 } | { version: 3 } | { version: 4 });
+
+export interface EditorLayerChild {
+  effects?: EditorRasterEffect[];
+  id: string;
+  name: string;
+  type: EditorObjectType;
+  typeLabel: string;
+  selected?: boolean;
+  locked?: boolean;
+  visible?: boolean;
+  containsSelection?: boolean;
+  groupChildren?: EditorLayerChild[];
+}
 
 export interface EditorLayerItem {
   effectCount: number;
@@ -159,7 +175,8 @@ export interface EditorLayerItem {
   selectedCount: number;
   typeLabel: string;
   groupSize?: number;
-  groupChildren?: Array<{ id: string; name: string; type: EditorObjectType; typeLabel: string }>;
+  containsSelection?: boolean;
+  groupChildren?: EditorLayerChild[];
   visible: boolean;
 }
 

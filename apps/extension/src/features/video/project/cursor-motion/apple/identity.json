@@ -1,0 +1,42 @@
+{
+  "repository": "https://github.com/ful1e5/apple_cursor",
+  "commit": "fe044a42b4e9cea16ea762d2ed9004f6d7b35543",
+  "license": "GPL-3.0-only",
+  "sources": [
+    {
+      "path": "LICENSE",
+      "sha256": "b506d1619aaec697f71d1230af32190c46777bf541e68f0fa6bf54d48f72c935"
+    },
+    {
+      "path": "configs/x.build.toml",
+      "sha256": "a1995c40a5621b3f5eeea016784f0aee0643632fae8bb2a4ef2a5e0b967fd997"
+    },
+    {
+      "path": "svg/crosshair.svg",
+      "sha256": "dd41110cc30dd228f59e5acdcd091a5c01454d9ca86d574dcc1896197ef514c5"
+    },
+    {
+      "path": "svg/hand1.svg",
+      "sha256": "dcb385764c2414870d1216f4c937bb21ff853a0a2e4519cc98913b622b0eb76b"
+    },
+    {
+      "path": "svg/hand2.svg",
+      "sha256": "1059f09b64ebe72946523d625fe1c4802ce1523f39c9519fb4620c66972bf5ab"
+    },
+    {
+      "path": "svg/left_ptr.svg",
+      "sha256": "1ed0122e8247c483374ebb0ab42895a890eebe0fb0c99824e3b56359f40be682"
+    },
+    {
+      "path": "svg/xterm.svg",
+      "sha256": "81ccdbbbd3d3b9a65678b37096e2d12b93d7b3cbbfd1719ebb759a2c322c475e"
+    }
+  ],
+  "sourceSetSha256": "f307941ba096017f0b6a62b7bfcff94d1f3171e5376415aed934ee29d0ff2237",
+  "sourceSetHashEncoding": "SHA-256 of compact JSON with sorted path entries and ordered path, sha256 properties.",
+  "derived": {
+    "path": "apps/extension/src/features/video/project/cursor-motion/apple-shapes.json",
+    "sha256": "d3180d9ecfc0471a9f3bb281a34f3befcadf5b15f63e2d95ff3107fc87f15f3e",
+    "changes": "Extract SVG path attributes and author hotspots. Apply runtime fill, outline, scale and shadow."
+  }
+}

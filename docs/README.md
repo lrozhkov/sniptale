@@ -36,7 +36,7 @@ This index lists current active documents and their authority.
 - [Storage state authority](architecture/storage-state-authority.md) owns state classes and mutation rules.
 - [Persistence contracts](architecture/persistence-contracts.md) owns IndexedDB admission, domain versions, migration, and recovery policy.
 - [Parser architecture](architecture/parser-architecture.md), [i18n architecture](architecture/i18n-architecture.md), and [platform tradeoffs](architecture/platform-patterns-and-tradeoffs.md) own their domain contracts.
-- [Video editor layering](architecture/video-editor-layering.md) and [EffectV1 bundles](architecture/video-effect-bundles.md) own their domain contracts.
+- [Video editor layering](architecture/video-editor-layering.md) and [Lottie animation packages and GL transitions](architecture/video-effect-bundles.md) own their domain contracts.
 - [Design reference](design/index.md) owns product UX, accessibility, theme, control semantics, screen composition, and interaction requirements. Local `DESIGN.md` routes to these documents.
 
 ## Implementation, operation, and release
@@ -46,6 +46,7 @@ This index lists current active documents and their authority.
 - [Project facts](engineering/project-facts.md) is the generated projection of values that can change. These values concern product, browser, permission, persistence, runtime, security-reporting, and release-policy facts.
 - [Canonical CI/CD](tooling/ci-cd.md) owns external execution and release admission.
 - [Operator handbook](tooling/operator-handbook.md) routes commands.
+- [Development surfaces](tooling/dev-surfaces.md) describes source and built page previews and managed browser captures.
 - [Preview performance](tooling/preview-performance.md) describes optional canvas measurements and new scenarios.
 - [Wrapper summary](tooling/wrapper-summary.md) explains wrapper behavior.
 - [Code quality](tooling/code-quality.md) owns gate and exception policy.

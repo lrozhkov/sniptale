@@ -1,9 +1,11 @@
+import type { EditorRasterState } from '../../features/editor/document/raster-state';
 import 'fabric';
 import type { EditorFrameSettings, EditorObjectType } from '../../features/editor/document/types';
 import type { BlurSettings } from '../../features/highlighter/contracts';
 import type { EditorGradientColorStop } from '../../features/editor/document/gradient';
 import type { EditorRasterEffect } from '../../features/editor/document/effects';
 import type { EditorRichShapeDocumentObject } from '../../features/editor/document/rich-shape';
+import type { EditorVectorInstance } from '../../features/editor/document/vector-element';
 import type {
   StepBadgeAlphabet,
   StepBadgeSizeLevel,
@@ -12,6 +14,11 @@ import type {
 
 declare module 'fabric' {
   interface FabricObject {
+    sniptaleRasterState?: EditorRasterState;
+    sniptaleRasterOriginalData?: string;
+    sniptaleRasterColorData?: string;
+    sniptaleRasterVisibilityData?: string;
+    sniptaleRasterKeyData?: string;
     sniptaleSimplifySourceData?: string;
     sniptaleSimplifySourceWidth?: number;
     sniptaleSimplifySourceHeight?: number;
@@ -23,6 +30,7 @@ declare module 'fabric' {
     sniptaleType?: EditorObjectType;
     sniptaleLabel?: string;
     sniptaleLocked?: boolean;
+    sniptaleContentLocked?: boolean;
     sniptaleRole?:
       | 'annotation'
       | 'background'
@@ -91,6 +99,7 @@ declare module 'fabric' {
     sniptaleEffects?: EditorRasterEffect[];
     sniptaleRichShape?: EditorRichShapeDocumentObject;
     sniptaleRichShapeCatalogId?: string;
+    sniptaleVectorElement?: EditorVectorInstance;
     sniptaleFrameAnnotationRevision?: number;
     sniptaleFrameAnnotationJson?: string;
     sniptaleDrawingJson?: string;

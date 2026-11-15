@@ -22,11 +22,11 @@ export function deleteEditorSelection(options: {
   }
 
   const removedBackground = objects.some(isManagedBackgroundObject);
-  objects.forEach((object) => canvas.remove(object));
+  canvas.discardActiveObject();
+  objects.forEach((object) => (object.parent ?? canvas).remove(object));
   if (removedBackground) {
     useEditorStore.getState().updateFrame(resetFrameBackgroundDraft());
   }
-  canvas.discardActiveObject();
   canvas.requestRenderAll();
   commitHistory();
   syncRuntimeState();

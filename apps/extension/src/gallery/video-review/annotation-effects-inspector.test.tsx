@@ -3,17 +3,23 @@ import { readFileSync } from 'node:fs';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { validateAnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
 import {
-  validateEffectV1Document,
   resolveEffectLocaleText,
-  resolveEffectV1ControlGroup,
-  resolveEffectV1ControlDefault,
-} from '@sniptale/runtime-contracts/effect-v1';
+  resolveEffectControlGroup,
+  resolveEffectControlDefault,
+} from '@sniptale/runtime-contracts/effect-controls';
 import { getCurrentLocale, translate } from '../../platform/i18n';
 import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
-import { initializeReviewAnnotationEffectAnchors } from '../../features/video/review/annotation-effects/layout';
+import {
+  initializeReviewAnnotationEffectAnchors,
+  resolveReviewAnnotationEffectControls,
+} from '../../features/video/review/annotation-effects/layout';
 import { readReviewAnnotationEffectDocument } from '../../features/video/review/annotation-effects/validation';
-import { createReviewAnnotationGeometry } from './annotation-effects-geometry';
+import {
+  createReviewAnnotationGeometry,
+  reviewAnnotationBodyMeasurementKey,
+} from './annotation-effects-geometry';
 import type { useReviewAnnotationEffects } from './annotation-effects-editor';
 import { ReviewAnnotationInspector } from './annotation-effects-inspector';
 
@@ -27,7 +33,9 @@ const geometry = createReviewAnnotationGeometry({
 })!;
 function fixture(name: string) {
   const source = readFileSync(
-    `apps/extension/public/video-effects/effects/annotations/sniptale-${name}/effect.sniptale-effect.json`,
+    name === 'callout'
+      ? 'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
+      : `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
     'utf8'
   );
   const document = readReviewAnnotationEffectDocument(source);
@@ -35,7 +43,7 @@ function fixture(name: string) {
   const controls = Object.fromEntries(
     document.controls.map((control) => [
       control.id,
-      resolveEffectV1ControlDefault(control, getCurrentLocale()),
+      resolveEffectControlDefault(control, getCurrentLocale()),
     ])
   );
   const bound = new Set(
@@ -75,6 +83,10 @@ function fixture(name: string) {
     remove: vi.fn(),
     duplicate: vi.fn(),
     beginGesture: vi.fn(() => true),
+    bodyMeasurements: new Map(),
+    refreshBodyGeometry: vi.fn(),
+    movement: { subscribe: vi.fn(() => () => undefined) },
+    previewMovement: vi.fn(() => false),
     previewGesture: vi.fn(),
     cancelGesture: vi.fn(),
     commitGesture: vi.fn(async () => true),
@@ -108,9 +120,14 @@ function input(label: string) {
   if (!node) throw new Error(`Missing fixture field: ${label}`);
   return node;
 }
-function type(node: HTMLInputElement, value: string) {
+function type(node: HTMLInputElement | HTMLTextAreaElement, value: string) {
   act(() => {
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    const setter = Object.getOwnPropertyDescriptor(
+      node instanceof HTMLTextAreaElement
+        ? HTMLTextAreaElement.prototype
+        : HTMLInputElement.prototype,
+      'value'
+    )?.set;
     if (!setter) throw new Error('Missing native value setter');
     setter.call(node, value);
     node.dispatchEvent(new Event('input', { bubbles: true }));
@@ -129,7 +146,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners'])(
+it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners', 'arrow'])(
   'renders every declared SDK control and group for %s',
   (name) => {
     const value = fixture(name);
@@ -151,7 +168,7 @@ it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners'])(
     const expected = new Set(
       value.document.controls.map(
         (control) =>
-          `sdk:${resolveEffectV1ControlGroup(control.group, value.document.controlGroups) ?? 'advanced'}`
+          `sdk:${resolveEffectControlGroup(control.group, value.document.controlGroups) ?? 'advanced'}`
       )
     );
     for (const group of expected)
@@ -160,17 +177,21 @@ it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners'])(
   }
 );
 
-it('previews text without history, commits once on Enter and cancels on Escape', () => {
+it('previews multiline text without history, commits once on Ctrl+Enter and cancels on Escape', () => {
   const value = fixture('title');
   render(value);
   const control = value.document.controls.find((item) => item.id === 'title')!;
-  const node = input(resolveEffectLocaleText(control.label, getCurrentLocale()));
+  const node = host.querySelector<HTMLTextAreaElement>(
+    `textarea[aria-label="${resolveEffectLocaleText(control.label, getCurrentLocale())}"]`
+  )!;
   type(node, 'Typed value');
   expect(value.editor.previewGesture).toHaveBeenLastCalledWith({
     controls: { ...value.instance.controls, title: 'Typed value' },
   });
   expect(value.editor.commitGesture).not.toHaveBeenCalled();
-  act(() => node.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  act(() =>
+    node.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }))
+  );
   expect(value.editor.commitGesture).toHaveBeenCalledOnce();
   vi.mocked(value.editor.commitGesture).mockClear();
   type(node, 'Cancelled value');
@@ -216,25 +237,26 @@ it('edits a bound numeric control through its anchor and preserves native aspect
   type(width, '50');
   act(() => width.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
   const next = vi.mocked(value.editor.previewGesture).mock.lastCall?.[0]?.transform;
-  const layout = value.document.objectLayout!;
   expect(
     (next!.width * geometry.content.width) / (next!.height * geometry.content.height)
-  ).toBeCloseTo(layout.width / layout.height);
+  ).toBeCloseTo(value.document.animation.w / value.document.animation.h);
 });
 
-it('keeps reflow dimensions independent and displays explicit imported full-scene mode', () => {
+it('keeps intrinsic aspect when metadata is absent and never mislabels Lottie as full-scene', () => {
   const value = fixture('frame');
   render(value);
   const width = input(translate('gallery.videoReview.annotationWidth'));
   type(width, '55');
   act(() => width.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
-  expect(vi.mocked(value.editor.previewGesture).mock.lastCall?.[0]?.transform?.height).toBe(
-    value.instance.transform.height
-  );
+  const resized = vi.mocked(value.editor.previewGesture).mock.lastCall?.[0]?.transform;
+  expect(
+    (resized!.width * geometry.content.width) / (resized!.height * geometry.content.height)
+  ).toBeCloseTo(value.document.animation.w / value.document.animation.h);
   const { objectLayout: discarded, ...fullScene } = value.document;
   void discarded;
   render(value, JSON.stringify(fullScene));
-  expect(host.textContent).toContain(translate('gallery.videoReview.annotationFullScene'));
+  expect(host.textContent).not.toContain(translate('gallery.videoReview.annotationFullScene'));
+  expect(input(translate('gallery.videoReview.annotationWidth')).disabled).toBe(false);
 });
 
 it('shows unavailable immutable source and disables pending controls without repairing content', () => {
@@ -304,8 +326,17 @@ it('disables reflected attachment conversion and restores it when valid geometry
 
 it('retains the SDK type of numeric select options and their localized labels', async () => {
   const value = fixture('chapters');
-  render(value);
-  const control = value.document.controls.find((item) => item.options?.length)!;
+  const control = value.document.controls.find((item) => item.id === 'opacity')!;
+  if (control.kind !== 'number') throw new Error('Missing scalar fixture');
+  control.defaultValue = 25;
+  control.options = [
+    { value: 25, label: { en: 'Soft', ru: 'Мягко' } },
+    { value: 75, label: { en: 'Strong', ru: 'Сильно' } },
+  ];
+  control.presentation = 'dropdown';
+  value.instance.controls[control.id] = 25;
+  expect(validateAnimationTemplate(value.document).ok).toBe(true);
+  render(value, JSON.stringify(value.document));
   const trigger = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
     (node) =>
       node.getAttribute('aria-label') === resolveEffectLocaleText(control.label, getCurrentLocale())
@@ -364,10 +395,8 @@ it('offers bounded scrub tracks in displayed units without changing authored val
   const handle = value.document.objectLayout!.handles![0]!;
   const control = value.document.controls.find((item) => item.id === handle.xControl)!;
   const anchor = input(`${resolveEffectLocaleText(control.label, getCurrentLocale())} range`);
-  expect(Number(anchor.min)).toBe(
-    Math.min(-value.document.objectLayout!.width, Number(anchor.value))
-  );
-  expect(Number(anchor.max)).toBe(2 * value.document.objectLayout!.width);
+  expect(Number(anchor.min)).toBe(Math.min(-value.document.animation.w, Number(anchor.value)));
+  expect(Number(anchor.max)).toBe(2 * value.document.animation.w);
   expect(value.editor.beginGesture).not.toHaveBeenCalled();
   expect(value.editor.change).not.toHaveBeenCalled();
 });
@@ -428,7 +457,7 @@ it('derives the preset label from accepted controls across rerender and reopenin
 it('preserves admitted unbounded auto fields without inventing a range', () => {
   const value = fixture('callout');
   const document = structuredClone(value.document);
-  const control = document.controls.find((item) => item.id === 'font');
+  const control = document.controls.find((item) => item.id === 'fontSize');
   if (!control || control.kind !== 'number') throw new Error('Missing numeric fixture');
   delete control.min;
   delete control.max;
@@ -448,7 +477,7 @@ it('keeps bound anchors and scale dimensions disabled without geometry, while pl
   const handle = value.document.objectLayout!.handles![0]!;
   const bound = value.document.controls.find((item) => item.id === handle.xControl)!;
   expect(input(resolveEffectLocaleText(bound.label, getCurrentLocale())).disabled).toBe(true);
-  const font = value.document.controls.find((item) => item.id === 'font')!;
+  const font = value.document.controls.find((item) => item.id === 'fontSize')!;
   expect(input(`${resolveEffectLocaleText(font.label, getCurrentLocale())} range`).disabled).toBe(
     false
   );
@@ -473,7 +502,7 @@ function rangeFixture(
 ) {
   const fixtureValue = fixture('frame');
   const document = structuredClone(fixtureValue.document);
-  const control = document.controls.find((item) => item.id === 'line');
+  const control = document.controls.find((item) => item.id === 'stroke');
   if (!control || control.kind !== 'number') throw new Error('Missing numeric fixture');
   delete document.controlPresets;
   delete document.defaultControlPresetId;
@@ -483,9 +512,9 @@ function rangeFixture(
   control.defaultValue = value;
   control.presentation = presentation;
   Object.assign(control, bounds);
-  fixtureValue.instance.controls['line'] = value;
+  fixtureValue.instance.controls['stroke'] = value;
   const source = JSON.stringify(document);
-  expect(validateEffectV1Document(document).diagnostics).toEqual([]);
+  expect(validateAnimationTemplate(document).diagnostics).toEqual([]);
   expect(readReviewAnnotationEffectDocument(source)).not.toBeNull();
   return { fixtureValue, source };
 }
@@ -509,10 +538,38 @@ it('keeps an unbounded auto number as an ordinary field without forcing a slider
 
 it('keeps a custom group from repeating the host placement icon', () => {
   const value = fixture('callout');
-  value.document.controlGroups![0]!.icon = 'move';
+  value.document.controlGroups = [
+    {
+      id: 'tracing',
+      parentId: 'geometry',
+      label: { en: 'Pointer', ru: 'Указатель' },
+      icon: 'move',
+    },
+  ];
+  for (const control of value.document.controls)
+    if (control.group === 'geometry') control.group = 'tracing';
   const source = JSON.stringify(value.document);
-  expect(validateEffectV1Document(value.document).ok).toBe(true);
+  expect(validateAnimationTemplate(value.document).ok).toBe(true);
   render(value, source);
   expect(host.querySelectorAll('summary svg.lucide-move')).toHaveLength(1);
   expect(host.querySelector('[data-effect-control-group="tracing"] input')).not.toBeNull();
+});
+
+it('uses measured visible bounds even when inspector metadata is a different parsed document', () => {
+  const value = fixture('frame');
+  const controls = resolveReviewAnnotationEffectControls(
+    value.document,
+    value.instance,
+    geometry.content
+  );
+  const key = reviewAnnotationBodyMeasurementKey(value.instance, controls);
+  value.editor.bodyMeasurements.set(key, {
+    x: value.document.animation.w / 4,
+    y: value.document.animation.h / 4,
+    width: value.document.animation.w / 2,
+    height: value.document.animation.h / 2,
+  });
+  render(value);
+  expect(Number(input(translate('gallery.videoReview.annotationWidth')).value)).toBeCloseTo(20, 6);
+  expect(Number(input(translate('gallery.videoReview.annotationHeight')).value)).toBeCloseTo(10, 6);
 });

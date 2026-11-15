@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import { createEffectRuntimeSandboxExecutor } from '../../../workflows/video/effect-runtime-sandbox';
 import { createEffectRuntimeRenderMessage } from '../../../features/video/composition/effect-runtime/runtime/request';
 import { createTimelineThumbnailStore } from '../../../composition/persistence/video-preview-cache/thumbnails';
@@ -41,8 +42,7 @@ export function useEffectClipPreviews(
         if (cancelled) break;
         try {
           const sourceKey =
-            'effect-v1-thumbnail:' +
-            (await sha256EffectV1Bytes(new TextEncoder().encode(item.key)));
+            'effect-v1-thumbnail:' + bytesToHex(sha256(new TextEncoder().encode(item.key)));
           const hits = await store
             .load(item.projectId, sourceKey, [item.plan.time])
             .catch(() => []);

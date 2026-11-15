@@ -1,3 +1,8 @@
+import { inspectEditorVectorCanvas } from '../../../features/editor/document/vector-document';
+import {
+  EDITOR_RASTER_BINARY_FIELDS,
+  inspectEditorRasterCanvas,
+} from '../../../features/editor/document/raster-state';
 import { isEditorCompositionBase } from '../../../features/editor/document/guards';
 import { parseEditorFrameGradient } from '../../../features/editor/document/frame-gradient';
 // policyStateIds: [] - canvas binary field names are an immutable persisted-data validation
@@ -11,7 +16,7 @@ import {
 import type {
   PersistedEditorAssetPointer,
   PersistedEditorDocumentAsset,
-  PersistedEditorDocumentV3,
+  PersistedEditorDocument,
 } from './contracts';
 import {
   isEditorRichShapeDocumentObjectArray,
@@ -25,6 +30,7 @@ const CANVAS_BINARY_FIELDS = new Set([
   'sniptaleBackgroundImageData',
   'sniptaleSimplifySourceData',
   'sniptaleBlurSourceData',
+  ...EDITOR_RASTER_BINARY_FIELDS,
 ]);
 const ASSET_URL_PREFIX = 'sniptale-asset:';
 
@@ -41,7 +47,7 @@ function parseOptionalStringArray(value: unknown): string[] | null | undefined {
 
 function parseGradientColorStops(
   value: unknown
-): PersistedEditorDocumentV3['frame']['backgroundGradientColorStops'] | null | undefined {
+): PersistedEditorDocument['frame']['backgroundGradientColorStops'] | null | undefined {
   if (value === undefined) return undefined;
   if (!Array.isArray(value)) return null;
   const stops = [];
@@ -65,7 +71,7 @@ function parseGradientColorStops(
 
 function parseEditorImageSettings(
   value: unknown
-): NonNullable<PersistedEditorDocumentV3['frame']['sourceImage']> | null | undefined {
+): NonNullable<PersistedEditorDocument['frame']['sourceImage']> | null | undefined {
   if (value === undefined) return undefined;
   if (
     !isRecord(value) ||
@@ -108,7 +114,7 @@ function parseEditorImageSettings(
   };
 }
 
-function parseFrame(value: unknown): PersistedEditorDocumentV3['frame'] | null {
+function parseFrame(value: unknown): PersistedEditorDocument['frame'] | null {
   if (!isRecord(value)) return null;
   const backgroundImage =
     value['backgroundImage'] === null ? null : parsePointer(value['backgroundImage']);
@@ -187,7 +193,7 @@ function parseFrame(value: unknown): PersistedEditorDocumentV3['frame'] | null {
 
 function parseBrowserFrame(
   value: unknown
-): PersistedEditorDocumentV3['browserFrame'] | null | undefined {
+): PersistedEditorDocument['browserFrame'] | null | undefined {
   if (value === undefined) return undefined;
   if (!isRecord(value)) return null;
   const favicon = value['favicon'] === null ? null : parsePointer(value['favicon']);
@@ -278,16 +284,51 @@ function hasValidCanvasAssetUrls(value: unknown, declaredIds: ReadonlySet<string
   return true;
 }
 
-export function parsePersistedEditorDocument(value: unknown): PersistedEditorDocumentV3 | null {
-  if (!isRecord(value) || value['version'] !== 3) return null;
+export function parsePersistedEditorDocument(value: unknown): PersistedEditorDocument | null {
+  if (
+    !isRecord(value) ||
+    (value['version'] !== 3 && value['version'] !== 4 && value['version'] !== 5)
+  )
+    return null;
   const sourceImage = parsePointer(value['sourceImage']);
   const frame = parseFrame(value['frame']);
   const browserFrame = parseBrowserFrame(value['browserFrame']);
   const assets = parseAssets(value['assets']);
+  const vectorDefinitions: Record<string, PersistedEditorAssetPointer> = {};
+  if (value['version'] === 5) {
+    if (
+      !isRecord(value['vectorDefinitions']) ||
+      Object.keys(value['vectorDefinitions']).length > 1000
+    )
+      return null;
+    for (const [id, raw] of Object.entries(value['vectorDefinitions'])) {
+      const pointer = parsePointer(raw);
+      if (
+        !/^[a-f0-9]{64}$/u.test(id) ||
+        !pointer ||
+        !isRecord(raw) ||
+        Object.keys(raw).length !== 1
+      )
+        return null;
+      vectorDefinitions[id] = pointer;
+    }
+  } else if (value['vectorDefinitions'] !== undefined) return null;
   const base = value['compositionBase'];
   if (base !== undefined && !isEditorCompositionBase(base)) return null;
   if (!sourceImage || !frame || browserFrame === null || !assets) return null;
   const declaredIds = new Set(assets.map((asset) => asset.assetId));
+  for (const [id, pointer] of Object.entries(vectorDefinitions)) {
+    if (!assets.some((asset) => asset.role === `vector:${id}` && asset.assetId === pointer.assetId))
+      return null;
+  }
+  if (
+    assets.some(
+      (asset) =>
+        asset.role.startsWith('vector:') &&
+        vectorDefinitions[asset.role.slice(7)]?.assetId !== asset.assetId
+    )
+  )
+    return null;
   if (!declaredIds.has(sourceImage.assetId)) return null;
   if (frame.backgroundImage && !declaredIds.has(frame.backgroundImage.assetId)) return null;
   if (browserFrame?.favicon && !declaredIds.has(browserFrame.favicon.assetId)) return null;
@@ -295,7 +336,17 @@ export function parsePersistedEditorDocument(value: unknown): PersistedEditorDoc
   let canvas: unknown;
   try {
     canvas = JSON.parse(value['canvasJson']);
+    const raster = inspectEditorRasterCanvas(
+      canvas,
+      (resource): resource is string =>
+        typeof resource === 'string' &&
+        resource.startsWith(ASSET_URL_PREFIX) &&
+        declaredIds.has(resource.slice(ASSET_URL_PREFIX.length))
+    );
+    if (!raster.valid || (value['version'] === 3 && raster.hasRaster)) return null;
     if (!hasValidCanvasAssetUrls(canvas, declaredIds)) return null;
+    if (!inspectEditorVectorCanvas(canvas, new Set(Object.keys(vectorDefinitions))).valid)
+      return null;
   } catch {
     return null;
   }
@@ -324,7 +375,9 @@ export function parsePersistedEditorDocument(value: unknown): PersistedEditorDoc
   if (richShapes === null) return null;
 
   return {
-    version: 3,
+    ...(value['version'] === 5
+      ? { version: 5 as const, vectorDefinitions }
+      : { version: value['version'] }),
     sourceImage: { assetId: sourceImage.assetId },
     ...(base === undefined
       ? {}

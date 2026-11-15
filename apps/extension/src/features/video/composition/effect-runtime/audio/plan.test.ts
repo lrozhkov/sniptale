@@ -1,33 +1,90 @@
+import { createHash } from 'node:crypto';
 import { expect, it } from 'vitest';
-
-import { VideoProjectClipType } from '../../../project/types/index';
-import {
-  convertToTargetEffect,
-  convertToTransitionEffect,
-  createAudioProject,
-  restoreValidAudioSnapshot,
-  updateDocument,
-} from './test-support';
+import { parseRuntimeAnimationDocument } from '../../../../../contracts/effect-runtime/animation';
+import { createEmptyVideoProject } from '../../../project/factories/creation';
+import { createEffectHostClip } from '../../../project/factories/overlay-clip';
+import type { VideoProject } from '../../../project/types';
 import { EffectRuntimeAudioPlanError, resolveEffectRuntimeAudioPlans } from './plan';
-const AUDIO_SHA = '0'.repeat(64);
 
-it('starts a trimmed effect audio segment at its retained document offset', () => {
-  const project = createAudioProject();
-  Object.assign(project.effectInstances![0]!, { sourceStart: 1, startTime: 9, duration: 1 });
-  Object.assign(project.clips[0]!, { startTime: 9, duration: 1 });
-  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([
-    expect.objectContaining({
-      startTime: 9,
-      duration: 0.25,
-      sourceStart: 0.75,
-      sourceDuration: 0.5,
+function fixture(): VideoProject {
+  const template = parseRuntimeAnimationDocument({
+    format: 'sniptale-animation',
+    version: 1,
+    id: 'silent-proof',
+    label: { en: 'Silent proof' },
+    resources: [],
+    controls: [],
+    bindings: [],
+    animation: { v: '5.12.2', w: 320, h: 180, fr: 30, ip: 30, op: 120, layers: [], assets: [] },
+  });
+  if (!template) throw new Error('Invalid supported animation fixture.');
+  const project = createEmptyVideoProject('Lottie audio boundary');
+  project.version = 52;
+  project.duration = 10;
+  project.effectInstances = [
+    {
+      id: 'effect-1',
+      snapshotId: 'pending',
+      kind: 'standalone',
+      target: { kind: 'scene' },
+      enabled: true,
+      controls: {},
+      startTime: 2,
+      duration: 1.5,
       playbackRate: 2,
+    },
+  ];
+  project.clips = [
+    createEffectHostClip({
+      duration: 1.5,
+      startTime: 2,
+      effectInstanceId: 'effect-1',
+      name: 'Animation',
+      projectWidth: project.width,
+      projectHeight: project.height,
+      trackId: project.tracks[0]!.id,
     }),
-  ]);
+  ];
+  replaceSource(project, template);
+  return project;
+}
+
+function replaceSource(project: VideoProject, value: unknown): void {
+  const source = JSON.stringify(value);
+  if (typeof source !== 'string') throw new Error('Invalid source fixture.');
+  const sha256 = createHash('sha256').update(source).digest('hex');
+  const snapshot = {
+    id: `effect:${sha256}`,
+    documentId: 'silent-proof',
+    schemaVersion: 'sniptale.animation.v1' as const,
+    kind: 'standalone' as const,
+    source,
+    sha256,
+    retainedByteLength: Buffer.byteLength(source),
+    assets: [],
+  };
+  project.effectSnapshots = [snapshot];
+  project.effectInstances![0]!.snapshotId = snapshot.id;
+}
+
+it('keeps supported Lottie silent without rewriting ordinary project or source state', () => {
+  const project = fixture(),
+    before = structuredClone(project);
+  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([]);
+  expect(project).toEqual(before);
+  project.effectInstances![0]!.enabled = false;
+  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([]);
 });
 
-it.each([-1, NaN, Infinity, 3])('rejects invalid retained audio range %s', (sourceStart) => {
-  const project = createAudioProject();
+it('accepts a retained document subrange without manufacturing effect audio', () => {
+  const project = fixture();
+  Object.assign(project.effectInstances![0]!, { sourceStart: 1, startTime: 9, duration: 1 });
+  Object.assign(project.clips[0]!, { startTime: 9, duration: 1 });
+  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([]);
+});
+
+it.each([-1, NaN, Infinity, 3])('rejects invalid retained source range %s', (sourceStart) => {
+  const project = fixture();
   Object.assign(project.effectInstances![0]!, { sourceStart, duration: 1 });
   project.clips[0]!.duration = 1;
   expect(() => resolveEffectRuntimeAudioPlans(project)).toThrow(
@@ -35,185 +92,98 @@ it.each([-1, NaN, Infinity, 3])('rejects invalid retained audio range %s', (sour
   );
 });
 
-it('maps EffectV1 clip timing, offset, volume, and playback rate into one shared audio plan', () => {
-  const project = createAudioProject();
+it.each([0.7, 0.1 + 0.2])(
+  'accepts fractional host timing %s within the existing shared epsilon',
+  (duration) => {
+    const project = fixture();
+    Object.assign(project.effectInstances![0]!, { duration, playbackRate: 3 / duration });
+    project.clips[0]!.duration = duration;
+    expect(resolveEffectRuntimeAudioPlans(project)).toEqual([]);
+  }
+);
 
-  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([
-    expect.objectContaining({
-      assetCacheKey: `snapshot-1:tone:${AUDIO_SHA}`,
-      duration: 0.5,
-      effectInstanceId: 'effect-1',
-      playbackRate: 2,
-      sourceDuration: 1,
-      sourceKind: 'effect-snapshot',
-      sourceStart: 0.25,
-      startTime: 2.25,
-      volume: 0.4,
-    }),
-  ]);
-});
+it.each(['missing-snapshot', 'kind', 'invalid-source', 'duration', 'document-id'])(
+  'keeps %s failure explicit instead of selecting an audio fallback',
+  (failure) => {
+    const project = fixture(),
+      snapshot = project.effectSnapshots![0]!,
+      instance = project.effectInstances![0]!;
+    if (failure === 'missing-snapshot') instance.snapshotId = 'missing';
+    if (failure === 'kind') Object.assign(snapshot, { kind: 'transition' });
+    if (failure === 'invalid-source') snapshot.source = '{';
+    if (failure === 'duration') instance.duration = 2;
+    if (failure === 'document-id') snapshot.documentId = 'foreign';
+    expect(() => resolveEffectRuntimeAudioPlans(project)).toThrow(EffectRuntimeAudioPlanError);
+    expect(() => resolveEffectRuntimeAudioPlans(project)).toThrow(
+      expect.objectContaining({ code: 'effectAudioIntegrityFailure' })
+    );
+  }
+);
 
-it('honors instance, layer, clip, and scene visibility without an audio fallback', () => {
-  const project = createAudioProject();
-  project.effectInstances![0]!.enabled = false;
-  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([]);
+it.each(['missing-host', 'wrong-target', 'host-time'])(
+  'refuses %s without consuming the valid retained source',
+  (failure) => {
+    const project = fixture(),
+      source = project.effectSnapshots![0]!.source;
+    if (failure === 'missing-host') project.clips = [];
+    if (failure === 'wrong-target')
+      Object.assign(project.effectInstances![0]!, { target: { kind: 'clip', clipId: 'foreign' } });
+    if (failure === 'host-time') project.clips[0]!.startTime += 1;
+    expect(() => resolveEffectRuntimeAudioPlans(project)).toThrow(
+      expect.objectContaining({ code: 'effectAudioTargetFailure' })
+    );
+    expect(project.effectSnapshots![0]!.source).toBe(source);
+  }
+);
 
-  project.effectInstances![0]!.enabled = true;
-  updateDocument(project, (document) => {
-    document.layers.find(({ id }) => id === 'audio')!.visible = false;
-  });
-  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([]);
-
-  updateDocument(project, (document) => {
-    document.layers.find(({ id }) => id === 'audio')!.visible = true;
-    document.clips.find(({ layerId }) => layerId === 'audio')!.enabled = false;
-  });
-  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([]);
-
-  updateDocument(project, (document) => {
-    document.clips.find(({ layerId }) => layerId === 'audio')!.enabled = true;
-    document.scenes[0]!.enabled = false;
-  });
-  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([]);
-});
-
-it('uses the ordinary standalone host clip as the visual and audio availability authority', () => {
-  const project = createAudioProject();
-  const host = project.clips.find(({ type }) => type === VideoProjectClipType.EFFECT)!;
-  const hostTrack = project.tracks.find(({ id }) => id === host.trackId)!;
-
-  hostTrack.visible = false;
-  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([]);
-  hostTrack.visible = true;
-  project.clips = project.clips.filter(({ id }) => id !== host.id);
+it('refuses detached audio bytes before any decoding or materialization', () => {
+  const project = fixture();
+  project.effectSnapshots![0]!.assets = [
+    {
+      id: 'tone',
+      blob: new Blob([Uint8Array.of(1)], { type: 'audio/wav' }),
+      kind: 'audio',
+      byteLength: 1,
+      mimeType: 'audio/wav',
+      sha256: 'a'.repeat(64),
+    },
+  ];
   expect(() => resolveEffectRuntimeAudioPlans(project)).toThrow(
-    expect.objectContaining({ code: 'effectAudioTargetFailure' })
+    expect.objectContaining({ code: 'effectAudioIntegrityFailure' })
   );
 });
 
-it('accepts fractional resize timing within the shared EffectV1 epsilon', () => {
-  const project = createAudioProject();
-  const instance = project.effectInstances![0]!;
-  const host = project.clips.find(({ type }) => type === VideoProjectClipType.EFFECT)!;
-  instance.duration = 0.7;
-  instance.playbackRate = 3 / 0.7;
-  host.duration = 0.7;
-
-  expect(() => resolveEffectRuntimeAudioPlans(project)).not.toThrow();
-});
-
-it('treats an audio layer without clips as active for the whole document', () => {
-  const project = createAudioProject();
-  updateDocument(project, (document) => {
-    document.clips = document.clips.filter(({ layerId }) => layerId !== 'audio');
+it('refuses legacy layer audio even when the immutable package digest matches', () => {
+  const project = fixture();
+  replaceSource(project, {
+    schemaVersion: 'sniptale.effect.v1',
+    id: 'silent-proof',
+    kind: 'standalone',
+    duration: 3,
+    program: { kind: 'graph', commands: [{ op: 'clear' }] },
+    layers: [{ id: 'audio', type: 'audio' }],
   });
-
-  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([
-    expect.objectContaining({
-      duration: 1.5,
-      sourceDuration: 3,
-      sourceStart: 0,
-      startTime: 2,
-    }),
-  ]);
-});
-
-it('fails closed when a retained snapshot asset no longer matches the declared bytes', () => {
-  const project = createAudioProject();
-  project.effectSnapshots![0]!.assets[0]!.byteLength = 5;
-
-  expect(() => resolveEffectRuntimeAudioPlans(project)).toThrow(EffectRuntimeAudioPlanError);
-});
-
-it('intersects target-effect audio with the visible owning clip interval', () => {
-  const project = createAudioProject();
-  convertToTargetEffect(project);
-
-  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([]);
-  project.effectInstances![0]!.startTime = 1.5;
-  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([
-    expect.objectContaining({
-      duration: 0.25,
-      sourceDuration: 0.5,
-      sourceStart: 0.25,
-      startTime: 1.75,
-    }),
-  ]);
-  project.tracks[0]!.visible = false;
-  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([]);
-  project.tracks[0]!.visible = true;
-  project.effectInstances![0]!.target = { clipId: 'missing', kind: 'clip' };
   expect(() => resolveEffectRuntimeAudioPlans(project)).toThrow(
-    expect.objectContaining({ code: 'effectAudioTargetFailure' })
+    expect.objectContaining({ code: 'effectAudioIntegrityFailure' })
   );
 });
 
-it('uses both transition tracks as the shared visual and audio availability authority', () => {
-  const project = createAudioProject();
-  convertToTransitionEffect(project);
-
-  expect(resolveEffectRuntimeAudioPlans(project)).not.toEqual([]);
-  project.tracks[0]!.visible = false;
-  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([]);
-});
-
-it('fails closed for missing snapshots, kind drift, invalid source, and duration drift', () => {
-  const project = createAudioProject();
-  project.effectInstances![0]!.snapshotId = 'missing';
-  expect(() => resolveEffectRuntimeAudioPlans(project)).toThrow(EffectRuntimeAudioPlanError);
-
-  project.effectInstances![0]!.snapshotId = 'snapshot-1';
-  project.effectSnapshots![0]!.kind = 'transition';
-  expect(() => resolveEffectRuntimeAudioPlans(project)).toThrow(EffectRuntimeAudioPlanError);
-
-  project.effectSnapshots![0]!.kind = 'standalone';
-  project.effectSnapshots![0]!.source = '{';
-  expect(() => resolveEffectRuntimeAudioPlans(project)).toThrow(EffectRuntimeAudioPlanError);
-
-  restoreValidAudioSnapshot(project);
-  project.effectInstances![0]!.duration = 1;
-  expect(() => resolveEffectRuntimeAudioPlans(project)).toThrow(EffectRuntimeAudioPlanError);
-});
-
-it('clamps authored audio volume to the supported unit interval', () => {
-  const project = createAudioProject();
-  updateDocument(project, (document) => {
-    document.layers.find(({ id }) => id === 'audio')!['volume'] = 2;
+it('rejects a Lottie audio layer rather than inventing an implicit audio track', () => {
+  const project = fixture();
+  const template = parseRuntimeAnimationDocument({
+    format: 'sniptale-animation',
+    version: 1,
+    id: 'silent-proof',
+    label: { en: 'Silent proof' },
+    resources: [],
+    controls: [],
+    bindings: [],
+    animation: { v: '5.12.2', w: 320, h: 180, fr: 30, ip: 30, op: 120, layers: [], assets: [] },
   });
-
-  expect(resolveEffectRuntimeAudioPlans(project)[0]!.volume).toBe(1);
-});
-
-it('keeps a retained dormant Native host silent without disabling its authored instance', () => {
-  const project = createAudioProject();
-  const host = project.clips[0]!;
-  if (host.type !== 'EFFECT') throw new Error('Expected effect host');
-  expect(resolveEffectRuntimeAudioPlans(project).length).toBeGreaterThan(0);
-  host.attachment = { kind: 'viewport' };
-  host.sourceRange = {
-    assetId: 'retained-origin',
-    sourceInstanceId: 'origin-placement',
-    start: 0,
-    end: 3,
-    dormant: true,
-  };
-  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([]);
-  expect(project.effectInstances![0]!.enabled).toBe(true);
-});
-
-it('advances EffectV1 audio by the placement offset without holding its tail', () => {
-  const project = createAudioProject();
-  const host = project.clips[0]!;
-  host.duration = 1.8;
-  host.playbackWindow = { offset: 0.5, holdAt: 1.4 };
-  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([
-    expect.objectContaining({
-      startTime: 2,
-      duration: 0.25,
-      sourceStart: 0.75,
-      sourceDuration: 0.5,
-    }),
-  ]);
-  host.playbackWindow = { offset: 1.6, holdAt: 1.4 };
-  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([]);
+  if (!template) throw new Error('Invalid animation fixture.');
+  template.animation.layers = [{ ty: 6, ind: 1, ip: 30, op: 120, refId: 'audio' }];
+  replaceSource(project, template);
+  expect(() => resolveEffectRuntimeAudioPlans(project)).toThrow(
+    expect.objectContaining({ code: 'effectAudioIntegrityFailure' })
+  );
 });

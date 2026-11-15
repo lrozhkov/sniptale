@@ -1,9 +1,6 @@
-import { createHash } from 'node:crypto';
+import { createGlTransitionSelection } from '../../../../apps/extension/src/features/video/project/transition/gl-catalog';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
-import {
-  parseEffectV1Source,
-  resolveEffectV1ControlDefault,
-} from '@sniptale/runtime-contracts/effect-v1';
+import { createSourceImageFilter } from '../../../../apps/extension/src/features/image-filters/contract';
 import { readFile, writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import {
@@ -933,7 +930,8 @@ async function composeGestureFixture(project: VideoProject) {
       id: 'gesture-crossfade',
       leadingClipId: main.id,
       trailingClipId: trailing.id,
-      kind: 'CROSSFADE',
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       duration: 0.4,
       easing: 'LINEAR',
     },
@@ -951,60 +949,17 @@ async function composeGestureFixture(project: VideoProject) {
       gestureArea: { x: 0, y: 0.25, width: 1, height: 0.5 },
     },
   ];
-  project.effectSnapshots = [];
-  project.effectInstances = [];
-  for (const effect of [
-    { filename: 'sniptale-video-warm', kind: 'targetEffect' },
-    { filename: 'sniptale-transition-dissolve', kind: 'transition' },
-  ] as const) {
-    const source = await readFile(
-      new URL(
-        `../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/` +
-          `${effect.filename}.sniptale-effect.json`,
-        import.meta.url
-      ),
-      'utf8'
-    );
-    const document = parseEffectV1Source(source).document;
-    if (!document) throw new Error('Invalid gesture EffectV1 fixture.');
-    const sha256 = createHash('sha256').update(source).digest('hex');
-    const snapshotId = `effect:${sha256}`;
-    project.effectSnapshots.push({
-      id: snapshotId,
-      sha256,
-      source,
-      assets: [],
-      retainedByteLength: Buffer.byteLength(source),
-      schemaVersion: 'sniptale.effect.v1',
-      documentId: document.id,
-      kind: effect.kind,
-    });
-    const duration = effect.kind === 'transition' ? 0.4 : 4;
-    project.effectInstances.push({
-      id: effect.filename,
-      kind: effect.kind,
-      target:
-        effect.kind === 'transition'
-          ? { kind: 'transition', transitionId: 'gesture-crossfade' }
-          : { kind: 'clip', clipId: copy.id },
-      snapshotId,
-      controls: Object.fromEntries(
-        document.controls.map((control) => [
-          control.id,
-          resolveEffectV1ControlDefault(control, 'en'),
-        ])
-      ),
-      ...(effect.kind === 'transition' ? {} : { rangeMode: 'owner' as const }),
-      enabled: true,
-      startTime: effect.kind === 'transition' ? 2.6 : 0,
-      duration,
-      playbackRate: document.duration / duration,
-    });
-  }
+  const warmth = createSourceImageFilter('color', 'gesture-inspector-warmth');
+  if (warmth.kind !== 'color') throw new Error('Expected color filter.');
+  warmth.parameters.temperature = 0.3;
+  warmth.parameters.saturation = 0.8;
+  warmth.intensity = 0.3;
+  copy.sourceFilters = { version: 1, filters: [warmth] };
+  project.version = 52;
 }
 
 for (const format of ['WEBM', 'MP4'] as const) {
-  test(`Native gesture composition retains crop, header, EffectV1 and crossfade in ${format}`, async ({
+  test(`Native gesture composition retains crop, header, source filters and GL crossfade in ${format}`, async ({
     page,
   }, info) => {
     test.setTimeout(360000);
@@ -1114,6 +1069,12 @@ for (const format of ['WEBM', 'MP4'] as const) {
       expect(states[1]!.project.clips).toEqual(initial.clips);
       expect(states[1]!.project.actionEvents).toEqual(initial.actionEvents);
       expect(states[1]!.project.effectInstances).toEqual(initial.effectInstances);
+      expect(
+        initial.clips.some(
+          (clip) => clip.type === 'VIDEO' && clip.sourceFilters?.filters.length === 1
+        )
+      ).toBe(true);
+      expect(states[1]!.project.transitions).toEqual(initial.transitions);
       await page.goto(`${host.origin}${OFFSCREEN_HARNESS_PATH}`);
       await page.locator('[data-ui="offscreen.harness.root"][data-state="ready"]').waitFor();
       const results = [];

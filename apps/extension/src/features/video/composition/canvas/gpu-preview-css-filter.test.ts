@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createSourceImageFilter } from '../../../image-filters/contract';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createGpuPreviewCssFilter } from './gpu-preview-css-filter';
 import { createGpuPreviewRenderer } from './gpu-preview';
@@ -184,4 +185,55 @@ it('keeps CSS scratch alive through the renderer GPU fence when disposed in flig
       (result) => result.type === 'return' && result.value.release.mock.calls.length === 1
     )
   ).toBe(true);
+});
+
+it('snapshots source filters before pipeline waits and retains their scratch through completion', async () => {
+  const mock = graphics();
+  const renderer = await createGpuPreviewRenderer({ reserve: mock.reserve });
+  if (!renderer) throw new Error('Expected renderer.');
+  const source = document.createElement('canvas');
+  source.width = 64;
+  source.height = 48;
+  const color = createSourceImageFilter('color', 'a');
+  if (color.kind !== 'color') throw new Error('Expected color.');
+  color.parameters.brightness = 2;
+  const fence = deferred<void>(),
+    submitted = deferred<void>();
+  mock.queue.onSubmittedWorkDone.mockReturnValue(fence.promise);
+  mock.queue.submit.mockImplementation(() => submitted.resolve());
+  const pending = renderer.render({
+    output: { width: 64, height: 48 },
+    logical: { width: 64, height: 48 },
+    layers: [
+      {
+        source,
+        rect: { x: 0, y: 0, width: 64, height: 48 },
+        inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+        imageFilters: {
+          stack: { version: 1, filters: [color] },
+          logical: { width: 64, height: 48 },
+        },
+      },
+    ],
+    signal: new AbortController().signal,
+  });
+  color.parameters.brightness = 1;
+  await submitted.promise;
+  const filterWrites = mock.queue.writeBuffer.mock.calls.filter(
+    ([, , data]) => data instanceof ArrayBuffer && data.byteLength === 64
+  );
+  expect(filterWrites).toHaveLength(1);
+  const data = filterWrites[0]![2];
+  if (!(data instanceof ArrayBuffer)) throw new Error('Expected uniform bytes.');
+  expect(new Float32Array(data)[4]).toBe(2);
+  renderer.dispose();
+  expect(renderer.allocatedBytes).toBeGreaterThan(0);
+  for (const result of mock.device.createTexture.mock.results)
+    if (result.type === 'return') expect(result.value.destroy).not.toHaveBeenCalled();
+  fence.resolve();
+  await expect(pending).rejects.toThrow('disposed');
+  expect(renderer.allocatedBytes).toBe(0);
+  expect(mock.transfer).not.toHaveBeenCalled();
+  for (const result of mock.reserve.mock.results)
+    if (result.type === 'return') expect(result.value.release).toHaveBeenCalledTimes(1);
 });

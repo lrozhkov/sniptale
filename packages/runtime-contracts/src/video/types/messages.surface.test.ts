@@ -353,6 +353,24 @@ it('validates release, snapshot, and command authority fields narrowly', () => {
       snapshot,
     })
   ).toBe(true);
+  const preparation = {
+    type: VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT,
+    snapshot,
+    surfaceToken: 'surface-token',
+    capturePreparation: { requestId: 'paint-1', suppressed: true },
+  };
+  expect(isVideoRecordingSurfaceSnapshotMessage(preparation)).toBe(true);
+  for (const capturePreparation of [
+    { requestId: '', suppressed: true },
+    { requestId: 'paint-1', suppressed: 'true' },
+    { requestId: 'paint-1', suppressed: true, extra: true },
+  ])
+    expect(isVideoRecordingSurfaceSnapshotMessage({ ...preparation, capturePreparation })).toBe(
+      false
+    );
+  expect(isVideoRecordingSurfaceSnapshotMessage({ ...preparation, surfaceToken: undefined })).toBe(
+    false
+  );
   const outputSettings = {
     outputProfile: DEFAULT_VIDEO_SETTINGS.outputProfile,
     qualityProfileId: 'builtin:optimal',

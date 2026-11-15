@@ -61,7 +61,6 @@ export function EffectCatalogPreviewProvider({ children }: { children: ReactNode
 export function EffectCatalogPreview({
   catalog,
   document: entry,
-  captureFrame,
   progress,
   expanded = false,
 }: {
@@ -69,12 +68,11 @@ export function EffectCatalogPreview({
   expanded?: boolean;
   catalog: EffectBundleCatalogEntry;
   document: EffectBundleCatalogDocumentEntry;
-  captureFrame?: (() => HTMLCanvasElement | null) | undefined;
 }) {
   const queue = useContext(PreviewContext);
   const canvas = useRef<HTMLCanvasElement>(null);
   const request = useRef<(progress: number, poster?: boolean) => void>(() => undefined);
-  const source = useRef<HTMLCanvasElement | null>(null);
+  const autoplayRequest = useRef<(progress: number) => void>(() => undefined);
   const controlled = progress !== undefined;
   const enteredAt = useRef(0);
   const animation = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -85,11 +83,6 @@ export function EffectCatalogPreview({
   const stop = () => {
     if (animation.current !== null) clearInterval(animation.current);
     animation.current = null;
-    if (source.current) {
-      source.current.width = 0;
-      source.current.height = 0;
-      source.current = null;
-    }
   };
   useEffect(() => {
     const target = canvas.current;
@@ -99,9 +92,9 @@ export function EffectCatalogPreview({
       queue,
       key,
       readDocument: () => latest.current,
-      readSource: () => source.current,
     });
     request.current = session.render;
+    autoplayRequest.current = session.renderAutoplay;
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) {
         if (!controlled) session.render(0.5, true);
@@ -112,6 +105,7 @@ export function EffectCatalogPreview({
     return () => {
       session.dispose();
       request.current = () => undefined;
+      autoplayRequest.current = () => undefined;
       observer.disconnect();
       stop();
     };
@@ -132,18 +126,13 @@ export function EffectCatalogPreview({
         if (progress !== undefined) return;
         stop();
         enteredAt.current = event.clientX;
-        source.current = captureFrame?.() ?? null;
         request.current(0);
         if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
         const started = performance.now();
         animation.current = setInterval(
           () =>
-            request.current(
-              effectPreviewProgress(
-                ((performance.now() - started) / 4000) % 1,
-                duration,
-                entry.kind
-              )
+            autoplayRequest.current(
+              effectPreviewProgress(((performance.now() - started) / 4000) % 1, duration)
             ),
           1000 / 15
         );
@@ -155,11 +144,7 @@ export function EffectCatalogPreview({
         animation.current = null;
         const bounds = event.currentTarget.getBoundingClientRect();
         request.current(
-          effectPreviewProgress(
-            (event.clientX - bounds.left) / Math.max(1, bounds.width),
-            duration,
-            entry.kind
-          )
+          effectPreviewProgress((event.clientX - bounds.left) / Math.max(1, bounds.width), duration)
         );
       }}
       onPointerLeave={() => {

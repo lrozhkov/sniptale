@@ -28,6 +28,26 @@ export function reviewVisibleEditBoundaries(edits: readonly ReviewEdit[]): numbe
 
 /** Edits on one lane cannot overlap each other; cuts and speed retain independent lanes. */
 function validateReviewEditIntervals(duration: number, edits: readonly ReviewEdit[]): void {
+  for (const edit of edits) {
+    if (edit.kind !== 'freeze') continue;
+    if (
+      ![edit.start, edit.end, edit.duration, edit.frameTime, edit.frameDuration].every(
+        Number.isFinite
+      ) ||
+      edit.start < 0 ||
+      edit.start > duration ||
+      edit.end !== edit.start ||
+      edit.duration <= 0 ||
+      edit.duration > 600 ||
+      edit.frameTime < 0 ||
+      edit.frameTime >= duration ||
+      edit.frameDuration <= 0 ||
+      edit.frameDuration > 172800 ||
+      (edit.start !== 0 && edit.frameTime > edit.start) ||
+      edit.frameTime + edit.frameDuration < edit.start - 1e-6
+    )
+      throw new Error('Review freeze interval is invalid.');
+  }
   for (const kind of ['cut', 'speed'] as const) {
     let previousEnd = 0;
     for (const edit of edits
@@ -85,13 +105,42 @@ export function buildReviewTimeMap(
   const boundaries = [
     ...new Set([0, duration, ...edits.flatMap((edit) => [edit.start, edit.end])]),
   ].sort((a, b) => a - b);
+  const holds = (at: number) => {
+    if (edits.some((edit) => edit.kind === 'cut' && edit.start <= at && at < edit.end)) return;
+    for (const edit of edits
+      .filter((edit) => edit.kind === 'freeze' && edit.start === at)
+      .sort((a, b) => a.id.localeCompare(b.id))) {
+      if (edit.kind !== 'freeze') continue;
+      segments.push({
+        sourceStart: at,
+        sourceEnd: at,
+        resultStart: resultEnd,
+        resultEnd: resultEnd + edit.duration,
+        kind: 'freeze',
+        rate: 0,
+        freezeId: edit.id,
+        frameTime: edit.frameTime,
+        frameDuration: edit.frameDuration,
+      });
+      resultEnd += edit.duration;
+    }
+  };
   for (let index = 1; index < boundaries.length; index += 1) {
     const start = boundaries[index - 1]!;
+    holds(start);
     const end = boundaries[index]!;
     const interval = effectiveReviewInterval(start, end, edits);
     append(end, interval.kind, interval.rate);
   }
+  holds(duration);
   return segments;
+}
+
+/** Exact physical source sample; inserted project time never advances the held source. */
+export function reviewSegmentSourceTime(segment: ReviewTimeSegment, time: number): number {
+  return segment.kind === 'freeze'
+    ? (segment.frameTime ?? segment.sourceStart)
+    : segment.sourceStart + (time - segment.resultStart) * segment.rate;
 }
 
 /** Wraps the segment builder in the shared conversion API for every timeline-time consumer. */
@@ -107,7 +156,7 @@ export function createReviewTimeMap(duration: number, edits: readonly ReviewEdit
         (part) => part.kind !== 'cut' && time >= part.resultStart && time < part.resultEnd
       );
       if (!segment) return null;
-      return segment.sourceStart + (time - segment.resultStart) * segment.rate;
+      return reviewSegmentSourceTime(segment, time);
     },
     getDuration: () => duration_,
     getSegments: () => segments,
@@ -140,6 +189,11 @@ export function mapReviewAnchor(anchor: ReviewAnchor, segments: readonly ReviewT
   const ranges = [];
   let removed = false;
   for (const segment of segments) {
+    if (segment.kind === 'freeze') {
+      if (anchor.start <= segment.sourceStart && segment.sourceStart < anchor.end)
+        ranges.push({ start: segment.resultStart, end: segment.resultEnd });
+      continue;
+    }
     const start = Math.max(anchor.start, segment.sourceStart);
     const end = Math.min(anchor.end, segment.sourceEnd);
     if (end <= start) continue;
@@ -156,5 +210,73 @@ export function mapReviewAnchor(anchor: ReviewAnchor, segments: readonly ReviewT
     excludedFromResult: ranges.length === 0,
     partiallyExcluded: removed && ranges.length > 0,
     ranges,
+  };
+}
+
+/** Timeline display retains cut widths and source speed widths, while insertions have their own width. */
+export function createReviewDisplayMap(duration: number, edits: readonly ReviewEdit[]) {
+  let cursor = 0;
+  const parts = buildReviewTimeMap(duration, edits).map((segment) => {
+    const start = cursor;
+    cursor +=
+      segment.kind === 'freeze'
+        ? segment.resultEnd - segment.resultStart
+        : segment.sourceEnd - segment.sourceStart;
+    return { segment, start, end: cursor };
+  });
+  const findResult = (time: number, edge: 'start' | 'end') =>
+    parts.find(
+      ({ segment }) =>
+        segment.kind !== 'cut' &&
+        (edge === 'end'
+          ? time > segment.resultStart && time <= segment.resultEnd
+          : time >= segment.resultStart && time < segment.resultEnd)
+    );
+  const sourceToDisplay = (time: number, edge: 'start' | 'end' = 'start') => {
+    const part = parts.find(
+      ({ segment }) =>
+        segment.kind !== 'freeze' &&
+        (edge === 'end'
+          ? time > segment.sourceStart && time <= segment.sourceEnd
+          : time >= segment.sourceStart && time < segment.sourceEnd)
+    );
+    return part ? part.start + time - part.segment.sourceStart : time <= 0 ? 0 : cursor;
+  };
+  const displayToSource = (time: number) => {
+    const part = parts.find((part) => time >= part.start && time < part.end);
+    return part
+      ? part.segment.sourceStart + (part.segment.kind === 'freeze' ? 0 : time - part.start)
+      : time <= 0
+        ? 0
+        : duration;
+  };
+  const resultToDisplay = (time: number, edge: 'start' | 'end' = 'start') => {
+    const part = findResult(time, edge);
+    return part
+      ? part.start +
+          (time - part.segment.resultStart) *
+            (part.segment.kind === 'freeze' ? 1 : part.segment.rate)
+      : time <= 0
+        ? 0
+        : cursor;
+  };
+  const displayToResult = (time: number) => {
+    const part = parts.find((part) => time >= part.start && time < part.end);
+    return part
+      ? part.segment.resultStart +
+          (part.segment.kind === 'cut'
+            ? 0
+            : (time - part.start) / (part.segment.kind === 'freeze' ? 1 : part.segment.rate))
+      : time <= 0
+        ? 0
+        : (parts.at(-1)?.segment.resultEnd ?? 0);
+  };
+  return {
+    duration: cursor,
+    parts,
+    sourceToDisplay,
+    displayToSource,
+    resultToDisplay,
+    displayToResult,
   };
 }

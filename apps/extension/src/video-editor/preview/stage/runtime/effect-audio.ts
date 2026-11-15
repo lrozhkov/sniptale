@@ -21,6 +21,10 @@ import {
 const logger = createLogger({ namespace: 'VideoEditorPreviewEffectAudio' });
 
 export function usePreviewEffectAudio(args: {
+  processedAudio?: {
+    prepare(request: VideoEditorPreviewPrepareRequest): Promise<void>;
+    sync(): Promise<void>;
+  };
   assetUrls: Record<string, string>;
   currentTime: number;
   feedback: PreviewEffectRuntimeFeedback;
@@ -68,6 +72,7 @@ export function usePreviewEffectAudio(args: {
     }
     let active = true;
     void Promise.all([
+      ...(args.processedAudio ? [args.processedAudio.sync()] : []),
       voiceStateRef.current.sync({
         entries: voiceEntries,
         assetUrls: args.assetUrls,
@@ -102,6 +107,7 @@ export function usePreviewEffectAudio(args: {
     };
   }, [
     args.assetUrls,
+    args.processedAudio,
     voiceEntries,
     args.currentTime,
     args.isPlaying,
@@ -118,6 +124,7 @@ export function usePreviewEffectAudio(args: {
     async (request: VideoEditorPreviewPrepareRequest) => {
       try {
         await Promise.all([
+          ...(args.processedAudio ? [args.processedAudio.prepare(request)] : []),
           voiceStateRef.current.prepare(
             { entries: voiceEntries, assetUrls: args.assetUrls, currentTime: request.time },
             request.signal
@@ -137,7 +144,15 @@ export function usePreviewEffectAudio(args: {
         throw error;
       }
     },
-    [voiceEntries, args.assetUrls, onFailure, retryVersion, recordingSource, actionPlan]
+    [
+      voiceEntries,
+      args.assetUrls,
+      args.processedAudio,
+      onFailure,
+      retryVersion,
+      recordingSource,
+      actionPlan,
+    ]
   );
 
   useEffect(() => {

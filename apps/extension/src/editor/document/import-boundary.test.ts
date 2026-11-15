@@ -1,3 +1,4 @@
+import { createCanvas } from 'canvas';
 import { describe, expect, it } from 'vitest';
 import type { DrawingObject } from '../../features/drawing/public';
 import {
@@ -236,5 +237,117 @@ it('round trips every admitted drawing kind through the document metadata serial
     const serialized = serializeEditorDrawingMetadata(object);
     expect(JSON.parse(serialized)).toEqual({ version: 1, object });
     expect(parseEditorDrawingMetadata(serialized)).toEqual(object);
+  }
+});
+
+it('admits cleanup as a Blur layer only with validated Simplify erase metadata and PNG pixels', () => {
+  const png = createCanvas(30, 20);
+  const settings = {
+    automatic: true,
+    content: 'all',
+    manualKind: 'text',
+    sensitivity: 90,
+    thickness: 0.5,
+    lineSpacing: 1.5,
+    textPattern: 'typical',
+    textAlign: 'left',
+    color: null,
+    erase: true,
+  };
+  const object = {
+    id: 'cleanup',
+    kind: 'simplify' as const,
+    bounds: { x: 10, y: 20, width: 30, height: 20 },
+    settings,
+  };
+  const raster = {
+    type: 'Image',
+    sniptaleId: 'cleanup',
+    sniptaleType: 'blur',
+    width: 30,
+    height: 20,
+    src: png.toDataURL('image/png'),
+    sniptaleDrawingJson: JSON.stringify({ version: 2, object }),
+  };
+  expect(() =>
+    assertValidEditorDrawingCanvasJson(JSON.stringify({ objects: [raster] }))
+  ).not.toThrow();
+  expect(() =>
+    assertValidEditorDrawingCanvasJson(
+      JSON.stringify({ objects: [{ ...raster, src: 'data:image/png;base64,invalid' }] })
+    )
+  ).toThrow();
+  expect(() =>
+    assertValidEditorDrawingCanvasJson(
+      JSON.stringify({
+        objects: [
+          {
+            ...raster,
+            sniptaleDrawingJson: JSON.stringify({
+              version: 2,
+              object: { ...object, settings: { ...settings, erase: false } },
+            }),
+          },
+        ],
+      })
+    )
+  ).toThrow('Mismatched editor drawing metadata');
+});
+
+it('admits optional text layout flags and rejects malformed values before restore', () => {
+  const text = objects.find((object) => object.kind === 'text')!;
+  const serialize = (flags: Record<string, unknown>) =>
+    JSON.stringify({ objects: [{ ...fabricObject(text), ...flags }] });
+  for (const flags of [
+    {},
+    { sniptaleDrawingTextAutoWidth: true, sniptaleDrawingTextMaxWidth: 640 },
+    { sniptaleDrawingTextAutoWidth: false },
+  ]) {
+    expect(() => assertValidEditorDrawingCanvasJson(serialize(flags))).not.toThrow();
+  }
+  for (const flags of [
+    { sniptaleDrawingTextAutoWidth: 'true' },
+    { sniptaleDrawingTextAutoWidth: null },
+    { sniptaleDrawingTextMaxWidth: '640' },
+    { sniptaleDrawingTextMaxWidth: 0 },
+    { sniptaleDrawingTextMaxWidth: -1 },
+    { sniptaleDrawingTextMaxWidth: 131073 },
+  ]) {
+    expect(() => assertValidEditorDrawingCanvasJson(serialize(flags))).toThrow(
+      'Invalid text layout metadata'
+    );
+  }
+});
+
+it('refuses malformed retained raster metadata before Fabric image loading', () => {
+  expect(() =>
+    assertValidEditorDrawingCanvasJson(
+      JSON.stringify({
+        objects: [
+          {
+            type: 'Image',
+            src: 'data:image/png;base64,QUJDRA==',
+            sniptaleRasterOriginalData: 'data:image/png;base64,QUJDRA==',
+          },
+        ],
+      })
+    )
+  ).toThrow('Invalid editor raster metadata');
+});
+
+it('admits optional boolean content permission and rejects malformed permission on every object', () => {
+  for (const marker of [undefined, false, true]) {
+    expect(() =>
+      assertValidEditorDrawingCanvasJson(
+        JSON.stringify({ objects: [{ sniptaleContentLocked: marker }] })
+      )
+    ).not.toThrow();
+  }
+  for (const marker of [null, 0, 'false', {}]) {
+    expect(() =>
+      assertValidEditorDrawingCanvasJson(
+        JSON.stringify({ objects: [{ objects: [{ sniptaleContentLocked: marker }] }] })
+      )
+    ).toThrow('Invalid editor content permission');
   }
 });

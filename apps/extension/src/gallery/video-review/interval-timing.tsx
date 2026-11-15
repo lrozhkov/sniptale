@@ -16,3 +16,10 @@ export function reviewIntervalDuration(
     0
   );
 }
+
+/** The mounted inspector title owns the interval hint; publishing does not rerender the scene. */
+export type ReviewIntervalHintOwner = {
+  title: { current: HTMLHeadingElement | null };
+  active: object | null;
+};
+export const ReviewIntervalHintContext = createContext<ReviewIntervalHintOwner | null>(null);

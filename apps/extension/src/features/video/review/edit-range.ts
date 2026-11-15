@@ -10,6 +10,8 @@ export function reviewEditEdgeLimits(args: {
   boundaries?: readonly number[] | undefined;
 }) {
   const { edit, edge, duration } = args;
+  if (edit.kind === 'freeze') return { min: edit.start, max: edit.start, values: [edit.start] };
+
   const others = args.edits.filter((item) => item.id !== edit.id);
   const minimum = Math.min(0.01, edit.end - edit.start);
   const before = Math.max(

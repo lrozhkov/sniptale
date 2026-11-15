@@ -28,6 +28,7 @@ it('leaves native disclosure activation to summary and retains transport Space e
         key: ' ',
         code: 'Space',
         bubbles: true,
+        composed: true,
         cancelable: true,
       });
       act(() => {
@@ -37,6 +38,12 @@ it('leaves native disclosure activation to summary and retains transport Space e
     };
     expect(dispatch(host.querySelector('summary')!).defaultPrevented).toBe(false);
     expect(dispatch(host.querySelector('[role=switch]')!).defaultPrevented).toBe(false);
+    expect(toggle).not.toHaveBeenCalled();
+    const overlay = document.createElement('div');
+    const field = document.createElement('textarea');
+    overlay.attachShadow({ mode: 'open' }).append(field);
+    host.append(overlay);
+    expect(dispatch(field).defaultPrevented).toBe(false);
     expect(toggle).not.toHaveBeenCalled();
     expect(dispatch(host.querySelector('button')!).defaultPrevented).toBe(true);
     expect(toggle).toHaveBeenCalledOnce();

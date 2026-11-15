@@ -1,8 +1,14 @@
+import { reviewTrackTitleKeys } from './track-items';
+import type { RefObject } from 'react';
+import type { QuickEditTrack } from '../../features/video/review/advanced/types';
+import { translate } from '../../platform/i18n';
 import { useEffect, useRef, useState } from 'react';
 import type { ReviewBeforeAction } from './note-transitions';
 import type { ReviewSelection } from '../../features/video/review/types';
 
 type Section =
+  | 'project'
+  | 'track'
   | 'scene'
   | 'selected'
   | 'comments'
@@ -18,12 +24,17 @@ type ReviewInspectorNavigationInput = {
   selectionLabel?: string | undefined;
   settingsAvailable?: boolean;
   exportAvailable: boolean;
+  recordingAvailable?: boolean;
   /** Existing explicit-open command ticket; never used as the visible-panel authority. */
   exportRequest?: number;
 };
 
 /** Owns transient inspector navigation and the scroll reset for each explicit view change. */
 export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInput) {
+  const [recordingShown, showRecording] = useState(true);
+  useEffect(() => {
+    if (!props.recordingAvailable) showRecording(true);
+  }, [props.recordingAvailable]);
   const [presentation, setPresentation] = useState<'all' | 'sections'>('all');
   const contextKey = props.contextKey ?? 'comments';
   const contextSection: Section = contextKey.startsWith('comments')
@@ -31,12 +42,14 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
     : props.selectionLabel
       ? 'selected'
       : props.settingsAvailable
-        ? 'scene'
-        : 'comments';
+        ? 'track'
+        : 'project';
   const [context, updateContext] = useState<
     'selected' | 'export' | 'history' | 'speech' | 'text' | null
   >(props.selectionLabel ? 'selected' : null);
-  const [section, updateSection] = useState<Section>(contextSection);
+  const [section, updateSection] = useState<Section>(
+    props.selectionLabel ? contextSection : 'project'
+  );
   const explicitSection = useRef<Section | null>(null);
   const previewReturn = useRef<{
     section: Section;
@@ -65,8 +78,10 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
     }
     (props.beforeAction ?? ((action) => action()))(() => {
       previewReturn.current = null;
-      explicitSection.current = value;
-      if (
+      if (props.recordingAvailable) showRecording(false);
+      explicitSection.current = value === section ? null : value;
+      if (value === 'project' || value === 'track') updateContext(null);
+      else if (
         value === 'export' ||
         value === 'selected' ||
         value === 'history' ||
@@ -120,11 +135,14 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
       exportRequested && exportAvailable
         ? 'export'
         : (explicit ??
-          ((preserveExport && current === 'export') ||
+          (((current === 'project' || current === 'track') &&
+            props.contextSelection?.kind === 'none' &&
+            !contextKey.startsWith('comments:')) ||
+          (preserveExport && current === 'export') ||
           ((current === 'history' ||
             ((current === 'speech' || current === 'text') && !modeChanged)) &&
             props.contextSelection?.kind === 'none') ||
-          (!modeChanged && contextSection === 'scene' && current === 'comments')
+          (!modeChanged && contextSection === 'track' && current === 'comments')
             ? current
             : contextSection))
     );
@@ -142,14 +160,16 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
   const shown =
     section === 'selected' && !props.selectionLabel
       ? props.settingsAvailable
-        ? 'scene'
-        : 'comments'
+        ? 'track'
+        : 'project'
       : (section === 'scene' || section === 'text') && !props.settingsAvailable
         ? 'comments'
         : section;
   return {
     presentation,
     setPresentation,
+    recordingShown,
+    openRecording: () => showRecording(true),
     shown,
     context,
     setSection,
@@ -164,6 +184,7 @@ export type ReviewInspectorNavigation = ReturnType<typeof useReviewInspectorNavi
 /** Timeline commands use the same exclusive third context as direct inspector navigation. */
 export function reviewTimelineInspectorCommands(args: {
   video: { current: Pick<HTMLVideoElement, 'pause'> | null };
+  pause?: (() => void) | undefined;
   select(selection: ReviewSelection): void;
   navigation: Pick<ReviewInspectorNavigation, 'setSection' | 'shown'>;
   selectedTextId: string | undefined;
@@ -171,7 +192,7 @@ export function reviewTimelineInspectorCommands(args: {
   requestExport(update: (current: number) => number): void;
 }) {
   const clearSelection = () => {
-    args.video.current?.pause();
+    (args.pause ?? (() => args.video.current?.pause()))();
     args.select({ kind: 'none' });
   };
   return {
@@ -183,7 +204,7 @@ export function reviewTimelineInspectorCommands(args: {
     onSelectAnnotationEffect: (id: string) => args.select({ kind: 'annotation-effect', id }),
     exportActive: args.navigation.shown === 'export',
     onSelectText: (id: string) => {
-      args.video.current?.pause();
+      (args.pause ?? (() => args.video.current?.pause()))();
       args.select({ kind: 'text', id });
       args.navigation.setSection('selected');
     },
@@ -197,5 +218,76 @@ export function reviewTimelineInspectorCommands(args: {
     },
     onOpenHistory: () => args.navigation.setSection('history'),
     onOpenExport: () => args.requestExport((current) => current + 1),
+  };
+}
+
+/** Tracks the lane root used by Back; editor commands retain mutation and admission authority. */
+export function useReviewInspectorTrackNavigation(props: {
+  navigation: Pick<ReviewInspectorNavigation, 'shown' | 'setSection'>;
+  selection: ReviewSelection;
+  beforeAction: ReviewBeforeAction;
+  cancelAnnotation: RefObject<(() => void) | null>;
+  setDrawing(value: boolean): void;
+  setCutting(value: false): void;
+  setAudioTool(value: boolean): void;
+  setAudioRange(value: boolean): void;
+  select(value: ReviewSelection): void;
+}) {
+  const [inspectorTrack, setTrack] = useState<QuickEditTrack>('source');
+  const [tabs, setTabs] = useState<Partial<Record<QuickEditTrack, 'list' | 'settings'>>>({});
+  const tab = tabs[inspectorTrack] ?? 'list';
+  const setTab = (value: 'list' | 'settings') =>
+    props.beforeAction(() => setTabs((current) => ({ ...current, [inspectorTrack]: value })));
+  const navigation = props.navigation;
+  const resetSelection = () => {
+    props.cancelAnnotation.current?.();
+    props.setDrawing(false);
+    props.setCutting(false);
+    props.setAudioTool(false);
+    props.setAudioRange(false);
+    if (props.selection.kind !== 'none') props.select({ kind: 'none' });
+  };
+  const openProject = () =>
+    props.beforeAction(() => {
+      resetSelection();
+      setTrack('source');
+      setTabs((current) => ({ ...current, source: 'settings' }));
+      navigation.setSection('track');
+    });
+  const trackSection =
+    inspectorTrack === 'originalAudio'
+      ? 'speech'
+      : inspectorTrack === 'text'
+        ? 'text'
+        : inspectorTrack === 'actions' ||
+            inspectorTrack === 'keyboard' ||
+            inspectorTrack === 'mouse'
+          ? 'history'
+          : 'track';
+  const atTrackRoot = navigation.shown === trackSection;
+  const backLabel = translate(
+    atTrackRoot ? 'gallery.videoReview.aboutProject' : reviewTrackTitleKeys[inspectorTrack]
+  );
+  const backToTrack = () =>
+    props.beforeAction(() => {
+      resetSelection();
+      setTabs((current) => ({ ...current, [inspectorTrack]: 'list' }));
+      navigation.setSection(trackSection);
+    });
+  const openTrack = (track: QuickEditTrack) =>
+    props.beforeAction(() => {
+      setTrack(track);
+      resetSelection();
+      navigation.setSection('track');
+    });
+  return {
+    track: inspectorTrack,
+    tab,
+    setTab,
+    setTrack,
+    openTrack,
+    back: backToTrack,
+    backLabel,
+    openProject,
   };
 }

@@ -71,7 +71,7 @@ it('patches volume and fades from numeric fields', () => {
   expect(onPatch).toHaveBeenCalledWith({ fadeOut: 0.3 });
 });
 
-it('keeps mute on the track indicator and deletes the clip', async () => {
+it('keeps track mute and inspector mute actions available and deletes the clip', async () => {
   const clip = createQuickEditAudioClip({
     id: 'a1',
     assetId: 'asset:1',
@@ -80,8 +80,14 @@ it('keeps mute on the track indicator and deletes the clip', async () => {
     endMax: 10,
   });
   renderEditor(clip);
-  expect(host.querySelector('[aria-label="gallery.videoReview.audioClipMute"]')).toBeNull();
+  expect(host.querySelector('[aria-label="gallery.videoReview.audioClipMute"]')).not.toBeNull();
   expect(onPatch).not.toHaveBeenCalled();
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.audioClipMute"]')!
+      .click()
+  );
+  expect(onPatch).toHaveBeenCalledWith({ volume: 0 });
   await act(async () =>
     host
       .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.audioClipDelete"]')!
@@ -107,7 +113,7 @@ it('binds inspector actions to the selected lane without duplicating its heading
   const editor = host.querySelector('[data-ui="gallery.videoReview.audioInspector"]')!;
   expect(editor!.textContent).toContain('gallery.videoReview.interval');
   expect(editor!.textContent).not.toContain('gallery.videoReview.audioVoiceover');
-  expect(host.querySelector('[aria-label="gallery.videoReview.audioClipMute"]')).toBeNull();
+  expect(host.querySelector('[aria-label="gallery.videoReview.audioClipMute"]')).not.toBeNull();
   await act(async () =>
     host
       .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.audioClipDelete"]')!
@@ -119,7 +125,7 @@ it('binds inspector actions to the selected lane without duplicating its heading
   expect(
     host.querySelector('[data-ui="gallery.videoReview.audioInspector"]')!.textContent
   ).not.toContain('gallery.videoReview.audioMusic');
-  expect(host.querySelector('[aria-label="gallery.videoReview.audioClipMute"]')).toBeNull();
+  expect(host.querySelector('[aria-label="gallery.videoReview.audioClipMute"]')).not.toBeNull();
   expect(patchClip).not.toHaveBeenCalled();
   act(() =>
     root.render(<ReviewAudioInspectorSection audio={{ selected: null } as never} busy={false} />)
@@ -149,7 +155,7 @@ it('explains cut suppression without changing the authored mute flag or deleting
   expect(host.querySelector('[role="status"]')?.textContent).toContain(
     'gallery.videoReview.voiceoverCut'
   );
-  expect(host.querySelector('[aria-label="gallery.videoReview.audioClipMute"]')).toBeNull();
+  expect(host.querySelector('[aria-label="gallery.videoReview.audioClipMute"]')).not.toBeNull();
   expect(onPatch).not.toHaveBeenCalled();
   expect(onDelete).not.toHaveBeenCalled();
   renderEditor(clip);
@@ -235,3 +241,48 @@ it('bounds a short audio fade to its duration', () => {
   act(() => field('audioFadeIn').dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(onPatch).toHaveBeenLastCalledWith({ fadeIn: 2 });
 });
+
+it.each(['voiceover', 'music'] as const)(
+  'sets %s clip volume to zero from its shared Mute action',
+  (lane) => {
+    const clip = createQuickEditAudioClip({
+      id: 'mute',
+      assetId: 'asset:mute',
+      timelineStart: 0,
+      duration: 2,
+      endMax: 10,
+    });
+    act(() =>
+      root.render(
+        <ReviewAudioClipEditor
+          clip={clip}
+          lane={lane}
+          busy={false}
+          onPatch={onPatch}
+          onDelete={onDelete}
+        />
+      )
+    );
+    const mute = host.querySelector<HTMLButtonElement>(
+      '[aria-label="gallery.videoReview.audioClipMute"]'
+    )!;
+    expect(mute.disabled).toBe(false);
+    act(() => mute.click());
+    expect(onPatch).toHaveBeenCalledWith({ volume: 0 });
+    act(() =>
+      root.render(
+        <ReviewAudioClipEditor
+          clip={{ ...clip, volume: 0 }}
+          lane={lane}
+          busy={false}
+          onPatch={onPatch}
+          onDelete={onDelete}
+        />
+      )
+    );
+    expect(
+      host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.audioClipMute"]')!
+        .disabled
+    ).toBe(true);
+  }
+);

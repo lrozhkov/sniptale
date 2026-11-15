@@ -1,13 +1,34 @@
-import type { DrawingBounds, DrawingPoint } from '../../features/drawing/public';
+import type {
+  DrawingAlignmentTarget,
+  DrawingBounds,
+  DrawingPoint,
+} from '../../features/drawing/public';
 import { isContentOwnedElement } from '../platform/dom-host';
 import type { PageScrollRoot } from '../platform/page-scroll';
 import { getDrawingViewportProjection } from './interaction';
+
+type DomAlignmentBounds = DrawingBounds & { alignmentTarget: DrawingAlignmentTarget };
+const identities = new WeakMap<object, { elements: WeakMap<Element, string>; next: number }>();
+function targetIdentity(root: PageScrollRoot, element: Element): string {
+  const owner = root.element ?? document;
+  let state = identities.get(owner);
+  if (!state) {
+    state = { elements: new WeakMap(), next: 0 };
+    identities.set(owner, state);
+  }
+  let id = state.elements.get(element);
+  if (!id) {
+    id = `dom:${++state.next}`;
+    state.elements.set(element, id);
+  }
+  return id;
+}
 
 function readDrawingDomAlignmentBounds(
   bounds: DrawingBounds,
   root: PageScrollRoot,
   probe?: Partial<DrawingPoint>
-): DrawingBounds[] {
+): DomAlignmentBounds[] {
   if (typeof document.elementsFromPoint !== 'function') return [];
   const projection = getDrawingViewportProjection(root);
   const viewport =
@@ -17,7 +38,7 @@ function readDrawingDomAlignmentBounds(
   const width = window.innerWidth;
   const height = window.innerHeight;
   const found = new Set<Element>();
-  const result: DrawingBounds[] = [];
+  const result: DomAlignmentBounds[] = [];
   const xs =
     probe?.x === undefined
       ? [bounds.x - 32, bounds.x + bounds.width / 2, bounds.x + bounds.width + 32]
@@ -64,11 +85,34 @@ function readDrawingDomAlignmentBounds(
           rect.width * rect.height > width * height * 0.85
         )
           continue;
-        result.push({
+        const bounds = {
           x: rect.x + projection.x,
           y: rect.y + projection.y,
           width: rect.width,
           height: rect.height,
+        };
+        const transparent =
+          !style.backgroundColor ||
+          style.backgroundColor === 'transparent' ||
+          style.backgroundColor === 'rgba(0, 0, 0, 0)';
+        const bordered = [
+          style.borderTopWidth,
+          style.borderRightWidth,
+          style.borderBottomWidth,
+          style.borderLeftWidth,
+        ].some((width) => Number.parseFloat(width) > 0);
+        result.push({
+          ...bounds,
+          alignmentTarget: {
+            id: targetIdentity(root, element),
+            kind: 'dom',
+            bounds,
+            showBounds:
+              transparent &&
+              !bordered &&
+              (!style.backgroundImage || style.backgroundImage === 'none') &&
+              !['IMG', 'VIDEO', 'CANVAS', 'SVG'].includes(element.tagName),
+          },
         });
       }
     }
@@ -80,7 +124,7 @@ export function collectDrawingDomAlignmentBounds(
   bounds: DrawingBounds,
   root: PageScrollRoot,
   probe?: Partial<DrawingPoint>
-): DrawingBounds[] {
+): DomAlignmentBounds[] {
   try {
     return readDrawingDomAlignmentBounds(bounds, root, probe);
   } catch {

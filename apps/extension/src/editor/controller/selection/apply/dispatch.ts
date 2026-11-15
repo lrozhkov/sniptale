@@ -6,7 +6,10 @@ import {
   readEditorDrawingObject,
   writeEditorDrawingObject,
 } from '../../../drawing/object/metadata';
-import { refreshEditorDrawingBlurObject } from '../../../drawing/object/blur';
+import {
+  createEditorDrawingBlurObject,
+  refreshEditorDrawingBlurObject,
+} from '../../../drawing/object/blur';
 import { replaceEditorDrawingFabricGeometry } from '../../../drawing/object/vector';
 import { parseScenarioBlurMetadata } from '../../../document/scenario-blur-metadata';
 import { updateBlurObject } from '../../../objects/annotation/blur/object';
@@ -15,6 +18,22 @@ import { applyImageLayerSettings } from './image';
 
 function applyDrawingSettings(object: FabricObject, settings: EditorToolSettings): FabricObject {
   const drawing = readEditorDrawingObject(object);
+  if (drawing?.kind === 'simplify' && drawing.settings.erase && !settings.blur.clean) {
+    const replacement = createEditorDrawingBlurObject({
+      drawing: {
+        id: drawing.id,
+        kind: 'blur',
+        bounds: drawing.bounds,
+        ...(drawing.rotation === undefined ? {} : { rotation: drawing.rotation }),
+        amount: settings.blur.amount,
+      },
+      labelIndex: 1,
+    });
+    if (object.sniptaleLabel !== undefined) replacement.sniptaleLabel = object.sniptaleLabel;
+    if (object.sniptaleLocked !== undefined) replacement.sniptaleLocked = object.sniptaleLocked;
+    replacement.visible = object.visible;
+    return replacement;
+  }
   if (!drawing || drawing.kind === 'blur' || drawing.kind === 'simplify') return object;
   let nextDrawing: Exclude<typeof drawing, { kind: 'blur' }>;
   if (drawing.kind === 'pencil') {
@@ -46,7 +65,7 @@ function replaceDrawingObjectsOnCanvas(
   objects: FabricObject[],
   settings: EditorToolSettings,
   prepareObject: (object: FabricObject) => void
-): void {
+): FabricObject[] {
   const entries = objects
     .map((object) => ({
       index: canvas.getObjects().indexOf(object),
@@ -54,7 +73,7 @@ function replaceDrawingObjectsOnCanvas(
       replacement: applyDrawingSettings(object, settings),
     }))
     .filter((entry) => entry.index >= 0);
-  if (entries.every((entry) => entry.replacement === entry.object)) return;
+  if (entries.every((entry) => entry.replacement === entry.object)) return objects;
   canvas.discardActiveObject();
   entries.forEach((entry) => canvas.remove(entry.object));
   entries
@@ -67,6 +86,7 @@ function replaceDrawingObjectsOnCanvas(
   const active =
     replacements.length === 1 ? replacements[0] : new ActiveSelection(replacements, { canvas });
   if (active) canvas.setActiveObject(active);
+  return replacements;
 }
 
 export function applySelectionToolSettingsToObjects(
@@ -82,6 +102,7 @@ export function applySelectionToolSettingsToObjects(
     case 'transparent-base':
     case 'browser-frame':
     case 'frame-annotation':
+    case 'vector-element':
     case 'group':
       return;
     case 'source-image':
@@ -98,6 +119,12 @@ export function applySelectionToolSettingsToObjects(
       replaceDrawingObjectsOnCanvas(canvas, objects, selectionToolSettings, prepareObject);
       return;
     case 'blur':
+      objects = replaceDrawingObjectsOnCanvas(
+        canvas,
+        objects,
+        selectionToolSettings,
+        prepareObject
+      );
       objects.forEach((object) => {
         const drawing = readEditorDrawingObject(object);
         if (drawing?.kind !== 'blur') {

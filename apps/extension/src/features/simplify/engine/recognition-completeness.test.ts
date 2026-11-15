@@ -1,4 +1,4 @@
-import { createCanvas } from 'canvas';
+import { createCanvas, type ImageData as CanvasImageData } from 'canvas';
 import { expect, it, vi } from 'vitest';
 
 const { prepare, render, DEFAULTS } = await vi.importActual<{
@@ -721,3 +721,189 @@ it.each(['outline', 'arrow'])('keeps an independent %s graphic beside paragraph 
   expect(delta(7, 67, 19, 19)).toBe(0);
   expect(delta(34, 69, 400, 17)).toBeGreaterThan(100);
 });
+
+it('erases catalog-confirmed faint glyph rows and preserves a separate protected line', () => {
+  const canvas = createCanvas(160, 80),
+    context = canvas.getContext('2d');
+  context.fillStyle = '#f1f1f1';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = '#c9c9c9';
+  for (let x = 20; x < 125; x += 15) {
+    context.fillRect(x, 24, 1, 9);
+    context.fillRect(x + 5, 24, 1, 9);
+    context.fillRect(x, 28, 6, 1);
+  }
+  context.fillRect(20, 55, 110, 1);
+  const input = context.getImageData(0, 0, canvas.width, canvas.height),
+    catalog = prepare(input);
+  const result = createCanvas(canvas.width, canvas.height);
+  render(result.getContext('2d'), canvas, catalog, { ...DEFAULTS, content: 'all', erase: true });
+  const output = result.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+  expect(changed(input.data, output.data, canvas.width, 20, 55, 110, 1)).toBe(0);
+  let originalInk = 0,
+    remainingInk = 0;
+  for (let y = 24; y < 33; y++)
+    for (let x = 20; x < 125; x++) {
+      const index = (y * canvas.width + x) * 4;
+      if (input.data[index] !== 241) originalInk++;
+      if (output.data[index] !== 241) remainingInk++;
+    }
+  expect(originalInk).toBe(154);
+  expect(remainingInk).toBe(0);
+  expect(context.getImageData(0, 0, canvas.width, canvas.height).data).toEqual(input.data);
+});
+
+it.each(['separator', 'grid'] as const)(
+  'preserves independent faint %s geometry through default erase',
+  (kind) => {
+    const canvas = createCanvas(160, 64),
+      context = canvas.getContext('2d');
+    context.fillStyle = '#f1f1f1';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#c9c9c9';
+    if (kind === 'separator') context.fillRect(20, 28, 110, 1);
+    else {
+      for (let x = 20; x <= 140; x += 20) context.fillRect(x, 15, 1, 35);
+      for (let y = 15; y <= 50; y += 7) context.fillRect(20, y, 120, 1);
+    }
+    const input = context.getImageData(0, 0, canvas.width, canvas.height),
+      result = createCanvas(canvas.width, canvas.height);
+    render(result.getContext('2d'), canvas, prepare(input), {
+      ...DEFAULTS,
+      content: 'all',
+      erase: true,
+    });
+    expect(result.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data).toEqual(
+      input.data
+    );
+  }
+);
+
+it('erases a large coherent glyph row with an embedded dot while preserving an independent disc', () => {
+  const canvas = createCanvas(640, 256),
+    context = canvas.getContext('2d');
+  context.scale(4, 4);
+  context.fillStyle = '#e5eef8';
+  context.fillRect(0, 0, 160, 64);
+  context.fillStyle = '#1366b3';
+  for (let k = 0; k < 7; k++) {
+    const x = 20 + k * 8;
+    if (k === 2) {
+      context.fillRect(x + 2, 28, 2, 5);
+      context.beginPath();
+      context.arc(x + 2.5, 25, 1.25, 0, Math.PI * 2);
+      context.fill();
+    } else {
+      context.fillRect(x, 24, 1, 9);
+      context.fillRect(x + 5, 24, 1, 9);
+      context.fillRect(x, 28, 6, 1);
+    }
+  }
+  context.beginPath();
+  context.arc(95, 25, 1.25, 0, Math.PI * 2);
+  context.fill();
+  const delta = execute(canvas);
+  expect(delta(80, 96, 4, 36)).toBe(144);
+  expect(delta(152, 112, 8, 20)).toBe(160);
+  expect(delta(374, 94, 12, 12)).toBe(0);
+});
+
+const { attachEraseSupport, eraseOwned } = await vi.importActual<{
+  attachEraseSupport(image: CanvasImageData, box: object): object;
+  eraseOwned(context: ReturnType<ReturnType<typeof createCanvas>['getContext']>, box: object): void;
+}>('./erasures.mjs');
+
+function eraseSupportedGlyphRow(canvas: ReturnType<typeof createCanvas>, background: number[]) {
+  const input = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+  const support = attachEraseSupport(input, {
+    x: 20,
+    y: 24,
+    w: 96,
+    h: 9,
+    shape: 'text',
+    bg: background,
+  });
+  const result = createCanvas(canvas.width, canvas.height),
+    context = result.getContext('2d');
+  context.drawImage(canvas, 0, 0);
+  eraseOwned(context, support);
+  return context.getImageData(0, 0, canvas.width, canvas.height);
+}
+
+function drawSupportedGlyphRow(canvas: ReturnType<typeof createCanvas>) {
+  const context = canvas.getContext('2d');
+  context.fillStyle = 'rgb(133,110,145)';
+  for (let x = 20; x < 125; x += 15) {
+    context.fillRect(x, 24, 1, 9);
+    context.fillRect(x + 5, 24, 1, 9);
+    context.fillRect(x, 28, 6, 1);
+  }
+}
+
+it('preserves exact flat background when faint neighboring ink contaminates one erase-plane corner', () => {
+  const canvas = createCanvas(160, 64),
+    context = canvas.getContext('2d'),
+    background = [133, 172, 134];
+  context.fillStyle = 'rgb(133,172,134)';
+  context.fillRect(0, 0, 160, 64);
+  drawSupportedGlyphRow(canvas);
+  context.fillStyle = 'rgb(133,168,135)';
+  context.fillRect(17, 33, 3, 3);
+  const input = context.getImageData(0, 0, 160, 64),
+    output = eraseSupportedGlyphRow(canvas, background);
+  let damagedBackground = 0;
+  for (let i = 0; i < input.data.length; i += 4) {
+    if (!background.every((value, channel) => input.data[i + channel] === value)) continue;
+    if (background.some((value, channel) => output.data[i + channel] !== value))
+      damagedBackground++;
+  }
+  expect(damagedBackground).toBe(0);
+  expect(context.getImageData(0, 0, 160, 64).data).toEqual(input.data);
+});
+
+it.each([
+  [4, 1, 1],
+  [4, 0.75, 1],
+  [20, 1, 1],
+  [20, 0.75, 2],
+])(
+  'retains a genuine gradient span %s and alpha %s while erasing glyphs',
+  (span, alpha, tolerance) => {
+    const canvas = createCanvas(160, 64),
+      context = canvas.getContext('2d'),
+      gradient = context.createLinearGradient(0, 0, 160, 0);
+    gradient.addColorStop(0, `rgba(133,160,134,${alpha})`);
+    gradient.addColorStop(1, `rgba(133,${160 + span},134,${alpha})`);
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 160, 64);
+    const reference = context.getImageData(0, 0, 160, 64);
+    drawSupportedGlyphRow(canvas);
+    const input = context.getImageData(0, 0, 160, 64),
+      at = (28 * 160 + 65) * 4,
+      output = eraseSupportedGlyphRow(canvas, Array.from(reference.data.slice(at, at + 3)));
+    let inkPixels = 0,
+      maximumColorError = 0,
+      maximumAlphaError = 0;
+    for (let y = 24; y < 33; y++)
+      for (let x = 20; x < 116; x++) {
+        const index = (y * 160 + x) * 4;
+        if (input.data.slice(index, index + 4).every((v, c) => v === reference.data[index + c]))
+          continue;
+        inkPixels++;
+        for (let channel = 0; channel < 3; channel++)
+          maximumColorError = Math.max(
+            maximumColorError,
+            Math.abs(output.data[index + channel]! - reference.data[index + channel]!)
+          );
+        maximumAlphaError = Math.max(
+          maximumAlphaError,
+          Math.abs(output.data[index + 3]! - reference.data[index + 3]!)
+        );
+      }
+    expect(inkPixels).toBe(154);
+    // These limits preserve measured interpolation and premultiplied-alpha rounding accuracy.
+    expect(maximumColorError).toBeLessThanOrEqual(tolerance);
+    expect(maximumAlphaError).toBe(0);
+    expect(output.data.slice(0, 160 * 20 * 4)).toEqual(reference.data.slice(0, 160 * 20 * 4));
+  }
+);

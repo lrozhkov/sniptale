@@ -6,7 +6,7 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string, locale?: string) => `${key}:${locale ?? 'default'}`,
 }));
 
-import type { DesignSystemRegistryEntry } from '../registry/types';
+import { DESIGN_SYSTEM_REGISTRY, type DesignSystemRegistryEntry } from '../registry';
 import {
   DesignSystemCatalogHeader,
   DesignSystemCatalogSourceFilesSection,
@@ -53,6 +53,14 @@ function createEntry(
 }
 
 describe('design system catalog sections', () => {
+  it('keeps annotatable image source file keys unique in the actual registry', () => {
+    const entry = DESIGN_SYSTEM_REGISTRY.find(
+      (item) => item.componentId === 'shared.ui.annotatable-image-surface'
+    );
+    expect(entry).toBeDefined();
+    expect(entry?.sourceFiles).toEqual([...new Set(entry?.sourceFiles)]);
+  });
+
   it('renders localized header and summary metadata for active and planned entries', () => {
     const activeMarkup = renderToStaticMarkup(
       <DesignSystemCatalogHeader entry={createEntry()} locale="en" scopeLabel="Shared UI" />

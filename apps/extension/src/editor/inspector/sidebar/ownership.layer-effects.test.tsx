@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { translate } from '../../../platform/i18n';
 import {
   createControllerMock,
@@ -12,32 +12,34 @@ import {
 import { useEditorStore } from '../../state/useEditorStore';
 
 it('opens layer-effects from the hovered layer row actions even when file mode is active', async () => {
-  const controller = createControllerMock();
+  const controller = {
+    ...createControllerMock(),
+    rasterizeLayer: vi.fn(async () => true),
+  };
   const { EditorInspectorSidebar } = await import('.');
 
   resetEditorStore({ inspector: 'file' });
   renderWithController(<EditorInspectorSidebar hasImage />, controller);
   await flushAsyncWork();
 
-  const layerRow = Array.from(document.querySelectorAll<HTMLDivElement>('button[title="Layer 1"]'))
-    .at(0)
-    ?.closest('[class*="grid-cols-[auto_minmax(0,1fr)_auto]"]') as HTMLDivElement | undefined;
+  const layerRow = document.querySelector<HTMLDivElement>('[data-editor-layer-id="layer-1"]');
+  expect(layerRow).not.toBeNull();
 
   expect(useEditorStore.getState().inspector).toBe('file');
 
   await act(async () => {
-    layerRow?.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    layerRow!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
   });
   await flushAsyncWork();
 
-  const adjustmentsButton = layerRow?.querySelector<HTMLButtonElement>(
-    '[data-ui="editor.layers.effects-adjustments"]'
+  const adjustmentsButton = layerRow!.querySelector<HTMLButtonElement>(
+    '[data-ui="editor.layers.rasterize-and-adjust"]'
   );
 
-  expect(adjustmentsButton).toBeDefined();
+  expect(adjustmentsButton).not.toBeNull();
 
   await act(async () => {
-    adjustmentsButton?.click();
+    adjustmentsButton!.click();
   });
   await flushAsyncWork();
 
@@ -46,6 +48,7 @@ it('opens layer-effects from the hovered layer row actions even when file mode i
       button.getAttribute('aria-label') === translate('editor.toolbar.layerEffectsAdjustments')
   );
 
+  expect(controller.rasterizeLayer).toHaveBeenCalledWith('layer-1');
   expect(useEditorStore.getState().inspector).toBe('layer-effects');
   expect(useEditorStore.getState().layerEffectsCategory).toBe('adjustments');
   expect(controller.selectLayer).toHaveBeenCalledWith('layer-1', { focusViewport: false });

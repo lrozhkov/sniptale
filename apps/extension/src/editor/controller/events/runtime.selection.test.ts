@@ -39,7 +39,7 @@ it('restores generic chrome when an all-drawing ActiveSelection becomes mixed', 
 
   selection.add(ordinary);
   handleSelectionChange();
-  expect(selection.borderColor).toBe('#f97316');
+  expect(selection.borderColor).toBe('#2563eb');
   expect(selection.borderDashArray).toBeNull();
   expect(selection.hasControls).toBe(true);
   expect(selection.controls['tl']).toBeDefined();

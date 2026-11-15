@@ -17,6 +17,11 @@ const {
   waitForEncoderQueueCapacityMock: vi.fn(),
 }));
 
+// Exercise the admitted fallback stages; the shared backend has dedicated owner proof.
+vi.mock('../shared-composition', () => ({
+  renderSharedProjectComposition: vi.fn(async () => false),
+}));
+
 vi.mock('../codecs', () => ({
   waitForEncoderQueueCapacity: waitForEncoderQueueCapacityMock,
 }));

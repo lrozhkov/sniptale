@@ -29,7 +29,7 @@ import type {
 
 export interface ProjectTimelineInsertionActions {
   onAddActionEvent: (preset: VideoProjectActionPreset) => void;
-  onAddMotionRegion: (startTime?: number) => void;
+  onAddMotionRegion: (startTime?: number, effect?: '3d') => void;
   onAddVideoBlock?: (blockKind: VideoBlockKind) => void;
   onAddShapeOverlay: (shapeType: VideoProjectShapeType) => void;
   onAddSubtitleOverlay?: () => void;

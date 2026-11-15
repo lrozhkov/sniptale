@@ -2,7 +2,6 @@ import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve as resolvePath } from 'node:path';
 
-import tailwindcss from '@tailwindcss/postcss';
 import type { Plugin as EsbuildPlugin } from 'esbuild';
 import postcss from 'postcss';
 import type { Plugin } from 'vite';
@@ -106,6 +105,7 @@ async function inlineCssImports(filePath: string, visited = new Set<string>()): 
 }
 
 async function buildInlineCssText(filePath: string): Promise<string> {
+  const { default: tailwindcss } = await import('@tailwindcss/postcss');
   return (
     await postcss([tailwindcss()]).process(await inlineCssImports(filePath), { from: filePath })
   ).css;

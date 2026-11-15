@@ -1,8 +1,12 @@
-import type { RecordingEventCadence } from '../project/recording-events/types';
+import type { ReviewInteractionTimeline } from './interaction-types';
+import type { ReviewTelemetryMarker, ReviewActionSoundDescriptor } from './telemetry-types';
+import type { RecordingTargetSemantics } from '../project/recording-target';
+export type { ReviewTelemetryMarker } from './telemetry-types';
+import { resolveReviewInteractions } from './interaction-timeline';
+
 import { buildHistoryCursorRuns } from './cursor-history';
 import { groupHistoryScrollActions } from './scroll-history';
-import type { RecordingKeyboardRhythmBlock } from '../project/types/interaction';
-import { resolveRecordingTarget, type RecordingTargetSemantics } from '../project/recording-target';
+import { resolveRecordingTarget } from '../project/recording-target';
 import { isRecordingPoint } from '../project/validation/recording-telemetry';
 import { normalizeRecordingActions, normalizeRecordingSignals } from '../project/recording-actions';
 import type {
@@ -68,48 +72,8 @@ function projectDoubleClickActions(
   return result;
 }
 
-/** Audio templates consume bounded facts, never recorded wording or event-count guesses. */
-type ReviewActionSoundDescriptor =
-  | { family: 'mouse' }
-  | { family: 'keyboard'; keyCount: number }
-  | { family: 'typing' };
-
-export interface ReviewTelemetryMarker {
-  ref: { kind: 'action' | 'signal' | 'cursor'; id: string };
-  eventType: string;
-  target?: string;
-  targetSemantics?: RecordingTargetSemantics;
-  audio?: ReviewActionSoundDescriptor;
-  privacy?: 'protected';
-  observed?: boolean;
-  keyboardHold?: boolean;
-  mouseButton?: number;
-  recordingCadence?: {
-    onsets: readonly RecordingEventCadence[];
-    repeats: readonly RecordingEventCadence[];
-  };
-  keyboardRhythm?: RecordingKeyboardRhythmBlock[];
-  keyboardRepeats?: RecordingKeyboardRhythmBlock[];
-  keyboardAttack?: { id: string; time: number };
-  gesture?: {
-    id: string;
-    type: string;
-    button: number;
-    downTime: number;
-    upTime?: number;
-    observedEndTime?: number;
-    completion: string;
-    path?: { time: number; x: number; y: number; captureSegment?: number }[];
-    gaps?: { start: number; end: number }[];
-  };
-  /** Verified normalized source position, never reconstructed from a final viewport. */
-  focusPoint?: { x: number; y: number };
-  start: number;
-  end: number;
-}
-
 /** Projects recorded interactions only; backend warnings never become fabricated timeline events. */
-export function projectReviewTelemetry(
+function projectCapturedReviewTelemetry(
   input: ReviewTelemetryInput,
   duration: number,
   includeCursor = false
@@ -460,4 +424,16 @@ function reviewMarkerWriter(markers: ReviewTelemetryMarker[], duration: number) 
       ...(isRecordingPoint(point) ? { focusPoint: { ...point } } : {}),
     });
   };
+}
+
+/** Capture facts and authored presentation share the same source clock. */
+export function projectReviewTelemetry(
+  input: ReviewTelemetryInput,
+  duration: number,
+  includeCursor = false,
+  timeline?: ReviewInteractionTimeline,
+  enabled?: { keyboard?: boolean; mouse?: boolean; actions?: boolean }
+) {
+  const captured = projectCapturedReviewTelemetry(input, duration, includeCursor);
+  return { ...captured, markers: resolveReviewInteractions(captured.markers, timeline, enabled) };
 }

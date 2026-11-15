@@ -1,3 +1,4 @@
+import { imageContextSchema, type ImageJobStart } from '../../../contracts/ai/image';
 import type { ScenarioAIAttachment } from '../../../contracts/ai/scenario';
 import { reviewTextContextSchema, type ReviewTextStart } from '../../../contracts/ai/review-text';
 import type { AIProvider } from '../../../contracts/settings';
@@ -11,6 +12,7 @@ import {
   type AiEgressAuthority,
   type ContentAiEgressAuthority,
   type ReviewTextAiEgressAuthority,
+  type ImageEditorAiEgressAuthority,
   type ScenarioAiAttachmentSummary,
   type ScenarioEditorAiEgressAuthority,
   type ScenarioEditorCanonicalEgressPayload,
@@ -24,6 +26,7 @@ export {
   type AiEgressAuthority,
   type ContentAiEgressAuthority,
   type ReviewTextAiEgressAuthority,
+  type ImageEditorAiEgressAuthority,
   type ScenarioAiAttachmentSummary,
   type ScenarioAiAttachmentSummaryItem,
   type ScenarioEditorAiEgressAuthority,
@@ -183,4 +186,31 @@ async function createScenarioAttachmentSummary(
 
 function createAiEgressPayloadHash(value: unknown): Promise<string> {
   return createSha256Digest(stableStringify(value));
+}
+
+/** Binds one paid image operation to the disclosed rasters, parameters and destination. */
+export async function createImageEditorEgressAuthority(
+  input: Pick<
+    ImageJobStart,
+    | 'context'
+    | 'scope'
+    | 'modelId'
+    | 'approvedProviderId'
+    | 'approvedDestination'
+    | 'approvedModelCode'
+  >
+): Promise<ImageEditorAiEgressAuthority> {
+  const context = imageContextSchema.parse(input.context);
+  return {
+    contractVersion: AI_EGRESS_AUTHORITY_CONTRACT_VERSION,
+    purpose: 'image-editor',
+    payloadHash: await createAiEgressPayloadHash({
+      context,
+      scope: input.scope,
+      modelId: input.modelId,
+      approvedProviderId: input.approvedProviderId,
+      approvedDestination: input.approvedDestination,
+      approvedModelCode: input.approvedModelCode,
+    }),
+  };
 }

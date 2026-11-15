@@ -62,6 +62,10 @@ export function applyEditorControllerFrame(
       prepareBackground: (canvasSize) =>
         prepareEditorBackgroundLayer({
           canvas,
+          ...(options.backgroundCandidate ? { candidate: options.backgroundCandidate } : {}),
+          ...(options.allowBackgroundContentEditing !== undefined
+            ? { allowBackgroundContentEditing: options.allowBackgroundContentEditing }
+            : {}),
           canvasSize,
           frame,
           preview: options.preview === true && options.quality !== 'final',

@@ -10,7 +10,7 @@ const io = vi.hoisted(() => ({
         args: Parameters<
           typeof import('../../workflows/video-review/render-preview').createReviewPreviewRenderer
         >[0]
-      ) => { dispose(): void; maximumInFlight(): 1 | 2 }
+      ) => { dispose(): void; maximumInFlight(): 1 | 2; cancelWarmAnnotations?(): void }
     >(),
   executor:
     vi.fn<
@@ -245,4 +245,86 @@ it('uses the explicit plan-only factory only while GPU playback is active', () =
   args.annotationWarmExecutor!();
   expect(io.executor).toHaveBeenCalledExactlyOnceWith({ compositionBackend: 'gpu-scene-plan' });
   owner.dispose();
+});
+
+it.each([true, false])('uses the primary startup capability or isolated fallback (%s)', (ready) => {
+  io.renderer.mockReturnValue({ dispose: vi.fn(), maximumInFlight: () => 2 });
+  const warm = { dispose: vi.fn(), renderFrame: vi.fn() };
+  const primary = {
+    dispose: vi.fn(),
+    renderFrame: vi.fn(),
+    createWarmExecutor: vi.fn(() => (ready ? warm : undefined)),
+  };
+  io.executor.mockReturnValue(primary);
+  const input = {
+    video: { current: null },
+    playing: true,
+    preferences: { renderer: 'gpu', frameRate: 'current', pausedQuality: 'same' },
+    pausedResultTime: 0,
+  };
+  const owner = createManualPresentationOwner(
+    (() => ({ input, placement: null })) as unknown as Parameters<
+      typeof createManualPresentationOwner
+    >[0],
+    vi.fn(),
+    vi.fn(),
+    vi.fn()
+  );
+  const args = io.renderer.mock.lastCall![0];
+  const foreground = args.annotationExecutor!();
+  expect(args.annotationWarmExecutor!(foreground)).toBeUndefined();
+  expect(primary.createWarmExecutor).not.toHaveBeenCalled();
+  owner.update({} as Parameters<typeof owner.update>[0], 1, false);
+  expect(args.annotationWarmExecutor!(foreground)).toBe(ready ? warm : primary);
+  expect(primary.createWarmExecutor).toHaveBeenCalledOnce();
+  expect(io.executor).toHaveBeenCalledTimes(ready ? 1 : 2);
+  if (!ready)
+    expect(io.executor).toHaveBeenLastCalledWith({ compositionBackend: 'gpu-scene-plan' });
+  owner.dispose();
+});
+
+it('cancels annotation preparation on seek and resumes the source clock only after readiness', () => {
+  const cancelWarm = vi.fn(),
+    invalidate = vi.fn(),
+    report = vi.fn(),
+    active = vi.fn();
+  io.renderer.mockReturnValue({
+    dispose: vi.fn(),
+    maximumInFlight: () => 2,
+    cancelWarmAnnotations: cancelWarm,
+  });
+  io.presentation.mockReturnValueOnce({ dispose: vi.fn(), invalidate, update: vi.fn() });
+  const video = document.createElement('video');
+  const input = {
+    video: { current: video },
+    sourceIdentity: 'seek-proof',
+    playing: true,
+    onPresentationActive: active,
+    preferences: { renderer: 'gpu', frameRate: 'current', pausedQuality: 'same' },
+    pausedResultTime: 0,
+  };
+  const owner = createManualPresentationOwner(
+    (() => ({ input, placement: null })) as unknown as Parameters<
+      typeof createManualPresentationOwner
+    >[0],
+    report,
+    vi.fn(),
+    vi.fn()
+  );
+  owner.update({} as Parameters<typeof owner.update>[0], 1, false);
+  cancelWarm.mockClear();
+  video.dispatchEvent(new Event('seeking'));
+  expect(cancelWarm).toHaveBeenCalledOnce();
+  expect(invalidate).toHaveBeenCalledOnce();
+  expect(active).toHaveBeenLastCalledWith('seek-proof', false);
+  expect(report).toHaveBeenLastCalledWith(expect.objectContaining({ phase: 'pending' }));
+  video.dispatchEvent(new Event('seeked'));
+  expect(active).toHaveBeenLastCalledWith('seek-proof', true);
+  expect(invalidate).toHaveBeenCalledTimes(2);
+  video.dispatchEvent(new Event('seeked'));
+  expect(invalidate).toHaveBeenCalledTimes(2);
+  owner.dispose();
+  const previous = cancelWarm.mock.calls.length;
+  video.dispatchEvent(new Event('seeking'));
+  expect(cancelWarm).toHaveBeenCalledTimes(previous);
 });

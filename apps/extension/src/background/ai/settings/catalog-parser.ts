@@ -53,6 +53,12 @@ function operationFacts(
 ): AIModelCapabilities['operations'] {
   const operations: AIModelCapabilities['operations'] = {};
   const kind = item['type'];
+  const endpoints = (strings(item['endpoints']) ?? []).map((endpoint) => {
+    const parts = endpoint.split('/');
+    if (parts[0] === '' && /^v[0-9]+$/u.test(parts[1] ?? '')) parts.splice(1, 1);
+    return parts.join('/');
+  });
+  const editEndpoint = endpoints.includes('/images/edits') || endpoints.includes('/images/edit');
   if (kind === 'chat' || kind === 'text' || kind === 'completion') operations.text = 'supported';
   if (kind === 'stt' || kind === 'transcription') operations.transcription = 'supported';
   if (kind === 'tts' || kind === 'speech') operations.speech = 'supported';
@@ -60,17 +66,24 @@ function operationFacts(
   if (kind === 'image-editing') operations['image-editing'] = 'supported';
   if (kind === 'background-removal') operations['background-removal'] = 'supported';
   if (output.text === 'supported' && input.text === 'supported') operations.text = 'supported';
-  if (output.image === 'supported' && input.text === 'supported' && input.image === 'unsupported')
+  if (
+    output.image === 'supported' &&
+    input.text === 'supported' &&
+    kind !== 'image-editing' &&
+    !editEndpoint
+  )
     operations['image-generation'] = 'supported';
-  const endpoints = (strings(item['endpoints']) ?? []).map((endpoint) => {
-    const parts = endpoint.split('/');
-    if (parts[0] === '' && /^v[0-9]+$/u.test(parts[1] ?? '')) parts.splice(1, 1);
-    return parts.join('/');
-  });
+  const parameters = strings(item['supported_parameters']);
+  if (output.image === 'supported' && parameters?.includes('input_references')) {
+    if (input.text === 'supported' && kind !== 'image-editing' && !editEndpoint)
+      operations['image-generation'] = 'supported';
+    if (input.image === 'supported') operations['image-editing'] = 'supported';
+  }
+  if (output.image === 'supported' && output.text === 'supported' && input.image === 'supported')
+    operations['image-editing'] = 'supported';
   if (endpoints.includes('/images/generations') || endpoints.includes('/images/generate'))
     operations['image-generation'] = 'supported';
-  if (endpoints.includes('/images/edits') || endpoints.includes('/images/edit'))
-    operations['image-editing'] = 'supported';
+  if (editEndpoint) operations['image-editing'] = 'supported';
   if (endpoints.includes('/images/background/remove'))
     operations['background-removal'] = 'supported';
   const methods = strings(item['supportedGenerationMethods']);

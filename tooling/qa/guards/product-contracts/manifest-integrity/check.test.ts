@@ -58,7 +58,7 @@ function createBaseManifest() {
       default_title: 'Open Sniptale',
     },
     content_security_policy: {
-      extension_pages: "script-src 'self'; object-src 'self';",
+      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';",
       sandbox: EXPECTED_SANDBOX_CSP,
     },
     icons: {

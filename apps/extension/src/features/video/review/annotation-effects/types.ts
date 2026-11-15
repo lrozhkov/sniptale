@@ -17,7 +17,7 @@ export interface ReviewAnnotationEffect {
   attachment: 'content' | 'viewport';
   transform: ReviewAnnotationEffectTransform;
   controls: Record<string, string | number>;
-  /** Fixed anchors in the same canonical plane as the body; moving the body keeps these points. */
+  /** Canonical scene anchors; whole-object transforms carry them, while handle edits remain independent. */
   anchors?: Record<string, { x: number; y: number }>;
   order: number;
 }
@@ -41,7 +41,7 @@ export interface ReviewAnnotationEffectAsset {
 /** Immutable verified source outside history; history stores snapshot identities only. */
 export interface ReviewAnnotationEffectSnapshot {
   id: string;
-  schemaVersion: 'sniptale.effect.v1';
+  schemaVersion: 'sniptale.animation.v1';
   kind: 'standalone';
   documentId: string;
   sha256: string;

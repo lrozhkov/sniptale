@@ -1,3 +1,4 @@
+import { EDITOR_RASTER_BINARY_FIELDS } from '../../../features/editor/document/raster-state';
 import { normalizeScenarioAnnotationsInCanvasJson } from '../scenario-annotation-import';
 import { isEditorDocument } from '../../../features/editor/document/guards';
 import { type EditorDocument } from '../../../features/editor/document/types';
@@ -19,6 +20,7 @@ const MAX_RICH_SHAPE_NODES = 20_000;
 const MAX_ARRAY_ITEMS = 5_000;
 const MAX_GENERIC_STRING_LENGTH = 200_000;
 const RESOURCE_SOURCE_KEYS = new Set([
+  ...EDITOR_RASTER_BINARY_FIELDS,
   'src',
   'source',
   'href',
@@ -229,7 +231,7 @@ function assertSafeRichShapes(richShapes: EditorDocument['richShapes']): void {
   });
 }
 
-export function assertEditorSessionFileCanBeRead(file: File): void {
+export function assertEditorSessionFileCanBeRead(file: Blob): void {
   if (file.size > MAX_SESSION_FILE_BYTES) {
     throwInvalidSession();
   }

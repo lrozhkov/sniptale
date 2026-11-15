@@ -1,3 +1,6 @@
+import { hasCursorComposition } from '../../project/motion/spatial';
+import { hasSourceImageFilters } from '../../../image-filters/contract';
+import { withCursorMotionPath } from '../../project/cursor-motion';
 import { reviewTrackEnabled } from './track-controls';
 import { resolveCameraFollowPolicy } from '../../project/camera/cursor-policy';
 import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
@@ -59,14 +62,14 @@ export function resolveQuickEditEffectiveFeatures(
   const advanced = state.ui.mode === 'advanced';
   return {
     mode: state.ui.mode,
-    actionsTrackVisible: state.ui.tracks.actions,
+    actionsTrackVisible: advanced,
     zoomTrackVisible: advanced && state.ui.tracks.zoom,
     audioTrackVisible: advanced && state.ui.tracks.audio,
     textTrackVisible: advanced && reviewTrackEnabled(state.ui, 'text'),
     originalAudioTrackVisible: reviewTrackEnabled(state.ui, 'originalAudio'),
     voiceoverTrackVisible: advanced && reviewTrackEnabled(state.ui, 'voiceover'),
     musicTrackVisible: advanced && reviewTrackEnabled(state.ui, 'music'),
-    webcamTrackVisible: advanced && !!state.webcam && state.ui.tracks.webcam !== false,
+    webcamTrackVisible: !!state.webcam && state.ui.tracks.webcam !== false,
     webcamApplied: advanced && !!state.webcam?.enabled && state.ui.tracks.webcam !== false,
     annotationEffectsTrackVisible: advanced && state.ui.tracks.annotationEffects !== false,
     annotationEffectsApplied:
@@ -84,7 +87,10 @@ export function resolveQuickEditEffectiveFeatures(
       !!state.captions?.enabled &&
       !!state.text?.fragments.some((fragment) => fragment.showInVideo && fragment.text.trim()),
     presentationApplied: advanced && hasPresentationEffects(state),
-    actionsApplied: advanced && state.ui.tracks.actions && state.actionsEnabled !== false,
+    actionsApplied:
+      advanced &&
+      state.actionsEnabled !== false &&
+      (reviewTrackEnabled(state.ui, 'keyboard') || reviewTrackEnabled(state.ui, 'mouse')),
     overlaysVisible: advanced && state.ui.overlaysVisible,
     zoomApplied: advanced && state.ui.tracks.zoom && state.zoom.enabled,
     backgroundApplied: advanced && state.background.enabled,
@@ -99,6 +105,7 @@ export function resolveQuickEditEffectiveFeatures(
  * consumes this instead of interpreting stored settings independently.
  */
 interface QuickEditEffectiveState extends QuickEditEffectiveFeatures {
+  sourceFilters?: QuickEditAdvancedState['sourceFilters'];
   zoomRegions: readonly QuickEditZoomRegion[];
   background: QuickEditBackgroundSettings;
   canvas: QuickEditCanvasSize | undefined;
@@ -109,6 +116,7 @@ interface QuickEditEffectiveState extends QuickEditEffectiveFeatures {
   text: QuickEditAdvancedState['text'];
   presentation: QuickEditAdvancedState['presentation'];
   annotationEffects: QuickEditAdvancedState['annotationEffects'];
+  cursorMotions?: QuickEditAdvancedState['cursorMotions'];
   originalAudio: QuickEditOriginalAudio;
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
@@ -138,6 +146,11 @@ export function resolveQuickEditEffectiveState(
   const features = resolveQuickEditEffectiveFeatures(state);
   return {
     ...features,
+    ...(state.sourceFilters ? { sourceFilters: state.sourceFilters } : {}),
+    cursorMotions:
+      advanced && state.cursorMotionEnabled !== false && state.ui.tracks.cursorMotion !== false
+        ? state.cursorMotions
+        : undefined,
     zoomRegions: resolveCursorRegions(state, features, cursorFacts),
     background: advanced ? state.background : { enabled: false },
     canvas: advanced ? state.canvas : undefined,
@@ -164,7 +177,10 @@ export function resolveQuickEditEffectiveState(
         ...clip,
         volume: clip.volume * (state.audio.laneVolumes?.voiceover ?? 1),
       })),
-    music: (features.musicApplied ? state.audio.music : [])
+    music: projectReviewVoiceover(
+      features.musicApplied ? state.audio.music : [],
+      state.audio.voiceoverSegments
+    )
       .filter((clip) => !clip.dormant)
       .filter((clip) => {
         const last = state.audio.voiceoverSegments?.at(-1);
@@ -182,11 +198,17 @@ function resolveCursorRegions(
   const advanced = state.ui.mode === 'advanced';
   const needsCursor =
     features.zoomApplied &&
-    state.zoom.regions.some(
-      (region) => region.followCursor ?? state.cursorFocusPath?.mode === 'follow'
+    state.zoom.regions.some((region) =>
+      region.effect === '3d'
+        ? hasCursorComposition(region.cursorComposition)
+        : (region.followCursor ?? state.cursorFocusPath?.mode === 'follow')
     );
   const key = JSON.stringify({
     needsCursor,
+    cursorMotions:
+      state.cursorMotionEnabled !== false && state.ui.tracks.cursorMotion !== false
+        ? state.cursorMotions
+        : undefined,
     defaults: state.cameraFollowDefaults,
     applied: features.zoomApplied,
     path: state.cursorFocusPath,
@@ -221,6 +243,10 @@ function resolveCursorRegions(
     needsCursor,
     source: cursorFacts?.source,
     segments: state.cursorFocusPath?.segments,
+    cursorMotions:
+      state.cursorMotionEnabled !== false && state.ui.tracks.cursorMotion !== false
+        ? state.cursorMotions
+        : undefined,
   });
   const paths =
     previous?.paths ??
@@ -246,16 +272,31 @@ function createCursorPaths(
   needsCursor: boolean,
   key: string
 ) {
-  const cursorPath = needsCursor
+  const basePath = needsCursor
     ? cursorFacts
       ? resolveReviewCursorFocusPath(cursorFacts.facts, cursorFacts.source, state.cursorFocusPath)
       : state.cursorFocusPath
     : undefined;
+  const cursorPath = withCursorMotionPath(
+    basePath,
+    state.cursorMotionEnabled !== false && state.ui.tracks.cursorMotion !== false
+      ? state.cursorMotions
+      : undefined
+  );
   const observed =
     cursorFacts && cursorPath
       ? deriveReviewCursorFocusPath(cursorFacts.facts, cursorFacts.source, true)
       : undefined;
-  return { key, cursorPath, observed };
+  return {
+    key,
+    cursorPath,
+    observed: withCursorMotionPath(
+      observed,
+      state.cursorMotionEnabled !== false && state.ui.tracks.cursorMotion !== false
+        ? state.cursorMotions
+        : undefined
+    ),
+  };
 }
 
 /** A neighboring overlay edit does not replace native facts or unchanged camera plan receivers. */
@@ -280,7 +321,9 @@ function createCursorRegionProjection(
     }
     const region = input;
     const result: QuickEditZoomRegion =
-      (region.followCursor ?? cursorPath?.mode === 'follow') && cursorPath
+      (region.effect === '3d'
+        ? hasCursorComposition(region.cursorComposition)
+        : (region.followCursor ?? cursorPath?.mode === 'follow')) && cursorPath
         ? {
             ...region,
             cursorFocus: {
@@ -323,17 +366,20 @@ function createCursorRegionProjection(
 }
 
 export type QuickEditExportReason =
+  | 'source-filters'
   | 'canvas'
   | 'window-header'
   | 'webcam'
   | 'watermark'
   | 'captions'
+  | 'cursor-motion'
   | 'annotation-effects'
   | 'caption-layout'
   | 'camera-follow'
   | 'presentation'
   | 'canvas-size'
   | 'precise-edits'
+  | 'freeze-frame'
   | 'cut-transition'
   | 'transition-frames'
   | 'zoom'
@@ -384,6 +430,16 @@ export function resolveQuickEditExportPlan(args: {
   const transitions = args.document.edits.some((edit) => edit.kind === 'cut' && edit.transition);
   const visual: QuickEditExportReason[] = preciseEdits ? ['precise-edits'] : [];
   if (transitions) visual.push('cut-transition');
+  if (
+    args.document.edits.some(
+      (edit) =>
+        edit.kind === 'freeze' &&
+        !args.document.edits.some(
+          (cut) => cut.kind === 'cut' && cut.start <= edit.start && edit.start < cut.end
+        )
+    )
+  )
+    visual.push('freeze-frame');
   const features = resolveQuickEditEffectiveFeatures(args.advanced);
   const effective = resolveQuickEditEffectiveState(args.advanced);
   const audio: QuickEditExportReason[] = [];
@@ -403,6 +459,14 @@ export function resolveQuickEditExportPlan(args: {
   if (features.musicApplied && effective.music.length > 0) audio.push('music');
   if (features.actionsApplied && args.actionAudioPresent) audio.push('action-audio');
   if (
+    (effective.originalAudio.audioProcessing !== undefined &&
+      !effective.originalAudio.audioProcessing.bypassed &&
+      (effective.originalAudio.audioProcessing.denoise?.enabled ||
+        (effective.originalAudio.audioProcessing.pitch?.enabled &&
+          effective.originalAudio.audioProcessing.pitch.semitones !== 0) ||
+        effective.originalAudio.audioProcessing.effects.some(
+          (effect) => effect.enabled && effect.wet > 0
+        ))) ||
     effective.originalAudio.muted ||
     args.advanced.audio.original.volume !== 1 ||
     effective.originalAudio.ranges?.some(
@@ -422,11 +486,14 @@ export function resolveQuickEditExportPlan(args: {
     visual.push('click-animations');
   if (features.actionsApplied && args.advanced.keyAnimations?.some((item) => item.enabled))
     visual.push('key-animations');
+  if (effective.sourceFilters && hasSourceImageFilters(effective.sourceFilters))
+    visual.push('source-filters');
   if (effective.canvas) visual.push('canvas');
   if (effective.windowHeader) visual.push('window-header');
   if (effective.webcam) visual.push('webcam');
   if (features.watermarkApplied) visual.push('watermark');
   if (features.captionsApplied) visual.push('captions');
+  if (effective.cursorMotions?.some((m) => m.enabled)) visual.push('cursor-motion');
   if (features.annotationEffectsApplied) visual.push('annotation-effects');
   if (features.zoomApplied && effective.zoomRegions.length > 0) visual.push('zoom');
   if (features.backgroundApplied) visual.push('background');
@@ -468,6 +535,7 @@ export function hasSuppressedAdvancedFeatures(state: QuickEditAdvancedState): bo
     !!state.keyAnimations?.some((item) => item.enabled) ||
     !!state.clickAnimations?.some((item) => item.effect !== 'off') ||
     !!state.actionAudio?.some((item) => item.enabled && item.presetId && item.volume > 0) ||
+    !!state.cursorMotions?.length ||
     !!state.canvas ||
     !!state.windowHeader ||
     !!state.webcam?.enabled ||

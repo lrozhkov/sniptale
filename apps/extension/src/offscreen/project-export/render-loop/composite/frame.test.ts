@@ -17,6 +17,11 @@ const {
   syncClipPlaybackMock: vi.fn(),
 }));
 
+// Exercise the admitted fallback stages; the shared backend has dedicated owner proof.
+vi.mock('../../shared-composition', () => ({
+  renderSharedProjectComposition: vi.fn(async () => false),
+}));
+
 vi.mock('../../renderer', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../renderer')>()),
   drawProjectFrame: drawProjectFrameMock,

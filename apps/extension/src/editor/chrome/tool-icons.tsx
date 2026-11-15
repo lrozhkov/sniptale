@@ -69,6 +69,7 @@ const OBJECT_TYPE_TO_TOOL = {
   'source-image': 'image',
   'meta-stamp': 'text',
   'rich-shape': 'shape',
+  'vector-element': 'select',
   group: 'select',
 } satisfies Partial<Record<EditorObjectType, EditorTool>>;
 
@@ -80,6 +81,7 @@ const LAYER_ICON_COMPONENTS = {
   image: FileImage,
   'meta-stamp': Type,
   group: Folder,
+  'vector-element': Shapes,
 } satisfies Partial<Record<EditorObjectType, ToolIconComponent>>;
 
 function renderToolIcon(tool: EditorTool, size = 18): React.ReactNode {

@@ -512,6 +512,7 @@ it.each(['fixed', 'follow-video'] as const)(
 
 const spatialRegion = () =>
   region({
+    effect: '3d',
     perspective: { enabled: true, rotateX: 25, rotateY: -30, rotateZ: 12, strength: 0.65 },
     depthOfField: {
       enabled: true,
@@ -531,8 +532,8 @@ function previewButton(key: string) {
   return button;
 }
 
-it('opens focus controls for a new Zoom and preserves stored focus values when switching Off', async () => {
-  const authored = region();
+it('opens focus controls for a new 3D fragment and preserves stored focus values when switching Off', async () => {
+  const authored = region({ effect: '3d' });
   const onCommit = vi.fn();
   renderPreview({ region: authored, spatialEdit: { region: authored, revision: 'new', onCommit } });
   await act(async () => Promise.resolve());
@@ -553,7 +554,7 @@ it('opens focus controls for a new Zoom and preserves stored focus values when s
   });
 });
 
-it('keeps spatial navigation read-only, restores framing, and owns just one decoded frame', async () => {
+it('keeps spatial navigation read-only, keeps its type boundary, and owns just one decoded frame', async () => {
   const authored = spatialRegion();
   const onCommit = vi.fn();
   const onInteract = vi.fn();
@@ -563,20 +564,15 @@ it('keeps spatial navigation read-only, restores framing, and owns just one deco
     onInteract,
   });
   await act(async () => Promise.resolve());
-  expect(view.section().dataset['view']).toBe('area');
+  expect(view.section().dataset['view']).toBe('result');
   await act(async () => previewButton('spatialToolTilt').click());
   expect(view.section().dataset['view']).toBe('result');
   expect(view.canvas().tabIndex).toBe(-1);
   expect(host.querySelector('[data-ui="gallery.videoReview.previewMode"]')).toBeNull();
   await act(async () => previewButton('spatialToolRotation').click());
   await act(async () => previewButton('spatialToolFocus').click());
-  await act(async () => previewButton('spatialToolPosition').click());
-  expect(view.section().dataset['view']).toBe('area');
-  expect(view.canvas().tabIndex).toBe(0);
-  await act(async () => previewButton('zoomPreviewResult').click());
-  await act(async () => previewButton('spatialToolTilt').click());
-  await act(async () => previewButton('spatialToolPosition').click());
-  expect(view.section().dataset['view']).toBe('result');
+  expect(host.querySelector('[aria-label="gallery.videoReview.spatialToolPosition"]')).toBeNull();
+  expect(view.canvas().tabIndex).toBe(-1);
   expect(onInteract).not.toHaveBeenCalled();
   expect(onCommit).not.toHaveBeenCalled();
   expect(view.onChange).not.toHaveBeenCalled();
@@ -611,7 +607,7 @@ it.each([
     },
   ],
 ] as const)('scopes %s reset to its authored group', async (tool, reset, patch) => {
-  const authored = spatialRegion();
+  const authored = tool === 'spatialToolPosition' ? region() : spatialRegion();
   const onCommit = vi.fn();
   const view = renderPreview({
     region: authored,

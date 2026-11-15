@@ -70,6 +70,17 @@ export function getVideoProjectClickStyle(
   event: VideoProjectActionEvent
 ): Readonly<ReviewClickStyle> | null {
   const anchor = event.anchor;
+  if (anchor.kind === 'source' && event.kind === 'CLICK') {
+    const doc = project.sourceInteractionDocuments?.find(
+      (doc) =>
+        doc.binding.assetId === anchor.assetId &&
+        doc.binding.sourceInstanceId === anchor.sourceInstanceId
+    );
+    return doc
+      ? (doc.feedback?.gestureStyles?.find((style) => style.id === anchor.sourceEventId) ??
+          REVIEW_CLICK_DEFAULT)
+      : null;
+  }
   if (
     anchor.kind !== 'recording-source' ||
     event.kind !== 'CLICK' ||
@@ -88,7 +99,9 @@ export function getVideoProjectClickStyle(
 
 function sourceClips(
   project: VideoProject,
-  group: Pick<VideoProjectActionFeedback, 'recordingId' | 'sourceInstanceId'>
+  group:
+    | Pick<VideoProjectActionFeedback, 'recordingId' | 'sourceInstanceId'>
+    | { assetId: string; sourceInstanceId: string }
 ) {
   return project.clips
     .filter((clip): clip is VideoProjectVideoClip => {
@@ -101,7 +114,7 @@ function sourceClips(
             ? asset.source.originRecordingId
             : null;
       return (
-        recordingId === group.recordingId &&
+        ('assetId' in group ? clip.assetId === group.assetId : recordingId === group.recordingId) &&
         project.tracks.some((track) => track.id === clip.trackId && track.visible)
       );
     })
@@ -194,7 +207,9 @@ export function projectVideoProjectFeedbackInterval(
 /** Maps retained source fragments without restricting continuity to one track. */
 export function getVideoProjectFeedbackRuns(
   project: VideoProject,
-  identity: Pick<VideoProjectActionFeedback, 'recordingId' | 'sourceInstanceId'>
+  identity:
+    | Pick<VideoProjectActionFeedback, 'recordingId' | 'sourceInstanceId'>
+    | { assetId: string; sourceInstanceId: string }
 ): readonly {
   clips: readonly VideoProjectVideoClip[];
   segments: readonly ReviewTimeSegment[];
@@ -215,6 +230,17 @@ export function getVideoProjectKeyStyle(
   event: VideoProjectActionEvent
 ): Readonly<ReviewKeyStyle> | null {
   const anchor = event.anchor;
+  if (anchor.kind === 'source' && event.kind === 'KEY') {
+    const doc = project.sourceInteractionDocuments?.find(
+      (doc) =>
+        doc.binding.assetId === anchor.assetId &&
+        doc.binding.sourceInstanceId === anchor.sourceInstanceId
+    );
+    return doc
+      ? (doc.feedback?.keyStyles?.find((style) => style.id === anchor.sourceEventId) ??
+          REVIEW_KEY_DEFAULT)
+      : null;
+  }
   if (anchor.kind !== 'recording-source' || event.kind !== 'KEY') return null;
   const group = project.actionFeedback?.find(
     (item) =>

@@ -17,6 +17,7 @@ export function cancelTransientInteractionForController(
     cropGuide: controller.cropGuide,
     activeTool: controller.activeTool,
     preserveActiveTool: reason === 'window-blur',
+    preserveSelection: reason === 'window-blur',
     preservePendingSimplify: reason === 'window-blur',
     clearCropSelection: () => controller.clearCropSelection(),
     switchToSelectTool: () => controller.switchToSelectTool(),

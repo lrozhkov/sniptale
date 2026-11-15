@@ -2,9 +2,6 @@ import {
   buildDrawingStrokeOutline,
   buildDrawingArrowOutline,
   createDrawingBounds,
-  DRAWING_TEXT_HORIZONTAL_PADDING,
-  DRAWING_TEXT_LINE_HEIGHT_FACTOR,
-  DRAWING_TEXT_VERTICAL_PADDING,
   getDrawingBoundsCenter,
   getDrawingEllipsePoints,
   getDrawingObjectBounds,
@@ -15,13 +12,22 @@ import {
   isDrawingTextStencil,
   resolveDrawingTextFontFamily,
   traceDrawingTextBackground,
+  resolveDrawingTextInkLayout,
+  measureDrawingTextWithTabs,
+  resolveDrawingTextRuns,
   transformDrawingPoint,
+  rotateDrawingPoint,
   type DrawingObject,
   type DrawingBounds,
   type DrawingPoint,
 } from '../../features/drawing/public';
 import { drawRoughArrow } from './rough-arrow';
-import { getDrawingMultiRotationHandlePoint } from './interaction';
+import { getDrawingMultiRotationHandlePoint, getDrawingRotationHandlePoint } from './interaction';
+import {
+  renderCanvasSelectionHandle,
+  renderCanvasRotationHandle,
+  readCanvasChromeColors,
+} from '../../ui/drawing-tools/selection-chrome';
 
 interface DrawingViewportProjection {
   readonly x: number;
@@ -83,35 +89,25 @@ function drawText(
   const y = bounds.y - projection.y;
   context.font = `${object.fontSize}px ${resolveDrawingTextFontFamily(object.fontFamily)}`;
   context.textBaseline = 'alphabetic';
-  const lineHeight = object.fontSize * DRAWING_TEXT_LINE_HEIGHT_FACTOR;
-  const maxWidth = Math.max(1, bounds.width - DRAWING_TEXT_HORIZONTAL_PADDING);
-  const lines: string[] = [];
-  object.text.split('\n').forEach((paragraph) => {
-    const words = paragraph.split(/\s+/);
-    let line = '';
-    words.forEach((word) => {
-      const candidate = line ? `${line} ${word}` : word;
-      if (line && context.measureText(candidate).width > maxWidth) {
-        lines.push(line);
-        line = word;
-      } else line = candidate;
-    });
-    lines.push(line);
+  context.textAlign = 'left';
+  context.direction = 'ltr';
+  const layout = resolveDrawingTextInkLayout({
+    text: object.text,
+    fontSize: object.fontSize,
+    wrapWidth: object.wrapWidth ?? bounds.width,
+    autoWidth: object.autoWidth ?? false,
+    measure: (text) => measureDrawingTextWithTabs(text, (part) => context.measureText(part)),
   });
-  const backgrounds = lines.map((line, index) => ({
-    left: x,
-    top: y + DRAWING_TEXT_VERTICAL_PADDING + index * lineHeight,
-    width: Math.min(bounds.width, Math.max(12, context.measureText(line).width + 12)),
-    height: lineHeight,
+  const backgrounds = layout.backgrounds.map((rect) => ({
+    ...rect,
+    left: rect.left + x,
+    top: rect.top + y,
   }));
-  const metrics = context.measureText('Mg');
-  const fontBoxAscent = metrics.fontBoundingBoxAscent ?? object.fontSize * 0.8;
-  const fontBoxDescent = metrics.fontBoundingBoxDescent ?? object.fontSize * 0.2;
-  const leading = Math.max(0, lineHeight - fontBoxAscent - fontBoxDescent) / 2;
-  const firstBaseline = y + DRAWING_TEXT_VERTICAL_PADDING + leading + fontBoxAscent;
   const paint = (target: CanvasRenderingContext2D, stencil: boolean) => {
     target.font = context.font;
     target.textBaseline = context.textBaseline;
+    target.textAlign = 'left';
+    target.direction = 'ltr';
     if (object.backgroundColor) {
       target.fillStyle = object.backgroundColor;
       target.beginPath();
@@ -120,22 +116,24 @@ function drawText(
     }
     target.fillStyle = stencil ? '#000000' : object.color;
     if (stencil) target.globalCompositeOperation = 'destination-out';
-    lines.forEach((line, index) =>
-      target.fillText(
-        line,
-        x + DRAWING_TEXT_HORIZONTAL_PADDING / 2,
-        firstBaseline + index * lineHeight
+    layout.lines.forEach((line, index) =>
+      resolveDrawingTextRuns(line, (part) => target.measureText(part)).forEach((run) =>
+        target.fillText(
+          run.text,
+          x + layout.originX + run.left,
+          y + layout.firstBaseline + index * layout.lineHeight
+        )
       )
     );
   };
   if (isDrawingTextStencil(object.color, object.backgroundColor)) {
     const transform = context.getTransform();
-    const height = lines.length * lineHeight;
+    const height = layout.height;
     const corners = [
-      { x, y: y + DRAWING_TEXT_VERTICAL_PADDING },
-      { x: x + bounds.width, y: y + DRAWING_TEXT_VERTICAL_PADDING },
-      { x, y: y + DRAWING_TEXT_VERTICAL_PADDING + height },
-      { x: x + bounds.width, y: y + DRAWING_TEXT_VERTICAL_PADDING + height },
+      { x, y },
+      { x: x + layout.width, y },
+      { x, y: y + height },
+      { x: x + layout.width, y: y + height },
     ].map((point) => transformDrawingPoint(point, transform));
     const left = Math.max(0, Math.floor(Math.min(...corners.map((point) => point.x))) - 1);
     const top = Math.max(0, Math.floor(Math.min(...corners.map((point) => point.y))) - 1);
@@ -276,12 +274,13 @@ export function renderDrawingHoverOutline(
   object: DrawingObject,
   projection: DrawingViewportProjection
 ): void {
+  if (object.kind === 'arrow') return;
   const bounds = getDrawingObjectBounds(object);
   context.save();
   applyDrawingObjectTransform(context, object, projection);
-  context.strokeStyle = '#2563eb';
+  context.strokeStyle = readCanvasChromeColors(context.canvas).selection;
   context.lineWidth = 1;
-  context.setLineDash([4, 3]);
+  context.setLineDash([]);
   context.strokeRect(bounds.x - projection.x, bounds.y - projection.y, bounds.width, bounds.height);
   context.restore();
 }
@@ -291,7 +290,8 @@ export function renderDrawingSelection(
   object: DrawingObject,
   projection: DrawingViewportProjection,
   hoverBend?: DrawingPoint,
-  bendOnly = false
+  bendOnly = false,
+  activeHandle?: string
 ): void {
   if (bendOnly && (!hoverBend || object.kind !== 'arrow' || object.design !== 'freehand')) return;
   const bounds = getDrawingObjectBounds(object);
@@ -299,27 +299,38 @@ export function renderDrawingSelection(
   const y = bounds.y - projection.y;
   context.save();
   applyDrawingObjectTransform(context, object, projection);
-  context.strokeStyle = '#2563eb';
+  context.strokeStyle = readCanvasChromeColors(context.canvas).selection;
   context.lineWidth = 1;
   if (object.kind !== 'arrow' && object.kind !== 'rectangle') {
-    context.setLineDash([4, 3]);
+    context.setLineDash([]);
     context.strokeRect(x, y, bounds.width, bounds.height);
     context.setLineDash([]);
   }
-  const handles = bendOnly
-    ? hoverBend
-      ? [viewportPoint(hoverBend, projection)]
-      : []
-    : object.kind === 'arrow'
-      ? [
-          viewportPoint(object.start, projection),
-          viewportPoint(object.end, projection),
-          ...(object.design === 'freehand'
-            ? (object.bendPoints ?? []).map((point) => viewportPoint(point, projection))
-            : []),
-          ...(hoverBend ? [viewportPoint(hoverBend, projection)] : []),
-        ]
-      : object.kind === 'text'
+  const hovered = hoverBend ? viewportPoint(hoverBend, projection) : undefined;
+  const samePoint = (left: DrawingPoint, right: DrawingPoint) =>
+    Math.hypot(left.x - right.x, left.y - right.y) < 1e-6;
+  const handles: Array<{
+    point: DrawingPoint;
+    id: string;
+    kind: 'point' | 'corner' | 'horizontal' | 'vertical';
+  }> = [];
+  if (object.kind === 'arrow') {
+    handles.push(
+      { point: viewportPoint(object.start, projection), id: 'start', kind: 'point' },
+      { point: viewportPoint(object.end, projection), id: 'end', kind: 'point' }
+    );
+    if (object.design === 'freehand') {
+      (object.bendPoints ?? []).forEach((point, index) =>
+        handles.push({
+          point: viewportPoint(point, projection),
+          id: `bend:${index}`,
+          kind: 'point',
+        })
+      );
+    }
+  } else {
+    const points =
+      object.kind === 'text'
         ? [
             { x, y: y + bounds.height / 2 },
             { x: x + bounds.width, y: y + bounds.height / 2 },
@@ -334,24 +345,40 @@ export function renderDrawingSelection(
             { x, y: y + bounds.height },
             { x, y: y + bounds.height / 2 },
           ];
-  handles.forEach((handle) => {
-    context.fillStyle = '#ffffff';
-    context.strokeStyle = '#2563eb';
-    context.beginPath();
-    context.arc(handle.x, handle.y, 4, 0, Math.PI * 2);
-    context.fill();
-    context.stroke();
-  });
-  if (object.kind !== 'arrow') {
-    const center = { x: x + bounds.width / 2, y: y + bounds.height / 2 };
-    const corner = { x: x + bounds.width, y };
-    const distance = Math.max(1, Math.hypot(corner.x - center.x, corner.y - center.y));
-    renderDrawingRotationControl(context, {
-      x: corner.x + ((corner.x - center.x) / distance) * 18,
-      y: corner.y + ((corner.y - center.y) / distance) * 18,
+    points.forEach((point, index) =>
+      handles.push({
+        point,
+        id:
+          object.kind === 'text'
+            ? index === 0
+              ? 'w'
+              : 'e'
+            : ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'][index]!,
+        kind:
+          object.kind === 'text'
+            ? 'vertical'
+            : index % 2 === 0
+              ? 'corner'
+              : index === 1 || index === 5
+                ? 'horizontal'
+                : 'vertical',
+      })
+    );
+  }
+  for (const handle of handles) {
+    if (bendOnly && (!hovered || !samePoint(handle.point, hovered))) continue;
+    renderCanvasSelectionHandle(context, handle.point.x, handle.point.y, handle.kind, {
+      color: readCanvasChromeColors(context.canvas).selection,
+      active: activeHandle
+        ? handle.id === activeHandle
+        : object.kind === 'arrow' && Boolean(hovered && samePoint(handle.point, hovered)),
     });
   }
   context.restore();
+  if (object.kind !== 'arrow') {
+    const point = getDrawingRotationHandlePoint(object, 'rotate-ne');
+    if (point) renderDrawingRotationControl(context, viewportPoint(point, projection));
+  }
 }
 
 export function renderDrawingMultiSelection(
@@ -369,16 +396,17 @@ export function renderDrawingMultiSelection(
     context.rotate((rotation.angle * Math.PI) / 180);
     context.translate(-center.x, -center.y);
   }
-  context.strokeStyle = '#2563eb';
+  context.strokeStyle = readCanvasChromeColors(context.canvas).selection;
   context.lineWidth = 1;
-  context.setLineDash([4, 3]);
+  context.setLineDash([]);
   context.strokeRect(bounds.x - projection.x, bounds.y - projection.y, bounds.width, bounds.height);
   context.setLineDash([]);
-  renderDrawingRotationControl(
-    context,
-    viewportPoint(getDrawingMultiRotationHandlePoint(bounds), projection)
-  );
   context.restore();
+  const local = getDrawingMultiRotationHandlePoint(bounds);
+  const point = rotation
+    ? rotateDrawingPoint(local, getDrawingBoundsCenter(bounds), rotation.angle)
+    : local;
+  renderDrawingRotationControl(context, viewportPoint(point, projection));
 }
 
 export function renderDrawingMarquee(
@@ -390,9 +418,9 @@ export function renderDrawingMarquee(
   const bounds = createDrawingBounds(start, current);
   context.save();
   context.fillStyle = 'rgba(37, 99, 235, 0.08)';
-  context.strokeStyle = '#2563eb';
+  context.strokeStyle = readCanvasChromeColors(context.canvas).selection;
   context.lineWidth = 1;
-  context.setLineDash([4, 3]);
+  context.setLineDash([]);
   context.fillRect(bounds.x - projection.x, bounds.y - projection.y, bounds.width, bounds.height);
   context.strokeRect(bounds.x - projection.x, bounds.y - projection.y, bounds.width, bounds.height);
   context.restore();
@@ -402,27 +430,10 @@ function renderDrawingRotationControl(
   context: CanvasRenderingContext2D,
   point: DrawingPoint
 ): void {
-  context.save();
-  context.translate(point.x, point.y);
-  context.scale(0.65, 0.65);
-  context.translate(-12, -12);
-  context.lineWidth = 2;
-  context.strokeStyle = '#2563eb';
-  context.lineCap = 'round';
-  context.lineJoin = 'round';
-  context.beginPath();
-  context.arc(12, 12, 9, Math.PI, Math.PI * 1.75);
-  context.lineTo(21, 8);
-  context.moveTo(21, 3);
-  context.lineTo(21, 8);
-  context.lineTo(16, 8);
-  context.stroke();
-  context.beginPath();
-  context.arc(12, 12, 9, 0, Math.PI * 0.75);
-  context.lineTo(3, 16);
-  context.moveTo(8, 16);
-  context.lineTo(3, 16);
-  context.lineTo(3, 21);
-  context.stroke();
-  context.restore();
+  renderCanvasRotationHandle(
+    context,
+    point.x,
+    point.y,
+    readCanvasChromeColors(context.canvas).selection
+  );
 }

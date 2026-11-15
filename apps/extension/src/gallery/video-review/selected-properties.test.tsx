@@ -1,4 +1,13 @@
 // @vitest-environment jsdom
+import { useGlTransitionCatalog } from '../../composition/gl-transition-presets/catalog';
+import {
+  createGlCatalogFixture,
+  createImportedGlCatalogFixture,
+} from '../../composition/gl-transition-presets/catalog.test-support';
+import {
+  GL_TRANSITIONS,
+  createGlTransitionSelection,
+} from '../../features/video/project/transition/gl-catalog';
 import { TextEncoder as NodeTextEncoder } from 'node:util';
 import '../../composition/persistence/infrastructure/indexed-db/fake-indexed-db.test-support';
 import { openDB, deleteDB, type IDBPDatabase } from 'idb';
@@ -183,7 +192,10 @@ function mount(transition?: CompositionJoinSettings) {
   );
   const props = {
     selection: { kind: 'edit', id: edit.id },
-    advanced: { ui: { mode: 'advanced' } },
+    advanced: {
+      ...createQuickEditAdvancedState(),
+      ui: { ...createQuickEditAdvancedState().ui, mode: 'advanced' },
+    },
     editing: {
       selected: edit,
       exporter: { phase: 'idle', index: null },
@@ -734,4 +746,158 @@ it('retains archive queries and history owners across clock and callback updates
     historyReads: archive.historyReads,
   }).toEqual(counts);
   expect(archive.mini.mock.calls.at(-1)![0].focus!.time).toBe(3.4);
+});
+
+it(
+  'offers all pinned GL transitions on a cut and preserves timing and ' +
+    'settings through the existing edit command',
+  async () => {
+    const view = mount({ type: 'dissolve', before: 0.5, after: 1 });
+    const select = view.host.querySelector('select')!;
+    expect(select.querySelectorAll('option')).toHaveLength(GL_TRANSITIONS.length + 3);
+    await act(async () => {
+      select.value = 'CrossZoom';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(view.edit.transition).toEqual({
+      type: 'gl',
+      selection: createGlTransitionSelection('CrossZoom'),
+      easing: 'LINEAR',
+      before: 0.5,
+      after: 1,
+    });
+    const easing = view.host.querySelector<HTMLSelectElement>(
+      'select[aria-label="videoEditor.sidebar.transitionEasingLabel"]'
+    )!;
+    await act(async () => {
+      easing.value = 'EASE_IN_OUT';
+      easing.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(view.edit.transition).toEqual({
+      type: 'gl',
+      selection: createGlTransitionSelection('CrossZoom'),
+      easing: 'EASE_IN_OUT',
+      before: 0.5,
+      after: 1,
+    });
+    await view.draft('Duration', 3);
+    await view.commit('Duration');
+    expect(view.edit.transition).toEqual({
+      type: 'gl',
+      selection: createGlTransitionSelection('CrossZoom'),
+      easing: 'EASE_IN_OUT',
+      before: 1,
+      after: 2,
+    });
+  }
+);
+
+it('restores a GL parameter after the existing cut command refuses a save', async () => {
+  const selection = createGlTransitionSelection('CrossZoom')!;
+  const initial = {
+    type: 'gl' as const,
+    selection,
+    easing: 'LINEAR' as const,
+    before: 0.5,
+    after: 0.5,
+  };
+  const view = mount(initial);
+  view.change.mockResolvedValue(false);
+  const field = view.host.querySelector<HTMLInputElement>(
+    '[data-effect-control-id="strength"] input[type="text"]'
+  )!;
+  await act(async () => field.dispatchEvent(new FocusEvent('focusin', { bubbles: true })));
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '0.7');
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await act(async () => {
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    field.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+  });
+  expect(view.change).toHaveBeenCalledExactlyOnceWith({
+    ...initial,
+    selection: { ...selection, values: { strength: 0.7 } },
+  });
+  expect(view.edit.transition).toEqual(initial);
+  expect(
+    view.host.querySelector<HTMLInputElement>(
+      '[data-effect-control-id="strength"] input[type="text"]'
+    )!.value
+  ).toBe('0.4');
+});
+
+async function importPresetFile(
+  parent: ParentNode,
+  selection: ReturnType<typeof createGlTransitionSelection>,
+  name = 'Imported'
+) {
+  if (!selection) throw new Error('Missing preset selection');
+  const source = JSON.stringify({
+    format: 'sniptale-gl-preset',
+    version: 1,
+    name,
+    transition: selection,
+  });
+  const file = new File([source], 'imported.sniptale-gl-preset.json');
+  Object.defineProperty(file, 'arrayBuffer', {
+    value: async () => new TextEncoder().encode(source).buffer,
+  });
+  const input = parent.querySelector<HTMLInputElement>('input[type=file]');
+  if (!input) throw new Error('Missing preset file input');
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+}
+
+it.each([true, false])(
+  'imports a GL preset into the selected cut through the existing save command (%s)',
+  async (accepted) => {
+    const initial = {
+      type: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
+      easing: 'EASE_IN_OUT' as const,
+      before: 0.3,
+      after: 0.7,
+    };
+    const view = mount(initial);
+    if (!accepted) view.change.mockResolvedValue(false);
+    const selection = createGlTransitionSelection('CrossZoom')!;
+    expect(
+      view.host.querySelector('[data-gl-preset-owner]')?.getAttribute('data-gl-preset-owner')
+    ).toBe(view.edit.id);
+    await importPresetFile(view.host, selection);
+    expect(view.change).toHaveBeenCalledExactlyOnceWith({ ...initial, selection });
+    expect(view.edit.transition).toEqual(accepted ? { ...initial, selection } : initial);
+    expect(
+      view.host.querySelector('[data-ui="composition.gl-preset-actions"] [role=status]')
+    ).toBeNull();
+  }
+);
+
+vi.mock('../../composition/gl-transition-presets/catalog', async () => {
+  const { createGlCatalogFixture } =
+    await import('../../composition/gl-transition-presets/catalog.test-support');
+  return { useGlTransitionCatalog: vi.fn(createGlCatalogFixture) };
+});
+
+it('applies a saved catalogue selection on a Gallery cut through its existing edit command', async () => {
+  const { catalog, selection } = createImportedGlCatalogFixture();
+  vi.mocked(useGlTransitionCatalog).mockReturnValue(catalog);
+  try {
+    const view = mount({ type: 'dissolve', before: 0.3, after: 0.7 });
+    const select = view.host.querySelector('select')!;
+    await act(async () => {
+      select.value = 'gl.saved';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(view.edit.transition).toEqual({
+      type: 'gl',
+      selection,
+      easing: 'LINEAR',
+      before: 0.3,
+      after: 0.7,
+    });
+  } finally {
+    vi.mocked(useGlTransitionCatalog).mockImplementation(createGlCatalogFixture);
+  }
 });

@@ -1,3 +1,6 @@
+import { readFile } from 'node:fs/promises';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
+import { createGlTransitionSelection } from '../../../../apps/extension/src/features/video/project/transition/gl-catalog';
 import { basename } from 'node:path';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { fileURLToPath } from 'node:url';
@@ -13,13 +16,13 @@ import {
 } from '../../../../apps/extension/src/features/video/project/timeline/logical-lanes';
 // prettier-ignore
 import {
-  normalizeVideoProjectTransition,
-} from '../../../../apps/extension/src/features/video/project/transition/template';
+  parseVideoProjectTransition,
+} from '../../../../apps/extension/src/features/video/project/transition/contract';
 import {
   VideoTrackKind,
   VideoTransitionEasing,
-  VideoTransitionKind,
   type VideoProject,
+  type VideoProjectClip,
 } from '../../../../apps/extension/src/features/video/project/types';
 import {
   applyHarnessBootstrap,
@@ -27,21 +30,21 @@ import {
   VIDEO_EDITOR_HARNESS_PATH,
 } from '../extension-critical.helpers';
 
-export const EFFECT_V1_STANDALONE_FIXTURE = fileURLToPath(
-  new URL(
-    '../../../../packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
-    import.meta.url
-  )
+export const LOTTIE_ANNOTATION_FIXTURE = fileURLToPath(
+  new URL('../fixtures/lottie/neutral.sniptale-animation.json', import.meta.url)
 );
-export const EFFECT_V1_TARGET_FIXTURE = fileURLToPath(
-  new URL('../fixtures/effect-v1/demo-target-overlay.sniptale-effect.json', import.meta.url)
-);
-export const EFFECT_V1_TRANSITION_FIXTURE = fileURLToPath(
-  new URL(
-    '../../../../packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-transition.sniptale-effect.json',
-    import.meta.url
-  )
-);
+/** Isolate shipped Lottie bytes under a test identity without changing embedded resources. */
+export async function readAnimationFixtureSource(fixturePath: string, documentId: string) {
+  const parsed = parseAnimationTemplateSource(await readFile(fixturePath, 'utf8'));
+  if (!parsed.template) throw new Error('Invalid Lottie fixture');
+  const template = parsed.template;
+  template.id = documentId;
+  template.label = { en: `E2E ${documentId}`, ru: `E2E ${documentId}` };
+  const source = JSON.stringify(template);
+  if (!parseAnimationTemplateSource(source).ok) throw new Error('Invalid authored Lottie fixture');
+  return source;
+}
+
 const VISUAL_INPUT_FIXTURE = fileURLToPath(
   new URL(
     '../extension-critical-media.spec.ts-snapshots/editor-browser-frame-exact-linux.png',
@@ -73,7 +76,7 @@ export async function openEffectVideoEditorHarness(
 }
 
 export function createTransitionE2eProject(): VideoProject {
-  const project = createEmptyVideoProject('EffectV1 transition E2E', 3840, 2160);
+  const project = createEmptyVideoProject('GL transition E2E', 3840, 2160);
   const track = createVideoProjectTrack('Effects', 0, VideoTrackKind.PRIMARY);
   project.tracks.push(track);
   const laneId = createVideoProjectClipLogicalLaneId(0);
@@ -94,14 +97,15 @@ export function createTransitionE2eProject(): VideoProject {
     clips: [leading, trailing],
     duration: 2,
     transitions: [
-      normalizeVideoProjectTransition({
+      parseVideoProjectTransition({
         duration: 1,
         easing: VideoTransitionEasing.EASE_IN_OUT,
         id: 'e2e-transition-junction',
-        kind: VideoTransitionKind.CROSSFADE,
+        kind: 'gl' as const,
+        selection: createGlTransitionSelection('Fade')!,
         leadingClipId: leading.id,
         trailingClipId: trailing.id,
-      }),
+      })!,
     ],
   };
 }
@@ -114,12 +118,7 @@ export async function importAndApplyEffect(
 
   const documentLabel = page.locator(`[data-effect-document="${args.documentId}"]`);
   await documentLabel.hover();
-  const applyKey =
-    args.fixturePath === EFFECT_V1_STANDALONE_FIXTURE
-      ? 'videoEditor.effectsLibrary.applyToScene'
-      : args.fixturePath === EFFECT_V1_TRANSITION_FIXTURE
-        ? 'videoEditor.effectsLibrary.applyToTransition'
-        : 'videoEditor.effectsLibrary.applyToClip';
+  const applyKey = 'videoEditor.effectsLibrary.applyToScene';
   const addButton = documentLabel.getByRole('button', { name: translate(applyKey), exact: true });
   await expect(addButton).toBeEnabled();
   await addButton.click();
@@ -136,6 +135,7 @@ export async function importEffectFile(
     if (await openMaterials.isVisible()) await openMaterials.click();
     await page.locator('[data-ui="video-editor.library-tab.effects"]').click();
   }
+  await page.locator('[data-ui="video-editor.library-tab.annotations"]').click();
   const importControl = dock.getByRole('button', {
     name: translate('videoEditor.effectsLibrary.importPack', args.locale ?? 'ru'),
     exact: true,
@@ -143,17 +143,52 @@ export async function importEffectFile(
   await expect(importControl).toBeEnabled();
   const chooserPromise = page.waitForEvent('filechooser');
   await importControl.click();
-  await (await chooserPromise).setFiles(args.fixturePath);
-
-  const section =
-    args.fixturePath === EFFECT_V1_STANDALONE_FIXTURE
-      ? 'annotations'
-      : args.fixturePath === EFFECT_V1_TRANSITION_FIXTURE
-        ? 'transitions'
-        : 'effects';
-  await page.locator(`[data-ui="video-editor.library-tab.${section}"]`).click();
+  await (
+    await chooserPromise
+  ).setFiles(
+    args.fixturePath.endsWith('.sniptale-animation.json')
+      ? {
+          name: `${args.documentId}.sniptale-animation.json`,
+          mimeType: 'application/json',
+          buffer: Buffer.from(await readAnimationFixtureSource(args.fixturePath, args.documentId)),
+        }
+      : args.fixturePath
+  );
+  await page.locator('[data-ui="video-editor.library-tab.annotations"]').click();
   const documentLabel = page.locator(`[data-effect-document="${args.documentId}"]`);
   await expect(documentLabel).toBeVisible();
+}
+
+async function openCurrentLibrary(page: Page, section: 'effects' | 'transitions') {
+  const tab = page.locator(`[data-ui="video-editor.library-tab.${section}"]`);
+  if (!(await tab.isVisible()))
+    await page
+      .locator(
+        '[data-ui="video-editor.viewer.open-materials"], [data-ui="video-editor.viewer.open-effects"]'
+      )
+      .first()
+      .click();
+  await tab.click();
+}
+export async function applyBuiltinSourceFilter(page: Page, locale: 'en' | 'ru' = 'ru') {
+  await openCurrentLibrary(page, 'effects');
+  const fields = page.locator('[data-ui="video-editor.effects-library.source-filters"]');
+  await expect(fields).toBeVisible();
+  await fields
+    .getByRole('button', {
+      name: translate('videoEditor.sidebar.sourceFiltersAddBlur', locale),
+      exact: true,
+    })
+    .first()
+    .click();
+  await page.locator('[data-ui="video-editor.materials.close"]').click();
+}
+export async function chooseGlTransition(page: Page, name: 'Fade' | 'CrossZoom' = 'CrossZoom') {
+  await openCurrentLibrary(page, 'transitions');
+  const fields = page.locator('[data-ui="video-editor.effects-library.gl"]');
+  await fields.locator('button[aria-haspopup="listbox"]').first().click();
+  await page.getByRole('option', { name, exact: true }).click();
+  await page.locator('[data-ui="video-editor.materials.close"]').click();
 }
 
 export async function importVisualInput(page: Page): Promise<void> {
@@ -250,4 +285,34 @@ async function appendImportedMaterial(page: Page, fixturePath: string): Promise<
     .locator('[data-ui="video-editor.source-viewer"]')
     .getByTitle(/^Append to timeline$|^Добавить в конец$/)
     .click();
+}
+
+export async function overlapTimelineClips(
+  page: Page,
+  args: {
+    leading: VideoProjectClip;
+    trailing: VideoProjectClip;
+    duration: number;
+  }
+) {
+  await page.locator('[data-ui="video-editor.timeline.toolbar.fit-project"]').click();
+  const leading = page.locator(`[data-project-timeline-clip="${args.leading.id}"]`);
+  const trailing = page.locator(`[data-project-timeline-clip="${args.trailing.id}"]`);
+  await trailing.scrollIntoViewIfNeeded();
+  await trailing.focus();
+  await trailing.press('v');
+  const before = await leading.boundingBox(),
+    moving = await trailing.boundingBox();
+  if (!before || !moving || args.leading.duration <= 0)
+    throw new Error('Missing join drag geometry.');
+  const shift =
+    ((args.leading.startTime + args.leading.duration - args.duration - args.trailing.startTime) *
+      before.width) /
+    args.leading.duration;
+  const x = moving.x + moving.width / 2,
+    y = moving.y + moving.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + shift, y, { steps: 12 });
+  await page.mouse.up();
 }

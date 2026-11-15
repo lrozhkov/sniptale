@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../transition/gl-catalog';
 import { expect, it } from 'vitest';
 
 import { syncProjectDuration } from './basics';
@@ -7,7 +8,7 @@ import {
   createTrack,
   createVideoClip,
 } from './project-meta.test.helpers.ts';
-import { VideoClipTransitionKind, VideoTransitionKind } from '../types/index';
+import { VideoClipTransitionKind } from '../types/index';
 
 it('synchronizes overlap transitions into shared project transition entities', () => {
   const project = createProject(
@@ -32,7 +33,8 @@ it('synchronizes overlap transitions into shared project transition entities', (
 
   expect(syncProjectDuration(project).transitions).toEqual([
     expect.objectContaining({
-      kind: VideoTransitionKind.CROSSFADE,
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       leadingClipId: 'clip-a',
       trailingClipId: 'clip-b',
     }),

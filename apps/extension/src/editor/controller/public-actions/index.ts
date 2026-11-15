@@ -4,6 +4,7 @@ export {
   duplicateEditorSelection,
   nudgeEditorSelection,
   reorderEditorLayer,
+  reorderEditorLayerBlock,
   renameEditorLayerById,
   resizeEditorLayerById,
   selectEditorLayerById,

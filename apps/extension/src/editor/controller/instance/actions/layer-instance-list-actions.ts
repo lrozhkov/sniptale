@@ -1,5 +1,6 @@
 import {
   reorderEditorControllerLayer,
+  reorderEditorControllerLayerBlock,
   selectEditorControllerLayer,
 } from '../../public-api/layer-selection-actions';
 import {
@@ -45,4 +46,12 @@ export function toggleLayerLockForController(
   id: string
 ): void {
   toggleEditorControllerLayerLock(controller.getPublicApiAdapter(), id);
+}
+
+export function reorderLayerBlockForController(
+  controller: EditorControllerInstance,
+  ids: readonly string[],
+  beforeId: string | null
+): void {
+  reorderEditorControllerLayerBlock(controller.getPublicApiAdapter(), ids, beforeId);
 }

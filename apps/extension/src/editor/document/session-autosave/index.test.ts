@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   activate,
   createDocument,
+  createWorkspaceCommitResult,
   commitPresentationMock,
   commitWorkspaceMock,
   createThumbnailMock,
@@ -20,12 +21,7 @@ it('coalesces expired uncaptured autosaves behind an acquired workspace write', 
   commitWorkspaceMock.mockImplementationOnce(
     (input) =>
       new Promise((resolve) => {
-        release = () =>
-          resolve({
-            aggregateId: input.aggregateId,
-            documentAssetsByRuntimeUrl: input.reusableAssetsByRuntimeUrl ?? new Map(),
-            revision: input.expectedRevision + 1,
-          });
+        release = () => resolve(createWorkspaceCommitResult(input.expectedRevision + 1, input));
       })
   );
   autosave.scheduleAutosave(createDocument('first acquired snapshot'));
@@ -73,7 +69,8 @@ describe('presentation scheduling admission', () => {
     const renderPresentation = vi.fn(async () => 'data:image/png;base64,cHJldmlldw==');
     activate(autosave);
     autosave.updateContext({ durableRevision: 4, renderPresentation });
-    let finishWrite: (value: unknown) => void = () => undefined;
+    let finishWrite: (value: ReturnType<typeof createWorkspaceCommitResult>) => void = () =>
+      undefined;
     commitWorkspaceMock.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
@@ -85,7 +82,7 @@ describe('presentation scheduling admission', () => {
     autosave.schedulePresentation();
     await vi.advanceTimersByTimeAsync(60_000);
     expect(renderPresentation).not.toHaveBeenCalled();
-    finishWrite({ revision: 5, documentAssetsByRuntimeUrl: new Map() });
+    finishWrite(createWorkspaceCommitResult(5));
     await save;
     await vi.advanceTimersByTimeAsync(3_000);
     expect(commitPresentationMock).toHaveBeenCalledWith(
@@ -528,10 +525,8 @@ it('drops an obsolete gallery preview when another edit arrives during rendering
 it('keeps the save indicator pending when another edit follows an in-flight write', async () => {
   const { createEditorSessionAutosaveService } = await import('./');
   const { useEditorStore } = await import('../../state/useEditorStore');
-  let finishFirst: (value: {
-    revision: number;
-    documentAssetsByRuntimeUrl: Map<never, never>;
-  }) => void = () => undefined;
+  let finishFirst: (value: ReturnType<typeof createWorkspaceCommitResult>) => void = () =>
+    undefined;
   commitWorkspaceMock.mockImplementationOnce(
     () =>
       new Promise((resolve) => {
@@ -545,7 +540,7 @@ it('keeps the save indicator pending when another edit follows an in-flight writ
   expect(commitWorkspaceMock).toHaveBeenCalledOnce();
 
   autosave.scheduleAutosave(createDocument('second'));
-  finishFirst({ revision: 1, documentAssetsByRuntimeUrl: new Map<never, never>() });
+  finishFirst(createWorkspaceCommitResult(1));
   await vi.advanceTimersByTimeAsync(0);
   expect(useEditorStore.getState().saveState).toBe('idle');
   await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
@@ -555,10 +550,8 @@ it('keeps the save indicator pending when another edit follows an in-flight writ
 it('skips an old preview after a newer edit has entered its write', async () => {
   const { createEditorSessionAutosaveService } = await import('./');
   let finishRender: (value: string) => void = () => undefined;
-  let finishWrite: (value: {
-    revision: number;
-    documentAssetsByRuntimeUrl: Map<never, never>;
-  }) => void = () => undefined;
+  let finishWrite: (value: ReturnType<typeof createWorkspaceCommitResult>) => void = () =>
+    undefined;
   const renderPresentation = vi.fn(
     () =>
       new Promise<string>((resolve) => {
@@ -588,7 +581,7 @@ it('skips an old preview after a newer edit has entered its write', async () => 
   await vi.advanceTimersByTimeAsync(0);
   expect(createThumbnailMock).not.toHaveBeenCalled();
   expect(commitPresentationMock).not.toHaveBeenCalled();
-  finishWrite({ revision: 2, documentAssetsByRuntimeUrl: new Map<never, never>() });
+  finishWrite(createWorkspaceCommitResult(2));
   await vi.advanceTimersByTimeAsync(0);
 });
 
@@ -611,6 +604,7 @@ describe('image workspace hydration freshness', () => {
       aggregateId: 'image-2',
       createdAt: 1,
       document: createDocument('blob:hydrated-source'),
+      documentAssetsByVectorDefinitionId: new Map(),
       documentAssetsByRuntimeUrl: restoredAssets,
       revision: 4,
       sourceTitle: null,

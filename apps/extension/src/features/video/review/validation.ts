@@ -199,10 +199,9 @@ function parseEdit(value: unknown, duration: number): ReviewEdit | null {
     !identity(value['id']) ||
     !time(value['start'], duration) ||
     !time(value['end'], duration) ||
-    value['start'] >= value['end'] ||
     !time(value['requestedStart'], duration) ||
     !time(value['requestedEnd'], duration) ||
-    value['requestedStart'] >= value['requestedEnd']
+    value['requestedStart'] > value['requestedEnd']
   )
     return null;
   const range = {
@@ -212,6 +211,31 @@ function parseEdit(value: unknown, duration: number): ReviewEdit | null {
     requestedStart: value['requestedStart'],
     requestedEnd: value['requestedEnd'],
   };
+  if (value['kind'] === 'freeze') {
+    if (
+      range.start !== range.end ||
+      range.requestedStart !== range.requestedEnd ||
+      !finite(value['duration']) ||
+      value['duration'] <= 0 ||
+      value['duration'] > 600 ||
+      !time(value['frameTime'], duration) ||
+      value['frameTime'] >= duration ||
+      !finite(value['frameDuration']) ||
+      value['frameDuration'] <= 0 ||
+      value['frameDuration'] > 172800 ||
+      (range.start !== 0 && value['frameTime'] > range.start) ||
+      value['frameTime'] + value['frameDuration'] < range.start - 1e-6
+    )
+      return null;
+    return {
+      ...range,
+      kind: 'freeze',
+      duration: value['duration'],
+      frameTime: value['frameTime'],
+      frameDuration: value['frameDuration'],
+    };
+  }
+  if (range.start >= range.end || range.requestedStart >= range.requestedEnd) return null;
   if (value['kind'] === 'cut') {
     if (value['transition'] === undefined) return { ...range, kind: 'cut' };
     const transition = parseCompositionJoinSettings(value['transition']);

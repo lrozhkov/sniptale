@@ -1,10 +1,13 @@
-import type { EffectV1Document } from '@sniptale/runtime-contracts/effect-v1';
+import {
+  ANIMATION_TEMPLATE_LIMITS,
+  type AnimationTemplate,
+} from '@sniptale/runtime-contracts/animation-template';
 
 const MAX_DOCUMENTS = 8;
-const MAX_SOURCE_BYTES = 8 * 1024 * 1024;
+const MAX_SOURCE_BYTES = ANIMATION_TEMPLATE_LIMITS.jsonBytes;
 
 interface EffectRuntimeCachedDocument {
-  document: EffectV1Document;
+  document: AnimationTemplate;
   id: string;
   source: string;
 }

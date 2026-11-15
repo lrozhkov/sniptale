@@ -3,6 +3,8 @@ import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import {
   clearVideoRecordingSurfaceSnapshot,
+  prepareVideoRecordingCapture,
+  subscribeToVideoRecordingCapturePreparation,
   receiveVideoRecordingSurfaceSnapshot,
   receiveVideoRecordingRuntimeState,
   subscribeToVideoRecordingRuntimeState,
@@ -60,4 +62,43 @@ it('delivers bridge-owned runtime state through the local channel', () => {
 
   expect(listener).toHaveBeenCalledWith(state);
   unsubscribe();
+});
+
+it('waits for the mounted drawing surface to finish capture preparation', async () => {
+  let ready!: () => void;
+  const preparation = new Promise<void>((resolve) => {
+    ready = resolve;
+  });
+  const listener = vi.fn(() => preparation);
+  const unsubscribe = subscribeToVideoRecordingCapturePreparation(listener);
+  let acknowledged = false;
+  const request = {
+    type: 'VIDEO_RECORDING_SURFACE_SNAPSHOT' as const,
+    snapshot,
+    surfaceToken: 'token-1',
+    capturePreparation: { requestId: 'prepare-1', suppressed: true },
+  };
+  const pending = prepareVideoRecordingCapture(request).then(() => {
+    acknowledged = true;
+  });
+  await Promise.resolve();
+  expect(listener).toHaveBeenCalledWith(request);
+  expect(acknowledged).toBe(false);
+  ready();
+  await pending;
+  expect(acknowledged).toBe(true);
+  unsubscribe();
+});
+
+it('refuses capture readiness after the surface consumer has disposed', async () => {
+  const unsubscribe = subscribeToVideoRecordingCapturePreparation(async () => undefined);
+  unsubscribe();
+  await expect(
+    prepareVideoRecordingCapture({
+      type: 'VIDEO_RECORDING_SURFACE_SNAPSHOT',
+      snapshot,
+      surfaceToken: 'token-1',
+      capturePreparation: { requestId: 'prepare-1', suppressed: true },
+    })
+  ).rejects.toThrow('Recording drawing surface is unavailable');
 });

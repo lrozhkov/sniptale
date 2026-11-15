@@ -29,7 +29,7 @@ it('applies base editor interaction controls with step and blur patches', () => 
 
   expect(object.set).toHaveBeenCalledWith(
     expect.objectContaining({
-      borderColor: '#f97316',
+      borderColor: '#2563eb',
       evented: true,
       hasControls: false,
       lockRotation: true,

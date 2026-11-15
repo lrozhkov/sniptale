@@ -1,3 +1,4 @@
+import { createAudioEffectInstance } from '../../../../features/video/audio/effects/catalog';
 import {
   sourceVoiceoverPlaybackFixture as playbackFixture,
   pairedSourceVoiceoverPlaybackFixture as pairedPlaybackFixture,
@@ -117,6 +118,12 @@ it('keeps a legacy whole take through actual split move trim rate and deletion c
 
 it('duplicates a source into an independent whole take without copying bytes', () => {
   const { project, clip } = fixture();
+  project.sourceVoiceoverDocuments![0]!.take.audioProcessing = {
+    version: 1,
+    bypassed: false,
+    effects: [createAudioEffectInstance('eq', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1')],
+  };
+  project.version = 53;
   const before = structuredClone(project);
   const result = duplicateProjectClipsWithResult(project, clip.id);
   if (!result) throw new Error('Expected copy');
@@ -128,6 +135,12 @@ it('duplicates a source into an independent whole take without copying bytes', (
   expect(copy.binding.sourceInstanceId).not.toBe(clip.id);
   expect(copy.id).not.toBe('voice');
   expect(copy.take.id).not.toBe('take');
+  expect(copy.take.audioProcessing?.effects[0]?.id).not.toBe(
+    project.sourceVoiceoverDocuments![0]!.take.audioProcessing!.effects[0]!.id
+  );
+  expect(copy.take.audioProcessing?.effects[0]?.parameters).toEqual(
+    project.sourceVoiceoverDocuments![0]!.take.audioProcessing!.effects[0]!.parameters
+  );
   expect(copy.take.assetId).toBe(project.sourceVoiceoverDocuments![0]!.take.assetId);
   expect(result.project.assets).toEqual(project.assets);
   expect(isExportReadyVideoProject(result.project)).toBe(true);

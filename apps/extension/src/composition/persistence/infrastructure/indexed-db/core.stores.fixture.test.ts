@@ -1,3 +1,6 @@
+import { imageAppV54Fixture } from './fixtures/image-app-v54';
+import { imageAppV55Fixture } from './fixtures/image-app-v55';
+import { betaV59Fixture } from './fixtures/beta-v59';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { SUPPORTED_BETA_DATABASE_FIXTURES } from './fixtures';
@@ -113,6 +116,8 @@ it('pins the complete released beta fixture to the database and domain registrie
   expect(fixtureVersions).toEqual(Array.from({ length: DB_VERSION }, (_value, index) => index + 1));
   for (const fixture of [
     ...SUPPORTED_BETA_DATABASE_FIXTURES,
+    imageAppV54Fixture,
+    imageAppV55Fixture,
     nativeAppV47Fixture,
     nativeAppV48Fixture,
   ]) {
@@ -432,7 +437,7 @@ it('adds empty capture and native revision stores without rewriting version 39 r
   expect(
     PERSISTENCE_DOMAIN_REGISTRY.find((domain) => domain.domainId === 'videoProjects')
   ).toMatchObject({
-    schemaVersion: 11,
+    schemaVersion: 13,
     stores: expect.arrayContaining([
       { storeName: 'video_project_revisions', dataClass: 'durable-authority' },
     ]),
@@ -701,3 +706,175 @@ it('adds only metadata indexes to version 50 while retaining every source row an
 });
 
 afterEach(() => vi.unstubAllGlobals());
+
+it('admits audio processing contracts without rewriting projects, history or immutable source bytes', async () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 56
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find((fixture) => fixture.databaseVersion === 57);
+  expect(target).toBeDefined();
+  expect(target?.domainVersions).toEqual({
+    ...source.domainVersions,
+    mediaLibrary: 35,
+    videoProjects: 12,
+  });
+  expect(target?.records).toEqual(source.records);
+  expect(target?.opfsObjects).toEqual(source.opfsObjects);
+  expect(target?.stores).toEqual(source.stores);
+  expect(target?.indexes).toEqual(source.indexes);
+  const migration = DATABASE_MIGRATIONS.find((step) => step.fromDatabaseVersion === 56)!;
+  expect(migration.toDatabaseVersion).toBe(57);
+  expect(migration.risk).toBe('additive');
+  const mutate = vi.fn();
+  const database = {
+    objectStoreNames: { contains: (name: string) => source.stores.some((store) => store === name) },
+    createObjectStore: mutate,
+    deleteObjectStore: mutate,
+  };
+  const transaction = { objectStore: mutate, abort: mutate };
+  await migration.migrate(database, transaction);
+  await migration.validate(database, transaction);
+  expect(mutate).not.toHaveBeenCalled();
+  expect(buildDatabaseMigrationPlan(57, 56)).toBeNull();
+});
+
+it('retains validated prototype preferences in migration quota estimates and refuses malformed rows', async () => {
+  const migration = DATABASE_MIGRATIONS.find((step) => step.fromDatabaseVersion === 54)!;
+  const document = { id: 'one', sha256: 'a'.repeat(64), enabled: true };
+  const row = {
+    format: 'sniptale-animation-catalog',
+    version: 1,
+    packId: 'pack',
+    enabled: true,
+    documents: [document],
+  };
+  const source = (value: unknown) => ({
+    transaction: () => ({
+      store: {
+        openCursor: async () => ({ value, primaryKey: 'pack', continue: async () => null }),
+      },
+    }),
+  });
+  expect(await migration.estimateAdditionalBytes()).toBe(65536);
+  const expected = {
+    format: 'sniptale-visual-preferences',
+    version: 1,
+    kind: 'animation',
+    packId: 'pack',
+    enabled: true,
+    documents: { one: { sourceSha256: document.sha256, enabled: true } },
+  };
+  expect(await migration.estimateAdditionalBytes(source(row))).toBe(
+    65536 + new TextEncoder().encode(JSON.stringify(expected)).byteLength
+  );
+  const withPreferences = {
+    ...row,
+    documents: [{ ...document, presetPreferences: { density: 2 } }],
+  };
+  expect(await migration.estimateAdditionalBytes(source(withPreferences))).toBeGreaterThan(
+    await migration.estimateAdditionalBytes(source(row))
+  );
+  const invalid: unknown[] = [
+    null,
+    { ...row, format: 'other' },
+    { ...row, version: 2 },
+    { ...row, packId: 1 },
+    { ...row, packId: '../escape' },
+    { ...row, enabled: 'yes' },
+    { ...row, documents: null },
+    { ...row, documents: [] },
+    { ...row, documents: Array.from({ length: 101 }, () => document) },
+    ...[
+      null,
+      { ...document, id: 1 },
+      { ...document, id: '../escape' },
+      { ...document, sha256: 1 },
+      { ...document, sha256: 'invalid' },
+      { ...document, enabled: 'yes' },
+    ].map((item) => ({ ...row, documents: [item] })),
+    { ...row, documents: [document, document] },
+  ];
+  for (const value of invalid)
+    await expect(migration.estimateAdditionalBytes(source(value))).rejects.toThrow(
+      'Invalid prototype'
+    );
+  expect(
+    await migration.estimateAdditionalBytes({
+      transaction() {
+        throw new DOMException('Missing old store', 'NotFoundError');
+      },
+    })
+  ).toBe(65536);
+  await expect(
+    migration.estimateAdditionalBytes({
+      transaction() {
+        throw new Error('Storage unavailable');
+      },
+    })
+  ).rejects.toThrow('Storage unavailable');
+});
+it('refuses missing project stores before admitting the audio contract-only migration', () => {
+  const migration = DATABASE_MIGRATIONS.find((step) => step.fromDatabaseVersion === 56)!;
+  const mutate = vi.fn();
+  expect(() =>
+    migration.validate(
+      {
+        objectStoreNames: { contains: () => false },
+        createObjectStore: mutate,
+        deleteObjectStore: mutate,
+      },
+      { objectStore: mutate, abort: mutate }
+    )
+  ).toThrow('Audio processing project stores');
+  expect(mutate).not.toHaveBeenCalled();
+});
+
+it('adds freeze admission without rewriting or deleting any retained row or source object', async () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 58
+  )!;
+  const target = betaV59Fixture;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, mediaLibrary: 37 });
+  const migration = DATABASE_MIGRATIONS.find((step) => step.fromDatabaseVersion === 58)!;
+  expect(migration.toDatabaseVersion).toBe(59);
+  expect(migration.risk).toBe('additive');
+  expect(migration.backupCoverage).toBe('none');
+  expect(await migration.estimateAdditionalBytes()).toBe(64 * 1024);
+  const mutate = vi.fn(() => {
+    throw new Error('Retained data must not be touched');
+  });
+  const database = {
+    objectStoreNames: { contains: (name: string) => source.stores.some((store) => store === name) },
+    createObjectStore: mutate,
+    deleteObjectStore: mutate,
+  };
+  const transaction = { objectStore: mutate, abort: mutate };
+  expect(migration.migrate(database, transaction)).toBeUndefined();
+  await migration.validate(database, transaction);
+  expect(mutate).not.toHaveBeenCalled();
+  expect(buildDatabaseMigrationPlan(59, 58)).toBeNull();
+  const { expectedDigest, ...input } = target;
+  expect(createHash('sha256').update(canonicalize(input)).digest('hex')).toBe(expectedDigest);
+});
+
+it('admits retained raster documents without changing any released row, store, index or immutable object', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 59
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 60
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({
+    ...source.domainVersions,
+    mediaLibrary: 38,
+    scenarioProjects: 11,
+  });
+});

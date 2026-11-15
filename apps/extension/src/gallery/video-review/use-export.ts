@@ -490,7 +490,13 @@ function reviewExportInputPlan(
   const advanced = { ui: ui, ...document.advancedContent };
   const fullMap = buildReviewTimeMap(duration, document.edits);
   const actionPlan = buildReviewActionAudioPlan({
-    markers: telemetry ? projectReviewTelemetry(telemetry, duration).markers : [],
+    markers: projectReviewTelemetry(
+      telemetry ?? { actionEvents: [], signals: [], cursorTrack: null },
+      duration,
+      false,
+      advanced.interactionTimeline,
+      advanced.ui.tracks
+    ).markers,
     settings: advanced.actionAudio ?? [],
     segments: fullMap,
     applied: resolveQuickEditEffectiveFeatures(advanced).actionsApplied,

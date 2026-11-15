@@ -54,7 +54,10 @@ export function returnEffectRuntimeRetryInputs(
 }
 
 export function collectEffectRuntimeResultBitmaps(result: EffectRuntimeSceneResult): ImageBitmap[] {
-  if (result.kind === 'gpu-plan') return result.resources.map(({ bitmap }) => bitmap);
+  if (result.kind === 'gpu-plan')
+    return result.resources.flatMap((resource) =>
+      resource.kind === 'paint' ? [] : [resource.bitmap]
+    );
   return result.kind === 'frame'
     ? [result.bitmap]
     : result.code === 'cacheMiss'

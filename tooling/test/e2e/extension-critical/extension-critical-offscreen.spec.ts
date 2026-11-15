@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 import type { ProjectExportInputReference } from '../../../../apps/extension/src/contracts/video/types/messages.export';
 import type { VideoProject } from '../../../../apps/extension/src/features/video/project/types';
-import { renderEffectV1Mp4Projects } from './extension-critical-offscreen-effects.helpers';
+import { renderLottieMp4Projects } from './extension-critical-offscreen-effects.helpers';
 import {
   DB_NAME,
   DB_VERSION,
@@ -435,12 +435,12 @@ test('cold and subsequent high-resolution recordings flush media before STOP', a
   });
 });
 
-test('offscreen MP4 export renders applied target and standalone EffectV1 projects', async ({
+test('offscreen MP4 export renders Lottie over text and standalone Lottie projects', async ({
   page,
   hostOrigin,
 }) => {
   await openOffscreenHarness(page, hostOrigin);
-  await renderEffectV1Mp4Projects(page);
+  await renderLottieMp4Projects(page);
 });
 
 test('real MV3 offscreen rasterizes frame annotations without suspended-paint deadlock', async ({

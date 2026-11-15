@@ -5,6 +5,7 @@ import {
   type DrawingPoint,
   type DrawingObjectProjection,
 } from '../../features/drawing/public';
+import { ContentDrawingTextProjection } from './text-measurement';
 import type { PageScrollRoot } from '../platform/page-scroll';
 import { getDrawingViewportProjection } from './interaction';
 import { resolveContentShadowRoot } from '../platform/dom-host';
@@ -41,6 +42,9 @@ interface Binding {
 export function createDrawingLayout(getRoot: () => PageScrollRoot) {
   let bindings = new WeakMap<DrawingObject, Binding | null>();
   const listeners = new Set<() => void>();
+  const textProjection = new ContentDrawingTextProjection(() =>
+    listeners.forEach((listener) => listener())
+  );
   const observer =
     typeof ResizeObserver === 'undefined'
       ? null
@@ -92,15 +96,15 @@ export function createDrawingLayout(getRoot: () => PageScrollRoot) {
     },
     resolve(object) {
       const binding = bindings.get(object);
-      if (!binding) return object;
+      if (!binding) return textProjection.resolve(object);
       const current = binding.target.isConnected ? origin(binding.target) : binding.latest;
       const unchanged = current.x === binding.latest.x && current.y === binding.latest.y;
       binding.latest = current;
-      if (unchanged && binding.projected) return binding.projected;
+      if (unchanged && binding.projected) return textProjection.resolve(binding.projected);
       const delta = { x: current.x - binding.origin.x, y: current.y - binding.origin.y };
       if (delta.x === 0 && delta.y === 0) {
         binding.projected = object;
-        return object;
+        return textProjection.resolve(object);
       }
       let projected = translateDrawingObject(object, delta);
       // External masks share the nested root's changing scene projection.
@@ -132,7 +136,7 @@ export function createDrawingLayout(getRoot: () => PageScrollRoot) {
       }
       binding.projected = projected;
       bindings.set(projected, { target: binding.target, origin: current, latest: current });
-      return projected;
+      return textProjection.resolve(projected);
     },
   };
   return {
@@ -149,6 +153,7 @@ export function createDrawingLayout(getRoot: () => PageScrollRoot) {
     },
     dispose() {
       observer?.disconnect();
+      textProjection.dispose();
       listeners.clear();
       bindings = new WeakMap();
     },

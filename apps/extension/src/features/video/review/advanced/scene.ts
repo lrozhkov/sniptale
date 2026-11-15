@@ -1,3 +1,5 @@
+import { resolveQuickEditActiveFocusRegions } from './focus-layout';
+import { cameraSpatialMotionPose } from '../../project/motion/spatial';
 import { reviewCursorSpatialSettings } from './cursor-focus-path';
 import { cameraTransitionProgress } from '../../project/motion/transitions';
 import { insetMediaCanvas } from '../../project/window-geometry';
@@ -664,9 +666,15 @@ export function sampleQuickEditFocusAtTime(
       return { from: region, to: next, progress, phase: 'link' };
     }
     if (timelineTime < region.start || timelineTime >= region.end) continue;
-    const scaled = fitQuickEditZoomTransitions(region, region.end - region.start);
-    const entering = linkedPrevious ? 1 : cameraProgress(scaled, timelineTime, 'enter');
-    const exiting = linkedNext ? 1 : cameraProgress(scaled, timelineTime, 'exit');
+    const clock = region.phaseClock;
+    const scaled = clock
+      ? { ...region, start: 0, end: clock.duration, enter: clock.enter, exit: clock.exit }
+      : fitQuickEditZoomTransitions(region, region.end - region.start);
+    const phaseTime = clock
+      ? clock.offset + (timelineTime - region.start) * clock.rate
+      : timelineTime;
+    const entering = linkedPrevious ? 1 : cameraProgress(scaled, phaseTime, 'enter');
+    const exiting = linkedNext ? 1 : cameraProgress(scaled, phaseTime, 'exit');
     return {
       from: null,
       to: region,
@@ -678,7 +686,7 @@ export function sampleQuickEditFocusAtTime(
 }
 
 /** Camera zoom and spotlight share one phase clock; spotlight never moves the camera. */
-export function evaluateQuickEditCameraAtTime(
+function evaluateQuickEditZoomCameraAtTime(
   regions: readonly QuickEditZoomRegion[],
   timelineTime: number,
   scene?: QuickEditCameraSceneInput
@@ -858,4 +866,39 @@ function fitSceneSource(input: Omit<SceneInput, 'output' | 'camera'>, content: Q
       : input.source
   );
   return { crop, fitted };
+}
+
+/** Zoom framing and spatial focus have independent clocks and share the final scene geometry. */
+export function evaluateQuickEditCameraAtTime(
+  regions: readonly QuickEditZoomRegion[],
+  timelineTime: number,
+  scene?: QuickEditCameraSceneInput
+): QuickEditCameraTransform {
+  const active = resolveQuickEditActiveFocusRegions(regions);
+  const camera = evaluateQuickEditZoomCameraAtTime(active, timelineTime, scene);
+  const sample = sampleQuickEditFocusAtTime(
+    active.filter((r) => r.effect === '3d'),
+    timelineTime,
+    active
+  );
+  if (!sample) return camera;
+  const pose = (r: QuickEditZoomRegion, time: number) =>
+    cameraSpatialMotionPose(
+      r,
+      r.spatialClock
+        ? (r.spatialClock.offset + (time - r.start) * r.spatialClock.rate) / r.spatialClock.duration
+        : (time - r.start) / (r.end - r.start)
+    );
+  return applyReviewCameraSpatial(
+    active,
+    timelineTime,
+    {
+      ...sample,
+      from: sample.from
+        ? pose(sample.from, sample.phase === 'link' ? sample.from.end : timelineTime)
+        : null,
+      to: pose(sample.to, sample.phase === 'link' ? sample.to.start : timelineTime),
+    },
+    camera
+  );
 }

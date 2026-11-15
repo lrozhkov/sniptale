@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEffectPresetCatalog } from './preset-catalog';
+import { type AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
 import {
-  applyEffectV1ControlPresetValues,
-  validateEffectV1ControlPresetValues,
+  applyEffectControlPresetValues,
+  validateEffectControlPresetValues,
   resolveEffectLocaleText,
-  type EffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
+} from '@sniptale/runtime-contracts/effect-controls';
 import {
   collectEffectVisualValues,
   type EffectPresetPreferences,
@@ -16,7 +16,7 @@ import { SelectInput } from '../shared/controls';
 import { InspectorActionButton } from '../shared/actions';
 
 export function EffectVisualPresets(props: {
-  document: EffectV1Document;
+  document: AnimationTemplate;
   sourceSha256: string;
   catalogPackId?: string | undefined;
   controls: Readonly<Record<string, number | string>>;
@@ -77,7 +77,7 @@ export function EffectVisualPresets(props: {
           setPreferred(id);
           if (preset && !preset.disabled)
             props.onChange(
-              applyEffectV1ControlPresetValues(props.document, props.controls, preset.values)
+              applyEffectControlPresetValues(props.document, props.controls, preset.values)
             );
         }}
       />
@@ -253,7 +253,7 @@ function PresetLibraryActions({
 }
 
 function resolveVisualPresetOptions(
-  document: EffectV1Document,
+  document: AnimationTemplate,
   preferences: EffectPresetPreferences,
   locale: ReturnType<typeof getCurrentLocale>
 ) {
@@ -266,11 +266,11 @@ function resolveVisualPresetOptions(
     })),
     ...preferences.presets.map((preset) => ({
       value: `user:${preset.id}`,
-      label: validateEffectV1ControlPresetValues(document, preset.values).ok
+      label: validateEffectControlPresetValues(document, preset.values).ok
         ? preset.name
         : `${preset.name} — ${translate('videoEditor.effectsLibrary.presetUnavailable')}`,
       values: preset.values,
-      disabled: !validateEffectV1ControlPresetValues(document, preset.values).ok,
+      disabled: !validateEffectControlPresetValues(document, preset.values).ok,
     })),
   ];
   return options;

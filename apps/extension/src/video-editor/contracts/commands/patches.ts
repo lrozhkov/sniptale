@@ -1,3 +1,4 @@
+import type { GlTransitionSelection } from '../../../features/video/project/transition/gl-catalog';
 import type { MotionFocusEdit } from '../../../features/video/project/motion/focus-appearance';
 import type { MotionSpatialEdit } from '../../../features/video/project/motion/spatial';
 import type { MotionTransitionPhaseEdit } from '../../../features/video/project/motion/transitions';
@@ -8,7 +9,6 @@ import type {
   VideoProjectSceneBackground,
   VideoProject,
   VideoProjectMotionRegion,
-  VideoProjectTransition,
 } from '../../../features/video/project/types/index';
 import type { VideoProjectEffectInstance } from '../../../features/video/project/effect-instance/types';
 
@@ -77,9 +77,10 @@ export type VideoEditorMotionRegionPatch = Partial<
   cameraFollow?: VideoProjectMotionRegion['cameraFollow'] | null;
 };
 
-export type VideoEditorTransitionTemplatePatch = Partial<
-  Pick<VideoProjectTransition, 'direction' | 'highlightColor' | 'intensity' | 'templateKind'>
->;
+export type VideoEditorTransitionTemplatePatch = {
+  selection: GlTransitionSelection;
+  presetId?: string | null;
+};
 
 export type VideoProjectEffectInstancePatch = {
   duration?: number;
@@ -92,6 +93,10 @@ export type VideoProjectEffectInstancePatch = {
 
 /** Original-source media edits; placement and source timing remain independent. */
 export type VideoEditorMediaClipEdit =
+  | {
+      kind: 'source-filters';
+      stack: import('../../../features/image-filters/contract').SourceImageFilterStack | null;
+    }
   | { kind: 'padding'; padding: number }
   | { kind: 'source-crop'; crop: MediaSourceCrop | null }
   | { kind: 'window-corner-radius'; radius: number | null }

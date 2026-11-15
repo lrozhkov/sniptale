@@ -15,7 +15,7 @@ import {
   DrawingTextBackgrounds,
   resolveDrawingTextContentStyle,
   resolveDrawingTextDomValue,
-  useDrawingTextBackgroundRects,
+  useDrawingTextLayout,
   type DrawingTextVisualStyle,
 } from './text-content';
 
@@ -190,7 +190,6 @@ function DrawingTextObject(props: {
   projection: DrawingPoint;
   opacity: number;
 }) {
-  const contentRef = useRef<HTMLSpanElement>(null);
   const { object } = props;
   const style: DrawingTextVisualStyle = {
     backgroundColor: object.backgroundColor,
@@ -199,8 +198,9 @@ function DrawingTextObject(props: {
     fontSize: object.fontSize,
   };
   const contentStyle = resolveDrawingTextContentStyle(style);
-  const backgroundRects = useDrawingTextBackgroundRects({
-    contentRef,
+  const textLayout = useDrawingTextLayout({
+    wrapWidth: object.wrapWidth ?? object.bounds.width,
+    autoWidth: object.autoWidth ?? false,
     fontFamily:
       typeof contentStyle.fontFamily === 'string' ? contentStyle.fontFamily : 'sans-serif',
     fontSize: style.fontSize,
@@ -235,17 +235,22 @@ function DrawingTextObject(props: {
     >
       <DrawingTextBackgrounds
         color={style.backgroundColor}
-        rects={backgroundRects}
+        rects={textLayout.backgrounds}
         text={{
-          contentRef,
-          value: object.text,
+          layout: textLayout,
           color: style.color,
           fontFamily: style.fontFamily,
           fontSize: style.fontSize,
         }}
       />
-      <span ref={contentRef} style={contentStyle}>
-        {resolveDrawingTextDomValue(object.text)}
+      <span
+        style={{
+          ...resolveDrawingTextContentStyle(style, textLayout),
+          whiteSpace: 'pre',
+          overflowWrap: 'normal',
+        }}
+      >
+        {resolveDrawingTextDomValue(textLayout.lines.join('\n'))}
       </span>
     </div>
   );

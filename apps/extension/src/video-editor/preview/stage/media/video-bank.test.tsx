@@ -8,7 +8,7 @@ import { createVideoProjectMotionRegion } from '../../../../features/video/proje
 import {
   capturePreviewImageResources,
   arePreviewImageResourcesReady,
-} from '../scene/image-resources';
+} from '../../../../workflows/video/native-composition/image-resources';
 import { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
 
 import { act } from 'react';

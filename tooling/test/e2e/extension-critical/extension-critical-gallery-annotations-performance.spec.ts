@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises';
-import { build } from 'esbuild';
+import { bundleQuickReviewAnnotationProbe } from '../support/quick-review-annotation-bundle';
 import { expect, test } from '@playwright/test';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
@@ -8,17 +8,9 @@ test('native 0/1/3/6 annotation frames at 1080p and 4K retain resource budgets a
   page,
 }, info) => {
   test.setTimeout(180_000);
-  const bundle = await build({
-    entryPoints: ['tooling/test/e2e/support/quick-review-annotation-render-probe.ts'],
-    bundle: true,
-    format: 'esm',
-    platform: 'browser',
-    write: false,
-    loader: { '.svg': 'text', '.woff2': 'dataurl' },
-    define: { 'process.env.NODE_ENV': '"production"' },
-  });
   const host = await startHostServer();
   try {
+    const bundle = await bundleQuickReviewAnnotationProbe(host.origin);
     await applyHarnessBootstrap(page, {});
     await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
     await page.locator('[data-ui="gallery.page.root"]').waitFor();

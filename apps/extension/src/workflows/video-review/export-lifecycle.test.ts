@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import * as recordingRender from './recording-render';
 import { createVideoProjectFromRecording } from '../../features/video/project/factories/creation';
 import eventsFixture from '../../features/video/project/recording-events/fixtures.json';
@@ -13,6 +16,23 @@ import { createCanvasComment } from '../../features/video/review/comments';
 import { anchorReviewVoiceover } from '../../features/video/review/voiceover-edits';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 
+const FRAME_SOURCE = readFileSync(
+  'apps/extension/public/video-effects/animations/frame.sniptale-animation.json',
+  'utf8'
+);
+const FRAME_DOCUMENT = parseAnimationTemplateSource(FRAME_SOURCE);
+if (!FRAME_DOCUMENT.ok) throw new Error('Expected valid shipped frame animation.');
+const FRAME_HASH = createHash('sha256').update(FRAME_SOURCE).digest('hex');
+const FRAME_SNAPSHOT = {
+  id: `effect:${FRAME_HASH}`,
+  schemaVersion: 'sniptale.animation.v1' as const,
+  kind: 'standalone' as const,
+  documentId: FRAME_DOCUMENT.template.id,
+  sha256: FRAME_HASH,
+  source: FRAME_SOURCE,
+  retainedByteLength: Buffer.byteLength(FRAME_SOURCE),
+  assets: [],
+};
 it('rejects a camera plan conflict before audio acquisition, staging, or publication', async () => {
   const { args, deps } = fixture();
   const advanced = args.snapshot.workspace.advanced;
@@ -71,7 +91,7 @@ it('routes annotation-only fragments with immutable workspace sources and the fu
     instances: [
       {
         id: 'frame',
-        snapshotId: 'effect:frame',
+        snapshotId: FRAME_SNAPSHOT.id,
         enabled: true,
         start: 0,
         end: 6,
@@ -82,18 +102,7 @@ it('routes annotation-only fragments with immutable workspace sources and the fu
       },
     ],
   };
-  args.snapshot.workspace.effectSnapshots = [
-    {
-      id: 'effect:frame',
-      schemaVersion: 'sniptale.effect.v1',
-      kind: 'standalone',
-      documentId: 'frame',
-      sha256: '0'.repeat(64),
-      source: '{}',
-      retainedByteLength: 2,
-      assets: [],
-    },
-  ];
+  args.snapshot.workspace.effectSnapshots = [{ ...FRAME_SNAPSHOT }];
   args.index.processedVideoCodec = 'vp8';
   deps.writeReviewFrames.mockResolvedValue({
     videoPackets: 10,

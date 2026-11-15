@@ -1,3 +1,6 @@
+import { createGlTransitionCanvas } from '../../features/video/composition/canvas/gl-transition';
+import type { ProjectCompositionSceneInput } from './types';
+import { renderSharedProjectComposition } from './shared-composition';
 import { createCompositionCutSampleSource } from '../../workflows/video-review/decoded-video-sample';
 import { createCompositionJoinEndpoints } from '../../features/video/composition/canvas/join-endpoints';
 import {
@@ -13,10 +16,7 @@ import {
 import type { VideoProjectCompositionJoinPlan } from '../../features/video/project/scene/joins-types';
 import { isClipActiveAtTime } from '../../features/video/project/timeline/basics';
 import { createPreviewRenderResources } from '../../workflows/video-review/preview-render-resources';
-import {
-  renderProjectCompositionScene,
-  type ProjectCompositionSceneInput,
-} from './composition-scene';
+import { renderProjectCompositionScene } from './composition-scene';
 import { createOffscreenProjectEffectRuntime } from './effect-runtime';
 import { syncVideoClipFrame } from './media-playback/frame';
 import { waitForMediaElementReady } from './media-loading/ready';
@@ -24,7 +24,7 @@ import type { ExportJobState, ProjectExportCompositionJoinRenderer } from './typ
 
 type Input = ProjectCompositionSceneInput & {
   job: ProjectCompositionSceneInput['job'] &
-    Pick<ExportJobState, 'compositionJoinRenderer' | 'clipMediaElements'>;
+    Pick<ExportJobState, 'compositionJoinRenderer' | 'clipMediaElements' | 'sharedComposition'>;
 };
 
 export type { ProjectExportCompositionJoinRenderer } from './types';
@@ -32,6 +32,7 @@ export type { ProjectExportCompositionJoinRenderer } from './types';
 /** Applies final composition joins and outer fades after the caller synchronizes its ordinary media. */
 export async function renderProjectCompositionFrame(args: Input): Promise<void> {
   if (args.job.cancelled || args.signal?.aborted) throw new Error('PROJECT_EXPORT_CANCELLED');
+  if (await renderSharedProjectComposition(args)) return;
   const plans = resolveVideoProjectCompositionJoinPlans(args.project);
   const plan = resolveActiveVideoProjectCompositionJoinPlan(plans, args.currentTime);
   const windowed = args.project.clips.some(
@@ -95,9 +96,13 @@ function createProjectExportCompositionJoinRenderer(
 ): ProjectExportCompositionJoinRenderer {
   const ownerDocument = args.ownerDocument ?? args.context.canvas.ownerDocument;
   const size = { width: args.settings.width, height: args.settings.height };
+  const hasGl = resolveVideoProjectCompositionJoinPlans(args.project).some(
+    (plan) => plan.boundary.transition?.type === 'gl'
+  );
+  let glJoin: ReturnType<typeof createGlTransitionCanvas> | undefined;
   const resources = createPreviewRenderResources({
     maximumCanvases: 3,
-    maximumManagedBytes: size.width * size.height * 12,
+    maximumManagedBytes: size.width * size.height * (hasGl ? 24 : 12) + (hasGl ? 32768 : 0),
     createCanvas: () => ownerDocument.createElement('canvas'),
   });
   const controller = new AbortController();
@@ -207,6 +212,8 @@ function createProjectExportCompositionJoinRenderer(
       nestedCuts?.dispose();
       cutSampler?.dispose();
       effectRuntime.dispose();
+      glJoin?.dispose();
+      glJoin = undefined;
       resources.dispose();
       for (const video of videos.values()) {
         video.pause();
@@ -240,7 +247,13 @@ function createProjectExportCompositionJoinRenderer(
           context.clearRect(0, 0, size.width, size.height);
           context.drawImage(sample.canvas, 0, 0);
           if (plan) {
-            const blend = evaluateCompositionJoin(time, plan.seam, plan.before, plan.after)!;
+            const blend = evaluateCompositionJoin(
+              time,
+              plan.seam,
+              plan.before,
+              plan.after,
+              plan.boundary.transition?.type === 'gl' ? plan.boundary.transition.easing : 'LINEAR'
+            )!;
             drawCompositionColorOverlay(
               context,
               blend.black,
@@ -253,7 +266,42 @@ function createProjectExportCompositionJoinRenderer(
         return;
       }
       const samples = resolveVideoProjectCompositionJoinEndpoints(plan, args.settings.fps, time);
-      const blend = evaluateCompositionJoin(time, plan.seam, plan.before, plan.after)!;
+      const blend = evaluateCompositionJoin(
+        time,
+        plan.seam,
+        plan.before,
+        plan.after,
+        plan.boundary.transition?.type === 'gl' ? plan.boundary.transition.easing : 'LINEAR'
+      )!;
+      if (plan.boundary.transition?.type === 'gl') {
+        const selection = plan.boundary.transition.selection;
+        await endpoints.withEndpoints(
+          {
+            key: plan.boundary,
+            ...samples,
+            ...(cutPlan ? { sampling: 'cut' as const } : {}),
+            incomingWeight: blend.incoming,
+          },
+          samplingSignal,
+          async ({ outgoing, incoming }) => {
+            glJoin ??= createGlTransitionCanvas({
+              ownerDocument,
+              reserve: (bytes) => resources.bytes('export-gl-transition', bytes),
+            });
+            await glJoin.render({
+              context,
+              from: outgoing,
+              to: incoming,
+              ...size,
+              selection,
+              progress: blend.incoming,
+              ratio: size.width / size.height,
+              signal: samplingSignal,
+            });
+          }
+        );
+        return;
+      }
       await endpoints.draw(
         context,
         {

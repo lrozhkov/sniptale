@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { readValidAnimationSnapshot } from '../../../../composition/persistence/effect-bundles/fixture.test-support';
+import { createEffectHostClip } from '../../../../features/video/project/factories/overlay-clip';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createVideoProjectTrack } from '../../../../features/video/project/factories/creation';
 import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
@@ -13,7 +14,6 @@ import { projectVideoProjectCommentAnchor } from '../../../../features/video/pro
 import { resolveVideoProjectActionOccurrences } from '../../../../features/video/project/action-occurrences';
 import type { VideoProject } from '../../../../features/video/project/types/model';
 import type { VideoProjectTextDocument } from '../../../../features/video/project/text/types';
-import type { VideoProjectEffectSnapshot } from '../../../../features/video/project/effect-instance/types';
 import {
   beginVideoEditorProjectHistoryTransaction,
   endVideoEditorProjectHistoryTransaction,
@@ -214,26 +214,6 @@ function completeComposition() {
   result.store.setState({ project: next });
   return { ...result, project: next };
 }
-function targetSnapshot(): VideoProjectEffectSnapshot {
-  const fixtureRoot = new URL(
-    '../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/valid/',
-    import.meta.url
-  );
-  const source = readFileSync(
-    new URL('neutral-target-effect.sniptale-effect.json', fixtureRoot),
-    'utf8'
-  );
-  return {
-    id: `effect:${'a'.repeat(64)}`,
-    sha256: 'a'.repeat(64),
-    documentId: 'neutral-target-effect',
-    schemaVersion: 'sniptale.effect.v1',
-    kind: 'targetEffect',
-    source,
-    assets: [],
-    retainedByteLength: new TextEncoder().encode(source).byteLength,
-  };
-}
 function undoRedo(store: ReturnType<typeof setup>['store']) {
   const current = store.getState();
   const undo = undoVideoEditorProjectHistory(
@@ -330,59 +310,60 @@ it('one command is one undo step and redo restores the complete graph', () => {
 });
 
 it.each(['intro', 'outro'] as const)(
-  'retains owner scoped effect coverage and phase when bookends extend tracks: %s',
-  (side) => {
-    const { store, asset } = populated();
-    const base = store.getState().project!;
-    const other = createVideoProjectTrack('Other', 1, 'PRIMARY');
-    const second = { ...base.clips[0]!, id: 'other-clip', trackId: other.id, duration: 2 };
-    const snapshot = targetSnapshot();
+  'retains standalone animation source, phase and timing when adding %s',
+  async (side) => {
+    const { store, asset } = populated(),
+      base = store.getState().project!;
+    const snapshot = await readValidAnimationSnapshot();
+    const tracks = [0, 1, 2].map((index) =>
+      createVideoProjectTrack(`Annotation ${index}`, index + 1, 'PRIMARY')
+    );
+    const instances = tracks.map((_track, index) => ({
+      id: `animation-${index}`,
+      snapshotId: snapshot.id,
+      kind: 'standalone' as const,
+      target: { kind: 'scene' as const },
+      startTime: index,
+      duration: 3 - index,
+      playbackRate: 3 / (3 - index),
+      sourceStart: 0,
+      enabled: true,
+      controls: {},
+      sceneAnchors: { tip: { x: 320, y: 180 } },
+    }));
+    const hosts = instances.map((instance, index) =>
+      createEffectHostClip({
+        duration: instance.duration,
+        effectInstanceId: instance.id,
+        name: 'Annotation',
+        projectHeight: base.height,
+        projectWidth: base.width,
+        startTime: instance.startTime,
+        trackId: tracks[index]!.id,
+      })
+    );
     const project: VideoProject = {
       ...base,
-      tracks: [...base.tracks, other],
-      clips: [...base.clips, second],
+      tracks: [...base.tracks, ...tracks],
+      clips: [...base.clips, ...hosts],
       effectSnapshots: [snapshot],
-      effectInstances: [base.tracks[0]!.id, other.id].map((trackId, index) => ({
-        id: `fx-${index}`,
-        snapshotId: snapshot.id,
-        kind: 'targetEffect',
-        target: { kind: 'track', trackId },
-        startTime: 0,
-        duration: index === 0 ? 6 : 2,
-        playbackRate: index === 0 ? 0.5 : 1.5,
-        sourceStart: 0,
-        rangeMode: 'owner',
-        enabled: true,
-        controls: {},
-      })),
+      effectInstances: instances,
     };
-    project.effectInstances!.push({
-      ...project.effectInstances![0]!,
-      id: 'group-fx',
-      target: { kind: 'video-group' },
-    });
     expect(isHydratableVideoProject(project)).toBe(true);
     store.setState({ project });
     expect(store.getState().placeBookendMaterial(asset.id, side, project).status).toBe('placed');
     const next = store.getState().project!;
-    expect(next.effectInstances![0]).toEqual({
-      ...project.effectInstances![0],
-      startTime: side === 'intro' ? 6 : 0,
-      rangeMode: 'interval',
-    });
-    expect(next.effectInstances![1]).toEqual({
-      ...project.effectInstances![1],
-      startTime: side === 'intro' ? 6 : 0,
-      rangeMode: side === 'intro' ? 'interval' : 'owner',
-    });
-    expect(next.effectInstances![2]).toEqual({
-      ...project.effectInstances![2],
-      startTime: side === 'intro' ? 6 : 0,
-      rangeMode: 'interval',
-    });
+    for (const [index, instance] of instances.entries()) {
+      expect(next.effectInstances![index]).toEqual({
+        ...instance,
+        startTime: instance.startTime + (side === 'intro' ? 6 : 0),
+      });
+    }
+    expect(next.effectSnapshots).toEqual([snapshot]);
     const { undo, redo } = undoRedo(store);
     expect(undo.project.effectInstances).toEqual(project.effectInstances);
     expect(redo.project.effectInstances).toEqual(next.effectInstances);
+    expect(redo.project.effectSnapshots).toEqual([snapshot]);
   }
 );
 

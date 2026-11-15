@@ -31,6 +31,7 @@ import type {
 } from '../../features/video/review/advanced/types';
 
 export type ReviewStageScene = {
+  sourceFilters?: import('../../features/video/review/advanced/types').QuickEditAdvancedState['sourceFilters'];
   background: QuickEditBackgroundSettings;
   canvas?: { width: number; height: number } | undefined;
   windowHeader?:

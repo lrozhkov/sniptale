@@ -1,4 +1,3 @@
-import { packTimelineFxRows } from './fx-layout';
 import { buildVideoCompositionTransitionSegments } from '../../../../features/video/composition/timeline/lanes';
 import { createVideoProjectClipLogicalLaneId } from '../../../../features/video/project/timeline/logical-lanes';
 import type { VideoProject } from '../../../../features/video/project/types';
@@ -71,19 +70,10 @@ export function buildTimelineTrackLayoutModel(params: {
     );
     const logicalRowHeight = clipRowHeight / logicalRows;
     const transitionRowCount = 0;
-    const clipIds = new Set(
-      params.project.clips.filter((clip) => clip.trackId === track.id).map((clip) => clip.id)
-    );
-    const fxInstances = (params.project.effectInstances ?? []).filter(
-      (instance) =>
-        instance.kind === 'targetEffect' &&
-        ((instance.target.kind === 'clip' && clipIds.has(instance.target.clipId)) ||
-          (instance.target.kind === 'track' && instance.target.trackId === track.id))
-    );
-    const fxInstanceIds = fxInstances.map((instance) => instance.id);
-    const fxRows = packTimelineFxRows(fxInstances);
-    const fxCollapsed = params.collapsedFxByTrackId?.[track.id] ?? false;
-    const fxHeight = fxInstanceIds.length ? (fxCollapsed ? 24 : fxRows.length * 24) : 0;
+    const fxInstanceIds: string[] = [];
+    const fxRows: string[][] = [];
+    const fxCollapsed = false;
+    const fxHeight = 0;
     const rowHeight = clipRowHeight + fxHeight;
     const layout = {
       fxInstanceIds,
@@ -108,27 +98,10 @@ export function buildTimelineTrackLayoutModel(params: {
     top += rowHeight;
   }
 
-  const globalInstances = (params.project.effectInstances ?? []).filter(
-    (instance) => instance.kind === 'targetEffect' && instance.target.kind === 'video-group'
-  );
-  const globalIds = globalInstances.map((instance) => instance.id);
-  const globalRows = packTimelineFxRows(globalInstances);
-  const collapsed = params.collapsedFxByTrackId?.['video-group'] ?? false;
-  const videoFx = globalIds.length
-    ? {
-        fxInstanceIds: globalIds,
-        fxRows: globalRows,
-        fxCollapsed: collapsed,
-        fxHeight: collapsed ? 24 : globalRows.length * 24,
-        clipRowHeight: 0,
-        top,
-      }
-    : undefined;
   return {
     layoutByTrackId,
     layouts,
-    totalTrackHeight: top + (videoFx?.fxHeight ?? 0),
-    ...(videoFx ? { videoFx } : {}),
+    totalTrackHeight: top,
   };
 }
 

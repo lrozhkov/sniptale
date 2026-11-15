@@ -1,3 +1,4 @@
+import { useReviewTimelineSnap, type ReviewTimelineSnap } from './timeline-magnets';
 import { ReviewTrackVisibilityButton } from './track-row';
 import { reviewTrackMetrics, ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { useReviewGestureCancellation } from './timeline-drag';
@@ -37,10 +38,14 @@ import {
   trimQuickEditAudioClip,
 } from '../../features/video/review/advanced/audio';
 import { reviewTrackStatusButtonClassName } from './controls';
-import { reviewAudioClipRows, type ReviewTrackProjection } from './track-projection';
+import {
+  reviewAudioClipRows,
+  reviewTimelinePointerSource,
+  type ReviewTrackProjection,
+} from './track-projection';
 import { ReviewAudioWaveform } from './audio-waveform';
 import type { ReviewWaveform } from '../../workflows/video-review/waveform';
-import { SNAP_THRESHOLD_PX, snapTimelineTime } from '../../features/video/review/snap';
+import { SNAP_THRESHOLD_PX } from '../../features/video/review/snap';
 import type { ReviewAudioLane, ReviewAudioAsset } from './use-review-audio';
 
 const percent = (time: number, duration: number) => `${(time / duration) * 100}%`;
@@ -302,6 +307,7 @@ type ReviewAudioClipBlockProps = {
 };
 
 function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
+  const snap = useReviewTimelineSnap(props.projection);
   const clip = props.clip;
   const asset = props.assets?.get(clip.assetId);
   const assetDuration = asset?.duration ?? props.waveforms?.get(clip.assetId)?.duration;
@@ -327,7 +333,8 @@ function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
           : filename
       }
       aria-pressed={props.selected}
-      className="pointer-events-none absolute z-[5] cursor-grab rounded text-xs active:cursor-grabbing
+      className="review-timeline-item pointer-events-none absolute z-[5] cursor-grab rounded text-xs
+        active:cursor-grabbing
         focus-visible:outline focus-visible:outline-[var(--sniptale-color-accent)]"
       style={{
         left: `${start * 100}%`,
@@ -337,18 +344,30 @@ function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
           reviewTrackMetrics(props.compact).inset,
         height: reviewTrackMetrics(props.compact).body,
       }}
-      {...reviewAudioClipGesture(props, assetDuration)}
+      {...reviewAudioClipGesture(props, assetDuration, snap)}
     >
       {props.pieces.map((piece, index) => {
         const left = piece
-          ? piece.sourceStart / (props.projection?.duration ?? props.duration)
+          ? (props.projection?.focus.position(piece.sourceStart) ??
+            piece.sourceStart / props.duration)
           : start;
         const right = piece
-          ? piece.sourceEnd / (props.projection?.duration ?? props.duration)
+          ? (props.projection?.focus.position(piece.sourceEnd, 'end') ??
+            piece.sourceEnd / props.duration)
           : end;
         return (
           <div
             key={index}
+            data-review-snap-start={
+              piece?.sourceStart ??
+              props.projection?.source(props.shown.timelineStart) ??
+              start * (props.projection?.duration ?? props.duration)
+            }
+            data-review-snap-end={
+              piece?.sourceEnd ??
+              props.projection?.source(props.shown.timelineStart + props.shown.duration, 'end') ??
+              end * (props.projection?.duration ?? props.duration)
+            }
             data-music-offset={
               piece ? props.shown.sourceOffset + piece.start - props.shown.timelineStart : undefined
             }
@@ -369,9 +388,7 @@ function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
                   key={edge}
                   data-audio-edge={edge}
                   className={`${reviewTimelineResizeHandleClassName} ${edge === 'start' ? 'left-0' : 'right-0'}`}
-                >
-                  <span className="h-4 w-px bg-current opacity-60" />
-                </span>
+                ></span>
               ))}
           </div>
         );
@@ -381,7 +398,11 @@ function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
 }
 
 /** Owns admission, capture, source-time trim/move preview and completion for one clip gesture. */
-function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?: number) {
+function reviewAudioClipGesture(
+  props: ReviewAudioClipBlockProps,
+  assetDuration: number | undefined,
+  snapTimelineTime: ReviewTimelineSnap
+) {
   const clip = props.clip;
   return {
     onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -397,17 +418,20 @@ function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?
         event.target instanceof Element
           ? event.target.closest('[data-audio-edge]')?.getAttribute('data-audio-edge')
           : null;
+      const laneBounds = event.currentTarget.parentElement!.getBoundingClientRect();
       props.drag.current = {
         original: props.shown,
         admission,
         lane: props.lane,
         edge: edge === 'start' || edge === 'end' ? edge : 'move',
         x: event.clientX,
-        sourceAtPointer:
-          ((event.clientX - event.currentTarget.parentElement!.getBoundingClientRect().left) /
-            event.currentTarget.parentElement!.getBoundingClientRect().width) *
-          (props.projection?.duration ?? props.duration),
-        width: event.currentTarget.parentElement!.getBoundingClientRect().width,
+        sourceAtPointer: reviewTimelinePointerSource(
+          event.clientX,
+          laneBounds,
+          props.duration,
+          props.projection
+        ),
+        width: laneBounds.width,
         moved: false,
         pointerId: event.pointerId,
         node: event.currentTarget,
@@ -568,22 +592,27 @@ function ReviewClipLanes(props: ReviewClipLanesProps) {
             lane={lane.key}
             label={translate(lane.label)}
             clips={props.audio[lane.key]}
-            voiceoverSegments={lane.key === 'voiceover' ? props.audio.voiceoverSegments : undefined}
+            voiceoverSegments={props.audio.voiceoverSegments}
             assets={props.assets}
             waveforms={props.waveforms}
             projection={
-              lane.key === 'voiceover' && props.audio.voiceoverSegments
-                ? undefined
+              props.audio[lane.key].some((clip) => clip.sourceAnchor) &&
+              props.audio.voiceoverSegments
+                ? props.projection
+                  ? { ...props.projection, ...props.projection.focus }
+                  : undefined
                 : props.projection
             }
             cutsProjection={props.projection}
             snapTimes={
-              lane.key === 'voiceover' && props.audio.voiceoverSegments
+              props.audio[lane.key].some((clip) => clip.sourceAnchor) &&
+              props.audio.voiceoverSegments
                 ? props.snapTimes?.map((time) => props.projection?.source(time) ?? time)
                 : props.snapTimes
             }
             duration={
-              lane.key === 'voiceover' && props.audio.voiceoverSegments
+              props.audio[lane.key].some((clip) => clip.sourceAnchor) &&
+              props.audio.voiceoverSegments
                 ? props.audio.voiceoverSegments.at(-1)!.sourceEnd
                 : props.duration
             }
@@ -648,6 +677,7 @@ function ReviewAudioLaneStatus(props: { guide: number | null; duration: number }
 
 /** File-drop hover and source-axis placement are independent of clip pointer trimming. */
 function useAudioLaneDrop(props: {
+  lane: ReviewAudioLane;
   busy: boolean;
   duration: number;
   projection?: ReviewTrackProjection | undefined;
@@ -692,16 +722,17 @@ function useAudioLaneDrop(props: {
           const file = event.dataTransfer.files[0];
           if (!file) return;
           const rect = event.currentTarget.getBoundingClientRect();
-          const time =
-            rect.width > 0 ? ((event.clientX - rect.left) / rect.width) * props.duration : 0;
+          const sourceDuration = props.projection?.originalDuration ?? props.duration;
           const sourceTime =
             rect.width > 0
-              ? ((event.clientX - rect.left) / rect.width) *
-                (props.projection?.duration ?? props.duration)
+              ? reviewTimelinePointerSource(event.clientX, rect, sourceDuration, props.projection)
               : 0;
           drop(
             file,
-            props.projection?.output(sourceTime) ?? Math.max(0, Math.min(time, props.duration))
+            props.lane === 'voiceover'
+              ? Math.max(0, Math.min(sourceTime, sourceDuration))
+              : (props.projection?.output(sourceTime) ??
+                  Math.max(0, Math.min(sourceTime, props.duration)))
           );
         },
       }

@@ -6,6 +6,9 @@ import type {
 import type { EditorLayerItem } from '../../../features/editor/document/types';
 import type { EditorLayerEffectCommandId } from '../../controller/layer-effects/registry';
 
+/** Metadata required by the effects panel for root layers and nested children. */
+export type EditorLayerEffectsTarget = Pick<EditorLayerItem, 'id' | 'name' | 'effects'>;
+
 export interface EditorInspectorLayerEffectsState {
   layerId: string | null;
   category: EditorLayerEffectCategory;
@@ -21,14 +24,14 @@ export const DEFAULT_EDITOR_LAYER_EFFECTS_STATE: EditorInspectorLayerEffectsStat
 };
 
 export function isAppliedRasterEffect(
-  layer: EditorLayerItem | null | undefined,
+  layer: EditorLayerEffectsTarget | null | undefined,
   effectId: EditorRasterEffectId
 ): boolean {
   return Boolean(layer?.effects.some((effect) => effect.id === effectId));
 }
 
 export function getAppliedRasterEffect(
-  layer: EditorLayerItem | null | undefined,
+  layer: EditorLayerEffectsTarget | null | undefined,
   effectId: EditorRasterEffectId
 ): EditorRasterEffect | null {
   return layer?.effects.find((effect) => effect.id === effectId) ?? null;

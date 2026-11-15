@@ -9,8 +9,18 @@ import type { ModelFormData } from '../../../../../features/ai/schemas/ai-settin
 function legacyModelCapabilities(operation: AIModelOperation = 'text'): AIModelCapabilities {
   return {
     operations: { [operation]: 'supported' },
-    input: operation === 'transcription' ? { audio: 'supported' } : { text: 'supported' },
-    output: operation === 'speech' ? { audio: 'supported' } : { text: 'supported' },
+    input:
+      operation === 'transcription'
+        ? { audio: 'supported' }
+        : operation === 'image-editing'
+          ? { text: 'supported', image: 'supported' }
+          : { text: 'supported' },
+    output:
+      operation === 'speech'
+        ? { audio: 'supported' }
+        : operation === 'image-generation' || operation === 'image-editing'
+          ? { image: 'supported' }
+          : { text: 'supported' },
     features: {},
   };
 }

@@ -310,18 +310,33 @@ for (const viewport of [
       });
       await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=dark`);
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
-      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await seedReviewVideo(
+        page,
+        'review-vp8-opus.webm',
+        { width: 160, height: 90, duration: 12 },
+        false,
+        false,
+        undefined,
+        undefined,
+        { modeChoice: 'advanced' }
+      );
       await page.reload();
       await open();
-      await button('gallery.videoReview.advancedEditing').click();
+      await expect(button('gallery.videoReview.advancedEditing')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
       await expect.poll(async () => !!(await readWebcamWorkspace(page))).toBe(true);
       await seedCutZooms(page);
       await page.reload();
       // The mediaId/mode route restores the editor; the gallery is behind its dialog.
       await expect(review).toBeVisible();
-      await expect(
-        review.getByRole('heading', { name: 'beta-v1.webm', exact: true })
-      ).toBeVisible();
+      await expect(page).toHaveTitle('beta-v1.webm');
+      await expect(review.getByRole('button', { name: 'beta-v1.webm', exact: true })).toBeVisible();
+      await expect(button('gallery.videoReview.advancedEditing')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
       const saved = await readWebcamWorkspace(page);
       if (!saved) throw new Error('Missing cut zoom workspace');
       const authored = replayReviewHistory(
@@ -392,6 +407,10 @@ for (const viewport of [
       if (!video || typeof video.width !== 'number' || typeof video.height !== 'number')
         throw new Error('Missing video geometry');
       expect(output.duration).toBeCloseTo(8, 1);
+      await writeFile(
+        info.outputPath('cut-zoom-inputs.json'),
+        JSON.stringify({ captures, output }, null, 2)
+      );
       const comparisons = [];
       for (const capture of captures) {
         const rgb = await pixels(path, capture.time);

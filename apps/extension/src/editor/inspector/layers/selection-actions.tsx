@@ -142,7 +142,7 @@ export function LayerSelectionActions(props: {
   const massActions = buildMassActions(controller, props.layers);
 
   return (
-    <div className="border-b border-[color:var(--sniptale-color-border-soft)] px-2 py-1.5">
+    <div className="border-b border-[color:var(--sniptale-color-border-soft)] px-3 py-2">
       <div className="flex items-center justify-between gap-2">
         <LayerSelectionActionGroup
           actions={reorderActions}

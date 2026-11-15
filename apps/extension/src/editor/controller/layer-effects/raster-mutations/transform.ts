@@ -1,3 +1,6 @@
+import { isManagedBackgroundObject } from '../../background/identity';
+import { FabricImage } from 'fabric';
+import { findObjectById, findRasterContentObject } from '../../document/layers';
 import type { EditorLayerTransformationId } from '../registry';
 import {
   commitLayerMutation,
@@ -13,7 +16,19 @@ export async function applyEditorLayerTransformation(
     transformationId: EditorLayerTransformationId;
   }
 ): Promise<void> {
-  const object = getEditableObject(context.canvas, context.id);
+  const isFlip =
+    context.transformationId === 'flip-horizontal' || context.transformationId === 'flip-vertical';
+  const ordinary = findObjectById(context.canvas, context.id);
+  const raster =
+    (ordinary instanceof FabricImage &&
+      (ordinary.sniptaleType === 'image' || ordinary.sniptaleType === 'source-image')) ||
+    (ordinary &&
+      isManagedBackgroundObject(ordinary) &&
+      ordinary.sniptaleBackgroundMode === 'image');
+  const object = isFlip
+    ? (findRasterContentObject(context.canvas, context.id) ??
+      (!raster ? getEditableObject(context.canvas, context.id) : null))
+    : getEditableObject(context.canvas, context.id);
   if (!context.canvas || !object) {
     return;
   }

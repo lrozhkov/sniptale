@@ -1,8 +1,6 @@
+import { readValidAnimationSnapshot } from '../effect-bundles/fixture.test-support';
 import { parseRecordingEntry } from '../recordings/index.guards';
 import { buildRecordingMediaEntry } from '../media-library/entry-mapping';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { validateEffectV1Document } from '@sniptale/runtime-contracts/effect-v1';
 import { expect, it } from 'vitest';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import {
@@ -343,42 +341,12 @@ it('reads split physical history through the existing transaction', async () => 
   expect(rows.review.workspace.project).toEqual(f.workspace().project);
 });
 
-it('retains disabled annotation effect resources from the redo suffix', async () => {
-  const f = fixture();
-  const source = readFileSync(
-    resolve(
-      'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conformance.sniptale-effect.json'
-    ),
-    'utf8'
-  );
-  const admitted = validateEffectV1Document(JSON.parse(source));
-  if (!admitted.ok || !admitted.document) throw new Error('Invalid effect fixture');
-  const declared = admitted.document.assets[0]!;
-  const resource = f.asset('effect-resource', declared.mimeType, declared.byteLength!);
-  const workspace = f.workspace();
-  const hash = 'a'.repeat(64);
-  const snapshotId = `effect:${hash}`;
-  workspace.effectSnapshots = [
-    {
-      id: snapshotId,
-      schemaVersion: 'sniptale.effect.v1',
-      kind: 'standalone',
-      documentId: admitted.document.id,
-      sha256: hash,
-      source,
-      retainedByteLength: new TextEncoder().encode(source).byteLength + declared.byteLength!,
-      assets: [
-        {
-          id: declared.id,
-          kind: 'svg',
-          mimeType: declared.mimeType,
-          byteLength: declared.byteLength!,
-          sha256: declared.sha256!,
-          assetId: `project-asset:${resource.id}`,
-        },
-      ],
-    },
-  ];
+it('retains disabled embedded annotation sources from the redo suffix without external resource claims', async () => {
+  const f = fixture(),
+    workspace = f.workspace(),
+    snapshot = await readValidAnimationSnapshot();
+  const snapshotId = snapshot.id;
+  workspace.effectSnapshots = [snapshot];
   const before = reviewAdvancedContentBaseline(workspace.advanced);
   workspace.history = [
     {
@@ -400,6 +368,7 @@ it('retains disabled annotation effect resources from the redo suffix', async ()
               attachment: 'viewport',
               transform: { x: 0, y: 0, width: 1, height: 1, rotation: 0 },
               controls: { accent: '#123456' },
+              anchors: { tip: { x: 0.5, y: 0.5 } },
               order: 0,
             },
           ],
@@ -410,9 +379,9 @@ it('retains disabled annotation effect resources from the redo suffix', async ()
   f.save(workspace);
   const rows = await freezeVideoReviewInTransaction(f.tx(), f.mediaId);
   if (!('projectAsset' in rows.source)) throw new Error('Expected project asset original');
-  expect(rows.assets.map((asset) => asset.id)).toEqual(['effect-resource']);
+  expect(rows.assets).toEqual([]);
   expect(rows.review.workspace.effectSnapshots).toEqual(workspace.effectSnapshots);
-  expect(parseCapturedVideoReviewRows({ ...rows, assets: [], refs: [] })).toBeNull();
+  expect(parseCapturedVideoReviewRows({ ...rows, assets: [] })).not.toBeNull();
 });
 
 it('retains only the selected workspace thumbnail and rejects a foreign thumbnail', async () => {

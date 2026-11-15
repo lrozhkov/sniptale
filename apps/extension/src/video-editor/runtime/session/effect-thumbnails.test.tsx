@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act } from 'react';
+import { createHash } from 'node:crypto';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { useEffectClipPreviews } from './effect-thumbnails';
@@ -36,10 +37,6 @@ vi.mock('../../../workflows/video/effect-runtime-sandbox', async (original) => (
 }));
 vi.mock('../../../features/video/composition/effect-runtime/runtime/request', () => ({
   createEffectRuntimeRenderMessage: async () => ({}),
-}));
-vi.mock('@sniptale/runtime-contracts/effect-v1', async (original) => ({
-  ...(await original<typeof import('@sniptale/runtime-contracts/effect-v1')>()),
-  sha256EffectV1Bytes: async () => 'hash',
 }));
 let root: Root;
 let container: HTMLDivElement;
@@ -106,7 +103,7 @@ it('closes generated bitmaps, stores project-scoped covers and disposes the rend
   expect(mocks.commit).toHaveBeenCalledWith({}, [
     expect.objectContaining({
       projectId: 'project',
-      sourceKey: 'effect-v1-thumbnail:hash',
+      sourceKey: 'effect-v1-thumbnail:' + createHash('sha256').update('stable').digest('hex'),
       sourceTime: 1,
     }),
   ]);

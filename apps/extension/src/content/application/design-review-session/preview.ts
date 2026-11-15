@@ -30,43 +30,44 @@ export async function captureReviewPreview(
   const element = host instanceof HTMLElement ? host : null;
   const previous = element?.style.getPropertyValue('opacity') ?? '';
   const priority = element?.style.getPropertyPriority('opacity') ?? '';
+  let response;
   try {
     element?.style.setProperty('opacity', '0', 'important');
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
     );
-    const response = await services.messaging.sendRuntimeMessage(message);
-    if (
-      !response.success ||
-      !response.dataUrl ||
-      !target.isConnected ||
-      entry.record.evidence.pageUrl !== location.href
-    )
-      return null;
-    const after = getAbsolutePosition(target);
-    if (
-      Math.abs(after.x - box.x) > 1 ||
-      Math.abs(after.y - box.y) > 1 ||
-      Math.abs(after.width - box.width) > 1 ||
-      Math.abs(after.height - box.height) > 1
-    )
-      return null;
-    const cropped = await cropImage(response.dataUrl, { x, y, width, height });
-    const image = new Image();
-    image.src = cropped;
-    await image.decode();
-    const scale = Math.min(1, 1024 / image.width, 512 / image.height);
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(image.width * scale));
-    canvas.height = Math.max(1, Math.round(image.height * scale));
-    const context = canvas.getContext('2d');
-    if (!context) return null;
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    return { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height };
+    response = await services.messaging.sendRuntimeMessage(message);
   } finally {
     if (element?.style.getPropertyValue('opacity') === '0') {
       if (previous) element.style.setProperty('opacity', previous, priority);
       else element.style.removeProperty('opacity');
     }
   }
+  if (
+    !response.success ||
+    !response.dataUrl ||
+    !target.isConnected ||
+    entry.record.evidence.pageUrl !== location.href
+  )
+    return null;
+  const after = getAbsolutePosition(target);
+  if (
+    Math.abs(after.x - box.x) > 1 ||
+    Math.abs(after.y - box.y) > 1 ||
+    Math.abs(after.width - box.width) > 1 ||
+    Math.abs(after.height - box.height) > 1
+  )
+    return null;
+  const cropped = await cropImage(response.dataUrl, { x, y, width, height });
+  const image = new Image();
+  image.src = cropped;
+  await image.decode();
+  const scale = Math.min(1, 1024 / image.width, 512 / image.height);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height };
 }

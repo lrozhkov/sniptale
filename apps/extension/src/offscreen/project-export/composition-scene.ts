@@ -1,48 +1,16 @@
 import { resolveVideoCompositionRenderPasses } from '../../features/video/composition/timeline/render';
 import { hasCursorFollowingCameraAt } from '../../features/video/composition/motion/camera-interval';
 import { disposeEffectRuntimeComposition } from '../../features/video/composition/effect-runtime';
-import type { VideoCompositionTimelineIndex } from '../../features/video/composition/timeline/frame/index';
 import { resolveProjectExportRange } from '../../features/video/project/export/range';
-import type { VideoProject } from '../../features/video/project/types/model';
-import type { VideoProjectExportSettings } from '../../features/video/project/types/export';
 import { createVideoProjectCaptionRenderer } from '../../workflows/video-review/project-captions';
 import { createRecordingCursorTrajectoryRenderer } from '../../workflows/video-review/cursor-trajectory';
 import { createRecordingEventsRenderer } from '../../workflows/video-review/recording-events';
-import {
-  renderOffscreenProjectEffectFrames,
-  type OffscreenProjectEffectRuntime,
-} from './effect-runtime';
-import { drawProjectFrame, type LoadedImagesMap } from './renderer';
-import type { ExportSceneBackgroundCache } from './renderer/background';
+import { renderOffscreenProjectEffectFrames } from './effect-runtime';
+import { drawProjectFrame } from './renderer';
 import { getProjectExportSpatialRenderer, getProjectExportWatermarkRenderer } from './runtime';
-import type { ExportJobState } from './types';
+import type { ProjectCompositionSceneInput } from './types';
 
 /** Media synchronization and final joins/fades belong to the calling render path. */
-export interface ProjectCompositionSceneInput {
-  context: CanvasRenderingContext2D;
-  currentTime: number;
-  captionSampleTime?: number;
-  sourceSamplingFallback?: 'first' | 'last';
-  job: Pick<
-    ExportJobState,
-    | 'sourceSampling'
-    | 'cancelled'
-    | 'cameraSpatialRenderer'
-    | 'captionRenderer'
-    | 'watermarkRenderer'
-    | 'cursorTrajectoryRenderer'
-    | 'recordingEventsRenderer'
-  >;
-  loadedImages: LoadedImagesMap;
-  clipMediaElements: Parameters<typeof drawProjectFrame>[5];
-  project: VideoProject;
-  settings: VideoProjectExportSettings;
-  signal?: AbortSignal;
-  ownerDocument?: Document;
-  compositionIndex?: VideoCompositionTimelineIndex;
-  effectRuntime?: OffscreenProjectEffectRuntime;
-  backgroundCache?: ExportSceneBackgroundCache;
-}
 
 /** Draws the complete composition, including FX, captions and watermark, without final joins/fades. */
 export async function renderProjectCompositionScene(

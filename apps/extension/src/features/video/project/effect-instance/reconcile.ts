@@ -1,17 +1,8 @@
-import { resolveEffectOwner } from './owner';
-import { buildProjectTransitionSegments } from '../transition/project';
 import { VideoProjectClipType, type VideoProject, type VideoProjectEffectClip } from '../types';
 import { isEffectInstanceTimingEqual } from './timing';
 import type { VideoProjectEffectInstance } from './types';
 
-/**
- * Reconciles EffectV1 references after a project geometry mutation.
- *
- * Clip-target effects remain attached to their clip and are clipped by the shared
- * render/audio plans. Transition effects, whose timing is defined by the junction,
- * follow the rebuilt transition segment exactly. Missing targets and snapshots that
- * are no longer referenced are removed in the same project mutation wave.
- */
+/** Reconcile source-only annotations with their host clips in the same project mutation. */
 export function reconcileVideoProjectEffectInstances(project: VideoProject): VideoProject {
   const effectHosts = project.clips.filter(
     (clip): clip is VideoProjectEffectClip => clip.type === VideoProjectClipType.EFFECT
@@ -60,29 +51,8 @@ function reconcileEffectInstances(
       hostsByInstanceId.set(host.effectInstanceId, host);
     }
   }
-  const transitionSegments = new Map(
-    buildProjectTransitionSegments(project).map((segment) => [segment.id, segment])
-  );
   return (project.effectInstances ?? []).flatMap((instance) => {
-    if (instance.kind === 'targetEffect') {
-      const clip = resolveEffectOwner(project, instance.target);
-      if (!clip || clip.duration <= 0) return [];
-      if (instance.rangeMode === 'owner')
-        return [reconcileStandaloneInstanceTiming(instance, clip.startTime, clip.duration)];
-      const startTime = Math.max(instance.startTime, clip.startTime);
-      const end = Math.min(instance.startTime + instance.duration, clip.startTime + clip.duration);
-      if (end <= startTime) return [];
-      const duration = end - startTime;
-      const sourceStart =
-        (instance.sourceStart ?? 0) + (startTime - instance.startTime) * instance.playbackRate;
-      return [
-        instance.startTime === startTime &&
-        instance.duration === duration &&
-        instance.sourceStart === sourceStart
-          ? instance
-          : { ...instance, startTime, duration, sourceStart },
-      ];
-    }
+    if (instance.kind !== 'standalone') return [];
     if (instance.target.kind === 'scene') {
       const host = hostsByInstanceId.get(instance.id);
       if (!host) return [];
@@ -94,10 +64,7 @@ function reconcileEffectInstances(
         ];
       return [reconcileStandaloneInstanceTiming(instance, host.startTime, host.duration)];
     }
-    if (instance.target.kind !== 'transition') return [];
-    const segment = transitionSegments.get(instance.target.transitionId);
-    if (!segment) return [];
-    return [reconcileTransitionInstanceTiming(instance, segment.start, segment.end)];
+    return [];
   });
 }
 
@@ -140,23 +107,4 @@ function reconcileStandaloneInstanceTiming(
     return instance;
   }
   return { ...instance, duration, playbackRate, startTime };
-}
-
-function reconcileTransitionInstanceTiming(
-  instance: VideoProjectEffectInstance,
-  segmentStart: number,
-  segmentEnd: number
-): VideoProjectEffectInstance {
-  const duration = segmentEnd - segmentStart;
-  if (duration <= 0) return instance;
-  const documentDuration = instance.duration * instance.playbackRate;
-  const playbackRate = documentDuration / duration;
-  if (
-    isEffectInstanceTimingEqual(instance.startTime, segmentStart) &&
-    isEffectInstanceTimingEqual(instance.duration, duration) &&
-    isEffectInstanceTimingEqual(instance.playbackRate, playbackRate)
-  ) {
-    return instance;
-  }
-  return { ...instance, duration, playbackRate, startTime: segmentStart };
 }

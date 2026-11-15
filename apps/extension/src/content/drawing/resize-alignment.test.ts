@@ -308,3 +308,198 @@ it('retains Shift arrow endpoint direction while accepting only reached guides',
   expect(result.object.end.y).toBeCloseTo(300, 6);
   expect(result.guides.map((guide) => guide.axis)).toEqual(['x']);
 });
+
+it('snaps an explicit resize handle to a target center without translating its fixed edge', () => {
+  const result = resolveDrawingResizeAlignment({
+    ...gesture(shape(), 'e', { x: 296, y: 140 }),
+    domBounds: [{ x: 260, y: 240, width: 80, height: 80 }],
+  });
+  expect(getDrawingObjectBounds(result.object)).toEqual({ x: 100, y: 100, width: 200, height: 80 });
+  expect(result.guides.map((guide) => [guide.axis, guide.coordinate])).toEqual([['x', 300]]);
+});
+
+it('uses actual arrow target endpoints and retains independent origins for a single-axis match', () => {
+  const target: Extract<DrawingObject, { kind: 'arrow' }> = {
+    id: 'target-arrow',
+    kind: 'arrow',
+    start: { x: 300, y: 260 },
+    end: { x: 360, y: 320 },
+    color: '#000',
+    width: 8,
+    dynamicWidth: false,
+  };
+  const result = resolveDrawingResizeAlignment({
+    ...gesture(shape(), 'se', { x: 296, y: 256 }),
+    objects: [target],
+  });
+  expect(handlePoint(result.object, 'se')).toEqual(target.start);
+  expect(result.guides).toHaveLength(2);
+  for (const guide of result.guides) {
+    expect(guide.matches?.[0]).toMatchObject({
+      target: { id: target.id },
+      source: { kind: 'point', point: target.start },
+      anchor: { kind: 'point', point: target.start },
+    });
+  }
+  const axisOnly = resolveDrawingResizeAlignment({
+    ...gesture(shape(), 'se', { x: 296, y: 200 }),
+    objects: [target],
+  });
+  expect(axisOnly.guides.map((guide) => guide.axis)).toEqual(['x']);
+  expect(axisOnly.guides[0]?.matches?.[0]?.source.point).toEqual({ x: 300, y: 200 });
+  expect(axisOnly.guides[0]?.matches?.[0]?.anchor.point).toEqual(target.start);
+  expect(target.start).toEqual({ x: 300, y: 260 });
+});
+
+it.each(['e', 'w', 's', 'n', 'se'] as const)(
+  'matches unaligned sibling dimensions through the %s native handle',
+  (handle) => {
+    const original = shape();
+    const horizontal = handle.includes('e') || handle.includes('w');
+    const vertical = handle.includes('s') || handle.includes('n');
+    const start = handlePoint(original, handle);
+    const point = {
+      x: start.x + (horizontal ? (handle.includes('w') ? -16 : 16) : 0),
+      y: start.y + (vertical ? (handle.includes('n') ? -16 : 16) : 0),
+    };
+    const peer = { ...shape(), id: 'distant', bounds: { x: 700, y: 400, width: 120, height: 100 } };
+    const result = resolveDrawingResizeAlignment({
+      ...gesture(original, handle, point),
+      objects: [peer],
+    });
+    const b = getDrawingObjectBounds(result.object);
+    expect(b.width).toBe(horizontal ? 120 : 100);
+    expect(b.height).toBe(vertical ? 100 : 80);
+    expect(b.x + (handle.includes('w') ? b.width : 0)).toBe(handle.includes('w') ? 200 : 100);
+    expect(b.y + (handle.includes('n') ? b.height : 0)).toBe(handle.includes('n') ? 180 : 100);
+    expect(
+      result.relations.map((relation) =>
+        relation.kind === 'dimension' ? relation.dimension : 'gap'
+      )
+    ).toEqual([...(horizontal ? ['width'] : []), ...(vertical ? ['height'] : [])]);
+    expect(result.guides).toEqual([]);
+  }
+);
+
+it.each([false, true])(
+  'measures the six-pixel dimension threshold at the actual centered=%s handle',
+  (centered) => {
+    const original = shape();
+    const modifiers = { ctrlKey: centered, shiftKey: false };
+    const args = gesture(original, 'e', { x: 210, y: 140 }, modifiers);
+    const raw = getDrawingObjectBounds(args.draft.object);
+    const targetWidth = raw.width + (centered ? 12 : 6);
+    const peer = {
+      ...shape(),
+      id: 'peer',
+      bounds: { x: 700, y: 400, width: targetWidth, height: 30 },
+    };
+    const accepted = resolveDrawingResizeAlignment({ ...args, objects: [peer] });
+    expect(getDrawingObjectBounds(accepted.object).width).toBe(targetWidth);
+    expect(accepted.relations).toHaveLength(1);
+    const rejected = resolveDrawingResizeAlignment({
+      ...args,
+      objects: [{ ...peer, bounds: { ...peer.bounds, width: targetWidth + 0.000002 } }],
+    });
+    expect(rejected.object).toBe(args.draft.object);
+    expect(rejected.relations).toEqual([]);
+  }
+);
+
+it('uses one feasible ratio correction and verifies both logical dimensions', () => {
+  const original = shape();
+  const args = gesture(original, 'se', { x: 218, y: 194.4 }, { ctrlKey: false, shiftKey: true });
+  const peer = { ...shape(), id: 'peer', bounds: { x: 700, y: 400, width: 120, height: 96 } };
+  const result = resolveDrawingResizeAlignment({ ...args, objects: [peer] });
+  const bounds = getDrawingObjectBounds(result.object);
+  expect(bounds.x).toBe(100);
+  expect(bounds.y).toBe(100);
+  expect(bounds.width).toBeCloseTo(120, 8);
+  expect(bounds.height).toBeCloseTo(96, 8);
+  expect(result.relations).toMatchObject([{ kind: 'dimension', value: 96 }]);
+  expect(new Set(Object.values(result.acceptedByAxis)).size).toBe(1);
+});
+
+it('keeps the nearest point correction when a size relation requires a larger correction', () => {
+  const original = shape();
+  const peer = { ...shape(), id: 'peer', bounds: { x: 700, y: 400, width: 120, height: 30 } };
+  const result = resolveDrawingResizeAlignment({
+    ...gesture(original, 'e', { x: 216, y: 140 }),
+    objects: [peer],
+    domBounds: [{ x: 217, y: 180, width: 100, height: 100 }],
+  });
+  expect(getDrawingObjectBounds(result.object).width).toBe(117);
+  expect(result.relations).toEqual([]);
+  expect(result.guides[0]?.coordinate).toBe(217);
+});
+
+it('verifies rotated logical width and its real scene span without using an AABB width', () => {
+  const original = { ...shape(), rotation: 30 };
+  const start = handlePoint(original, 'e');
+  const movement = transformDrawingObjectVector(original, { x: 16, y: 0 });
+  const point = { x: start.x + movement.x, y: start.y + movement.y };
+  const peer = {
+    ...shape(),
+    id: 'peer',
+    rotation: 60,
+    bounds: { x: 700, y: 400, width: 120, height: 35 },
+  };
+  const result = resolveDrawingResizeAlignment({
+    ...gesture(original, 'e', point),
+    objects: [peer],
+  });
+  expect(getDrawingObjectBounds(result.object).width).toBeCloseTo(120, 8);
+  const relation = result.relations[0];
+  expect(relation).toMatchObject({ kind: 'dimension', dimension: 'width', value: 120 });
+  if (relation?.kind !== 'dimension') throw new Error('Expected a verified logical-width witness');
+  expect(
+    Math.hypot(
+      relation.sourceSpan.to.x - relation.sourceSpan.from.x,
+      relation.sourceSpan.to.y - relation.sourceSpan.from.y
+    )
+  ).toBeCloseTo(120, 8);
+  expect(
+    Math.hypot(
+      relation.targetSpans[0]!.to.x - relation.targetSpans[0]!.from.x,
+      relation.targetSpans[0]!.to.y - relation.targetSpans[0]!.from.y
+    )
+  ).toBeCloseTo(120, 8);
+});
+
+it('rejects an infeasible dimension correction and retains the raw source-constrained proposal', () => {
+  const original: DrawingObject = {
+    id: 'mask',
+    kind: 'simplify',
+    bounds: shape().bounds,
+    settings: { ...createDefaultSimplifySettings(), automatic: true },
+    source: {
+      dataUrl: 'data:image/png;base64,AA==',
+      width: 118,
+      height: 80,
+      bounds: { x: 100, y: 100, width: 118, height: 80 },
+    },
+  };
+  const args = gesture(original, 'e', { x: 216, y: 140 });
+  const peer = { ...shape(), id: 'peer', bounds: { x: 700, y: 400, width: 120, height: 35 } };
+  const result = resolveDrawingResizeAlignment({ ...args, objects: [peer] });
+  expect(result.object).toBe(args.draft.object);
+  expect(getDrawingObjectBounds(result.object).width).toBe(116);
+  expect(result.relations).toEqual([]);
+  expect(result.acceptedByAxis).toEqual({});
+});
+
+it('omits unsupported text logical dimensions while retaining native point alignment', () => {
+  const original: DrawingObject = {
+    id: 'text',
+    kind: 'text',
+    bounds: shape().bounds,
+    text: 'Title',
+    fontSize: 16,
+    color: '#000',
+    backgroundColor: null,
+    wrapWidth: 150,
+  };
+  const args = gesture(original, 'e', { x: 216, y: 140 });
+  const peer = { ...shape(), id: 'peer', bounds: { x: 700, y: 400, width: 120, height: 35 } };
+  expect(resolveDrawingResizeAlignment({ ...args, objects: [peer] }).relations).toEqual([]);
+});

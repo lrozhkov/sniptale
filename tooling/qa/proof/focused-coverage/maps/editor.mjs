@@ -1,5 +1,13 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'editor-frame-annotation-export',
+    productionFile:
+      'apps/extension/src/editor/controller/public-api/document/frame-annotation-export.ts',
+    reason:
+      'Frame export proof covers render order, proxy restoration, format conversion, cancellation and stale results.',
+    testFiles: ['apps/extension/src/editor/frame-annotation/export.test.ts'],
+  },
+  {
     owner: 'editor-frame-annotation-projection',
     productionFile: 'apps/extension/src/editor/frame-annotation/projection-read-only.tsx',
     reason:
@@ -92,13 +100,11 @@ export const EDITOR_OWNER_MAPPINGS = [
   },
   {
     owner: 'video-preview-canvas-region-gestures',
-    productionFile: 'apps/extension/src/video-editor/preview/stage/canvas/editor-region/gesture.ts',
+    productionFile: 'apps/extension/src/video-editor/preview/stage/canvas/effect-handles.tsx',
     reason:
-      'Region and anchor consumers retain shared arrow decoding, pointer preview, single commit \
-and cancellation behavior.',
+      'Lottie object anchors retain arrow decoding, pointer preview, single commit and cancellation behavior.',
     testFiles: [
-      'apps/extension/src/video-editor/preview/stage/canvas/editor-region/model.test.ts',
-      'apps/extension/src/video-editor/preview/stage/canvas/editor-region/index.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/canvas/root.test.tsx',
       'apps/extension/src/video-editor/preview/stage/canvas/index.test.tsx',
     ],
   },
@@ -172,6 +178,7 @@ and cancellation behavior.',
     allowCrossOwner: true,
     reason: 'Video isolation owns source fit, decorations, sharp feedback and failure cleanup.',
     testFiles: [
+      'apps/extension/src/workflows/video-review/source-filters-render.test.ts',
       'apps/extension/src/features/video/composition/draw/video.test.ts',
       'apps/extension/src/features/video/composition/draw/visual.test.ts',
       'apps/extension/src/features/video/composition/draw/visual.media-source.test.ts',
@@ -621,8 +628,14 @@ action-feedback-click-fields.test.tsx',
   {
     owner: 'gallery-review-opening-and-feedback',
     productionFile: 'apps/extension/src/gallery/video-review/index.tsx',
-    reason: 'The modal integration suite exercises opening, retry, feedback and editor navigation.',
-    testFiles: ['apps/extension/src/gallery/video-review/review.test.tsx'],
+    reason:
+      'Mounted shell and selection suites cover opening, navigation, tools and transient preview controls.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/review.test.tsx',
+      'apps/extension/src/gallery/video-review/index.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+    ],
   },
   {
     owner: 'gallery-review-opening-and-feedback',
@@ -660,6 +673,10 @@ action-feedback-click-fields.test.tsx',
     reason: `Mounted preview hooks exercise the session acquisition, source callbacks, stale
       results, publication, cancellation, failure diagnostics and retry lifecycle.`,
     testFiles: [
+      'apps/extension/src/gallery/video-review/preview-presentation-session.test.ts',
+      'apps/extension/src/gallery/video-review/preview-presentation-session.sources.test.ts',
+      'apps/extension/src/gallery/video-review/use-preview-presentation-camera.test.tsx',
+      'apps/extension/src/gallery/video-review/use-preview-presentation-performance.test.tsx',
       'apps/extension/src/gallery/video-review/use-preview-presentation.test.tsx',
       'apps/extension/src/gallery/video-review/use-preview-presentation-captions.test.tsx',
     ],
@@ -709,17 +726,7 @@ action-feedback-click-fields.test.tsx',
       'apps/extension/src/gallery/video-review/stage-geometry.test.tsx',
     ],
   },
-  {
-    owner: 'video-review-export-scene',
-    productionFile: 'apps/extension/src/workflows/video-review/render-export-scene.ts',
-    reason: `Export frame and overlay consumer suites execute the extracted scene composition,
-      borrowed raster lifetime and decorated lens sampling.`,
-    testFiles: [
-      'apps/extension/src/workflows/video-review/render-export.test.ts',
-      'apps/extension/src/workflows/video-review/scene-frame.test.ts',
-      'apps/extension/src/workflows/video-review/render-scene-overlays.test.ts',
-    ],
-  },
+
   {
     owner: 'gallery-review-annotation-numeric',
     productionFile: 'apps/extension/src/gallery/video-review/annotation-effects-numeric.tsx',
@@ -833,6 +840,8 @@ action-feedback-click-fields.test.tsx',
     testFiles: [
       'apps/extension/src/content/drawing/frame.test.ts',
       'apps/extension/src/content/drawing/freehand-parity.test.ts',
+      'apps/extension/src/content/drawing/render.test.ts',
+      'apps/extension/src/content/drawing/capture.test.ts',
     ],
   },
   {
@@ -875,6 +884,27 @@ action-feedback-click-fields.test.tsx',
     testFiles: [
       'apps/extension/src/editor/state/actions.test.ts',
       'apps/extension/src/editor/state/viewport-preview.test.ts',
+    ],
+  },
+  {
+    owner: 'editor-controller-layer-publication',
+    productionFile: 'apps/extension/src/editor/controller/core/controller-layer-actions.ts',
+    reason:
+      'Real layer publication and Undo proof supplements the existing controller delegation contract.',
+    testFiles: [
+      'apps/extension/src/editor/controller/core/controller-layer-actions.test.ts',
+      'apps/extension/src/editor/controller/core/controller.instance-delegation.test.ts',
+    ],
+  },
+  {
+    owner: 'editor-controller-layer-selection',
+    productionFile: 'apps/extension/src/editor/controller/public-api/layer-selection-actions.ts',
+    reason: 'Block publication and existing selection callbacks share this public API boundary.',
+    testFiles: [
+      'apps/extension/src/editor/controller/core/controller-layer-actions.test.ts',
+      'apps/extension/src/editor/controller/public-api/layer-selection-actions.test.ts',
+      'apps/extension/src/editor/controller/public-api/actions.coverage.test.ts',
+      'apps/extension/src/editor/controller/public-api/actions.callbacks.coverage.test.ts',
     ],
   },
   {
@@ -1300,10 +1330,14 @@ action-feedback-click-fields.test.tsx',
     reason:
       'Shared drawing geometry, creation, updates, selection, and sessions are covered by focused model suites.',
     testFiles: [
+      'apps/extension/src/features/drawing/alignment.test.ts',
+      'apps/extension/src/features/drawing/alignment-relations.test.ts',
       'apps/extension/src/features/drawing/arrow.test.ts',
       'apps/extension/src/features/drawing/create-update.test.ts',
       'apps/extension/src/features/drawing/geometry.test.ts',
       'apps/extension/src/features/drawing/model.test.ts',
+      'apps/extension/src/features/drawing/parser.test.ts',
+      'apps/extension/src/features/drawing/text-ink.test.ts',
       'apps/extension/src/features/drawing/preferences-sync.test.ts',
       'apps/extension/src/features/drawing/selection.test.ts',
       'apps/extension/src/features/drawing/session.test.ts',
@@ -1343,5 +1377,23 @@ action-feedback-click-fields.test.tsx',
       'apps/extension/src/editor/inspector/tools/shape-browser/custom-shapes.stale.test.tsx',
       'apps/extension/src/editor/inspector/tools/shape-browser/custom-shapes.test.tsx',
     ],
+  },
+  {
+    owner: 'editor-raster-region',
+    productionFile: 'apps/extension/src/editor/raster-editing/vendor/flood-fill.ts',
+    reason:
+      'Region, pixel and Worker tests cover fill tolerance, selection, transparency and clipped growth.',
+    testFiles: [
+      'apps/extension/src/editor/raster-editing/region.test.ts',
+      'apps/extension/src/editor/raster-editing/pixels.test.ts',
+      'apps/extension/src/editor/raster-editing/compute.test.ts',
+    ],
+  },
+  {
+    owner: 'editor-raster-brush',
+    productionFile: 'apps/extension/src/editor/raster-editing/vendor/bezier-line.ts',
+    reason:
+      'Brush tests execute interpolation through fast strokes, final segments, single stamps, Restore and clipping.',
+    testFiles: ['apps/extension/src/editor/raster-editing/brush.test.ts'],
   },
 ];

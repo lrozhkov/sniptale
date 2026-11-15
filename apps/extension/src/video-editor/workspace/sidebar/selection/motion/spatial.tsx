@@ -1,3 +1,4 @@
+import { SpatialMotionFields } from '../../../../../ui/focus-appearance/spatial';
 import { useEffect } from 'react';
 import {
   DEFAULT_CAMERA_DEPTH,
@@ -206,5 +207,17 @@ export function MotionSpatialReferenceFields(props: SpatialFieldProps) {
         {translate('videoEditor.sidebar.spatialReferenceReset')}
       </InspectorActionButton>
     </div>
+  );
+}
+
+export function MotionSpatialMotionFields(props: SpatialFieldProps) {
+  const editing = useMotionSpatialEditing(props);
+  return (
+    <SpatialMotionFields
+      perspective={props.motionRegion.perspective}
+      value={props.motionRegion.spatialMotion}
+      onChange={(value) => editing.commit({ kind: 'motion', ...value })}
+      onPreview={(value) => editing.preview(value ? { kind: 'motion', ...value } : null)}
+    />
   );
 }

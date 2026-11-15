@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { applySourceImageFilters } from '../../features/image-filters/reference';
+import { createSourceImageFilter } from '../../features/image-filters/contract';
 import { ReviewPreviewRendererContext } from './use-preview-preferences';
 import { act, type ComponentProps } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -282,6 +284,123 @@ it('paints live HTML through owned RGB when VideoFrame is absent', async () => {
   } finally {
     await act(async () => root.unmount());
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('repaints a mounted paused inspector when only source filter settings change', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div'),
+    root = createRoot(host),
+    source = document.createElement('canvas');
+  source.width = 64;
+  source.height = 32;
+  const context = source.getContext('2d')!;
+  context.fillStyle = 'rgb(32,64,96)';
+  context.fillRect(0, 0, 64, 32);
+  const size = { width: 64, height: 32 },
+    camera = { scale: 1, centerX: 0.5, centerY: 0.5 },
+    background = { enabled: false as const };
+  const color = createSourceImageFilter('color', 'color');
+  if (color.kind !== 'color') throw new Error('Expected color');
+  color.parameters.brightness = 2;
+  const props: ComponentProps<typeof ZoomPreviewCanvas> = {
+    sourceFilters: { version: 1, filters: [color] },
+    sourceSize: size,
+    background,
+    imageUrl: null,
+    camera,
+    frame: { image: source, ...size },
+    output: size,
+    view: 'result',
+    cornerRadius: 0,
+    layout: computeQuickEditSceneLayout({ output: size, source: size, background, camera }),
+    onCenter: vi.fn(),
+  };
+  const render = () =>
+    act(async () =>
+      root.render(
+        <ReviewPreviewRendererContext.Provider value="legacy">
+          <ZoomPreviewCanvas {...props} />
+        </ReviewPreviewRendererContext.Provider>
+      )
+    );
+  try {
+    await render();
+    const pixel = () => [
+      ...host.querySelector('canvas')!.getContext('2d')!.getImageData(32, 16, 1, 1).data,
+    ];
+    await vi.waitFor(() => expect(pixel()).toEqual([64, 128, 192, 255]));
+    props.sourceFilters = {
+      version: 1,
+      filters: [{ ...color, parameters: { ...color.parameters, brightness: 0.5 } }],
+    };
+    await render();
+    await vi.waitFor(() => expect(pixel()).toEqual([16, 32, 48, 255]));
+    expect([...context.getImageData(32, 16, 1, 1).data]).toEqual([32, 64, 96, 255]);
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('updates a held paused inspector source when only the seeded grain clock changes', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div'),
+    root = createRoot(host),
+    source = document.createElement('canvas');
+  source.width = 64;
+  source.height = 32;
+  const context = source.getContext('2d')!;
+  context.fillStyle = 'rgb(128,128,128)';
+  context.fillRect(0, 0, 64, 32);
+  const input = context.getImageData(0, 0, 64, 32).data,
+    size = { width: 64, height: 32 },
+    camera = { scale: 1, centerX: 0.5, centerY: 0.5 },
+    background = { enabled: false as const };
+  const grain = createSourceImageFilter('grain', 'grain');
+  if (grain.kind !== 'grain') throw new Error('Expected grain');
+  grain.parameters.amount = 0.8;
+  const sourceFilters = { version: 1 as const, filters: [grain] };
+  const props: ComponentProps<typeof ZoomPreviewCanvas> = {
+    currentTime: 0.2,
+    sourceFilters,
+    sourceSize: size,
+    background,
+    imageUrl: null,
+    camera,
+    frame: { image: source, ...size },
+    output: size,
+    view: 'result',
+    cornerRadius: 0,
+    layout: computeQuickEditSceneLayout({ output: size, source: size, background, camera }),
+    onCenter: vi.fn(),
+  };
+  const render = () =>
+    act(async () =>
+      root.render(
+        <ReviewPreviewRendererContext.Provider value="legacy">
+          <ZoomPreviewCanvas {...props} />
+        </ReviewPreviewRendererContext.Provider>
+      )
+    );
+  const expected = (time: number) => [
+    ...applySourceImageFilters(input, 64, 32, sourceFilters, size, time).slice(0, 16),
+  ];
+  try {
+    const pixel = () => [
+      ...host.querySelector('canvas')!.getContext('2d')!.getImageData(0, 0, 4, 1).data,
+    ];
+    await render();
+    await vi.waitFor(() => expect(pixel()).toEqual(expected(0.2)));
+    props.currentTime = 0.8;
+    await render();
+    await vi.waitFor(() => expect(pixel()).toEqual(expected(0.8)));
+    props.currentTime = 0.2;
+    await render();
+    await vi.waitFor(() => expect(pixel()).toEqual(expected(0.2)));
+  } finally {
+    await act(async () => root.unmount());
     vi.unstubAllGlobals();
   }
 });

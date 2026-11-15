@@ -1,3 +1,5 @@
+import { parseSourceImageFilterStack } from '../../features/image-filters/contract';
+import { QUICK_EDIT_ADVANCED_SCHEMA_VERSION } from '../../features/video/review/advanced/types';
 import { authoredCursorFocusPath } from '../../features/video/project/cursor-focus-path/authoring';
 import { loadQuickEditAdvancedContentState } from '../../features/video/review/advanced/validation';
 import { useRecoveryLifecycle } from './use-recovery-lifecycle';
@@ -184,13 +186,14 @@ export function useReviewAdvancedContent(
     flush,
     endTyping,
     reset,
-    commands: reviewContentCommands(stage),
+    commands: reviewContentCommands(stage, endTyping),
   };
 }
 
 /** Authored mutations share the debounced history writer, independent of its React lifecycle. */
 function reviewContentCommands(
-  stage: (mutation: ContentMutation, typing?: ReviewTextTypingTarget) => void
+  stage: (mutation: ContentMutation, typing?: ReviewTextTypingTarget) => void,
+  endTyping: () => void
 ) {
   return {
     setCameraFollowDefaults: (
@@ -246,6 +249,15 @@ function reviewContentCommands(
         }
         return { ...content, actionAudio: next };
       }),
+    setInteractionTimeline: (
+      update: (
+        current: NonNullable<QuickEditAdvancedContent['interactionTimeline']>
+      ) => NonNullable<QuickEditAdvancedContent['interactionTimeline']>
+    ) =>
+      stage((content) => ({
+        ...content,
+        interactionTimeline: update(content.interactionTimeline ?? { presses: [], overrides: [] }),
+      })),
     setKeyAnimations: (
       update: (
         current: NonNullable<QuickEditAdvancedContent['keyAnimations']>
@@ -274,6 +286,26 @@ function reviewContentCommands(
         const { presentation: _previous, ...rest } = content;
         return presentation ? { ...rest, presentation } : rest;
       }),
+    setCursorMotionEnabled: (cursorMotionEnabled: boolean) =>
+      stage((content) => ({
+        ...content,
+        schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
+        cursorMotionEnabled,
+      })),
+    setCursorMotions: (cursorMotions: NonNullable<QuickEditAdvancedContent['cursorMotions']>) =>
+      stage((content) => ({
+        ...content,
+        schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
+        cursorMotions,
+      })),
+    setSourceFilters: (value: QuickEditAdvancedState['sourceFilters']) => {
+      const sourceFilters = value === undefined ? undefined : parseSourceImageFilterStack(value);
+      if (sourceFilters === null) return;
+      stage((content) => {
+        const { sourceFilters: _previous, ...rest } = content;
+        return sourceFilters ? { ...rest, sourceFilters } : rest;
+      });
+    },
     setWindowHeader: (windowHeader: QuickEditAdvancedState['windowHeader']) =>
       stage((content) => {
         const { windowHeader: _previous, ...rest } = content;
@@ -293,7 +325,12 @@ function reviewContentCommands(
         return canvas ? { ...rest, canvas } : rest;
       }),
     setAudio: (
-      update: (audio: QuickEditAdvancedState['audio']) => QuickEditAdvancedState['audio']
-    ) => stage((content) => ({ ...content, audio: update(content.audio) })),
+      update: (audio: QuickEditAdvancedState['audio']) => QuickEditAdvancedState['audio'],
+      discrete = false
+    ) => {
+      if (discrete) endTyping();
+      stage((content) => ({ ...content, audio: update(content.audio) }));
+      if (discrete) endTyping();
+    },
   };
 }

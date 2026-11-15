@@ -1,12 +1,11 @@
+import { MotionFramingPreview } from '../motion/framing-preview';
 import { Crosshair } from 'lucide-react';
 import { OptionButtonsField } from '../shared/option-buttons';
 import { isCameraMotionRegion } from '../../../../../features/video/project/motion/normalization';
+import { MotionFocusFields, MotionFocusAnimationFields } from '../motion/appearance';
 import {
-  MotionEffectModeField,
-  MotionFocusFields,
-  MotionFocusAnimationFields,
-} from '../motion/appearance';
-import {
+  MotionSpatialMotionFields,
+  MotionCursorCompositionFields,
   MotionPerspectiveFields,
   MotionDepthFields,
   MotionSpatialReferenceFields,
@@ -26,9 +25,11 @@ import {
 } from '../motion/content';
 import { PANEL_SECTION_CLASS_NAME } from '../shared/panel';
 import { VideoEditorSelectionKind } from '../../../../contracts/selection';
-import { resolveMotionConnectionSource } from '../../../../../features/video/project/motion';
+import {
+  resolveActiveSpatialMotionRegions,
+  resolveMotionConnectionSource,
+} from '../../../../../features/video/project/motion';
 import { getTemporalEasingOptions } from '../effect-controls/options';
-import { VideoMotionFocusMode } from '../../../../../features/video/project/types';
 
 export function InspectMotionConnectionPanel(props: WorkspaceSidebarSelectionPanelProps) {
   const selection = props.selection;
@@ -85,7 +86,8 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
   }
   const isLocked = getVideoProjectUtilityLanes(props.project).camera.locked;
   const manualCamera =
-    isCameraMotionRegion(motionRegion) && motionRegion.focusMode !== VideoMotionFocusMode.CURSOR;
+    motionRegion.effect === '3d' &&
+    (!motionRegion.cursorComposition || motionRegion.cursorComposition.mode === 'off');
 
   return (
     <section className={PANEL_SECTION_CLASS_NAME}>
@@ -115,8 +117,26 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
             content: (
               <MotionInspectorFieldset locked={isLocked}>
                 <div className="sniptale-parameter-stack">
-                  <MotionEffectModeField motionRegion={motionRegion} panel={props} />
-                  {!isCameraMotionRegion(motionRegion) ? (
+                  {motionRegion.effect === '3d' &&
+                  !resolveActiveSpatialMotionRegions(props.project).some(
+                    (r) => r.id === motionRegion.id
+                  ) ? (
+                    <p
+                      role="status"
+                      className="text-xs text-[var(--sniptale-color-text-secondary)]"
+                    >
+                      {translate('gallery.videoReview.focus3dConflict')}
+                    </p>
+                  ) : null}
+                  {motionRegion.effect === '3d' ? (
+                    <>
+                      <MotionFramingPreview motionRegion={motionRegion} panel={props} />
+                      <MotionCursorCompositionFields motionRegion={motionRegion} panel={props} />
+                      {manualCamera ? (
+                        <MotionSpatialMotionFields motionRegion={motionRegion} panel={props} />
+                      ) : null}
+                    </>
+                  ) : !isCameraMotionRegion(motionRegion) ? (
                     <MotionFocusFields motionRegion={motionRegion} panel={props} />
                   ) : (
                     <MotionCameraFields motionRegion={motionRegion} panel={props} />
@@ -176,7 +196,7 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
             label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
             content: (
               <MotionInspectorFieldset locked={isLocked}>
-                {!isCameraMotionRegion(motionRegion) ? (
+                {motionRegion.effect !== '3d' && !isCameraMotionRegion(motionRegion) ? (
                   <MotionFocusAnimationFields motionRegion={motionRegion} panel={props} />
                 ) : (
                   <MotionBehaviorFields motionRegion={motionRegion} panel={props} />

@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../../../../apps/extension/src/features/video/project/transition/gl-catalog';
 import type { VideoProject } from '../../../../apps/extension/src/features/video/project/types';
 import { createQuickEditBorder } from '../../../../apps/extension/src/features/video/project/scene/focus-appearance';
 import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
@@ -22,11 +23,7 @@ import {
 } from '../extension-critical.helpers';
 import { startHostServer } from '../support/host-server';
 import { readFile, writeFile } from 'node:fs/promises';
-import { createHash } from 'node:crypto';
-import {
-  parseEffectV1Source,
-  resolveEffectV1ControlDefault,
-} from '@sniptale/runtime-contracts/effect-v1';
+import { createSourceImageFilter } from '../../../../apps/extension/src/features/image-filters/contract';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { isValidVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
 import { build } from 'esbuild';
@@ -473,7 +470,7 @@ for (const [index, size] of [
   });
 }
 
-test('encoded border composition retains canvas scope through transitions, EffectV1 and perspective', async ({
+test('encoded border composition retains canvas scope through transitions, source filters and perspective', async ({
   page,
 }, info) => {
   test.setTimeout(180000);
@@ -592,7 +589,8 @@ async function configureEncodedComposition(project: VideoProject) {
       leadingClipId: main.id,
       trailingClipId: trailing.id,
       duration: 0.2,
-      kind: 'CROSSFADE',
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       easing: 'LINEAR',
     },
   ];
@@ -610,7 +608,7 @@ async function configureEncodedComposition(project: VideoProject) {
   });
   const track = createVideoProjectTrack('Upper video', 1, 'PRIMARY');
   project.tracks.push(track);
-  const upper = {
+  const upper: typeof trailing = {
     ...structuredClone(trailing),
     id: 'border-upper',
     sourceInstanceId: 'border-upper-instance',
@@ -621,49 +619,13 @@ async function configureEncodedComposition(project: VideoProject) {
     transform: { x: 420, y: 220, width: 120, height: 90, rotation: 0, opacity: 1 },
   };
   project.clips.push(upper);
-  const source = await readFile(
-    new URL(
-      '../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/' +
-        'sniptale-video-warm.sniptale-effect.json',
-      import.meta.url
-    ),
-    'utf8'
-  );
-  const document = parseEffectV1Source(source).document;
-  if (!document) throw new Error('Invalid composition effect');
-  const sha256 = createHash('sha256').update(source).digest('hex');
-  const snapshotId = `effect:${sha256}`;
-  project.effectSnapshots = [
-    {
-      id: snapshotId,
-      sha256,
-      source,
-      assets: [],
-      retainedByteLength: Buffer.byteLength(source),
-      schemaVersion: 'sniptale.effect.v1',
-      documentId: document.id,
-      kind: document.kind,
-    },
-  ];
-  project.effectInstances = [
-    {
-      id: 'border-upper-fx',
-      kind: document.kind,
-      snapshotId,
-      target: { kind: 'clip', clipId: upper.id },
-      rangeMode: 'owner',
-      enabled: true,
-      startTime: 0,
-      duration: 1.2,
-      playbackRate: document.duration / 1.2,
-      controls: Object.fromEntries(
-        document.controls.map((control) => [
-          control.id,
-          resolveEffectV1ControlDefault(control, 'en'),
-        ])
-      ),
-    },
-  ];
+  const warmth = createSourceImageFilter('color', 'border-upper-warmth');
+  if (warmth.kind !== 'color') throw new Error('Expected color filter.');
+  warmth.parameters.temperature = 0.3;
+  warmth.parameters.saturation = 0.8;
+  warmth.intensity = 0.3;
+  upper.sourceFilters = { version: 1, filters: [warmth] };
+  project.version = 52;
 }
 
 function borderSamplePoints(composition = false) {

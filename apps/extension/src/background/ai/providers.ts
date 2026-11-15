@@ -1,5 +1,5 @@
 import { APICallError, type ProviderV4 } from '@ai-sdk/provider';
-import type { AIConnectionReason } from '../../contracts/settings/ai-catalog';
+import type { AIConnectionReason, AIModelOperation } from '../../contracts/settings/ai-catalog';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
@@ -23,7 +23,7 @@ interface AIProviderRuntimeOptions {
   baseUrl: string;
   apiKey: string;
   fetch: typeof globalThis.fetch;
-  operation: 'text' | 'transcription' | 'speech';
+  operation: AIModelOperation;
   compatibleChat?: {
     supportsStructuredOutputs: boolean;
     transformRequestBody?: (body: Record<string, unknown>) => Record<string, unknown>;
@@ -62,7 +62,9 @@ export function createAIProviderRuntime(options: AIProviderRuntimeOptions): Prov
     case 'cohere':
       return createCohere(settings);
     case 'openrouter':
-      return createOpenRouter(settings);
+      return options.operation === 'image-generation' || options.operation === 'image-editing'
+        ? createOpenAI(settings)
+        : createOpenRouter(settings);
     case 'elevenlabs':
       return createElevenLabs(settings);
     case 'deepgram':

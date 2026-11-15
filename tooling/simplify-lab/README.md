@@ -62,6 +62,58 @@ npm run simplify:check -- --corpus /absolute/path/corpus.json --full
 
 The manifest contains `cases` with `id`, `path`, and SHA-256 `sourceHash`. The server checks each PNG and hash before it starts. Paths must remain within the parent of the manifest directory after symbolic links resolve. No local corpus loads automatically. Do not commit private images or reports.
 
+## Generate a local text corpus
+
+The generator renders paired pages with identical layout. One page contains text. The other page hides only the text ink. The difference supplies an independent pixel mask. Separate masks protect panels, dividers, and other geometry. DOM coordinates identify fragments. They do not replace the pixel masks.
+
+```bash
+npm run simplify:corpus -- --profile smoke --seed 1
+npm run simplify:corpus -- --profile full --seed 1
+```
+
+The smoke profile contains eight pages. The full profile contains seventy pages with separate tuning and holdout template families. The recipes cover Cyrillic, Latin, Arabic, CJK, handwriting, typography, contrast, and region boundaries. Negative cases contain geometry without text. The generator uses local resources and blocks network requests.
+
+Install Playwright Chromium before generation. The operating system must support the Chromium sandbox. The font check requires `fc-query`. Default fonts include the pinned Liberation, DejaVu, Droid, and repository Marck Script resources. The generator refuses missing files, changed hashes, unsupported characters, and unexpected fallback fonts. Use `--font-config /absolute/path/fonts.json` to provide explicit replacement resources. The configuration contains a `fonts` array with the same fields as `DEFAULT_CORPUS_FONTS` in [`corpus-fonts.mjs`](corpus-fonts.mjs). Replacement resources change the corpus identity. They cannot reuse an incompatible baseline.
+
+The default output directory is `.tmp/simplify-corpus/<fingerprint>/`. Use `--out /absolute/path/new-directory` to select another directory. The generator verifies a completed corpus before reuse. It refuses unrelated directories and changed artifacts. It preserves partial output after failure. It does not delete previous results.
+
+The fingerprint includes recipes, generator sources, font bytes, Chromium, viewport, DPR, and native rendering versions. It excludes the Simplify engine. Each computation report records the engine identity separately. Repeated renders measure pixel noise. The generator checks paired layout, visible ink, fragment coordinates, and protected geometry.
+
+## Measure cleanup quality
+
+The benchmark uses the current application Worker with `erase: true`. Only source pixels, the processing region, and normal settings reach the Worker. The independent evaluator receives the references and masks after computation. It measures text residue, protected damage, background damage, and changes outside the region separately. Changing the color of retained letters does not count as complete removal.
+
+```bash
+npm run simplify:bench -- --profile smoke --seed 1 --out .tmp/simplify-corpus-runs/smoke-before
+npm run simplify:bench -- --profile full --seed 1 --split tuning --out .tmp/simplify-corpus-runs/before
+npm run simplify:bench -- --profile full --seed 1 --split tuning --baseline .tmp/simplify-corpus-runs/before/summary.json --out .tmp/simplify-corpus-runs/after
+```
+
+Each output directory must be new. The command creates or verifies the input corpus automatically. A complete initial measurement has status `baseline`. It does not establish sufficient quality. Freeze quality targets after that measurement and before engine changes. Measure holdout templates with `--split holdout` after tuning. Preserve their independent baseline before engine changes. If holdout results guide another correction, reclassify those inputs and create independent holdout cases.
+
+Revision 2 supplies two different holdout template families. It preserves the original tuning recipes. Create its baseline before the next engine change. Do not inspect its quality results during tuning.
+
+```bash
+npm run simplify:bench -- --profile full --seed 1 --holdout-revision 2 --split holdout --out .tmp/simplify-corpus-runs/replacement-before
+```
+
+Use `--corpus` to replay an immutable generated corpus after generator changes. The reader verifies the manifest sidecar and resources. It does not require the original generator code or font files. Existing baselines retain their original fingerprints. The reader does not rewrite them.
+
+```bash
+npm run simplify:corpus -- --profile full --seed 1 --out .tmp/simplify-frozen-inputs
+npm run simplify:bench -- --corpus .tmp/simplify-frozen-inputs/manifest.json --split tuning --out .tmp/simplify-corpus-runs/frozen-before
+```
+
+`--corpus` cannot accompany `--font-config` or `--holdout-revision`. If you also specify `--profile` or `--seed`, these values must match the frozen manifest. Record consumed holdouts in the study log. Preserve their original manifests and reports.
+
+Use repeated `--case-id <id>` options to select cases. Use `--failures-from <failures.jsonl>` to select earlier failures. Use `--limit <count>` to restrict the selected cohort. Subset reports identify their limited coverage. Comparison requires the same corpus, ordered cases, split, settings, oracle version, and thresholds. The comparison permits engine changes. Improved average recall cannot cancel new local damage or a new complete text miss. The `pass` status means no measured regression against the selected baseline. Inspect remaining failures and the frozen quality targets separately. A comparison does not guarantee complete text removal. It can retain existing text residue or geometry damage.
+
+The command writes `summary.json`, `cases.jsonl`, and `failures.jsonl`. Fragment records include text, coordinates, tags, settings, input hash, engine identity, and measured residue. Failure artifacts contain source, result, reference, and error-map PNGs. Use `--artifacts all` for every case or `--artifacts none` to omit these copies. The default is `--artifacts failures`.
+
+Incomplete or cancelled runs retain completed records and return a nonzero exit code. Invalid fonts, masks, computation, and incompatible baselines also prevent a successful comparison. Normal Simplify produces placeholder bands. Its expected result differs from the blank reference used for cleanup. Keep its product checks separate from cleanup quality metrics.
+
+Real sites require frozen source PNGs and capture provenance before engine changes. Compare the baseline and candidate on those exact bytes. Label unannotated changes `needs-review`. An unavailable site does not prove successful capture or quality. Limited manual controls establish only their annotated regions.
+
 ## Check the application
 
 The laboratory bundles the current `offscreen/simplify/worker.ts`, `offscreen/simplify/service.ts`, and `workflows/simplify/compute-client.ts` through the installed esbuild. The Worker runs outside the interface thread. Restart the server after source changes. This procedure checks computation, but it does not check background authorization in the extension.
@@ -70,10 +122,17 @@ Build the extension harness before the application check:
 
 ```bash
 npm run qa:e2e:build
-SNIPTALE_EXTENSION_BUILD_DIR=.tmp/e2e-builds/test npm exec playwright test -- tooling/test/e2e/extension-critical/extension-critical-simplify.spec.ts --workers=1
+SNIPTALE_EXTENSION_BUILD_DIR=.tmp/e2e-builds/test \
+  SNIPTALE_E2E_VIEWPORT=1280x560 npm exec playwright test -- \
+  tooling/test/e2e/extension-critical/extension-critical-simplify.spec.ts --grep 1280x560 --workers=1
+SNIPTALE_EXTENSION_BUILD_DIR=.tmp/e2e-builds/test \
+  SNIPTALE_E2E_VIEWPORT=1920x900 npm exec playwright test -- \
+  tooling/test/e2e/extension-critical/extension-critical-simplify.spec.ts --grep 1920x900 --workers=1
 ```
 
 These scenarios check the editor, page drawing, crop selection, and recording at 1280×560 and 1920×900. The editor harness substitutes platform storage and save operations. Its computation requests reach the real extension. Other surfaces use the real extension capture routes and Worker.
+
+Start the browser with the selected case viewport. Filter each run to its matching viewport. Page emulation can change CSS dimensions without changing the native capture raster.
 
 The scenarios check background, text changes, resized bands, manual image symbols, flattened screenshots, and decoded recording pixels. Normal runs do not change the Worker or open diagnostic documents.
 

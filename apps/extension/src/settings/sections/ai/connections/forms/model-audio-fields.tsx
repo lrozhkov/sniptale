@@ -11,6 +11,7 @@ import type {
   AITranscriptionModelParameters,
 } from '../../../../../contracts/settings/model-operation';
 import { translate } from '../../../../../platform/i18n';
+import { AI_MODEL_OPERATIONS } from '../../../../../contracts/settings/ai-catalog';
 
 type Props = {
   availableOperations?: readonly AIModelOperation[];
@@ -271,14 +272,22 @@ export function ModelAudioFields(props: Props) {
               label: translate('settings.aiProviders.modelOperationTranscription'),
             },
             { value: 'speech', label: translate('settings.aiProviders.modelOperationSpeech') },
+            {
+              value: 'image-generation',
+              label: translate('settings.aiProviders.modelOperationImageGeneration'),
+            },
+            {
+              value: 'image-editing',
+              label: translate('settings.aiProviders.modelOperationImageEditing'),
+            },
           ].filter(
             (option) =>
               props.availableOperations === undefined ||
               props.availableOperations.some((operation) => operation === option.value)
           )}
           onChange={(value) => {
-            if (value === 'text' || value === 'transcription' || value === 'speech')
-              props.onOperationChange?.(value);
+            const operation = AI_MODEL_OPERATIONS.find((operation) => operation === value);
+            if (operation) props.onOperationChange?.(operation);
           }}
         />
       </ProductField>

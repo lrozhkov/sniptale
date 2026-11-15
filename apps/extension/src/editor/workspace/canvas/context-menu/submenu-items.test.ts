@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { Canvas, Rect } from 'fabric';
+import { selectLayerObject } from '../../../controller/layer-actions/state/selection';
 import { expect, it, vi } from 'vitest';
 import {
   buildArrangeItems,
@@ -21,6 +23,9 @@ function createController(): CanvasContextMenuController {
     clearSelection: vi.fn(),
     deleteSelection: vi.fn(),
     duplicateSelection: vi.fn(async () => undefined),
+    copyVectorSelection: vi.fn(async () => true),
+    pasteVectorSelection: vi.fn(async () => true),
+    getVectorClipboardAvailability: vi.fn(() => ({ canCopy: false, canPaste: false })),
     mergeSelectedLayers: vi.fn(async () => undefined),
     resetZoom: vi.fn(),
     selectLayer: vi.fn(),
@@ -135,16 +140,19 @@ const selection = {
 
 it('resolves empty, selected, and directly targeted canvas context requests', () => {
   const controller = createController();
-  const target = {
-    sniptaleId: 'layer-1',
-    sniptaleRole: 'annotation',
-    sniptaleType: 'shape',
-  };
-  const canvas = Object.assign(Object.create(null), {
-    findTarget: vi.fn<() => unknown>(() => target),
-    getActiveObject: vi.fn(() => null),
+  const target = new Rect({ width: 80, height: 40 });
+  target.sniptaleId = 'layer-1';
+  target.sniptaleRole = 'annotation';
+  target.sniptaleType = 'shape';
+  const canvas = {
+    findTarget: vi.fn<Canvas['findTarget']>(() => ({
+      target,
+      subTargets: [],
+      currentSubTargets: [],
+    })),
+    getActiveObject: vi.fn(() => undefined),
     getActiveObjects: vi.fn(() => [target]),
-  });
+  };
   controller.canvas = canvas;
 
   expect(
@@ -166,7 +174,7 @@ it('resolves empty, selected, and directly targeted canvas context requests', ()
     })
   ).toEqual(expect.objectContaining({ kind: 'single' }));
 
-  canvas.findTarget.mockReturnValue(null);
+  canvas.findTarget.mockReturnValue({ subTargets: [], currentSubTargets: [] });
   expect(
     resolveCanvasContextMenuRequest({
       controller,
@@ -200,7 +208,7 @@ it('targets the frame annotation under a DOM context menu event', () => {
   expect(request).toEqual(
     expect.objectContaining({ kind: 'single', layer: expect.objectContaining({ id: 'frame-1' }) })
   );
-  expect(controller.selectLayer).toHaveBeenCalledWith('frame-1');
+  expect(controller.selectLayer).toHaveBeenCalledWith('frame-1', { focusViewport: false });
 });
 
 it('clamps menu placement and chooses a submenu side from available space', () => {
@@ -222,7 +230,7 @@ it('clamps menu placement and chooses a submenu side from available space', () =
       request: { kind: 'single', layer },
       wrapperElement,
     })
-  ).toEqual(expect.objectContaining({ style: { left: 20, top: 140 }, submenuSide: 'right' }));
+  ).toEqual(expect.objectContaining({ style: { left: 20, top: 44 }, submenuSide: 'right' }));
   expect(
     resolveCanvasContextMenuState({
       anchor: { x: 790, y: 10 },
@@ -230,4 +238,43 @@ it('clamps menu placement and chooses a submenu side from available space', () =
       wrapperElement,
     }).submenuSide
   ).toBe('left');
+});
+
+it('selects the real Fabric 7 hit target from its result container', async () => {
+  const canvas = new Canvas(undefined, { width: 300, height: 200, renderOnAddRemove: false });
+  try {
+    const target = new Rect({ left: 30, top: 40, width: 80, height: 40, fill: '#ff0000' });
+    target.sniptaleId = 'layer-1';
+    target.sniptaleType = 'shape';
+    target.sniptaleRole = 'annotation';
+    canvas.add(target);
+    canvas.calcOffset();
+    const event = new MouseEvent('contextmenu', { clientX: 50, clientY: 60, button: 2 });
+    expect(canvas.findTarget(event).target).toBe(target);
+    const controller = createController();
+    controller.canvas = canvas;
+    controller.selectLayer = vi.fn((id: string, options?: { focusViewport?: boolean }) => {
+      selectLayerObject(
+        canvas,
+        id,
+        options ?? {},
+        () => false,
+        () => canvas.setViewportTransform([1, 0, 0, 1, -60, -40])
+      );
+    });
+    const viewport = [...canvas.viewportTransform];
+    const request = resolveCanvasContextMenuRequest({
+      controller,
+      event,
+      hasImage: true,
+      layers: [layer],
+      selection: { ...selection, hasSelection: false, selectedObjectIds: [] },
+    });
+    expect(request).toMatchObject({ kind: 'single', layer: { id: 'layer-1' } });
+    expect(controller.selectLayer).toHaveBeenCalledWith('layer-1', { focusViewport: false });
+    expect(canvas.getActiveObject()).toBe(target);
+    expect(canvas.viewportTransform).toEqual(viewport);
+  } finally {
+    await canvas.dispose();
+  }
 });

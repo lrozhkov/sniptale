@@ -18,6 +18,7 @@ export interface CursorFocusKey extends CursorFocusPoint {
 }
 
 export type CursorFocusBinding =
+  | { kind: 'source'; assetId: string; sourceInstanceId: string }
   | { kind: 'project' }
   | { kind: 'recording-source'; recordingId: string; sourceInstanceId: string };
 

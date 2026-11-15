@@ -1,5 +1,5 @@
 import type { Canvas } from 'fabric';
-import { reorderLayerObjects } from '../../../layer-actions';
+import { reorderLayerObjects, reorderLayerBlockObjects } from '../../../layer-actions';
 import { synchronizeFrameAnnotationOrdering } from '../../../../frame-annotation/proxy';
 
 export function reorderEditorLayer(options: {
@@ -21,4 +21,20 @@ export function reorderEditorLayer(options: {
   canvas?.requestRenderAll();
   commitHistory();
   syncRuntimeState();
+}
+
+export function reorderEditorLayerBlock(options: {
+  canvas: Canvas | null;
+  ids: readonly string[];
+  beforeId: string | null;
+  sendFrameObjectsToBack: () => void;
+  commitHistory: () => void;
+  syncRuntimeState: () => void;
+}): void {
+  if (!reorderLayerBlockObjects(options.canvas, options.ids, options.beforeId)) return;
+  options.sendFrameObjectsToBack();
+  synchronizeFrameAnnotationOrdering(options.canvas?.getObjects?.() ?? []);
+  options.canvas?.requestRenderAll();
+  options.commitHistory();
+  options.syncRuntimeState();
 }

@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { collectTargetAssetSnapshot } from './retention-index';
 import { createTargetAssetDatabaseFixture } from './retention-authority.test-support';
 
@@ -12,6 +12,28 @@ const ref = {
   location: { kind: 'opfs', objectKey: 'objects/target' },
 };
 const owner = { ownerKind: 'project-asset', ownerId: 'private', role: 'body', assetId: 'target' };
+
+it('returns no retirement authority after cancellation during evidence collection', async () => {
+  const controller = new AbortController();
+  const fixture = createTargetAssetDatabaseFixture(async (name) => {
+    if (name === 'asset_refs') controller.abort(new Error('maintenance cancelled'));
+    return [];
+  });
+  const transaction = vi.spyOn(fixture, 'transaction');
+  await expect(collectTargetAssetSnapshot(fixture, ['target'], controller.signal)).rejects.toThrow(
+    'maintenance cancelled'
+  );
+  expect(transaction.mock.results[0]?.value.abort).toHaveBeenCalledOnce();
+});
+
+it('refuses malformed selected reference evidence rather than reporting an unclaimed asset', async () => {
+  const db = createTargetAssetDatabaseFixture(async (name) =>
+    name === 'asset_refs' ? [{ ...ref, size: -1 }] : []
+  );
+  const snapshot = await collectTargetAssetSnapshot(db, ['target']);
+  expect(snapshot.authorityValid).toBe(false);
+  expect(snapshot.refs).toEqual([]);
+});
 
 it('reads only target claims while preserving projected owners and immutable bindings', async () => {
   const unrelated = Array.from({ length: 1000 }, (_, index) => ({

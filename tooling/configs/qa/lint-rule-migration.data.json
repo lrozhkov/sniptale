@@ -493,6 +493,8 @@
       "no-this-before-super",
       "no-unreachable",
       "no-unsafe-negation",
+      "no-unused-vars",
+      "no-useless-assignment",
       "no-useless-escape",
       "no-var",
       "no-with",

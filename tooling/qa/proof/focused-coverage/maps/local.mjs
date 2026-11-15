@@ -1,5 +1,251 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'review-inserted-time-contract',
+    productionFile: 'apps/extension/src/features/video/review/time-segment.ts',
+    reason:
+      'Timeline, lane and export tests cover source/result intervals and held source samples.',
+    testFiles: [
+      'apps/extension/src/features/video/review/timeline.test.ts',
+      'apps/extension/src/features/video/review/document.test.ts',
+      'apps/extension/src/features/video/review/freeze-ripple.test.ts',
+      'apps/extension/src/features/video/review/voiceover-edits.test.ts',
+      'apps/extension/src/features/video/review/project-timeline.test.ts',
+      'apps/extension/src/workflows/video-review/render-schedule.test.ts',
+      'apps/extension/src/workflows/video-review/audio-render.test.ts',
+    ],
+  },
+  {
+    owner: 'review-authored-contract',
+    productionFile: 'apps/extension/src/features/video/review/types.ts',
+    reason:
+      'History, validation, conversion and persistence test authored review operations and time maps.',
+    testFiles: [
+      'apps/extension/src/features/video/review/timeline.test.ts',
+      'apps/extension/src/features/video/review/document.test.ts',
+      'apps/extension/src/features/video/review/freeze-ripple.test.ts',
+      'apps/extension/src/features/video/review/fragment.test.ts',
+      'apps/extension/src/features/video/review/project-conversion.camera.test.ts',
+      'apps/extension/src/features/video/review/project-conversion.voiceover.test.ts',
+      'apps/extension/src/features/video/review/advanced/advanced-state.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store.test.ts',
+    ],
+  },
+  {
+    owner: 'review-source-audio-anchor-admission',
+    productionFile: 'apps/extension/src/features/video/review/voiceover-validation.ts',
+    reason:
+      'Audio projection and advanced admission tests check retained sample anchors and source maps.',
+    testFiles: [
+      'apps/extension/src/features/video/review/voiceover-edits.test.ts',
+      'apps/extension/src/features/video/review/advanced/advanced.test.ts',
+      'apps/extension/src/features/video/review/advanced/advanced-state.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store-voiceover.test.ts',
+    ],
+  },
+  {
+    owner: 'review-comment-navigation',
+    productionFile: 'apps/extension/src/gallery/video-review/use-review-comments.ts',
+    reason: 'Mounted comment and selection tests check navigation and pause ownership.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/review-selection.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/index.test.tsx',
+      'apps/extension/src/gallery/video-review/review.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-editing-tool-admission',
+    productionFile: 'apps/extension/src/gallery/video-review/use-review-editing.ts',
+    reason:
+      'Mounted editing, source admission and workspace CAS tests check history commands and refused writes.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/index.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/use-edits.test.tsx',
+      'apps/extension/src/workflows/video-review/freeze-frame.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store.test.ts',
+    ],
+  },
+  {
+    owner: 'review-result-clock-adapter',
+    productionFile: 'apps/extension/src/gallery/video-review/use-review-time.ts',
+    reason: 'Transport and mounted readouts test source/result clocks and pause or seek updates.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/use-playback.test.tsx',
+      'apps/extension/src/gallery/video-review/timeline-chrome.test.tsx',
+      'apps/extension/src/gallery/video-review/use-review-transport.test.tsx',
+      'apps/extension/src/gallery/video-review/index.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-inserted-playback-clock',
+    productionFile: 'apps/extension/src/gallery/video-review/use-freeze-playback.ts',
+    reason:
+      'Controlled playback tests check held source, project time, pause, resume, loops and insertion removal.',
+    testFiles: ['apps/extension/src/gallery/video-review/use-playback.test.tsx'],
+  },
+  {
+    owner: 'review-presented-clock',
+    productionFile: 'apps/extension/src/gallery/video-review/playback-presentation-clock.ts',
+    reason:
+      'Transport validation and mounted readouts cover presented time, pause, seek and stale commits.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/use-playback.test.tsx',
+      'apps/extension/src/gallery/video-review/timeline-chrome.test.tsx',
+      'apps/extension/src/gallery/video-review/stage-presentation.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-project-motion-conversion',
+    productionFile: 'apps/extension/src/features/video/review/project-motion.ts',
+    reason:
+      'Camera conversion covers independent 3D, source bindings, transitions, cursor orientation and scene settings.',
+    testFiles: [
+      'apps/extension/src/features/video/review/project-conversion.motion.test.ts',
+      'apps/extension/src/features/video/review/project-conversion.camera.test.ts',
+      'apps/extension/src/features/video/review/project-conversion.cursor.test.ts',
+      'apps/extension/src/features/video/review/project-conversion.scene.test.ts',
+      'apps/extension/src/features/video/review/project-conversion.test.ts',
+    ],
+  },
+  {
+    owner: 'review-workspace-source-admission',
+    productionFile: 'apps/extension/src/composition/persistence/review-workspaces/parser.ts',
+    reason:
+      'Admission checks baseline, redo, canonical append, asset closure, embedded sources and portable restore.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/review-workspaces/parser.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store-incremental.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store-annotation-retention.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/annotation-effects.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/asset-refs.operations.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/asset-refs.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/backup-restore-authored-content.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/focus-compatibility.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/backup-restore.test.ts',
+    ],
+  },
+  {
+    owner: 'review-authored-interaction-ui',
+    productionFile: 'apps/extension/src/gallery/video-review/interaction-editor.tsx',
+    reason:
+      'Mounted authoring flows cover press creation, timing, copy, deletion and journal recovery.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/review-selection.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/use-advanced-content.test.tsx',
+      'apps/extension/src/gallery/video-review/action-properties.test.tsx',
+      'apps/extension/src/gallery/video-review/timeline-telemetry.test.tsx',
+      'apps/extension/src/gallery/video-review/keyboard-chord.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-track-inspector-navigation',
+    productionFile: 'apps/extension/src/gallery/video-review/track-workspace.tsx',
+    reason:
+      'Inspector and mounted editor suites cover lane tabs, selection, mode, Back and pending-note admission.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/review.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/timeline-track-selection.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-history-row-presentation',
+    reason: 'History rows preserve selection, navigation and displayed action details.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/action-history.test.tsx',
+      'apps/extension/src/gallery/video-review/action-history-rendering.test.tsx',
+    ],
+    productionFile: 'apps/extension/src/gallery/video-review/action-history-list.tsx',
+  },
+  {
+    owner: 'review-authored-cursor-ui',
+    reason: 'Authored cursor controls use the existing content journal and inspector selection.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/cursor-motion-editor.test.tsx',
+      'apps/extension/src/gallery/video-review/use-advanced-content.test.tsx',
+      'apps/extension/src/gallery/video-review/inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+    ],
+    productionFile: 'apps/extension/src/gallery/video-review/cursor-motion-editor.tsx',
+  },
+  {
+    owner: 'review-authored-cursor-ui',
+    reason: 'Authored cursor controls use the existing content journal and inspector selection.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/cursor-motion-editor.test.tsx',
+      'apps/extension/src/gallery/video-review/use-advanced-content.test.tsx',
+      'apps/extension/src/gallery/video-review/inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+    ],
+    productionFile: 'apps/extension/src/gallery/video-review/cursor-motion-overlay.tsx',
+  },
+  {
+    owner: 'review-track-collection-actions',
+    reason:
+      'Collection actions preserve batch identities, clone placement and selected-item navigation.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/timeline-batch-inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/timeline-batch-selection.test.ts',
+      'apps/extension/src/gallery/video-review/timeline-clone.test.ts',
+      'apps/extension/src/gallery/video-review/track-items.test.ts',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/inspector.test.tsx',
+    ],
+    productionFile: 'apps/extension/src/gallery/video-review/timeline-batch-inspector.tsx',
+  },
+  {
+    owner: 'review-track-collection-actions',
+    reason:
+      'Collection actions preserve batch identities, clone placement and selected-item navigation.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/timeline-batch-inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/timeline-batch-selection.test.ts',
+      'apps/extension/src/gallery/video-review/timeline-clone.test.ts',
+      'apps/extension/src/gallery/video-review/track-items.test.ts',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/inspector.test.tsx',
+    ],
+    productionFile: 'apps/extension/src/gallery/video-review/timeline-clone-action.tsx',
+  },
+  {
+    owner: 'review-track-collection-actions',
+    reason:
+      'Collection actions preserve batch identities, clone placement and selected-item navigation.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/timeline-batch-inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/timeline-batch-selection.test.ts',
+      'apps/extension/src/gallery/video-review/timeline-clone.test.ts',
+      'apps/extension/src/gallery/video-review/track-items.test.ts',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/inspector.test.tsx',
+    ],
+    productionFile: 'apps/extension/src/gallery/video-review/track-items-inspector.tsx',
+  },
+  {
+    owner: 'review-edit-snap-consumers',
+    reason: 'Edit snapping is exercised by source-axis magnets and timeline gestures.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/timeline-magnets.test.ts',
+      'apps/extension/src/gallery/video-review/timeline-drag.test.tsx',
+      'apps/extension/src/gallery/video-review/timeline-selection.test.tsx',
+    ],
+    productionFile: 'apps/extension/src/gallery/video-review/timeline-edit-snap.ts',
+  },
+  {
+    owner: 'review-webcam-position-gesture',
+    reason: 'Webcam position editing preserves source-axis placement and selection.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/webcam-ui.test.tsx',
+      'apps/extension/src/gallery/video-review/webcam-editor.test.tsx',
+      'apps/extension/src/gallery/video-review/timeline-binding.test.tsx',
+    ],
+    productionFile: 'apps/extension/src/gallery/video-review/webcam-position-marker.tsx',
+  },
+  {
     owner: 'i18n-catalog-data-proof',
     productionDataFiles: [
       'apps/extension/src/platform/i18n/catalogs/en.json',
@@ -101,10 +347,12 @@ dispatch retry and native replica validation.`,
 purged-root refusal and recovery validation.`,
     testFiles: [
       'apps/extension/src/composition/persistence/document-assets/codec.test.ts',
+      'apps/extension/src/composition/persistence/document-assets/codec.vector-elements.test.ts',
       'apps/extension/src/composition/persistence/document-assets/ownership.test.ts',
       'apps/extension/src/composition/persistence/image-aggregates/mutations.test.ts',
       'apps/extension/src/composition/persistence/image-aggregates/mutations.reused-assets.test.ts',
       'apps/extension/src/composition/persistence/image-aggregates/mutations.root-lifecycle.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.vector-assets.test.ts',
     ],
   },
   {
@@ -233,6 +481,7 @@ cancellation and keyboard movement.',
       'The content writer preserves closed gesture groups, failed-capture retry, concurrent \
 rebasing, reset generations and the existing autosave session boundary.',
     testFiles: [
+      'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
       'apps/extension/src/gallery/video-review/use-advanced-content.test.tsx',
       'apps/extension/src/gallery/video-review/use-advanced.test.tsx',
       'apps/extension/src/gallery/video-review/use-advanced.autosave.test.tsx',
@@ -418,7 +667,7 @@ history and persistence.',
       'apps/extension/src/features/video/project/validation/root.test.ts',
       'apps/extension/src/features/video/project/comments/projection.test.ts',
       'apps/extension/src/features/video/project/text/projection.test.ts',
-      'apps/extension/src/features/video/project/effect-instance/time-map.test.ts',
+      'apps/extension/src/features/video/project/effect-instance/editing.test.ts',
       'apps/extension/src/video-editor/project/operations/source-timed-clips.test.ts',
       'apps/extension/src/video-editor/project/history/index.test.ts',
       'apps/extension/src/composition/persistence/projects/backup-restore.test.ts',
@@ -467,7 +716,7 @@ history and persistence.',
       'apps/extension/src/offscreen/project-export/renderer/frame.locked-overlays.motion-blur.test.ts',
       'apps/extension/src/offscreen/project-export/renderer/frame.test.ts',
       'apps/extension/src/video-editor/preview/stage/scene/locked-overlays-motion-blur.test.tsx',
-      'apps/extension/src/video-editor/preview/stage/scene/render-visual.test.tsx',
+      'apps/extension/src/workflows/video/native-composition/render-visual.test.tsx',
       'apps/extension/src/video-editor/project/state/clip-timeline/actions.test.ts',
       'apps/extension/src/video-editor/project/state/clip-timeline/split-partial.test.ts',
       'apps/extension/src/video-editor/project/state/clip-timeline/split-text.test.ts',
@@ -496,7 +745,7 @@ history and persistence.',
       'apps/extension/src/features/video/project/validation/root.test.ts',
       'apps/extension/src/video-editor/runtime/controller/shared-actions.test.ts',
       'apps/extension/src/video-editor/workspace/sidebar/selection/scene-background/fields.test.tsx',
-      'apps/extension/src/video-editor/preview/stage/scene/canvas.test.tsx',
+      'apps/extension/src/workflows/video/native-composition/canvas.test.tsx',
       'apps/extension/src/offscreen/project-export/renderer/background.test.ts',
       'apps/extension/src/features/video/project/library-source-removal.test.ts',
       'apps/extension/src/composition/persistence/media-library/delete-cascade.test.ts',
@@ -671,6 +920,11 @@ Both paths must apply the same expansion policy and conflict interval.`,
     reason:
       'Media shadow commands affect schema admission, track copies, shared rendering and inspector routing.',
     testFiles: [
+      'apps/extension/src/video-editor/project/state/clip-property/media-crop.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-property/media-padding.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-property/media-roundness.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-property/source-filters.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/source-filters.test.tsx',
       'apps/extension/src/features/video/project/validation/root.test.ts',
       'apps/extension/src/features/video/project/validation/clips.test.ts',
       'apps/extension/src/features/video/project/hydration/clip.test.ts',

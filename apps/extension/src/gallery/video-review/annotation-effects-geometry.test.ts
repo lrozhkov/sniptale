@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
+import { validateAnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
 import {
-  resolveEffectV1ControlDefault,
-  validateEffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
+  parseEffectControlValues,
+  resolveEffectControlDefault,
+} from '@sniptale/runtime-contracts/effect-controls';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { quickEditSpatialTargetCamera } from '../../features/video/review/advanced/spatial';
@@ -39,17 +40,19 @@ const transform = { x: 0.3, y: 0.3, width: 0.3, height: 0.2, rotation: 0.15 };
 function builtin(name: string) {
   const raw: unknown = JSON.parse(
     readFileSync(
-      `apps/extension/public/video-effects/effects/annotations/sniptale-${name}/effect.sniptale-effect.json`,
+      name === 'callout'
+        ? 'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
+        : `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
       'utf8'
     )
   );
-  const result = validateEffectV1Document(raw);
-  if (!result.ok || !result.document) throw new Error('Invalid builtin fixture');
-  return result.document;
+  const result = validateAnimationTemplate(raw);
+  if (!result.ok || !result.template) throw new Error('Invalid builtin fixture');
+  return result.template;
 }
 function instance(document = builtin('callout')): ReviewAnnotationEffect {
   const values = Object.fromEntries(
-    document.controls.map((control) => [control.id, resolveEffectV1ControlDefault(control, 'en')])
+    document.controls.map((control) => [control.id, resolveEffectControlDefault(control, 'en')])
   );
   const bound = new Set(
     document.objectLayout?.handles?.flatMap((handle) => [handle.xControl, handle.yControl])
@@ -338,3 +341,45 @@ it('keeps a rotated resize opposite corner fixed and rotates around the body cen
   expect(rotated.transform).toMatchObject({ x: transform.x, y: transform.y });
   expect(original.transform).toEqual(transform);
 });
+
+it.each(['start', 'end'])(
+  'keeps the handwritten arrow %s handle inside admitted controls',
+  (handle) => {
+    const document = builtin('arrow');
+    const original = instance(document);
+    const geometry = createReviewAnnotationGeometry({
+      source,
+      output,
+      camera,
+      background: { enabled: false },
+    })!;
+    const patch = previewReviewAnnotationDrag({
+      instance: original,
+      document,
+      geometry,
+      start: { x: 0, y: 0 },
+      point: { x: 50000, y: -50000 },
+      kind: { anchor: handle },
+    })!;
+    const controls = resolveReviewAnnotationEffectControls(
+      document,
+      { ...original, ...patch },
+      geometry[original.attachment]
+    );
+    expect(parseEffectControlValues(document, controls)).not.toBeNull();
+    expect(patch.anchors?.[handle]).not.toEqual(original.anchors?.[handle]);
+    const other = handle === 'start' ? 'end' : 'start';
+    expect(patch.anchors?.[other]).toEqual(original.anchors?.[other]);
+    const raw = patch.anchors![handle]!;
+    const projected = projectQuickEditPoint(geometry.contentToViewport, {
+      x: raw.x * geometry.content.width,
+      y: raw.y * geometry.content.height,
+    })!;
+    const drawn = reviewAnnotationBodyGeometry(
+      { ...original, ...patch },
+      document,
+      geometry
+    )!.handles.find((item) => item.id === handle)!;
+    closePoint(drawn.point, projected);
+  }
+);

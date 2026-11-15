@@ -1,3 +1,4 @@
+import { applyReviewOperation } from './document';
 import { prepareReviewProjectVoiceSnapshots } from './project-audio';
 import { editReviewTextFragment } from './text-document';
 import { applyVideoProjectTextEdit } from '../project/text/authoring';
@@ -507,4 +508,64 @@ it('transfers detached result speech metadata without reviving replacements or d
   expect(reopened?.clips.find((clip) => clip.id === converted.id)).toEqual(converted);
   expect(isExportReadyVideoProject(removed)).toBe(true);
   expect(args).toEqual(before);
+});
+
+it('transfers crossing voiceover and later music through a freeze without playing held source samples', () => {
+  const input = externalAudioFixture();
+  input.document.edits = [];
+  input.document.advancedContent.audio.voiceover[0] = {
+    ...input.document.advancedContent.audio.voiceover[0]!,
+    timelineStart: 1,
+    duration: 2,
+    tempo: 1,
+  };
+  input.document = applyReviewOperation(
+    input.document,
+    {
+      id: 'insert',
+      at: 1,
+      target: 'edit',
+      before: null,
+      after: {
+        id: 'hold',
+        kind: 'freeze',
+        start: 2,
+        end: 2,
+        requestedStart: 2,
+        requestedEnd: 2,
+        duration: 2,
+        frameTime: 1.98,
+        frameDuration: 0.04,
+      },
+      preserveVoiceoverAnchors: true,
+      preserveFocusAnchors: true,
+      preserveUnderCuts: true,
+      preserveTextAnchors: true,
+    },
+    input.source
+  );
+  const result = planReviewProjectConversion(input);
+  expect(result.status).toBe('prepared');
+  if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+  expect(isExportReadyVideoProject(result.project)).toBe(true);
+  const actual = planProjectSourceVoiceoverPlayback(result.project);
+  expect(
+    new Set(result.project.sourceVoiceoverDocuments!.map((document) => document.id)).size
+  ).toBe(2);
+  const voice = actual
+    .filter((entry) => entry.trackId === 'voice-track')
+    .map(({ entry }) => [entry.timelineStart, entry.duration, entry.sourceOffset]);
+  const music = actual
+    .filter((entry) => entry.trackId === 'music-track')
+    .map(({ entry }) => [entry.timelineStart, entry.duration, entry.sourceOffset]);
+  expect(voice).toEqual([
+    [1, 1, 0.5],
+    [4, 1, 1.5],
+  ]);
+  expect(music).toEqual([[4, 3, 1]]);
+  expect(
+    actual.every(
+      ({ entry }) => entry.timelineStart >= 4 || entry.timelineStart + entry.duration <= 2
+    )
+  ).toBe(true);
 });

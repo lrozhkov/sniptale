@@ -1,11 +1,16 @@
 // @vitest-environment jsdom
-import { Group, util, type FabricObject } from 'fabric';
+import { Canvas, Group, Rect, util, type FabricObject } from 'fabric';
 import { buildScenarioEditorCanvasDocument } from '../../../../../features/scenario/capture-step/editor-canvas-document';
 import { normalizeScenarioAnnotationsInCanvasJson } from '../../../../document/scenario-annotation-import';
 import { assertValidEditorDrawingCanvasJson } from '../../../../document/import-boundary';
 import { CUSTOM_JSON_PROPS } from '../../../../document/model/custom-json-props';
 import { expect, it, vi } from 'vitest';
 
+import { createDefaultRichShapeObject } from '../../../../../features/editor/document/rich-shape';
+import {
+  createFrameAnnotationProxy,
+  readFrameAnnotationSnapshot,
+} from '../../../../frame-annotation/proxy';
 import { createObjectLabel } from '../../../../document/model';
 import { parseEditorDrawingMetadata } from '../../../../document/import-boundary';
 import { duplicateEditorSelection } from './duplicate';
@@ -127,4 +132,125 @@ it.each([false, true])('roundtrips duplicated scenario blur (grouped: %s)', asyn
     id: copiedBlur.sniptaleId,
   });
   expect(blur.sniptaleScenarioBlurJson).toBe(originalMetadata);
+});
+
+it('rejects a clone result after selection replacement without adding a layer or history', async () => {
+  let release: (clone: unknown) => void = () => {};
+  const clone = { set: vi.fn(), dispose: vi.fn(), sniptaleType: 'shape' };
+  const object = {
+    sniptaleType: 'shape',
+    clone: vi.fn(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        })
+    ),
+  };
+  let selection: unknown[] = [object];
+  const canvas = {
+    getActiveObjects: () => selection,
+    add: vi.fn(),
+    setActiveObject: vi.fn(),
+    requestRenderAll: vi.fn(),
+  };
+  const commitHistory = vi.fn();
+  const pending = duplicateEditorSelection({
+    canvas: canvas as never,
+    prepareObject: vi.fn(),
+    nextLabelIndex: () => 1,
+    commitHistory,
+    syncRuntimeState: vi.fn(),
+  });
+  selection = [];
+  release(clone);
+  await pending;
+  expect(canvas.add).not.toHaveBeenCalled();
+  expect(commitHistory).not.toHaveBeenCalled();
+  expect(clone.dispose).toHaveBeenCalledOnce();
+});
+
+it('duplicates rich shape and frame metadata with independent identities and frame ordering', async () => {
+  const shape = new Rect({ left: 10, top: 20, width: 30, height: 40 });
+  shape.sniptaleId = 'rich-original';
+  shape.sniptaleType = 'rich-shape';
+  shape.sniptaleRichShape = createDefaultRichShapeObject({ id: 'rich-original' });
+  const frame = createFrameAnnotationProxy({
+    frame: { id: 'frame-original', x: 20, y: 30, width: 100, height: 80 },
+    label: 'Frame 1',
+    ordering: 3,
+  });
+  const canvas = new Canvas(undefined, { renderOnAddRemove: false });
+  canvas.add(shape, frame);
+  const commitHistory = vi.fn();
+  const duplicate = () =>
+    duplicateEditorSelection({
+      canvas,
+      commitHistory,
+      prepareObject: vi.fn(),
+      nextLabelIndex: () => 2,
+      syncRuntimeState: vi.fn(),
+    });
+  try {
+    canvas.setActiveObject(shape);
+    await duplicate();
+    const copiedShape = canvas.getActiveObject()!;
+    expect(copiedShape.sniptaleRichShape).toEqual({
+      ...shape.sniptaleRichShape,
+      id: copiedShape.sniptaleId,
+    });
+    expect(copiedShape.sniptaleRichShape).not.toBe(shape.sniptaleRichShape);
+    expect(copiedShape.sniptaleId).not.toBe(shape.sniptaleId);
+    expect(shape.sniptaleRichShape.id).toBe('rich-original');
+    canvas.setActiveObject(frame);
+    await duplicate();
+    const copiedFrame = canvas.getActiveObject()!;
+    expect(readFrameAnnotationSnapshot(copiedFrame)).toMatchObject({
+      id: copiedFrame.sniptaleId,
+      x: 44,
+      y: 54,
+      ordering: 4,
+    });
+    expect(readFrameAnnotationSnapshot(frame)).toMatchObject({
+      id: 'frame-original',
+      x: 20,
+      y: 30,
+      ordering: 3,
+    });
+    expect(commitHistory).toHaveBeenCalledTimes(2);
+  } finally {
+    await canvas.dispose();
+  }
+});
+
+it('duplicates a nested selected child in scene coordinates and preserves its parent', async () => {
+  const child = new Rect({ left: 10, top: 20, width: 30, height: 40 });
+  child.sniptaleId = 'child';
+  child.sniptaleType = 'shape';
+  const parent = new Group([child], { left: 80, top: 90, scaleX: 2, scaleY: 2 });
+  parent.sniptaleId = 'parent';
+  parent.sniptaleType = 'group';
+  const canvas = new Canvas(undefined, { renderOnAddRemove: false });
+  canvas.add(parent);
+  vi.spyOn(canvas, 'getActiveObjects').mockReturnValue([child]);
+  const commitHistory = vi.fn();
+  const before = child.getCenterPoint();
+  try {
+    await duplicateEditorSelection({
+      canvas,
+      commitHistory,
+      prepareObject: vi.fn(),
+      nextLabelIndex: () => 2,
+      syncRuntimeState: vi.fn(),
+    });
+    const copy = canvas.getActiveObject()!;
+    expect(parent.getObjects()).toEqual([child, copy]);
+    expect(canvas.getObjects()).toEqual([parent]);
+    expect(copy.sniptaleId).not.toBe(child.sniptaleId);
+    expect(copy.parent).toBe(parent);
+    expect(copy.getCenterPoint().x).toBeCloseTo(before.x + 24, 8);
+    expect(copy.getCenterPoint().y).toBeCloseTo(before.y + 24, 8);
+    expect(commitHistory).toHaveBeenCalledOnce();
+  } finally {
+    await canvas.dispose();
+  }
 });

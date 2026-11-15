@@ -46,6 +46,14 @@ export type ReviewEdit = ReviewEditRange &
   (
     | { kind: 'cut'; transition?: CompositionJoinSettings }
     | { kind: 'speed'; rate: ReviewSpeedRate; audio: 'speed' | 'mute' }
+    | {
+        kind: 'freeze';
+        /** Added project seconds; the original source interval stays empty. */
+        duration: number;
+        /** Exact original decoded frame interval, independent of preview raster size. */
+        frameTime: number;
+        frameDuration: number;
+      }
   );
 
 export interface ReviewDocument {
@@ -129,6 +137,7 @@ export type ReviewOperation = { id: string; at: number } & (
  * through the same owner, so a stale edit never hides behind a newer selection.
  */
 export type ReviewSelection =
+  | { kind: 'cursor-motion'; id: string }
   | { kind: 'cursor-focus'; id: string; time: number }
   | { kind: 'none' }
   | { kind: 'webcam' }

@@ -65,10 +65,18 @@ export function projectAnchoredReviewText(
   fragment: ReviewTextFragment,
   map: readonly ReviewTimeSegment[]
 ) {
-  return projectReviewVoiceover([textClip(fragment)], map).map((slice) => ({
+  const slices = projectReviewVoiceover([textClip(fragment)], map).map((slice) => ({
     start: slice.timelineStart,
     end: slice.timelineStart + slice.duration,
   }));
+  const source = reviewTextSourceInterval(fragment, map);
+  for (const part of map) {
+    if (part.kind !== 'freeze') continue;
+    const time = part.frameTime ?? part.sourceStart;
+    if (source.start <= time && time < source.end)
+      slices.push({ start: part.resultStart, end: part.resultEnd });
+  }
+  return slices.sort((a, b) => a.start - b.start);
 }
 
 /** The timeline retains source positions, including text temporarily hidden by a Cut. */

@@ -198,6 +198,7 @@ function expectOpenAndLoadState(
     expect.objectContaining({ url: 'https://stored.example' })
   );
   expect(applyDocument).toHaveBeenNthCalledWith(1, expect.objectContaining({ canvasWidth: 100 }), {
+    freshSourceContent: true,
     resetHistory: true,
     updateOriginal: true,
   });

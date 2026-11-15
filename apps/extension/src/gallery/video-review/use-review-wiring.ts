@@ -46,10 +46,19 @@ type Session = ReturnType<
 >;
 
 /** Project recorded observations together with their capture coverage for both history views. */
-function projectHistory(telemetry: LoadedReview['telemetry'], duration: number) {
+function projectHistory(
+  telemetry: LoadedReview['telemetry'],
+  duration: number,
+  interactionTimeline: QuickEditAdvancedState['interactionTimeline']
+) {
   const history = telemetry
-    ? projectReviewTelemetry(telemetry, duration, true)
-    : { markers: [], warnings: 0 };
+    ? projectReviewTelemetry(telemetry, duration, true, interactionTimeline)
+    : projectReviewTelemetry(
+        { actionEvents: [], signals: [], cursorTrack: null },
+        duration,
+        true,
+        interactionTimeline
+      );
   return { ...history, captureCapabilities: telemetry?.capabilities ?? null };
 }
 
@@ -74,6 +83,7 @@ export function useReviewEditorWiring(args: {
   run(action: () => Promise<unknown>): Promise<unknown>;
   composer: ReturnType<typeof useReviewComposer>;
   video: RefObject<HTMLVideoElement | null>;
+  pause?: (() => void) | undefined;
   seek(value: number, snap?: boolean): void;
   setTimelineSelection(value: import('../../features/video/review/types').ReviewAnchor): void;
   setCutting(cutting: false): void;
@@ -89,14 +99,15 @@ export function useReviewEditorWiring(args: {
   const annotationToolCancellation = useRef<(() => void) | null>(null);
   const cancelAnnotationTool = () => annotationToolCancellation.current?.();
   const projected = useMemo(
-    () => projectHistory(args.telemetry, args.sourceDuration),
-    [args.telemetry, args.sourceDuration]
+    () => projectHistory(args.telemetry, args.sourceDuration, args.advanced.interactionTimeline),
+    [args.telemetry, args.sourceDuration, args.advanced.interactionTimeline]
   );
   const comments = useReviewCommentActions({
     composer: args.composer,
     time: args.time,
     playbackRange: args.playbackRange,
     video: args.video,
+    pause: args.pause,
     seek: args.seek,
     setSelection: args.setTimelineSelection,
     setSelected: args.clearAnnotation,
@@ -149,7 +160,7 @@ export function useReviewEditorWiring(args: {
     beforeAction: args.beforeAction,
     select: args.setActiveSelection,
     seek: args.seek,
-    pause: () => args.video.current?.pause(),
+    pause: args.pause ?? (() => args.video.current?.pause()),
   });
   const { cursorFocusPath, cursorFocusKeys } = useReviewCursorFocus(args);
   const removeSelection = useReviewSelectionLifecycle({
@@ -158,6 +169,10 @@ export function useReviewEditorWiring(args: {
     cursorFocusPath,
     cursorFocusKeys,
     historyPending: args.historyPending ?? false,
+    deleteCursorMotion: (id) =>
+      args.advancedState.setCursorMotions(
+        (args.advanced.cursorMotions ?? []).filter((m) => m.id !== id)
+      ),
     deleteCursorFocus: (id) =>
       args.advancedState.setCursorFocusPath(deleteCursorFocusKey(cursorFocusPath, id)),
     setSelection: args.setActiveSelection,
@@ -168,6 +183,23 @@ export function useReviewEditorWiring(args: {
     deleteCanvas: (id) => {
       const comment = args.document.canvasComments.find((item) => item.id === id);
       if (comment) void canvasComments.onDelete(comment);
+    },
+    deleteTelemetry: (marker) => {
+      if (
+        marker.ref.kind !== 'action' ||
+        !args.advanced.interactionTimeline?.presses.some((press) => press.id === marker.ref.id)
+      )
+        return;
+      args.advancedState.setInteractionTimeline((current) => ({
+        ...current,
+        overrides: [
+          ...current.overrides.filter(
+            (p) => p.ref.kind !== marker.ref.kind || p.ref.id !== marker.ref.id
+          ),
+          { ref: marker.ref, start: marker.start, end: marker.end, enabled: false },
+        ],
+      }));
+      args.setActiveSelection({ kind: 'none' });
     },
     deleteAnnotationEffect: args.annotationEffects.remove,
     deleteText: (id) => text.remove([id]),
@@ -205,7 +237,7 @@ export function useReviewEditorWiring(args: {
     moveHistory: history.run,
     removeSelection,
     exporter: prepareReviewExporter(args.exporter, args.run, history.flush, () =>
-      args.video.current?.pause()
+      (args.pause ?? (() => args.video.current?.pause()))()
     ),
   };
 }
@@ -283,7 +315,7 @@ async function resetReviewEditor(
   canvasComments: ReturnType<typeof useCanvasComments>,
   cancelAnnotationTool: () => void
 ) {
-  args.video.current?.pause();
+  (args.pause ?? (() => args.video.current?.pause()))();
   await args.advancedState.flush();
   await canvasComments.flushTexts();
   await args.session.reset();

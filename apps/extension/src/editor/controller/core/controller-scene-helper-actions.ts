@@ -1,3 +1,4 @@
+import { flushEditorFreehandCompletion } from '../draw-workflow/released';
 import { type FabricObject } from 'fabric';
 import type {
   BrowserFrameState,
@@ -23,6 +24,7 @@ export abstract class ImageEditorControllerSceneHelperActions extends ImageEdito
   }
 
   ensureBrowserFrameOnTop(): void {
+    flushEditorFreehandCompletion(this.canvas);
     ensureBrowserFrameOnTopForController(this.instance);
   }
 
@@ -36,6 +38,7 @@ export abstract class ImageEditorControllerSceneHelperActions extends ImageEdito
       fitSourceToContent?: boolean;
     } = {}
   ): void {
+    flushEditorFreehandCompletion(this.canvas);
     relayoutSceneForController(this.instance, frame, browserFrame, options);
   }
 
@@ -44,14 +47,17 @@ export abstract class ImageEditorControllerSceneHelperActions extends ImageEdito
   }
 
   applyDocument(document: EditorDocument, options: ApplyDocumentOptions) {
+    flushEditorFreehandCompletion(this.canvas);
     return applyDocumentForController(this.instance, document, options);
   }
 
   rebuildFrameDecorations() {
+    flushEditorFreehandCompletion(this.canvas);
     return rebuildFrameDecorationsForController(this.instance);
   }
 
   sendFrameObjectsToBack(): void {
+    flushEditorFreehandCompletion(this.canvas);
     sendFrameObjectsToBackForController(this.instance);
   }
 }

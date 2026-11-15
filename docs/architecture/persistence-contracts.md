@@ -22,6 +22,14 @@ Restore retains root-local OPFS staging and existing per-root claims. Thus, fail
 
 Keep one database because recording publication commits recording metadata, media, assets, and the completion outbox atomically.
 
+## Retained raster documents
+
+Logical editor version 3 and stored version 4 admit retained raster metadata. Legacy logical version 2 and stored version 3 remain readable without these fields. Readers refuse retained raster metadata under a legacy version. Reading does not rewrite legacy documents.
+
+Physical database version 54 advances mediaLibrary from 34 to 35 and scenarioProjects from 10 to 11. The additive 53→54 migration changes admission metadata only. It preserves every existing row, workspace, sidecar, history entry, immutable object, store and index. All other domain contracts remain unchanged, including assetGraph version 6. Earlier applications refuse the newer physical database before ordinary mutation.
+
+The document asset owner retains the original image, accepted color image, visibility mask and key image through its existing resource closure. Managed backgrounds keep these fields on the serialized background object. The change adds no Frame binary property, store, journal or archive layout. Portable readers refuse unsupported document versions before restore staging or publication.
+
 ## Recording recovery
 
 The recordings domain owns `recording_recovery_sessions` and `recording_recovery_blocks` in the canonical database. Both stores contain authoritative user data. Database version 33 adds these stores and changes the recordings contract from 2 to 3. The migration preserves all earlier rows and immutable media.
@@ -1187,3 +1195,12 @@ Advanced schema27 admits optional `sourceAnchor` on result-domain text fragments
 The text document owns these anchors. Descriptive provenance owns no timing authority or audio lease. Malformed anchors reject the operation without partial publication. Preview, captions, and subtitle export use the same projection. Gallery-to-Montage conversion retains current slices as ordinary Native text and retains fully excluded text with a zero result limit.
 
 Physical database47 and mediaLibrary32 admit this contract through a metadata-only46→47 migration. The migration preserves existing workspaces, history, recovery, and immutable objects. Earlier applications refuse the newer database before writing. Reading older supported projects does not create anchors or write a migration.
+
+
+## Audio processing admission
+
+Physical database version 57 admits Gallery advanced schema 31 and Native project schema 53. The mediaLibrary contract uses version 35. The videoProjects contract uses version 12.
+
+The additive 56→57 migration changes contracts only. It preserves project heads, history, recovery drafts, source references and immutable media bytes. Older writers refuse the newer database before they can discard audio settings.
+
+DSP settings contain fixed processor identities and parameters. They contain no executable code. Reads of older supported projects do not add processing settings or write project migrations. User audio presets retain their separate browser storage authority.

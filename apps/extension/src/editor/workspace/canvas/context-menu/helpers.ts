@@ -34,11 +34,11 @@ function getEstimatedMenuHeight(kind: CanvasContextMenuRequest['kind']) {
     case 'no-image':
       return 64;
     case 'blank':
-      return 104;
+      return 144;
     case 'single':
-      return 252;
+      return 348;
     case 'multi':
-      return 204;
+      return 268;
   }
 }
 
@@ -80,7 +80,7 @@ function resolveCanvasTarget(
     return null;
   }
 
-  return (canvas.findTarget(event) as EditableTarget | null) ?? null;
+  return canvas.findTarget(event).target ?? null;
 }
 
 function isEditingTextTarget(target: EditableTarget | null) {
@@ -88,7 +88,7 @@ function isEditingTextTarget(target: EditableTarget | null) {
 }
 
 function shouldUseNativeCanvasContextMenu(controller: CanvasContextMenuController): boolean {
-  const activeObject = (controller.canvas?.getActiveObject?.() as EditableTarget | null) ?? null;
+  const activeObject = controller.canvas?.getActiveObject?.() ?? null;
   return isEditingTextTarget(activeObject);
 }
 
@@ -114,7 +114,9 @@ export function resolveCanvasContextMenuRequest(args: {
   const frameId = frameElement?.getAttribute('data-frame-id');
   const frameLayer = findLayer(layers, frameId);
   if (frameLayer?.type === 'frame-annotation') {
-    controller.withHistoryMuted(() => controller.selectLayer(frameLayer.id));
+    controller.withHistoryMuted(() =>
+      controller.selectLayer(frameLayer.id, { focusViewport: false })
+    );
     return buildSelectionRequest([frameLayer.id], layers);
   }
   const target = resolveCanvasTarget(controller, event);
@@ -122,17 +124,13 @@ export function resolveCanvasContextMenuRequest(args: {
     return buildSelectionRequest(selectionIds, layers);
   }
 
-  if (
-    target &&
-    isEditableObject(target) &&
-    typeof target.sniptaleId === 'string' &&
-    target.sniptaleId.length > 0
-  ) {
+  const targetId = target?.sniptaleId;
+  if (target && isEditableObject(target) && typeof targetId === 'string' && targetId.length > 0) {
     controller.withHistoryMuted(() => {
-      controller.selectLayer(target.sniptaleId as string);
+      controller.selectLayer(targetId, { focusViewport: false });
     });
 
-    return buildSelectionRequest([target.sniptaleId], layers);
+    return buildSelectionRequest([targetId], layers);
   }
 
   if (selection.hasSelection) {

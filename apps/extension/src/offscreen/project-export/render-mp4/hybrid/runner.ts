@@ -1,3 +1,4 @@
+import { parseEnhancementMode } from '../../../../features/video/composition/export-enhancement/mode';
 import {
   createExportTimeEstimator,
   type ExportTimeWorkInterval,
@@ -276,6 +277,18 @@ export async function runMp4HybridVideoPipeline(args: Mp4HybridVideoPipelineArgs
       }
 
       if (span.kind === 'accelerated-composite') {
+        if (
+          parseEnhancementMode(args.settings.detailEnhancement) === 'off' ||
+          args.job.sourceSampling
+        ) {
+          applyCompositeFallback(span);
+          await renderCompositeSpan(
+            args,
+            span,
+            translate('offscreenExport.hybridCompositeSpanRender')
+          );
+          continue;
+        }
         const renderedAcceleratedComposite = await tryRenderAcceleratedCompositeSpan(args, span);
         if (!renderedAcceleratedComposite) {
           applyCompositeFallback(span);

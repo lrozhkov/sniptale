@@ -14,7 +14,14 @@ import {
 
 /** Admit the renderer for effective zoom settings, including disposable cursor composition. */
 export function quickEditRegionNeedsSpatialRenderer(region: QuickEditZoomRegion): boolean {
-  if (region.dormant || quickEditFocusType(region) !== 'zoom') return false;
+  if (region.dormant || (quickEditFocusType(region) !== 'zoom' && region.effect !== '3d'))
+    return false;
+  if (
+    region.effect === '3d' &&
+    region.spatialMotion?.enabled &&
+    hasQuickEditPerspective(region.spatialMotion.end)
+  )
+    return true;
   if (region.cursorFocus && region.cursorComposition)
     return hasCursorComposition(region.cursorComposition);
   return hasQuickEditPerspective(region.perspective) || region.depthOfField?.enabled === true;
@@ -93,7 +100,11 @@ export function applyReviewCameraSpatial(
     sample.to,
     sample.phase === 'link' ? sample.to.start : timelineTime
   );
-  const lockBackground = quickEditSpatialSpan(regions, timelineTime);
+  const lockBackground =
+    (sample.to.effect === '3d' &&
+      (hasQuickEditPerspective(spatialFrom?.perspective) ||
+        hasQuickEditPerspective(spatialTo.perspective))) ||
+    quickEditSpatialSpan(regions, timelineTime);
   if (lockBackground || spatialFrom?.depthOfField?.enabled || spatialTo.depthOfField?.enabled)
     return {
       ...camera,

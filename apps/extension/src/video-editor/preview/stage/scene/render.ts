@@ -1,3 +1,4 @@
+import { createNativeGlTrackCanvas } from '../../../../workflows/video/native-composition/gl-track-canvas';
 import type { GpuPreviewFramePresenter } from '../../../../features/video/composition/canvas/preview-presentation';
 import { createVideoPreviewCompositionJoinRenderer } from './joins';
 import { createVideoProjectWatermarkRenderer } from '../../../../features/video/composition/canvas/project-watermark';
@@ -13,14 +14,14 @@ import {
   type VideoEditorEffectRuntime,
 } from '../../../runtime/effect-runtime';
 import { renderPreviewScene, PreviewGpuSerialFallback } from './render-preview';
-import { prepareNativePreviewSceneFrame } from './frame-plan';
+import { prepareNativePreviewSceneFrame } from '../../../../workflows/video/native-composition/frame-plan';
 import { createPreviewSceneRenderScheduler } from './render-scheduler';
 import type { PreviewSceneRenderJob } from './render-scheduler';
 import type { PreviewStageCanvasSceneParams } from './types';
 import { createVideoPreviewRenderRevision } from '../../cache/revision';
 import { createVideoPreviewExactFrameRenderer } from '../../cache/render';
 import { createVideoProjectCaptionRenderer } from '../../../../workflows/video-review/project-captions';
-import { createNativeGpuPreviewRenderer } from './gpu-preview';
+import { createNativeGpuPreviewRenderer } from '../../../../workflows/video/native-composition/gpu-preview';
 import { resolveActivePreviewClips } from '../runtime/index';
 import { canRenderActivePreviewVideos } from './video-frame';
 import type { VideoPreviewRenderer } from '../../../../features/video/preview/preferences';
@@ -66,6 +67,14 @@ function usePreviewStageRenderEffect(
   const committed = useRef({ params, renderRevision });
   const lastRequest = useRef<{ projectId: string; generation: number; time: number } | null>(null);
   const cancelDirect = useRef<(() => void) | null>(null);
+  const cancelRender = useRef<(() => void) | null>(null);
+  useLayoutEffect(
+    () => () => {
+      cancelRender.current?.();
+      cancelRender.current = null;
+    },
+    []
+  );
   useLayoutEffect(() => {
     committed.current = { params, renderRevision };
   });
@@ -108,6 +117,7 @@ function usePreviewStageRenderEffect(
         previewRenderer: current.previewRenderer ?? 'gpu',
         project: current.project,
         effectPreparationProject: current.effectPreparationProject,
+        transformInteraction: current.transformInteraction,
         renderGeneration: current.renderGenerationRef?.current ?? current.renderGeneration ?? 0,
         runtimeVersion: current.effectRuntimeFeedback.retryVersion,
         layoutVersion: current.resizeVersion,
@@ -153,7 +163,16 @@ function usePreviewStageRenderEffect(
       direct && last?.projectId === current.project.id && last.generation === generation
         ? last.time
         : current.currentTime;
-    return enqueueRef.current(time, direct);
+    const previous = cancelRender.current;
+    const transform =
+      !!current.transformInteraction &&
+      current.isPlaying !== true &&
+      current.previewRenderer === 'gpu' &&
+      current.previewCacheBypass === true;
+    // A committed gesture replacement can retain its predecessor; other requests cancel first.
+    if (!transform) previous?.();
+    cancelRender.current = enqueueRef.current(time, direct) ?? null;
+    if (transform) previous?.();
   }, [
     direct,
     effectTime,
@@ -169,6 +188,7 @@ function usePreviewStageRenderEffect(
     params.isPlaying,
     params.project,
     params.effectPreparationProject,
+    params.transformInteraction,
     activeClipKey,
     params.previewMode,
     params.previewRenderer,
@@ -215,6 +235,7 @@ function createPreviewStageCanvasRenderJob(args: {
   previewRenderer: PreviewStageCanvasSceneParams['previewRenderer'];
   project: PreviewStageCanvasSceneParams['project'];
   effectPreparationProject?: PreviewStageCanvasSceneParams['effectPreparationProject'];
+  transformInteraction?: PreviewStageCanvasSceneParams['transformInteraction'];
   renderGeneration: number;
   runtimeVersion: number;
   layoutVersion: number;
@@ -255,6 +276,7 @@ function createPreviewStageCanvasRenderJob(args: {
     ...(args.previewMode ? { previewMode: args.previewMode } : {}),
     project: args.project,
     effectPreparationProject: args.effectPreparationProject,
+    transformInteraction: args.transformInteraction,
     renderGeneration: args.renderGeneration,
     runtimeVersion: args.runtimeVersion,
     layoutVersion: args.layoutVersion,
@@ -285,6 +307,7 @@ function usePreviewRenderSchedulerRef(
   );
   const stagingRef = useRef<HTMLCanvasElement | null>(null);
   const spatialRef = useRef<ReviewSpatialRenderer | null>(null);
+  const transitionRef = useRef<ReturnType<typeof createNativeGlTrackCanvas> | null>(null);
   const gpuRef = useRef<ReturnType<typeof createNativeGpuPreviewRenderer> | null>(null);
   const cacheRendererRef = useRef<ReturnType<typeof createVideoPreviewExactFrameRenderer> | null>(
     null
@@ -317,6 +340,8 @@ function usePreviewRenderSchedulerRef(
         const spatial = spatialRef.current;
         spatialRef.current = null;
         spatial?.dispose();
+        transitionRef.current?.dispose();
+        transitionRef.current = null;
         gpuRef.current?.dispose();
         gpuRef.current = null;
         feedbackRef.current.onFailure('visual', error);
@@ -364,7 +389,7 @@ function usePreviewRenderSchedulerRef(
         const render = (input: Parameters<typeof renderPreviewScene>[0]) => {
           joinsRef.current ??= createVideoPreviewCompositionJoinRenderer(
             renderPreviewScene,
-            prepareNativePreviewSceneFrame
+            prepareNativeSceneSources
           );
           if (input.previewRenderer !== 'legacy')
             gpuRef.current ??= createNativeGpuPreviewRenderer(undefined, {
@@ -381,6 +406,11 @@ function usePreviewRenderSchedulerRef(
               gpuRef.current?.acceptsNativeFrames === true,
             captionRenderer,
             watermarkRenderer,
+            transitionRenderer: () => {
+              input.signal?.throwIfAborted();
+              transitionRef.current ??= createNativeGlTrackCanvas(input.canvas.ownerDocument);
+              return transitionRef.current;
+            },
             spatialRenderer: () => {
               input.signal?.throwIfAborted();
               if (spatialRef.current) return spatialRef.current;
@@ -427,6 +457,8 @@ function usePreviewRenderSchedulerRef(
     const spatial = spatialRef.current;
     spatialRef.current = null;
     spatial?.dispose();
+    transitionRef.current?.dispose();
+    transitionRef.current = null;
     gpuRef.current?.dispose();
     gpuRef.current = null;
   }, [retryVersion, renderer]);
@@ -443,6 +475,8 @@ function usePreviewRenderSchedulerRef(
       const spatial = spatialRef.current;
       spatialRef.current = null;
       spatial?.dispose();
+      transitionRef.current?.dispose();
+      transitionRef.current = null;
       gpuRef.current?.dispose();
       gpuRef.current = null;
       if (stagingRef.current) {
@@ -499,7 +533,14 @@ function prepareNativeSceneJob(
     return undefined;
   joins.current ??= createVideoPreviewCompositionJoinRenderer(
     renderPreviewScene,
-    prepareNativePreviewSceneFrame
+    prepareNativeSceneSources
   );
   return joins.current.prepare(input);
+}
+
+/** Keep replaceable playback lookahead limited to source and geometry preparation. */
+function prepareNativeSceneSources(input: Parameters<typeof renderPreviewScene>[0]) {
+  return prepareNativePreviewSceneFrame(input, {
+    deferEffectRendering: Boolean(input.effectPreparation),
+  });
 }

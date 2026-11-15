@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { renderDrawingObject, renderDrawingSelection, renderDrawingHoverOutline } from './render';
+import {
+  renderDrawingObject,
+  renderDrawingSelection,
+  renderDrawingMultiSelection,
+  renderDrawingHoverOutline,
+} from './render';
 import type { DrawingObject } from '../../features/drawing/public';
+import { renderCanvasRotationHandle } from '../../ui/drawing-tools/selection-chrome';
 
 const stencilText: Extract<DrawingObject, { kind: 'text' }> = {
   id: 'stencil',
@@ -57,13 +63,14 @@ it('renders the curved shaft and bend chrome without filling the empty selection
   const nearVertex = context.getImageData(114, 114, 12, 12).data;
   expect([...nearVertex].some((value, index) => index % 4 === 3 && value > 0)).toBe(true);
   expect(context.getImageData(120, 20, 1, 1).data[3]).toBe(0);
+  const shaftBeforeSelection = Array.from(context.getImageData(70, 80, 1, 1).data);
   renderDrawingSelection(context, arrow, { x: 0, y: 0 }, { x: 70, y: 80 });
   expect(context.getImageData(120, 120, 1, 1).data[3]).toBeGreaterThan(0);
-  expect(context.getImageData(70, 80, 1, 1).data[3]).toBeGreaterThan(0);
+  expect(Array.from(context.getImageData(70, 80, 1, 1).data)).toEqual(shaftBeforeSelection);
   expect(context.getImageData(20, 120, 1, 1).data[3]).toBe(0);
 });
 
-it('shows only the transient bend marker when ordinary selection chrome is suppressed', () => {
+it('does not draw a prospective bend when ordinary selection chrome is suppressed', () => {
   const context = createPixelCanvas();
   const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
     kind: 'arrow',
@@ -78,7 +85,7 @@ it('shows only the transient bend marker when ordinary selection chrome is suppr
   renderDrawingSelection(context, arrow, { x: 0, y: 0 }, undefined, true);
   expect(context.getImageData(0, 0, 500, 500).data.every((value) => value === 0)).toBe(true);
   renderDrawingSelection(context, arrow, { x: 0, y: 0 }, { x: 120, y: 20 }, true);
-  expect(context.getImageData(120, 20, 1, 1).data[3]).toBeGreaterThan(0);
+  expect(context.getImageData(120, 20, 1, 1).data[3]).toBe(0);
   expect(context.getImageData(20, 20, 1, 1).data[3]).toBe(0);
   expect(context.getImageData(220, 20, 1, 1).data[3]).toBe(0);
 });
@@ -176,7 +183,10 @@ it('bounds zoomed stencil allocation to the visible scene without changing visib
       if (background) backgroundPixels += 1;
       if (
         (background || source) &&
-        channels.some((channel) => actual[offset + channel] !== expected[offset + channel])
+        // Scratch compositing can round an antialias channel by one byte.
+        channels.some(
+          (channel) => Math.abs(actual[offset + channel]! - expected[offset + channel]!) > 1
+        )
       )
         mismatchedPixels += 1;
     }
@@ -394,7 +404,7 @@ it.each(['rectangle', 'ellipse', 'triangle'] as const)(
   }
 );
 
-it('renders a dashed blue hover boundary without fill or handles and preserves canvas state', () => {
+it('shows a solid rectangle hover boundary without handles or source changes', () => {
   const context = createPixelCanvas();
   context.strokeStyle = '#ff0000';
   context.lineWidth = 3;
@@ -413,13 +423,170 @@ it('renders a dashed blue hover boundary without fill or handles and preserves c
   );
   const edge = context.getImageData(62, 59, 96, 1).data;
   const visible = Array.from({ length: 96 }, (_, index) => edge[index * 4 + 3]! > 0);
-  expect(visible.some(Boolean)).toBe(true);
-  expect(visible.some((value) => !value)).toBe(true);
-  const first = visible.findIndex(Boolean) * 4;
-  expect(Array.from(edge.slice(first, first + 3))).toEqual([37, 99, 235]);
+  expect(visible.every(Boolean)).toBe(true);
   expect(context.getImageData(90, 90, 1, 1).data[3]).toBe(0);
   expect(context.getImageData(57, 57, 1, 1).data[3]).toBe(0);
   expect(context.getLineDash()).toEqual([2, 1]);
   expect(context.lineWidth).toBe(3);
   expect(context.strokeStyle).toBe('#ff0000');
+});
+
+it.each(['#111111', '#00000000'])(
+  'leaves blank text rows transparent in captured output; glyphs=%s',
+  (color) => {
+    const context = createPixelCanvas();
+    renderDrawingObject(
+      context,
+      {
+        id: 'blank-rows',
+        kind: 'text',
+        bounds: { x: 10, y: 10, width: 200, height: 170 },
+        text: '\nAlpha\n\n \t \nBeta\n',
+        color,
+        backgroundColor: '#ff8800',
+        fontFamily: 'sans',
+        fontSize: 20,
+      },
+      { x: 0, y: 0 }
+    );
+    const bands: Array<{ top: number; bottom: number }> = [];
+    for (let y = 0; y < 200; y++) {
+      if (!context.getImageData(12, y, 1, 1).data[3]) continue;
+      const previous = bands.at(-1);
+      if (previous?.bottom === y) previous.bottom = y + 1;
+      else bands.push({ top: y, bottom: y + 1 });
+    }
+    expect(bands).toHaveLength(2);
+    expect(bands[0]!.top).toBe(10);
+    expect(bands[1]!.top - bands[0]!.top).toBe(75);
+    expect(bands[1]!.top - bands[0]!.bottom).toBe(38);
+    expect(context.getImageData(12, bands[1]!.bottom, 1, 1).data[3]).toBe(0);
+  }
+);
+
+it('paints pasted tab-separated text at native eight-space stops in capture', () => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 500;
+  canvas.height = 100;
+  const context = canvas.getContext('2d')!;
+  const fill = vi.spyOn(context, 'fillText');
+  renderDrawingObject(
+    context,
+    {
+      id: 'tabs',
+      kind: 'text',
+      text: 'A\tB\tC',
+      fontFamily: 'sans',
+      fontSize: 24,
+      color: '#111111',
+      backgroundColor: null,
+      bounds: { x: 0, y: 0, width: 500, height: 60 },
+    },
+    { x: 0, y: 0 }
+  );
+  const stop = context.measureText(' ').width * 8;
+  expect(fill.mock.calls.map((call) => call[0])).toEqual(['A', 'B', 'C']);
+  expect(fill.mock.calls[1]![1] - fill.mock.calls[0]![1]).toBeCloseTo(stop, 4);
+  expect(fill.mock.calls[2]![1] - fill.mock.calls[0]![1]).toBeCloseTo(stop * 2, 4);
+});
+
+it('fills only the ready arrow point on hover and draws an existing hovered bend once', () => {
+  const context = createPixelCanvas();
+  const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
+    id: 'ready',
+    kind: 'arrow',
+    design: 'freehand',
+    start: { x: 20, y: 20 },
+    end: { x: 220, y: 20 },
+    bendPoints: [
+      { x: 80, y: 80 },
+      { x: 180, y: 80 },
+    ],
+    color: '#f00',
+    width: 2,
+    dynamicWidth: false,
+  };
+  const arc = vi.spyOn(context, 'arc');
+  renderDrawingSelection(context, arrow, { x: 0, y: 0 }, arrow.bendPoints![1]);
+  expect(arc).toHaveBeenCalledTimes(4);
+  const ready = context.getImageData(180, 80, 1, 1).data;
+  expect(ready[2]! - ready[0]!).toBeGreaterThan(40);
+  expect(Array.from(context.getImageData(80, 80, 1, 1).data)).toEqual([255, 255, 255, 255]);
+});
+
+it('keeps an existing captured bend blue and its neighbors neutral', () => {
+  const context = createPixelCanvas();
+  const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
+    id: 'captured',
+    kind: 'arrow',
+    design: 'freehand',
+    start: { x: 20, y: 20 },
+    end: { x: 220, y: 20 },
+    bendPoints: [
+      { x: 80, y: 80 },
+      { x: 130, y: 180 },
+      { x: 180, y: 80 },
+    ],
+    color: '#f00',
+    width: 2,
+    dynamicWidth: false,
+  };
+  renderDrawingSelection(context, arrow, { x: 0, y: 0 }, arrow.bendPoints![2], false, 'bend:1');
+  const active = context.getImageData(130, 180, 1, 1).data;
+  expect(active[2]! - active[0]!).toBeGreaterThan(40);
+  for (const x of [80, 180])
+    expect(Array.from(context.getImageData(x, 80, 1, 1).data)).toEqual([255, 255, 255, 255]);
+});
+
+it.each(['single', 'multi'] as const)(
+  'keeps the shared rotation glyph upright outside a rotated %s selection',
+  (mode) => {
+    const context = createPixelCanvas();
+    const reference = createPixelCanvas();
+    const object: Extract<DrawingObject, { kind: 'rectangle' }> = {
+      id: 'upright',
+      kind: 'rectangle',
+      bounds: { x: 100, y: 100, width: 100, height: 60 },
+      color: '#000',
+      width: 2,
+      rotation: 90,
+    };
+    if (mode === 'single') renderDrawingSelection(context, object, { x: 0, y: 0 });
+    else
+      renderDrawingMultiSelection(
+        context,
+        [object],
+        { x: 0, y: 0 },
+        { bounds: object.bounds, angle: 90 }
+      );
+    renderCanvasRotationHandle(reference, 200, 200);
+    const actual = context.getImageData(188, 188, 24, 24).data;
+    const expected = reference.getImageData(188, 188, 24, 24).data;
+    expect(expected.some((channel, index) => index % 4 === 3 && channel > 0)).toBe(true);
+    expect(Array.from(actual)).toEqual(Array.from(expected));
+  }
+);
+
+it('does not add an insertion preview to the existing arrow point handles', () => {
+  const context = createPixelCanvas();
+  renderDrawingSelection(
+    context,
+    {
+      id: 'preview',
+      kind: 'arrow',
+      design: 'freehand',
+      start: { x: 20, y: 20 },
+      end: { x: 220, y: 20 },
+      bendPoints: [
+        { x: 80, y: 80 },
+        { x: 180, y: 80 },
+      ],
+      color: '#f00',
+      width: 2,
+      dynamicWidth: false,
+    },
+    { x: 0, y: 0 },
+    { x: 130, y: 100 }
+  );
+  expect(Array.from(context.getImageData(130, 100, 1, 1).data)).toEqual([0, 0, 0, 0]);
 });

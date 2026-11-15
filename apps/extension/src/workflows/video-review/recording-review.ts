@@ -1,3 +1,7 @@
+import { reviewInteractionSourceQueries } from '../../features/video/review/interaction-timeline';
+import type { ReviewInteractionTimeline } from '../../features/video/review/interaction-types';
+import { projectActionFeedbackMarkers } from '../../features/video/review/project-action-audio';
+import { recordingEventProjectSources } from '../../features/video/project/recording-events/project-facts';
 import { initDB } from '../../composition/persistence/infrastructure/indexed-db/core';
 import type { RecordingTelemetryEntry } from '../../composition/persistence/recordings/contracts';
 import type { RecordingEventsStoreDependencies } from '../../composition/persistence/recordings/recording-events/contracts';
@@ -77,10 +81,16 @@ export function createReviewRecordingHistorySource(
     database: initDB,
     mintGeneration: () => crypto.randomUUID(),
   },
-  options: { includeCursor?: boolean } = {}
+  options: {
+    includeCursor?: boolean;
+    interactionTimeline?: ReviewInteractionTimeline | undefined;
+  } = {}
 ) {
   project = structuredClone(project);
   telemetry = structuredClone(telemetry);
+  const interactionTimeline = options.interactionTimeline
+    ? structuredClone(options.interactionTimeline)
+    : undefined;
   const events = createRecordingEventsRenderer(dependencies);
   const cursor = createRecordingCursorTrajectoryRenderer(dependencies);
   const lifetime = new AbortController();
@@ -157,10 +167,20 @@ export function createReviewRecordingHistorySource(
         if (options.includeCursor === false) facts.cursorTrack = null;
         const markers = projectReviewTelemetry(facts, project.duration).markers;
         if (group?.events) applyRecordingEventMarkerFacts(prepared, group, markers);
+        const relocated = await readReviewInteractionArchiveMarkers(
+          project,
+          events,
+          interactionTimeline,
+          range,
+          active
+        );
+        const byRef = new Map(
+          [...markers, ...relocated.markers].map((marker) => [JSON.stringify(marker.ref), marker])
+        );
         return {
           project: prepared,
           telemetry: attachReviewRecordingWindow(facts, {
-            markers,
+            markers: [...byRef.values()],
             ...(source ? { cursorEndSeconds: source.knownEndSeconds } : {}),
           }),
         };
@@ -180,4 +200,29 @@ export function createReviewRecordingHistorySource(
       cursor.clear();
     },
   };
+}
+
+/** Reads only original event windows needed by relocated presentation in this destination window. */
+export async function readReviewInteractionArchiveMarkers(
+  project: VideoProject,
+  reader: Pick<ReturnType<typeof createRecordingEventsRenderer>, 'prepare'>,
+  timeline: ReviewInteractionTimeline | undefined,
+  range: { start: number; end: number },
+  signal: AbortSignal
+) {
+  const markers: ReturnType<typeof projectActionFeedbackMarkers> = [];
+  const sources: ReturnType<typeof recordingEventProjectSources> = [];
+  for (const query of reviewInteractionSourceQueries(timeline, range)) {
+    signal.throwIfAborted();
+    const prepared = await reader.prepare(project, query.range, signal);
+    signal.throwIfAborted();
+    sources.push(...recordingEventProjectSources(prepared));
+    for (const group of prepared.actionFeedback ?? [])
+      markers.push(
+        ...projectActionFeedbackMarkers(prepared, group, false).filter(
+          (marker) => marker.ref.kind === query.ref.kind && marker.ref.id === query.ref.id
+        )
+      );
+  }
+  return { markers, sources };
 }

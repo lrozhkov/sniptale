@@ -3,6 +3,7 @@ import { buildReviewTimeMap } from '../timeline';
 import { describe, expect, it } from 'vitest';
 import {
   buildQuickEditAudioPlan,
+  buildQuickEditOriginalAudioPlan,
   buildQuickEditClipEnvelope,
   planQuickEditClipPlayback,
   type QuickEditAudioPlanEntry,
@@ -364,4 +365,139 @@ it('retains source-phase fade crossings after tempo changes and midclip resume',
   });
   expect(points.map(([time]) => time)).toEqual([0.5, 1.5, 1.9, 2.5, 3.5]);
   expect(points[2]?.[1]).toBeCloseTo(0.4, 12);
+});
+
+it('retains an independent processing snapshot in the common preview and export schedule', () => {
+  const audioProcessing = { version: 1 as const, bypassed: false, effects: [] };
+  const take: QuickEditAudioClip = {
+    id: 'processed',
+    assetId: 'audio',
+    timelineStart: 1,
+    sourceOffset: 2,
+    duration: 3,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+    audioProcessing,
+  };
+  const [entry] = buildQuickEditAudioPlan({ voiceover: [take], music: [] });
+  expect(entry?.audioProcessing).toEqual(audioProcessing);
+  expect(entry?.audioProcessing).not.toBe(audioProcessing);
+  entry!.audioProcessing!.bypassed = true;
+  expect(take.audioProcessing?.bypassed).toBe(false);
+});
+
+it('keeps whole original DSP intervals across cut and tempo while applying exact source gain boundaries', () => {
+  const edits = [
+    { id: 'cut', kind: 'cut' as const, start: 2, end: 3, requestedStart: 2, requestedEnd: 3 },
+    {
+      id: 'speed',
+      kind: 'speed' as const,
+      start: 3,
+      end: 7,
+      requestedStart: 3,
+      requestedEnd: 7,
+      rate: 2 as const,
+      audio: 'speed' as const,
+    },
+  ];
+  const entries = buildQuickEditOriginalAudioPlan({
+    sourceId: 'recording:source',
+    segments: buildReviewTimeMap(10, edits),
+    edits,
+    original: {
+      muted: false,
+      volume: 0.8,
+      audioProcessing: { version: 1, bypassed: false, effects: [] },
+      ranges: [{ id: 'range', start: 4, end: 5, volume: 0.25 }],
+    },
+  });
+  expect(entries.map((entry) => [entry.sourceOffset, entry.duration, entry.playbackRate])).toEqual([
+    [0, 2, 1],
+    [3, 2, 2],
+    [7, 3, 1],
+  ]);
+  const schedule = planQuickEditClipPlayback({
+    entry: entries[1]!,
+    outputTime: 2.25,
+    audioNow: 100,
+  });
+  expect(schedule).toEqual({
+    when: 100,
+    offset: 3.5,
+    duration: 3.5,
+    playbackRate: 2,
+    envelopeMode: 'step',
+    envelope: [
+      [100, 0.8],
+      [100.25, 0.2],
+      [100.75, 0.8],
+    ],
+  });
+});
+it('keeps original speed-mute separate from the configured DSP snapshot', () => {
+  const edits = [
+    {
+      id: 'speed',
+      kind: 'speed' as const,
+      start: 1,
+      end: 2,
+      requestedStart: 1,
+      requestedEnd: 2,
+      rate: 2 as const,
+      audio: 'mute' as const,
+    },
+  ];
+  const original = {
+    muted: false,
+    volume: 1,
+    audioProcessing: { version: 1 as const, bypassed: false, effects: [] },
+  };
+  const entries = buildQuickEditOriginalAudioPlan({
+    sourceId: 'source',
+    segments: buildReviewTimeMap(3, edits),
+    edits,
+    original,
+  });
+  expect(entries.map((entry) => entry.volume)).toEqual([1, 0, 1]);
+  expect(entries[1]!.audioProcessing).toEqual(original.audioProcessing);
+  expect(entries[1]!.audioProcessing).not.toBe(original.audioProcessing);
+});
+
+it('never schedules original DSP audio for a held frame', () => {
+  const edits = [
+    {
+      id: 'hold',
+      kind: 'freeze' as const,
+      start: 2,
+      end: 2,
+      requestedStart: 2,
+      requestedEnd: 2,
+      duration: 2,
+      frameTime: 2,
+      frameDuration: 0.04,
+    },
+  ];
+  const entries = buildQuickEditOriginalAudioPlan({
+    sourceId: 'recording:source',
+    edits,
+    segments: buildReviewTimeMap(4, edits),
+    original: {
+      volume: 1,
+      muted: false,
+      audioProcessing: { version: 1, bypassed: false, effects: [] },
+    },
+  });
+  expect(
+    entries.map((entry) => [
+      entry.timelineStart,
+      entry.duration,
+      entry.sourceOffset,
+      entry.playbackRate,
+    ])
+  ).toEqual([
+    [0, 2, 0, 1],
+    [4, 2, 2, 1],
+  ]);
 });

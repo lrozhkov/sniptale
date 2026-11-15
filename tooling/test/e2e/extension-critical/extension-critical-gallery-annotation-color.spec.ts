@@ -14,7 +14,7 @@ test('builtin RGBA survives sandbox and flat/perspective composition with declar
     format: 'esm',
     platform: 'browser',
     write: false,
-    loader: { '.svg': 'text', '.woff2': 'dataurl' },
+    loader: { '.svg': 'text', '.woff2': 'dataurl', '.bin': 'dataurl' },
     define: { 'process.env.NODE_ENV': '"production"' },
   });
   const host = await startHostServer();

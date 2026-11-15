@@ -1,102 +1,90 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-
 import { describe, expect, it } from 'vitest';
-
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
+import { animationRuntimeDuration } from '../../../../contracts/effect-runtime/animation';
+import { createGlTransitionSelection } from '../transition/gl-catalog';
+import { buildProjectTransitionSegments } from '../transition/project';
 import { resolveEffectRuntimeFramePlans } from '../../composition/effect-runtime/frame/plan';
 import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
 import { createRecordingBaseClip, createRecordingProjectAsset } from '../factories/recording';
 import { createEffectHostClip } from '../factories/overlay-clip';
 import { syncProjectDuration } from '../timeline/basics';
-import {
-  VideoTrackKind,
-  VideoTransitionEasing,
-  VideoTransitionKind,
-  type VideoProject,
-} from '../types';
+import { VideoTrackKind, VideoTransitionEasing, type VideoProject } from '../types';
 import { isHydratableVideoProject } from '../validation';
 import type { VideoProjectEffectInstance, VideoProjectEffectSnapshot } from './types';
 
-describe('EffectV1 project mutation reconciliation', () => {
-  it('recomputes transition timing before render and persistence validation', () => {
-    const project = createProjectWithEffects();
-    const trailingClipId = project.transitions![0]!.trailingClipId;
-    const reconciled = syncProjectDuration({
-      ...project,
-      clips: project.clips.map((clip) =>
-        clip.id === trailingClipId ? { ...clip, startTime: 4.3 } : clip
-      ),
-    });
-
-    const transition = reconciled.effectInstances?.find(({ id }) => id === 'transition');
-    expect(transition?.duration).toBeCloseTo(0.7);
-    expect(transition?.playbackRate).toBeCloseTo(3 / 0.7);
-    expect(transition?.startTime).toBeCloseTo(4.3);
-    expect(isHydratableVideoProject(reconciled)).toBe(true);
-    const [plan] = resolveEffectRuntimeFramePlans(reconciled, 4.65);
-    expect(plan?.effectInstanceId).toBe('transition');
-    expect(plan?.progress).toBeCloseTo(0.5);
-  });
-
-  it('prunes instances with deleted targets and their unreferenced snapshots atomically', () => {
-    const project = createProjectWithEffects();
-    const leadingClipId = project.transitions![0]!.leadingClipId;
-    const reconciled = syncProjectDuration({
-      ...project,
-      clips: project.clips.filter(({ id }) => id !== leadingClipId),
-    });
-
-    expect(reconciled.transitions).toEqual([]);
-    expect(reconciled.effectInstances?.map(({ id }) => id)).toEqual(['scene']);
-    expect(reconciled.effectSnapshots?.map(({ id }) => id)).toEqual([
-      reconciled.effectInstances![0]!.snapshotId,
-    ]);
-    expect(isHydratableVideoProject(reconciled)).toBe(true);
-    expect(resolveEffectRuntimeFramePlans(reconciled, 1)).toEqual([
-      expect.objectContaining({ effectInstanceId: 'scene' }),
-    ]);
-  });
-});
-
 function createProjectWithEffects(): VideoProject {
-  const project = createEmptyVideoProject('effect-reconciliation');
+  const project = createEmptyVideoProject('Animation reconciliation');
+  project.version = 52;
   const { asset, leading, trailing } = createRecordingFixture(project);
-  const snapshots = [
-    createSnapshot('standalone', 'neutral-standalone.sniptale-effect.json', 'a'),
-    createSnapshot('targetEffect', 'neutral-target-effect.sniptale-effect.json', 'b'),
-    createSnapshot('transition', 'neutral-transition.sniptale-effect.json', 'c'),
-  ] as const;
-  const transitionId = 'transition-id';
+  const track = createVideoProjectTrack('Annotations', -1, VideoTrackKind.PRIMARY);
+  project.tracks.push(track);
+  const definitions = ['title', 'frame'].map((name) => {
+    const source = readFileSync(
+      name === 'callout'
+        ? 'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
+        : `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
+      'utf8'
+    );
+    const parsed = parseAnimationTemplateSource(source);
+    if (!parsed.ok) throw new Error('Expected valid animation.');
+    const sha256 = createHash('sha256').update(source).digest('hex');
+    const snapshot: VideoProjectEffectSnapshot = {
+      source,
+      sha256,
+      id: `effect:${sha256}`,
+      documentId: parsed.template.id,
+      kind: 'standalone',
+      schemaVersion: 'sniptale.animation.v1',
+      assets: [],
+      retainedByteLength: Buffer.byteLength(source),
+    };
+    return { snapshot, document: parsed.template };
+  });
+  const effectInstances: VideoProjectEffectInstance[] = definitions.map(
+    ({ snapshot, document }, index) => ({
+      id: index === 0 ? 'scene' : 'other',
+      snapshotId: snapshot.id,
+      kind: 'standalone',
+      target: { kind: 'scene' },
+      duration: animationRuntimeDuration(document),
+      playbackRate: 1,
+      enabled: true,
+      startTime: index * 4,
+      controls: Object.fromEntries(
+        document.controls.map((control) => [control.id, control.defaultValue])
+      ),
+    })
+  );
   return {
     ...project,
     assets: [asset],
-    clips: [leading, trailing, createStandaloneHost(project, snapshots[0].duration)],
     duration: 9,
-    effectInstances: [
-      createInstance('scene', snapshots[0], { kind: 'scene' }, 0, snapshots[0].duration, 1),
-      createInstance(
-        'clip',
-        snapshots[1],
-        { clipId: leading.id, kind: 'clip' },
-        0,
-        snapshots[1].duration,
-        1
-      ),
-      createInstance(
-        'transition',
-        snapshots[2],
-        { kind: 'transition', transitionId },
-        4,
-        1,
-        snapshots[2].duration
+    effectSnapshots: definitions.map((entry) => entry.snapshot),
+    effectInstances,
+    clips: [
+      leading,
+      trailing,
+      ...effectInstances.map((instance) =>
+        createEffectHostClip({
+          duration: instance.duration,
+          effectInstanceId: instance.id,
+          name: instance.id,
+          projectWidth: project.width,
+          projectHeight: project.height,
+          startTime: instance.startTime,
+          trackId: track.id,
+        })
       ),
     ],
-    effectSnapshots: snapshots.map(({ snapshot }) => snapshot),
     transitions: [
       {
         duration: 1,
         easing: VideoTransitionEasing.LINEAR,
-        id: transitionId,
-        kind: VideoTransitionKind.CROSSFADE,
+        id: 'transition-id',
+        kind: 'gl',
+        selection: createGlTransitionSelection('Fade')!,
         leadingClipId: leading.id,
         trailingClipId: trailing.id,
       },
@@ -122,89 +110,72 @@ function createRecordingFixture(project: VideoProject) {
   return { asset, leading, trailing };
 }
 
-function createStandaloneHost(project: VideoProject, duration: number) {
-  const track = createVideoProjectTrack('Effects', 0, VideoTrackKind.PRIMARY);
-  project.tracks.push(track);
-  const trackId = track.id;
-  return createEffectHostClip({
-    duration,
-    effectInstanceId: 'scene',
-    name: 'scene',
-    projectHeight: project.height,
-    projectWidth: project.width,
-    startTime: 0,
-    trackId,
+describe('animation project mutation reconciliation', () => {
+  it('recomputes the GL boundary without retiming independent scene annotations', () => {
+    const project = createProjectWithEffects(),
+      original = structuredClone(project);
+    const trailingClipId = project.transitions![0]!.trailingClipId;
+    const reconciled = syncProjectDuration({
+      ...project,
+      clips: project.clips.map((clip) =>
+        clip.id === trailingClipId ? { ...clip, startTime: 4.3 } : clip
+      ),
+    });
+    const [segment] = buildProjectTransitionSegments(reconciled);
+    expect(segment?.start).toBeCloseTo(4.3);
+    expect(segment?.end).toBeCloseTo(5);
+    expect(reconciled.transitions![0]!.duration).toBeCloseTo(0.7);
+    expect(reconciled.effectInstances).toEqual(project.effectInstances);
+    expect(isHydratableVideoProject(reconciled)).toBe(true);
+    const plans = resolveEffectRuntimeFramePlans(reconciled, 4.65);
+    expect(plans.map((plan) => plan.effectInstanceId)).toEqual(['scene', 'other']);
+    for (const plan of plans) {
+      const instance = project.effectInstances!.find(
+        (entry) => entry.id === plan.effectInstanceId
+      )!;
+      expect(plan.progress).toBeCloseTo((4.65 - instance.startTime) / instance.duration);
+    }
+    expect(project).toEqual(original);
   });
-}
+  it('prunes a deleted annotation host and its unreferenced snapshot atomically', () => {
+    const project = createProjectWithEffects(),
+      leadingClipId = project.transitions![0]!.leadingClipId;
+    const reconciled = syncProjectDuration({
+      ...project,
+      clips: project.clips.filter(
+        (clip) =>
+          clip.id !== leadingClipId &&
+          !(clip.type === 'EFFECT' && clip.effectInstanceId === 'other')
+      ),
+    });
+    expect(reconciled.transitions).toEqual([]);
+    expect(reconciled.effectInstances?.map((entry) => entry.id)).toEqual(['scene']);
+    expect(reconciled.effectSnapshots?.map((entry) => entry.id)).toEqual([
+      reconciled.effectInstances![0]!.snapshotId,
+    ]);
+    expect(isHydratableVideoProject(reconciled)).toBe(true);
+    expect(resolveEffectRuntimeFramePlans(reconciled, 1)).toEqual([
+      expect.objectContaining({ effectInstanceId: 'scene' }),
+    ]);
+  });
+});
 
-function createSnapshot(
-  kind: VideoProjectEffectSnapshot['kind'],
-  filename: string,
-  digestCharacter: string
-): { duration: number; snapshot: VideoProjectEffectSnapshot } {
-  const source = readFileSync(
-    new URL(
-      `../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/valid/${filename}`,
-      import.meta.url
-    ),
-    'utf8'
-  );
-  const document = JSON.parse(source) as { duration: number; id: string };
-  const sha256 = digestCharacter.repeat(64);
-  return {
-    duration: document.duration,
-    snapshot: {
-      assets: [],
-      documentId: document.id,
-      id: `effect:${sha256}`,
-      kind,
-      retainedByteLength: new TextEncoder().encode(source).byteLength,
-      schemaVersion: 'sniptale.effect.v1',
-      sha256,
-      source,
-    },
-  };
-}
-
-function createInstance(
-  id: string,
-  source: ReturnType<typeof createSnapshot>,
-  target: VideoProjectEffectInstance['target'],
-  startTime: number,
-  duration: number,
-  playbackRate: number
-): VideoProjectEffectInstance {
-  return {
-    controls: {},
-    duration,
-    enabled: true,
-    id,
-    kind: source.snapshot.kind,
-    playbackRate,
-    snapshotId: source.snapshot.id,
-    startTime,
-    target,
-  };
-}
-
-it('keeps the retained document interval when a windowed EFFECT placement changes', () => {
-  const project = createProjectWithEffects();
-  const scene = project.effectInstances!.find(({ id }) => id === 'scene')!;
-  const original = structuredClone(scene);
+it('keeps the retained document interval when a windowed annotation placement changes', () => {
+  const project = createProjectWithEffects(),
+    scene = project.effectInstances![0]!,
+    original = structuredClone(scene);
   const host = project.clips.find(
     (clip) => clip.type === 'EFFECT' && clip.effectInstanceId === scene.id
   )!;
   host.duration += 0.3;
   host.playbackWindow = { offset: 0, holdAt: scene.duration - 0.1 };
-  project.version = 43;
   const next = syncProjectDuration(project);
-  expect(next.effectInstances!.find(({ id }) => id === scene.id)).toEqual(original);
+  expect(next.effectInstances!.find((entry) => entry.id === scene.id)).toEqual(original);
   expect(isHydratableVideoProject(next)).toBe(true);
 });
-
-it.each(['motion', 'background'])('retains normalized effect inputs after a %s edit', (kind) => {
-  const project = syncProjectDuration(createProjectWithEffects());
-  const before = structuredClone(project);
+it.each(['motion', 'background'])('retains normalized animation inputs after a %s edit', (kind) => {
+  const project = syncProjectDuration(createProjectWithEffects()),
+    before = structuredClone(project);
   const edited =
     kind === 'motion'
       ? { ...project, motionRegions: [] }

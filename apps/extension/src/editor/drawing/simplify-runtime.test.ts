@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { createDrawingCleanup } from '../../features/drawing/public';
+import { createEditorDrawingBlurObject } from './object/blur';
 import { cancelEditorTransientInteraction } from '../controller/input/canvas-actions/transient';
 import { afterEach, expect, it, vi } from 'vitest';
 import { Canvas, FabricImage, Rect } from 'fabric';
@@ -643,6 +645,56 @@ it.each([false, true])(
       expect(readEditorDrawingObject(f.canvas.getObjects()[0]!)).toMatchObject({
         engineVersion: 'after-focus-loss',
       });
+    }
+  }
+);
+
+it.each(['failure', 'cancel', 'success'] as const)(
+  'keeps the old blur intact until cleanup conversion succeeds: %s',
+  async (outcome) => {
+    const f = fixture();
+    f.canvas.remove(f.object);
+    setEditorEditingSurfaceDimensions(f.canvas, { width: 100, height: 100 });
+    const drawing = {
+      id: 'blur-original',
+      kind: 'blur' as const,
+      bounds: { x: 5, y: 5, width: 80, height: 40 },
+      amount: 6,
+    };
+    const old = createEditorDrawingBlurObject({ drawing, labelIndex: 1 });
+    f.canvas.add(old);
+    f.canvas.setActiveObject(old);
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      callback(0);
+      return 1;
+    });
+    const replacement = createDrawingCleanup(drawing);
+    expect(
+      requestEditorSimplify(f.canvas, old, replacement.settings, false, false, replacement)
+    ).toBe(true);
+    await settled();
+    expect(f.canvas.getObjects()).toContain(old);
+    expect(readEditorDrawingObject(old)).toEqual(drawing);
+    if (outcome === 'failure') f.result.reject(new Error('compute failed'));
+    else {
+      if (outcome === 'cancel') cancelPendingEditorSimplify(f.canvas);
+      f.result.resolve({ ...f.snapshot, version: '1' });
+    }
+    await settled();
+    if (outcome === 'success') {
+      const current = f.canvas.getObjects()[0]!;
+      expect(current).not.toBe(old);
+      expect(current.sniptaleId).toBe(drawing.id);
+      expect(current.sniptaleType).toBe('blur');
+      expect(readEditorDrawingObject(current)).toMatchObject({
+        settings: { erase: true },
+        blurAmount: 6,
+      });
+      expect(f.commitHistory).toHaveBeenCalledOnce();
+    } else {
+      expect(f.canvas.getObjects()).toContain(old);
+      expect(readEditorDrawingObject(old)).toEqual(drawing);
+      expect(f.commitHistory).not.toHaveBeenCalled();
     }
   }
 );

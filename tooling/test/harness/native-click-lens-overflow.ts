@@ -21,8 +21,8 @@ import {
   admittedVisualWindowHeader,
   projectWindowHeaderImages,
 } from '../../../apps/extension/src/features/video/composition/draw/window-header';
-import { createNativeGpuPreviewRenderer } from '../../../apps/extension/src/video-editor/preview/stage/scene/gpu-preview';
-import { drawPreviewVisualPasses } from '../../../apps/extension/src/video-editor/preview/stage/scene/render-visual';
+import { createNativeGpuPreviewRenderer } from '../../../apps/extension/src/workflows/video/native-composition/gpu-preview';
+import { drawPreviewVisualPasses } from '../../../apps/extension/src/workflows/video/native-composition/render-visual';
 import { createReviewSpatialRenderer } from '../../../apps/extension/src/features/video/composition/canvas/spatial-renderer';
 import type { VideoCompositionActionState } from '../../../apps/extension/src/features/video/composition/types';
 import type { VideoCompositionFrameSource } from '../../../apps/extension/src/features/video/composition/draw/media-source';

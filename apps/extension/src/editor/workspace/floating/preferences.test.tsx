@@ -54,13 +54,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('hydrates floating layers collapsed and height preference from storage', async () => {
+it('hydrates collapsed state but starts each session without a stored height', async () => {
   storageMocks.loadPreference.mockResolvedValue({ collapsed: true, heightRatio: 0.45 });
 
   await renderHarness();
 
   expect(latestState?.layersCollapsed).toBe(true);
-  expect(latestState?.layersHeightRatio).toBe(0.45);
+  expect(latestState?.layersHeight).toBeNull();
 });
 
 it('persists user updates and does not let late hydration overwrite them', async () => {
@@ -73,19 +73,16 @@ it('persists user updates and does not let late hydration overwrite them', async
 
   await renderHarness();
   act(() => latestState?.setLayersCollapsed(true));
-  act(() => latestState?.setLayersHeightRatio(0.75));
+  act(() => latestState?.setLayersHeight(450));
   await act(async () => resolveLoad({ collapsed: false, heightRatio: 0.25 }));
 
   expect(latestState?.layersCollapsed).toBe(true);
-  expect(latestState?.layersHeightRatio).toBe(0.75);
+  expect(latestState?.layersHeight).toBe(450);
   expect(storageMocks.savePreference).toHaveBeenNthCalledWith(1, {
     collapsed: true,
     heightRatio: null,
   });
-  expect(storageMocks.savePreference).toHaveBeenNthCalledWith(2, {
-    collapsed: true,
-    heightRatio: 0.75,
-  });
+  expect(storageMocks.savePreference).toHaveBeenCalledTimes(1);
 });
 
 it('surfaces failed preference saves and clears the inline error on retry', async () => {
@@ -107,4 +104,34 @@ it('surfaces failed preference saves and clears the inline error on retry', asyn
   await act(async () => Promise.resolve());
 
   expect(latestState?.layersPreferenceError).toBeNull();
+});
+
+it('retains resized height across collapse and resets it in a new session without storage writes', async () => {
+  storageMocks.loadPreference.mockResolvedValue({ collapsed: false, heightRatio: 0.4 });
+  await renderHarness();
+  act(() => latestState?.setLayersHeight(620));
+  expect(latestState?.layersHeight).toBe(620);
+  expect(storageMocks.savePreference).not.toHaveBeenCalled();
+  act(() => latestState?.setLayersCollapsed(true));
+  act(() => latestState?.setLayersCollapsed(false));
+  expect(latestState?.layersHeight).toBe(620);
+  act(() => root?.unmount());
+  container?.remove();
+  await renderHarness();
+  expect(latestState?.layersHeight).toBeNull();
+});
+
+it('keeps session height when only collapse preferences arrive after a resize', async () => {
+  let resolveLoad!: (value: { collapsed: boolean; heightRatio: number | null }) => void;
+  storageMocks.loadPreference.mockReturnValue(
+    new Promise((resolve) => {
+      resolveLoad = resolve;
+    })
+  );
+  await renderHarness();
+  act(() => latestState?.setLayersHeight(600));
+  await act(async () => resolveLoad({ collapsed: true, heightRatio: 0.2 }));
+  expect(latestState?.layersCollapsed).toBe(true);
+  expect(latestState?.layersHeight).toBe(600);
+  expect(storageMocks.savePreference).not.toHaveBeenCalled();
 });

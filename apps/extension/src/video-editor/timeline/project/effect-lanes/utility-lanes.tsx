@@ -1,3 +1,4 @@
+import { resolveActiveSpatialMotionRegions } from '../../../../features/video/project/motion';
 import type { VideoEditorRecordingActionObservation } from '../../../contracts/recording-events';
 import { motionFocusAreaScale } from '../../../../features/video/project/motion/focus-area';
 import { VideoMotionFocusMode } from '../../../../features/video/project/types';
@@ -261,17 +262,21 @@ function MotionSegments(
     rows: Map<string, number>;
   }
 ) {
+  const activeSpatial = new Set(resolveActiveSpatialMotionRegions(props.project).map((r) => r.id));
   return props.segments.map((segment) => {
+    const suppressed = segment.region.effect === '3d' && !activeSpatial.has(segment.region.id);
     const border = segment.region.border;
     const spotlight = segment.region.spotlight;
     const label = translate(
-      border
-        ? 'gallery.videoReview.focusBorder'
-        : spotlight?.effect === 'magnify'
-          ? 'gallery.videoReview.focusLens'
-          : spotlight
-            ? 'gallery.videoReview.focusSpotlight'
-            : 'videoEditor.timeline.motionSegment'
+      segment.region.effect === '3d'
+        ? 'gallery.videoReview.focus3d'
+        : border
+          ? 'gallery.videoReview.focusBorder'
+          : spotlight?.effect === 'magnify'
+            ? 'gallery.videoReview.focusLens'
+            : spotlight
+              ? 'gallery.videoReview.focusSpotlight'
+              : 'videoEditor.timeline.motionSegment'
     );
     const scale =
       segment.region.focusMode === VideoMotionFocusMode.MANUAL_AREA && segment.region.focusArea
@@ -283,7 +288,8 @@ function MotionSegments(
         key={segment.id}
         segmentId={segment.id}
         movable={!getVideoProjectUtilityLanes(props.project).camera.locked}
-        className={MOTION_LANE_SEGMENT_CLASS_NAME}
+        className={`${MOTION_LANE_SEGMENT_CLASS_NAME} ${suppressed ? 'opacity-50' : ''}`}
+        hidden={!props.laneVisible || suppressed}
         height={28}
         top={
           (props.rows.get(segment.region.id) ?? 0) * EFFECT_LANE_ROW_HEIGHT +
@@ -303,7 +309,13 @@ function MotionSegments(
             <ZoomIn size={14} aria-hidden="true" />
           )
         }
-        title={border || spotlight ? label : `${label} · ${subtitle}`}
+        title={
+          suppressed
+            ? translate('gallery.videoReview.focus3dConflict')
+            : border || spotlight || segment.region.effect === '3d'
+              ? label
+              : `${label} · ${subtitle}`
+        }
         startTime={segment.start}
         endTime={segment.end}
         pixelsPerSecond={props.pixelsPerSecond}

@@ -1,5 +1,3 @@
-import type { EffectV1Kind } from '@sniptale/runtime-contracts/effect-v1';
-
 export interface VideoProjectEffectSnapshotAsset {
   blob: Blob;
   byteLength: number;
@@ -13,9 +11,9 @@ export interface VideoProjectEffectSnapshot {
   assets: VideoProjectEffectSnapshotAsset[];
   documentId: string;
   id: string;
-  kind: EffectV1Kind;
+  kind: 'standalone';
   retainedByteLength: number;
-  schemaVersion: 'sniptale.effect.v1';
+  schemaVersion: 'sniptale.animation.v1';
   sha256: string;
   source: string;
 }
@@ -38,7 +36,7 @@ export interface VideoProjectEffectInstance {
   duration: number;
   enabled: boolean;
   id: string;
-  kind: EffectV1Kind;
+  kind: 'standalone';
   playbackRate: number;
   /** First retained document time, in seconds. Omission starts at the document beginning. */
   sourceStart?: number;

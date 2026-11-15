@@ -3,7 +3,7 @@ import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-ur
 import type { MediaLibraryEntry } from '../../../composition/persistence/media-library/contracts';
 import type { RecordingGroupMember } from '../../../features/media-hub/recording-groups';
 import type { StoredImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/contracts';
-import type { PersistedEditorDocumentV3 } from '../../../composition/persistence/document-assets';
+import type { PersistedEditorDocument } from '../../../composition/persistence/document-assets';
 import { getTourImages } from '../../../features/scenario/project/public';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { ScenarioProjectEntry } from '../../../composition/persistence/scenario/contracts';
@@ -44,9 +44,9 @@ export function projectMediaEntryPrivacy(
 }
 
 export function projectStoredEditorDocumentPrivacy(
-  document: PersistedEditorDocumentV3,
+  document: PersistedEditorDocument,
   options: MediaHubBackupExportOptions
-): PersistedEditorDocumentV3 {
+): PersistedEditorDocument {
   const browserFrame = document.browserFrame
     ? {
         ...document.browserFrame,

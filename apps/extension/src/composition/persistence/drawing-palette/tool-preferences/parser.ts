@@ -80,7 +80,9 @@ function parseDefaults(value: unknown, fallback: DrawingToolDefaults): DrawingTo
     !isNumberOption(arrow['width'], DRAWING_ARROW_WIDTHS) ||
     !(
       blur === undefined ||
-      (isRecord(blur) && isNumberOption(blur['amount'], DRAWING_BLUR_STRENGTHS))
+      (isRecord(blur) &&
+        isNumberOption(blur['amount'], DRAWING_BLUR_STRENGTHS) &&
+        (blur['clean'] === undefined || typeof blur['clean'] === 'boolean'))
     ) ||
     !isRecord(text) ||
     !isColor(text['color']) ||
@@ -112,7 +114,14 @@ function parseDefaults(value: unknown, fallback: DrawingToolDefaults): DrawingTo
       width: arrow['width'],
     },
     blur:
-      blur === undefined ? { ...fallback.blur } : { amount: (blur as { amount: number }).amount },
+      blur === undefined
+        ? { ...fallback.blur }
+        : {
+            amount: (blur as { amount: number }).amount,
+            ...((blur as Record<string, unknown>)['clean'] === undefined
+              ? {}
+              : { clean: (blur as { clean: boolean }).clean }),
+          },
     text: {
       backgroundColor: text['backgroundColor'],
       color: text['color'],

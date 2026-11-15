@@ -28,6 +28,7 @@ function getMutationSchemaVersion(
 }
 
 function motionSchemaRequirement(regions: VideoProject['motionRegions']): VideoProject['version'] {
+  if (regions?.some((region) => region.effect === '3d')) return 55;
   if (regions?.some((region) => region.cursorComposition !== undefined)) return 51;
   if (regions?.some((region) => requiresExtendedBorderSchema(region.border))) return 48;
   if (regions?.some((region) => region.spotlightTarget === 'source-scene')) return 39;
@@ -67,6 +68,14 @@ function motionSchemaRequirement(regions: VideoProject['motionRegions']): VideoP
 }
 
 function clipSchemaRequirement(clips: VideoProject['clips']): VideoProject['version'] {
+  if (
+    clips.some(
+      (clip) =>
+        (clip.type === 'VIDEO' || clip.type === 'AUDIO') && clip.audioProcessing !== undefined
+    )
+  )
+    return 53;
+  if (clips.some((clip) => clip.type === 'VIDEO' && clip.sourceFilters !== undefined)) return 52;
   if (clips.some((clip) => clip.type === 'VIDEO' && clip.cameraShadowDirection !== undefined))
     return 47;
   if (
@@ -152,6 +161,21 @@ function projectSchemaRequirement(
   project: VideoProject,
   patch: MutationPatch
 ): VideoProject['version'] {
+  if (
+    (patch.actionEvents ?? project.actionEvents).some((event) => event.anchor.kind === 'source') ||
+    (patch.cursorFocusPath ?? project.cursorFocusPath)?.segments.some(
+      (segment) => segment.binding.kind === 'source'
+    )
+  )
+    return 54;
+  if ((patch.sourceInteractionDocuments ?? project.sourceInteractionDocuments) !== undefined)
+    return 54;
+  if (
+    (patch.sourceVoiceoverDocuments ?? project.sourceVoiceoverDocuments)?.some(
+      (document) => document.take.audioProcessing !== undefined
+    )
+  )
+    return 53;
   if ((patch.actionFeedback ?? project.actionFeedback)?.some((group) => group.events !== undefined))
     return 50;
   if (

@@ -1,3 +1,4 @@
+import { useReviewTimelineSnap } from './timeline-magnets';
 import { ReviewTrackVisibilityButton } from './track-row';
 import { reviewTrackMetrics, ReviewTrackCuts, ReviewTrackRow } from './track-row';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
@@ -9,7 +10,7 @@ import type {
   ReviewAnnotationEffectSnapshot,
 } from '../../features/video/review/annotation-effects/types';
 import { readReviewAnnotationEffectDocument } from '../../features/video/review/annotation-effects/validation';
-import { SNAP_THRESHOLD_PX, snapTimelineTime } from '../../features/video/review/snap';
+import { SNAP_THRESHOLD_PX } from '../../features/video/review/snap';
 import {
   reviewTimeLabel,
   reviewTimelineItemTone,
@@ -84,7 +85,37 @@ function boundedRange(
 }
 
 /** Source-clock plates; overlap rows are disposable and never change compositing order. */
-export function ReviewAnnotationEffectsTrack(props: TrackProps) {
+export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
+  const display = incoming.projection?.display;
+  const props: TrackProps = display
+    ? {
+        ...incoming,
+        duration: display.duration,
+        time: display.sourceToDisplay(incoming.time),
+        instances: incoming.instances.map((item) => ({
+          ...item,
+          start: display.sourceToDisplay(item.start),
+          end: display.sourceToDisplay(item.end, 'end'),
+        })),
+        snapTimes: incoming.snapTimes.map((time) => display.sourceToDisplay(time)),
+        onPreview: (range) =>
+          incoming.onPreview({
+            start: display.displayToSource(range.start),
+            end: display.displayToSource(range.end),
+          }),
+        onPlace: (range, anchor) =>
+          incoming.onPlace?.(
+            {
+              start: display.displayToSource(range.start),
+              ...(range.end === undefined ? {} : { end: display.displayToSource(range.end) }),
+            },
+            anchor
+          ),
+      }
+    : incoming;
+  const snapTimelineTime = useReviewTimelineSnap(
+    display ? { output: display.sourceToDisplay, fromDisplay: (time) => time } : undefined
+  );
   const locale = useAppLocale();
   const drag = useRef<Drag | null>(null);
   const latest = useRef(props);
@@ -141,7 +172,7 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
             props.instances.some((instance) => instance.snapshotId === snapshot.id)
           )
           .map((snapshot) => {
-            const document = readReviewAnnotationEffectDocument(snapshot.source);
+            const document = readReviewAnnotationEffectDocument(snapshot.source, snapshot.sha256);
             return [
               snapshot.id,
               document?.label[locale] ??
@@ -209,6 +240,7 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
     >
       <div
         data-ui="gallery.videoReview.annotationEffectsLane"
+        data-review-snap-domain="display"
         tabIndex={props.drawing && !props.busy ? 0 : undefined}
         aria-label={
           props.drawing ? translate('gallery.videoReview.annotationEffectsDraw') : undefined
@@ -364,6 +396,8 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
               aria-disabled={props.busy}
               data-annotation-effect-id={instance.id}
               data-review-removal-key={`annotation:${instance.id}`}
+              data-review-snap-start={instance.start}
+              data-review-snap-end={instance.end}
               data-annotation-effect-row={rows.get(instance.id)}
               data-enabled={instance.enabled}
               title={`${name} ${interval}`}
@@ -517,16 +551,12 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
                 data-annotation-effect-edge="start"
                 aria-hidden
                 className={`${reviewTimelineResizeHandleClassName} left-0`}
-              >
-                <span className="h-2.5 border-l border-current" />
-              </div>
+              ></div>
               <div
                 data-annotation-effect-edge="end"
                 aria-hidden
                 className={`${reviewTimelineResizeHandleClassName} right-0`}
-              >
-                <span className="h-2.5 border-l border-current" />
-              </div>
+              ></div>
             </div>
           );
         })}

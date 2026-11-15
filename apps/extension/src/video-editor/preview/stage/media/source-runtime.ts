@@ -41,6 +41,8 @@ function nominalSourceDemands(context: SourceContext, time: number): PreviewSour
       time: getVideoClipSourceTime(clip, time),
       rangeStart: clip.sourceStart - offset,
       rangeEnd: clip.sourceStart + clip.sourceDuration - offset,
+      // Container audio can outlast video; retain its final sample inside the authored range.
+      holdEnd: true,
     });
   }
   return demands;

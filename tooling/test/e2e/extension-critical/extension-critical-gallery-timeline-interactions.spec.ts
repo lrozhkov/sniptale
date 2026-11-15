@@ -532,7 +532,7 @@ async function seedDensityRows(page: Page, count: number, adjacent = false) {
     reviewAdvancedContentBaseline(saved.advanced)
   ).advancedContent;
   const source = await readFile(
-    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
+    'tooling/test/e2e/fixtures/lottie/neutral.sniptale-animation.json',
     'utf8'
   );
   const document = readReviewAnnotationEffectDocument(source);
@@ -540,7 +540,7 @@ async function seedDensityRows(page: Page, count: number, adjacent = false) {
   const sha256 = createHash('sha256').update(source).digest('hex');
   const snapshot = {
     id: `effect:${sha256}`,
-    schemaVersion: 'sniptale.effect.v1' as const,
+    schemaVersion: 'sniptale.animation.v1' as const,
     kind: 'standalone' as const,
     documentId: document.id,
     sha256,

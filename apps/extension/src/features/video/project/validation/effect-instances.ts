@@ -1,6 +1,5 @@
-import { validateEffectV1Document } from '@sniptale/runtime-contracts/effect-v1';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 
-import { parseBoundedEffectJson } from '../effect-bundle/json-structure';
 import type {
   VideoProjectEffectInstance,
   VideoProjectEffectSnapshot,
@@ -14,37 +13,28 @@ import { isRecord } from './primitives';
 const SHA256 = /^[a-f0-9]{64}$/;
 const MAX_EFFECT_INSTANCES = 1_000;
 const MAX_EFFECT_SNAPSHOTS = 100;
-const MAX_EFFECT_ASSETS_PER_SNAPSHOT = 200;
 const MAX_PROJECT_EFFECT_SNAPSHOT_BYTES = 512 * 1024 * 1024;
 
 export function isEffectProjectBranches(
   snapshotsValue: unknown,
   instancesValue: unknown
 ): snapshotsValue is VideoProjectEffectSnapshot[] {
-  return validateEffectProjectBranches(snapshotsValue, instancesValue, isEffectSnapshotAsset);
+  return validateEffectProjectBranches(snapshotsValue, instancesValue);
 }
 
 export function isEffectProjectMetadataBranches(
   snapshotsValue: unknown,
   instancesValue: unknown
 ): boolean {
-  return validateEffectProjectBranches(
-    snapshotsValue,
-    instancesValue,
-    isEffectSnapshotAssetMetadata
-  );
+  return validateEffectProjectBranches(snapshotsValue, instancesValue);
 }
 
-function validateEffectProjectBranches(
-  snapshotsValue: unknown,
-  instancesValue: unknown,
-  isAsset: (value: unknown) => boolean
-): boolean {
+function validateEffectProjectBranches(snapshotsValue: unknown, instancesValue: unknown): boolean {
   if (
     snapshotsValue !== undefined &&
     (!Array.isArray(snapshotsValue) ||
       snapshotsValue.length > MAX_EFFECT_SNAPSHOTS ||
-      !snapshotsValue.every((snapshot) => isEffectSnapshot(snapshot, isAsset)))
+      !snapshotsValue.every((snapshot) => isEffectSnapshot(snapshot)))
   ) {
     return false;
   }
@@ -84,16 +74,13 @@ export function hasValidEffectProjectReferences(
   return hasValidReferences(project);
 }
 
-function isEffectSnapshot(
-  value: unknown,
-  isAsset: (value: unknown) => boolean
-): value is VideoProjectEffectSnapshot {
+function isEffectSnapshot(value: unknown): value is VideoProjectEffectSnapshot {
   if (
     !isRecord(value) ||
     typeof value['id'] !== 'string' ||
-    value['id'] !== `effect:${String(value['sha256'])}` ||
+    value['id'] !== `effect:${value['sha256']}` ||
     typeof value['documentId'] !== 'string' ||
-    value['schemaVersion'] !== 'sniptale.effect.v1' ||
+    value['schemaVersion'] !== 'sniptale.animation.v1' ||
     !isKind(value['kind']) ||
     typeof value['sha256'] !== 'string' ||
     !SHA256.test(value['sha256']) ||
@@ -102,61 +89,15 @@ function isEffectSnapshot(
     !Number.isSafeInteger(value['retainedByteLength']) ||
     value['retainedByteLength'] <= 0 ||
     !Array.isArray(value['assets']) ||
-    value['assets'].length > MAX_EFFECT_ASSETS_PER_SNAPSHOT ||
-    !value['assets'].every(isAsset)
+    value['assets'].length !== 0
   ) {
     return false;
   }
-  let input: unknown;
-  try {
-    input = parseBoundedEffectJson(new TextEncoder().encode(value['source']));
-  } catch {
-    return false;
-  }
-  const validation = validateEffectV1Document(input, { presentationPolicy: 'retained' });
-  const retainedByteLength =
-    new TextEncoder().encode(value['source']).byteLength +
-    sumEffectSnapshotAssetBytes(value['assets']);
+  const validation = parseAnimationTemplateSource(value['source']);
   return (
     validation.ok &&
-    validation.document?.id === value['documentId'] &&
-    validation.document.kind === value['kind'] &&
-    retainedByteLength === value['retainedByteLength']
-  );
-}
-
-function sumEffectSnapshotAssetBytes(value: unknown): number {
-  if (!Array.isArray(value)) return 0;
-  return value.reduce<number>(
-    (total, asset) =>
-      total +
-      (isRecord(asset) && typeof asset['byteLength'] === 'number' ? asset['byteLength'] : 0),
-    0
-  );
-}
-
-function isEffectSnapshotAsset(value: unknown): boolean {
-  return (
-    isEffectSnapshotAssetMetadata(value) &&
-    isRecord(value) &&
-    value['blob'] instanceof Blob &&
-    value['byteLength'] === value['blob'].size
-  );
-}
-
-function isEffectSnapshotAssetMetadata(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    typeof value['id'] === 'string' &&
-    value['id'].length > 0 &&
-    value['id'].length <= 128 &&
-    typeof value['byteLength'] === 'number' &&
-    Number.isSafeInteger(value['byteLength']) &&
-    value['byteLength'] > 0 &&
-    (value['kind'] === 'audio' || value['kind'] === 'image' || value['kind'] === 'svg') &&
-    typeof value['mimeType'] === 'string' &&
-    typeof value['sha256'] === 'string' &&
-    SHA256.test(value['sha256'])
+    validation.template.id === value['documentId'] &&
+    new TextEncoder().encode(value['source']).byteLength === value['retainedByteLength']
   );
 }
 
@@ -169,12 +110,12 @@ function isEffectInstance(value: unknown): value is VideoProjectEffectInstance {
     typeof value['snapshotId'] === 'string' &&
     (value['catalogPackId'] === undefined ||
       (typeof value['catalogPackId'] === 'string' &&
-        /^(builtin:)?[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value['catalogPackId']))) &&
+        (value['catalogPackId'].startsWith('builtin:')
+          ? /^builtin:[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value['catalogPackId'])
+          : /^[A-Za-z0-9][A-Za-z0-9._-]{0,191}$/.test(value['catalogPackId'])))) &&
     isKind(value['kind']) &&
     typeof value['enabled'] === 'boolean' &&
-    (value['rangeMode'] === undefined ||
-      (value['kind'] === 'targetEffect' &&
-        (value['rangeMode'] === 'owner' || value['rangeMode'] === 'interval'))) &&
+    value['rangeMode'] === undefined &&
     isNonNegativeFinite(value['startTime']) &&
     isPositiveFinite(value['duration']) &&
     isPositiveFinite(value['playbackRate']) &&
@@ -186,14 +127,7 @@ function isEffectInstance(value: unknown): value is VideoProjectEffectInstance {
 }
 
 function isEffectTarget(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    (value['kind'] === 'scene' ||
-      value['kind'] === 'video-group' ||
-      (value['kind'] === 'track' && typeof value['trackId'] === 'string') ||
-      (value['kind'] === 'clip' && typeof value['clipId'] === 'string') ||
-      (value['kind'] === 'transition' && typeof value['transitionId'] === 'string'))
-  );
+  return isRecord(value) && value['kind'] === 'scene';
 }
 
 function isControls(value: unknown): boolean {
@@ -210,8 +144,8 @@ function isControls(value: unknown): boolean {
   );
 }
 
-function isKind(value: unknown): value is 'standalone' | 'targetEffect' | 'transition' {
-  return value === 'standalone' || value === 'targetEffect' || value === 'transition';
+function isKind(value: unknown): value is 'standalone' {
+  return value === 'standalone';
 }
 
 function isNonNegativeFinite(value: unknown): value is number {
@@ -245,14 +179,9 @@ function hasValidInstanceLayout(
   instance: VideoProjectEffectInstance,
   snapshot: VideoProjectEffectSnapshot
 ): boolean {
-  let value: unknown;
-  try {
-    value = parseBoundedEffectJson(new TextEncoder().encode(snapshot.source));
-  } catch {
-    return false;
-  }
-  const document = validateEffectV1Document(value, { presentationPolicy: 'retained' }).document;
-  if (!document) return false;
+  const parsed = parseAnimationTemplateSource(snapshot.source);
+  if (!parsed.ok) return false;
+  const document = parsed.template;
   const handles = document.objectLayout?.handles ?? [];
   const anchors = instance.sceneAnchors ?? {};
   return (

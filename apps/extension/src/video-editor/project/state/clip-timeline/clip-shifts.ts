@@ -32,8 +32,10 @@ export function createShiftedClipStartPatch({
     return updateClip(clip, startTime);
   });
   const effectInstances = project.effectInstances?.map((instance) => {
-    if (instance.target.kind !== 'clip') return instance;
-    const startDelta = clipStartDeltaById.get(instance.target.clipId);
+    const host = project.clips.find(
+      (clip) => clip.type === 'EFFECT' && clip.effectInstanceId === instance.id
+    );
+    const startDelta = host ? clipStartDeltaById.get(host.id) : undefined;
     return startDelta === undefined
       ? instance
       : { ...instance, startTime: Math.max(0, instance.startTime + startDelta) };

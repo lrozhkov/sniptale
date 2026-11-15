@@ -148,3 +148,66 @@ it('keeps the fake IndexedDB export exception closed without an installed packag
     rules.find((candidate) => candidate.name === 'no-non-package-json')?.to?.pathNot?.[1]
   ).toBe('(?!)');
 });
+
+async function unresolvedResourceViolations(imports: readonly string[]) {
+  const root = createTempRoot('dependency-rules-vite-resources-');
+  writeFile(root, 'entry.mjs', imports.map((id) => `import ${JSON.stringify(id)};`).join('\n'));
+  const rule = loadRules().find((candidate) => candidate.name === 'not-to-unresolvable');
+  if (!rule) throw new Error('Missing Vite resource rule.');
+  return withCwd(root, async () => {
+    const result = await cruise(['entry.mjs'], {
+      validate: true,
+      ruleSet: { forbidden: [rule] },
+      outputType: 'json',
+    });
+    const output: unknown =
+      typeof result.output === 'string' ? JSON.parse(result.output) : result.output;
+    if (!isRecord(output) || !isRecord(output['summary']))
+      throw new Error('Dependency-cruiser did not return its resource graph.');
+    const violations = output['summary']['violations'];
+    if (!Array.isArray(violations)) throw new Error('Resource graph violations are missing.');
+    return violations.map((violation: unknown) => {
+      if (!isRecord(violation) || typeof violation['to'] !== 'string')
+        throw new Error('Resource graph violation target is missing.');
+      expect(violation['rule']).toEqual({ severity: 'error', name: 'not-to-unresolvable' });
+      return violation['to'];
+    });
+  });
+}
+
+it('recognizes only the exact packaged Lottie inline WASM query', async () => {
+  const resource = '@lottiefiles/dotlottie-web/dotlottie-player.wasm?url&inline';
+  expect(fs.existsSync(require.resolve('@lottiefiles/dotlottie-web/dotlottie-player.wasm'))).toBe(
+    true
+  );
+  const rejected = [
+    '@lottiefiles/dotlottie-web/other.wasm?url&inline',
+    '@other/dotlottie-web/dotlottie-player.wasm?url&inline',
+    'https://example.com/@lottiefiles/dotlottie-web/dotlottie-player.wasm?url&inline',
+    resource + '&remote=1',
+    resource + '/other',
+  ];
+  expect(await unresolvedResourceViolations([resource, ...rejected])).toEqual(
+    expect.arrayContaining(rejected)
+  );
+  expect(await unresolvedResourceViolations([resource])).toEqual([]);
+});
+
+it('recognizes only the four fixed audio modules owned by the Vite build plugin', async () => {
+  const admitted = [
+    'sniptale:audio-runtime/faust',
+    'sniptale:audio-runtime/rnnoise',
+    'sniptale:audio-runtime/pitch',
+    'sniptale:audio-test-assets',
+  ];
+  const rejected = [
+    'sniptale:audio-runtime/other',
+    'sniptale:audio-runtime/faust/other',
+    'sniptale:audio-runtime/faust?remote=1',
+    'sniptale:audio-test-assets/other',
+    'https://example.com/sniptale:audio-runtime/faust',
+    'missing-module',
+  ];
+  expect(await unresolvedResourceViolations(admitted)).toEqual([]);
+  expect(await unresolvedResourceViolations(rejected)).toEqual(expect.arrayContaining(rejected));
+});

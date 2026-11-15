@@ -103,3 +103,14 @@ it('uses neutral property choices only inside the migrated command scope', () =>
   expect(pending).toContain('sniptale-glass-toolbar-button--active');
   expect(pending).toContain('!text-[var(--sniptale-color-accent-emphasis)]');
 });
+
+it('separates cleanup from the three blur strengths and keeps one active mode', () => {
+  const markup = renderToStaticMarkup(
+    <DrawingBlurStrengthOptions value={20} clean onChange={vi.fn()} onClean={vi.fn()} />
+  );
+  expect(markup).toContain('content.toolbar.drawing-options.blur.clean');
+  expect(markup.match(/aria-pressed="true"/g)).toHaveLength(1);
+  expect(markup.indexOf('content.toolbar.drawing-options.divider')).toBeLessThan(
+    markup.indexOf('content.toolbar.drawing-options.blur.clean')
+  );
+});

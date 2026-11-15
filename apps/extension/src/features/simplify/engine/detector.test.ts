@@ -119,3 +119,47 @@ it('preserves an empty capsule and solid geometric marks', async () => {
     expect(buildDetectionCatalog(image).some((box) => box.shape === 'text')).toBe(false);
   }
 });
+
+function faintGlyphRow() {
+  const image = raster(160, 64);
+  rect(image, 0, 0, 160, 64, [241, 241, 241]);
+  for (let x = 20; x < 125; x += 15) {
+    rect(image, x, 24, 1, 9, [201, 201, 201]);
+    rect(image, x + 5, 24, 1, 9, [201, 201, 201]);
+    rect(image, x, 28, 6, 1, [201, 201, 201]);
+  }
+  return image;
+}
+
+type ConfidentTextBox = Box & {
+  contrast: number;
+  textConfidence?: boolean;
+  typeMetrics?: { glyphs: number; foregroundCoverage: number };
+};
+const { buildDetectionCatalog: buildFaintCatalog, selectDetection } = await vi.importActual<{
+  buildDetectionCatalog(image: SimplifyPixelSource): ConfidentTextBox[];
+  selectDetection(catalog: ConfidentTextBox[], detail: number): ConfidentTextBox[];
+}>('./detector.mjs');
+
+it('selects catalog-confirmed faint glyph rows at default sensitivity', () => {
+  const catalog = buildFaintCatalog(faintGlyphRow());
+  expect(catalog).toHaveLength(1);
+  expect(catalog[0]).toMatchObject({
+    shape: 'text',
+    textConfidence: true,
+    contrast: 40,
+    typeMetrics: { glyphs: 7, foregroundCoverage: 1 },
+  });
+  expect(selectDetection(catalog, 55)).toContain(catalog[0]);
+});
+
+it('keeps sensitivity monotonic for catalog-confirmed faint glyph rows', () => {
+  const catalog = buildFaintCatalog(faintGlyphRow());
+  let previous: ConfidentTextBox[] = [];
+  for (const detail of [10, 25, 40, 55, 70, 90]) {
+    const selected = selectDetection(catalog, detail);
+    expect(previous.every((box) => selected.includes(box))).toBe(true);
+    previous = selected;
+  }
+  expect(previous).toContain(catalog[0]);
+});

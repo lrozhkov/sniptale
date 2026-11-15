@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createSourceImageFilter } from '../../features/image-filters/contract';
 import { ReviewPreviewRendererContext } from './use-preview-preferences';
 import { VideoSample } from 'mediabunny';
 import type { PreviewSourceLease } from '../../workflows/video/preview-source';
@@ -1348,3 +1349,65 @@ it.each(['declined', 'decoder-absent'] as const)(
     expect(c.release).toHaveBeenCalledOnce();
   }
 );
+
+it('applies the inspector filter only to the raw source plane before quarter-turn orientation', async () => {
+  const c = canonicalLive(),
+    color = createSourceImageFilter('color', 'color');
+  if (color.kind !== 'color') throw new Error('Expected color');
+  color.parameters.brightness = 2;
+  const sourceFilters = { version: 1 as const, filters: [color] };
+  io.render.mockResolvedValue(bitmap());
+  io.create.mockResolvedValue({ render: io.render, dispose: io.dispose, allocatedBytes: 0 });
+  const renderer = createZoomPreviewGpuRenderer();
+  owners.push(renderer);
+  await renderer.render(
+    { ...c.request, sourceFilters, sourceSize: { width: 1904, height: 984 } },
+    new AbortController().signal,
+    c.source
+  );
+  const filtered: GpuPreviewLayer[] = [];
+  const visit = (layers: readonly GpuPreviewLayer[]) => {
+    for (const layer of layers) {
+      if (layer.imageFilters) filtered.push(layer);
+      if ('kind' in layer.source && layer.source.kind === 'group') visit(layer.source.layers);
+    }
+  };
+  visit(io.render.mock.calls[0]![0].layers);
+  expect(filtered).toHaveLength(1);
+  expect(filtered[0]!.source).toBe(c.frames[0]);
+  expect(filtered[0]!.imageFilters).toEqual({
+    stack: sourceFilters,
+    projectTime: c.request.currentTime,
+    logical: { width: 984, height: 1904 },
+  });
+  expect(c.frames[0]!.close).toHaveBeenCalledOnce();
+  expect(c.frames[0]!.copyTo).not.toHaveBeenCalled();
+});
+it('cancels a stale inspector output on a filter edit without requiring a new video or camera', async () => {
+  const first = deferred<ImageBitmap>(),
+    old = bitmap(),
+    latest = bitmap();
+  const render = vi.fn().mockReturnValueOnce(first.promise).mockResolvedValue(latest),
+    publish = vi.fn();
+  const owner = createZoomPreviewPaintOwner({
+    renderer: { render, dispose: vi.fn() },
+    publish,
+    fallback: vi.fn(),
+    onBackend: vi.fn(),
+    onError: vi.fn(),
+  });
+  owners.push(owner);
+  const initial = input();
+  owner.update(initial);
+  const color = createSourceImageFilter('color', 'color');
+  if (color.kind !== 'color') throw new Error('Expected color');
+  color.parameters.brightness = 2;
+  const next = { ...initial, sourceFilters: { version: 1 as const, filters: [color] } };
+  owner.update(next);
+  expect(render.mock.calls[0]![1].aborted).toBe(true);
+  first.resolve(old);
+  await vi.waitFor(() => expect(publish).toHaveBeenCalledOnce());
+  expect(old.close).toHaveBeenCalledOnce();
+  expect(publish.mock.calls[0]![0]).toBe(latest);
+  expect(render.mock.calls[1]![0].sourceFilters).toEqual(next.sourceFilters);
+});

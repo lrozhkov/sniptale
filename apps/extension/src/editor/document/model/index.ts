@@ -128,6 +128,8 @@ export function getEditorObjectTypeLabel(type: EditorObjectType): string {
       return translate('editor.runtime.rectangle');
     case 'rich-shape':
       return translate('editor.runtime.richShape');
+    case 'vector-element':
+      return translate('editor.elements.nameFallback');
     case 'group':
       return translate('editor.runtime.group');
     case 'simplify':

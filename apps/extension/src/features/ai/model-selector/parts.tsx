@@ -40,18 +40,9 @@ export function Trigger(props: {
     onClick: props.onToggle,
   });
   const content = (
-    <>
-      <span className="min-w-0 flex-1 truncate text-left">
-        {props.selectedLabel || translate('aiModal.modelUnsetOption')}
-      </span>
-      <ChevronDown
-        aria-hidden
-        className={[
-          'sniptale-select-chevron sniptale-select-chevron-edge shrink-0',
-          props.isOpen ? 'sniptale-select-chevron-open' : '',
-        ].join(' ')}
-      />
-    </>
+    <span className="min-w-0 flex-1 truncate text-left">
+      {props.selectedLabel || translate('aiModal.modelUnsetOption')}
+    </span>
   );
   return (
     <button
@@ -74,6 +65,13 @@ export function Trigger(props: {
       ) : (
         content
       )}
+      <ChevronDown
+        aria-hidden
+        className={[
+          'sniptale-select-chevron sniptale-select-chevron-edge shrink-0',
+          props.isOpen ? 'sniptale-select-chevron-open' : '',
+        ].join(' ')}
+      />
     </button>
   );
 }

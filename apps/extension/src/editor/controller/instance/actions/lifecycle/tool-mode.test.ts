@@ -3,6 +3,11 @@
 import { Textbox } from 'fabric';
 import { expect, it, vi } from 'vitest';
 
+const raster = vi.hoisted(() => ({ runtime: null as { setTool: (tool: null) => void } | null }));
+vi.mock('../../../../raster-editing/runtime', () => ({
+  getEditorRasterRuntime: () => raster.runtime,
+}));
+
 import {
   clearSelectionForController,
   setActiveToolForController,
@@ -78,4 +83,17 @@ it('cancels an active drawing before changing tools', () => {
 
   expect(controller.cancelTransientInteraction).toHaveBeenCalledOnce();
   expect(controller.activeTool).toBe('marker');
+});
+
+it('exits the raster mode when Select is explicitly chosen again', () => {
+  const stop = vi.fn();
+  raster.runtime = { setTool: stop };
+  const controller = {
+    activeTool: 'select',
+    canvas: { getActiveObject: () => undefined },
+    syncRuntimeState: vi.fn(),
+  };
+  setActiveToolForController(controller as never, 'select');
+  expect(stop).toHaveBeenCalledWith(null);
+  raster.runtime = null;
 });

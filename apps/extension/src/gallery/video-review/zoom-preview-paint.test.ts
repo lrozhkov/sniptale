@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+import { createSourceImageFilter } from '../../features/image-filters/contract';
 import { expect, it, vi } from 'vitest';
 import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
@@ -243,5 +245,44 @@ it.each([false, true])(
           frame: spatial,
         })
       );
+  }
+);
+
+it.each(['area', 'result'] as const)(
+  'filters actual %s inspector pixels without changing source or crop geometry',
+  (view) => {
+    const source = document.createElement('canvas');
+    source.width = 64;
+    source.height = 32;
+    const input = source.getContext('2d')!;
+    input.fillStyle = 'rgb(32,64,96)';
+    input.fillRect(0, 0, 64, 32);
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 32;
+    const context = canvas.getContext('2d')!,
+      size = { width: 64, height: 32 };
+    const color = createSourceImageFilter('color', 'color');
+    if (color.kind !== 'color') throw new Error('Expected color');
+    color.parameters.brightness = 2;
+    const camera = { scale: 1, centerX: 0.5, centerY: 0.5 },
+      background = { enabled: false as const };
+    const layout = computeQuickEditSceneLayout({ source: size, output: size, background, camera });
+    paintZoomPreview(context, {
+      accent: '#fff',
+      camera,
+      background,
+      frame: { image: source, ...size },
+      sourceFilters: { version: 1, filters: [color] },
+      sourceSize: size,
+      height: 32,
+      width: 64,
+      layout,
+      view,
+      showControls: false,
+    });
+    expect([...context.getImageData(32, 16, 1, 1).data]).toEqual([64, 128, 192, 255]);
+    expect([...input.getImageData(32, 16, 1, 1).data]).toEqual([32, 64, 96, 255]);
+    expect(layout.videoRect).toEqual({ x: 0, y: 0, ...size });
   }
 );

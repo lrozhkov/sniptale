@@ -1,3 +1,4 @@
+import { INSPECTOR_CONTENT_INSET_CLASS_NAME } from '../../inspector/chrome';
 import { ArrowLeft } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { EditorInspectorContent } from '../../inspector/content';
@@ -27,7 +28,12 @@ export function EditorFloatingLayerEffectsPanel({
           {translate('editor.toolbar.layerEffectsBackToLayers')}
         </ProductActionButton>
       </div>
-      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-3 [scrollbar-gutter:stable]">
+      <div
+        className={[
+          'min-h-0 flex-1 overflow-x-hidden overflow-y-auto [scrollbar-width:thin]',
+          INSPECTOR_CONTENT_INSET_CLASS_NAME,
+        ].join(' ')}
+      >
         <EditorInspectorContent
           {...contentProps}
           inspector="layer-effects"

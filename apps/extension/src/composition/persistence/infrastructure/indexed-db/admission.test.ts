@@ -475,3 +475,33 @@ it.each([
     expect(mocks.openDB).toHaveBeenCalledTimes(1);
   }
 );
+
+it('the physical version 53 reader refuses version 54 before contracts, transactions or mutation', async () => {
+  vi.resetModules();
+  vi.doMock('./core.stores.ts', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('./core.stores.ts')>()),
+    DB_VERSION: 53,
+  }));
+  try {
+    const db = createCurrentDatabase({ version: 54 });
+    mocks.openDB.mockResolvedValue(db);
+    const previousReader = await import('./admission');
+    await expect(previousReader.inspectDatabaseAdmission()).resolves.toEqual({
+      databaseVersion: 54,
+      reason: 'future-version',
+      status: 'unsupported-version',
+      targetDatabaseVersion: 53,
+    });
+    expect(mocks.openDB).toHaveBeenCalledExactlyOnceWith('sniptale-db');
+    expect(db.close).toHaveBeenCalledOnce();
+    expect(db.getAll).not.toHaveBeenCalled();
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(indexedDB.deleteDatabase).not.toHaveBeenCalled();
+    expect(mocks.eraseAssetStorage).not.toHaveBeenCalled();
+    expect(mocks.deletePreviewCache).not.toHaveBeenCalled();
+    expect(mocks.local.size).toBe(0);
+  } finally {
+    vi.doUnmock('./core.stores.ts');
+    vi.resetModules();
+  }
+});

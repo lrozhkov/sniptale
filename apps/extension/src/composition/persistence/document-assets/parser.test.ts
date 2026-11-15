@@ -236,3 +236,50 @@ it('retains finite signed reference extents and rejects unbounded signed extents
   ])
     expect(parsePersistedEditorDocument({ ...document, compositionBase })).toBeNull();
 });
+
+function retainedStoredDocument() {
+  const document = createPersistedDocument();
+  return {
+    ...document,
+    version: 4 as const,
+    canvasJson: JSON.stringify({
+      objects: [
+        {
+          sniptaleRasterOriginalData: 'sniptale-asset:editor-source',
+          sniptaleRasterColorData: 'sniptale-asset:editor-source',
+          sniptaleRasterVisibilityData: 'sniptale-asset:editor-source',
+          sniptaleRasterKeyData: 'sniptale-asset:editor-source',
+          sniptaleRasterState: {
+            version: 1,
+            width: 8,
+            height: 6,
+            crop: { x: 2, y: 1, width: 4, height: 3 },
+          },
+        },
+      ],
+    }),
+  };
+}
+
+it('admits retained stored 4 and refuses metadata mislabeled as stored 3', () => {
+  const document = retainedStoredDocument();
+  expect(parsePersistedEditorDocument(document)).toEqual(document);
+  expect(parsePersistedEditorDocument({ ...document, version: 3 })).toBeNull();
+  expect(parsePersistedEditorDocument({ ...document, version: 5 })).toBeNull();
+});
+
+it.each(['missing', 'inline', 'partial', 'crop'])(
+  'refuses %s retained stored resources or metadata',
+  (kind) => {
+    const document = retainedStoredDocument();
+    const canvas = JSON.parse(document.canvasJson);
+    if (kind === 'missing') canvas.objects[0].sniptaleRasterKeyData = 'sniptale-asset:undeclared';
+    if (kind === 'inline')
+      canvas.objects[0].sniptaleRasterVisibilityData = 'data:image/png;base64,AA==';
+    if (kind === 'partial') delete canvas.objects[0].sniptaleRasterOriginalData;
+    if (kind === 'crop') canvas.objects[0].sniptaleRasterState.crop.width = 20;
+    expect(
+      parsePersistedEditorDocument({ ...document, canvasJson: JSON.stringify(canvas) })
+    ).toBeNull();
+  }
+);

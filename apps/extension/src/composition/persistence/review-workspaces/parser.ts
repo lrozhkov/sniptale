@@ -160,7 +160,10 @@ function validEffectSnapshotClosure(
   duration: number
 ): boolean {
   const documents = new Map(
-    snapshots.map((snapshot) => [snapshot.id, readReviewAnnotationEffectDocument(snapshot.source)])
+    snapshots.map((snapshot) => [
+      snapshot.id,
+      readReviewAnnotationEffectDocument(snapshot.source, snapshot.sha256),
+    ])
   );
   const content = [
     advanced,

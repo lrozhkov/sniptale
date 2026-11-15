@@ -338,3 +338,62 @@ it('binds review-text tokens separately to owned Gallery and editor documents', 
   expect(omittedDocumentId).toBe('same-document');
   expect(issue(missingDocument)).toBeNull();
 });
+
+it('binds image-editor tokens to owned standalone and embedded editor documents', () => {
+  vi.stubGlobal('chrome', {
+    runtime: {
+      id: 'extension-id',
+      getURL: (path: string) => `chrome-extension://extension-id/${path}`,
+    },
+  });
+  const authority: AiEgressAuthority = {
+    contractVersion: 1,
+    purpose: 'image-editor',
+    payloadHash: CONTENT_HASH,
+  };
+  const sender = {
+    id: 'extension-id',
+    frameId: 0,
+    documentId: 'editor-document',
+    url: 'chrome-extension://extension-id/apps/extension/src/editor/index.html',
+  };
+  const issue = (owner: chrome.runtime.MessageSender) =>
+    issueLlmSessionToken({ purpose: 'image-editor', sender: owner, egressAuthority: authority });
+  for (const owner of [sender, { ...sender, frameId: 2, url: `${sender.url}?embed=scenario` }]) {
+    const token = issue(owner);
+    expect(token).toBeTruthy();
+    const args = {
+      purpose: 'image-editor',
+      sender: owner,
+      egressAuthority: authority,
+      token: token!,
+    } as const;
+    expect(consumeLlmSessionToken(args)).toBe(true);
+    expect(consumeLlmSessionToken(args)).toBe(false);
+  }
+  for (const patch of [
+    { id: 'foreign' },
+    { frameId: -1 },
+    { documentLifecycle: 'cached' as const },
+    { url: sender.url.replace('/editor/', '/settings/') },
+  ])
+    expect(issue({ ...sender, ...patch })).toBeNull();
+  const { documentId, ...withoutDocument } = sender;
+  const { frameId, ...withoutFrame } = sender;
+  expect(documentId).toBe('editor-document');
+  expect(frameId).toBe(0);
+  expect(issue(withoutDocument)).toBeNull();
+  expect(issue(withoutFrame)).toBeNull();
+  const token = issue(sender)!;
+  expect(
+    consumeLlmSessionToken({
+      purpose: 'image-editor',
+      sender: { ...sender, documentId: 'foreign-document' },
+      egressAuthority: authority,
+      token,
+    })
+  ).toBe(false);
+  expect(
+    consumeLlmSessionToken({ purpose: 'image-editor', sender, egressAuthority: authority, token })
+  ).toBe(false);
+});

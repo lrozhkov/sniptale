@@ -1,3 +1,8 @@
+import { sourceImageFilterPlaneSize } from '../../features/image-filters/contract';
+import { cursorMotionArtwork } from '../../features/video/project/cursor-motion/paint';
+import { resolveGpuPreviewGroupRasters } from '../../features/video/composition/canvas/gpu-preview-plan';
+import { preparedSourceGpuLayers } from '../../features/video/composition/export-enhancement/prepared-source';
+import type { ReviewExportSamplingFrame } from './export-source-sampling';
 import type {
   GpuPreviewGroup,
   GpuPreviewLayer,
@@ -40,6 +45,7 @@ export function reviewGpuStaticBackgroundDrift(background: PreviewScene['backgro
 /** Build one borrowed endpoint scene; the caller owns frames, primitives and GPU publication. */
 export async function buildReviewGpuScene(args: {
   source: VideoFrame;
+  sampling?: ReviewExportSamplingFrame | null;
   scene: PreviewScene;
   geometry: ReviewPresentedGeometry;
   sourceTime: number;
@@ -50,7 +56,7 @@ export async function buildReviewGpuScene(args: {
   header: ImageBitmap | null;
   artwork: Readonly<{
     background: HTMLCanvasElement;
-    decoration: HTMLCanvasElement;
+    decoration: HTMLCanvasElement | null;
     rect: { x: number; y: number; width: number; height: number };
     backgroundRevision: number;
     retainedDrift: boolean;
@@ -155,13 +161,23 @@ export async function buildReviewGpuScene(args: {
       ? {}
       : { cache: { key: 'background', revision: artwork.backgroundRevision } }),
   };
+  const cursor = cursorMotionArtwork(
+    currentScene.cursorMotions,
+    sourceTime,
+    base.videoRect,
+    currentScene.source.height
+  );
   const originalLayers: GpuPreviewLayer[] = [
-    {
-      source: artwork.decoration,
-      rect: artwork.rect,
-      inverse: identity,
-      cache: { key: 'decoration', revision: artwork.decorationRevision },
-    },
+    ...(artwork.decoration
+      ? [
+          {
+            source: artwork.decoration,
+            rect: artwork.rect,
+            inverse: identity,
+            cache: { key: 'decoration', revision: artwork.decorationRevision },
+          },
+        ]
+      : []),
     ...(header
       ? [
           {
@@ -181,12 +197,30 @@ export async function buildReviewGpuScene(args: {
       : []),
     {
       source,
+      ...(currentScene.sourceFilters
+        ? {
+            imageFilters: {
+              stack: currentScene.sourceFilters,
+              projectTime: args.resultTime,
+              logical: sourceImageFilterPlaneSize(currentScene.source, orientation?.rotation),
+            },
+          }
+        : {}),
       rect: base.videoRect,
       inverse: identity,
       ...(orientation ? { orientation } : {}),
       clip: { rect: base.windowRect, radius },
     },
   ];
+  if (cursor)
+    originalLayers.push({
+      source: cursor.canvas,
+      rect: cursor.rect,
+      inverse: identity,
+      clip: { rect: base.windowRect, radius },
+      cache: { key: 'authored-cursor', revision: cursor.canvas },
+    });
+  const sourceExposures = new WeakMap<GpuPreviewLayer, number>();
   const original: GpuPreviewGroup = {
     kind: 'group',
     logical: dimensions.canonical,
@@ -201,7 +235,7 @@ export async function buildReviewGpuScene(args: {
       });
   const exposure: GpuPreviewLayer[] = [];
   const singleExposure = samples.length === 1 && samples[0]!.alpha === 1;
-  for (const sample of samples) {
+  for (const [exposureIndex, sample] of samples.entries()) {
     const pose = reviewPresentedGeometry(
       currentScene,
       dimensions,
@@ -213,6 +247,17 @@ export async function buildReviewGpuScene(args: {
     );
     const plane = reviewGpuSourcePlane(pose.layout, currentScene.background);
     const planeLayers = originalLayers.map((layer) => {
+      if (cursor && layer.source === cursor.canvas)
+        return {
+          ...layer,
+          rect: cursorMotionArtwork(
+            currentScene.cursorMotions,
+            sourceTime,
+            plane.video,
+            currentScene.source.height
+          )!.rect,
+          clip: { rect: plane.clip, radius: radius * plane.clipScale },
+        };
       if (layer.source === artwork.decoration)
         return { ...layer, rect: plane.shadowRect(artwork.rect) };
       if (layer.source === source)
@@ -229,6 +274,8 @@ export async function buildReviewGpuScene(args: {
         };
       return layer;
     });
+    for (const layer of planeLayers)
+      if (layer.source === source) sourceExposures.set(layer, exposureIndex);
     const planeSource: GpuPreviewGroup = { ...original, layers: planeLayers };
     if (focus || samples.length > 1)
       exposure.push({
@@ -240,13 +287,16 @@ export async function buildReviewGpuScene(args: {
         ...(singleExposure ? {} : { blend: 'add' as const }),
       });
     else
-      for (const layer of planeLayers)
-        exposure.push({
+      for (const layer of planeLayers) {
+        const projected = {
           ...layer,
           inverse: plane.outerInverse,
           opacity: sample.alpha,
           ...(samples.length > 1 ? { blend: 'add' as const } : {}),
-        });
+        };
+        if (layer.source === source) sourceExposures.set(projected, exposureIndex);
+        exposure.push(projected);
+      }
   }
   const window: GpuPreviewGroup = {
     kind: 'group',
@@ -254,17 +304,75 @@ export async function buildReviewGpuScene(args: {
     logical: dimensions.canonical,
     layers: exposure,
   };
-  const main: GpuPreviewGroup = {
+  const rawMain: GpuPreviewGroup = {
     kind: 'group',
     output: dimensions.backing,
     logical: dimensions.canonical,
     layers: [bg, { source: window, rect: full, inverse: identity }],
   };
+  let sourceDensity = 1;
+  const sampled = (
+    root: GpuPreviewGroup,
+    demandFor: (index: number) => string
+  ): GpuPreviewGroup => {
+    const sampling = args.sampling;
+    if (!sampling) return root;
+    const groups = new WeakMap<GpuPreviewGroup, { group: GpuPreviewGroup; density: number }>();
+    const visit = (group: GpuPreviewGroup): { group: GpuPreviewGroup; density: number } => {
+      const retained = groups.get(group);
+      if (retained) return retained;
+      let density = 0;
+      const layers = group.layers.flatMap((layer): GpuPreviewLayer[] => {
+        if (layer.source === source) {
+          const id = demandFor(sourceExposures.get(layer) ?? 0);
+          // A lens outside the source aperture retains the header and artwork, without video.
+          if (!sampling.plan.demands.some((demand) => demand.id === id)) return [];
+          const prepared = preparedSourceGpuLayers(
+            sampling.sampling,
+            id,
+            layer.rect,
+            currentScene.sourceFilters,
+            args.resultTime
+          );
+          if (!prepared) return [layer];
+          density = Math.max(density, prepared.density);
+          const { orientation: _orientation, ...placement } = layer;
+          return prepared.layers.map((tile) => ({
+            ...placement,
+            ...tile,
+            inverse: layer.inverse,
+            ...(layer.clip ? { clip: layer.clip } : {}),
+          }));
+        }
+        if ('kind' in layer.source && layer.source.kind === 'group') {
+          const child = visit(layer.source);
+          density = Math.max(density, child.density);
+          return [{ ...layer, source: child.group }];
+        }
+        return [layer];
+      });
+      const result = {
+        group: {
+          ...group,
+          layers,
+        },
+        density,
+      };
+      groups.set(group, result);
+      return result;
+    };
+    const result = visit(root);
+    sourceDensity = Math.max(sourceDensity, result.density);
+    return result.group;
+  };
+  const main = sampled(rawMain, (index) => `body:${index}`);
   const focused = reviewGpuSpotlightLayers({
     scene: currentScene,
     dimensions,
     geometry: currentGeometry,
     source: main,
+    sourceForLens: (index) =>
+      sampled(rawMain, (exposure) => `scene:${index}${exposure ? `:${exposure}` : ''}`),
     projection: reviewPresentedStageProjection(currentGeometry, dimensions.canonical),
     primitives,
   });
@@ -277,6 +385,7 @@ export async function buildReviewGpuScene(args: {
     sourceTime,
     fps: fps ?? 30,
     original,
+    originalForLens: (index) => sampled(original, () => `click:${index}`),
     primitives,
     annotations: annotations ?? null,
     ...(retainAnnotationBatch ? { retainAnnotationBatch } : {}),
@@ -291,10 +400,15 @@ export async function buildReviewGpuScene(args: {
     kind: 'group' as const,
     output: dimensions.backing,
     logical: dimensions.canonical,
-    layers: [
-      ...(focused === main ? main.layers : [{ source: focused, rect: full, inverse: identity }]),
-      ...overlays.contentLayers,
-      ...overlays.viewportLayers,
-    ],
+    layers: resolveGpuPreviewGroupRasters({
+      layers: [
+        ...(focused === main ? main.layers : [{ source: focused, rect: full, inverse: identity }]),
+        ...overlays.contentLayers,
+        ...overlays.viewportLayers,
+      ],
+      output: dimensions.backing,
+      logical: dimensions.canonical,
+      sourceDensity,
+    }),
   };
 }

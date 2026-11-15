@@ -119,6 +119,14 @@ function render(
 }
 
 beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+    }
+  );
   controller = createImageEditorController();
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -132,6 +140,7 @@ afterEach(async () => {
   useEditorStore.getState().resetDocumentState();
   await setLocalePreference('en');
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 it('skips unchanged row work across panel rerenders and calls the latest committed effects handler', () => {
@@ -242,7 +251,7 @@ it('renders a changed row while retaining its neighbours and responds to hover a
 
 it('updates memoized row translations and binds selection/drop to the replacement controller', async () => {
   await setLocalePreference('en');
-  const layers = [createLayer('a'), createLayer('b')];
+  const layers = [{ ...createLayer('a'), selected: true }, createLayer('b')];
   const open = vi.fn();
   render(layers, open, 'a');
   const english = translate('editor.toolbar.toggleLayerSelection');
@@ -253,16 +262,25 @@ it('updates memoized row translations and binds selection/drop to the replacemen
   expect(container.querySelector(`button[title="${russian}"]`)).not.toBeNull();
   const oldController = controller;
   const oldSelect = vi.spyOn(oldController, 'selectLayer').mockImplementation(() => undefined);
-  const oldDrop = vi.spyOn(oldController, 'reorderLayer').mockImplementation(() => undefined);
+  const oldDrop = vi.spyOn(oldController, 'reorderLayerBlock').mockImplementation(() => undefined);
   controller = createImageEditorController();
   const nextSelect = vi.spyOn(controller, 'selectLayer').mockImplementation(() => undefined);
-  const nextDrop = vi.spyOn(controller, 'reorderLayer').mockImplementation(() => undefined);
+  const nextDrop = vi.spyOn(controller, 'reorderLayerBlock').mockImplementation(() => undefined);
   render(layers, open, 'a');
   act(() => container.querySelector<HTMLButtonElement>('button[title="b"]')!.click());
   expect(oldSelect).not.toHaveBeenCalled();
   expect(nextSelect).toHaveBeenCalledWith('b', expect.objectContaining({ focusViewport: false }));
-  const trigger = container.querySelector<HTMLButtonElement>('button[title="b"]')!;
-  act(() => trigger.dispatchEvent(new Event('drop', { bubbles: true, cancelable: true })));
+  const grip = container.querySelector<HTMLButtonElement>('[data-ui="editor.layers.drag-handle"]')!;
+  const pointer = (type: string, y: number) => {
+    const event = Object.assign(
+      new MouseEvent(type, { clientY: y, button: 0, bubbles: true, cancelable: true }),
+      { pointerId: 1 }
+    );
+    act(() => (type === 'pointerdown' ? grip : window).dispatchEvent(event));
+  };
+  pointer('pointerdown', 0);
+  pointer('pointermove', 100);
+  pointer('pointerup', 100);
   expect(oldDrop).not.toHaveBeenCalled();
-  expect(nextDrop).toHaveBeenCalledWith('a', 'b');
+  expect(nextDrop).toHaveBeenCalledWith(['a'], null);
 });

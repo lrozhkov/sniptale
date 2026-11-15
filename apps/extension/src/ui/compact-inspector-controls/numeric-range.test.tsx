@@ -429,6 +429,7 @@ it('compares mapped scrub coordinates rather than the authored numeric value', (
   });
   expect(getRow().getAttribute('data-out-of-scale')).not.toBe('true');
   expect(getRange().getAttribute('aria-describedby')).toBeNull();
+  expect(getRange().getAttribute('aria-valuetext')).toBe('750');
 });
 
 it('returns to the practical scale only after a deliberate range edit', () => {

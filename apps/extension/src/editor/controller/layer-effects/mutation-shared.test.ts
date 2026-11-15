@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Canvas, FabricImage, Rect, type FabricObject } from 'fabric';
 
 const mocks = vi.hoisted(() => ({
   applyEditorRasterEffects: vi.fn(),
@@ -12,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   })),
   findObjectById: vi.fn(),
   isEditorRasterLayerType: vi.fn((type: string) => type === 'image' || type === 'source-image'),
-  isEditorRasterObject: vi.fn(() => true),
+  isEditorRasterObject: vi.fn((_object: unknown) => true),
   rasterizeEditorObjects: vi.fn(() => ({
     bounds: { left: 10, top: 20 },
     dataUrl: 'data:image/png;base64,replacement',
@@ -52,6 +53,7 @@ import {
   commitLayerMutation,
   ensureRasterObject,
   getEditableObject,
+  getRasterEffectObject,
   upsertEditorRasterEffect,
 } from './mutation-shared';
 
@@ -209,3 +211,80 @@ function runSourceReplacementSuite() {
     expect(context.sendFrameObjectsToBack).toHaveBeenCalledOnce();
   });
 }
+
+it('refuses generic rasterization for managed backgrounds including tile rectangles', async () => {
+  vi.clearAllMocks();
+  const context = createContext();
+  const background = { sniptaleRole: 'background', sniptaleType: 'background' };
+  expect(await ensureRasterObject(context as never, background as never, 1)).toBeNull();
+  expect(mocks.rasterizeEditorObjects).not.toHaveBeenCalled();
+  expect(mocks.createRasterizedEditorImage).not.toHaveBeenCalled();
+  expect(context.canvas.remove).not.toHaveBeenCalled();
+});
+
+it('admits exact content-enabled source and tiled background without changing native locks', () => {
+  vi.clearAllMocks();
+  const source: FabricImage = Object.create(FabricImage.prototype);
+  Object.assign(source, {
+    sniptaleId: 'source',
+    sniptaleType: 'source-image',
+    sniptaleLocked: true,
+    sniptaleContentLocked: false,
+  });
+  const background = new Rect();
+  Object.assign(background, {
+    sniptaleId: 'background',
+    sniptaleType: 'background',
+    sniptaleRole: 'background',
+    sniptaleBackgroundMode: 'image',
+    sniptaleLocked: true,
+    sniptaleContentLocked: false,
+  });
+  const canvas: Canvas = Object.assign(Object.create(Canvas.prototype), {
+    getObjects: () => [source, background],
+  });
+  expect(getRasterEffectObject(canvas, 'source')).toBe(source);
+  expect(getRasterEffectObject(canvas, 'background')).toBe(background);
+  expect(source.sniptaleLocked).toBe(true);
+  expect(background.sniptaleLocked).toBe(true);
+  expect(mocks.findObjectById).not.toHaveBeenCalled();
+  expect(mocks.applyEditorRasterEffects).not.toHaveBeenCalled();
+});
+
+it('keeps the editable vector fallback and refuses inaccessible raster content', () => {
+  vi.clearAllMocks();
+  const vector = new Rect();
+  vector.sniptaleId = 'vector';
+  vector.sniptaleType = 'shape';
+  const source: FabricImage = Object.create(FabricImage.prototype);
+  Object.assign(source, {
+    sniptaleId: 'source',
+    sniptaleType: 'source-image',
+    sniptaleContentLocked: true,
+    sniptaleEffects: [{ id: 'brightness', enabled: true, amount: 0.2 }],
+  });
+  const background = new Rect();
+  Object.assign(background, {
+    sniptaleId: 'background',
+    sniptaleRole: 'background',
+    sniptaleBackgroundMode: 'image',
+    visible: false,
+  });
+  const objects: FabricObject[] = [vector, source, background];
+  const canvas: Canvas = Object.assign(Object.create(Canvas.prototype), {
+    getObjects: () => objects,
+  });
+  mocks.findObjectById.mockImplementation((_canvas, id: string) =>
+    objects.find((object) => object.sniptaleId === id)
+  );
+  mocks.isEditorRasterObject.mockImplementation((object) => object instanceof FabricImage);
+  const accepted = source.sniptaleEffects;
+  expect(getRasterEffectObject(canvas, 'vector')).toBe(vector);
+  expect(getRasterEffectObject(canvas, 'source')).toBeNull();
+  expect(getRasterEffectObject(canvas, 'background')).toBeNull();
+  expect(getRasterEffectObject(canvas, 'missing')).toBeNull();
+  expect(source.sniptaleEffects).toBe(accepted);
+  expect(mocks.applyEditorRasterEffects).not.toHaveBeenCalled();
+  mocks.isEditorRasterObject.mockReturnValue(true);
+  mocks.findObjectById.mockReset();
+});

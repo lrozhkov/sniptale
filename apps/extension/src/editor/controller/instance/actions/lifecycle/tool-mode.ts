@@ -1,3 +1,4 @@
+import { getEditorRasterRuntime } from '../../../../raster-editing/runtime';
 import type { EditorTool } from '../../../../../features/editor/document/types';
 import type { EditorControllerInstance } from '../../types';
 import { isTextbox } from '../../../core/helpers';
@@ -25,6 +26,7 @@ export function setActiveToolForController(
   controller: EditorControllerInstance,
   tool: EditorTool
 ): void {
+  if (controller.canvas) getEditorRasterRuntime(controller.canvas)?.setTool(null);
   if (controller.activeTool !== tool && controller.drawSession) {
     controller.cancelTransientInteraction();
   }
@@ -43,6 +45,7 @@ export function setActiveToolForController(
 }
 
 export function suspendToolModeForController(controller: EditorControllerInstance): void {
+  if (controller.canvas) getEditorRasterRuntime(controller.canvas)?.setTool(null);
   controller.activeTool = 'select';
   controller.toolModeEnabled = false;
   if (!discardActiveCanvasSelection(controller)) {

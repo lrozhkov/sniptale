@@ -22,23 +22,25 @@ afterEach(() => {
   renameLayer.mockReset();
 });
 
+const BASE_LAYER: EditorLayerItem = {
+  id: 'layer-1',
+  name: 'Rectangle',
+  type: 'shape',
+  typeLabel: 'Rectangle',
+  visible: true,
+  locked: false,
+  selected: true,
+  selectedCount: 1,
+  raster: false,
+  previewColor: '#fff',
+  previewDataUrl: null,
+  previewTransparent: false,
+  effects: [],
+  effectCount: 0,
+};
+
 it('clears a layer name draft without accepting it and keeps keyboard focus for replacement', () => {
-  const layer: EditorLayerItem = {
-    id: 'layer-1',
-    name: 'Rectangle',
-    type: 'shape',
-    typeLabel: 'Rectangle',
-    visible: true,
-    locked: false,
-    selected: true,
-    selectedCount: 1,
-    raster: false,
-    previewColor: '#fff',
-    previewDataUrl: null,
-    previewTransparent: false,
-    effects: [],
-    effectCount: 0,
-  };
+  const layer = BASE_LAYER;
   function Harness() {
     const editableName = useEditableLayerName(layer);
     return (
@@ -72,3 +74,25 @@ it('clears a layer name draft without accepting it and keeps keyboard focus for 
   expect(container.textContent).toContain('Rectangle');
   expect(renameLayer).not.toHaveBeenCalled();
 });
+
+it.each([false, true])(
+  'double-click edits an unlocked name and keeps locked=%s protected',
+  (locked) => {
+    const layer = { ...BASE_LAYER, locked };
+    function Harness() {
+      const editableName = useEditableLayerName(layer);
+      return <LayerName layer={layer} editableName={editableName} />;
+    }
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+    act(() => root?.render(<Harness />));
+    act(() =>
+      container!
+        .querySelector('[title="Rectangle"]')!
+        .dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }))
+    );
+    expect(Boolean(container!.querySelector('input'))).toBe(!locked);
+    expect(renameLayer).not.toHaveBeenCalled();
+  }
+);

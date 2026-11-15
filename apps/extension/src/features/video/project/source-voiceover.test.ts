@@ -1,3 +1,4 @@
+import { createAudioEffectInstance } from '../audio/effects/catalog';
 import { createAudioClipFromAsset } from './factories/clip';
 import { reviewSpeechTextSignature } from '../review/speech-transcript';
 import { expect, it } from 'vitest';
@@ -104,7 +105,9 @@ it('fences whole source voice takes at schema 31 without changing old documents'
   expect(isExportReadyVideoProject(changed)).toBe(true);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(parseHydratableVideoProject({ ...changed, version: 40 })).not.toBeNull();
-  expect(parseHydratableVideoProject({ ...changed, version: 52 })).toBeNull();
+  expect(parseHydratableVideoProject({ ...changed, version: 52 })).not.toBeNull();
+  expect(parseHydratableVideoProject({ ...changed, version: 55 })).not.toBeNull();
+  expect(parseHydratableVideoProject({ ...changed, version: 56 })).toBeNull();
   expect(applyVideoProjectMutationPatch(changed, { sourceVoiceoverDocuments: [] }).version).toBe(
     31
   );
@@ -430,5 +433,49 @@ it.each([false, true])('remaps paired audio only when that instance is copied: %
   expect(copied![1]!.binding.sourceInstanceId).toBe('new-video');
   if (copyAudio) expect(copied![1]!.originalAudioSourceInstanceId).toBe('new-audio');
   else expect(copied![1]).not.toHaveProperty('originalAudioSourceInstanceId');
+  expect(document).toEqual(before);
+});
+
+it('retains canonical take processing and requires schema 53 even without processed placement clips', () => {
+  const { project, document } = fixture();
+  const audioProcessing = { version: 1 as const, bypassed: false, effects: [] };
+  const sourceVoiceoverDocuments = [{ ...document, take: { ...document.take, audioProcessing } }];
+  const changed = applyVideoProjectMutationPatch(project, { sourceVoiceoverDocuments });
+  expect(changed.version).toBe(53);
+  expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
+  expect(parseHydratableVideoProject({ ...changed, version: 52 })).toBeNull();
+  expect(parseVideoProjectSourceVoiceoverDocuments(sourceVoiceoverDocuments)).toEqual(
+    sourceVoiceoverDocuments
+  );
+  expect(
+    parseVideoProjectSourceVoiceoverDocuments([
+      {
+        ...document,
+        take: { ...document.take, audioProcessing: { ...audioProcessing, code: 'forbidden' } },
+      },
+    ])
+  ).toBeNull();
+  expect(applyVideoProjectMutationPatch(changed, { sourceVoiceoverDocuments: [] }).version).toBe(
+    53
+  );
+});
+
+it('copies canonical processing values with independent instance identities and preserves unavailable data', () => {
+  const { document } = fixture();
+  const effect = createAudioEffectInstance('eq', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1');
+  effect.processor.sha256 = '0'.repeat(64);
+  document.take.audioProcessing = { version: 1, bypassed: false, effects: [effect] };
+  const before = structuredClone(document);
+  let id = 0;
+  const result = duplicateProjectSourceVoiceoverDocuments(
+    [document],
+    new Map([[document.binding.sourceInstanceId, 'copied-source']]),
+    () => `00000000-0000-4000-8000-${String(++id).padStart(12, '0')}`
+  );
+  expect(result).toHaveLength(2);
+  const copy = result![1]!;
+  expect(copy.take.audioProcessing!.effects[0]!.id).not.toBe(effect.id);
+  expect(copy.take.audioProcessing!.effects[0]!.processor).toEqual(effect.processor);
+  copy.take.audioProcessing!.effects[0]!.wet = 0.2;
   expect(document).toEqual(before);
 });

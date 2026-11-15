@@ -627,3 +627,37 @@ it('admits two real drift painter caches and blur scratch while both destination
   }
   expect(resources.counters.managedBytes).toBe(0);
 });
+
+it('accounts for simultaneous raw and enhanced filter storage without altering the unfiltered graph', () => {
+  const graph = input(),
+    baseline = calculatePreviewRenderAllocation(graph);
+  graph.scene.sourceFilter = {
+    raster: size,
+    scratchCount: 3,
+    preparedRaster: { width: 20, height: 20 },
+  };
+  const plan = calculatePreviewRenderAllocation(graph),
+    scene = phase(plan, 'scene');
+  expect(scene.allocations).toContainEqual({
+    role: 'source-image-filter-0',
+    bytes: 400,
+    canvases: 1,
+  });
+  expect(scene.allocations).toContainEqual({
+    role: 'source-image-filter-1',
+    bytes: 1600,
+    canvases: 1,
+  });
+  expect(scene.allocations).toContainEqual({
+    role: 'source-image-filter-working-0',
+    bytes: 7200,
+    canvases: 0,
+  });
+  expect(scene.allocations).toContainEqual({
+    role: 'source-image-filter-working-1',
+    bytes: 28800,
+    canvases: 0,
+  });
+  expect(plan.maximumManagedBytes - baseline.maximumManagedBytes).toBe(38000);
+  expect(plan.maximumCanvases - baseline.maximumCanvases).toBe(2);
+});

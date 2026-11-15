@@ -256,56 +256,73 @@ it.each([true, false])(
   }
 );
 
-it('keeps an uncommitted new Simplify mask visibly blurred while acquisition is pending', async () => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  const { createContentSimplifyRuntime } = await import('./simplify');
-  const { createDefaultSimplifySettings } = await import('../../features/simplify/settings');
-  const acquisition = Promise.withResolvers<never>();
-  const session = createDrawingSession({ onDocumentCommit: () => true });
-  session.setActiveTool('simplify');
-  const simplify = createContentSimplifyRuntime(session, {
-    acquire: () => acquisition.promise,
-    send: vi.fn(async () => undefined),
-    decode: vi.fn(async () => undefined),
-  });
-  const controller: ContentDrawingController = {
-    session,
-    simplify,
-    getPalette: () => [],
-    applyPalette: vi.fn(),
-    getScrollRoot: () => ({ kind: 'viewport', element: null }),
-    prepareActivation: () => true,
-    registerInteractionFinalizer: vi.fn(),
-    finalizeInteraction: vi.fn(),
-  };
-  const host = document.createElement('div');
-  document.body.append(host);
-  const root = createRoot(host);
-  act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
-  let work: Promise<void> | undefined;
-  act(() => {
-    work = simplify.submit(
-      {
-        id: 'pending-mask',
-        kind: 'simplify',
-        bounds: { x: 20, y: 30, width: 100, height: 60 },
-        settings: createDefaultSimplifySettings(),
-      },
-      new Event('pointerup')
-    );
-  });
-  try {
-    const mask = host.querySelector<HTMLElement>('[data-ui="content.drawing.simplify-private"]');
-    expect(mask).not.toBeNull();
-    expect(mask?.style.backdropFilter).toBe('blur(2px)');
-    expect(session.getSnapshot().document.objects).toHaveLength(0);
-  } finally {
-    act(() => {
-      simplify.dispose();
-      root.unmount();
+it.each([false, true])(
+  'keeps a pending protective mask while service UI suppression is %s',
+  async (suppressed) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const { createContentSimplifyRuntime } = await import('./simplify');
+    const { createDefaultSimplifySettings } = await import('../../features/simplify/settings');
+    const acquisition = Promise.withResolvers<never>();
+    const session = createDrawingSession({ onDocumentCommit: () => true });
+    session.setActiveTool('simplify');
+    const simplify = createContentSimplifyRuntime(session, {
+      acquire: () => acquisition.promise,
+      send: vi.fn(async () => undefined),
+      decode: vi.fn(async () => undefined),
     });
-    host.remove();
-    acquisition.reject(new Error('Cancelled acquisition'));
-    await work;
+    const controller: ContentDrawingController = {
+      session,
+      simplify,
+      getPalette: () => [],
+      applyPalette: vi.fn(),
+      getScrollRoot: () => ({ kind: 'viewport', element: null }),
+      prepareActivation: () => true,
+      registerInteractionFinalizer: vi.fn(),
+      finalizeInteraction: vi.fn(),
+    };
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    act(() =>
+      root.render(
+        <DrawingSurface
+          active
+          chromeHidden={false}
+          serviceUiSuppressed={suppressed}
+          controller={controller}
+        />
+      )
+    );
+    let work: Promise<void> | undefined;
+    act(() => {
+      work = simplify.submit(
+        {
+          id: 'pending-mask',
+          kind: 'simplify',
+          bounds: { x: 20, y: 30, width: 100, height: 60 },
+          settings: createDefaultSimplifySettings(),
+        },
+        new Event('pointerup')
+      );
+    });
+    try {
+      const mask = host.querySelector<HTMLElement>('[data-ui="content.drawing.simplify-private"]');
+      expect(mask).not.toBeNull();
+      expect(mask?.style.backdropFilter).toBe('blur(2px)');
+      expect(host.querySelector('[data-ui="content.drawing.simplify-pending"]') === null).toBe(
+        suppressed
+      );
+      if (suppressed)
+        expect(host.querySelector('style')?.textContent).toContain('border: 0 !important');
+      expect(session.getSnapshot().document.objects).toHaveLength(0);
+    } finally {
+      act(() => {
+        simplify.dispose();
+        root.unmount();
+      });
+      host.remove();
+      acquisition.reject(new Error('Cancelled acquisition'));
+      await work;
+    }
   }
-});
+);

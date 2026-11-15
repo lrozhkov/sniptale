@@ -1499,3 +1499,58 @@ it('does not acquire video for an unattached procedural effect frame', async () 
     vi.unstubAllGlobals();
   }
 });
+
+it('retains every enhanced exposure until its GPU consumer releases the passes', async () => {
+  const f = preparationFixture();
+  try {
+    const first = await f.owner.prepare({
+      project: f.project,
+      frame: f.frame,
+      time: 1,
+      media: f.media,
+      retain: true,
+    });
+    const second = await f.owner.prepare({
+      project: f.project,
+      frame: f.frame,
+      time: 1.01,
+      media: f.media,
+      retain: true,
+    });
+    expect(f.clones[0]!.close).not.toHaveBeenCalled();
+    expect(first.media.get(f.clip.id)).toBeDefined();
+    first.release();
+    expect(f.clones[0]!.close).toHaveBeenCalledOnce();
+    expect(f.clones[1]!.close).not.toHaveBeenCalled();
+    second.release();
+    expect(f.clones[1]!.close).toHaveBeenCalledOnce();
+  } finally {
+    await f.owner.dispose();
+  }
+});
+
+it('preserves a retained exposure after another preparation fails and drains it on disposal', async () => {
+  const f = preparationFixture();
+  await f.owner.prepare({
+    project: f.project,
+    frame: f.frame,
+    time: 1,
+    media: f.media,
+    retain: true,
+  });
+  f.enhancer.withEnhancedRegion.mockRejectedValueOnce(new Error('Inference refused'));
+  await expect(
+    f.owner.prepare({
+      project: f.project,
+      frame: f.frame,
+      time: 1.01,
+      media: f.media,
+      retain: true,
+    })
+  ).rejects.toThrow('Inference refused');
+  expect(f.clones[0]!.close).not.toHaveBeenCalled();
+  expect(f.clones[1]!.close).toHaveBeenCalledOnce();
+  await f.owner.dispose();
+  expect(f.clones[0]!.close).toHaveBeenCalledOnce();
+  expect(f.canvases.every((canvas) => canvas.width === 0 && canvas.height === 0)).toBe(true);
+});

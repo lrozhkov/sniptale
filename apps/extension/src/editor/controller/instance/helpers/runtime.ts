@@ -10,6 +10,8 @@ import {
   withEditorHistoryMuted,
 } from '../../runtime/actions';
 import { refreshEditorToolSettingsPreview } from '../../tools/settings-preview';
+import { deferEditorSnapshotHistory } from '../../history';
+import { reportEditorActionFailure } from '../../../runtime/async-actions';
 
 export function withHistoryMutedForController<T>(
   controller: EditorControllerInstance,
@@ -32,6 +34,31 @@ export function commitHistoryForController(controller: EditorControllerInstance)
     snapshot ??= controller.exportDocument();
     return snapshot;
   };
+
+  const history = controller.history;
+  const canvas = controller.canvas;
+  if (history && canvas && controller.historyMuted === 0) {
+    const document = getSnapshot();
+    if (
+      deferEditorSnapshotHistory(history, {
+        document,
+        isCurrent: () => controller.history === history && controller.canvas === canvas,
+        onCommitted: () => {
+          if (!controller.drawSession) controller.syncRuntimeState();
+        },
+        onFailure: () => {
+          reportEditorActionFailure(
+            'history-after-paint',
+            new Error('History snapshot encoding failed')
+          );
+        },
+      })
+    ) {
+      controller.syncRuntimeState();
+      controller.autosaveService?.scheduleAutosave(document);
+      return;
+    }
+  }
 
   const committed = commitEditorHistory({
     history: controller.history,

@@ -16,10 +16,6 @@ import {
   buildRecordingMediaEntry,
 } from '../../composition/persistence/media-library/entry-mapping';
 import { beforeEach, expect, it, vi } from 'vitest';
-import {
-  EFFECT_BUNDLE_CORPUS,
-  readEffectBundleCorpusArchive,
-} from '../../../../../tooling/test/support/effect-v1-corpus.test-support';
 import type { AssetRef } from '../../composition/persistence/assets';
 import type { CapturedVideoProjectRows } from '../../composition/persistence/sync-capture/contracts';
 import {
@@ -27,7 +23,7 @@ import {
   createProjectExportEntry,
   createVideoProjectEntryWithMediaClip,
 } from '../../composition/persistence/projects/index.test-support';
-import { importEffectBundleZip } from '../../features/video/project/effect-bundle/import/zip';
+import { readValidAnimationSnapshot } from '../../composition/persistence/effect-bundles/fixture.test-support';
 import { parsePortableVideoProjectMetadata } from '../media-hub-backup/v6/root-codecs/projects';
 import { encodeCapturedProjectRoot } from './captured-project';
 import { parsePortableSyncRoot, preparePortableReplica } from './prepared-root';
@@ -362,56 +358,22 @@ it('detaches the complete project before the first asynchronous source read', as
   expect(result.bindings[0]!.ref.assetId).toBe('source-original');
 });
 
-it('keeps effect binary objects unbound while preserving the complete backup snapshot metadata', async () => {
-  const corpus = EFFECT_BUNDLE_CORPUS.find(
-    ({ accepted, artifact }) => accepted && artifact.includes('asset-bearing-conformance')
-  );
-  if (!corpus) throw new Error('Missing asset-bearing effect fixture.');
-  const imported = await importEffectBundleZip(readEffectBundleCorpusArchive(corpus));
-  if (!imported.ok) throw new Error('Invalid effect fixture.');
-  const document = imported.bundle.documents[0]!;
-  const rows = projectRows();
-  rows.project.project.effectSnapshots = [
-    {
-      id: `effect:${document.sha256}`,
-      documentId: document.document.id,
-      kind: document.document.kind,
-      schemaVersion: 'sniptale.effect.v1',
-      sha256: document.sha256,
-      source: document.source,
-      retainedByteLength:
-        new TextEncoder().encode(document.source).byteLength +
-        document.assets.reduce((sum, asset) => sum + asset.byteLength, 0),
-      assets: document.assets.map((asset) => ({
-        blob: new Blob([Uint8Array.from(asset.bytes).buffer], { type: asset.mimeType }),
-        id: asset.id,
-        kind: asset.kind,
-        byteLength: asset.byteLength,
-        mimeType: asset.mimeType,
-        sha256: asset.sha256,
-      })),
-    },
-  ];
+it('keeps embedded animation resources in exact source metadata without detached binary objects', async () => {
+  const snapshot = await readValidAnimationSnapshot(),
+    rows = projectRows();
+  rows.project.project.effectSnapshots = [snapshot];
   const result = await encodeCapturedProjectRoot(rows);
   const metadata = parsePortableVideoProjectMetadata(result.envelope.metadata);
-  const snapshots = metadata.entry.project.effectSnapshots!;
-  expect(snapshots[0]!.source).toBe(document.source);
-  expect(result.objects).toHaveLength(2 + document.assets.length);
+  expect(metadata.entry.project.effectSnapshots![0]).toEqual(snapshot);
+  expect(result.objects).toHaveLength(2);
   expect(result.bindings).toHaveLength(2);
-  for (const asset of snapshots[0]!.assets) {
-    expect(asset).not.toHaveProperty('blob');
-    expect(result.bindings.some((binding) => binding.objectId === asset.objectId)).toBe(false);
-    const object = result.objects.find((object) => object.ref.objectId === asset.objectId)!;
-    expect(object.ref.size).toBe(asset.byteLength);
-    expect(object.ref.filename).not.toContain(':');
-  }
   io.read.mockClear();
   io.read.mockRejectedValue(new Error('Unloaded Montage bodies must not be read.'));
   const copies = new Map(
     rows.refs.map((ref, index) => [ref.assetId, verifiedDeferredCopy(ref, index)])
   );
   const retained = await encodeCapturedProjectRoot(rows, copies);
-  expect(retained.objects).toHaveLength(document.assets.length);
+  expect(retained.objects).toHaveLength(0);
   expect(retained.retainedObjects).toHaveLength(rows.refs.length);
   expect(retained.envelope.metadata).toEqual(result.envelope.metadata);
   expect(io.read).not.toHaveBeenCalled();

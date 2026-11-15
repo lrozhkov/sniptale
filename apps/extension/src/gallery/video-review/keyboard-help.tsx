@@ -8,7 +8,7 @@ import {
   useResolvedPortalTheme,
 } from '@sniptale/ui/theme/safe-portal';
 import { isComposedEventWithinElement } from '@sniptale/ui/dom-events';
-import { Archive, FilePlus2, Keyboard, MoreHorizontal } from 'lucide-react';
+import { Archive, FilePlus2, Keyboard, MoreHorizontal, PanelsTopLeft } from 'lucide-react';
 import { ProductModalBody, ProductModalHeader } from '@sniptale/ui/product-modal';
 import { translate } from '../../platform/i18n';
 import { formatHotkey } from '../../features/keyboard-shortcuts/hotkey-format';
@@ -99,6 +99,7 @@ export function ReviewKeyboardHelp(props: {
   busy?: boolean | undefined;
   onNewProject?: (() => void) | undefined;
   onBackup?: (() => void) | undefined;
+  onBasicMode?: (() => void) | undefined;
 }) {
   const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
   const [open, setOpen] = useState(false);
@@ -192,6 +193,7 @@ export function ReviewKeyboardHelp(props: {
         ? createPortal(
             <div ref={menu} style={portalStyle} data-theme={theme ?? undefined}>
               <ProductDropdownMenu
+                className="review-utility-menu"
                 role="menu"
                 aria-label={translate('gallery.videoReview.moreActions')}
                 data-ui="gallery.videoReview.utilityMenu"
@@ -233,6 +235,19 @@ export function ReviewKeyboardHelp(props: {
                   >
                     <Archive size={16} aria-hidden="true" />
                     {translate('gallery.app.selectionBackup')}
+                  </ProductDropdownItem>
+                ) : null}
+                {props.onBasicMode ? (
+                  <ProductDropdownItem
+                    role="menuitem"
+                    disabled={Boolean(props.busy)}
+                    onClick={() => {
+                      close();
+                      props.onBasicMode?.();
+                    }}
+                  >
+                    <PanelsTopLeft size={16} aria-hidden="true" />
+                    {translate('gallery.videoReview.returnBasicMode')}
                   </ProductDropdownItem>
                 ) : null}
               </ProductDropdownMenu>

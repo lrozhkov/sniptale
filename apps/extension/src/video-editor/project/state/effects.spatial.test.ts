@@ -249,3 +249,27 @@ it('retains cursor composition through canonical edits, undo, redo, and strict h
     .updateMotionRegion(region.id, { spatialEdit: { kind: 'cursor-composition', amount: 5 } });
   expect(store.getState().project).toBe(beforeInvalid);
 });
+
+it('authors independent 3D motion through the existing Undo and hydration owners', async () => {
+  const { DEFAULT_CAMERA_PERSPECTIVE } =
+    await import('../../../features/video/project/motion/spatial');
+  const { store, region } = setup();
+  store.getState().updateMotionRegion(region.id, { focusEdit: { kind: '3d', enabled: true } });
+  const before = store.getState().project!;
+  const motion = {
+    enabled: true,
+    easing: 'linear' as const,
+    end: { ...DEFAULT_CAMERA_PERSPECTIVE, enabled: true, rotateY: -25 },
+  };
+  store.getState().updateMotionRegion(region.id, { spatialEdit: { kind: 'motion', ...motion } });
+  const after = store.getState().project!;
+  expect(after.motionRegions?.find((r) => r.id === region.id)).toMatchObject({
+    effect: '3d',
+    spatialMotion: motion,
+  });
+  expect(after.version).toBe(55);
+  expect(isHydratableVideoProject(after)).toBe(true);
+  const undo = undoVideoEditorProjectHistory(store.getState().projectHistory, after);
+  if (undo?.status !== 'applied') throw new Error('Expected spatial motion undo');
+  expect(undo.project.motionRegions).toEqual(before.motionRegions);
+});

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Copy, Pencil, Trash2 } from 'lucide-react';
+import { Copy, Trash2 } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { useEditorController } from '../../application/controller-context';
 import { EditorIconButton } from '../../chrome/ui';
@@ -8,9 +8,7 @@ interface LayerMutationButtonsProps {
   autoNavigateSelectedLayer: boolean;
   canDelete: boolean;
   canDuplicate: boolean;
-  canRename: boolean;
   layerId: string;
-  onRenameLayer: () => void;
 }
 
 interface LayerMutationButtonConfig {
@@ -50,12 +48,6 @@ function buildLayerMutationButtons(
 ): LayerMutationButtonConfig[] {
   return [
     {
-      title: translate('editor.toolbar.renameLayer'),
-      onClick: props.onRenameLayer,
-      disabled: !props.canRename,
-      icon: <Pencil size={13} strokeWidth={2} />,
-    },
-    {
       title: translate('editor.toolbar.duplicateLayer'),
       onClick: () =>
         withSingleLayerSelection(controller, props.layerId, props.autoNavigateSelectedLayer, () =>
@@ -72,7 +64,7 @@ function buildLayerMutationButtons(
         ),
       danger: true,
       disabled: !props.canDelete,
-      icon: <Trash2 size={13} strokeWidth={2} className="text-[var(--sniptale-color-danger)]" />,
+      icon: <Trash2 size={13} strokeWidth={2} />,
     },
   ];
 }

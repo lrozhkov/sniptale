@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  cancelRaster: vi.fn(),
   closeEditorDocumentViaController: vi.fn(),
   copyRenderedEditorImageViaController: vi.fn(async () => undefined),
   exportEditorDocumentViaController: vi.fn(() => ({ version: 1 })),
@@ -8,6 +9,10 @@ const mocks = vi.hoisted(() => ({
   loadEditorDocumentViaController: vi.fn(async () => undefined),
   openEditorImageViaController: vi.fn(async () => undefined),
   renderEditorControllerToDataUrl: vi.fn(() => 'data:image/png;base64,rendered'),
+}));
+
+vi.mock('../../../../raster-editing/runtime', () => ({
+  getEditorRasterRuntime: () => ({ cancel: mocks.cancelRaster }),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
@@ -50,6 +55,7 @@ function createAutosaveService(
   return {
     activate: vi.fn(),
     adoptPreparedDocument: vi.fn(),
+    adoptVectorAssets: vi.fn(),
     beginHydration: vi.fn(() => ({ finish: vi.fn(), saveNow: vi.fn(async () => undefined) })),
     discardDraft: vi.fn(async () => undefined),
     dispose: vi.fn(),
@@ -66,6 +72,7 @@ function createAutosaveService(
     restoreDraft: vi.fn(async () => undefined),
     scheduleAutosave: vi.fn(),
     setInteractionActive: vi.fn(),
+    setPendingCompletionActive: vi.fn(),
     saveNow: vi.fn(async () => undefined),
     setEnabled: vi.fn(),
     updateContext: vi.fn(),
@@ -126,4 +133,17 @@ it('keeps the persisted workspace when closing a document', async () => {
   expect(autosaveService.discardDraft).not.toHaveBeenCalled();
   expect(mocks.closeEditorDocumentViaController).toHaveBeenCalledWith(expect.any(Object));
   expect(mocks.loggerError).not.toHaveBeenCalled();
+});
+
+it('cancels raster work before each document replacement entry', async () => {
+  const controller = createImageEditorController();
+  controller.canvas = {} as never;
+  mocks.cancelRaster.mockClear();
+  await openImageForController(controller, 'data:image/png;base64,a');
+  expect(mocks.cancelRaster.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.openEditorImageViaController.mock.invocationCallOrder.at(-1) ?? Infinity
+  );
+  await loadDocumentForController(controller, createEditorDocumentFixture());
+  closeDocumentForController(controller);
+  expect(mocks.cancelRaster).toHaveBeenCalledTimes(3);
 });

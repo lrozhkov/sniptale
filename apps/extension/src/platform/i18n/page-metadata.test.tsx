@@ -160,3 +160,22 @@ it('updates changed locale and restores current metadata after external DOM chan
     observer.disconnect();
   }
 });
+
+it('keeps a mounted document above its shell across locale changes and restores the current shell on close', async () => {
+  useAppLocaleMock.mockReturnValue('en');
+  container = document.createElement('div');
+  root = createRoot(container);
+  function Shell({ open }: { open: boolean }) {
+    usePageLocaleMetadata('gallery.app.documentTitle');
+    return open ? <DocumentHarness name="Project" /> : null;
+  }
+  await act(async () => root?.render(<Shell open={false} />));
+  await act(async () => root?.render(<Shell open />));
+  expect(document.title).toBe('Project');
+  useAppLocaleMock.mockReturnValue('ru');
+  await act(async () => root?.render(<Shell open />));
+  expect(document.title).toBe('Project');
+  expect(document.documentElement.lang).toBe('ru');
+  await act(async () => root?.render(<Shell open={false} />));
+  expect(document.title).toBe('Sniptale — Библиотека');
+});

@@ -1,6 +1,7 @@
 import { openDB } from 'idb';
-import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
+import { withIndexedRowProjections } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/indexed-row-projections';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import {
   DB_NAME,
   DB_VERSION,
@@ -20,7 +21,10 @@ import {
   workspaceStorageRows,
 } from '../../../../apps/extension/src/composition/persistence/review-workspaces/storage-format';
 import { withReviewWorkspaceUsage } from '../../../../apps/extension/src/composition/persistence/media-library/usage-index-keys';
-import { ASSET_ROOT_DIRECTORY_NAME } from '../../../../apps/extension/src/composition/persistence/assets/opfs-store';
+import {
+  ASSET_ROOT_DIRECTORY_NAME,
+  prepareAssetReadyClaimIndex,
+} from '../../../../apps/extension/src/composition/persistence/assets/opfs-store';
 import { getProjectAsset } from '../../../../apps/extension/src/composition/persistence/projects';
 import { createVideoReviewSession } from '../../../../apps/extension/src/workflows/video-review/session';
 import { initDB } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/core';
@@ -43,19 +47,19 @@ let readerLease: AssetResourceSession | undefined;
 
 /** Isolated native source fixture includes real OPFS bytes and their exact canonical binding. */
 export async function seed(source: string) {
-  const raw: unknown = JSON.parse(source);
-  if (!isRecord(raw) || !Array.isArray(raw['assets'])) throw new Error('Invalid neutral source');
   const bytes = new TextEncoder().encode(svg);
-  const hash = await sha256EffectV1Bytes(bytes);
-  raw['assets'] = raw['assets'].map((asset: unknown) => {
-    if (!isRecord(asset)) throw new Error('Invalid neutral asset');
-    return { ...asset, byteLength: bytes.byteLength, sha256: hash };
-  });
-  const snapshot = await historyRetentionEffectSnapshot(JSON.stringify(raw));
+  const hash = await bytesToHex(sha256(bytes));
+  const snapshot = await historyRetentionEffectSnapshot(source);
   const advanced = createQuickEditAdvancedState();
   const before = reviewAdvancedContentBaseline(advanced);
   const withEffect = {
     ...before,
+    // Source-only Lottie owns no detached blobs. A supported remembered background
+    // in the same historical operation keeps the physical-resource lifecycle proof.
+    background: {
+      enabled: false as const,
+      rememberedImage: { assetId: 'project-asset:retained-effect', imageFit: 'contain' as const },
+    },
     annotationEffects: {
       enabled: true,
       instances: [
@@ -109,6 +113,9 @@ export async function seed(source: string) {
     updatedAt: 1,
   });
   if (!admitted.workspace) throw new Error('Invalid resource history fixture');
+  // The blank host does not run app startup. Use the actual startup recovery entry,
+  // so candidate cleanup has complete ready-claim authority without scanning on replay.
+  await prepareAssetReadyClaimIndex();
   const root = await navigator.storage.getDirectory();
   const objects = await (
     await root.getDirectoryHandle(ASSET_ROOT_DIRECTORY_NAME, { create: true })
@@ -116,7 +123,9 @@ export async function seed(source: string) {
   const writable = await (await objects.getFileHandle(assetId, { create: true })).createWritable();
   await writable.write(bytes);
   await writable.close();
-  const db = await openDB(DB_NAME, DB_VERSION, { upgrade: handleDatabaseUpgrade });
+  const db = withIndexedRowProjections(
+    await openDB(DB_NAME, DB_VERSION, { upgrade: handleDatabaseUpgrade })
+  );
   try {
     const tx = db.transaction(
       [
@@ -210,7 +219,7 @@ export async function readReaderSource() {
     ? {
         status: source.status,
         bytes: source.entry.file.size,
-        sha256: await sha256EffectV1Bytes(new Uint8Array(await source.entry.file.arrayBuffer())),
+        sha256: await bytesToHex(sha256(new Uint8Array(await source.entry.file.arrayBuffer()))),
       }
     : { status: source.status, bytes: 0, sha256: null };
 }

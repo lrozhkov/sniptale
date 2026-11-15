@@ -1,3 +1,4 @@
+import { duplicateAudioProcessing } from '../../../../features/video/audio/effects/presets';
 import { sliceClipPlaybackWindow } from '../../../../features/video/project/timeline/rate';
 import { materializeVideoProjectCursorSourceObservations } from '../../../../features/video/project/cursor-source-observations';
 import {
@@ -206,6 +207,8 @@ export function duplicateProjectClipsWithResult(
         name: `${item.name} ${translate('shared.projectActions.copySuffix')}`,
       } as VideoProjectClip;
 
+      if ((duplicate.type === 'AUDIO' || duplicate.type === 'VIDEO') && duplicate.audioProcessing)
+        duplicate.audioProcessing = duplicateAudioProcessing(duplicate.audioProcessing);
       duplicateSourceInstance(item, duplicate, project, sourceInstances);
       duplicateClipIds.set(item.id, duplicate.id);
       duplicateIds.push(duplicate.id);

@@ -1,4 +1,4 @@
-import { vi, type Mock } from 'vitest';
+import { afterEach, beforeEach, vi, type Mock } from 'vitest';
 import {
   createRetentionDatabaseFixture,
   createTargetAssetDatabaseFixture,
@@ -102,4 +102,107 @@ export function createWebSnapshotCompensation(
     ownerRole,
     previousRecords,
   };
+}
+
+const mocks = vi.hoisted(() => ({
+  retireCursorStages: vi.fn(),
+  retireEventStages: vi.fn(),
+  completePhysicalDelete: vi.fn(),
+  collectWriting: vi.fn(),
+  physicalAuthority: vi.fn(),
+  prepareReadyIndex: vi.fn(),
+  readyClaims: vi.fn(),
+  deleteObject: vi.fn(),
+  deleteJournal: vi.fn(),
+  journals: vi.fn(),
+  objects: vi.fn(),
+  writing: vi.fn(),
+  recoverStandalone: vi.fn(),
+  recoverNative: vi.fn(),
+  runMutation: vi.fn(),
+}));
+
+vi.mock('../recordings/native-history/recovery', () => ({
+  recoverNativeRecordingHistories: mocks.recoverNative,
+}));
+
+vi.mock('../recordings/recording-events/staging', () => ({
+  retireJournalRecordingEventStages: mocks.retireEventStages,
+}));
+vi.mock('../recordings/cursor-trajectory/staging', () => ({
+  retireJournalCursorTrajectoryStages: mocks.retireCursorStages,
+}));
+
+vi.mock('../assets/operations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets/operations')>()),
+  completePhysicalDeleteOperation: mocks.completePhysicalDelete,
+  readPhysicalDeleteAuthority: mocks.physicalAuthority,
+}));
+vi.mock('../assets/opfs-store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets/opfs-store')>()),
+  deleteReadyJournal: mocks.deleteJournal,
+  deleteAssetObject: mocks.deleteObject,
+  listReadyJournals: mocks.journals,
+  prepareAssetReadyClaimIndex: mocks.prepareReadyIndex,
+  readAssetReadyClaims: mocks.readyClaims,
+  readWritingAssetIds: mocks.writing,
+}));
+vi.mock('../assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets')>()),
+  completePhysicalDeleteOperation: mocks.completePhysicalDelete,
+  collectQuiescentWritingObjects: mocks.collectWriting,
+  deleteAssetObject: mocks.deleteObject,
+  deleteReadyJournal: mocks.deleteJournal,
+  listReadyJournals: mocks.journals,
+  listAssetObjectIds: mocks.objects,
+  listWritingAssetIds: mocks.writing,
+  recoverStandaloneAssetPublications: mocks.recoverStandalone,
+}));
+
+vi.mock('../infrastructure/indexed-db/mutation', () => ({
+  runWithIndexedDbMutation: mocks.runMutation,
+}));
+
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
+  initDB: vi.fn(async () => undefined),
+}));
+
+vi.mock('../recordings/asset-publication', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../recordings/asset-publication')>()),
+  RECORDING_ASSET_OWNER_KIND: 'recording',
+  RECORDING_ASSET_ROLE: 'body',
+  recordingAssetPublicationAdapter: { domain: 'recording-assets', publish: vi.fn() },
+}));
+
+afterEach(() => vi.unstubAllGlobals());
+
+beforeEach(() => {
+  vi.stubGlobal('navigator', {
+    locks: {
+      request: async (
+        _name: string,
+        _options: unknown,
+        operation: (lock: object) => Promise<unknown>
+      ) => operation({}),
+    },
+  });
+  vi.clearAllMocks();
+  mocks.retireCursorStages.mockResolvedValue(undefined);
+  mocks.retireEventStages.mockResolvedValue(undefined);
+  mocks.completePhysicalDelete.mockResolvedValue(undefined);
+  mocks.collectWriting.mockResolvedValue(0);
+  mocks.prepareReadyIndex.mockResolvedValue(undefined);
+  mocks.readyClaims.mockResolvedValue({ valid: true, assetIds: new Set(), journals: [] });
+  mocks.deleteObject.mockResolvedValue(undefined);
+  mocks.deleteJournal.mockResolvedValue(undefined);
+  mocks.journals.mockResolvedValue([]);
+  mocks.objects.mockResolvedValue([]);
+  mocks.writing.mockResolvedValue([]);
+  mocks.recoverStandalone.mockResolvedValue(0);
+  mocks.recoverNative.mockResolvedValue(0);
+});
+
+export function getAssetPublicationRecoveryMocks() {
+  return mocks;
 }

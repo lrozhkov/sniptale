@@ -1,3 +1,8 @@
+import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
+import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   createReviewPresentationMain,
@@ -12,6 +17,23 @@ import { createReviewCaptionSettings } from '../../features/video/review/text-do
 import { calculatePreviewRenderAllocation } from './preview-render-allocation';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 
+const FRAME_SOURCE = readFileSync(
+  'apps/extension/public/video-effects/animations/frame.sniptale-animation.json',
+  'utf8'
+);
+const FRAME_DOCUMENT = parseAnimationTemplateSource(FRAME_SOURCE);
+if (!FRAME_DOCUMENT.ok) throw new Error('Expected valid shipped frame animation.');
+const FRAME_HASH = createHash('sha256').update(FRAME_SOURCE).digest('hex');
+const FRAME_SNAPSHOT = {
+  id: `effect:${FRAME_HASH}`,
+  schemaVersion: 'sniptale.animation.v1' as const,
+  kind: 'standalone' as const,
+  documentId: FRAME_DOCUMENT.template.id,
+  sha256: FRAME_HASH,
+  source: FRAME_SOURCE,
+  retainedByteLength: Buffer.byteLength(FRAME_SOURCE),
+  assets: [],
+};
 const io = vi.hoisted(() => ({
   samples: [] as {
     timestamp: number;
@@ -319,7 +341,7 @@ it('composes immutable annotations with full clocks and export fps', async () =>
     instances: [
       {
         id: 'frame',
-        snapshotId: 'effect:frame',
+        snapshotId: FRAME_SNAPSHOT.id,
         enabled: true,
         start: 0,
         end: 10,
@@ -330,18 +352,7 @@ it('composes immutable annotations with full clocks and export fps', async () =>
       },
     ],
   };
-  args.effectSnapshots = [
-    {
-      id: 'effect:frame',
-      schemaVersion: 'sniptale.effect.v1',
-      kind: 'standalone',
-      documentId: 'frame',
-      sha256: '0'.repeat(64),
-      source: '{}',
-      retainedByteLength: 2,
-      assets: [],
-    },
-  ];
+  args.effectSnapshots = [{ ...FRAME_SNAPSHOT }];
   const owner = await open(args);
   const frame = await owner.renderAtTime(0.3001);
   expect(io.times).toEqual([0.5]);
@@ -731,48 +742,56 @@ it.each(['long-leading-gap', 'outside-retained-interval'] as const)(
         },
       ];
     const owner = await open(args);
-    await expect(owner.renderAtTime(0)).rejects.toThrow('Main source frame is unavailable');
+    await expect(owner.renderAtTime(0)).rejects.toThrow('Source frame is unavailable.');
     expect(io.render).not.toHaveBeenCalled();
     expect(io.samples).toEqual([]);
   }
 );
 
-it('borrows an owned GPU source clone with SDK orientation until render settlement', async () => {
-  const raw = { close: vi.fn() };
-  const source = {
-    timestamp: 0,
-    draw: vi.fn(),
-    close: vi.fn(),
-    allocationSize: () => 4096,
-    toVideoFrame: vi.fn(() => raw),
-    rotation: 90,
-    flip: true,
-  };
-  io.sample.mockResolvedValueOnce(source);
-  let complete!: () => void;
-  io.render.mockImplementationOnce(
-    () =>
-      new Promise<void>((resolve) => {
-        complete = resolve;
-      })
-  );
-  const args = { ...fixture(), renderer: 'gpu' as const };
-  const owner = await open(args);
-  const pending = owner.renderAtTime(0);
-  await vi.waitFor(() => expect(io.render).toHaveBeenCalledOnce());
-  const frame = io.render.mock.calls[0]![0];
-  expect(frame.source.videoFrame()).toBe(raw);
-  expect(frame.source.orientation).toEqual({ rotation: 90, flip: true });
-  owner.dispose();
-  expect(raw.close).not.toHaveBeenCalled();
-  expect(source.close).not.toHaveBeenCalled();
-  expect(io.inputs[0]!.dispose).not.toHaveBeenCalled();
-  complete();
-  await expect(pending).rejects.toThrow();
-  expect(raw.close).toHaveBeenCalledOnce();
-  expect(source.close).toHaveBeenCalledOnce();
-  expect(io.inputs[0]!.dispose).toHaveBeenCalledOnce();
-});
+it.each([false, true])(
+  'borrows an owned GPU source clone with SDK orientation until render settlement (enhancement %s)',
+  async (enhanced) => {
+    vi.stubGlobal('VideoFrame', class {});
+    const raw = { close: vi.fn() };
+    const source = {
+      timestamp: 0,
+      draw: vi.fn(),
+      close: vi.fn(),
+      allocationSize: () => 4096,
+      toVideoFrame: vi.fn(() => raw),
+      rotation: 90,
+      flip: true,
+    };
+    io.sample.mockResolvedValueOnce(source);
+    let complete!: () => void;
+    io.render.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          complete = resolve;
+        })
+    );
+    const args = {
+      ...fixture(),
+      renderer: 'gpu' as const,
+      ...(enhanced ? { exportEnhancer: { withEnhancedRegion: vi.fn(), dispose: vi.fn() } } : {}),
+    };
+    const owner = await open(args);
+    const pending = owner.renderAtTime(0);
+    await vi.waitFor(() => expect(io.render).toHaveBeenCalledOnce());
+    const frame = io.render.mock.calls[0]![0];
+    expect(frame.source.videoFrame()).toBe(raw);
+    expect(frame.source.orientation).toEqual({ rotation: 90, flip: true });
+    owner.dispose();
+    expect(raw.close).not.toHaveBeenCalled();
+    expect(source.close).not.toHaveBeenCalled();
+    expect(io.inputs[0]!.dispose).not.toHaveBeenCalled();
+    complete();
+    await expect(pending).rejects.toThrow();
+    expect(raw.close).toHaveBeenCalledOnce();
+    expect(source.close).toHaveBeenCalledOnce();
+    expect(io.inputs[0]!.dispose).toHaveBeenCalledOnce();
+  }
+);
 
 it.each(['ordinary', 'planned'] as const)(
   'uses bounded-prefix metadata rather than index average for %s leading admission',
@@ -814,7 +833,7 @@ it('rejects a leading gap that only the whole-file average would admit', async (
   const args = fixture();
   args.index.frameRate = 30;
   const owner = await open(args);
-  await expect(owner.renderAtTime(0)).rejects.toThrow('Main source frame is unavailable');
+  await expect(owner.renderAtTime(0)).rejects.toThrow('Source frame is unavailable.');
   expect(io.render).not.toHaveBeenCalled();
 });
 
@@ -828,7 +847,7 @@ it.each([0, NaN, Infinity])(
     const args = fixture();
     args.index.frameRate = 30;
     const owner = await open(args);
-    await expect(owner.renderAtTime(0)).rejects.toThrow('Main source frame is unavailable');
+    await expect(owner.renderAtTime(0)).rejects.toThrow('Source frame is unavailable.');
   }
 );
 
@@ -850,3 +869,140 @@ it.each(['error', 'abort'] as const)(
     expect(io.render).not.toHaveBeenCalled();
   }
 );
+
+it('retains one accounted transition pair for sequential export and releases it at the seam exit', async () => {
+  const args = fixture();
+  args.transitionFrameRetention = 'transition';
+  args.edits = [
+    {
+      id: 'cut',
+      kind: 'cut',
+      start: 0.5,
+      end: 1,
+      requestedStart: 0.5,
+      requestedEnd: 1,
+      transition: { type: 'dissolve', before: 0.5, after: 0.5 },
+    },
+  ];
+  const owner = await open(args);
+  const first = await owner.renderAtTime(0.25);
+  const endpoints = io.samples.slice(1);
+  expect(endpoints).toHaveLength(2);
+  expect(endpoints.every((sample) => sample.close.mock.calls.length === 0)).toBe(true);
+  first.release();
+  const next = await owner.renderAtTime(0.4);
+  expect(io.samples).toHaveLength(4);
+  expect(io.render.mock.calls[1]![0].transition.frames).toEqual(
+    io.render.mock.calls[0]![0].transition.frames
+  );
+  next.release();
+  const outside = await owner.renderAtTime(1.25);
+  for (const sample of endpoints) expect(sample.close).toHaveBeenCalledOnce();
+  outside.release();
+  owner.dispose();
+  for (const sample of io.samples) expect(sample.close).toHaveBeenCalledOnce();
+});
+
+it('holds export transition sources until an interrupted render settles', async () => {
+  const args = fixture();
+  args.transitionFrameRetention = 'transition';
+  args.edits = [
+    {
+      id: 'cut',
+      kind: 'cut',
+      start: 0.5,
+      end: 1,
+      requestedStart: 0.5,
+      requestedEnd: 1,
+      transition: { type: 'dissolve', before: 0.5, after: 0.5 },
+    },
+  ];
+  const entered = Promise.withResolvers<void>();
+  const pending = Promise.withResolvers<void>();
+  io.render.mockImplementationOnce(() => {
+    entered.resolve();
+    return pending.promise;
+  });
+  const owner = await open(args);
+  const rendering = owner.renderAtTime(0.25);
+  const rejected = expect(rendering).rejects.toThrow();
+  await entered.promise;
+  owner.dispose();
+  expect(io.samples).toHaveLength(3);
+  for (const sample of io.samples) expect(sample.close).not.toHaveBeenCalled();
+  pending.resolve();
+  await rejected;
+  for (const sample of io.samples) expect(sample.close).toHaveBeenCalledOnce();
+});
+
+it('streams the ordinary export schedule through one decoder without random per-frame reads', async () => {
+  const args = fixture();
+  args.plannedMainTimes = function* () {
+    yield 0;
+    yield 0.5;
+    yield 1;
+  };
+  const closed = Promise.withResolvers<void>();
+  io.streamClosed.mockImplementationOnce(() => closed.resolve());
+  const owner = await open(args);
+  for (const time of [0, 0.5, 1]) {
+    const frame = await owner.renderAtTime(time);
+    frame.release();
+  }
+  expect(io.stream).toHaveBeenCalledOnce();
+  expect(io.single).not.toHaveBeenCalled();
+  expect(io.render.mock.calls.map(([frame]) => frame.source.timestamp)).toEqual([0, 0.5, 1]);
+  owner.dispose();
+  await closed.promise;
+  for (const sample of io.samples) expect(sample.close).toHaveBeenCalledOnce();
+});
+
+it('keeps the common outer fade plan in a sparse hover composition', async () => {
+  const settings = createNewWorkspacePresentationSettings();
+  const planned = planReviewPresentationSequence({
+    settings,
+    mainDuration: 3,
+    fragmentOffset: 0,
+    includeBookends: true,
+    rate: { numerator: 30, denominator: 1 },
+  });
+  if (!planned.ok) throw new Error('Expected a valid fade plan');
+  const main = await open({ ...fixture(), fragmentOffset: 0, outerFadePlan: planned.plan });
+  const frame = await main.renderAtTime(0.1);
+  expect(io.prepare.mock.calls.at(-1)![0]).toMatchObject({ outerFadePlan: planned.plan });
+  frame.release();
+});
+
+it('decodes the persisted original frame throughout inserted time, including an EOF hold', async () => {
+  const args = fixture();
+  args.edits = [
+    {
+      id: 'hold',
+      kind: 'freeze',
+      start: 1,
+      end: 1,
+      requestedStart: 1,
+      requestedEnd: 1,
+      duration: 2,
+      frameTime: 0.98,
+      frameDuration: 0.04,
+    },
+    {
+      id: 'eof',
+      kind: 'freeze',
+      start: 3,
+      end: 3,
+      requestedStart: 3,
+      requestedEnd: 3,
+      duration: 2,
+      frameTime: 2.96,
+      frameDuration: 0.04,
+    },
+  ];
+  const owner = await open(args);
+  for (const time of [1, 2, 2.99, 3, 5, 6.99]) {
+    const frame = await owner.renderAtTime(time);
+    frame.release();
+  }
+  expect(io.times).toEqual([0.98, 0.98, 0.98, 1, 2.96, 2.96]);
+});

@@ -15,6 +15,20 @@ it('keeps committed focused coverage owner maps valid', async () => {
   expect(module.collectFocusedCoverageOwnerMappingViolations()).toEqual([]);
 });
 
+it.each(['action-kernel/owned-route-handlers.ts', 'authorization/owned.ts'])(
+  'selects registered editor catalog and Simplify proof for %s',
+  async (owner) => {
+    const module = await importOwnerMap();
+    const root = 'apps/extension/src/background/runtime/routing';
+    expect(module.resolveMappedCoverageOwnerTests(`${root}/${owner}`)).toEqual(
+      expect.arrayContaining([
+        `${root}/action-kernel/owned-route-handlers.simplify.test.ts`,
+        `${root}/action-kernel/owned-route-handlers.vector-catalog.test.ts`,
+      ])
+    );
+  }
+);
+
 it.each(['controller.ts', 'context.tsx', 'view.tsx', 'dialog.tsx'])(
   'selects direct and participant composition proof for the common Settings protection %s owner',
   async (owner) => {
@@ -430,6 +444,21 @@ it.each([
   );
 });
 
+it('retains existing authorization policy proof when mapping editor catalog callers', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/background/runtime/routing/authorization';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/owned.ts`)).toEqual(
+    expect.arrayContaining([
+      `${root}/background-owned-route.test.ts`,
+      `${root}/background-owned.matrix.test.ts`,
+      `${root}/background-owned.query.test.ts`,
+      `${root}/background-owned.wakeup.test.ts`,
+      `${root}/index.test.ts`,
+      `${root}/policy-registry.test.ts`,
+    ])
+  );
+});
+
 it('retains pending-opening, cancellation and disposal proof for the Gallery reader owner', async () => {
   const module = await importOwnerMap();
   expect(
@@ -650,5 +679,43 @@ it('requires exactly one mapping target kind without treating JSON as covered co
   );
   expect(results.code).toContainEqual(
     expect.objectContaining({ rule: 'focused-coverage-owner-mapping-non-coverage-production-file' })
+  );
+});
+
+it('keeps existing layer contract proof when adjacent publication proof is added', async () => {
+  const { resolveLocalFocusedCoverageOwnerTests } =
+    await import('./focused-coverage-owner-tests.mjs');
+  const root = 'apps/extension/src/editor/controller';
+  expect(resolveLocalFocusedCoverageOwnerTests(`${root}/core/controller-layer-actions.ts`)).toEqual(
+    expect.arrayContaining([
+      `${root}/core/controller-layer-actions.test.ts`,
+      `${root}/core/controller.instance-delegation.test.ts`,
+    ])
+  );
+  expect(
+    resolveLocalFocusedCoverageOwnerTests(`${root}/public-api/layer-selection-actions.ts`)
+  ).toEqual(
+    expect.arrayContaining([
+      `${root}/core/controller-layer-actions.test.ts`,
+      `${root}/public-api/layer-selection-actions.test.ts`,
+      `${root}/public-api/actions.coverage.test.ts`,
+      `${root}/public-api/actions.callbacks.coverage.test.ts`,
+    ])
+  );
+});
+
+it('retains raster and vector resource publication proof for the document codec owner', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/composition/persistence';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/document-assets/codec.ts`)).toEqual(
+    expect.arrayContaining([
+      `${root}/document-assets/codec.test.ts`,
+      `${root}/document-assets/codec.vector-elements.test.ts`,
+      `${root}/document-assets/ownership.test.ts`,
+      `${root}/image-aggregates/mutations.test.ts`,
+      `${root}/image-aggregates/mutations.reused-assets.test.ts`,
+      `${root}/image-aggregates/mutations.root-lifecycle.test.ts`,
+      `${root}/image-aggregates/mutations.vector-assets.test.ts`,
+    ])
   );
 });

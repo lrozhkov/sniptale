@@ -143,6 +143,7 @@ function audioInput(args: Args, prepared: Preparation, renderer: Renderer): Pres
       track: renderer.audioTracks.main,
       segments: prepared.segments,
       isOriginalMuted: (segment) =>
+        segment.kind === 'freeze' ||
         args.edits.some(
           (edit) =>
             edit.kind === 'speed' &&
@@ -263,8 +264,9 @@ function createRenderer(
   return createReviewPresentationRenderer({
     plan: prepared.plan,
     settings: prepared.settings,
-    renderer: preview?.renderer ?? 'legacy',
+    renderer: preview?.renderer ?? 'gpu',
     main: {
+      transitionFrameRetention: preview ? 'frame' : 'transition',
       ...(exportEnhancer ? { exportEnhancer } : {}),
       *plannedCandidates() {
         for (const { candidate } of iteratePresentationVideoFrames(prepared.plan, {

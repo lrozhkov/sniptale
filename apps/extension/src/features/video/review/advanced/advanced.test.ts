@@ -85,3 +85,78 @@ it('roundtrips lane masters and locks without adding defaults to legacy UI', () 
     loadQuickEditAdvancedState({ ...state, ui: { ...ui, tracks: { ...ui.tracks, music: 1 } } })
   ).toBeNull();
 });
+
+it('retains audio snapshots in schema 31 without silently admitting them in historical schemas', () => {
+  const base = createQuickEditAdvancedContent();
+  const audioProcessing = { version: 1 as const, bypassed: false, effects: [] };
+  const clip = {
+    id: 'take',
+    assetId: 'audio',
+    timelineStart: 0,
+    sourceOffset: 0,
+    duration: 1,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+    audioProcessing,
+  };
+  for (const audio of [
+    { ...base.audio, original: { ...base.audio.original, audioProcessing } },
+    { ...base.audio, voiceover: [clip] },
+    { ...base.audio, music: [clip] },
+  ]) {
+    const content = { ...base, audio };
+    expect(content.schemaVersion).toBe(34);
+    expect(loadQuickEditAdvancedContentState(JSON.parse(JSON.stringify(content)))).toEqual(content);
+    expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion: 31 })).toEqual(content);
+    expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion: 30 })).toBeNull();
+  }
+  expect(loadQuickEditAdvancedContentState({ ...base, schemaVersion: 30 })).toEqual(base);
+  const invalid = {
+    ...base,
+    audio: {
+      ...base.audio,
+      original: {
+        ...base.audio.original,
+        audioProcessing: { ...audioProcessing, script: 'forbidden' },
+      },
+    },
+  };
+  expect(loadQuickEditAdvancedContentState(invalid)).toBeNull();
+});
+
+it('admits authored interaction timelines only from schema 32 and preserves historical empty content', () => {
+  const base = createQuickEditAdvancedContent();
+  const interactionTimeline = {
+    presses: [
+      {
+        id: 'key',
+        family: 'keyboard',
+        start: 1,
+        end: 2,
+        label: 'Cmd+K',
+        keys: ['Cmd', 'K'],
+        button: 0,
+        x: 0.5,
+        y: 0.5,
+      },
+    ],
+    overrides: [],
+  };
+  const candidate = { ...base, interactionTimeline };
+  expect(loadQuickEditAdvancedContentState(JSON.parse(JSON.stringify(candidate)))).toEqual(
+    candidate
+  );
+  expect(loadQuickEditAdvancedContentState({ ...candidate, schemaVersion: 31 })).toBeNull();
+  expect(loadQuickEditAdvancedContentState({ ...base, schemaVersion: 31 })).toEqual(base);
+  expect(
+    loadQuickEditAdvancedContentState({
+      ...base,
+      interactionTimeline: {
+        ...interactionTimeline,
+        presses: [{ ...interactionTimeline.presses[0], x: Infinity }],
+      },
+    })
+  ).toBeNull();
+});

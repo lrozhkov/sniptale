@@ -1,3 +1,5 @@
+import { useReviewTimelineSnap } from './timeline-magnets';
+import { SNAP_THRESHOLD_PX } from '../../features/video/review/snap';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Scissors } from 'lucide-react';
 import { translate } from '../../platform/i18n';
@@ -29,6 +31,7 @@ export function ReviewWebcamHiddenMarker(props: {
   compact: boolean;
 }) {
   const { editor, id, duration, admit } = props;
+  const snap = useReviewTimelineSnap();
   const range = editor.camera!.hiddenRanges.find((item) => item.id === id)!;
   const drag = useRef<Drag | null>(null);
   const pending = useRef<ReturnType<typeof deferReviewGesture> | null>(null);
@@ -83,11 +86,16 @@ export function ReviewWebcamHiddenMarker(props: {
       ? { start: Math.max(left, Math.min(original.end - minimum, time)), end: original.end }
       : { start: original.start, end: Math.max(original.start + minimum, Math.min(right, time)) };
   };
-  const dragPosition = (current: Drag, clientX: number) =>
+  const dragPosition = (current: Drag, clientX: number, bypass = false) =>
     bounded(
       current.range,
       current.edge,
-      current.range[current.edge] + ((clientX - current.x) / Math.max(1, current.width)) * duration
+      snap(
+        current.range[current.edge] +
+          ((clientX - current.x) / Math.max(1, current.width)) * duration,
+        [],
+        bypass ? 0 : (SNAP_THRESHOLD_PX * duration) / Math.max(1, current.width)
+      ).time
     );
   const metrics = reviewTrackMetrics(props.compact);
   const visible = preview ?? range;
@@ -96,6 +104,8 @@ export function ReviewWebcamHiddenMarker(props: {
     <div
       data-ui="gallery.videoReview.webcamHiddenMarker"
       data-review-removal-key={`webcam-hidden:${id}`}
+      data-review-snap-start={visible.start}
+      data-review-snap-end={visible.end}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
       className={
@@ -159,14 +169,14 @@ export function ReviewWebcamHiddenMarker(props: {
             event.stopPropagation();
             const current = drag.current;
             if (!current || current.pointerId !== event.pointerId) return;
-            current.next = dragPosition(current, event.clientX);
+            current.next = dragPosition(current, event.clientX, event.altKey);
             setPreview(current.next);
           }}
           onPointerUp={(event) => {
             event.stopPropagation();
             const current = drag.current;
             if (!current || current.pointerId !== event.pointerId) return;
-            current.next = dragPosition(current, event.clientX);
+            current.next = dragPosition(current, event.clientX, event.altKey);
             drag.current = null;
             if (current.node.hasPointerCapture(current.pointerId))
               current.node.releasePointerCapture(current.pointerId);
@@ -207,9 +217,7 @@ export function ReviewWebcamHiddenMarker(props: {
               });
             }
           }}
-        >
-          <span className="h-4 w-px bg-current opacity-60" />
-        </button>
+        ></button>
       ))}
     </div>
   );

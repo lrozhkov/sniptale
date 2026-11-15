@@ -1,3 +1,4 @@
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { test, expect, type Page } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
@@ -12,17 +13,16 @@ import {
 import { createVideoProjectMotionRegion } from '../../../../apps/extension/src/features/video/project/motion';
 import { bindMotionRegionToClip } from '../../../../apps/extension/src/features/video/project/motion/source-binding';
 import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
-import { parseHydratableVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
+import {
+  isValidVideoProject,
+  parseHydratableVideoProject,
+} from '../../../../apps/extension/src/features/video/project/validation/root';
 import { resolveVideoCompositionRenderPasses } from '../../../../apps/extension/src/features/video/composition/timeline/render';
 import { mapCompositionPointThroughCamera } from '../../../../apps/extension/src/features/video/composition/motion';
 import { readNativeVideoProject } from '../support/native-video-project';
 import { encodedNativeVideoSamples } from '../support/native-video-export-proof';
 import { checkInspectorPaintedFont } from '../support/inspector-utilities';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
-import {
-  EFFECT_BUNDLE_CORPUS,
-  readEffectBundleCorpusArchive,
-} from '../../support/effect-v1-corpus.test-support';
 import { resourcePresetBundle } from './extension-critical-video-editor-resource-bundle.fixture';
 import { startHostServer } from '../support/host-server';
 import {
@@ -45,10 +45,9 @@ for (const variant of [
       const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
       await page.setViewportSize({ width, height });
       await page.emulateMedia({ colorScheme: theme });
-      await page.addInitScript(
-        (value) => localStorage.setItem('sniptale-locale-preference', value),
-        locale
-      );
+      await page.addInitScript((value) => {
+        if (window === window.top) localStorage.setItem('sniptale-locale-preference', value);
+      }, locale);
       const host = await startHostServer();
       try {
         const storage = {
@@ -89,10 +88,7 @@ for (const variant of [
             .click();
         await open();
         const dock = page.locator('[data-ui="video-editor.effects-library.dock"]');
-        const specimen = EFFECT_BUNDLE_CORPUS.find(
-          (item) => item.accepted && item.artifact.includes('asset-bearing-conformance')
-        );
-        if (!specimen) throw new Error('Missing SDK resource corpus');
+        await page.locator('[data-ui="video-editor.library-tab.annotations"]').click();
         const chooser = page.waitForEvent('filechooser');
         await dock
           .getByRole('button', {
@@ -103,9 +99,9 @@ for (const variant of [
         await (
           await chooser
         ).setFiles({
-          name: 'resource.sniptale-bundle.zip',
+          name: 'resource.sniptale-animations.zip',
           mimeType: 'application/zip',
-          buffer: await resourcePresetBundle(readEffectBundleCorpusArchive(specimen)),
+          buffer: await resourcePresetBundle(),
         });
         for (const style of [
           locale === 'en' ? 'Bright' : 'Светлый',
@@ -143,9 +139,14 @@ for (const variant of [
         );
         const project = parseHydratableVideoProject({
           ...imported,
-          version: 44,
+          version: 52,
           id: crypto.randomUUID(),
           name: 'Two content resources',
+          effectInstances: imported.effectInstances?.map((instance) => ({
+            ...instance,
+            startTime: 0,
+            duration: 2,
+          })),
           fps: 40,
           tracks: imported.tracks,
           clips: imported.clips.map((clip) => {
@@ -190,7 +191,8 @@ for (const variant of [
           ],
         });
         if (!project) throw new Error('Invalid admitted two-layer baseline');
-        // The recording and SVGs were imported above. Only geometry/camera are an admitted baseline.
+        expect(isValidVideoProject(project)).toBe(true);
+        // The recording and embedded images were imported above. Only geometry/camera are an admitted baseline.
         await applyHarnessBootstrap(page, { preserveMediaLibrary: true, storage });
         await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
         const normalized = hydrateVideoProject(project);
@@ -206,7 +208,7 @@ for (const variant of [
           name: locale === 'en' ? 'Intensity' : 'Интенсивность',
           exact: true,
         });
-        await intensity.fill('0.65');
+        await intensity.fill('65');
         await intensity.press('Enter');
         await expect
           .poll(
@@ -215,7 +217,7 @@ for (const variant of [
                 (instance) => instance.id === selected.effectInstanceId
               )?.controls['intensity']
           )
-          .toBe(0.65);
+          .toBe(65);
         await checkInspectorPaintedFont(page, intensity, 'two-resource-intensity');
         const saved = (await readNativeVideoProject(page))!;
         await page.reload();
@@ -228,7 +230,12 @@ for (const variant of [
         expect(passes.visualPasses).toHaveLength(5);
         for (const pass of passes.visualPasses) {
           expect(pass.frame.effectRuntimePlans).toHaveLength(2);
-          for (const plan of pass.frame.effectRuntimePlans!) expect(plan.assets).toHaveLength(1);
+          for (const plan of pass.frame.effectRuntimePlans!) {
+            expect(plan.assets).toHaveLength(0);
+            expect(
+              parseAnimationTemplateSource(plan.documentSource).template?.resources
+            ).toHaveLength(1);
+          }
         }
         const points = bodies.map((_body, index) =>
           mapCompositionPointThroughCamera(

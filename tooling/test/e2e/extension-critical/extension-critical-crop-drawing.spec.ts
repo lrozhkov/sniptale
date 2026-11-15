@@ -547,7 +547,7 @@ for (const { size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
         await expect(options).toBeVisible();
         await expect(pencil).toHaveAttribute('data-menu-side', 'up');
         expect((await options.boundingBox())!.y).toBeLessThan((await toolbar.boundingBox())!.y);
-        await options.locator('button[title="#f97316"]').click();
+        await options.locator('button[title="#ff7f50"]').click();
         await pencil.click();
         await stroke(page, { x: 450, y: 300 }, { x: 870, y: 300 });
         expect(await frame.boundingBox()).toEqual(originalFrame);

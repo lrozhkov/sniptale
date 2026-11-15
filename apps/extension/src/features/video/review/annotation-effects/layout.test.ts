@@ -2,10 +2,13 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  resolveEffectV1ControlDefault,
-  resolveEffectV1ObjectRenderBounds,
-  validateEffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
+  resolveAnimationObjectRenderBounds,
+  validateAnimationTemplate,
+} from '@sniptale/runtime-contracts/animation-template';
+import {
+  parseEffectControlValues,
+  resolveEffectControlDefault,
+} from '@sniptale/runtime-contracts/effect-controls';
 import { quickEditPlaneProjection } from '../../composition/motion/spatial-geometry';
 import {
   initializeReviewAnnotationEffectAnchors,
@@ -13,6 +16,7 @@ import {
   resolveReviewAnnotationEffectBox,
   resolveReviewAnnotationEffectControls,
   transformReviewAnnotationEffectAttachment,
+  transformReviewAnnotationAnchors,
 } from './layout';
 import type { ReviewAnnotationEffect } from './types';
 
@@ -21,25 +25,27 @@ const transform = { x: 0.2, y: 0.3, width: 0.3, height: 0.12, rotation: 0.1 };
 function builtin(name: string) {
   const raw: unknown = JSON.parse(
     readFileSync(
-      resolve(
-        'apps/extension/public/video-effects/effects/annotations',
-        `sniptale-${name}/effect.sniptale-effect.json`
-      ),
+      name === 'callout'
+        ? 'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
+        : resolve(
+            'apps/extension/public/video-effects/animations',
+            `${name}.sniptale-animation.json`
+          ),
       'utf8'
     )
   );
-  const result = validateEffectV1Document(raw);
-  if (!result.ok || !result.document) throw Error('Invalid test fixture');
-  return result.document;
+  const result = validateAnimationTemplate(raw);
+  if (!result.ok || !result.template) throw Error('Invalid test fixture');
+  return result.template;
 }
 
 describe('annotation canonical geometry', () => {
-  it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners'])(
+  it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners', 'arrow'])(
     'uses the declared geometry and controls for %s',
     (name) => {
       const document = builtin(name);
       const controls = Object.fromEntries(
-        document.controls.map((c) => [c.id, resolveEffectV1ControlDefault(c, 'ru')])
+        document.controls.map((c) => [c.id, resolveEffectControlDefault(c, 'ru')])
       );
       const anchors = initializeReviewAnnotationEffectAnchors(document, transform, controls, plane);
       const annotation: ReviewAnnotationEffect = {
@@ -60,9 +66,7 @@ describe('annotation canonical geometry', () => {
         expect(resolved[h.xControl]).toBeCloseTo(Number(controls[h.xControl]));
         expect(resolved[h.yControl]).toBeCloseTo(Number(controls[h.yControl]));
       }
-      expect(
-        resolveEffectV1ObjectRenderBounds(document.objectLayout!, resolved).width
-      ).toBeGreaterThan(0);
+      expect(resolveAnimationObjectRenderBounds(document, resolved).width).toBeGreaterThan(0);
       expect(resolveReviewAnnotationEffectBox(transform, plane)).toMatchObject({
         x: 384,
         y: 324,
@@ -75,10 +79,10 @@ describe('annotation canonical geometry', () => {
     const document = builtin('callout'),
       h = document.objectLayout!.handles![0]!;
     const controls = Object.fromEntries(
-      document.controls.map((c) => [c.id, resolveEffectV1ControlDefault(c, 'en')])
+      document.controls.map((c) => [c.id, resolveEffectControlDefault(c, 'en')])
     );
-    controls[h.xControl] = document.objectLayout!.width * 2;
-    controls[h.yControl] = -document.objectLayout!.height;
+    controls[h.xControl] = document.animation.w * 2;
+    controls[h.yControl] = -document.animation.h;
     const anchors = initializeReviewAnnotationEffectAnchors(document, transform, controls, plane)!;
     const instance: ReviewAnnotationEffect = {
       id: 'callout',
@@ -96,9 +100,9 @@ describe('annotation canonical geometry', () => {
     const resolved = resolveReviewAnnotationEffectControls(document, moved, plane);
     expect(moved.anchors).toBe(anchors);
     expect(resolved[h.xControl]).not.toBe(controls[h.xControl]);
-    expect(
-      resolveEffectV1ObjectRenderBounds(document.objectLayout!, resolved).width
-    ).toBeGreaterThan(document.objectLayout!.width);
+    expect(resolveAnimationObjectRenderBounds(document, resolved).width).toBeGreaterThan(
+      document.animation.w
+    );
     const { anchors: _anchors, ...withoutAnchors } = instance;
     expect(() => resolveReviewAnnotationEffectControls(document, withoutAnchors, plane)).toThrow(
       'Missing annotation anchor'
@@ -185,4 +189,93 @@ it.each([
   ['outside-bounds', [1e9, 0, 0, 0, 1e9, 0, 0, 0, 1]],
 ] as const)('rejects %s without clamping or manufacturing a flattened body', (_reason, mapping) => {
   expect(transformReviewAnnotationEffectAttachment(transform, plane, plane, mapping)).toBeNull();
+});
+
+it('carries all arrow anchors through whole-object transforms without changing local controls', () => {
+  const document = builtin('arrow');
+  const controls = Object.fromEntries(
+    document.controls.map((control) => [control.id, resolveEffectControlDefault(control, 'en')])
+  );
+  const anchors = initializeReviewAnnotationEffectAnchors(document, transform, controls, plane);
+  if (!anchors) throw new Error('Arrow anchors unavailable');
+  const original: ReviewAnnotationEffect = {
+    id: 'arrow',
+    snapshotId: 'source',
+    enabled: true,
+    start: 0,
+    end: 5,
+    order: 0,
+    attachment: 'content',
+    transform,
+    controls,
+    anchors,
+  };
+  const serialized = JSON.stringify(original);
+  const before = resolveReviewAnnotationEffectControls(document, original, plane);
+  for (const next of [
+    { ...transform, x: transform.x + 0.1, y: transform.y - 0.05 },
+    { ...transform, width: transform.width * 1.4, height: transform.height * 1.4 },
+    { ...transform, rotation: transform.rotation + 0.8 },
+  ]) {
+    const moved = transformReviewAnnotationAnchors(original, next, plane);
+    if (!moved) throw new Error('Transformed anchors unavailable');
+    const values = resolveReviewAnnotationEffectControls(
+      document,
+      { ...original, transform: next, anchors: moved },
+      plane
+    );
+    for (const handle of document.objectLayout?.handles ?? []) {
+      expect(values[handle.xControl]).toBeCloseTo(Number(before[handle.xControl]), 8);
+      expect(values[handle.yControl]).toBeCloseTo(Number(before[handle.yControl]), 8);
+    }
+  }
+  expect(JSON.stringify(original)).toBe(serialized);
+});
+
+it.each(['leader-labels', 'arrow'])(
+  'keeps the attached %s label outside the authored artboard',
+  (name) => {
+    const document = builtin(name);
+    const controls = Object.fromEntries(
+      document.controls.map((c) => [c.id, resolveEffectControlDefault(c, 'ru')])
+    );
+    const binding = document.bindings.find(
+      (b) => b.kind === 'vector' && b.slot === 'labelPosition'
+    );
+    if (binding?.kind !== 'vector') throw new Error('Missing label fixture binding');
+    controls[binding.xControl] = 950;
+    controls[binding.yControl] = -400;
+    controls['title'] = 'Подпись полностью за пределами исходного холста';
+    const bounds = resolveAnimationObjectRenderBounds(document, controls);
+    // The old fixed 96px handle padding cuts both this text and the arrow label panel.
+    expect(bounds.x + bounds.width).toBeGreaterThan(1200);
+    expect(bounds.y).toBeLessThan(-420);
+    expect(bounds.y + bounds.height).toBeGreaterThanOrEqual(document.animation.h);
+    const unchanged = resolveAnimationObjectRenderBounds(document, { ...controls });
+    expect(unchanged).toEqual(bounds);
+  }
+);
+
+it('recovers persisted arrow anchors outside template controls without rewriting them', () => {
+  const document = builtin('arrow'),
+    controls = Object.fromEntries(
+      document.controls.map((c) => [c.id, resolveEffectControlDefault(c, 'en')])
+    );
+  const anchors = initializeReviewAnnotationEffectAnchors(document, transform, controls, plane)!;
+  const instance: ReviewAnnotationEffect = {
+    id: 'legacy-arrow',
+    snapshotId: 'snapshot',
+    enabled: true,
+    start: 130,
+    end: 140,
+    attachment: 'content',
+    transform,
+    controls,
+    anchors: { ...anchors, start: { x: 8, y: -8 } },
+    order: 0,
+  };
+  const before = structuredClone(instance);
+  const resolved = resolveReviewAnnotationEffectControls(document, instance, plane);
+  expect(parseEffectControlValues(document, resolved)).not.toBeNull();
+  expect(instance).toEqual(before);
 });

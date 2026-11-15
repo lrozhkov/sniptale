@@ -205,7 +205,7 @@ it('grows below the cap without enabling list scrolling and only scrolls after h
   renderExpandedPanel(['layer-1']);
 
   expect(getPanelFrame()?.style.height).toBe('157px');
-  expectLastListViewport({ reserveScrollbarGutter: true, scrollable: false });
+  expectLastListViewport({ reserveScrollbarGutter: false, scrollable: false });
 
   setMediumLayerMetrics();
   renderExpandedPanel(['layer-1', 'layer-2']);
@@ -307,4 +307,25 @@ it('restores the workspace list offset, records native scrolling and releases th
   expect(
     container!.querySelector<HTMLDivElement>('[data-ui="editor.layers.list-viewport"]')!.scrollTop
   ).toBe(90);
+});
+
+it('does not restore an unchanged scroll offset when a new layer and callback arrive', () => {
+  setOverflowLayerMetrics();
+  renderExpandedPanel(['a', 'b', 'c'], { initialScrollOffset: 64, onScrollOffsetChange: vi.fn() });
+  const list = container!.querySelector<HTMLDivElement>('[data-ui="editor.layers.list-viewport"]')!;
+  const write = vi.fn();
+  Object.defineProperty(list, 'scrollTop', { configurable: true, get: () => 64, set: write });
+  const remember = vi.fn();
+  renderExpandedPanel(['a', 'b', 'c', 'd'], {
+    initialScrollOffset: 64,
+    onScrollOffsetChange: remember,
+  });
+  expect(write).not.toHaveBeenCalled();
+  act(() => list.dispatchEvent(new Event('scroll')));
+  expect(remember).toHaveBeenCalledWith(64);
+  renderExpandedPanel(['a', 'b', 'c', 'd'], {
+    initialScrollOffset: 90,
+    onScrollOffsetChange: remember,
+  });
+  expect(write).toHaveBeenCalledWith(90);
 });

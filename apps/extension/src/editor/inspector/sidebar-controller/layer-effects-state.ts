@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { findLayerEffectsTarget } from '../layer-effects/helpers';
 import type { EditorLayerEffectCategory } from '../../../features/editor/document/effects';
 import type {
   EditorLayerItem,
@@ -27,14 +28,14 @@ function resolveFallbackLayerId(
   selection: EditorSelectionState,
   currentLayerId: string | null
 ): string | null {
-  if (currentLayerId && layers.some((layer) => layer.id === currentLayerId)) {
+  if (currentLayerId && findLayerEffectsTarget(layers, currentLayerId)) {
     return currentLayerId;
   }
 
   if (
     selection.selectedObjectCount === 1 &&
     selection.selectedObjectId &&
-    layers.some((layer) => layer.id === selection.selectedObjectId)
+    findLayerEffectsTarget(layers, selection.selectedObjectId)
   ) {
     return selection.selectedObjectId;
   }
@@ -51,7 +52,7 @@ function isCurrentSingleLayerSelection(
     layerId !== null &&
     selection.selectedObjectCount === 1 &&
     selection.selectedObjectId === layerId &&
-    layers.some((layer) => layer.id === layerId)
+    findLayerEffectsTarget(layers, layerId) !== null
   );
 }
 
@@ -66,7 +67,7 @@ export function useEditorInspectorLayerEffectsState(args: UseEditorInspectorLaye
   const [state, setState] = useState(DEFAULT_EDITOR_LAYER_EFFECTS_STATE);
 
   useEffect(() => {
-    if (inspector === 'layer-effects' && state.layerId) {
+    if (inspector === 'layer-effects') {
       return;
     }
 
@@ -87,17 +88,15 @@ export function useEditorInspectorLayerEffectsState(args: UseEditorInspectorLaye
       return;
     }
 
-    if (state.layerId === null) {
-      return;
-    }
-
     if (isCurrentSingleLayerSelection(layers, selection, state.layerId)) {
       return;
     }
 
     const selectedId = selection.selectedObjectCount === 1 ? selection.selectedObjectId : null;
-    if (selectedId && layers.some((layer) => layer.id === selectedId)) {
+    if (selectedId && findLayerEffectsTarget(layers, selectedId)) {
       setState((current) => ({ ...current, layerId: selectedId }));
+    } else if (state.layerId && !findLayerEffectsTarget(layers, state.layerId)) {
+      setState((current) => ({ ...current, layerId: null }));
     }
   }, [inspector, layers, selection, state.layerId]);
 

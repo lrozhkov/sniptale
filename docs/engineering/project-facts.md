@@ -7,7 +7,7 @@ This file projects changeable values and inventories from their existing machine
 | --- | --- | --- |
 | Product version | `0.5.2` | `package.json#/version` |
 | Minimum Chrome version | `148` | `apps/extension/manifest.json#/minimum_chrome_version` |
-| Persistence database version | `53` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
+| Persistence database version | `61` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
 | Security reporting | .github/SECURITY.md and GitHub private vulnerability reporting | `tooling/configs/ci/github-policy.json#/security/privateVulnerabilityReporting` |
 | Immutable GitHub Releases | `true` | `tooling/configs/ci/github-policy.json#/security/immutableReleases` |
 | Required GitHub checks | `pr-gate` | `tooling/configs/ci/github-policy.json#/ruleset` |
@@ -39,12 +39,14 @@ This inventory is projected from the live source tree. It is navigation data, no
 
 - `apps/extension/src/composition/archive-transfer`
 - `apps/extension/src/composition/audio-library`
+- `apps/extension/src/composition/audio-preset-resources`
 - `apps/extension/src/composition/audio-recording`
 - `apps/extension/src/composition/background-resources`
 - `apps/extension/src/composition/editor-resource-admission.test.tsx`
 - `apps/extension/src/composition/editor-resource-admission.tsx`
 - `apps/extension/src/composition/frame-annotation-controls`
 - `apps/extension/src/composition/frame-annotation-raster-client`
+- `apps/extension/src/composition/gl-transition-presets`
 - `apps/extension/src/composition/gradient-preset-resources`
 - `apps/extension/src/composition/inspector-disclosures`
 - `apps/extension/src/composition/library-preview`
@@ -53,6 +55,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/persistence/annotation-template-tags`
 - `apps/extension/src/composition/persistence/asset-publication-recovery`
 - `apps/extension/src/composition/persistence/assets`
+- `apps/extension/src/composition/persistence/audio-presets`
 - `apps/extension/src/composition/persistence/background-presets`
 - `apps/extension/src/composition/persistence/callout-presets`
 - `apps/extension/src/composition/persistence/capture-settings`
@@ -99,6 +102,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/persistence/surface-style-presets`
 - `apps/extension/src/composition/persistence/sync-capture`
 - `apps/extension/src/composition/persistence/sync-catalog`
+- `apps/extension/src/composition/persistence/vector-elements`
 - `apps/extension/src/composition/persistence/video-editor-preview-preferences`
 - `apps/extension/src/composition/persistence/video-preview-cache`
 - `apps/extension/src/composition/persistence/voice-input-history`
@@ -135,6 +139,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/features/editor-history`
 - `apps/extension/src/features/file-naming`
 - `apps/extension/src/features/highlighter`
+- `apps/extension/src/features/image-filters`
 - `apps/extension/src/features/keyboard-shortcuts`
 - `apps/extension/src/features/media-hub`
 - `apps/extension/src/features/prompt-templates`
@@ -179,6 +184,10 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/effect-catalog.css`
 - `apps/extension/src/ui/effect-control-presentation`
 - `apps/extension/src/ui/focus-appearance`
+- `apps/extension/src/ui/gl-transition-choices.test.ts`
+- `apps/extension/src/ui/gl-transition-choices.ts`
+- `apps/extension/src/ui/gl-transition-fields.test.tsx`
+- `apps/extension/src/ui/gl-transition-fields.tsx`
 - `apps/extension/src/ui/glass-select`
 - `apps/extension/src/ui/gradient-preset-grid`
 - `apps/extension/src/ui/highlighter-preset-editor`
@@ -202,6 +211,8 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/recording-camera-controls.tsx`
 - `apps/extension/src/ui/recording-icon.test.tsx`
 - `apps/extension/src/ui/recording-icon.tsx`
+- `apps/extension/src/ui/source-image-filter-fields.test.tsx`
+- `apps/extension/src/ui/source-image-filter-fields.tsx`
 - `apps/extension/src/ui/surface-style-selector`
 - `apps/extension/src/ui/sync-cache-feedback.tsx`
 - `apps/extension/src/ui/text-document.test.tsx`
@@ -228,6 +239,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/workflows/settings-transfer`
 - `apps/extension/src/workflows/simplify`
 - `apps/extension/src/workflows/sync-transfer`
+- `apps/extension/src/workflows/vector-catalog`
 - `apps/extension/src/workflows/video`
 - `apps/extension/src/workflows/video-review`
 - `apps/extension/src/workflows/voice-input`
@@ -322,6 +334,7 @@ The ownership, justification, failure behavior, disclosure key, web-accessible r
 - `apps/extension/src/background/simplify/route.ts`
 - `apps/extension/src/background/sync-connection/product-route.ts`
 - `apps/extension/src/background/sync-connection/route.ts`
+- `apps/extension/src/background/vector-catalog/route.ts`
 - `apps/extension/src/background/voice-input/route.ts`
 
 The route registry remains the semantic authority for handler, authorization, policy-state, failure-shape, and mutation ownership. This projection is navigation aid only.

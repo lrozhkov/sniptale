@@ -18,7 +18,7 @@ const flush = async () => {
   await Promise.resolve();
   await Promise.resolve();
 };
-function fixture(allowPreparedPlayingFrames = false, maximumInFlight: 1 | 2 = 1) {
+function fixture(allowPreparedPlayingFrames = false, maximumInFlight: 1 | 2 = 1, coalesce = false) {
   let time = 0;
   let id = 0;
   const ticks = new Map<number, () => void>();
@@ -34,6 +34,12 @@ function fixture(allowPreparedPlayingFrames = false, maximumInFlight: 1 | 2 = 1)
   const completed = lease('completed');
   const publishTimes: number[] = [];
   const dependencies = {
+    ...(coalesce
+      ? {
+          canCoalesceInteraction: (left: string, right: string) =>
+            left.startsWith('drag:') && right.startsWith('drag:'),
+        }
+      : {}),
     allowPreparedPlayingFrames,
     maximumInFlight: () => maximumInFlight,
     requestTick: (callback: () => void) => {
@@ -724,3 +730,68 @@ it('keeps cold scene preparation single until its first frame has published', as
   expect(f.dependencies.publish).toHaveBeenCalledOnce();
   f.scheduler.dispose();
 });
+
+it('finishes a compatible paused gesture frame before preparing only the latest pending position', async () => {
+  const f = fixture(false, 1, true);
+  const wait = deferred<typeof f.prepared>();
+  f.dependencies.prepare.mockImplementationOnce(() => wait.promise);
+  f.scheduler.update({ ...f.state, playing: false, interacting: true, scene: 'drag:1' });
+  await f.step(0);
+  const signal = f.dependencies.prepare.mock.calls[0]![1];
+  f.scheduler.update({
+    ...f.state,
+    playing: false,
+    interacting: true,
+    generation: '2',
+    scene: 'drag:2',
+  });
+  f.scheduler.update({
+    ...f.state,
+    playing: false,
+    interacting: true,
+    generation: '3',
+    scene: 'drag:3',
+  });
+  await f.step(50);
+  expect(signal.aborted).toBe(false);
+  wait.resolve(f.prepared);
+  await flush();
+  await flush();
+  expect(f.dependencies.publish).toHaveBeenCalledOnce();
+  expect(f.dependencies.prepare).toHaveBeenCalledOnce();
+  await f.step(100);
+  expect(f.dependencies.prepare.mock.calls.at(-1)![0]).toMatchObject({
+    scene: 'drag:3',
+    generation: '3',
+  });
+  expect(f.dependencies.publish).toHaveBeenCalledTimes(2);
+  f.scheduler.dispose();
+});
+
+it.each(['seek', 'end', 'scene'] as const)(
+  'still cancels an interacting frame after incompatible %s',
+  async (change) => {
+    const f = fixture(false, 1, true),
+      wait = deferred<typeof f.prepared>();
+    f.dependencies.prepare.mockImplementationOnce(() => wait.promise);
+    const initial = { ...f.state, playing: false, interacting: true, scene: 'drag:1' };
+    f.scheduler.update(initial);
+    await f.step(0);
+    const signal = f.dependencies.prepare.mock.calls[0]![1];
+    f.scheduler.update({
+      ...initial,
+      generation: '2',
+      ...(change === 'seek'
+        ? { pausedTime: 2 }
+        : change === 'end'
+          ? { interacting: false }
+          : { scene: 'replacement' }),
+    });
+    expect(signal.aborted).toBe(true);
+    wait.resolve(f.prepared);
+    await flush();
+    await flush();
+    expect(f.dependencies.publish).not.toHaveBeenCalled();
+    f.scheduler.dispose();
+  }
+);

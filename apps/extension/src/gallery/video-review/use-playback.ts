@@ -1,3 +1,5 @@
+import { useReviewFreezePlayback } from './use-freeze-playback';
+import { createReviewPlaybackPresentationClock } from './playback-presentation-clock';
 import {
   createReviewPlaybackRange,
   reviewPlaybackRangeStart,
@@ -5,7 +7,7 @@ import {
   type ReviewPlaybackRange,
 } from './playback-range';
 import { originalAudioGainAt } from '../../features/video/review/advanced/original-audio';
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { startTransition, useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { useReviewPlaybackRecovery } from './use-playback-recovery';
 import type { ReviewEdit } from '../../features/video/review/types';
 import type { QuickEditOriginalAudio } from '../../features/video/review/advanced/types';
@@ -17,6 +19,10 @@ interface ReviewPlaybackProps {
   boundaries(): readonly number[] | undefined;
   onSeek(value: number): void;
   onFailure(): void;
+  /** A real seek/loop holds its media clock until dependent audio is ready. */
+  prepareAfterSeek?: (() => Promise<boolean>) | undefined;
+  /** Starts prepared audio on the same native transport command, before React reports playing. */
+  onPreparedPlay?: (() => void) | undefined;
   onRecovered?: (() => void) | undefined;
   onInvalidRange?: (() => void) | undefined;
   original: QuickEditOriginalAudio;
@@ -25,16 +31,76 @@ interface ReviewPlaybackProps {
 }
 
 /** Owns source-time playback; the persisted original-audio gate and rate live here. */
-export function useReviewPlayback(props: ReviewPlaybackProps) {
+function useReviewSourcePlayback(props: ReviewPlaybackProps) {
   const video = useRef<HTMLVideoElement>(null);
+  const [playheadClock] = useState(() =>
+    createReviewPlaybackPresentationClock(
+      () => !!video.current && !video.current.paused && !video.current.error
+    )
+  );
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const latest = useRef(props);
   latest.current = props;
-  const publishTime = useCallback((value: number) => {
-    // Browser media clocks can round the terminal timestamp beyond the project endpoint.
-    if (Number.isFinite(value)) setTime(Math.max(0, Math.min(latest.current.duration, value)));
-  }, []);
+  const pendingResume = useRef<{ node: HTMLVideoElement; source: string } | null>(null);
+  const [resumeRevision, requestResume] = useState(0);
+  const prepareAfterSeek = (node: HTMLVideoElement) => {
+    if (!latest.current.prepareAfterSeek) return false;
+    node.pause();
+    setPlaying(false);
+    pendingResume.current = { node, source: node.currentSrc };
+    requestResume((revision) => revision + 1);
+    return true;
+  };
+  useEffect(() => {
+    const request = pendingResume.current;
+    if (!request) return;
+    let active = true;
+    const current = () =>
+      active &&
+      pendingResume.current === request &&
+      video.current === request.node &&
+      request.node.currentSrc === request.source;
+    // All audio consumers must first commit the new seek revision and paused state.
+    queueMicrotask(() => {
+      if (!current()) return;
+      void Promise.resolve()
+        .then(() => latest.current.prepareAfterSeek?.() ?? true)
+        .then(async (ready) => {
+          if (!current()) return;
+          if (!ready) {
+            pendingResume.current = null;
+            return;
+          }
+          latest.current.onPreparedPlay?.();
+          await request.node.play();
+          if (current()) {
+            pendingResume.current = null;
+            latest.current.onRecovered?.();
+          }
+        })
+        .catch(() => {
+          if (current()) {
+            pendingResume.current = null;
+            latest.current.onFailure();
+          }
+        });
+    });
+    return () => {
+      active = false;
+      if (pendingResume.current === request) pendingResume.current = null;
+    };
+  }, [resumeRevision]);
+  const publishTime = useCallback(
+    (value: number) => {
+      // Browser media clocks can round the terminal timestamp beyond the project endpoint.
+      if (!Number.isFinite(value)) return;
+      const time = Math.max(0, Math.min(latest.current.duration, value));
+      playheadClock.publish(time);
+      setTime(time);
+    },
+    [playheadClock]
+  );
   const presentation = useRef<{ source: string; active: boolean } | null>(null);
   const setPresentationActive = useCallback((source: string, active: boolean) => {
     if (active) presentation.current = { source, active };
@@ -52,7 +118,8 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
         !Number.isFinite(value)
       )
         return;
-      publishTime(value);
+      // Observed playback time must yield to frame preparation and direct editor commands.
+      startTransition(() => publishTime(value));
     },
     [publishTime]
   );
@@ -95,6 +162,7 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
     if (effective.looped || restoreSource) reviseSeek((revision) => revision + 1);
     if (node) {
       if (restoreSource) node.currentTime = next;
+      if (effective.looped && !node.paused) prepareAfterSeek(node);
       applyReviewPlaybackSample(node, effective, value, latest.current);
     }
     if (
@@ -132,13 +200,18 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
   }, [audioSettingsKey, props.duration]);
   usePlaybackFrames(playing, video, tick);
   const seekSource = (value: number) => {
+    const node = video.current;
+    const resume = !!node && (!node.paused || pendingResume.current !== null);
+    pendingResume.current = null;
     if (recovery.seek(value)) publishTime(value);
     else if (video.current) video.current.currentTime = value;
     reviseSeek((revision) => revision + 1);
     synchronize(value, false);
     props.onSeek(value);
+    if (resume && node) prepareAfterSeek(node);
   };
   return {
+    playheadClock,
     video,
     recovering: recovery.recovering,
     time,
@@ -172,7 +245,8 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
         video.current.currentTime = start;
         reviseSeek((revision) => revision + 1);
         synchronize(start, true);
-        void video.current.play().catch(() => props.onFailure());
+        if (!prepareAfterSeek(video.current))
+          void video.current.play().catch(() => props.onFailure());
       } else {
         if (video.current) publishTime(video.current.currentTime);
         setPlaying(false);
@@ -190,6 +264,7 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
       seekSource(next);
     },
     play: () => {
+      pendingResume.current = null;
       const node = video.current;
       if (!node) return;
       if (recovery.retry()) return;
@@ -197,7 +272,17 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
         if (node.currentTime >= props.duration) node.currentTime = 0;
         synchronize(node.currentTime, true);
         if (node.currentTime >= props.duration) return;
-        void node.play().catch(() => props.onFailure());
+        const source = node.currentSrc;
+        latest.current.onPreparedPlay?.();
+        void node.play().then(
+          () => {
+            if (video.current === node && node.currentSrc === source)
+              latest.current.onRecovered?.();
+          },
+          () => {
+            if (video.current === node && node.currentSrc === source) latest.current.onFailure();
+          }
+        );
       } else node.pause();
     },
   };
@@ -247,4 +332,9 @@ function usePlaybackFrames(
       node?.removeEventListener('pause', paused);
     };
   }, [playing, video, tick]);
+}
+
+/** One source transport with an explicit clock for inserted hold intervals. */
+export function useReviewPlayback(props: ReviewPlaybackProps) {
+  return useReviewFreezePlayback(useReviewSourcePlayback(props), props.edits, props.duration);
 }

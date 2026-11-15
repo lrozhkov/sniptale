@@ -1,5 +1,14 @@
 import { isComposedEventWithinElement } from '../dom-events';
-import { createContext, useEffect, useRef, useState, type ButtonHTMLAttributes } from 'react';
+import {
+  createContext,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+} from 'react';
 
 /** Enables the native command press cycle for a migrated surface and its portals. */
 export const CommandPressScope = createContext(false);
@@ -23,6 +32,11 @@ export function useCommandPress({
   enabled = true,
   ...handlers
 }: ButtonHandlers & { disabled?: boolean | undefined; enabled?: boolean | undefined }) {
+  const committed = useRef({ disabled, handlers });
+  useLayoutEffect(() => {
+    // Native events use committed commands, including while a newer render is suspended.
+    committed.current = { disabled, handlers };
+  });
   const [held, setHeld] = useState(false);
   const [pressed, setPressed] = useState(false);
   const source = useRef<'pointer' | 'space' | 'enter' | null>(null);
@@ -31,21 +45,21 @@ export function useCommandPress({
   const canceledSpace = useRef(false);
   const pointerId = useRef<number | null>(null);
 
-  const release = () => {
+  const release = useCallback(() => {
     source.current = null;
     pointerId.current = null;
     setHeld(false);
     setPressed(false);
-  };
-  const cancel = () => {
+  }, []);
+  const cancel = useCallback(() => {
     if (source.current === 'pointer') canceledPointer.current = true;
     if (source.current === 'space') canceledSpace.current = true;
     release();
-  };
+  }, [release]);
 
   useEffect(() => {
     if (disabled || !enabled) cancel();
-  }, [disabled, enabled]);
+  }, [disabled, enabled, cancel]);
 
   useEffect(() => {
     if (!enabled || !held) return;
@@ -87,84 +101,92 @@ export function useCommandPress({
         localRoot.removeEventListener('keydown', onExternalEscape, true);
       window?.removeEventListener('blur', cancel);
     };
-  }, [held, enabled]);
+  }, [held, enabled, cancel, release]);
 
-  const props: ButtonHandlers = {
-    onPointerDown(event) {
-      handlers.onPointerDown?.(event);
-      if (disabled || event.currentTarget.matches(':disabled') || event.button !== 0) return;
-      button.current = event.currentTarget;
-      source.current = 'pointer';
-      pointerId.current = event.pointerId;
-      canceledPointer.current = false;
-      setHeld(true);
-      setPressed(true);
-    },
-    onPointerEnter(event) {
-      handlers.onPointerEnter?.(event);
-      if (source.current === 'pointer' && event.buttons & 1) setPressed(true);
-    },
-    onPointerLeave(event) {
-      handlers.onPointerLeave?.(event);
-      if (source.current === 'pointer') setPressed(false);
-    },
-    onPointerCancel(event) {
-      handlers.onPointerCancel?.(event);
-      cancel();
-    },
-    onLostPointerCapture(event) {
-      handlers.onLostPointerCapture?.(event);
-      if (source.current === 'pointer') cancel();
-    },
-    onKeyDown(event) {
-      handlers.onKeyDown?.(event);
-      if (event.key === 'Escape' && source.current !== null) {
-        event.preventDefault();
-        event.stopPropagation();
+  const props = useMemo<ButtonHandlers>(
+    () => ({
+      onPointerDown(event) {
+        committed.current.handlers.onPointerDown?.(event);
+        if (
+          committed.current.disabled ||
+          event.currentTarget.matches(':disabled') ||
+          event.button !== 0
+        )
+          return;
+        button.current = event.currentTarget;
+        source.current = 'pointer';
+        pointerId.current = event.pointerId;
+        canceledPointer.current = false;
+        setHeld(true);
+        setPressed(true);
+      },
+      onPointerEnter(event) {
+        committed.current.handlers.onPointerEnter?.(event);
+        if (source.current === 'pointer' && event.buttons & 1) setPressed(true);
+      },
+      onPointerLeave(event) {
+        committed.current.handlers.onPointerLeave?.(event);
+        if (source.current === 'pointer') setPressed(false);
+      },
+      onPointerCancel(event) {
+        committed.current.handlers.onPointerCancel?.(event);
         cancel();
-        return;
-      }
-      if (
-        disabled ||
-        event.currentTarget.matches(':disabled') ||
-        event.defaultPrevented ||
-        (event.key !== ' ' && event.key !== 'Enter')
-      )
-        return;
-      if (event.repeat) {
-        if (event.key === 'Enter') event.preventDefault();
-        return;
-      }
-      canceledSpace.current = false;
-      button.current = event.currentTarget;
-      source.current = event.key === ' ' ? 'space' : 'enter';
-      setHeld(true);
-      setPressed(true);
-    },
-    onKeyUp(event) {
-      handlers.onKeyUp?.(event);
-      if (event.key === ' ' && canceledSpace.current) {
-        event.preventDefault();
+      },
+      onLostPointerCapture(event) {
+        committed.current.handlers.onLostPointerCapture?.(event);
+        if (source.current === 'pointer') cancel();
+      },
+      onKeyDown(event) {
+        committed.current.handlers.onKeyDown?.(event);
+        if (event.key === 'Escape' && source.current !== null) {
+          event.preventDefault();
+          event.stopPropagation();
+          cancel();
+          return;
+        }
+        if (
+          committed.current.disabled ||
+          event.currentTarget.matches(':disabled') ||
+          event.defaultPrevented ||
+          (event.key !== ' ' && event.key !== 'Enter')
+        )
+          return;
+        if (event.repeat) {
+          if (event.key === 'Enter') event.preventDefault();
+          return;
+        }
         canceledSpace.current = false;
-      }
-      if (event.key === ' ' || event.key === 'Enter') release();
-    },
-    onBlur(event) {
-      handlers.onBlur?.(event);
-      cancel();
-    },
-    onClick(event) {
-      if (
-        disabled ||
-        event.currentTarget.matches(':disabled') ||
-        (event.detail > 0 && canceledPointer.current)
-      ) {
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-      }
-      handlers.onClick?.(event);
-    },
-  };
+        button.current = event.currentTarget;
+        source.current = event.key === ' ' ? 'space' : 'enter';
+        setHeld(true);
+        setPressed(true);
+      },
+      onKeyUp(event) {
+        committed.current.handlers.onKeyUp?.(event);
+        if (event.key === ' ' && canceledSpace.current) {
+          event.preventDefault();
+          canceledSpace.current = false;
+        }
+        if (event.key === ' ' || event.key === 'Enter') release();
+      },
+      onBlur(event) {
+        committed.current.handlers.onBlur?.(event);
+        cancel();
+      },
+      onClick(event) {
+        if (
+          committed.current.disabled ||
+          event.currentTarget.matches(':disabled') ||
+          (event.detail > 0 && canceledPointer.current)
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        committed.current.handlers.onClick?.(event);
+      },
+    }),
+    [cancel, release]
+  );
   return { pressed: enabled && !disabled && pressed, props: enabled ? props : handlers };
 }

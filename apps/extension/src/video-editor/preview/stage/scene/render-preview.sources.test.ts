@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import * as decoded from '../../../../features/video/composition/draw/decoded-sample';
-import * as visual from './render-visual';
+import * as visual from '../../../../workflows/video/native-composition/render-visual';
 import type { PreviewSourceBinding } from '../../../../workflows/video/preview-source';
 import type { VideoCompositionFrameSource } from '../../../../features/video/composition/draw/media-source';
 import {

@@ -9,11 +9,9 @@ import {
 } from '../../../features/video/project/factories/creation';
 import { createVideoClipFromAsset } from '../../../features/video/project/factories/clip';
 import { VideoProjectAssetType } from '../../../features/video/project/types';
-import { importEffectBundleZip } from '../../../features/video/project/effect-bundle/import/zip';
-import {
-  EFFECT_BUNDLE_CORPUS,
-  readEffectBundleCorpusArchive,
-} from '../../../../../../tooling/test/support/effect-v1-corpus.test-support';
+import { readFileSync } from 'node:fs';
+import { importAnimationArtifactBytes } from '../../../features/video/project/effect-bundle/lottie-profile';
+import * as runtimeAnimation from '../../../contracts/effect-runtime/animation';
 import type { ReviewTextStart, ReviewTextServerMessage } from '../../../contracts/ai/review-text';
 import type { VideoProjectEntry } from '../../../composition/persistence/projects/contracts';
 
@@ -38,35 +36,24 @@ function deferred() {
   return { promise, resolve };
 }
 async function fixture(): Promise<VideoProjectEntry> {
-  const corpus = EFFECT_BUNDLE_CORPUS.find(
-    ({ accepted, artifact }) => accepted && artifact.includes('asset-bearing-conformance')
+  const imported = await importAnimationArtifactBytes(
+    readFileSync('apps/extension/public/video-effects/animations/title.sniptale-animation.json')
   );
-  if (!corpus) throw new Error('Missing asset-bearing corpus');
-  const imported = await importEffectBundleZip(readEffectBundleCorpusArchive(corpus));
-  if (!imported.ok) throw new Error('Invalid fixture bundle');
-  const document = imported.bundle.documents[0]!;
+  if (!imported.ok) throw new Error('Invalid inline resource fixture');
+  const document = imported.documents[0]!;
   const project = createEmptyVideoProject('Text');
-  project.version = 5;
+  project.version = 52;
   project.id = 'project';
   project.updatedAt = 10;
   project.duration = 10;
   project.effectSnapshots = [
     {
-      assets: document.assets.map((asset) => ({
-        blob: new Blob([Uint8Array.from(asset.bytes).buffer], { type: asset.mimeType }),
-        byteLength: asset.byteLength,
-        id: asset.id,
-        kind: asset.kind,
-        mimeType: asset.mimeType,
-        sha256: asset.sha256,
-      })),
-      documentId: document.document.id,
+      assets: [],
+      documentId: document.template.id,
       id: `effect:${document.sha256}`,
-      kind: document.document.kind,
-      retainedByteLength:
-        new TextEncoder().encode(document.source).byteLength +
-        document.assets.reduce((total, asset) => total + asset.byteLength, 0),
-      schemaVersion: 'sniptale.effect.v1',
+      kind: 'standalone',
+      retainedByteLength: Buffer.byteLength(document.source),
+      schemaVersion: 'sniptale.animation.v1',
       sha256: document.sha256,
       source: document.source,
     },
@@ -188,16 +175,18 @@ it.each([
     start.llmSessionToken = token;
     const entered = deferred();
     const release = deferred();
-    const blob = original.project.effectSnapshots![0]!.assets[0]!.blob;
-    const readBytes = blob.arrayBuffer.bind(blob);
+    const actualVerify = runtimeAnimation.verifyRuntimeAnimationSource;
     let integrityReads = 0;
-    vi.spyOn(blob, 'arrayBuffer').mockImplementation(async () => {
-      if (++integrityReads === 3) {
-        entered.resolve();
-        await release.promise;
+    vi.spyOn(runtimeAnimation, 'verifyRuntimeAnimationSource').mockImplementation(
+      async (...args) => {
+        const valid = await actualVerify(...args);
+        if (++integrityReads === 3) {
+          entered.resolve();
+          await release.promise;
+        }
+        return valid;
       }
-      return readBytes();
-    });
+    );
     const config = {
       modelId: 'model',
       providerId: 'provider',

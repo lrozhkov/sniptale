@@ -408,3 +408,22 @@ it('retains feedback after a quiet position save fails and supports explicit ret
   expect(JSON.parse(ctx.saved()).entries).toHaveLength(1);
   expect(JSON.parse(ctx.saved()).position).toEqual({ x: 140, y: 110 });
 });
+
+it('retains a captured preview while only the review comment changes', async () => {
+  const ctx = setup();
+  await ctx.runtime.open();
+  const preview = { dataUrl: 'data:image/png;base64,YQ==', width: 100, height: 50 };
+  ctx.ports.capture.mockResolvedValue(preview);
+  await ctx.runtime.captureCurrent({ kind: 'trusted-content-event' });
+  expect(ctx.ports.capture).toHaveBeenCalledTimes(1);
+  const snapshot = ctx.ports.annotations.captureSnapshot();
+  snapshot.domRecords[0]!.comment = 'An edited comment with spaces';
+  ctx.ports.annotations.applySnapshot(snapshot);
+  ctx.runtime.changed();
+  await ctx.runtime.captureCurrent({ kind: 'trusted-content-event' });
+  expect(ctx.runtime.getSnapshot().records[0]!.record.comment).toBe(
+    'An edited comment with spaces'
+  );
+  expect(ctx.runtime.getSnapshot().records[0]!.preview).toEqual(preview);
+  expect(ctx.ports.capture).toHaveBeenCalledTimes(1);
+});

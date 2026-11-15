@@ -1,3 +1,4 @@
+import { serializeCanvasObjects } from './serialization';
 import { applyEditorDocumentToCanvas } from './apply/orchestrate';
 import { applyPreparedEditorDocumentState } from './lifecycle-helpers';
 import type { ApplyEditorControllerDocumentStateOptions } from './apply-types';
@@ -23,6 +24,17 @@ export async function applyEditorControllerDocumentState(
     ...syncBackgroundLayerPatch,
     rebuildFrameDecorations: options.rebuildFrameDecorations,
   });
+
+  if (options.applyOptions.freshSourceContent) {
+    const sourceObject = options.canvas
+      .getObjects()
+      .find((object) => object.sniptaleRole === 'source');
+    if (sourceObject) sourceObject.sniptaleContentLocked = false;
+    prepared.normalizedDocument = {
+      ...prepared.normalizedDocument,
+      canvasJson: serializeCanvasObjects(options.canvas),
+    };
+  }
 
   applyPreparedEditorDocumentState({
     ...createPreparedEditorDocumentStateOptions({

@@ -106,10 +106,7 @@ export async function buildMediaHubBackupExportPlanFromLibraryV6(
     options,
     admission
   );
-  const effects =
-    options.scope === 'all' || videoProjects.length > 0
-      ? await buildEffectBundleRootInventory(db, paths)
-      : [];
+  const effects = options.scope === 'all' ? await buildEffectBundleRootInventory(db, paths) : [];
   return buildMediaHubBackupExportPlanV6({
     layout: MEDIA_HUB_BACKUP_SHARED_LAYOUT,
     ...(options.scope === 'all' ? { galleryViews: await listGallerySavedViews() } : {}),

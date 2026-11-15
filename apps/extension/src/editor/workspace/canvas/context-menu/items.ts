@@ -23,6 +23,37 @@ function withEllipsis(label: string) {
   return `${label}…`;
 }
 
+function buildVectorClipboardItems(
+  controller: CanvasContextMenuController,
+  onClose: () => void,
+  includeCopy: boolean
+): CanvasContextMenuItem[] {
+  const availability = controller.getVectorClipboardAvailability();
+  if (!availability.canCopy && !availability.canPaste) return [];
+  const action = (kind: 'copy' | 'paste', disabled: boolean) =>
+    withMenuClose(
+      {
+        id: `${kind}-vector-layers`,
+        label: translate(
+          kind === 'copy' ? 'editor.elements.copyLayers' : 'editor.elements.pasteLayers'
+        ),
+        disabled,
+        onSelect: () =>
+          fireAndReportEditorAction(`canvas-context-menu:${kind}-vector-layers`, async () => {
+            const accepted = await (kind === 'copy'
+              ? controller.copyVectorSelection()
+              : controller.pasteVectorSelection());
+            if (!accepted) throw new Error(translate('editor.elements.operationFailed'));
+          }),
+      },
+      onClose
+    );
+  return [
+    ...(includeCopy ? [action('copy', !availability.canCopy)] : []),
+    action('paste', !availability.canPaste),
+  ];
+}
+
 function buildNoImageItems(onOpenImage: () => void, onClose: () => void): CanvasContextMenuItem[] {
   return [
     withMenuClose(
@@ -42,6 +73,7 @@ function buildBlankItems(
   onOpenImage: () => void
 ): CanvasContextMenuItem[] {
   return [
+    ...buildVectorClipboardItems(controller, onClose, false),
     withMenuClose(
       {
         id: 'insert-image',
@@ -65,6 +97,7 @@ function buildMultiItems(
   onClose: () => void
 ): CanvasContextMenuItem[] {
   return [
+    ...buildVectorClipboardItems(controller, onClose, true),
     withMenuClose(
       {
         disabled: !enabledSnapshot.canDuplicate,
@@ -141,6 +174,7 @@ function buildSinglePrimaryItems(
   onClose: () => void
 ): CanvasContextMenuItem[] {
   return [
+    ...buildVectorClipboardItems(controller, onClose, true),
     withMenuClose(
       {
         disabled: !enabledSnapshot.canDuplicate,

@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { Control, Point, Rect } from 'fabric';
+import { Control, Point, Rect, Textbox } from 'fabric';
 import { createFrameAnnotationProxy } from '../../../../frame-annotation/proxy';
 import { EditorCanvas } from '../../../../document/canvas-surface/render-region';
 import type { EditorMagnetManager } from '../../../magnet';
 import { useEditorStore } from '../../../../state/useEditorStore';
 import { patchEdgeControl } from '../../../document/interaction-border-controls';
+import { createEditorDrawingFabricObject } from '../../../../drawing/object/vector';
+import { applyEditorDrawingInteractionControls } from '../../../../drawing/object/controls/apply';
+import { updateEditorDrawingArrowHover } from '../../../../drawing/object/controls/arrow';
 import {
   disposeEditorSelectionChrome,
   mountEditorSelectionChrome,
@@ -14,15 +17,47 @@ import {
 
 it('keeps selection controls bounded in screen pixels across editor zoom', () => {
   expect(resolveSelectionChromeMetrics(4)).toMatchObject({
-    cornerRadius: 8.125,
-    borderWidth: 1.35,
+    cornerRadius: 4.5,
+    borderWidth: 1.25,
     guideWidth: 1,
   });
   expect(resolveSelectionChromeMetrics(0.2)).toMatchObject({
-    cornerRadius: 4.875,
-    borderWidth: 1.35,
+    cornerRadius: 4.5,
+    borderWidth: 1.25,
     guideWidth: 1,
   });
+});
+
+it('leaves empty selection chrome unchanged without reading layout on repeated renders', () => {
+  const container = document.createElement('div');
+  const upperCanvasEl = document.createElement('canvas');
+  container.appendChild(upperCanvasEl);
+  const readBounds = vi.spyOn(upperCanvasEl, 'getBoundingClientRect');
+  const listeners = new Map<string, (event?: any) => void>();
+  const canvas = {
+    upperCanvasEl,
+    getWidth: () => 100,
+    getHeight: () => 100,
+    getActiveObject: () => undefined,
+    getActiveObjects: () => [],
+    on: (name: string, handler: (event?: any) => void) => {
+      listeners.set(name, handler);
+      return () => listeners.delete(name);
+    },
+  };
+  mountEditorSelectionChrome(
+    canvas as never,
+    { getVisualFeedback: () => ({ guides: [], relations: [], acceptedByAxis: {} }) } as never
+  );
+  const svg = container.querySelector('[data-ui="editor.canvas.selection-chrome"]')!;
+  const replace = vi.spyOn(svg, 'replaceChildren');
+  const attributes = vi.spyOn(svg, 'setAttribute');
+  for (let i = 0; i < 10; i++) listeners.get('after:render')?.();
+  expect(readBounds).not.toHaveBeenCalled();
+  expect(replace).not.toHaveBeenCalled();
+  expect(attributes).not.toHaveBeenCalled();
+  expect(svg.querySelector('[data-ui="editor.canvas.selection-controls"]')).not.toBeNull();
+  disposeEditorSelectionChrome(canvas as never);
 });
 
 it('fades controls for a selected shape during a pointer gesture and restores them on release', () => {
@@ -55,7 +90,7 @@ it('fades controls for a selected shape during a pointer gesture and restores th
   };
   mountEditorSelectionChrome(
     canvas as never,
-    { getVisualGuides: () => ({ lines: [], points: [] }) } as never
+    { getVisualFeedback: () => ({ guides: [], relations: [], acceptedByAxis: {} }) } as never
   );
   const controls = container.querySelector(
     '[data-ui="editor.canvas.selection-controls"]'
@@ -114,7 +149,7 @@ it('leaves text selection visible and respects the workspace switch', () => {
   };
   mountEditorSelectionChrome(
     canvas as never,
-    { getVisualGuides: () => ({ lines: [], points: [] }) } as never
+    { getVisualFeedback: () => ({ guides: [], relations: [], acceptedByAxis: {} }) } as never
   );
   const controls = container.querySelector(
     '[data-ui="editor.canvas.selection-controls"]'
@@ -176,9 +211,10 @@ it('renders selection and magnet as sharp vectors while preserving the Fabric hi
     },
   };
   const magnet = {
-    getVisualGuides: () => ({
-      lines: [{ origin: { x: 1, y: 2 }, target: { x: 50, y: 2 } }],
-      points: [],
+    getVisualFeedback: () => ({
+      guides: [{ axis: 'y', coordinate: 2, from: 1, to: 50, points: [] }],
+      relations: [],
+      acceptedByAxis: {},
     }),
   };
 
@@ -191,13 +227,15 @@ it('renders selection and magnet as sharp vectors while preserving the Fabric hi
   expect(svg.getAttribute('viewBox')).toBe('0 0 100 100');
   expect(svg.querySelector('polygon')?.getAttribute('vector-effect')).toBe('non-scaling-stroke');
   expect(svg.querySelector('line')?.getAttribute('vector-effect')).toBe('non-scaling-stroke');
-  expect(Number(svg.querySelector('circle')?.getAttribute('r')) * 4).toBeCloseTo(8.125);
-  expect(object.controls.tl).toHaveProperty('sizeX', 5);
+  expect(Number(svg.querySelector('[data-control=tl]')?.getAttribute('width')) * 4).toBeCloseTo(9);
+  expect(object.controls.tl).toHaveProperty('sizeX', 5.5);
 
   displayedWidth = 20;
   render?.();
-  expect(Number(svg.querySelector('circle')?.getAttribute('r')) * 0.2).toBeCloseTo(4.875);
-  expect(object.controls.tl).toHaveProperty('sizeX', 100);
+  expect(Number(svg.querySelector('[data-control=tl]')?.getAttribute('width')) * 0.2).toBeCloseTo(
+    9
+  );
+  expect(object.controls.tl).toHaveProperty('sizeX', 110);
   disposeEditorSelectionChrome(canvas as never);
   expect(container.querySelector('svg')).toBeNull();
   expect(canvas).toHaveProperty('skipControlsDrawing', false);
@@ -258,16 +296,41 @@ it('shows visible custom and rotation controls, point guides, and clears stale s
       return () => {};
     },
   };
-  const magnet = { getVisualGuides: () => ({ lines: [], points: [{ x: 5, y: 6 }] }) };
+  const magnet = {
+    getVisualFeedback: () => ({
+      guides: [
+        {
+          axis: 'x',
+          coordinate: 5,
+          from: -10,
+          to: 30,
+          points: [],
+          matches: [
+            {
+              target: {
+                id: 'point',
+                kind: 'object',
+                bounds: { x: 0, y: 0, width: 10, height: 12 },
+              },
+              source: { kind: 'center', point: { x: 5, y: 20 } },
+              anchor: { kind: 'center', point: { x: 5, y: 6 } },
+            },
+          ],
+        },
+      ],
+      relations: [],
+      acceptedByAxis: {},
+    }),
+  };
   mountEditorSelectionChrome(canvas as never, magnet as never);
   const svg = container.querySelector('svg')!;
   expect(svg.querySelector('polygon')?.getAttribute('stroke-dasharray')).toBe('4 3');
-  const rotationPath = svg.querySelector('g path')?.getAttribute('d');
-  expect(rotationPath).toContain('M -9 0 A 9 9 0 0 1');
-  expect(rotationPath).toContain('M 9 0 A 9 9 0 0 1');
-  expect(rotationPath).toContain('M 9 -9 L 9 -4 L 4 -4');
-  expect(rotationPath).toContain('M -4 4 L -9 4 L -9 9 L -4 4');
-  expect(svg.querySelectorAll('circle')).toHaveLength(2);
+  const rotationPath = svg
+    .querySelector('[data-ui="editor.canvas.selection-rotate"]')
+    ?.getAttribute('d');
+  expect(rotationPath).toContain('M19.95 11a8 8');
+  expect(rotationPath).toContain('M11 12a1 1');
+  expect(svg.querySelectorAll('[data-ui="editor.canvas.selection-handle"]')).toHaveLength(3);
   expect(svg.querySelectorAll('path')).toHaveLength(2);
 
   selected = null;
@@ -286,7 +349,7 @@ it('does not replace Fabric controls when its canvas wrapper is unavailable', ()
   const canvas = { upperCanvasEl: document.createElement('canvas') };
   mountEditorSelectionChrome(
     canvas as never,
-    { getVisualGuides: () => ({ lines: [], points: [] }) } as never
+    { getVisualFeedback: () => ({ guides: [], relations: [], acceptedByAxis: {} }) } as never
   );
   expect(canvas).not.toHaveProperty('skipControlsDrawing');
 });
@@ -318,7 +381,7 @@ it('projects the selection border through the virtual viewport transform', () =>
   mountEditorSelectionChrome(
     canvas as never,
     {
-      getVisualGuides: () => ({ lines: [], points: [] }),
+      getVisualFeedback: () => ({ guides: [], relations: [], acceptedByAxis: {} }),
     } as never
   );
 
@@ -350,7 +413,30 @@ it('keeps live selection chrome unchanged after a temporary preview render', () 
   mountEditorSelectionChrome(
     canvas as never,
     {
-      getVisualGuides: () => ({ lines: [], points: [{ x: 5, y: 6 }] }),
+      getVisualFeedback: () => ({
+        guides: [
+          {
+            axis: 'x',
+            coordinate: 5,
+            from: -10,
+            to: 30,
+            points: [],
+            matches: [
+              {
+                target: {
+                  id: 'point',
+                  kind: 'object',
+                  bounds: { x: 0, y: 0, width: 10, height: 12 },
+                },
+                source: { kind: 'center', point: { x: 5, y: 20 } },
+                anchor: { kind: 'center', point: { x: 5, y: 6 } },
+              },
+            ],
+          },
+        ],
+        relations: [],
+        acceptedByAxis: {},
+      }),
     } as never
   );
   const svg = container.querySelector('svg')!;
@@ -405,7 +491,7 @@ it('keeps the Simplify resize border visible while hiding controls until release
   };
   mountEditorSelectionChrome(
     canvas as never,
-    { getVisualGuides: () => ({ lines: [], points: [] }) } as never
+    { getVisualFeedback: () => ({ guides: [], relations: [], acceptedByAxis: {} }) } as never
   );
   const controls = container.querySelector<SVGGElement>(
     '[data-ui="editor.canvas.selection-controls"]'
@@ -415,7 +501,9 @@ it('keeps the Simplify resize border visible while hiding controls until release
   listeners.get('object:scaling')?.({ target: object });
   expect(controls.style.opacity).toBe('1');
   expect(controls.style.getPropertyValue('--editor-selection-controls-opacity')).toBe('0');
-  expect(controls.querySelector('polygon')?.getAttribute('stroke')).toBe('#2563eb');
+  expect(controls.querySelector('polygon')?.getAttribute('stroke')).toBe(
+    'var(--sniptale-color-canvas-selection, #2563eb)'
+  );
   window.dispatchEvent(new Event('pointercancel'));
   expect(controls.style.getPropertyValue('--editor-selection-controls-opacity')).toBe('1');
   disposeEditorSelectionChrome(canvas as never);
@@ -448,12 +536,13 @@ it('renders hover as a border only and clears it on selection, leave, blur and d
     clearGuides() {},
     dispose() {},
     hasActiveGuides: () => false,
-    getVisualGuides: () => ({ lines: [], points: [] }),
+    getVisualFeedback: () => ({ guides: [], relations: [], acceptedByAxis: {} }),
     snapRect: ({ rect }) => rect,
+    snapPoint: ({ point }) => point,
   };
   mountEditorSelectionChrome(canvas, magnet);
   const root = canvas.upperCanvasEl.parentElement!;
-  const preview = () => root.querySelector('[data-ui="editor.canvas.selection-preview"]')!;
+  const preview = () => root.querySelector('[data-ui="editor.canvas.selection-preview"]');
   const hover = () =>
     canvas.fire('mouse:move', {
       e: new MouseEvent('mousemove'),
@@ -462,22 +551,22 @@ it('renders hover as a border only and clears it on selection, leave, blur and d
       viewportPoint: new Point(25, 25),
     });
   hover();
-  expect(preview().querySelector('polygon')?.getAttribute('data-layer-id')).toBe('hover-layer');
-  expect(preview().querySelectorAll('circle')).toHaveLength(0);
+  expect(preview()?.querySelector('polygon')?.getAttribute('data-layer-id')).toBe('hover-layer');
+  expect(preview()?.querySelectorAll('circle')).toHaveLength(0);
   expect(canvas.getActiveObjects()).toEqual([]);
   canvas.setZoom(2);
   canvas.renderAll();
-  expect(preview().querySelector('polygon')?.getAttribute('points')).toMatch(/^40,40 /);
+  expect(preview()?.querySelector('polygon')?.getAttribute('points')).toMatch(/^40,40 /);
   canvas.setActiveObject(object);
   canvas.renderAll();
-  expect(preview().children).toHaveLength(0);
+  expect(preview()?.children.length ?? 0).toBe(0);
   canvas.discardActiveObject();
   canvas.upperCanvasEl.dispatchEvent(new MouseEvent('mouseout'));
-  expect(preview().children).toHaveLength(0);
+  expect(preview()?.children.length ?? 0).toBe(0);
   hover();
-  expect(preview().children).toHaveLength(1);
+  expect(preview()?.children.length).toBe(1);
   window.dispatchEvent(new Event('blur'));
-  expect(preview().children).toHaveLength(0);
+  expect(preview()?.children.length ?? 0).toBe(0);
   disposeEditorSelectionChrome(canvas);
   hover();
   expect(root.querySelector('[data-ui="editor.canvas.selection-chrome"]')).toBeNull();
@@ -558,8 +647,9 @@ it.each(['callout', 'step-badge'] as const)(
       clearGuides() {},
       dispose() {},
       hasActiveGuides: () => false,
-      getVisualGuides: () => ({ lines: [], points: [] }),
+      getVisualFeedback: () => ({ guides: [], relations: [], acceptedByAxis: {} }),
       snapRect: ({ rect }) => rect,
+      snapPoint: ({ point }) => point,
     };
     mountEditorSelectionChrome(canvas, magnet);
     canvas.setActiveObject(object);
@@ -570,7 +660,7 @@ it.each(['callout', 'step-badge'] as const)(
     expect(Number(chrome.style.zIndex)).toBeGreaterThan(30);
     const outline = viewport.querySelector('[data-ui="editor.canvas.projected-selection-outline"]');
     expect(outline?.getAttribute('points')).toBe('80,40 160,40 160,80 80,80');
-    expect(outline?.getAttribute('stroke')).toBe('#2563eb');
+    expect(outline?.getAttribute('stroke')).toBe('var(--sniptale-color-canvas-selection, #2563eb)');
     expect(object.width).toBe(1);
     await Promise.resolve();
     mutationDeliveries = 0;
@@ -632,6 +722,231 @@ it.each(['callout', 'step-badge'] as const)(
     ).toEqual([replacement]);
     await canvas.dispose();
     viewport.remove();
+    vi.unstubAllGlobals();
+  }
+);
+
+it('keeps control visual metrics fixed across CSS projection scales', () => {
+  for (const scale of [0.25, 0.5, 1, 2, 4]) {
+    expect(resolveSelectionChromeMetrics(scale)).toMatchObject({
+      cornerRadius: 4.5,
+      rotationRadius: 12,
+    });
+  }
+});
+
+it('removes the selected text frame and controls during native text editing', () => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+  const canvas = new EditorCanvas(document.createElement('canvas'), { width: 200, height: 140 });
+  const text = new Textbox('тс', { left: 40, top: 40, width: 100, fontSize: 24 });
+  text.sniptaleType = 'text';
+  canvas.add(text);
+  canvas.setActiveObject(text);
+  mountEditorSelectionChrome(canvas, {
+    getVisualFeedback: () => ({ guides: [], relations: [], acceptedByAxis: {} }),
+  } as never);
+  const controls = () =>
+    canvas.upperCanvasEl.parentElement!.querySelector(
+      '[data-ui="editor.canvas.selection-controls"]'
+    )!;
+  expect(controls().children.length).toBeGreaterThan(0);
+  text.isEditing = true;
+  canvas.renderAll();
+  expect(controls().children).toHaveLength(0);
+  text.isEditing = false;
+  canvas.renderAll();
+  expect(controls().children.length).toBeGreaterThan(0);
+  disposeEditorSelectionChrome(canvas);
+  void canvas.dispose();
+  vi.unstubAllGlobals();
+});
+
+it('shows a solid rectangle hover outline without handles or a second selected outline', () => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+  const canvas = new EditorCanvas(document.createElement('canvas'), { width: 200, height: 140 });
+  const object = new Rect({ left: 40, top: 40, width: 80, height: 40 });
+  object.sniptaleType = 'shape';
+  canvas.add(object);
+  mountEditorSelectionChrome(canvas, {
+    getVisualFeedback: () => ({ guides: [], relations: [], acceptedByAxis: {} }),
+  } as never);
+  canvas.fire('mouse:move', {
+    e: new MouseEvent('mousemove'),
+    target: object,
+    scenePoint: new Point(60, 60),
+    viewportPoint: new Point(60, 60),
+  });
+  const root = canvas.upperCanvasEl.parentElement!;
+  const preview = () => root.querySelector('[data-ui="editor.canvas.selection-preview"]');
+  expect(preview()?.querySelectorAll('polygon')).toHaveLength(1);
+  expect(preview()?.querySelector('polygon')!.getAttribute('stroke-dasharray')).toBe('');
+  expect(preview()?.querySelectorAll('[data-control]')).toHaveLength(0);
+  expect(canvas.getActiveObjects()).toEqual([]);
+  canvas.setActiveObject(object);
+  canvas.renderAll();
+  expect(preview()?.children.length ?? 0).toBe(0);
+  expect(
+    root.querySelector('[data-ui="editor.canvas.selection-controls"]')!.querySelectorAll('polygon')
+  ).toHaveLength(0);
+  disposeEditorSelectionChrome(canvas);
+  void canvas.dispose();
+  vi.unstubAllGlobals();
+});
+
+it('keeps selected controls and accepted magnet feedback out of actual PNG and SVG scene exports', () => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+  const canvas = new EditorCanvas(document.createElement('canvas'), { width: 200, height: 140 });
+  const object = new Rect({
+    left: 70,
+    top: 60,
+    width: 70,
+    height: 40,
+    fill: '#ff8800',
+    strokeWidth: 0,
+  });
+  object.sniptaleType = 'shape';
+  object.sniptaleId = 'export-shape';
+  canvas.add(object);
+  const baseline = canvas.toDataURL({ format: 'png', multiplier: 1 });
+  const magnet: EditorMagnetManager = {
+    clearGuides() {},
+    dispose() {},
+    hasActiveGuides: () => true,
+    snapRect: ({ rect }) => rect,
+    snapPoint: ({ point }) => point,
+    getVisualFeedback: () => ({
+      guides: [
+        {
+          axis: 'x',
+          coordinate: 70,
+          from: 10,
+          to: 130,
+          points: [],
+          matches: [
+            {
+              target: {
+                id: 'target',
+                kind: 'object',
+                bounds: { x: 60, y: 10, width: 20, height: 20 },
+              },
+              anchor: { kind: 'center', point: { x: 70, y: 20 } },
+              source: { kind: 'center', point: { x: 70, y: 60 } },
+            },
+          ],
+        },
+      ],
+      relations: [
+        {
+          kind: 'dimension',
+          dimension: 'width',
+          key: 'export-width',
+          value: 70,
+          sourceSpan: {
+            from: { x: 35, y: 80 },
+            to: { x: 105, y: 80 },
+            participantIds: ['export-shape'],
+          },
+          targetSpans: [
+            { from: { x: 10, y: 20 }, to: { x: 80, y: 20 }, participantIds: ['target'] },
+          ],
+        },
+      ],
+      acceptedByAxis: {},
+    }),
+  };
+  mountEditorSelectionChrome(canvas, magnet);
+  canvas.setActiveObject(object);
+  canvas.renderAll();
+  const overlay = canvas.upperCanvasEl.parentElement!;
+  expect(overlay.querySelector('[data-ui="editor.canvas.selection-handle"]')).not.toBeNull();
+  expect(overlay.querySelector('[data-ui="editor.canvas.magnet-marker"]')).not.toBeNull();
+  expect(overlay.querySelectorAll('[data-ui="editor.canvas.magnet-relation"]')).toHaveLength(2);
+  expect(overlay.querySelector('text')?.textContent).toBe('70');
+  expect(canvas.toDataURL({ format: 'png', multiplier: 1 })).toBe(baseline);
+  const svg = canvas.toSVG();
+  expect(svg).toContain('rgb(255,136,0)');
+  expect(svg).not.toContain('M19.95 11');
+  expect(svg).not.toContain('canvas-selection');
+  expect(svg).not.toContain('canvas-magnet');
+  expect(svg).not.toContain('ui-monospace');
+  disposeEditorSelectionChrome(canvas);
+  void canvas.dispose();
+  vi.unstubAllGlobals();
+});
+
+it.each([0.2, 1, 4])(
+  'keeps an off-center existing arrow point ahead of insertion at zoom%s',
+  (zoom) => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+    const canvas = new EditorCanvas(document.createElement('canvas'), { width: 1000, height: 700 });
+    const arrow = createEditorDrawingFabricObject(
+      {
+        kind: 'arrow',
+        id: 'point-hit',
+        design: 'freehand',
+        start: { x: 20, y: 20 },
+        end: { x: 220, y: 20 },
+        bendPoints: [{ x: 120, y: 80 }],
+        color: '#f97316',
+        width: 4,
+        dynamicWidth: false,
+      },
+      1
+    );
+    applyEditorDrawingInteractionControls(arrow);
+    canvas.add(arrow);
+    canvas.setActiveObject(arrow);
+    canvas.setZoom(zoom);
+    mountEditorSelectionChrome(canvas, {
+      getVisualFeedback: () => ({ guides: [], relations: [], acceptedByAxis: {} }),
+    } as never);
+    canvas.renderAll();
+    const point = arrow.calcOCoords()['bend-0']!;
+    const pointer = new Point(point.x + 12, point.y);
+    updateEditorDrawingArrowHover(
+      canvas,
+      zoom === 1 ? { x: 136, y: 80 } : { x: pointer.x / zoom, y: pointer.y / zoom }
+    );
+    canvas.renderAll();
+    if (zoom === 1)
+      expect(arrow.controls['bend-insert']!.getVisibility(arrow, 'bend-insert')).toBe(true);
+    expect(arrow.findControl(pointer)?.key).toBe('bend-0');
+    const root = canvas.upperCanvasEl.parentElement!;
+    expect(root.querySelector('[data-control="bend-insert"]')).toBeNull();
+    arrow.__corner = 'bend-0';
+    canvas.renderAll();
+    const handle = root.querySelector('[data-control="bend-0"]')!;
+    expect(handle.getAttribute('fill')).toBe(handle.getAttribute('stroke'));
+    disposeEditorSelectionChrome(canvas);
+    void canvas.dispose();
     vi.unstubAllGlobals();
   }
 );

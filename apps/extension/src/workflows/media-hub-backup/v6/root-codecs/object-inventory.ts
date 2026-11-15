@@ -5,7 +5,7 @@ import { assertSafeScenarioAssetStorageMetadata } from '../../../../composition/
 import { parseBoundedJson } from '../codec';
 import type { MediaHubBackupRootEnvelope, MediaHubBackupSharedObject } from '../contracts';
 import { parseEffectBundleMetadata } from './effect-bundle';
-import { decodePortableEditorDocument, type PortableEditorDocumentV3 } from './editor-document';
+import { decodePortableEditorDocument, type PortableEditorDocument } from './editor-document';
 import {
   parsePortableMediaMetadata,
   type PortableAggregatePresentation,
@@ -63,7 +63,7 @@ function createRoleInventory(
     pointer(value.thumbnailObjectId);
     if (value.previewObjectId !== undefined) pointer(value.previewObjectId);
   };
-  const document = (value: PortableEditorDocumentV3) => {
+  const document = (value: PortableEditorDocument) => {
     decodePortableEditorDocument({
       document: value,
       assetsByObjectId: new Map(
@@ -177,8 +177,17 @@ async function collectTypedInventory(
   const descriptor = envelope.descriptor;
   if (descriptor.rootKind === 'media' && descriptor.mediaSubtype === 'effect-bundle') {
     const metadata = parseEffectBundleMetadata(envelope.metadata);
-    for (const asset of metadata.entry.assets)
-      inventory.body(asset.objectId, asset.mimeType, asset.byteLength, asset.sha256);
+    if (metadata.kind === 'animation') {
+      for (const source of metadata.entry.documents)
+        inventory.body(source.objectId, 'application/json', source.byteLength, source.sha256);
+    } else {
+      inventory.body(
+        metadata.entry.sourceObjectId,
+        'application/json',
+        metadata.entry.retainedByteLength,
+        metadata.entry.sourceSha256
+      );
+    }
   } else if (descriptor.rootKind === 'media') {
     collectMediaRoles(parsePortableMediaMetadata(envelope.metadata), inventory);
   } else if (descriptor.rootKind === 'scenario-project') {

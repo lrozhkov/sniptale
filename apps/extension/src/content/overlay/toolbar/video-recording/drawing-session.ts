@@ -1,3 +1,4 @@
+import { ContentDrawingTextProjection } from '../../../drawing/text-measurement';
 import { setUIHidden } from '../../../selection/locker';
 import {
   createContentSimplifyDependencies,
@@ -39,6 +40,22 @@ export interface RecordingDrawingOwner {
   setAutoHideDelay(delay: RecordingDrawingAutoHideDelay): void;
   setClockRunning(running: boolean): void;
   dispose(): void;
+}
+
+/** Prevents source acquisition from uncovering masks on a recordable surface. */
+function preserveRecordingMasks(
+  dependencies?: ContentSimplifyDependencies
+): ContentSimplifyDependencies | undefined {
+  if (!dependencies) return undefined;
+  return {
+    ...dependencies,
+    acquire(event, signal, excludedDrawingObjectId) {
+      // Keep this mode-wide: acquisition may overlap recording start or resume.
+      if (excludedDrawingObjectId)
+        return Promise.reject(new Error('Recording capture must preserve accepted drawings.'));
+      return dependencies.acquire(event, signal);
+    },
+  };
 }
 
 /**
@@ -111,9 +128,15 @@ export function createRecordingDrawingOwner(options?: {
     return true;
   };
 
+  const textProjection = new ContentDrawingTextProjection();
   controller = createContentDrawingController(
-    createDrawingSession({ autoSelectCreatedObjects: false, onDocumentCommit: acceptCommit }),
-    options?.simplifyDependencies
+    createDrawingSession({
+      autoSelectCreatedObjects: false,
+      onDocumentCommit: acceptCommit,
+      objectProjection: textProjection,
+      onDispose: () => textProjection.dispose(),
+    }),
+    preserveRecordingMasks(options?.simplifyDependencies)
   );
 
   return {

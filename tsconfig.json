@@ -36,6 +36,11 @@
     /* Chrome Extension specific */
     "types": ["chrome"]
   },
-  "include": ["apps/extension/src", "packages/*/src", "tooling/design-reference/pickers/entry.tsx"],
+  "include": [
+    "apps/extension/src",
+    "packages/*/src",
+    "tooling/design-reference/pickers/entry.tsx",
+    "tooling/test/harness/dev-surface.ts"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

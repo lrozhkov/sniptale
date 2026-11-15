@@ -1,4 +1,4 @@
-import type { Rect } from 'fabric';
+import type { Canvas, Rect } from 'fabric';
 import type { EditorDocument, EditorTool } from '../../../features/editor/document/types';
 import type { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
 import type { SourceState } from '../../document/model/source-state';
@@ -10,7 +10,7 @@ import type { EditorMagnetManager } from '../magnet';
 import { getEditorViewportDevicePixelRatioBaseline } from '../viewport';
 
 export abstract class ImageEditorControllerState {
-  canvas = null;
+  canvas: Canvas | null = null;
   viewportElement = null;
   stageElement = null;
   drawSession: DrawSession | null = null;

@@ -40,5 +40,5 @@ export function resolveMotionStartTime(
 
 /** Camera occupancy and sampling exclude authored appearance intervals. */
 export function isCameraMotionRegion(region: VideoProjectMotionRegion): boolean {
-  return region.border === undefined && region.spotlight === undefined;
+  return region.effect !== '3d' && region.border === undefined && region.spotlight === undefined;
 }

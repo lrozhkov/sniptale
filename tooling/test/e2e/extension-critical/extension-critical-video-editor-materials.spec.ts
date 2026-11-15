@@ -39,9 +39,8 @@ import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/
 import { createQuickEditZoomRegion } from '../../../../apps/extension/src/features/video/review/advanced/zoom';
 import { encodedNativeVideoSamples } from '../support/native-video-export-proof';
 import {
-  EFFECT_V1_TARGET_FIXTURE,
-  EFFECT_V1_TRANSITION_FIXTURE,
-  importEffectFile,
+  applyBuiltinSourceFilter,
+  chooseGlTransition,
 } from './extension-critical-video-effects.helpers';
 import { readNativeVideoProject } from '../support/native-video-project';
 import { startHostServer } from '../support/host-server';
@@ -2092,47 +2091,24 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         path: info.outputPath('migrated-project-rate.png'),
         fullPage: false,
       });
-      await importEffectFile(page, {
-        documentId: 'demo-target-overlay',
-        fixturePath: EFFECT_V1_TARGET_FIXTURE,
-        locale,
-      });
-      const effect = page.locator('[data-effect-document="demo-target-overlay"]');
-      await effect.hover();
-      await effect
-        .getByRole('button', { name: label('videoEditor.effectsLibrary.applyToClip'), exact: true })
-        .click();
+      await page.locator(`[data-project-timeline-clip="${appended.id}"]`).click();
+      await applyBuiltinSourceFilter(page, locale);
       await expect
-        .poll(async () => (await readNativeVideoProject(page))?.effectInstances?.length)
+        .poll(async () => {
+          const clip = (await readNativeVideoProject(page))?.clips.find(
+            (item) => item.id === appended.id
+          );
+          return clip?.type === 'VIDEO' ? clip.sourceFilters?.filters.length : 0;
+        })
         .toBe(1);
-      await importEffectFile(page, {
-        documentId: 'neutral-transition',
-        fixturePath: EFFECT_V1_TRANSITION_FIXTURE,
-        locale,
-      });
       await page.locator('[data-ui="video-editor.timeline.toolbar.fit-project"]').click();
-      const transition = page.locator('[data-effect-document="neutral-transition"]');
       const junction = page
         .locator(`[data-track-lane-id="${originalVideos[0]!.trackId}"]`)
-        .locator('[data-ui="timeline.transition-cut-drop"]')
+        .locator('[data-ui="timeline.track-transition-zone"]')
         .first();
-      const cardBox = (await transition.locator('p').first().boundingBox())!;
-      const junctionBox = (await junction.boundingBox())!;
-      await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
-      await page.mouse.down();
-      const dropX = junctionBox.x + junctionBox.width / 2;
-      const dropY = junctionBox.y + junctionBox.height / 2;
-      await page.mouse.move(dropX, dropY, { steps: 20 });
-      await page.mouse.move(dropX, dropY);
-      await page.mouse.up();
-      await expect
-        .poll(
-          async () =>
-            (await readNativeVideoProject(page))?.effectInstances?.filter(
-              (instance) => instance.kind === 'transition'
-            ).length
-        )
-        .toBe(1);
+      await junction.scrollIntoViewIfNeeded();
+      await junction.click();
+      await chooseGlTransition(page, 'CrossZoom');
       const transitioned = (await readNativeVideoProject(page))!;
       const videoJunction = transitioned.transitions?.find(
         (item) =>
@@ -2140,9 +2116,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
           item.trailingClipId === originalVideos[1]!.id
       );
       expect(videoJunction).toBeDefined();
-      expect(
-        transitioned.effectInstances?.find((instance) => instance.kind === 'transition')?.target
-      ).toEqual({ kind: 'transition', transitionId: videoJunction!.id });
+      expect(videoJunction).toMatchObject({ kind: 'gl', selection: { name: 'CrossZoom' } });
       const originalAudio = migrated.clips.filter((clip) => clip.type === 'AUDIO');
       expect(originalAudio).toHaveLength(2);
       expect(
@@ -2152,7 +2126,6 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
             item.trailingClipId === originalAudio[1]!.id
         )
       ).toBe(true);
-      await page.locator('[data-ui="video-editor.materials.close"]').click();
       const beforeCameraMode = (await readNativeVideoProject(page))!;
       await page
         .getByRole('button', { name: label('videoEditor.sidebar.sceneProperties'), exact: true })

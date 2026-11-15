@@ -27,7 +27,16 @@ function createCanonicalObject(
     if (!source) return null;
     return createEditorDrawingBlurObject({ drawing, labelIndex: 1, source });
   }
-  return createEditorDrawingFabricObject(drawing, 1, { preserveTextWidth: true });
+  return createEditorDrawingFabricObject(drawing, 1, {
+    preserveTextWidth: true,
+    ...(drawing.kind === 'text'
+      ? {
+          textAutoWidth: drawing.autoWidth ?? original?.sniptaleDrawingTextAutoWidth ?? false,
+          textMaxWidth:
+            drawing.wrapWidth ?? original?.sniptaleDrawingTextMaxWidth ?? drawing.bounds.width,
+        }
+      : {}),
+  });
 }
 
 export function replaceEditorDrawingObjectWithCanonicalGeometry(args: {
@@ -54,10 +63,12 @@ export function replaceEditorDrawingObjectWithCanonicalGeometry(args: {
   const replacement = createCanonicalObject(drawing, args.source, args.object);
   if (!replacement) return args.object;
   copyEditorDrawingRuntimeState(args.object, replacement);
-  const index = args.canvas.getObjects().indexOf(args.object);
+  const collection = args.object.parent ?? args.canvas;
+  const index = collection.getObjects().indexOf(args.object);
   if (index < 0) return args.object;
-  args.canvas.remove(args.object);
-  args.canvas.insertAt(index, replacement);
+  collection.remove(args.object);
+  collection.insertAt(index, replacement);
+  collection.getObjects().forEach((object) => object.setCoords());
   args.prepareObject(replacement);
   if (drawing.kind === 'simplify')
     carryEditorSimplifySourceContext(args.canvas, args.object, replacement);

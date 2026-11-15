@@ -62,6 +62,7 @@ const aiProviderSelectorEntrySchema = AIProviderSchema.omit({ baseUrl: true })
   .extend({
     connectionType: z.enum(AI_PROVIDER_TYPES),
     destinationKind: z.enum(['chrome-built-in', 'external', 'local-custom']),
+    imageApi: z.literal('routerai').optional(),
     destinationBinding: z.string().regex(SHA256_DIGEST_PATTERN).optional(),
   })
   .strict();

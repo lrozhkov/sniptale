@@ -1,7 +1,8 @@
+import type { EffectRuntimeGpuRasterResource } from '../../../../../contracts/effect-runtime/gpu-plan';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { EffectRuntimeGpuPass } from '../../../../../contracts/effect-runtime/gpu-plan';
 import { EFFECT_SVG_VECTOR_LIMITS } from '../../../../../contracts/effect-runtime/svg-vector';
-import { EFFECT_V1_GRAPH_LIMITS } from '@sniptale/runtime-contracts/effect-v1';
+import { EFFECT_RUNTIME_GPU_PLAN_LIMITS } from '../../../../../contracts/effect-runtime/gpu-plan';
 import { EFFECT_RUNTIME_RESOURCE_LIMITS } from './resource-limits';
 import {
   EFFECT_RUNTIME_PROTOCOL_VERSION,
@@ -24,7 +25,7 @@ class Bitmap implements ImageBitmap {
 }
 beforeEach(() => vi.stubGlobal('ImageBitmap', Bitmap));
 afterEach(() => vi.unstubAllGlobals());
-function request(): EffectRuntimeWorkerMessage {
+function request(): EffectRuntimeWorkerMessage & { renderTarget?: 'gpu-plan' } {
   return {
     renderTarget: 'gpu-plan',
     assetSelectionRef: { id: 'a'.repeat(64) },
@@ -48,7 +49,7 @@ function request(): EffectRuntimeWorkerMessage {
     type: EFFECT_RUNTIME_WORKER_REQUEST,
   };
 }
-function plan(): EffectRuntimeGpuPlanResult {
+function plan(): EffectRuntimeGpuPlanResult & { resources: EffectRuntimeGpuRasterResource[] } {
   const r = request();
   return {
     kind: 'gpu-plan',
@@ -193,13 +194,13 @@ it('accepts earlier immutable passes, fractional logical sizes and finite normal
 it('bounds graph operations, depth, resource entries and aggregate raster allocation', () => {
   const p = plan();
   const nativePaints =
-    EFFECT_V1_GRAPH_LIMITS.expandedCommands * 2 * EFFECT_SVG_VECTOR_LIMITS.maxParts;
+    EFFECT_RUNTIME_GPU_PLAN_LIMITS.scalarOperations * 2 * EFFECT_SVG_VECTOR_LIMITS.maxParts;
   p.passes[0]!.operations = Array(nativePaints + 1);
   expect(parseEffectRuntimeGpuPlan(p, request())).toBeNull();
   p.passes[0]!.operations = [];
   p.resources = Array(
     nativePaints +
-      EFFECT_V1_GRAPH_LIMITS.expandedCommands +
+      EFFECT_RUNTIME_GPU_PLAN_LIMITS.scalarOperations +
       EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterEntries +
       EFFECT_RUNTIME_RESOURCE_LIMITS.maxInputFrames +
       2
@@ -220,7 +221,7 @@ it('rejects forward references, duplicate pass IDs, excessive depth and noncover
   const draw = initial.operations[0]!;
   if (draw.op !== 'draw') throw Error();
   const passes: EffectRuntimeGpuPass[] = Array.from(
-    { length: EFFECT_V1_GRAPH_LIMITS.graphDepth + 1 },
+    { length: EFFECT_RUNTIME_GPU_PLAN_LIMITS.depth + 1 },
     (_, index) => ({
       ...initial,
       id: index,
@@ -302,12 +303,12 @@ it('rejects repeated primitive operands and bounds shared scalar operations at c
   const initial = p.passes[0]!.operations[0]!;
   if (initial.op !== 'draw') throw Error();
   p.passes[0]!.operations = Array.from(
-    { length: EFFECT_V1_GRAPH_LIMITS.expandedCommands + 1 },
+    { length: EFFECT_RUNTIME_GPU_PLAN_LIMITS.scalarOperations + 1 },
     () => initial
   );
   expect(parseEffectRuntimeGpuPlan(p, request())).toBeNull();
   p.passes[0]!.operations = Array.from(
-    { length: EFFECT_V1_GRAPH_LIMITS.expandedCommands },
+    { length: EFFECT_RUNTIME_GPU_PLAN_LIMITS.scalarOperations },
     () => initial
   );
   expect(parseEffectRuntimeGpuPlan(p, request())).not.toBeNull();
@@ -340,4 +341,124 @@ it('admits parent plans only for explicit preparation with bounded synchronous t
   expect(fitsEffectRuntimeGpuSceneTransport({ ...p, passes: [{ operations: Array(513) }] })).toBe(
     false
   );
+});
+
+function paintPlan(): EffectRuntimeGpuPlanResult {
+  const p: EffectRuntimeGpuPlanResult = plan();
+  p.resources.push({
+    id: 1,
+    kind: 'paint',
+    width: 10,
+    height: 10,
+    paint: {
+      path: [],
+      draw: { op: 'fillRect', args: [0, 0, 10, 10] },
+      transform: [1, 0, 0, 1, 0, 0],
+      style: {
+        fill: '#ffffff',
+        stroke: '#000000',
+        font: '10px sans-serif',
+        lineWidth: 1,
+        lineCap: 'butt',
+        lineJoin: 'miter',
+        miterLimit: 10,
+        textAlign: 'start',
+        textBaseline: 'alphabetic',
+        direction: 'inherit',
+      },
+    },
+  });
+  return p;
+}
+it('admits closed paint contents without transferring a bitmap handle', () => {
+  const p = paintPlan();
+  expect(parseEffectRuntimeGpuPlan(p, request())).toEqual(p);
+  expect(p.resources[1]).not.toHaveProperty('bitmap');
+});
+it.each(['operation', 'number', 'extra', 'radius', 'path-budget'])(
+  'rejects malformed paint contents: %s',
+  (reason) => {
+    const p = paintPlan(),
+      resource = p.resources[1]!;
+    if (resource.kind !== 'paint') throw new Error('Missing paint');
+    if (reason === 'operation') Object.assign(resource.paint.draw, { op: 'drawImage' });
+    if (reason === 'number') resource.paint.draw.args[2] = Number.POSITIVE_INFINITY;
+    if (reason === 'extra') Object.assign(resource.paint, { sourceUrl: 'https://invalid.test/' });
+    if (reason === 'radius')
+      resource.paint.path = [
+        { op: 'arc', args: [0, 0, -1, 0, 1, false], transform: [1, 0, 0, 1, 0, 0] },
+      ];
+    if (reason === 'path-budget')
+      resource.paint.path = Array.from({ length: 129 }, () => ({
+        op: 'closePath',
+        args: [],
+        transform: [1, 0, 0, 1, 0, 0],
+      }));
+    expect(parseEffectRuntimeGpuPlan(p, request())).toBeNull();
+  }
+);
+
+it('keeps paint coverage separate from drawable sources', () => {
+  const p = paintPlan(),
+    resource = p.resources[1]!;
+  if (resource.kind !== 'paint') throw new Error('Missing paint');
+  resource.coverage = true;
+  const draw = p.passes[0]!.operations[0]!;
+  if (draw.op !== 'draw') throw new Error('Missing draw');
+  draw.coverage = 1;
+  expect(parseEffectRuntimeGpuPlan(p, request())).not.toBeNull();
+  draw.source = { kind: 'resource', id: 1 };
+  expect(parseEffectRuntimeGpuPlan(p, request())).toBeNull();
+});
+it('bounds aggregate paint metadata independently from decoded raster bytes', () => {
+  const p = paintPlan(),
+    resource = p.resources[1]!;
+  if (resource.kind !== 'paint') throw new Error('Missing paint');
+  resource.paint.draw = { op: 'fillText', args: ['x'.repeat(16000), 0, 8] };
+  p.resources = [
+    p.resources[0]!,
+    ...Array.from({ length: 40 }, (_, id) => ({ ...resource, id: id + 1 })),
+  ];
+  expect(parseEffectRuntimeGpuPlan(p, request())).toBeNull();
+});
+
+it.each([
+  'clip-shape',
+  'clip-count',
+  'clip-transform',
+  'paint-bytes',
+  'arc-boolean',
+  'arc-to-radius',
+  'ellipse-radius',
+] as const)('rejects closed paint operands at the %s boundary', (reason) => {
+  const p = paintPlan();
+  const resource = p.resources[1]!;
+  if (resource.kind !== 'paint') throw new Error('Expected paint resource');
+  if (reason === 'clip-shape') Object.assign(resource.paint, { clips: null });
+  if (reason === 'clip-count') Object.assign(resource.paint, { clips: Array(129) });
+  if (reason === 'clip-transform')
+    resource.paint.clips = [
+      { rect: { x: 0, y: 0, width: 1, height: 1 }, transform: [1, 0, 0, 1, Number.NaN, 0] },
+    ];
+  if (reason === 'paint-bytes')
+    resource.paint.style.fill = {
+      kind: 'linear',
+      args: [0, 0, 1, 1],
+      transform: [1, 0, 0, 1, 0, 0],
+      stops: Array.from({ length: 128 }, (_, i) => [i / 127, 'x'.repeat(1024)]),
+    };
+  if (reason === 'arc-boolean')
+    resource.paint.path = [{ op: 'arc', args: [0, 0, 1, 0, 1, 0], transform: [1, 0, 0, 1, 0, 0] }];
+  if (reason === 'arc-to-radius')
+    resource.paint.path = [{ op: 'arcTo', args: [0, 0, 1, 1, -1], transform: [1, 0, 0, 1, 0, 0] }];
+  if (reason === 'ellipse-radius')
+    resource.paint.path = [
+      { op: 'ellipse', args: [0, 0, 1, -1, 0, 0, 1, false], transform: [1, 0, 0, 1, 0, 0] },
+    ];
+  expect(parseEffectRuntimeGpuPlan(p, request())).toBeNull();
+});
+
+it('retains the established evaluated-plan operation and dependency-depth budgets', () => {
+  expect(EFFECT_RUNTIME_GPU_PLAN_LIMITS).toEqual({ scalarOperations: 50_000, depth: 32 });
+  expect(Object.isFrozen(EFFECT_RUNTIME_GPU_PLAN_LIMITS)).toBe(true);
 });

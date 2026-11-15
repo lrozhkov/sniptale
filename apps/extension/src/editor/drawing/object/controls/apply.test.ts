@@ -198,7 +198,7 @@ it('applies drawing chrome without box controls to drawing multi-selection', () 
   applyEditorDrawingActiveSelectionChrome(selection);
 
   expect(selection.borderColor).toBe('#2563eb');
-  expect(selection.borderDashArray).toEqual([4, 3]);
+  expect(selection.borderDashArray).toBeNull();
   expect(selection.hasControls).toBe(true);
   expect(Object.keys(selection.controls)).toEqual(['mtr']);
   expect(selection.controls['mtr']?.actionName).toBe('rotate');
@@ -221,7 +221,7 @@ it('uses the blue drawing selection chrome for an editable layer group', () => {
 
   expect(group.borderColor).toBe('#2563eb');
   expect(group.cornerStrokeColor).toBe('#2563eb');
-  expect(group.borderDashArray).toEqual([4, 3]);
+  expect(group.borderDashArray).toBeNull();
   expect(group.hasControls).toBe(true);
 });
 

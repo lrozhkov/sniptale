@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../../../project/transition/gl-catalog';
 import { expect, it } from 'vitest';
 import {
   createAnnotationClip,
@@ -294,7 +295,7 @@ it('resolves only active visible visual layers across clip kinds', () => {
   );
 });
 
-it('resolves transition-driven render state for active clip overlaps', () => {
+it('retains canonical source geometry and delegates active overlaps to the GL plan', () => {
   const project = createEmptyVideoProject('Transition layers', 1280, 720);
   const trackId = project.tracks[0]?.id ?? '';
   const imageAsset = createMediaAsset(
@@ -312,34 +313,41 @@ it('resolves transition-driven render state for active clip overlaps', () => {
   trailingClip.id = 'clip-b';
   trailingClip.duration = 4;
 
-  const frame = resolveVideoCompositionFrame(
-    {
-      ...project,
-      assets: [imageAsset],
-      clips: [leadingClip, trailingClip],
-      transitions: [
-        {
-          direction: 'LEFT',
-          duration: 1,
-          easing: 'LINEAR',
-          id: 'transition-1',
-          intensity: 'BALANCED',
-          kind: 'PUSH',
-          leadingClipId: 'clip-a',
-          renderKind: 'COMPOSITE',
-          templateKind: 'PUSH',
-          trailingClipId: 'clip-b',
-        },
-      ],
-    },
-    3.5
-  );
+  Object.assign(project, {
+    ...project,
+    assets: [imageAsset],
+    clips: [leadingClip, trailingClip],
+    transitions: [
+      {
+        duration: 1,
+        easing: 'LINEAR',
+        id: 'transition-1',
+
+        kind: 'gl' as const,
+        selection: createGlTransitionSelection('Fade')!,
+        leadingClipId: 'clip-a',
+
+        trailingClipId: 'clip-b',
+      },
+    ],
+  });
+  const frame = resolveVideoCompositionFrame(project, 3.5);
 
   const leadingLayer = frame.visualLayers.find((layer) => layer.clipId === 'clip-a');
   const trailingLayer = frame.visualLayers.find((layer) => layer.clipId === 'clip-b');
 
-  expect(leadingLayer?.renderState.translateX).toBeLessThan(0);
-  expect(trailingLayer?.renderState.translateX).toBeGreaterThan(0);
+  expect(leadingLayer?.renderState.translateX).toBe(0);
+  expect(trailingLayer?.renderState.translateX).toBe(0);
+  expect(leadingLayer?.opacity).toBe(1);
+  expect(trailingLayer?.opacity).toBe(1);
+  expect(frame.glTrackPlans?.get(trackId)).toMatchObject({
+    kind: 'gl',
+    junction: { progress: 0.5 },
+  });
+  project.tracks[0]!.visible = false;
+  const hidden = resolveVideoCompositionFrame(project, 3.5);
+  expect(hidden.glTrackPlans).toBeUndefined();
+  expect(hidden.visualLayers).toHaveLength(0);
 });
 
 it('omits subtitle layers when subtitle rendering is disabled for the frame', () => {

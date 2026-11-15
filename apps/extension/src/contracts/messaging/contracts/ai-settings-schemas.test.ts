@@ -366,3 +366,34 @@ it('rejects retired global selection metadata in current catalog responses', () 
     }).success
   ).toBe(false);
 });
+
+it('parses the sanitized image protocol hint and rejects a raw endpoint in its place', () => {
+  const provider = {
+    connectionType: 'openai-compatible',
+    createdAt: 1,
+    hasStoredApiKey: true,
+    id: '00000000-0000-4000-8000-000000000002',
+    name: 'Image provider',
+    destinationKind: 'external',
+    imageApi: 'routerai',
+  };
+  const response = {
+    success: true,
+    modelSelection: {
+      chromeAiEnabled: false,
+      globalSystemPrompt: '',
+      models: [],
+      providers: [provider],
+    },
+  };
+  expect(aiSettingsQueryResponseSchema.safeParse(response).success).toBe(true);
+  expect(
+    aiSettingsQueryResponseSchema.safeParse({
+      ...response,
+      modelSelection: {
+        ...response.modelSelection,
+        providers: [{ ...provider, imageApi: 'https://private-provider.test/v1' }],
+      },
+    }).success
+  ).toBe(false);
+});

@@ -1,114 +1,46 @@
-import { resolveCatalogDocument } from '../effect-bundle/catalog/resolution';
-import {
-  assertEffectV1AssetSignature,
-  sha256EffectV1Bytes,
-  validateEffectV1Document,
-  type EffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
-
+import type { AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
+import { verifyRuntimeAnimationSource } from '../../../../contracts/effect-runtime/animation';
 import type { EffectBundleCatalogEntry } from '../effect-bundle/catalog';
-import {
-  resolveEffectBundleCatalogClosure,
-  type ResolvedEffectBundleCatalogAsset,
-} from '../effect-bundle/catalog/closure';
-import { parseBoundedEffectJson } from '../effect-bundle/json-structure';
+import { resolveCatalogDocument } from '../effect-bundle/catalog/resolution';
 import { failCatalogIntegrity } from './errors';
 
-export interface VerifiedCatalogAsset extends ResolvedEffectBundleCatalogAsset {
-  bytes: Uint8Array;
-}
-
+/** Catalogs contain self-contained immutable packages; no detached resource closure is decoded or copied. */
 export async function readVerifiedCatalogDocument(
   catalog: EffectBundleCatalogEntry,
   documentId: string
 ): Promise<{
-  assets: VerifiedCatalogAsset[];
+  assets: [];
   catalogDocument: EffectBundleCatalogEntry['documents'][number];
-  document: EffectV1Document;
+  document: AnimationTemplate;
 }> {
   catalog = await resolveCatalogDocument(catalog, documentId);
-  const catalogDocument = catalog.documents.find(({ id }) => id === documentId);
-  if (!catalogDocument) failCatalogIntegrity();
-  const documentResult = await readCatalogDocuments(catalog);
-  const closure = resolveEffectBundleCatalogClosure(catalog, documentResult.documents);
-  if (!closure) failCatalogIntegrity();
-  const assetResult = await readCatalogAssets(catalog);
-  const document = documentResult.documents.get(documentId);
-  const resolvedAssets = closure.get(documentId);
+  const selected = catalog.documents.find((entry) => entry.id === documentId);
   if (
-    !document ||
-    !resolvedAssets ||
-    documentResult.retainedByteLength + assetResult.retainedByteLength !==
-      catalog.retainedByteLength
-  ) {
+    !selected ||
+    selected.source === undefined ||
+    selected.kind !== 'standalone' ||
+    selected.schemaVersion !== 'sniptale.animation.v1' ||
+    catalog.assets.length !== 0
+  )
     failCatalogIntegrity();
-  }
-  return {
-    assets: resolvedAssets.map((resolved) => ({
-      ...resolved,
-      bytes: requireVerifiedBytes(assetResult.verifiedBytes, resolved.sha256),
-    })),
-    catalogDocument,
-    document,
-  };
-}
-
-async function readCatalogDocuments(catalog: EffectBundleCatalogEntry): Promise<{
-  documents: Map<string, EffectV1Document>;
-  retainedByteLength: number;
-}> {
-  const documents = new Map<string, EffectV1Document>();
-  let retainedByteLength = 0;
+  let retainedBytes = 0;
+  const ids = new Set<string>();
+  let selectedDocument: AnimationTemplate | null = null;
   for (const entry of catalog.documents) {
-    if (entry.source === undefined) failCatalogIntegrity();
-    const sourceBytes = new TextEncoder().encode(entry.source);
-    retainedByteLength += sourceBytes.byteLength;
-    if ((await sha256EffectV1Bytes(sourceBytes)) !== entry.sha256) failCatalogIntegrity();
-    const input = parseCatalogDocument(sourceBytes);
-    const validation = validateEffectV1Document(input, { presentationPolicy: 'retained' });
-    if (!validation.ok || !validation.document || validation.document.id !== entry.id) {
+    if (
+      ids.has(entry.id) ||
+      entry.source === undefined ||
+      entry.assets.length !== 0 ||
+      entry.kind !== 'standalone' ||
+      entry.schemaVersion !== 'sniptale.animation.v1'
+    )
       failCatalogIntegrity();
-    }
-    documents.set(entry.id, validation.document);
+    ids.add(entry.id);
+    retainedBytes += new TextEncoder().encode(entry.source).byteLength;
+    const document = await verifyRuntimeAnimationSource(entry.source, entry.sha256);
+    if (!document || document.id !== entry.id) failCatalogIntegrity();
+    if (entry.id === documentId) selectedDocument = document;
   }
-  return { documents, retainedByteLength };
-}
-
-async function readCatalogAssets(catalog: EffectBundleCatalogEntry): Promise<{
-  retainedByteLength: number;
-  verifiedBytes: Map<string, Uint8Array>;
-}> {
-  const verifiedBytes = new Map<string, Uint8Array>();
-  let retainedByteLength = 0;
-  for (const asset of catalog.assets) {
-    const bytes = new Uint8Array(await asset.blob.arrayBuffer());
-    retainedByteLength += bytes.byteLength;
-    try {
-      if (
-        bytes.byteLength !== asset.byteLength ||
-        (await sha256EffectV1Bytes(bytes)) !== asset.sha256
-      ) {
-        failCatalogIntegrity();
-      }
-      assertEffectV1AssetSignature(bytes, asset.mimeType, 'catalog-apply');
-    } catch {
-      failCatalogIntegrity();
-    }
-    verifiedBytes.set(asset.sha256, bytes);
-  }
-  return { retainedByteLength, verifiedBytes };
-}
-
-function parseCatalogDocument(sourceBytes: Uint8Array): unknown {
-  try {
-    return parseBoundedEffectJson(sourceBytes);
-  } catch {
-    failCatalogIntegrity();
-  }
-}
-
-function requireVerifiedBytes(verifiedBytes: Map<string, Uint8Array>, sha256: string): Uint8Array {
-  const bytes = verifiedBytes.get(sha256);
-  if (!bytes) failCatalogIntegrity();
-  return bytes;
+  if (!selectedDocument || retainedBytes !== catalog.retainedByteLength) failCatalogIntegrity();
+  return { assets: [], catalogDocument: selected, document: selectedDocument };
 }

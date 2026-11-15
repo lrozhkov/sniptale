@@ -151,6 +151,8 @@ export async function prepareReviewFinalCaptions(args: {
   >;
   effective: Pick<
     ReturnType<typeof resolveQuickEditEffectiveState>,
+    | 'sourceFilters'
+    | 'cursorMotions'
     | 'canvas'
     | 'background'
     | 'windowHeader'
@@ -170,12 +172,14 @@ export async function prepareReviewFinalCaptions(args: {
   input.signal.throwIfAborted();
   const scene = {
     source: source.size,
+    sourceFilters: effective.sourceFilters,
     ...(effective.canvas ? { canvas: effective.canvas } : {}),
     background: effective.background,
     windowHeader: effective.windowHeader,
     watermark: effective.watermark,
     webcam: effective.webcam,
     webcamDuration: args.webcamDuration,
+    cursorMotions: effective.cursorMotions,
     zoomRegions: effective.zoomRegions,
     comments: input.comments ?? [],
     keys: input.keyCues ?? [],

@@ -85,7 +85,7 @@ it.each(['solid', 'pixelate', 'distortion', 'gaussian'] as const)(
     expect(syncAmount).toHaveBeenCalledWith('blur', { amount: 9 });
     syncAmount.mockRestore();
     applySelectionToolSettingsToObjects(
-      { requestRenderAll: vi.fn() } as unknown as Canvas,
+      { getObjects: () => reopened, requestRenderAll: vi.fn() } as unknown as Canvas,
       [reopenedBlur],
       'blur',
       { ...useEditorStore.getState().selectionToolSettings, blur: { amount: 17 } }

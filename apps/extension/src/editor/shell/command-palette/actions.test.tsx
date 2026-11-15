@@ -27,6 +27,9 @@ function createArgs(): Parameters<typeof buildEditorCommandPaletteActions>[0] {
     setImageData: vi.fn(),
     controller: {
       copyRenderedImage: vi.fn(),
+      copyVectorSelection: vi.fn(async () => true),
+      pasteVectorSelection: vi.fn(async () => true),
+      getVectorClipboardAvailability: vi.fn(() => ({ canCopy: false, canPaste: false })),
       deleteSelection: vi.fn(),
       duplicateSelection: vi.fn(),
       exportDocument: vi.fn(),
@@ -70,4 +73,35 @@ it('builds history and selection actions with the expected enabled state', () =>
   expect(undoAction).toEqual(expect.objectContaining({ disabled: false }));
   expect(redoAction).toEqual(expect.objectContaining({ disabled: true }));
   expect(duplicateAction).toEqual(expect.objectContaining({ disabled: true }));
+});
+
+it('routes vector copy and paste independently from existing PNG copy', async () => {
+  const args = createArgs();
+  vi.mocked(args.controller.getVectorClipboardAvailability).mockReturnValue({
+    canCopy: true,
+    canPaste: true,
+  });
+  const actions = buildEditorCommandPaletteActions(args);
+  await actions.find((action) => action.id === 'editor-copy-vector-layers')?.onSelect();
+  await actions.find((action) => action.id === 'editor-paste-vector-layers')?.onSelect();
+  expect(args.controller.copyVectorSelection).toHaveBeenCalledOnce();
+  expect(args.controller.pasteVectorSelection).toHaveBeenCalledOnce();
+  expect(args.controller.copyRenderedImage).not.toHaveBeenCalled();
+  await actions.find((action) => action.id === 'editor-copy-png')?.onSelect();
+  expect(args.controller.copyRenderedImage).toHaveBeenCalledOnce();
+});
+
+it('uses clipboard availability so empty selection can paste while unsupported copy stays disabled', () => {
+  const args = createArgs();
+  vi.mocked(args.controller.getVectorClipboardAvailability).mockReturnValue({
+    canCopy: false,
+    canPaste: true,
+  });
+  const actions = buildEditorCommandPaletteActions(args);
+  expect(actions.find((action) => action.id === 'editor-copy-vector-layers')).toMatchObject({
+    disabled: true,
+  });
+  expect(actions.find((action) => action.id === 'editor-paste-vector-layers')).toMatchObject({
+    disabled: false,
+  });
 });

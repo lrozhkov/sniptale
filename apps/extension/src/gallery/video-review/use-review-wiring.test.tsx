@@ -118,7 +118,12 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
   try {
     await act(async () => root.render(<Harness />));
     expect(result.telemetry).toBe(true);
-    expect(mocks.project).toHaveBeenCalledWith(args.telemetry, args.sourceDuration, true);
+    expect(mocks.project).toHaveBeenCalledWith(
+      args.telemetry,
+      args.sourceDuration,
+      true,
+      undefined
+    );
     expect(result.projected.warnings).toBe(2);
     expect(result.projected.captureCapabilities).toBeNull();
     const capabilities = {

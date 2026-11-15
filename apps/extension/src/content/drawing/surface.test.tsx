@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createDrawingSession, resolveDrawingToolCursor } from '../../features/drawing/public';
+import type { DrawingDocumentCommit, DrawingTool } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import { DrawingSurface, getDrawingViewportProjection, toDrawingScenePoint } from './surface';
 
@@ -45,6 +46,177 @@ function createCanvasContextFixture(): CanvasRenderingContext2D {
 }
 
 const context = createCanvasContextFixture();
+
+it.each(['select', 'arrow'] as const)(
+  'removes a selected arrow bend once on a real double-click sequence in %s',
+  (tool) => {
+    const commits: DrawingDocumentCommit[] = [];
+    const session = createDrawingSession({
+      onDocumentCommit: (commit) => {
+        commits.push(commit);
+        return true;
+      },
+    });
+    const original = {
+      id: 'double-click-arrow',
+      kind: 'arrow' as const,
+      design: 'freehand' as const,
+      dynamicWidth: false,
+      start: { x: 40, y: 80 },
+      end: { x: 240, y: 80 },
+      bendPoints: [{ x: 140, y: 140 }],
+      color: '#ef4444',
+      width: 4,
+    };
+    session.commitObject(original);
+    session.setActiveTool(tool);
+    session.select(original.id);
+    const controller: ContentDrawingController = {
+      session,
+      getPalette: () => [],
+      applyPalette: vi.fn(),
+      getScrollRoot: () => ({ kind: 'viewport', element: null }),
+      prepareActivation: () => true,
+      registerInteractionFinalizer: vi.fn(),
+      finalizeInteraction: vi.fn(),
+    };
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
+    const canvas = host.querySelector('canvas')!;
+    commits.length = 0;
+    try {
+      for (const detail of [1, 2]) {
+        for (const type of ['pointerdown', 'pointerup', 'click']) {
+          const event = new MouseEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            clientX: 152,
+            clientY: 140,
+            button: 0,
+            detail,
+          });
+          Object.defineProperties(event, {
+            pointerId: { value: 1 },
+            pointerType: { value: 'mouse' },
+          });
+          act(() => canvas.dispatchEvent(event));
+        }
+      }
+      act(() =>
+        canvas.dispatchEvent(
+          new MouseEvent('dblclick', {
+            bubbles: true,
+            cancelable: true,
+            clientX: 152,
+            clientY: 140,
+            detail: 2,
+          })
+        )
+      );
+      expect(commits).toHaveLength(1);
+      const removed = { ...original, bendPoints: [] };
+      expect(session.getSnapshot().document.objects).toEqual([removed]);
+      expect(session.getSnapshot().selectedObjectId).toBe(original.id);
+      act(() => commits[0]!.replay(commits[0]!.before));
+      expect(session.getSnapshot().document.objects).toEqual([original]);
+      act(() => commits[0]!.replay(commits[0]!.after));
+      expect(session.getSnapshot().document.objects).toEqual([removed]);
+      expect(commits).toHaveLength(1);
+      act(() => session.select(original.id));
+      for (const point of [original.start, original.end, { x: 140, y: 80 }]) {
+        act(() =>
+          canvas.dispatchEvent(
+            new MouseEvent('dblclick', {
+              bubbles: true,
+              clientX: point.x,
+              clientY: point.y,
+              detail: 2,
+            })
+          )
+        );
+      }
+      expect(commits).toHaveLength(1);
+      expect(session.getSnapshot().selectedObjectId).toBe(original.id);
+    } finally {
+      act(() => root.unmount());
+    }
+  }
+);
+
+it.each([
+  { active: false, suppressed: false, tool: 'select', liveDraft: false },
+  { active: true, suppressed: true, tool: 'select', liveDraft: false },
+  { active: true, suppressed: false, tool: 'pencil', liveDraft: false },
+  { active: true, suppressed: false, tool: 'select', liveDraft: true },
+] satisfies Array<{ active: boolean; suppressed: boolean; tool: DrawingTool; liveDraft: boolean }>)(
+  'does not remove an unavailable arrow point: %j',
+  ({ active, suppressed, tool, liveDraft }) => {
+    const commit = vi.fn(() => true);
+    const session = createDrawingSession({ onDocumentCommit: commit });
+    session.commitObject({
+      id: 'guarded-arrow',
+      kind: 'arrow',
+      design: 'freehand',
+      dynamicWidth: false,
+      color: '#ef4444',
+      width: 4,
+      start: { x: 40, y: 80 },
+      end: { x: 240, y: 80 },
+      bendPoints: [{ x: 140, y: 140 }],
+    });
+    session.setActiveTool(tool);
+    session.select('guarded-arrow');
+    const before = session.getCommittedDocument();
+    const controller: ContentDrawingController = {
+      session,
+      getPalette: () => [],
+      applyPalette: vi.fn(),
+      getScrollRoot: () => ({ kind: 'viewport', element: null }),
+      prepareActivation: () => true,
+      registerInteractionFinalizer: vi.fn(),
+      finalizeInteraction: vi.fn(),
+    };
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    act(() =>
+      root.render(
+        <DrawingSurface
+          active={active}
+          chromeHidden={false}
+          serviceUiSuppressed={suppressed}
+          controller={controller}
+        />
+      )
+    );
+    commit.mockClear();
+    if (liveDraft) {
+      const event = new MouseEvent('pointerdown', {
+        bubbles: true,
+        clientX: 140,
+        clientY: 140,
+        button: 0,
+      });
+      Object.defineProperties(event, { pointerId: { value: 1 }, pointerType: { value: 'mouse' } });
+      act(() => host.querySelector('canvas')!.dispatchEvent(event));
+    }
+    act(() =>
+      host.querySelector('canvas')!.dispatchEvent(
+        new MouseEvent('dblclick', {
+          bubbles: true,
+          clientX: 140,
+          clientY: 140,
+          detail: 2,
+        })
+      )
+    );
+    expect(session.getCommittedDocument()).toBe(before);
+    expect(commit).not.toHaveBeenCalled();
+    act(() => root.unmount());
+  }
+);
 
 function inputText(editor: HTMLTextAreaElement, value: string) {
   const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
@@ -416,6 +588,21 @@ it('opens an existing text with the Text tool and hides its canvas copy while ed
   vi.clearAllMocks();
   const canvas = host.querySelector('canvas')!;
 
+  const pointer = (type: string, clientX: number) => {
+    const event = new MouseEvent(type, { bubbles: true, button: 0, clientX, clientY: 40 });
+    Object.defineProperties(event, {
+      pointerId: { value: 1 },
+      pointerType: { value: 'mouse' },
+    });
+    return event;
+  };
+  act(() => canvas.dispatchEvent(pointer('pointerdown', 40)));
+  expect(session.getSnapshot().selectedObjectIds).toEqual([]);
+  act(() => canvas.dispatchEvent(pointer('pointermove', 43.99)));
+  expect(session.getSnapshot().selectedObjectIds).toEqual([]);
+  act(() => canvas.dispatchEvent(pointer('pointerup', 43.99)));
+  expect(session.getSnapshot().selectedObjectIds).toEqual(['existing-text']);
+
   act(() =>
     canvas.dispatchEvent(
       new MouseEvent('click', { bubbles: true, cancelable: true, clientX: 40, clientY: 40 })
@@ -490,57 +677,6 @@ it('keeps the text baseline and per-line background stable while switching to ed
   expect(editor.style.fontSize).toBe('20px');
   expect(editor.style.lineHeight).toBe('25px');
   expect(editor.style.padding).toBe('2px 6px');
-  act(() => root.unmount());
-});
-
-it('moves existing text with a Text-tool drag without opening the editor on the trailing click', () => {
-  const session = createDrawingSession({ onDocumentCommit: () => true });
-  session.commitObject({
-    backgroundColor: null,
-    bounds: { x: 20, y: 30, width: 180, height: 40 },
-    color: '#111827',
-    fontSize: 20,
-    id: 'draggable-text',
-    kind: 'text',
-    text: 'Drag me',
-  });
-  session.setActiveTool('text');
-  const controller: ContentDrawingController = {
-    session,
-    getPalette: () => ['#ef4444'],
-    applyPalette: vi.fn(),
-    getScrollRoot: () => ({ kind: 'viewport', element: null }),
-    prepareActivation: () => true,
-    registerInteractionFinalizer: vi.fn(),
-    finalizeInteraction: vi.fn(),
-  };
-  const host = document.createElement('div');
-  document.body.append(host);
-  const root = createRoot(host);
-  act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
-  const canvas = host.querySelector('canvas')!;
-  const pointer = (type: string, clientX: number, clientY: number) => {
-    const event = new MouseEvent(type, { bubbles: true, button: 0, clientX, clientY });
-    Object.defineProperties(event, {
-      pointerId: { value: 1 },
-      pointerType: { value: 'mouse' },
-    });
-    return event;
-  };
-
-  act(() => {
-    canvas.dispatchEvent(pointer('pointerdown', 40, 40));
-    canvas.dispatchEvent(pointer('pointermove', 90, 80));
-    canvas.dispatchEvent(pointer('pointerup', 90, 80));
-    canvas.dispatchEvent(
-      new MouseEvent('click', { bubbles: true, cancelable: true, clientX: 90, clientY: 80 })
-    );
-  });
-
-  expect(session.getSnapshot().document.objects[0]).toMatchObject({
-    bounds: { x: 70, y: 70, width: 180, height: 40 },
-  });
-  expect(host.querySelector('[data-ui="content.drawing.text-input"]')).toBeNull();
   act(() => root.unmount());
 });
 
@@ -796,4 +932,75 @@ it('commits a speed-sampled pencil object and becomes click-through outside Draw
   expect(canvas.style.cursor).toBe('default');
   expect(session.getSnapshot().document.objects).toHaveLength(3);
   act(() => root.unmount());
+});
+
+it('keeps drawing content editable without invisible resize handles during recording', () => {
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.commitObject({
+    id: 'box',
+    kind: 'rectangle',
+    bounds: { x: 100, y: 100, width: 100, height: 60 },
+    color: '#f00',
+    fillColor: '#f00',
+    width: 2,
+  });
+  session.setActiveTool('select');
+  session.select('box');
+  const controller: ContentDrawingController = {
+    session,
+    getPalette: () => ['#f00'],
+    applyPalette: vi.fn(),
+    getScrollRoot: () => ({ kind: 'viewport', element: null }),
+    prepareActivation: () => true,
+    registerInteractionFinalizer: vi.fn(),
+    finalizeInteraction: vi.fn(),
+  };
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const event = (type: string, clientX: number, clientY: number) => {
+    const value = new MouseEvent(type, { bubbles: true, button: 0, clientX, clientY });
+    Object.defineProperties(value, { pointerId: { value: 1 }, pointerType: { value: 'mouse' } });
+    return value;
+  };
+  try {
+    act(() =>
+      root.render(
+        <DrawingSurface active chromeHidden={false} serviceUiSuppressed controller={controller} />
+      )
+    );
+    const chrome = host.querySelector<HTMLCanvasElement>(
+      '[data-ui="content.drawing.selection-chrome"]'
+    )!;
+    const canvas =
+      host.querySelector<HTMLCanvasElement>('[data-ui="content.drawing.canvas"]') ??
+      host.querySelector<HTMLCanvasElement>('canvas')!;
+    expect(chrome.hidden).toBe(true);
+    act(() => canvas.dispatchEvent(event('pointerdown', 100, 100)));
+    act(() => canvas.dispatchEvent(event('pointermove', 120, 120)));
+    act(() => canvas.dispatchEvent(event('pointerup', 120, 120)));
+    const object = session.getSnapshot().document.objects[0]!;
+    expect(object.kind).toBe('rectangle');
+    if (object.kind !== 'rectangle') throw new Error('Expected rectangle');
+    expect(object.bounds).toEqual({ x: 120, y: 120, width: 100, height: 60 });
+    act(() =>
+      root.render(
+        <DrawingSurface
+          active
+          chromeHidden={false}
+          serviceUiSuppressed={false}
+          controller={controller}
+        />
+      )
+    );
+    expect(chrome.hidden).toBe(false);
+    act(() => canvas.dispatchEvent(event('pointerdown', 120, 120)));
+    act(() => canvas.dispatchEvent(event('pointermove', 100, 100)));
+    act(() => canvas.dispatchEvent(event('pointerup', 100, 100)));
+    const resized = session.getSnapshot().document.objects[0]!;
+    if (resized.kind !== 'rectangle') throw new Error('Expected rectangle');
+    expect(resized.bounds).toEqual({ x: 100, y: 100, width: 120, height: 80 });
+  } finally {
+    act(() => root.unmount());
+  }
 });

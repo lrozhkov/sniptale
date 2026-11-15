@@ -9,6 +9,8 @@ interface PreviewAudioGraphNode {
   element: HTMLAudioElement;
   gain: GainNode;
   source: MediaElementAudioSourceNode;
+  processingActive?: boolean;
+  processedOutput?: AudioNode;
 }
 
 export interface PreviewAudioGraphState {
@@ -53,9 +55,9 @@ function markPreviewAudioGraphUnavailable(
   return null;
 }
 
-function getPreviewAudioContext(
+export function getPreviewAudioContext(
   state: PreviewAudioGraphState,
-  logger: Logger | null
+  logger: Logger | null = null
 ): AudioContext | null {
   if (state.unavailable) {
     return null;
@@ -87,6 +89,7 @@ function getPreviewAudioContext(
 }
 
 function disconnectPreviewAudioNode(node: PreviewAudioGraphNode): void {
+  disconnectProcessedOutput(node);
   node.source.disconnect();
   node.gain.disconnect();
 }
@@ -224,4 +227,38 @@ export function cleanupPreviewAudioGraph(
   state.audioContext = null;
   state.resumePromise = null;
   state.unavailable = false;
+}
+
+function disconnectProcessedOutput(node: PreviewAudioGraphNode) {
+  if (!node.processedOutput) return;
+  // The placement owner can already have disconnected its output during cancellation.
+  try {
+    node.processedOutput.disconnect(node.gain);
+  } catch {
+    /* Already released. */
+  }
+  delete node.processedOutput;
+}
+
+/** Only explicit bypass reconnects the media element; failed processing remains silent. */
+export function setPreviewAudioNodeProcessing(
+  node: PreviewAudioGraphNode,
+  active: boolean,
+  output?: AudioNode
+): void {
+  if (active) {
+    if (!node.processingActive) {
+      node.source.disconnect();
+      node.processingActive = true;
+    }
+    if (output && node.processedOutput !== output) {
+      disconnectProcessedOutput(node);
+      output.connect(node.gain);
+      node.processedOutput = output;
+    }
+  } else if (node.processingActive) {
+    disconnectProcessedOutput(node);
+    node.source.connect(node.gain);
+    node.processingActive = false;
+  }
 }

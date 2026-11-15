@@ -1,4 +1,4 @@
-import fs from 'node:fs';
+import KNIP_CONFIG from '../../../configs/qa/knip.json';
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -7,10 +7,11 @@ import { runKnipCheck } from './knip.mjs';
 
 describe('Knip configured integrity owner', () => {
   it('keeps raw and canonical execution on the same exact policy scope', () => {
-    const config = JSON.parse(fs.readFileSync('tooling/configs/qa/knip.json', 'utf8'));
+    const config = KNIP_CONFIG;
     expect(config.include).toEqual(['unresolved', 'unlisted', 'binaries']);
     expect(config.ignoreBinaries).toEqual([
       'codeql',
+      'fc-query',
       'flock',
       'gcc',
       'import',

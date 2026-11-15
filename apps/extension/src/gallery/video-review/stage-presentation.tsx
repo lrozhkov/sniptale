@@ -1,3 +1,4 @@
+import type { ReviewAnnotationEditing } from './annotation-effects-overlay';
 import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
 import { DelayedLoadingFallback } from '@sniptale/ui/loading-delay';
 import { useEffect, useState, type RefObject, type PointerEvent } from 'react';
@@ -18,6 +19,8 @@ import type {
 type PreviewInput = Parameters<typeof useReviewPreviewPresentation>[0];
 /** Presentation input is independent of the stage component that consumes this adapter. */
 type PresentationProps = {
+  annotationEditing?: Pick<ReviewAnnotationEditing, 'editor'> | undefined;
+  cursorMotions?: import('../../features/video/project/cursor-motion').CursorMotion[] | undefined;
   captions?: PreviewInput['scene']['captions'];
   annotationEffects?: PreviewInput['scene']['annotationEffects'];
   readAsset?: PreviewInput['readAsset'];
@@ -56,6 +59,7 @@ type PresentationProps = {
 function stagePresentationScene(
   props: Pick<
     PresentationProps,
+    | 'cursorMotions'
     | 'source'
     | 'captions'
     | 'annotationEffects'
@@ -69,10 +73,12 @@ function stagePresentationScene(
   >
 ): Parameters<typeof useReviewPreviewPresentation>[0]['scene'] {
   return {
+    ...(props.cursorMotions ? { cursorMotions: props.cursorMotions } : {}),
     ...(props.captions ? { captions: props.captions } : {}),
     ...(props.annotationEffects ? { annotationEffects: props.annotationEffects } : {}),
     outerFadePlan: props.outerFadePlan,
     source: { width: props.source.width, height: props.source.height },
+    ...(props.scene?.sourceFilters ? { sourceFilters: props.scene.sourceFilters } : {}),
     ...(props.scene?.canvas ? { canvas: props.scene.canvas } : {}),
     background: props.scene?.background ?? { enabled: false },
     ...(props.scene?.windowHeader ? { windowHeader: props.scene.windowHeader } : {}),
@@ -145,6 +151,10 @@ export function useStagePresentation(
     preferences: props.preview?.preferences ?? DEFAULT_QUICK_PREVIEW_PREFERENCES,
     playing: props.preview?.playing ?? false,
     interacting: interacting || !!props.preview?.interacting,
+    annotationMovement: props.annotationEditing?.editor.movement,
+    annotationGesture: props.annotationEditing?.editor.lane?.instances.find(
+      (entry) => entry.id === props.annotationEditing?.editor.gestureId
+    ),
     visible: true,
     pausedSourceTime: props.comments?.time ?? props.video.current?.currentTime ?? 0,
     pausedResultTime: props.scene?.focus?.time ?? 0,

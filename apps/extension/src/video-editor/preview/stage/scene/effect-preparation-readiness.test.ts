@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { animationRuntimeDuration } from '../../../../contracts/effect-runtime/animation';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { EffectRuntimeSandboxExecutor } from '../../../../contracts/effect-runtime/types';
 import {
@@ -15,7 +17,7 @@ import {
   createProject,
   createVideoClip,
 } from '../../../../features/video/project/timeline/project-meta.test.helpers';
-import { createNativeEffectPreparation } from './effect-preparation';
+import { createNativeEffectPreparation } from '../../../../workflows/video/native-composition/effect-preparation';
 import type { PreviewSceneRenderInput } from './types';
 import { createVideoEditorEffectRuntime } from '../../../runtime/effect-runtime';
 import {
@@ -39,11 +41,11 @@ afterEach(() => {
 function futureInput(executor: EffectRuntimeSandboxExecutor): PreviewSceneRenderInput {
   const project = createProject([createVideoClip({ duration: 5, sourceDuration: 5 })]);
   const source = readFileSync(
-    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
+    'apps/extension/public/video-effects/animations/title.sniptale-animation.json',
     'utf8'
   );
   const definition = parseEffectRuntimeSnapshotDocument({ source });
-  const sha256 = 'a'.repeat(64);
+  const sha256 = createHash('sha256').update(source).digest('hex');
   project.effectSnapshots = [
     {
       id: `effect:${sha256}`,
@@ -52,7 +54,7 @@ function futureInput(executor: EffectRuntimeSandboxExecutor): PreviewSceneRender
       documentId: definition.id,
       assets: [],
       kind: 'standalone',
-      schemaVersion: 'sniptale.effect.v1',
+      schemaVersion: 'sniptale.animation.v1',
       retainedByteLength: new TextEncoder().encode(source).byteLength,
     },
   ];
@@ -61,7 +63,7 @@ function futureInput(executor: EffectRuntimeSandboxExecutor): PreviewSceneRender
       id: 'future',
       snapshotId: `effect:${sha256}`,
       controls: {},
-      duration: definition.duration,
+      duration: animationRuntimeDuration(definition),
       enabled: true,
       kind: 'standalone',
       playbackRate: 1,
@@ -74,7 +76,7 @@ function futureInput(executor: EffectRuntimeSandboxExecutor): PreviewSceneRender
       effectInstanceId: 'future',
       name: 'Future',
       startTime: 2,
-      duration: definition.duration,
+      duration: animationRuntimeDuration(definition),
       trackId: project.tracks[0]!.id,
       projectWidth: project.width,
       projectHeight: project.height,

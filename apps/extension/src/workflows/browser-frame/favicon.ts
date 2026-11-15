@@ -89,11 +89,15 @@ async function rasterIcon(
       'image/x-icon',
       'image/vnd.microsoft.icon',
       'image/svg+xml',
+      'application/octet-stream',
     ].includes(mime)
   )
     return null;
   const bytes = await readBounded(response, MAX_ICON_BYTES);
   signal.throwIfAborted();
+  // Generic binary responses require a recognized raster signature; SVG stays MIME-gated.
+  if (mime === 'application/octet-stream')
+    return importWindowHeaderIcon(new File([bytes], 'favicon.bin', { type: mime }), signal);
   if (mime === 'image/svg+xml')
     return importWindowHeaderIcon(new File([bytes], 'favicon.svg', { type: mime }), signal);
   return rasterizeWindowHeaderIcon(new Blob([bytes], { type: mime }), signal);

@@ -1,3 +1,4 @@
+import { hasSourceImageFilters } from '../../features/image-filters/contract';
 import {
   useCallback,
   useEffect,
@@ -56,6 +57,7 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
   const interacting = input.interacting || placement !== null || Object.keys(comments).length > 0;
   // A raw-source dissolve cannot represent two independently decorated camera poses.
   const manual =
+    !!(input.scene.sourceFilters && hasSourceImageFilters(input.scene.sourceFilters)) ||
     (typeof navigator !== 'undefined' && !!navigator.gpu) ||
     isReviewPreviewManual(input.preferences, input.playing) ||
     !!(
@@ -64,6 +66,7 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
     ) ||
     (!!input.scene.annotationEffects?.lane.enabled &&
       input.scene.annotationEffects.lane.instances.some((instance) => instance.enabled)) ||
+    !!input.scene.cursorMotions?.some((m) => m.enabled) ||
     !!input.scene.captions?.settings?.enabled ||
     !!input.cut?.edits.some((edit) => edit.kind === 'cut' && edit.transition?.type === 'dissolve');
   const active = manual && input.visible !== false && pageVisible;
@@ -150,6 +153,17 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
     }
     owner.current?.update(current.description, current.generation, !!interacting, active);
   }, [active, owner, key, interacting, reportPresentation]);
+  useEffect(
+    () =>
+      input.annotationMovement?.subscribe((instance) => {
+        if (!instance) {
+          owner.current?.endAnnotationMovement();
+          return false;
+        }
+        return owner.current?.moveAnnotation(instance) ?? false;
+      }),
+    [input.annotationMovement, owner]
+  );
   useEffect(() => {
     owner.current?.ready();
   }, [owner, cut.current, camera.ready, camera.phase]);

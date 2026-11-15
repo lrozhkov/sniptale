@@ -1,4 +1,9 @@
-import type { PersistedEditorDocumentV3 } from '../../../../composition/persistence/document-assets';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import {
+  EDITOR_RASTER_BINARY_FIELDS,
+  inspectEditorRasterCanvas,
+} from '../../../../features/editor/document/raster-state';
+import type { PersistedEditorDocument } from '../../../../composition/persistence/document-assets';
 import { parsePersistedEditorDocument } from '../../../../composition/persistence/document-assets/parser';
 
 const ASSET_URL_PREFIX = 'sniptale-asset:';
@@ -6,24 +11,27 @@ const OBJECT_URL_PREFIX = 'sniptale-object:';
 const CANVAS_BINARY_FIELDS: readonly string[] = [
   'src',
   'sniptaleBackgroundImageData',
+  'sniptaleSimplifySourceData',
   'sniptaleBlurSourceData',
+  ...EDITOR_RASTER_BINARY_FIELDS,
 ];
 
 interface PortableEditorAssetPointer {
   objectId: string;
 }
 
-export interface PortableEditorDocumentV3 extends Omit<
-  PersistedEditorDocumentV3,
-  'assets' | 'browserFrame' | 'frame' | 'sourceImage'
+export interface PortableEditorDocument extends Omit<
+  PersistedEditorDocument,
+  'assets' | 'browserFrame' | 'frame' | 'sourceImage' | 'vectorDefinitions'
 > {
   assets: Array<PortableEditorAssetPointer & { role: string }>;
   sourceImage: PortableEditorAssetPointer;
-  frame: Omit<PersistedEditorDocumentV3['frame'], 'backgroundImage'> & {
+  vectorDefinitions?: Record<string, PortableEditorAssetPointer>;
+  frame: Omit<PersistedEditorDocument['frame'], 'backgroundImage'> & {
     backgroundImage: PortableEditorAssetPointer | null;
   };
   browserFrame?:
-    | (Omit<NonNullable<PersistedEditorDocumentV3['browserFrame']>, 'favicon'> & {
+    | (Omit<NonNullable<PersistedEditorDocument['browserFrame']>, 'favicon'> & {
         favicon: PortableEditorAssetPointer | null;
       })
     | undefined;
@@ -62,9 +70,9 @@ function projectCanvasObjects(
 }
 
 export function encodePortableEditorDocument(args: {
-  document: PersistedEditorDocumentV3;
+  document: PersistedEditorDocument;
   objectsByAssetId: ReadonlyMap<string, string>;
-}): PortableEditorDocumentV3 {
+}): PortableEditorDocument {
   if (!parsePersistedEditorDocument(args.document)) {
     throw new Error('Stored editor document is invalid for archive export.');
   }
@@ -77,8 +85,12 @@ export function encodePortableEditorDocument(args: {
     browserFrame: storedBrowserFrame,
     frame: storedFrame,
     sourceImage: storedSourceImage,
+    vectorDefinitions: storedVectorDefinitions,
     ...documentMetadata
-  } = args.document;
+  } = {
+    ...args.document,
+    vectorDefinitions: args.document.version === 5 ? args.document.vectorDefinitions : undefined,
+  };
   const { backgroundImage, ...frame } = storedFrame;
   const browserFrame = storedBrowserFrame
     ? (() => {
@@ -91,6 +103,16 @@ export function encodePortableEditorDocument(args: {
     : undefined;
   return {
     ...documentMetadata,
+    ...(storedVectorDefinitions
+      ? {
+          vectorDefinitions: Object.fromEntries(
+            Object.entries(storedVectorDefinitions).map(([id, value]) => [
+              id,
+              objectPointer(value.assetId, args.objectsByAssetId),
+            ])
+          ),
+        }
+      : {}),
     assets: args.document.assets.map(({ assetId, role }) => ({
       ...objectPointer(assetId, args.objectsByAssetId),
       role,
@@ -135,48 +157,94 @@ function restoreCanvasAssets(
   return output;
 }
 
+/** Decode untrusted archive metadata before any document resource is staged. */
 export function decodePortableEditorDocument(args: {
-  document: PortableEditorDocumentV3;
+  document: unknown;
   assetsByObjectId: ReadonlyMap<string, string>;
-}): PersistedEditorDocumentV3 {
+}): PersistedEditorDocument {
+  if (
+    !isRecord(args.document) ||
+    !Array.isArray(args.document['assets']) ||
+    !isRecord(args.document['frame']) ||
+    typeof args.document['canvasJson'] !== 'string'
+  ) {
+    throw new Error('Portable editor document is invalid.');
+  }
   const {
     assets,
     browserFrame: portableBrowserFrame,
     frame: portableFrame,
     sourceImage,
+    vectorDefinitions,
     ...metadata
   } = args.document;
+  const restorePointer = (value: unknown) => {
+    if (!isRecord(value) || typeof value['objectId'] !== 'string') {
+      throw new Error('Portable editor document pointer is invalid.');
+    }
+    return assetPointer(value['objectId'], args.assetsByObjectId);
+  };
+  let restoredVectorDefinitions: Record<string, { assetId: string }> | undefined;
+  if (vectorDefinitions !== undefined) {
+    if (!isRecord(vectorDefinitions))
+      throw new Error('Portable editor vector definitions are invalid.');
+    restoredVectorDefinitions = Object.fromEntries(
+      Object.entries(vectorDefinitions).map(([id, value]) => [id, restorePointer(value)])
+    );
+  }
   const { backgroundImage, ...frame } = portableFrame;
-  const browserFrame = portableBrowserFrame
-    ? (() => {
-        const { favicon, ...browserMetadata } = portableBrowserFrame;
-        return {
-          ...browserMetadata,
-          favicon: favicon ? assetPointer(favicon.objectId, args.assetsByObjectId) : null,
-        };
-      })()
-    : undefined;
-  const restored: PersistedEditorDocumentV3 = {
+  let browserFrame: Record<string, unknown> | undefined;
+  if (portableBrowserFrame !== undefined) {
+    if (!isRecord(portableBrowserFrame))
+      throw new Error('Portable editor browser frame is invalid.');
+    const { favicon, ...browserMetadata } = portableBrowserFrame;
+    browserFrame = {
+      ...browserMetadata,
+      favicon: favicon === null ? null : restorePointer(favicon),
+    };
+  }
+  const canvas: unknown = JSON.parse(args.document['canvasJson']);
+  const raster = inspectEditorRasterCanvas(
+    canvas,
+    (resource): resource is string =>
+      typeof resource === 'string' &&
+      resource.startsWith(OBJECT_URL_PREFIX) &&
+      args.assetsByObjectId.has(resource.slice(OBJECT_URL_PREFIX.length))
+  );
+  if (!raster.valid) throw new Error('Portable editor raster metadata is invalid.');
+  const restored = {
     ...metadata,
-    assets: assets.map(({ objectId, role }) => ({
-      ...assetPointer(objectId, args.assetsByObjectId),
-      role,
-    })),
+    ...(restoredVectorDefinitions ? { vectorDefinitions: restoredVectorDefinitions } : {}),
+    assets: assets.map((asset: unknown) => {
+      if (!isRecord(asset) || typeof asset['role'] !== 'string') {
+        throw new Error('Portable editor document asset is invalid.');
+      }
+      return { ...restorePointer(asset), role: asset['role'] };
+    }),
     ...(browserFrame ? { browserFrame } : {}),
-    canvasJson: JSON.stringify(
-      restoreCanvasAssets(JSON.parse(args.document.canvasJson) as unknown, args.assetsByObjectId)
-    ),
+    canvasJson: JSON.stringify(restoreCanvasAssets(canvas, args.assetsByObjectId)),
     frame: {
       ...frame,
-      backgroundImage: backgroundImage
-        ? assetPointer(backgroundImage.objectId, args.assetsByObjectId)
-        : null,
+      backgroundImage: backgroundImage === null ? null : restorePointer(backgroundImage),
     },
-    sourceImage: assetPointer(sourceImage.objectId, args.assetsByObjectId),
+    sourceImage: restorePointer(sourceImage),
   };
   const parsed = parsePersistedEditorDocument(restored);
-  if (!parsed) {
-    throw new Error('Restored editor document is invalid.');
-  }
+  if (!parsed) throw new Error('Restored editor document is invalid.');
   return parsed;
+}
+
+/** Admit the portable document against its declared objects before restore staging. */
+export function assertPortableEditorDocument(value: unknown): void {
+  if (!isRecord(value) || !Array.isArray(value['assets'])) {
+    throw new Error('Portable editor document is invalid.');
+  }
+  const declared = new Map<string, string>();
+  for (const asset of value['assets']) {
+    if (!isRecord(asset) || typeof asset['objectId'] !== 'string') {
+      throw new Error('Portable editor document asset is invalid.');
+    }
+    declared.set(asset['objectId'], asset['objectId']);
+  }
+  decodePortableEditorDocument({ document: value, assetsByObjectId: declared });
 }

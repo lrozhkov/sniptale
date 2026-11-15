@@ -1,3 +1,4 @@
+import { cameraSpatialMotionPose } from '../../features/video/project/motion/spatial';
 import { useEffect, useMemo, useState } from 'react';
 import { resolveQuickEditFocusLink } from '../../features/video/review/advanced/focus-layout';
 
@@ -34,6 +35,9 @@ export type ZoomPreviewProps = {
   };
   focus?: { regions: readonly QuickEditZoomRegion[]; time: number } | undefined;
   background: QuickEditBackgroundSettings;
+  sourceFilters?:
+    | import('../../features/image-filters/contract').SourceImageFilterStack
+    | undefined;
   source: { width: number; height: number };
   canvas?: { width: number; height: number } | undefined;
   windowHeader?:
@@ -66,6 +70,7 @@ type ZoomCameraScene = {
   focus: ZoomPreviewProps['focus'];
   background: ZoomPreviewProps['background'];
   source: ZoomPreviewProps['source'];
+  sourceFilters: ZoomPreviewProps['sourceFilters'];
   canvas: ZoomPreviewProps['canvas'];
   windowHeader: ZoomPreviewProps['windowHeader'];
   sourceTime: ZoomPreviewProps['sourceTime'];
@@ -134,6 +139,7 @@ export function usePreparedZoomCamera(props: ZoomPreviewProps) {
     focus,
     background,
     source,
+    sourceFilters,
     canvas,
     windowHeader,
     sourceTime,
@@ -146,13 +152,25 @@ export function usePreparedZoomCamera(props: ZoomPreviewProps) {
       focus,
       background,
       source,
+      sourceFilters,
       canvas,
       windowHeader,
       sourceTime,
       loadFrame,
       playback,
     }),
-    [region, focus, background, source, canvas, windowHeader, sourceTime, loadFrame, playback]
+    [
+      region,
+      focus,
+      background,
+      source,
+      sourceFilters,
+      canvas,
+      windowHeader,
+      sourceTime,
+      loadFrame,
+      playback,
+    ]
   );
   const lifetime = useMemo(
     () => ({ selectionId: region.id, loadFrame, width: source.width, height: source.height }),
@@ -239,7 +257,7 @@ function resolvePreviewCamera(props: ZoomCameraScene) {
       time < region.end
   );
   const target = quickEditCropCamera(
-    quickEditSpatialTargetCamera(effective ?? props.region, time),
+    quickEditSpatialTargetCamera(cameraSpatialMotionPose(effective ?? props.region, 0.5), time),
     props
   );
   return effective?.cursorFocus?.path.mode === 'follow'

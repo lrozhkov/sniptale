@@ -1,3 +1,4 @@
+import { runEditorDocumentTransition } from '../history/transition-queue';
 import { beforeEach, expect, it, vi } from 'vitest';
 const actionMocks = vi.hoisted(() => ({
   deleteEditorSelectionMock: vi.fn(),
@@ -71,6 +72,7 @@ function createController() {
     focusObjectInViewport: vi.fn(),
     isLayerMutationTokenCurrent: vi.fn(() => true),
     lastLayerSelectionAnchorId: 'layer-anchor',
+    layerMutationToken: 0,
     nextLabelIndex: vi.fn(() => 1),
     prepareObject: vi.fn(),
     sendFrameObjectsToBack: vi.fn(),
@@ -173,6 +175,7 @@ beforeEach(() => {
   mutationMocks.applyEditorLayerRasterEffectMock.mockResolvedValue(undefined);
   mutationMocks.applyEditorLayerTransformationMock.mockResolvedValue(undefined);
   mutationMocks.mergeEditorSelectedLayersMock.mockResolvedValue(undefined);
+  mutationMocks.removeEditorLayerRasterEffectMock.mockResolvedValue(undefined);
   mutationMocks.resizeEditorLayerWithRasterizeMock.mockResolvedValue(undefined);
   mutationMocks.updateEditorLayerRasterEffectMock.mockResolvedValue(undefined);
 });
@@ -295,4 +298,39 @@ it('forwards layer-effect mutations into the raster mutation seam', async () => 
   invokeMutationHandlers(removeHandlers, controller);
   resetControllerSpies(controller);
   invokeMutationHandlers(transformHandlers, controller);
+});
+
+it('keeps duplicate admission bound to the current document and controller generation', async () => {
+  const controller = createController();
+  await duplicateEditorControllerSelection(controller as never);
+  const options = actionMocks.duplicateEditorSelectionMock.mock.calls[0]?.[0];
+  expect(options.isCurrent()).toBe(true);
+  const originalCanvas = controller.canvas;
+  controller.canvas = { id: 'replacement' };
+  expect(options.isCurrent()).toBe(false);
+  controller.canvas = originalCanvas;
+  controller.layerMutationToken += 1;
+  expect(options.isCurrent()).toBe(false);
+  controller.layerMutationToken -= 1;
+  const originalSource = controller.source;
+  controller.source = { id: 'replacement-source' };
+  expect(options.isCurrent()).toBe(false);
+  controller.source = originalSource;
+  expect(options.isCurrent()).toBe(true);
+  let finish: () => void = () => {};
+  const transition = runEditorDocumentTransition(
+    controller.canvas,
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+  );
+  expect(options.isCurrent()).toBe(false);
+  await duplicateEditorControllerSelection(controller as never);
+  expect(actionMocks.duplicateEditorSelectionMock).toHaveBeenCalledOnce();
+  finish();
+  await transition;
+  expect(options.isCurrent()).toBe(false);
+  await duplicateEditorControllerSelection(controller as never);
+  expect(actionMocks.duplicateEditorSelectionMock.mock.calls[1]?.[0].isCurrent()).toBe(true);
 });

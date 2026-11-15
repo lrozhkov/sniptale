@@ -1,22 +1,19 @@
 import { applyInitialEffectPreset } from '../effect-bundle/catalog/presets';
-import { normalizeVideoProjectTransition } from '../transition/template';
-import { resolveEffectOwner } from './owner';
 import { getCurrentLocale } from '../../../../platform/i18n';
-import { resolveEffectV1ControlDefault } from '@sniptale/runtime-contracts/effect-v1';
+import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
 import { getEffectInsertionError } from './placement';
 import { initializeEffectSceneAnchors } from './layout';
-import type { EffectV1ObjectLayout } from '@sniptale/runtime-contracts/effect-v1';
+import type { AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
+import { animationRuntimeDuration } from '../../../../contracts/effect-runtime/animation';
 import type { EffectBundleCatalogEntry } from '../effect-bundle/catalog';
 import type { VideoProject } from '../types';
 import { createEffectHostClip } from '../factories/overlay-clip';
 import { resolveVideoOverlayTrack } from '../factories/creation';
-import { buildProjectTransitionSegments } from '../transition/project';
-import { readVerifiedCatalogDocument, type VerifiedCatalogAsset } from './catalog-reader';
+import { readVerifiedCatalogDocument } from './catalog-reader';
 import { ApplyEffectInstanceError } from './errors';
 import type {
   VideoProjectEffectInstance,
   VideoProjectEffectSnapshot,
-  VideoProjectEffectSnapshotAsset,
   VideoProjectEffectTarget,
 } from './types';
 
@@ -34,37 +31,33 @@ export async function applyEffectCatalogDocument(args: {
   trackId?: string;
   timelineLaneId?: string | null;
 }): Promise<VideoProject> {
+  if (args.target.kind !== 'scene') throw new ApplyEffectInstanceError('effectKindTargetMismatch');
   const locale = getCurrentLocale();
-  const { assets, catalogDocument, document } = await readVerifiedCatalogDocument(
+  const { catalogDocument, document } = await readVerifiedCatalogDocument(
     args.catalog,
     args.documentId
   );
-  assertTarget(document.kind, args.target, args.project);
-  const snapshot = createSnapshot(catalogDocument, assets);
+  const snapshot = createSnapshot(catalogDocument);
   const snapshots = await appendVerifiedSnapshot(args.project, snapshot);
   if (
     args.standaloneDuration !== undefined &&
-    (document.kind !== 'standalone' ||
-      !Number.isFinite(args.standaloneDuration) ||
+    (!Number.isFinite(args.standaloneDuration) ||
       args.standaloneDuration < 1 / args.project.fps ||
       args.standaloneDuration > 3600)
   )
     throw new ApplyEffectInstanceError('effectKindTargetMismatch');
-  const timing = resolveInstanceTiming(
-    args.standaloneDuration ?? document.duration,
-    args.startTime,
-    args.target,
-    args.project
-  );
+  const timing = {
+    duration: args.standaloneDuration ?? animationRuntimeDuration(document),
+    startTime: args.startTime,
+  };
   const instance: VideoProjectEffectInstance = {
     catalogPackId: args.catalog.packId,
-    ...(document.kind === 'targetEffect' ? { rangeMode: 'owner' as const } : {}),
     controls: applyInitialEffectPreset(
       document,
       Object.fromEntries(
         document.controls.map((control) => [
           control.id,
-          resolveEffectV1ControlDefault(control, locale),
+          resolveEffectControlDefault(control, locale),
         ])
       ),
       catalogDocument.presetPreferences,
@@ -73,32 +66,23 @@ export async function applyEffectCatalogDocument(args: {
     duration: timing.duration,
     enabled: true,
     id: args.instanceId,
-    kind: document.kind,
-    playbackRate: document.duration / timing.duration,
+    kind: 'standalone',
+    playbackRate: animationRuntimeDuration(document) / timing.duration,
     snapshotId: snapshot.id,
     startTime: timing.startTime,
     target: args.target,
   };
-  const overlayTrack =
-    document.kind === 'standalone'
-      ? resolveStandaloneTrack(
-          args.project,
-          timing.startTime,
-          timing.duration,
-          args.trackId,
-          args.timelineLaneId
-        )
-      : null;
+  const overlayTrack = resolveStandaloneTrack(
+    args.project,
+    timing.startTime,
+    timing.duration,
+    args.trackId,
+    args.timelineLaneId
+  );
   const clips = overlayTrack
     ? [
         ...args.project.clips,
-        createStandaloneHostClip(
-          args.project,
-          instance,
-          '',
-          overlayTrack.id,
-          document.objectLayout
-        ),
+        createStandaloneHostClip(args.project, instance, '', overlayTrack.id, document),
       ]
     : args.project.clips;
   if (overlayTrack && args.timelineLaneId)
@@ -107,7 +91,7 @@ export async function applyEffectCatalogDocument(args: {
     (clip) => clip.type === 'EFFECT' && clip.effectInstanceId === instance.id
   );
   if (host && document.objectLayout?.handles?.length) {
-    instance.sceneAnchors = initializeEffectSceneAnchors(document, host.transform, args.project)!;
+    instance.sceneAnchors = initializeEffectSceneAnchors(document, host.transform)!;
     for (const handle of document.objectLayout.handles) {
       delete instance.controls[handle.xControl];
       delete instance.controls[handle.yControl];
@@ -120,26 +104,7 @@ export async function applyEffectCatalogDocument(args: {
       overlayTrack && !args.project.tracks.includes(overlayTrack)
         ? [...args.project.tracks, overlayTrack]
         : args.project.tracks,
-    ...(args.target.kind === 'transition'
-      ? {
-          transitions: (args.project.transitions ?? []).map((junction) =>
-            args.target.kind === 'transition' && junction.id === args.target.transitionId
-              ? normalizeVideoProjectTransition({ ...junction, templateKind: 'CROSSFADE' })
-              : junction
-          ),
-        }
-      : {}),
-    effectInstances: [
-      ...(args.project.effectInstances ?? []).filter(
-        (previous) =>
-          !(
-            args.target.kind === 'transition' &&
-            previous.target.kind === 'transition' &&
-            args.target.transitionId === previous.target.transitionId
-          )
-      ),
-      instance,
-    ],
+    effectInstances: [...(args.project.effectInstances ?? []), instance],
     effectSnapshots: snapshots,
   };
 }
@@ -149,10 +114,10 @@ function createStandaloneHostClip(
   instance: VideoProjectEffectInstance,
   name: string,
   trackId: string,
-  objectLayout: EffectV1ObjectLayout | undefined
+  document: AnimationTemplate
 ) {
   return createEffectHostClip({
-    objectLayout,
+    dimensions: { width: document.animation.w, height: document.animation.h },
     duration: instance.duration,
     effectInstanceId: instance.id,
     name,
@@ -181,77 +146,20 @@ async function appendVerifiedSnapshot(
 }
 
 function createSnapshot(
-  document: EffectBundleCatalogEntry['documents'][number],
-  verifiedAssets: VerifiedCatalogAsset[]
+  document: EffectBundleCatalogEntry['documents'][number]
 ): VideoProjectEffectSnapshot {
-  const assets: VideoProjectEffectSnapshotAsset[] = verifiedAssets.map(
-    ({ asset, bytes, id, sha256 }) => ({
-      blob: new Blob([bytes.slice().buffer], { type: asset.mimeType }),
-      byteLength: bytes.byteLength,
-      id,
-      kind: asset.kind,
-      mimeType: asset.mimeType,
-      sha256,
-    })
-  );
+  if (document.source === undefined)
+    throw new ApplyEffectInstanceError('effectCatalogIntegrityFailure');
   return {
-    assets,
+    assets: [],
     documentId: document.id,
     id: `effect:${document.sha256}`,
-    kind: document.kind,
-    retainedByteLength:
-      new TextEncoder().encode(document.source).byteLength +
-      assets.reduce((total, asset) => total + asset.byteLength, 0),
-    schemaVersion: 'sniptale.effect.v1',
+    kind: 'standalone',
+    retainedByteLength: new TextEncoder().encode(document.source).byteLength,
+    schemaVersion: 'sniptale.animation.v1',
     sha256: document.sha256,
-    source: document.source!,
+    source: document.source,
   };
-}
-
-function assertTarget(
-  kind: 'standalone' | 'targetEffect' | 'transition',
-  target: VideoProjectEffectTarget,
-  project: VideoProject
-): void {
-  const matches =
-    (kind === 'standalone' && target.kind === 'scene') ||
-    (kind === 'targetEffect' &&
-      (() => {
-        const owner = resolveEffectOwner(project, target);
-        return owner !== null && !owner.locked && owner.duration > 0;
-      })()) ||
-    (kind === 'transition' &&
-      target.kind === 'transition' &&
-      project.transitions?.some((junction) => {
-        if (junction.id !== target.transitionId) return false;
-        return [junction.leadingClipId, junction.trailingClipId].every((id) => {
-          const clip = project.clips.find((item) => item.id === id);
-          const track = project.tracks.find((item) => item.id === clip?.trackId);
-          return clip && clip.type !== 'AUDIO' && track && !track.locked && track.role !== 'CAMERA';
-        });
-      }));
-  if (!matches) throw new ApplyEffectInstanceError('effectKindTargetMismatch');
-}
-
-function resolveInstanceTiming(
-  documentDuration: number,
-  requestedStartTime: number,
-  target: VideoProjectEffectTarget,
-  project: VideoProject
-): { duration: number; startTime: number } {
-  if (target.kind === 'scene') return { duration: documentDuration, startTime: requestedStartTime };
-  if (target.kind !== 'transition') {
-    const clip = resolveEffectOwner(project, target);
-    if (!clip || clip.duration <= 0) throw new ApplyEffectInstanceError('effectTargetMissing');
-    return { duration: clip.duration, startTime: clip.startTime };
-  }
-  const segment = buildProjectTransitionSegments(project).find(
-    ({ id }) => id === target.transitionId
-  );
-  if (!segment || segment.end <= segment.start) {
-    throw new ApplyEffectInstanceError('effectTargetMissing');
-  }
-  return { duration: segment.end - segment.start, startTime: segment.start };
 }
 
 async function snapshotsEqual(

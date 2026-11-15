@@ -1,3 +1,5 @@
+import { useGlTransitionCatalog } from '../../../../../composition/gl-transition-presets/catalog';
+import { GlTransitionPresetActions } from '../../../../../composition/gl-transition-presets/actions';
 import { useState } from 'react';
 import {
   createVideoProjectBookendPresets,
@@ -29,6 +31,7 @@ type Mode = VideoProjectBookendPreset['mode'];
 
 /** Authoring changes only the retained insertion recipe, never an existing instance. */
 export function SceneBookendPreset(props: { project: VideoProject; side: 'intro' | 'outro' }) {
+  const glCatalog = useGlTransitionCatalog();
   const editor = useBookendPresetEditing(props);
   const { mode, slot, asset, current, refused, patch } = editor;
   const common = { Details: InspectorDetails, preferenceId: `scene-bookend-preset.${props.side}` };
@@ -82,12 +85,26 @@ export function SceneBookendPreset(props: { project: VideoProject; side: 'intro'
       )}
       {mode !== 'none' && (
         <PresentationJoinFields
+          glCatalog={glCatalog}
           label={translate(
             props.side === 'intro'
               ? 'gallery.videoReview.presentationJoinIntro'
               : 'gallery.videoReview.presentationJoinOutro'
           )}
           value={editor.transition}
+          glPresetActions={
+            editor.transition?.type === 'gl' ? (
+              <GlTransitionPresetActions
+                ownerKey={`${props.project.id}:bookend:${props.side}`}
+                ownerRevision={props.project}
+                selection={editor.transition.selection}
+                onApply={(selection) => {
+                  if (editor.transition?.type === 'gl')
+                    editor.changeTransition({ ...editor.transition, selection });
+                }}
+              />
+            ) : undefined
+          }
           Details={InspectorDetails}
           preferenceId={`scene-bookend-preset.${props.side}`}
           onChange={editor.changeTransition}

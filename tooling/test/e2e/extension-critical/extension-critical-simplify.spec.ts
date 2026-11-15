@@ -98,10 +98,20 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         if (offscreenTargetId)
           await writeSimplifyWorkerObservation(context, page, offscreenTargetId, mode, info);
         await assertNativeAutomaticRaster(page, mode, beforePixels, info);
+        if (mode === 'video-recording') {
+          await page.locator('[data-ui="content.toolbar.video-recording.pause"]').click();
+          await expect(
+            page.locator('[data-ui="content.toolbar.video-recording.resume"]')
+          ).toBeVisible();
+        }
         await assertNativeAutomaticResize(page, mode, info);
         await assertNativeManualMove(page, mode, info);
         await assertNativeManualResize(page, mode, info);
         if (mode === 'video-recording') {
+          await page.locator('[data-ui="content.toolbar.video-recording.resume"]').click();
+          await expect(
+            page.locator('[data-ui="content.toolbar.video-recording.pause"]')
+          ).toBeVisible();
           await assertSavedSimplifyRecording(page, popup, info);
         } else {
           const editor = await captureSimplifyToEditor(context, page, mode);

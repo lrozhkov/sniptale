@@ -74,7 +74,7 @@ export function reviewClickSections(props: {
         onClick={() => props.onChange(null)}
       >
         <RotateCcw size={15} aria-hidden="true" />
-        {translate('gallery.videoReview.clickReset')}
+        <span>{translate('gallery.videoReview.clickReset')}</span>
       </ReviewButton>
     )
   );

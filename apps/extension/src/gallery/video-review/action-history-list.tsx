@@ -15,7 +15,7 @@ import {
 } from './controls';
 
 /** Neutral selection matches Library facets, including the native mixed state. */
-function HistoryCheckbox(props: {
+export function HistoryCheckbox(props: {
   label: string;
   checked: boolean;
   mixed?: boolean;

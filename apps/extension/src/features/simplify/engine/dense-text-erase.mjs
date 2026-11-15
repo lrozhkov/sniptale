@@ -6,12 +6,8 @@ export function denseTextErase(image, box, bounds, plane) {
     w = bounds.w,
     h = bounds.h,
     size = w * h;
-  const { offsets, slots, inside, red, green, blue, delta, count } = sampleDenseText(
-    image,
-    box,
-    bounds,
-    plane
-  );
+  const samples = sampleDenseText(image, box, bounds, plane);
+  const { offsets, slots, inside, red, green, blue, delta, count } = samples;
   const distances = delta.slice(0, count),
     peak = orderStatistic(distances, Math.floor((count - 1) * 0.95)) || 0,
     bins = new Map();
@@ -35,6 +31,7 @@ export function denseTextErase(image, box, bounds, plane) {
   seedDenseTextCore(pixels, count, inside, delta, offsets, red, green, blue, slots, palette, core);
   expandDenseTextSupport(count, delta, slots, w, h, core, mask);
   completeDenseTextFringe(pixels, box, count, inside, delta, slots, offsets, peak, w, size, mask);
+  completeWeakTextFringe(box, bounds, plane, samples, mask);
   const runs = [];
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w;) {
@@ -47,6 +44,105 @@ export function denseTextErase(image, box, bounds, plane) {
       runs.push([bounds.y + y, bounds.x + start, x - start]);
     }
   return { ...box, eraseRuns: runs, erasePlane: plane };
+}
+
+const WEAK_NEIGHBORS = [
+  [-1, -1],
+  [0, -1],
+  [1, -1],
+  [-1, 0],
+  [1, 0],
+  [-1, 1],
+  [0, 1],
+  [1, 1],
+];
+
+function collectSourceComponent(seed, foreground, mask, width, queue) {
+  const height = foreground.length / width;
+  let head = 0,
+    count = 1,
+    left = width,
+    top = height,
+    right = -1,
+    bottom = -1,
+    anchored = false;
+  queue[0] = seed;
+  foreground[seed] = 0;
+  while (head < count) {
+    const slot = queue[head++],
+      x = slot % width,
+      y = Math.floor(slot / width);
+    left = Math.min(left, x);
+    top = Math.min(top, y);
+    right = Math.max(right, x);
+    bottom = Math.max(bottom, y);
+    for (const [dx, dy] of WEAK_NEIGHBORS) {
+      const xx = x + dx,
+        yy = y + dy;
+      if (xx < 0 || yy < 0 || xx >= width || yy >= height) continue;
+      const neighbor = yy * width + xx;
+      if (mask[neighbor]) anchored = true;
+      if (foreground[neighbor]) {
+        foreground[neighbor] = 0;
+        queue[count++] = neighbor;
+      }
+    }
+  }
+  return { count, left, top, right, bottom, anchored };
+}
+
+function belongsToSourceGlyph(component, box, bounds) {
+  const { left, top, right, bottom, anchored } = component;
+  if (!anchored || left === 0 || top === 0 || right === bounds.w - 1 || bottom === bounds.h - 1)
+    return false;
+  const x = bounds.x + left,
+    y = bounds.y + top;
+  if (
+    x < box.x ||
+    y < box.y ||
+    bounds.x + right >= box.x + box.w ||
+    bounds.y + bottom >= box.y + box.h
+  )
+    return false;
+  // A whole weak component must belong to one source glyph; a crossing line is not its fringe.
+  const owners = box.atoms.filter(
+    (atom) =>
+      x >= atom.x - 1 &&
+      y >= atom.y - 1 &&
+      bounds.x + right < atom.x + atom.w + 1 &&
+      bounds.y + bottom < atom.y + atom.h + 1
+  );
+  return owners.length === 1;
+}
+
+function completeWeakTextFringe(box, bounds, plane, samples, mask) {
+  if (
+    !box.atoms?.length ||
+    plane.corners[0][3] !== 255 ||
+    plane.corners.some((corner) =>
+      corner.some((value, channel) => value !== plane.corners[0][channel])
+    )
+  )
+    return;
+  const weak = new Uint8Array(mask.length);
+  const foreground = new Uint8Array(mask.length);
+  for (let index = 0; index < samples.count; index++) {
+    const slot = samples.slots[index];
+    const difference = Math.round(samples.delta[index]);
+    if (difference > 0) foreground[slot] = 1;
+    if (!mask[slot] && difference > 0 && difference <= 2) weak[slot] = 1;
+  }
+  const queue = new Int32Array(mask.length);
+  for (let seed = 0; seed < foreground.length; seed++) {
+    if (!foreground[seed]) continue;
+    // Strong glyph strokes must not split a crossing faint line into apparent fringes.
+    const component = collectSourceComponent(seed, foreground, mask, bounds.w, queue);
+    if (belongsToSourceGlyph(component, box, bounds))
+      for (let index = 0; index < component.count; index++) {
+        const slot = queue[index];
+        if (weak[slot]) mask[slot] = 1;
+      }
+  }
 }
 
 function sampleDenseText(image, box, bounds, plane) {

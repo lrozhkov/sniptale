@@ -1,7 +1,8 @@
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import { resolveContentShadowRoot } from '../../platform/dom-host';
 
-const BUNDLED_FONT_FAMILIES = Object.freeze(['Sniptale Interface', 'Sniptale Text']);
+const EAGER_FONT_FAMILIES = Object.freeze(['Sniptale Interface', 'Sniptale Text']);
+const BUNDLED_FONT_FAMILIES = Object.freeze([...EAGER_FONT_FAMILIES, 'Sniptale Handwritten']);
 const installationByDocument = new WeakMap<
   Document,
   { root: ShadowRoot; promise: Promise<void>; installed: boolean }
@@ -89,24 +90,39 @@ export function installContentInterfaceFonts(
   });
   if (declarations.length === 0) return Promise.resolve();
   const entry = { root, installed: false, promise: Promise.resolve() };
+  const registered: FontFace[] = [];
+  const withdraw = () => {
+    for (const face of registered) owner.fonts.delete(face);
+    registered.length = 0;
+  };
   entry.promise = Promise.resolve()
     .then(async () => {
-      if (!isLiveRoot(root)) return [];
+      if (!isLiveRoot(root)) return;
       const faces = declarations.map(({ family, source, descriptors }) =>
         dependencies.createFace(family, source, descriptors)
       );
-      await Promise.all(faces.map((face) => face.load()));
-      return faces;
+      // Pending faces must be discoverable by fonts.check/load and text geometry consumers.
+      for (const face of faces) {
+        owner.fonts.add(face);
+        registered.push(face);
+      }
+      // Artwork fonts load on demand; an unused artwork face must not delay or fail UI fonts.
+      await Promise.all(
+        faces.flatMap((face, index) =>
+          EAGER_FONT_FAMILIES.includes(declarations[index]!.family) ? [face.load()] : []
+        )
+      );
     })
-    .then((faces) => {
+    .then(() => {
       if (!isLiveRoot(root)) {
+        withdraw();
         if (installationByDocument.get(owner) === entry) installationByDocument.delete(owner);
         return;
       }
-      for (const face of faces) owner.fonts.add(face);
       entry.installed = true;
     })
     .catch((error: unknown) => {
+      withdraw();
       if (installationByDocument.get(owner) === entry) installationByDocument.delete(owner);
       throw error;
     });

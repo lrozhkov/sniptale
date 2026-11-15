@@ -1,3 +1,4 @@
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
 import { ActiveSelection, type Canvas, type FabricObject, type TPointerEvent } from 'fabric';
 import type { EditorTool } from '../../../features/editor/document/types';
 
@@ -67,12 +68,15 @@ export function finishEditorSelectionModifierGesture(
   canvas: Canvas,
   gesture: EditorSelectionModifierGesture | null
 ): boolean {
-  if (!gesture?.marquee) return false;
-  const next = resolveMarqueeObjects(
+  if (!gesture?.marquee || (canvas instanceof EditorCanvas && canvas.isSelectionMarqueeCancelled()))
+    return false;
+  const candidates = resolveMarqueeObjects(
     gesture.marquee.mode,
     gesture.marquee.previous,
     canvas.getActiveObjects()
   );
+  const scope = canvas instanceof EditorCanvas ? canvas.getSelectionGroupScope() : null;
+  const next = candidates.filter((object) => (object.parent ?? null) === scope);
   canvas.discardActiveObject();
   if (next.length === 1) canvas.setActiveObject(next[0]!);
   else if (next.length > 1) canvas.setActiveObject(new ActiveSelection(next, { canvas }));

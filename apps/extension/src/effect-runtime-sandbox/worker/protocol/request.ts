@@ -1,4 +1,4 @@
-import type { EffectV1Document } from '@sniptale/runtime-contracts/effect-v1';
+import type { AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
 
 import {
   EFFECT_RUNTIME_PROTOCOL_VERSION,
@@ -15,9 +15,9 @@ import {
 
 interface EffectRuntimeWorkerImmutableCache {
   getAssets(id: string): Record<string, EffectRuntimeWorkerAsset> | null;
-  getDocument(id: string): EffectV1Document | null;
+  getDocument(id: string): AnimationTemplate | null;
   setAssets(id: string, assets: Record<string, EffectRuntimeWorkerAsset>): boolean;
-  setDocument(id: string, document: EffectV1Document): void;
+  setDocument(id: string, document: AnimationTemplate): void;
 }
 
 type EffectRuntimeWorkerRequestResolution =
@@ -29,11 +29,10 @@ function createResolvedWorkerRequest(params: {
   assets: Record<string, EffectRuntimeWorkerAsset>;
   envelope: WorkerRequestEnvelope;
   fields: WorkerRequestFields;
-  document: EffectV1Document;
+  document: AnimationTemplate;
 }): EffectRuntimeWorkerRequest {
   const { assets, document, envelope, fields } = params;
   return {
-    ...(fields.renderTarget ? { renderTarget: fields.renderTarget } : {}),
     ...envelope.identity,
     assets,
     assetSelectionId: envelope.assetSelectionRef.id,
@@ -87,7 +86,7 @@ export function resolveEffectRuntimeWorkerRequest(
 
 function createOneShotCache(): EffectRuntimeWorkerImmutableCache {
   const assets = new Map<string, Record<string, EffectRuntimeWorkerAsset>>();
-  const documents = new Map<string, EffectV1Document>();
+  const documents = new Map<string, AnimationTemplate>();
   return {
     getAssets: (id) => assets.get(id) ?? null,
     getDocument: (id) => documents.get(id) ?? null,

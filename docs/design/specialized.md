@@ -5,7 +5,7 @@
 [Surface-specific patterns](surfaces.md) limit generic rules for popup, timeline, canvas, and embedded UI.
 ## Preserve the useful interaction
 
-Standardize surrounding labels, values, icons, focus, surfaces, and feedback. Do not replace a timeline, canvas gesture, color plane, scrub control, or docking interaction with a generic field for visual consistency. The examples provide bounded probes. They do not implement media decoding, real playback, production history, capture permissions, or native eyedropper parity.
+Standardize surrounding labels, values, icons, focus, surfaces, and feedback. Do not replace a timeline, canvas gesture, color plane, scrub control, or docking interaction with a generic field for visual consistency. Examples provide bounded probes. They exclude media decoding, real playback, production history, capture permissions, and native eyedropper parity.
 
 | Mechanic | Preserve |
 | --- | --- |
@@ -18,7 +18,7 @@ Standardize surrounding labels, values, icons, focus, surfaces, and feedback. Do
 | Inspector docking/resize | Scroll owners, category rail, intermediate layouts, reachability |
 | Dense trees and structured data selection | Row rhythm, disclosure glyphs, checkbox drawings, indentation, column selection and inner scrolling |
 
-Before implementation, record the trigger, state owner, preview, acceptance, cancellation, failure, and supported limits for the affected mechanic. Map a real consumer and evidence to each claimed invariant. Preserve supported keyboard alternatives and pointer capture. Do not invent shortcuts or change domain mappings during styling.
+Before implementation, record the affected mechanic’s trigger, state owner, preview, acceptance, cancellation, failure, and supported limits. Map a real consumer and evidence to each claimed invariant. Preserve supported keyboard alternatives and pointer capture. Do not invent shortcuts or change domain mappings during styling.
 
 ## Dense trees and structured data
 
@@ -42,7 +42,7 @@ Some device settings expose a slider and read-only value. Preserve that range-on
 
 ## Property expressions
 
-A property editor can accept expressions, keywords, and units. Keep complete text entry and the existing parser and recovery owner. A numeric current value does not justify a control that accepts only numbers. A field for these values can remain stacked and use the available width. The [design review fields](../../apps/extension/src/content/overlay/design-review/settings/numeric-field.tsx) preserve this text contract.
+A property editor can accept expressions, keywords, and units. Keep complete text entry and the existing parser and recovery owner. A current numeric value does not justify accepting only numbers. This field can remain stacked and use the available width. The [design review fields](../../apps/extension/src/content/overlay/design-review/settings/numeric-field.tsx) preserve this text contract.
 
 ## Product references
 
@@ -50,4 +50,4 @@ Preserve existing crop, timeline, media, and inspector owners rather than copyin
 
 Timeline lane settings use mini switches beside mini actions. Keep an enabled, unavailable source switch in the same column. A disabled lane master disables its visibility action, but not independent import or recording actions. Lane reordering changes view order only. Preserve composition, authored timing, media, and history. Move label and body together. Escape or cancellation restores the previous order.
 
-An inspector recording flow retains its existing capture, take, and save owners. Keep the inspector filename and navigation visible. Add recording as a temporary tab below this shared header. Switching tabs must keep the capture session and take mounted. The recording tab has its own scroll area and ordinary Tab navigation. A discard confirmation can interrupt it. Keep unrelated editing controls inert while capture controls remain usable.
+Inspector recording retains its capture, take, and save owners. Show the active section in the shared header. Keep the project name in the browser tab and project information section. During recording, put a temporary section selector in this header. It permits access to recording, notes, and available scene settings. Section changes must keep the capture session and take mounted. The recording view retains its scroll area and ordinary Tab navigation. A discard confirmation can interrupt it. Keep unrelated editing controls inert while capture controls remain usable.

@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import {
   buildReviewTimeMap,
+  createReviewDisplayMap,
   createReviewTimeMap,
   mapReviewAnchor,
   sourceToReviewResult,
@@ -185,4 +186,157 @@ it('keeps float boundaries stable across speed-section boundaries', () => {
   expect(near(timeMap.timelineToSource(5 / 4 + 4)!, 2.5)).toBe(true);
   expect(near(timeMap.sourceToTimeline(1)!, 1)).toBe(true);
   expect(near(timeMap.timelineToSource(1)!, 1)).toBe(true);
+});
+
+it('inserts source-zero-width held time without changing source observations or later speed', () => {
+  const freeze = {
+    id: 'freeze-a',
+    kind: 'freeze' as const,
+    start: 4,
+    end: 4,
+    requestedStart: 4,
+    requestedEnd: 4,
+    duration: 2,
+    frameTime: 3.97,
+    frameDuration: 0.04,
+  };
+  const edits = [
+    freeze,
+    {
+      id: 'speed',
+      kind: 'speed' as const,
+      start: 6,
+      end: 10,
+      requestedStart: 6,
+      requestedEnd: 10,
+      rate: 2 as const,
+      audio: 'speed' as const,
+    },
+  ];
+  const original = structuredClone(edits);
+  const map = createReviewTimeMap(12, edits);
+  expect(map.getDuration()).toBe(12);
+  expect(map.getSegments().find((segment) => segment.kind === 'freeze')).toMatchObject({
+    sourceStart: 4,
+    sourceEnd: 4,
+    resultStart: 4,
+    resultEnd: 6,
+    rate: 0,
+    frameTime: 3.97,
+    freezeId: 'freeze-a',
+  });
+  expect(map.timelineToSource(5)).toBe(3.97);
+  expect(map.sourceToTimeline(4)).toBe(6);
+  expect(map.sourceToTimeline(8)).toBe(9);
+  expect(edits).toEqual(original);
+  expect(
+    createReviewTimeMap(
+      12,
+      edits.filter((edit) => edit.kind !== 'freeze')
+    ).getDuration()
+  ).toBe(10);
+});
+
+it('holds the actual final frame and temporarily suppresses an insertion under a cut', () => {
+  const freeze = {
+    id: 'freeze-end',
+    kind: 'freeze' as const,
+    start: 12,
+    end: 12,
+    requestedStart: 12,
+    requestedEnd: 12,
+    duration: 2,
+    frameTime: 11.95,
+    frameDuration: 0.05,
+  };
+  const map = createReviewTimeMap(12, [freeze]);
+  expect(map.getDuration()).toBe(14);
+  expect(map.timelineToSource(13.9)).toBe(11.95);
+  expect(map.timelineToSource(14)).toBe(12);
+  const inside = {
+    ...freeze,
+    id: 'inside',
+    start: 4,
+    end: 4,
+    requestedStart: 4,
+    requestedEnd: 4,
+    frameTime: 3.99,
+    frameDuration: 0.02,
+  };
+  const cut = {
+    id: 'cut',
+    kind: 'cut' as const,
+    start: 3,
+    end: 5,
+    requestedStart: 3,
+    requestedEnd: 5,
+  };
+  expect(createReviewTimeMap(12, [inside, cut]).getDuration()).toBe(10);
+  expect(createReviewTimeMap(12, [inside]).getDuration()).toBe(14);
+});
+
+it('holds a leading nonzero PTS without inventing a source frame at zero', () => {
+  const hold = {
+    id: 'first',
+    kind: 'freeze' as const,
+    start: 0,
+    end: 0,
+    requestedStart: 0,
+    requestedEnd: 0,
+    duration: 2,
+    frameTime: 0.033,
+    frameDuration: 0.04,
+  };
+  const map = createReviewTimeMap(12, [hold]);
+  expect(map.timelineToSource(0)).toBe(0.033);
+  expect(map.timelineToSource(1.99)).toBe(0.033);
+  expect(map.sourceToTimeline(0)).toBe(2);
+  for (const change of [{ frameDuration: 1e308 }, { duration: 0 }, { frameTime: 12 }])
+    expect(() => createReviewTimeMap(12, [{ ...hold, ...change }])).toThrow('freeze interval');
+});
+
+it('gives inserted time physical width while retaining source coordinates and cut/speed widths', () => {
+  const edits = [
+    {
+      id: 'hold',
+      kind: 'freeze' as const,
+      start: 4,
+      end: 4,
+      requestedStart: 4,
+      requestedEnd: 4,
+      duration: 2,
+      frameTime: 3.98,
+      frameDuration: 0.04,
+    },
+    {
+      id: 'speed',
+      kind: 'speed' as const,
+      start: 6,
+      end: 10,
+      requestedStart: 6,
+      requestedEnd: 10,
+      rate: 2 as const,
+      audio: 'speed' as const,
+    },
+    { id: 'cut', kind: 'cut' as const, start: 1, end: 2, requestedStart: 1, requestedEnd: 2 },
+  ];
+  const before = structuredClone(edits);
+  const map = createReviewDisplayMap(12, edits);
+  expect(map.duration).toBe(14);
+  expect(map.sourceToDisplay(4)).toBe(6);
+  expect(map.sourceToDisplay(4, 'end')).toBe(4);
+  expect(map.sourceToDisplay(8)).toBe(10);
+  expect(map.displayToSource(5)).toBe(4);
+  expect(map.displayToResult(5)).toBe(4);
+  expect(map.resultToDisplay(4)).toBe(5);
+  expect(map.resultToDisplay(8)).toBe(10);
+  for (const display of [0, 0.5, 3, 4, 4.5, 5, 6, 8, 10, 13.9, 14])
+    expect(map.resultToDisplay(map.displayToResult(display))).toBeCloseTo(display);
+  expect(
+    createReviewDisplayMap(
+      12,
+      edits.filter((edit) => edit.kind !== 'freeze')
+    ).sourceToDisplay(8)
+  ).toBe(8);
+  expect(edits).toEqual(before);
 });

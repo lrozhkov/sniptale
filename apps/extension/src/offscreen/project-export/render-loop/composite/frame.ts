@@ -1,5 +1,5 @@
 import { renderProjectCompositionFrame } from '../../composition-joins';
-import type { ProjectCompositionSceneInput } from '../../composition-scene';
+import type { ProjectCompositionSceneInput } from '../../types';
 import { syncClipPlayback } from '../../media';
 import type { RenderLoopJobState } from '../shared/index';
 import { sendCompositeRenderProgress } from '../progress/index';

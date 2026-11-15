@@ -241,7 +241,9 @@ it('admits only operations implemented by the pinned provider packages', () => {
           ? runtime.languageModel('fixture-model')
           : operation === 'transcription'
             ? runtime.transcriptionModel?.('fixture-model')
-            : runtime.speechModel?.('fixture-model')
+            : operation === 'image-generation' || operation === 'image-editing'
+              ? runtime.imageModel?.('fixture-model')
+              : runtime.speechModel?.('fixture-model')
       ).toBeDefined();
     }
   }

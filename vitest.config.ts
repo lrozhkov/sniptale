@@ -1,3 +1,4 @@
+import { audioEffects } from './apps/extension/build/audio-effects.ts';
 import { normalizeMediabunny } from './tooling/ci/mediabunny/normalize.mjs';
 import { fileURLToPath } from 'node:url';
 import { i18nCatalogs } from './apps/extension/build/i18n-catalogs.ts';
@@ -171,7 +172,11 @@ function resolveCanonicalCoverageExclude() {
 }
 
 export default defineConfig({
-  plugins: [i18nCatalogs(fileURLToPath(new URL('.', import.meta.url))), tourPlayerScript()],
+  plugins: [
+    audioEffects({ inlineRuntime: true, prepareOnStart: false }),
+    i18nCatalogs(fileURLToPath(new URL('.', import.meta.url))),
+    tourPlayerScript(),
+  ],
   test: {
     css: { include: [/\.css\?raw$/u] },
     include: resolveSuiteInclude(),

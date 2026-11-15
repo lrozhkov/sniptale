@@ -1,10 +1,9 @@
 import { readCatalogPresentation } from './presentation';
-import { type EffectV1Kind } from '@sniptale/runtime-contracts/effect-v1';
 import type { EffectBundleCatalogDocumentEntry, EffectBundleCatalogEntry } from './index';
 
 export interface EffectCatalogFilter {
   query: string;
-  kind: 'all' | EffectV1Kind;
+  kind: 'all' | 'standalone';
   theme: string;
 }
 export interface EffectCatalogTheme {

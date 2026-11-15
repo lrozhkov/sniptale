@@ -631,3 +631,102 @@ it('keeps a restored leading gain plateau through collection, range clipping and
     );
   }
 });
+
+it.each([1, 1.5])(
+  'keeps processed samples and source warm-up after selected-range clipping at %sx',
+  async (rate) => {
+    const { readAudioFixtureAsset } = await import('sniptale:audio-test-assets');
+    const { createAudioEffectInstance } =
+      await import('../../../../features/video/audio/effects/catalog');
+    const { createReviewProcessedClip } =
+      await import('../../../../workflows/video-review/audio-clip-processing');
+    const { clipAudioClipToExportRange } = await import('../clip-audio/collect');
+    const { scheduleOfflineAudioClipMix } = await import('./schedule');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: URL) => new Response(readAudioFixtureAsset(url.pathname.slice(1))))
+    );
+    const context = new FakeOfflineAudioContext();
+    const nodes: NonNullable<typeof context.lastSource>[] = [];
+    const create = context.createBufferSource.bind(context);
+    vi.spyOn(context, 'createBufferSource').mockImplementation(() => {
+      const node = create();
+      nodes.push(node);
+      return node;
+    });
+    const buffer = createAudioBuffer(1, 48000, 3 * 48000);
+    const plane = buffer.getChannelData(0);
+    for (let i = 0; i < plane.length; i++) plane[i] = i > 4800 && i < 6000 ? 0.4 : 0;
+    const audioProcessing = {
+      version: 1 as const,
+      bypassed: false,
+      effects: [createAudioEffectInstance('delay', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1')],
+    };
+    const asset = createVideoProjectAsset(
+      'Audio',
+      'AUDIO',
+      { kind: 'project-asset', projectAssetId: 'bytes' },
+      {
+        width: 0,
+        height: 0,
+        duration: 3,
+        mimeType: 'audio/wav',
+        size: 100,
+        hasAudio: true,
+        audioPeaks: null,
+      }
+    );
+    const clip = {
+      ...createAudioClipFromAsset('track', asset),
+      audioProcessing,
+      startTime: 0,
+      sourceStart: 0.1,
+      sourceDuration: 2.5,
+      duration: 2.5 / rate,
+      playbackRate: rate,
+      volume: 0.5,
+    };
+    const selected = clipAudioClipToExportRange(clip, { start: 0.2, end: 0.6 });
+    if (!selected) throw new Error('Missing selected clip');
+    expect(selected.audioProcessingSource).toEqual({ start: 0.1, duration: 2.5 });
+    await scheduleOfflineAudioClipMix(context as unknown as OfflineAudioContext, selected, buffer);
+    expect(nodes).toHaveLength(1);
+    const node = nodes[0]!;
+    expect(node.start).toHaveBeenCalledTimes(1);
+    expect(node.start.mock.calls[0]!.slice(0, 2)).toEqual([0, 0.02]);
+    // Decimal range endpoints differ by floating-point rounding, far below one sample.
+    expect(node.start.mock.calls[0]![2]).toBeCloseTo(0.4, 12);
+    expect(node.stop).toHaveBeenCalledTimes(1);
+    expect(node.stop.mock.calls[0]![0]).toBeCloseTo(0.4, 12);
+    const entry = {
+      lane: 'voiceover' as const,
+      clipId: clip.id,
+      source: { kind: 'project' as const, assetId: asset.id },
+      timelineStart: 0,
+      sourceOffset: 0.1,
+      duration: 2.5 / rate,
+      playbackRate: rate,
+      volume: 1,
+      fadeIn: 0,
+      fadeOut: 0,
+      audioProcessing,
+    };
+    const reference = await createReviewProcessedClip(
+      entry,
+      buffer,
+      new AbortController().signal,
+      async (asset) => readAudioFixtureAsset(asset.path)
+    );
+    try {
+      const expected = await reference.render(
+        Math.round(0.2 * 48000) - 960,
+        Math.round(0.6 * 48000) + 960
+      );
+      expect(node.buffer?.sampleRate).toBe(48000);
+      expect(node.buffer?.getChannelData(0)).toEqual(expected[0]);
+      expect(context.gains[0]!.gain.setValueAtTime).toHaveBeenCalledWith(0.5, 0);
+    } finally {
+      reference.dispose();
+    }
+  }
+);

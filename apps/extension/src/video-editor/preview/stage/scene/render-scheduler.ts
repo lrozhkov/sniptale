@@ -1,18 +1,20 @@
-import { isPreviewFrameGpuIsolated } from './source-frames';
-import { arePreviewImageResourcesCurrent } from './image-resources';
+import { isPreviewFrameGpuIsolated } from '../../../../workflows/video/native-composition/source-frames';
+import { arePreviewImageResourcesCurrent } from '../../../../workflows/video/native-composition/image-resources';
 import type { GpuPreviewFramePresenter } from '../../../../features/video/composition/canvas/preview-presentation';
 import type {
   PreviewScenePresentation,
   PreviewScenePreparedFrame,
   PreviewSceneImageResources,
 } from './types';
-import { resolvePreviewCompositionFrameSize } from './canvas';
+import { resolvePreviewCompositionFrameSize } from '../../../../workflows/video/native-composition/canvas';
 import type { renderPreviewScene } from './render-preview';
 import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
 
 export type PreviewSceneRenderJob = Parameters<typeof renderPreviewScene>[0] & {
   controller: AbortController;
   effectPreparationProject?: Parameters<typeof renderPreviewScene>[0]['project'] | undefined;
+  /** Same frozen-time gesture permits ordered intermediate poses; hard context changes still abort. */
+  transformInteraction?: { readonly clipId: string } | undefined;
   /** The mounted frontend receives the completed output; the producer receives only acquisition. */
   framePresenter?: GpuPreviewFramePresenter;
   onCameraPresented?: ((camera: VideoCompositionCameraState, time: number) => void) | undefined;
@@ -199,7 +201,23 @@ export function createPreviewSceneRenderScheduler(
       preparePendingFrame(state, args);
       scheduleNextPreviewSceneRender(state, args);
       return () => {
-        if (state.active.some((active) => active.job === job) && !job.isPlaybackFrame) {
+        // Withdrawing the latest request also withdraws the active pose it retained.
+        if (state.latestJob === job && isTransformInteractionJob(job)) {
+          for (const active of state.active) {
+            if (active.job.transformInteraction === job.transformInteraction)
+              active.job.controller.abort();
+          }
+        }
+        if (
+          state.active.some((active) => active.job === job) &&
+          !job.isPlaybackFrame &&
+          !(
+            state.latestJob &&
+            state.latestJob !== job &&
+            sameTransformInteraction(job, state.latestJob) &&
+            sameRenderingContext(job, state.latestJob)
+          )
+        ) {
           job.controller.abort();
         }
         if (state.pendingJob === job) {
@@ -216,6 +234,7 @@ function renderInput(
 ): Parameters<typeof renderPreviewScene>[0] {
   const {
     controller: _controller,
+    transformInteraction: _interaction,
     framePresenter: _presenter,
     runtimeVersion: _runtime,
     layoutVersion: _layout,
@@ -231,27 +250,80 @@ function renderInput(
   };
 }
 
+function isTransformInteractionJob(job: PreviewSceneRenderJob) {
+  return (
+    !!job.transformInteraction &&
+    !job.isPlaybackFrame &&
+    job.previewRenderer === 'gpu' &&
+    job.previewCacheBypass === true
+  );
+}
+
+function sameTransformInteraction(previous: PreviewSceneRenderJob, next: PreviewSceneRenderJob) {
+  if (
+    !isTransformInteractionJob(previous) ||
+    !isTransformInteractionJob(next) ||
+    previous.transformInteraction !== next.transformInteraction ||
+    previous.currentTime !== next.currentTime
+  )
+    return false;
+  if (previous.project === next.project) return true;
+  const before = previous.project;
+  const after = next.project;
+  // Hydrated cursor/history and every other non-pose value must still agree.
+  const keys = Reflect.ownKeys(before);
+  if (
+    keys.length !== Reflect.ownKeys(after).length ||
+    !keys.every(
+      (key) =>
+        Object.hasOwn(after, key) &&
+        (key === 'clips' || Object.is(Reflect.get(before, key), Reflect.get(after, key)))
+    )
+  )
+    return false;
+  if (before.clips.length !== after.clips.length) return false;
+  return before.clips.every((clip, index) => {
+    const candidate = after.clips[index];
+    if (clip === candidate) return true;
+    if (!candidate || clip.id !== previous.transformInteraction?.clipId || candidate.id !== clip.id)
+      return false;
+    const fields = Object.keys(clip);
+    return (
+      fields.length === Object.keys(candidate).length &&
+      fields.every(
+        (key) =>
+          Object.hasOwn(candidate, key) &&
+          (key === 'transform' || Object.is(Reflect.get(clip, key), Reflect.get(candidate, key)))
+      )
+    );
+  });
+}
+
 function sameRenderingContext(
   previous: PreviewSceneRenderJob,
   next: PreviewSceneRenderJob,
   images?: PreviewSceneImageResources
 ) {
+  const interaction = sameTransformInteraction(previous, next);
   return (
     previous.sourceRuntime === next.sourceRuntime &&
     previous.renderGeneration === next.renderGeneration &&
     previous.runtimeVersion === next.runtimeVersion &&
     previous.layoutVersion === next.layoutVersion &&
-    previous.project === next.project &&
-    previous.renderRevision === next.renderRevision &&
+    (interaction || previous.project === next.project) &&
+    (interaction || previous.renderRevision === next.renderRevision) &&
     previous.previewRenderer === next.previewRenderer &&
     previous.previewMode === next.previewMode &&
-    previous.previewRasterSize === next.previewRasterSize &&
+    (previous.previewRasterSize === next.previewRasterSize ||
+      (interaction &&
+        previous.previewRasterSize?.width === next.previewRasterSize?.width &&
+        previous.previewRasterSize?.height === next.previewRasterSize?.height)) &&
     previous.previewCacheBypass === next.previewCacheBypass &&
     previous.canvas === next.canvas &&
     previous.stage === next.stage &&
     previous.framePresenter === next.framePresenter &&
     previous.acquireGpuOutput === next.acquireGpuOutput &&
-    previous.onCameraPresented === next.onCameraPresented &&
+    (interaction || previous.onCameraPresented === next.onCameraPresented) &&
     previous.videoRefs === next.videoRefs &&
     (images
       ? arePreviewImageResourcesCurrent(images, next.imageBank)
@@ -352,7 +424,8 @@ function shouldAbortActivePreviewJob(
   images?: PreviewSceneImageResources
 ) {
   return (
-    !sameRenderingContext(active, next, images) || !active.isPlaybackFrame || !next.isPlaybackFrame
+    !sameRenderingContext(active, next, images) ||
+    (!(active.isPlaybackFrame && next.isPlaybackFrame) && !sameTransformInteraction(active, next))
   );
 }
 
@@ -362,6 +435,8 @@ function canStart(
 ) {
   const job = state.pendingJob;
   if (state.disposed || state.failure || !job || state.preparingJob === job) return false;
+  // A replacement seek must wait for its own decoded sources while canceled preparation drains.
+  if (job.sourceRuntime?.selected && args.prepare && state.prepared?.job !== job) return false;
   if (!state.active.length) return true;
   const preparation = state.prepared;
   return (

@@ -1,11 +1,13 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
+import { createGlTransitionSelection } from '../transition/gl-catalog';
 import { createVideoProjectTrack } from '../factories/creation';
 import { expect, it } from 'vitest';
-
 import {
   VideoTrackKind,
   VideoProjectClipType,
   VideoTransitionEasing,
-  VideoTransitionKind,
   type VideoProject,
 } from '../types';
 import { createEffectHostClip } from '../factories/overlay-clip';
@@ -16,133 +18,103 @@ import {
   createScopeSettings,
 } from './render-scope.test-support';
 
-it('projects transitions and EffectV1 references as a closed selected-clip graph', () => {
-  const project = createScopeProject([
-    createScopeClip('clip-1', VideoProjectClipType.VIDEO),
-    createScopeClip('clip-2', VideoProjectClipType.VIDEO),
-    createScopeClip('clip-3', VideoProjectClipType.VIDEO),
-  ]);
+function addAnnotation(project: VideoProject, id: string, name: string) {
+  const source = readFileSync(
+    name === 'callout'
+      ? 'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json'
+      : `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
+    'utf8'
+  );
+  const parsed = parseAnimationTemplateSource(source);
+  if (!parsed.ok) throw new Error('Expected valid animation.');
+  const hash = createHash('sha256').update(source).digest('hex');
+  const track = createVideoProjectTrack('Annotation', -1, VideoTrackKind.PRIMARY);
+  project.tracks.push(track);
+  const host = createEffectHostClip({
+    duration: 1,
+    effectInstanceId: id,
+    name: id,
+    projectWidth: project.width,
+    projectHeight: project.height,
+    startTime: 0,
+    trackId: track.id,
+  });
+  host.id = `${id}-host`;
+  project.clips.push(host);
+  project.effectSnapshots!.push({
+    assets: [],
+    documentId: parsed.template.id,
+    id: `effect:${hash}`,
+    kind: 'standalone',
+    retainedByteLength: Buffer.byteLength(source),
+    schemaVersion: 'sniptale.animation.v1',
+    sha256: hash,
+    source,
+  });
+  project.effectInstances!.push({
+    controls: {},
+    duration: 1,
+    enabled: true,
+    id,
+    kind: 'standalone',
+    playbackRate: 3,
+    snapshotId: `effect:${hash}`,
+    startTime: 0,
+    target: { kind: 'scene' },
+  });
+  return { host, snapshotId: `effect:${hash}` };
+}
+function createTransition(id: string, leadingClipId: string, trailingClipId: string) {
+  return {
+    duration: 1,
+    easing: VideoTransitionEasing.LINEAR,
+    id,
+    kind: 'gl' as const,
+    selection: createGlTransitionSelection('Fade')!,
+    leadingClipId,
+    trailingClipId,
+  };
+}
+it('projects ordinary GL boundaries and selected annotation hosts as a closed graph', () => {
+  const project = createScopeProject(
+    ['clip-1', 'clip-2', 'clip-3'].map((id) => createScopeClip(id, VideoProjectClipType.VIDEO))
+  );
   project.transitions = [
     createTransition('transition-kept', 'clip-1', 'clip-2'),
     createTransition('transition-dropped', 'clip-2', 'clip-3'),
   ];
-  project.effectSnapshots = [
-    createSnapshot('snapshot-target', 'targetEffect'),
-    createSnapshot('snapshot-transition', 'transition'),
-    createSnapshot('snapshot-dropped', 'targetEffect'),
-  ];
-  project.effectInstances = [
-    createInstance('target-kept', 'snapshot-target', 'targetEffect', {
-      clipId: 'clip-1',
-      kind: 'clip',
-    }),
-    createInstance('transition-kept', 'snapshot-transition', 'transition', {
-      kind: 'transition',
-      transitionId: 'transition-kept',
-    }),
-    createInstance('target-dropped', 'snapshot-dropped', 'targetEffect', {
-      clipId: 'clip-3',
-      kind: 'clip',
-    }),
-  ];
-
+  const kept = addAnnotation(project, 'kept', 'title');
+  addAnnotation(project, 'dropped', 'frame');
+  const before = structuredClone(project);
   const scoped = resolveProjectRenderScope(
     project,
     createScopeSettings({
       scope: 'selected-clip',
-      selectedClipIds: ['clip-1', 'clip-2'],
+      selectedClipIds: ['clip-1', 'clip-2', kept.host.id],
     })
   );
-
-  expect(scoped.clips.map(({ id }) => id)).toEqual(['clip-1', 'clip-2']);
-  expect(scoped.transitions?.map(({ id }) => id)).toEqual(['transition-kept']);
-  expect(scoped.effectInstances?.map(({ id }) => id)).toEqual(['target-kept', 'transition-kept']);
-  expect(scoped.effectSnapshots?.map(({ id }) => id)).toEqual([
-    'snapshot-target',
-    'snapshot-transition',
-  ]);
+  expect(scoped.clips.map((clip) => clip.id)).toEqual(['clip-1', 'clip-2', kept.host.id]);
+  expect(scoped.transitions?.map((entry) => entry.id)).toEqual(['transition-kept']);
+  expect(scoped.effectInstances?.map((entry) => entry.id)).toEqual(['kept']);
+  expect(scoped.effectSnapshots?.map((entry) => entry.id)).toEqual([kept.snapshotId]);
+  expect(project).toEqual(before);
 });
-
-it('retains a standalone EffectV1 instance only with its selected ordinary clip host', () => {
-  const project = createScopeProject([createScopeClip('clip-1', VideoProjectClipType.VIDEO)]);
-  const overlayTrack = createVideoProjectTrack('Effect', 0, VideoTrackKind.PRIMARY);
-  project.tracks.push(overlayTrack);
-  const host = createEffectHostClip({
-    duration: 1,
-    effectInstanceId: 'standalone',
-    name: 'Standalone',
-    projectHeight: project.height,
-    projectWidth: project.width,
-    startTime: 0,
-    trackId: overlayTrack.id,
-  });
-  host.id = 'standalone-host';
-  project.clips.push(host);
-  project.effectSnapshots = [createSnapshot('snapshot-standalone', 'standalone')];
-  project.effectInstances = [
-    createInstance('standalone', 'snapshot-standalone', 'standalone', { kind: 'scene' }),
-  ];
-
+it('retains a standalone annotation only with its selected ordinary host clip', () => {
+  const project = createScopeProject([createScopeClip('clip-1', VideoProjectClipType.VIDEO)]),
+    { host, snapshotId } = addAnnotation(project, 'standalone', 'title');
   const withoutHost = resolveProjectRenderScope(
     project,
     createScopeSettings({ scope: 'selected-clip', selectedClipIds: ['clip-1'] })
   );
   expect(withoutHost.effectInstances).toEqual([]);
   expect(withoutHost.effectSnapshots).toEqual([]);
-
   const withHost = resolveProjectRenderScope(
     project,
-    createScopeSettings({ scope: 'selected-clip', selectedClipIds: ['standalone-host'] })
+    createScopeSettings({ scope: 'selected-clip', selectedClipIds: [host.id] })
   );
-  expect(withHost.effectInstances?.map(({ id }) => id)).toEqual(['standalone']);
-  expect(withHost.effectSnapshots?.map(({ id }) => id)).toEqual(['snapshot-standalone']);
+  expect(withHost.effectInstances?.map((entry) => entry.id)).toEqual(['standalone']);
+  expect(withHost.effectSnapshots?.map((entry) => entry.id)).toEqual([snapshotId]);
 });
-
-function createTransition(id: string, leadingClipId: string, trailingClipId: string) {
-  return {
-    duration: 1,
-    easing: VideoTransitionEasing.LINEAR,
-    id,
-    kind: VideoTransitionKind.CROSSFADE,
-    leadingClipId,
-    trailingClipId,
-  };
-}
-
-function createSnapshot(
-  id: string,
-  kind: 'standalone' | 'targetEffect' | 'transition'
-): NonNullable<VideoProject['effectSnapshots']>[number] {
-  return {
-    assets: [],
-    documentId: id,
-    id,
-    kind,
-    retainedByteLength: 2,
-    schemaVersion: 'sniptale.effect.v1',
-    sha256: id.padEnd(64, '0'),
-    source: '{}',
-  };
-}
-
-function createInstance(
-  id: string,
-  snapshotId: string,
-  kind: 'standalone' | 'targetEffect' | 'transition',
-  target: NonNullable<VideoProject['effectInstances']>[number]['target']
-): NonNullable<VideoProject['effectInstances']>[number] {
-  return {
-    controls: {},
-    duration: 1,
-    enabled: true,
-    id,
-    kind,
-    playbackRate: 1,
-    snapshotId,
-    startTime: 0,
-    target,
-  };
-}
 
 it('validates selected IDs, keeps complete scopes intact and includes subtitles only when requested', () => {
   const project = createScopeProject([

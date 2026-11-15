@@ -17,6 +17,7 @@ beforeEach(() => {
   commitWorkspaceMock.mockReset();
   commitWorkspaceMock.mockImplementation(async (input) => ({
     revision: input.expectedRevision + 1,
+    documentAssetsByVectorDefinitionId: new Map(),
     documentAssetsByRuntimeUrl: new Map(),
   }));
 });
@@ -49,7 +50,11 @@ it('coalesces uncaptured caption autosaves while retaining the latest published 
     if (commitWorkspaceMock.mock.calls.length === 1) await firstWrite;
     if (input.expectedRevision !== revision) throw new Error('Stale workspace revision');
     revision += 1;
-    return { revision, documentAssetsByRuntimeUrl: new Map() };
+    return {
+      revision,
+      documentAssetsByVectorDefinitionId: new Map(),
+      documentAssetsByRuntimeUrl: new Map(),
+    };
   });
   for (const displayName of ['First', 'Second', 'Third']) {
     publisher.publishHistoryDocument({ ...createEditorDocumentFixture(), displayName });
@@ -91,7 +96,11 @@ it('flushes edits arriving during the awaited write before allowing the document
   });
   commitWorkspaceMock.mockImplementationOnce(async () => {
     await firstWrite;
-    return { revision: 1, documentAssetsByRuntimeUrl: new Map() };
+    return {
+      revision: 1,
+      documentAssetsByVectorDefinitionId: new Map(),
+      documentAssetsByRuntimeUrl: new Map(),
+    };
   });
   let current = createDocument('first');
   autosave.scheduleAutosave(current);
@@ -137,7 +146,11 @@ it('refuses an old close flush when its in-flight atomic write finishes after a 
     await new Promise<void>((resolve) => {
       finishWrite = resolve;
     });
-    return { revision: 9, documentAssetsByRuntimeUrl: new Map() };
+    return {
+      revision: 9,
+      documentAssetsByVectorDefinitionId: new Map(),
+      documentAssetsByRuntimeUrl: new Map(),
+    };
   });
   autosave.scheduleAutosave(createDocument('old'));
   const closing = autosave.flushAutosave(() => createDocument('old'));
@@ -166,7 +179,11 @@ it('finishes the atomic write and saves the newest admitted snapshot during inpu
     await new Promise<void>((resolve) => {
       finishWrite = resolve;
     });
-    return { revision: 1, documentAssetsByRuntimeUrl: new Map() };
+    return {
+      revision: 1,
+      documentAssetsByVectorDefinitionId: new Map(),
+      documentAssetsByRuntimeUrl: new Map(),
+    };
   });
   autosave.scheduleAutosave(createDocument('first'));
   await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);

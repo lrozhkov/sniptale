@@ -1,3 +1,12 @@
+import type { AudioProcessing } from '@sniptale/runtime-contracts/audio-effects';
+import { useAudioPresets } from '../../../../../composition/audio-preset-resources/use-audio-presets';
+import { AudioPresetControls } from '../../../../../ui/audio/preset-controls';
+import { AudioProcessingFields } from '../../../../../ui/audio/processing-fields';
+import {
+  getProjectAudioProcessingSelection,
+  updateProjectAudioProcessing,
+  type ProjectAudioProcessingTarget,
+} from '../../../../../features/video/project/audio-processing';
 import { useRef, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import type { VideoProject } from '../../../../../features/video/project/types/model';
@@ -152,6 +161,7 @@ function SourceAudioDocumentEditor({
   };
   return (
     <>
+      <ProjectAudioProcessingEditor project={project} target={binding} disabled={disabled} />
       {(['ranges', 'mutes'] as const).map((branch) => (
         <SourceAudioRangeGroup
           key={branch}
@@ -180,6 +190,67 @@ function SourceAudioDocumentEditor({
               ? 'videoEditor.sidebar.sourceAudioInvalid'
               : 'videoEditor.sidebar.sourceAudioStale'
           )}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+/** Native adapters keep command/history authority outside the shared processing fields. */
+export function ProjectAudioProcessingEditor({
+  project,
+  target,
+  disabled = false,
+}: {
+  project: VideoProject;
+  target: ProjectAudioProcessingTarget;
+  disabled?: boolean;
+}) {
+  const updateProject = useVideoEditorTimelineEditingPort((port) => port.updateProject);
+  const [refused, setRefused] = useState(false);
+  const selection = getProjectAudioProcessingSelection(project, target);
+  const ownerKey = JSON.stringify([project.id, target]);
+  const presets = useAudioPresets(ownerKey, selection.mixed ? undefined : selection.value);
+  if (!selection.clipIds.length) return null;
+  const apply = (value: AudioProcessing | undefined) => {
+    let failed = false;
+    updateProject((current) => {
+      if (current !== project) {
+        failed = true;
+        return current;
+      }
+      const result = updateProjectAudioProcessing(current, target, value, () =>
+        crypto.randomUUID()
+      );
+      if (!result.ok) {
+        failed = true;
+        return current;
+      }
+      return result.project;
+    });
+    setRefused(failed);
+  };
+  return (
+    <>
+      <AudioPresetControls
+        key={ownerKey}
+        {...presets}
+        hasValue={!!selection.value && !selection.mixed}
+        disabled={disabled || !selection.editable}
+        onApply={apply}
+      />
+      <AudioProcessingFields
+        key={ownerKey + ':fields'}
+        value={selection.value}
+        mixed={selection.mixed}
+        sourceScope={target.kind === 'source'}
+        disabled={disabled || !selection.editable}
+        createDefaultProcessing={presets.createDefaultProcessing}
+        onChange={apply}
+      />
+      {refused ? (
+        <p role="alert" className="text-xs text-[var(--sniptale-color-danger)]">
+          {translate('audioProcessing.refused')}
         </p>
       ) : null}
     </>

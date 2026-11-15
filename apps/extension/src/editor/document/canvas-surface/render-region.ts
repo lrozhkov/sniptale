@@ -1,5 +1,6 @@
-import { Canvas, type FabricObject, type TPointerEvent } from 'fabric';
-import { isBackgroundObject, isEditableObject, isUserObject } from '../model/index';
+import { type Canvas } from 'fabric';
+import { isBackgroundObject, isUserObject } from '../model/index';
+import { EditorSelectionCanvas } from './canvas-selection';
 import {
   createEditorWorkspaceInsets,
   getEditorWorkspaceSurfaceSize,
@@ -7,18 +8,10 @@ import {
   type EditorWorkspaceInsets,
 } from './workspace-extent';
 
+export type { EditorLayerPresentationBounds } from './canvas-selection';
+
 type RenderRect = { x: number; y: number; width: number; height: number };
 type DocumentSize = { width: number; height: number };
-/** Visible bounds of a projected layer in Fabric scene coordinates. */
-export type EditorLayerPresentationBounds = {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-};
-type PresentationBoundsResolver = (
-  object: FabricObject
-) => EditorLayerPresentationBounds | null | undefined;
 const MAX_INTERACTIVE_BACKING_PIXELS = 4_000_000;
 const MAX_WORKSPACE_SIDE = 200_000;
 const WORKSPACE_EDGE_TRIGGER_PX = 160;
@@ -26,7 +19,7 @@ const WORKSPACE_GROWTH_PX = 768;
 const RENDER_OVERSCAN_PX = 2;
 
 /** The backing canvas covers the scrollable workspace; interactive frames paint only its visible part. */
-export class EditorCanvas extends Canvas {
+export class EditorCanvas extends EditorSelectionCanvas {
   private renderViewport: HTMLElement | null = null;
   private virtualStage: HTMLElement | null = null;
   private documentSize: DocumentSize | null = null;
@@ -40,116 +33,6 @@ export class EditorCanvas extends Canvas {
   private expandingCanvasWorkspace = false;
   private presentationScale = 1;
   private showOutsideCanvas = false;
-  private layerSelectionPriority: FabricObject | null = null;
-  private tracksLayerSelectionPriority = false;
-
-  setLayerSelectionPriority(object: FabricObject | null): void {
-    if (!this.tracksLayerSelectionPriority) {
-      const clearPriority = () => {
-        this.layerSelectionPriority = null;
-      };
-      this.on('selection:created', clearPriority);
-      this.on('selection:updated', clearPriority);
-      this.on('selection:cleared', clearPriority);
-      this.tracksLayerSelectionPriority = true;
-    }
-    this.layerSelectionPriority = object;
-  }
-
-  override findTarget(e: TPointerEvent): ReturnType<Canvas['findTarget']> {
-    const priority = this.layerSelectionPriority;
-    if (!priority) return super.findTarget(e);
-    if (this.getActiveObject() !== priority) {
-      this.layerSelectionPriority = null;
-      return super.findTarget(e);
-    }
-    const preserveObjectStacking = this.preserveObjectStacking;
-    this.preserveObjectStacking = false;
-    try {
-      return super.findTarget(e);
-    } finally {
-      this.preserveObjectStacking = preserveObjectStacking;
-    }
-  }
-
-  private presentationBounds: PresentationBoundsResolver | null = null;
-
-  /** Undefined retains native bounds; null excludes a projected layer until its surface exists. */
-  setLayerPresentationBoundsResolver(resolve: PresentationBoundsResolver | null): void {
-    this.presentationBounds = resolve;
-  }
-
-  /** Returns presentation bounds for a projected layer, without changing document geometry. */
-  getLayerPresentationBounds(
-    object: FabricObject
-  ): EditorLayerPresentationBounds | null | undefined {
-    return this.presentationBounds?.(object);
-  }
-
-  override collectObjects(
-    ...args: Parameters<Canvas['collectObjects']>
-  ): ReturnType<Canvas['collectObjects']> {
-    const native = super.collectObjects(...args);
-    if (!this.presentationBounds) return native;
-    const [rect, options] = args;
-    const includeIntersecting = options?.includeIntersecting ?? true;
-    const nativeObjects = new Set(native);
-    return this.getObjects()
-      .toReversed()
-      .filter((object) => {
-        const bounds = this.presentationBounds?.(object);
-        if (bounds === undefined) return nativeObjects.has(object);
-        if (bounds === null || !object.visible || !object.selectable) return false;
-        if (includeIntersecting)
-          return (
-            bounds.left <= rect.left + rect.width &&
-            bounds.left + bounds.width >= rect.left &&
-            bounds.top <= rect.top + rect.height &&
-            bounds.top + bounds.height >= rect.top
-          );
-        return (
-          bounds.left >= rect.left &&
-          bounds.top >= rect.top &&
-          bounds.left + bounds.width <= rect.left + rect.width &&
-          bounds.top + bounds.height <= rect.top + rect.height
-        );
-      });
-  }
-
-  /** Reads the current cursor or fully-contained marquee candidates without changing selection. */
-  getSelectionPreviewObjects(hoverTarget?: FabricObject): FabricObject[] {
-    if (!this.selection || this.skipTargetFind || this.isDrawingMode || this._currentTransform)
-      return [];
-    const marquee = this._groupSelector;
-    const eligible = (object: FabricObject) =>
-      object.visible &&
-      object.selectable &&
-      object.sniptaleLocked !== true &&
-      isEditableObject(object);
-    if (marquee) {
-      if (marquee.deltaX === 0 && marquee.deltaY === 0) return [];
-      const candidates = new Set(
-        this.collectObjects(
-          {
-            left: marquee.x + Math.min(0, marquee.deltaX),
-            top: marquee.y + Math.min(0, marquee.deltaY),
-            width: Math.abs(marquee.deltaX),
-            height: Math.abs(marquee.deltaY),
-          },
-          { includeIntersecting: false }
-        )
-      );
-      return this.getObjects()
-        .toReversed()
-        .filter((object) => candidates.has(object) && eligible(object));
-    }
-    return hoverTarget &&
-      eligible(hoverTarget) &&
-      this.getObjects().includes(hoverTarget) &&
-      !this.getActiveObjects().includes(hoverTarget)
-      ? [hoverTarget]
-      : [];
-  }
 
   setRenderViewport(viewport: HTMLElement | null, stage?: HTMLElement): void {
     this.renderViewport = viewport;

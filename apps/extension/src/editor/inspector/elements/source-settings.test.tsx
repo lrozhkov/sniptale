@@ -1,0 +1,40 @@
+// @vitest-environment jsdom
+import { change, click, fixture, setupElements, state } from './fixture.test-support';
+import { expect, it } from 'vitest';
+import { act } from 'react';
+import { EditorElementsSourceSettings } from './source-settings';
+const ui = setupElements();
+it('requires disclosure consent before enabling the edited source and supports connection and disable', async () => {
+  await ui.render(<EditorElementsSourceSettings />);
+  expect(ui.button('editor.elements.enable').disabled).toBe(true);
+  change(ui.input('editor.elements.source'), 'https://icons.example/');
+  const consent = ui.host().querySelector<HTMLInputElement>('input[type=checkbox]');
+  if (!consent) throw new Error('Missing consent');
+  await click(ui.button('editor.elements.testConnection'));
+  expect(fixture.api.checkConnection).toHaveBeenCalledOnce();
+  act(() => consent.click());
+  await click(ui.button('editor.elements.enable'));
+  expect(fixture.api.enableSource).toHaveBeenCalledWith('https://icons.example/', true);
+  await click(ui.button('editor.elements.disable'));
+  expect(fixture.api.saveSettings).toHaveBeenCalledWith({ networkEnabled: false });
+  state().connected = true;
+  await ui.render(<EditorElementsSourceSettings />);
+  expect(ui.host().querySelector('[role=status]')?.textContent).toBe('editor.elements.connected');
+});
+it('loads settings into an untouched draft and preserves a user edit on later settings updates', async () => {
+  const saved = state().settings!;
+  state().settings = null;
+  await ui.render(<EditorElementsSourceSettings />);
+  expect(ui.input('editor.elements.source').value).toBe('https://api.iconify.design/');
+  expect(ui.button('editor.elements.testConnection').disabled).toBe(true);
+  state().settings = { ...saved, baseUrl: 'https://loaded.example/', networkEnabled: false };
+  await ui.render(<EditorElementsSourceSettings />);
+  expect(ui.input('editor.elements.source').value).toBe('https://loaded.example/');
+  change(ui.input('editor.elements.source'), 'https://draft.example/');
+  state().settings = saved;
+  state().busy = true;
+  await ui.render(<EditorElementsSourceSettings />);
+  expect(ui.input('editor.elements.source').value).toBe('https://draft.example/');
+  expect(ui.input('editor.elements.source').disabled).toBe(true);
+  expect(ui.button('editor.elements.testConnection').disabled).toBe(true);
+});

@@ -1,4 +1,11 @@
+// @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
+import { createFabricCanvasFixture } from '../../../testing/fabric-canvas.test-support';
+import {
+  createEditorSnapshotHistory,
+  deferEditorSnapshotHistory,
+  readCurrentEditorSnapshot,
+} from '../../history';
 import { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
 import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../../features/editor/document/constants';
 import type { EditorDocument } from '../../../../features/editor/document/types';
@@ -154,4 +161,40 @@ it('rejects stale ownership before applying or clearing history', async () => {
 
   expect(applyDocument).not.toHaveBeenCalled();
   expect(history.getState().current).toBe(JSON.stringify(latest));
+});
+
+it('retains the captured pending step when restoring through its canvas owner cannot be saved', async () => {
+  const initial = createEditorDocument('initial');
+  const latest = createEditorDocument('pending edit');
+  const original = createEditorDocument('raw source');
+  const history = createEditorSnapshotHistory(initial);
+  deferEditorSnapshotHistory(history, {
+    document: latest,
+    isCurrent: () => true,
+    onCommitted: vi.fn(),
+    onFailure: vi.fn(),
+  });
+  expect(history.getState().index).toBe(0);
+  let visible = latest;
+  const publishHistoryDocument = vi.fn();
+  await expect(
+    restoreEditorControllerOriginalDocument(
+      {
+        canvas: createFabricCanvasFixture({}),
+        history,
+        applyDocument: async (document) => {
+          visible = document;
+        },
+        publishHistoryDocument,
+      },
+      original,
+      async () => {
+        throw new Error('storage full');
+      }
+    )
+  ).rejects.toThrow('storage full');
+  expect(visible).toEqual(latest);
+  expect(readCurrentEditorSnapshot(history)).toEqual(latest);
+  expect(history.getState()).toMatchObject({ index: 1, size: 2, canUndo: true });
+  expect(publishHistoryDocument).toHaveBeenCalledWith(latest);
 });

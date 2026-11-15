@@ -7,6 +7,7 @@ import {
   createVideoClip,
 } from '../../../../features/video/project/timeline/project-meta.test.helpers';
 import { usePreviewStageRuntime } from './controller';
+import { usePreviewStageTransientTransform } from './transform-preview';
 import * as recordingEvents from './recording-events';
 import { usePreviewStagePresentationTime } from './presentation';
 import { usePreviewStageCanvasRender } from '../scene/render';
@@ -51,6 +52,7 @@ function Harness(props: PreviewStageProps & { direct?: boolean }) {
     previewRasterSize: runtime.previewRasterSize,
     project: runtime.render.project,
     effectPreparationProject: runtime.render.effectPreparationProject,
+    transformInteraction: runtime.render.transformInteraction,
     resizeVersion: 0,
     videoFrameState,
     videoRefs: runtime.media.videoRefs,
@@ -286,6 +288,7 @@ it('keeps playback handoff and its active frozen gesture usable while rendering 
   input.onPausePlayback = vi.fn(() => 2);
   try {
     await render(input);
+    const initialSourceRuntime = latest.media.sourceRuntime;
     const first = scheduler.enqueue.mock.lastCall![0];
     act(() => first.onCameraPresented?.(latest.surface.camera, first.currentTime));
     await render({ ...input, isPlaying: true, currentTime: 2 });
@@ -299,6 +302,7 @@ it('keeps playback handoff and its active frozen gesture usable while rendering 
     expect(input.onPausePlayback).toHaveBeenCalledOnce();
     await render({ ...input, isPlaying: false, currentTime: 2 });
     expect(latest.cache.bypass).toBe(true);
+    expect(latest.media.sourceRuntime).toBe(initialSourceRuntime);
     expect(latest.surface.cameraInteractionEnabled).toBe(true);
     const hooks = factory.mock.lastCall![0].gestureHooks!;
     act(() => {
@@ -530,4 +534,57 @@ it('forwards stable authored provenance with the latest hydrated project and eff
   const edited = { ...input, project: { ...input.project, backgroundColor: '#123456' } };
   await render(edited);
   expect(latest.render.effectPreparationProject).toBe(edited.project);
+});
+
+it('owns one transform cohort until the gesture settles or the authored project changes', async () => {
+  let project = createProject([createVideoClip()]);
+  let transient: ReturnType<typeof usePreviewStageTransientTransform>;
+  function TransformHarness() {
+    transient = usePreviewStageTransientTransform(project, { currentTime: 2.5, pause: () => 2.5 });
+    return null;
+  }
+  await act(async () => root.render(<TransformHarness />));
+  expect(transient!.transformInteraction).toBeUndefined();
+  const clip = project.clips[0]!;
+  await act(async () => {
+    transient!.gestureHooks.onActivate?.(clip.id);
+    transient!.gestureHooks.onCacheBypassChange?.(true);
+    transient!.gestureHooks.onPreviewTransform?.(clip.id, { ...clip.transform, x: 10 });
+  });
+  const first = transient!.transformInteraction;
+  expect(first).toEqual({ clipId: clip.id, project });
+  await act(async () => {
+    transient!.gestureHooks.onPreviewTransform?.(clip.id, { ...clip.transform, x: 20 });
+  });
+  expect(transient!.transformInteraction).toBe(first);
+  expect(transient!.previewProject.clips[0]!.transform.x).toBe(20);
+  project = { ...project, backgroundColor: '#ffffff' };
+  await act(async () => root.render(<TransformHarness />));
+  expect(transient!.transformInteraction).not.toBe(first);
+  await act(async () => {
+    transient!.gestureHooks.onCacheBypassChange?.(false);
+    transient!.gestureHooks.onSettle?.('cancel');
+  });
+  expect(transient!.transformInteraction).toBeUndefined();
+  expect(transient!.previewProject).toBe(project);
+});
+
+it('cancels the previous ordinary request before admitting its replacement', async () => {
+  const original = scheduler.enqueue.getMockImplementation()!;
+  const events: string[] = [];
+  scheduler.enqueue.mockImplementation(() => {
+    events.push('enqueue');
+    return () => {
+      events.push('cleanup');
+    };
+  });
+  try {
+    const input = props();
+    await render(input);
+    events.length = 0;
+    await render({ ...input, currentTime: 2 });
+    expect(events.slice(0, 2)).toEqual(['cleanup', 'enqueue']);
+  } finally {
+    scheduler.enqueue.mockImplementation(original);
+  }
 });

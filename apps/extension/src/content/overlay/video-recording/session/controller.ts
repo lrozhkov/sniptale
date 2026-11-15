@@ -1,3 +1,5 @@
+import { flushSync } from 'react-dom';
+import { subscribeToVideoRecordingCapturePreparation } from '../transport/snapshot-channel';
 import {
   applyWebcamPresentationPatch,
   type WebcamPresentationPatch,
@@ -121,14 +123,90 @@ function parseMediaDevicesResult(value: unknown): VideoRecordingMediaDevice[] {
   return devices;
 }
 
+function useRecordingCapturePreparation(
+  identityRef: MutableRefObject<SurfaceIdentity | null>,
+  drawingOwner: ReturnType<typeof createRecordingDrawingOwner>,
+  phase: VideoRecordingToolbarState['phase']
+) {
+  const [prepared, setPrepared] = useState(false);
+  const requestIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (phase === 'recording' || phase === 'paused' || phase === 'idle' || phase === 'error') {
+      setPrepared(false);
+    }
+  }, [phase]);
+  useEffect(() => {
+    let disposed = false;
+    const pending = new Set<() => void>();
+    const unsubscribe = subscribeToVideoRecordingCapturePreparation(async (message) => {
+      const request = message.capturePreparation;
+      const identity = identityRef.current;
+      const matches = () => {
+        const current = identityRef.current;
+        return (
+          current &&
+          current.surfaceSessionId === message.snapshot.surfaceSessionId &&
+          current.documentGeneration === message.snapshot.documentGeneration &&
+          current.capabilityEpoch === message.snapshot.capabilityEpoch &&
+          current.recordingId === message.snapshot.recordingId &&
+          current.surfaceToken === message.surfaceToken
+        );
+      };
+      if (!request || disposed || !identity || !matches()) {
+        throw new Error('Recording drawing surface identity changed');
+      }
+      if (!request.suppressed && requestIdRef.current !== request.requestId) {
+        throw new Error('Recording drawing surface preparation is stale');
+      }
+      requestIdRef.current = request.suppressed ? request.requestId : null;
+      flushSync(() => {
+        if (request.suppressed) drawingOwner.controller.finalizeInteraction();
+        setPrepared(request.suppressed);
+      });
+      if (!request.suppressed) return;
+      await new Promise<void>((resolve, reject) => {
+        let frame = 0;
+        const cancel = () => {
+          cancelAnimationFrame(frame);
+          pending.delete(cancel);
+          reject(new Error('Recording drawing surface disposed during preparation'));
+        };
+        pending.add(cancel);
+        frame = requestAnimationFrame(() => {
+          frame = requestAnimationFrame(() => {
+            pending.delete(cancel);
+            resolve();
+          });
+        });
+      });
+      if (disposed || !matches() || requestIdRef.current !== request.requestId) {
+        throw new Error('Recording drawing surface preparation is stale');
+      }
+    });
+    return () => {
+      disposed = true;
+      unsubscribe();
+      pending.forEach((cancel) => cancel());
+    };
+  }, [drawingOwner, identityRef]);
+  return prepared || phase === 'starting' || phase === 'recording' || phase === 'stopping';
+}
+
 function useRecordingDrawingLifecycle(
   drawingOwner: ReturnType<typeof createRecordingDrawingOwner>,
   phase: VideoRecordingToolbarState['phase']
 ) {
+  const recordedLifetime = useRef(false);
   useEffect(() => () => drawingOwner.dispose(), [drawingOwner]);
   useEffect(() => {
     drawingOwner.setClockRunning(phase === 'recording');
-    if (phase === 'idle' || phase === 'error') drawingOwner.controller.session.clear();
+    if (phase === 'recording' || phase === 'paused') recordedLifetime.current = true;
+    if (phase === 'idle' && recordedLifetime.current) {
+      drawingOwner.controller.session.clear();
+      recordedLifetime.current = false;
+    }
+    // Failure preserves accepted drawings, including a later idle recovery projection.
+    if (phase === 'error') recordedLifetime.current = false;
   }, [drawingOwner, phase]);
 }
 
@@ -675,6 +753,11 @@ export function useVideoRecordingSurfaceController(args: VideoRecordingSurfaceCo
     applySnapshot
   );
 
+  const drawingCaptureSuppressed = useRecordingCapturePreparation(
+    identityRef,
+    drawingOwner,
+    state.phase
+  );
   const activate = useSurfaceActivation(applySnapshot);
   const setupRef = useRef<RecordingSetupState>({
     captureMode: 'TAB',
@@ -794,5 +877,5 @@ export function useVideoRecordingSurfaceController(args: VideoRecordingSurfaceCo
       stateRef,
     ]
   );
-  return useSurfaceControllerProjection(projectionArgs);
+  return { ...useSurfaceControllerProjection(projectionArgs), drawingCaptureSuppressed };
 }

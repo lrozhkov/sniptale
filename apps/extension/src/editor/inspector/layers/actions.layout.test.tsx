@@ -73,7 +73,6 @@ function renderExpandedActions(args?: {
         isImmutable={false}
         layer={(args?.layer ?? LAYER) as never}
         visible={args?.visible ?? true}
-        onRenameLayer={vi.fn()}
         onOpenLayerEffects={vi.fn()}
       />
     )
@@ -83,9 +82,8 @@ function renderExpandedActions(args?: {
 function renderLayerRow(
   args: {
     layer?: EditorLayerItem;
-    onDrop?: ReturnType<typeof vi.fn>;
-    setDraggedLayerId?: ReturnType<typeof vi.fn>;
-    setDragOverLayerId?: ReturnType<typeof vi.fn>;
+    draggedLayerId?: string | null;
+    onPointerStart?: (id: string, event: import('react').PointerEvent<HTMLButtonElement>) => void;
   } = {}
 ) {
   container = document.createElement('div');
@@ -96,10 +94,8 @@ function renderLayerRow(
       <LayerRow
         locale="en"
         layer={(args.layer ?? LAYER) as never}
-        dragOverLayerId={null}
-        setDraggedLayerId={(args.setDraggedLayerId ?? vi.fn()) as never}
-        setDragOverLayerId={(args.setDragOverLayerId ?? vi.fn()) as never}
-        onDrop={(args.onDrop ?? vi.fn()) as (targetLayerId: string) => void}
+        draggedLayerId={args.draggedLayerId ?? null}
+        onPointerStart={args.onPointerStart ?? vi.fn()}
         onOpenLayerEffects={vi.fn()}
       />
     )
@@ -115,10 +111,6 @@ function renderLockedLayerRow() {
       <LayerRow
         locale="en"
         layer={{ ...LAYER, locked: true } as never}
-        dragOverLayerId={null}
-        setDraggedLayerId={vi.fn() as never}
-        setDragOverLayerId={vi.fn() as never}
-        onDrop={vi.fn()}
         onOpenLayerEffects={vi.fn()}
       />
     )
@@ -177,7 +169,7 @@ it('routes row preview modifier clicks and keeps locked rows non-draggable', () 
   renderLayerRow();
   act(() => {
     container
-      ?.querySelector<HTMLButtonElement>('button[title="editor.toolbar.toggleLayerSelection"]')
+      ?.querySelector<HTMLButtonElement>('button[aria-pressed]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true }));
   });
   expect(controllerMocks.selectLayer).toHaveBeenCalledWith('layer-1', {
@@ -199,21 +191,47 @@ it('routes row preview modifier clicks and keeps locked rows non-draggable', () 
   ).toBe(false);
 });
 
-it('keeps unlocked row drag handlers active and reports hover drop targets', () => {
-  const setDraggedLayerId = vi.fn();
-  const setDragOverLayerId = vi.fn();
-  const onDrop = vi.fn();
-  renderLayerRow({ onDrop, setDraggedLayerId, setDragOverLayerId });
-  const row = container?.firstElementChild as HTMLDivElement | null;
-  const trigger = container?.querySelector<HTMLButtonElement>('button[title="Layer 1"]');
+it('starts pointer reorder only from the selected icon handle', () => {
+  const onPointerStart = vi.fn();
+  renderLayerRow({ onPointerStart });
+  const title = container!.querySelector<HTMLButtonElement>('button[title="Layer 1"]')!;
+  const pointer = () => new MouseEvent('pointerdown', { bubbles: true, button: 0 });
+  act(() => title.dispatchEvent(pointer()));
+  expect(onPointerStart).not.toHaveBeenCalled();
+  const grip = container!.querySelector<HTMLButtonElement>(
+    '[data-ui="editor.layers.drag-handle"]'
+  )!;
+  expect(grip.draggable).toBe(false);
+  act(() => grip.dispatchEvent(pointer()));
+  expect(onPointerStart).toHaveBeenCalledExactlyOnceWith('layer-1', expect.anything());
+});
 
+it('keeps the icon a selection control when the row is not selected', () => {
+  const onPointerStart = vi.fn();
+  renderLayerRow({ layer: { ...LAYER, selected: false }, onPointerStart });
+  expect(container!.querySelector('[data-ui="editor.layers.drag-handle"]')).toBeNull();
+  const icon = container!.querySelector<HTMLButtonElement>('button[aria-pressed]')!;
+  expect(icon.draggable).toBe(false);
+  const drag = new Event('dragstart', { bubbles: true, cancelable: true });
   act(() => {
-    trigger?.dispatchEvent(new Event('dragstart', { bubbles: true }));
-    row?.dispatchEvent(new Event('dragover', { bubbles: true }));
-    row?.dispatchEvent(new Event('drop', { bubbles: true }));
+    icon.dispatchEvent(drag);
+    icon.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
   });
+  expect(drag.defaultPrevented).toBe(true);
+  expect(onPointerStart).not.toHaveBeenCalled();
+});
 
-  expect(setDraggedLayerId).toHaveBeenCalledWith('layer-1');
-  expect(setDragOverLayerId).toHaveBeenCalledWith('layer-1');
-  expect(onDrop).toHaveBeenCalledWith('layer-1');
+it.each([
+  { ...LAYER, locked: true },
+  { ...LAYER, type: 'source-image' as const, immutable: true, locked: true },
+])('refuses pointer reorder from a fixed or locked row', (layer) => {
+  const onPointerStart = vi.fn();
+  renderLayerRow({ layer, onPointerStart });
+  expect(container!.querySelector('[data-ui="editor.layers.drag-handle"]')).toBeNull();
+  act(() =>
+    container!
+      .querySelector('button')!
+      .dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+  );
+  expect(onPointerStart).not.toHaveBeenCalled();
 });

@@ -16,7 +16,9 @@ import {
 import { editReviewTextFragment } from '../../../../apps/extension/src/features/video/review/text-document';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { readReviewAnnotationEffectDocument } from '../../../../apps/extension/src/features/video/review/annotation-effects/validation';
-import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
+import { verifyRuntimeAnimationSource } from '../../../../apps/extension/src/contracts/effect-runtime/animation';
 import type { ReviewAnnotationEffectSnapshot } from '../../../../apps/extension/src/features/video/review/annotation-effects/types';
 
 /** Shared neutral source registry for native history/resource retention proofs. */
@@ -24,29 +26,18 @@ export async function historyRetentionEffectSnapshot(
   source: string
 ): Promise<ReviewAnnotationEffectSnapshot> {
   const document = readReviewAnnotationEffectDocument(source);
-  if (!document || document.assets.length !== 1) throw new Error('Invalid neutral scale effect');
-  const asset = document.assets[0]!;
-  if (asset.kind !== 'svg' || !asset.byteLength || !asset.sha256)
-    throw new Error('Invalid neutral asset');
-  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(source));
+  const sha256Hex = bytesToHex(sha256(new TextEncoder().encode(source)));
+  if (!document || !(await verifyRuntimeAnimationSource(source, sha256Hex)))
+    throw new Error('Invalid retained animation source.');
   return {
-    id: `effect:${sha256}`,
-    sha256,
+    id: `effect:${sha256Hex}`,
+    sha256: sha256Hex,
     source,
-    schemaVersion: 'sniptale.effect.v1',
+    schemaVersion: 'sniptale.animation.v1',
     kind: 'standalone',
     documentId: document.id,
-    retainedByteLength: new TextEncoder().encode(source).byteLength + asset.byteLength,
-    assets: [
-      {
-        id: asset.id,
-        assetId: 'project-asset:retained-effect',
-        kind: 'svg',
-        mimeType: asset.mimeType,
-        sha256: asset.sha256,
-        byteLength: asset.byteLength,
-      },
-    ],
+    retainedByteLength: new TextEncoder().encode(source).byteLength,
+    assets: [],
   };
 }
 

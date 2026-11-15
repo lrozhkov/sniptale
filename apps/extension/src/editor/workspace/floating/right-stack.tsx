@@ -18,12 +18,12 @@ type EditorFloatingRightStackProps = {
   hasImage: boolean;
   inspectorMeta: EditorToolbarContentProps['inspectorMeta'];
   layersCollapsed: boolean;
-  layersHeightRatio: number | null;
+  layersHeight: number | null;
   layersPreferenceError: string | null;
   documentController: EditorFloatingDocumentController;
   onCollapseLayers: () => void;
   onExpandLayers: () => void;
-  onLayersHeightRatioChange: (heightRatio: number | null) => void;
+  onLayersHeightChange: (preferredHeight: number | null) => void;
 };
 
 function renderLayersPanel(args: EditorFloatingRightStackProps) {
@@ -32,25 +32,25 @@ function renderLayersPanel(args: EditorFloatingRightStackProps) {
       collapsed={args.layersCollapsed && args.documentController.inspector !== 'layer-effects'}
       documentController={args.documentController}
       hasImage={args.hasImage}
-      heightRatio={args.layersHeightRatio}
+      preferredHeight={args.layersHeight}
       preferenceError={args.layersPreferenceError}
       onCollapse={args.onCollapseLayers}
       onExpand={args.onExpandLayers}
-      onHeightRatioChange={args.onLayersHeightRatioChange}
+      onHeightChange={args.onLayersHeightChange}
     />
   );
 }
 
 export function EditorFloatingRightStack({
   layersCollapsed,
-  layersHeightRatio,
+  layersHeight,
   layersPreferenceError,
   documentController,
   hasImage,
   inspectorMeta,
   onCollapseLayers,
   onExpandLayers,
-  onLayersHeightRatioChange,
+  onLayersHeightChange,
 }: EditorFloatingRightStackProps) {
   useEffect(() => {
     if (layersCollapsed && documentController.inspector === 'layer-effects') onExpandLayers();
@@ -61,11 +61,11 @@ export function EditorFloatingRightStack({
     hasImage,
     inspectorMeta,
     layersCollapsed,
-    layersHeightRatio,
+    layersHeight,
     layersPreferenceError,
     onCollapseLayers,
     onExpandLayers,
-    onLayersHeightRatioChange,
+    onLayersHeightChange,
   };
   const layersPanel = renderLayersPanel(props);
 

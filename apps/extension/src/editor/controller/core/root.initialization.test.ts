@@ -44,3 +44,11 @@ it('initializes instance-owned event handlers without calling an override during
   expect(mocks.createBindings).toHaveBeenCalledWith(second);
   expect(first.eventHandlers).not.toBe(second.eventHandlers);
 });
+
+it('retains the explicit raster compute factory and returns no runtime before mounting', () => {
+  const createRasterCompute = vi.fn();
+  const controller = new ImageEditorController({ createRasterCompute });
+  expect(controller.createRasterCompute).toBe(createRasterCompute);
+  expect(controller.getRasterRuntime()).toBeNull();
+  expect(createRasterCompute).not.toHaveBeenCalled();
+});

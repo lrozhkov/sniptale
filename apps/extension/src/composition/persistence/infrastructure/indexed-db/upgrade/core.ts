@@ -14,6 +14,7 @@ import {
   DIAGNOSTICS_EVENTS_STORE,
   DIAGNOSTICS_META_STORE,
   EDITOR_CUSTOM_SHAPES_STORE,
+  EDITOR_VECTOR_LIBRARY_STORE,
   FRAME_ANNOTATION_RASTER_JOBS_STORE,
   IMAGE_WORKSPACES_STORE,
   VIDEO_WORKSPACES_STORE,
@@ -48,6 +49,9 @@ import {
   STORE_NAME,
   THUMBNAILS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
+  VIDEO_ANIMATION_PACKAGES_STORE,
+  VIDEO_VISUAL_PREFERENCES_STORE,
+  VIDEO_GL_TRANSITION_PRESETS_STORE,
   VIDEO_PROJECTS_STORE,
   VIDEO_PROJECT_REVISIONS_STORE,
   WEB_SNAPSHOTS_STORE,
@@ -127,6 +131,10 @@ function assertSynchronousMigrationStep(result: unknown, step: 'migrate' | 'vali
 }
 
 function createBetaBaseline(db: UpgradeDatabase): void {
+  const vectors = db.createObjectStore(EDITOR_VECTOR_LIBRARY_STORE, { keyPath: 'key' });
+  vectors.createIndex('kind', 'kind');
+  vectors.createIndex('definitionId', 'definitionId');
+  vectors.createIndex(ROW_REFERENCE_INDEX, ROW_REFERENCE_FIELD, { multiEntry: true });
   createStore(db, STORE_NAME, 'id', ['createdAt']);
   createStore(db, RECORDING_TELEMETRY_STORE, 'recordingId', ['updatedAt']);
   createStore(db, RECORDING_RECOVERY_SESSIONS_STORE, 'id', ['createdAt', 'recoveryId']);
@@ -175,6 +183,9 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, AGGREGATE_PRESENTATIONS_STORE, ['aggregateKind', 'aggregateId'], ['updatedAt']);
   createStore(db, WEB_SNAPSHOTS_STORE, 'id', ['createdAt']);
   createStore(db, VIDEO_EFFECT_BUNDLES_STORE, 'packId', ['enabled', 'updatedAt']);
+  createStore(db, VIDEO_ANIMATION_PACKAGES_STORE, 'packId', ['enabled', 'updatedAt']);
+  createStore(db, VIDEO_VISUAL_PREFERENCES_STORE, ['kind', 'packId'], []);
+  createStore(db, VIDEO_GL_TRANSITION_PRESETS_STORE, 'id', ['updatedAt']);
   createStore(db, PROJECT_EXPORT_INPUTS_STORE, 'jobId', ['createdAt']);
   createStore(db, FRAME_ANNOTATION_RASTER_JOBS_STORE, 'jobId', ['createdAt']);
   createStore(db, EDITOR_CUSTOM_SHAPES_STORE, 'id', ['enabled', 'updatedAt']);

@@ -1,4 +1,6 @@
-import { CursorFocusTimelineKeys } from '../../ui/cursor-focus-timeline-keys';
+import { useReviewDragEscape } from './timeline-drag';
+import { useReviewTimelineSnap } from './timeline-magnets';
+import { reviewTimelineResizeHandleClassName } from './controls';
 import type { CursorFocusTimelineKey } from '../../features/video/project/cursor-focus-path/timeline';
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone } from './controls';
@@ -25,13 +27,10 @@ import {
 } from '../../features/video/review/action-lanes';
 import { reviewEventLabel, reviewMouseButtonLabel, reviewTimeLabel } from './controls';
 
-const ACTION_MARKER_HEIGHT_PX = 20;
+const ACTION_MARKER_HEIGHT_PX = 24;
 const ACTION_LANE_GAP_PX = 4;
 const ACTION_LANE_PITCH_PX = ACTION_MARKER_HEIGHT_PX + ACTION_LANE_GAP_PX;
-const HISTORY_EVENT_BACKGROUND = [
-  'linear-gradient(var(--sniptale-color-surface-hover),var(--sniptale-color-surface-hover))',
-  'var(--sniptale-color-surface-canvas)',
-].join(',');
+const HISTORY_EVENT_BACKGROUND = 'var(--review-interaction-item-background)';
 
 /** Cursor interactions forwarded unchanged from the review timeline to its telemetry strip. */
 export type ReviewCursorTimelineInteractions = {
@@ -44,6 +43,8 @@ export type ReviewCursorTimelineInteractions = {
 };
 
 type TelemetryStripProps = ReviewCursorTimelineInteractions & {
+  family?: 'keyboard' | 'mouse' | undefined;
+  interactionEditor?: import('./interaction-editor').ReviewInteractionEditor | undefined;
   cursorArchiveAvailable?: boolean | undefined;
   sourceId?: string | undefined;
   captureCapabilities?: RecordingTelemetryCapabilities | null | undefined;
@@ -54,7 +55,7 @@ type TelemetryStripProps = ReviewCursorTimelineInteractions & {
   playing?: boolean | undefined;
   width: number;
   zoom: number;
-  selectedTelemetryRef?: ReviewTelemetryMarker['ref'];
+  selectedTelemetryRef?: ReviewTelemetryMarker['ref'] | undefined;
 
   onMarker(marker: ReviewTelemetryMarker): void;
 };
@@ -71,6 +72,15 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
     (marker: ReviewTelemetryMarker) => markerCommand.current(marker),
     []
   );
+  const editorCommand = useRef(props.interactionEditor);
+  useLayoutEffect(() => {
+    editorCommand.current = props.interactionEditor;
+  }, [props.interactionEditor]);
+  const update = useCallback<NonNullable<TelemetryStripProps['interactionEditor']>['update']>(
+    (...args) => editorCommand.current?.update(...args),
+    []
+  );
+  const editable = !!props.interactionEditor;
   const [settled, setSettled] = useState({ width: props.width, zoom: props.zoom });
   useEffect(() => {
     const timer = setTimeout(() => setSettled({ width: props.width, zoom: props.zoom }), 250);
@@ -90,15 +100,22 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
   const retainedLanes = useRef<{ sourceId: string | undefined; lanes: number[] } | null>(null);
   const lanes = useMemo(
     () =>
-      [0, 1, 2].filter(
+      (props.family ? [props.family === 'keyboard' ? 0 : 1] : [0, 1]).filter(
         (lane) =>
+          !!props.family ||
           layout.items.some((item) => item.lane === lane) ||
           (lane === 2 && (!!props.cursorFocusKeys?.length || props.cursorArchiveAvailable)) ||
           (props.cursorArchiveAvailable &&
             retainedLanes.current?.sourceId === props.sourceId &&
             retainedLanes.current?.lanes.includes(lane))
       ),
-    [layout, props.cursorFocusKeys?.length, props.cursorArchiveAvailable, props.sourceId]
+    [
+      layout,
+      props.family,
+      props.cursorFocusKeys?.length,
+      props.cursorArchiveAvailable,
+      props.sourceId,
+    ]
   );
   useLayoutEffect(() => {
     // Retain only committed row presence, never markers from an expired archive window.
@@ -106,9 +123,7 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
       ? { sourceId: props.sourceId, lanes }
       : null;
   }, [props.cursorArchiveAvailable, props.sourceId, lanes]);
-  const cursorRow = lanes.indexOf(2);
-  const cursorTop = Math.max(0, cursorRow) * ACTION_LANE_PITCH_PX;
-  const height = Math.max(1, lanes.length) * ACTION_LANE_PITCH_PX - ACTION_LANE_GAP_PX;
+  const height = Math.max(1, lanes.length) * ACTION_LANE_PITCH_PX;
   const eventRows = useMemo(
     () =>
       lanes.map((lane, row) => (
@@ -144,7 +159,7 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
           <span
             aria-hidden="true"
             className={['pointer-events-none absolute inset-x-0', ''].join(' ')}
-            style={{ top: row * ACTION_LANE_PITCH_PX, height: ACTION_MARKER_HEIGHT_PX }}
+            style={{ top: row * ACTION_LANE_PITCH_PX + 2, height: ACTION_MARKER_HEIGHT_PX }}
           />
           {layout.items
             .filter((item) => item.lane === lane)
@@ -157,9 +172,12 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
                     selectedTelemetryRef: props.selectedTelemetryRef,
                     animatedIds: props.animatedIds,
                     onMarker,
+                    editable,
+                    update,
+                    duration: props.duration,
                   }}
                   ratio={ratio}
-                  top={row * ACTION_LANE_PITCH_PX}
+                  top={row * ACTION_LANE_PITCH_PX + 2}
                 />
               );
             })}
@@ -170,6 +188,9 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
       layout,
       ratio,
       coverageId,
+      editable,
+      update,
+      props.duration,
       props.captureCapabilities,
       props.selectedTelemetryRef,
       props.animatedIds,
@@ -180,29 +201,10 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
   return (
     <div
       data-ui="gallery.videoReview.historyStrip"
+      data-review-snap-domain="display"
       className="relative overflow-hidden"
       style={{ height }}
-      onDoubleClick={(event) => {
-        if (cursorRow < 0 && lanes.length > 0 && event.target !== event.currentTarget) return;
-        const rect = event.currentTarget.getBoundingClientRect();
-        if ((cursorRow >= 0 && event.clientY - rect.top < cursorTop) || !props.onAddCursorFocusKey)
-          return;
-        event.preventDefault();
-        event.stopPropagation();
-        props.onAddCursorFocusKey(
-          Math.max(
-            0,
-            Math.min(
-              props.duration,
-              ((event.clientX - rect.left) * props.duration) / Math.max(1, props.width * props.zoom)
-            )
-          )
-        );
-      }}
     >
-      {cursorRow >= 0 || lanes.length === 0 ? (
-        <ReviewCursorKeyRow props={props} top={cursorTop} />
-      ) : null}
       {eventRows}
     </div>
   );
@@ -258,6 +260,7 @@ function ReviewHistoryCluster(props: {
   );
   return (
     <div
+      data-review-snap-priority="none"
       className={`absolute ${props.members.every((marker) => marker.eventType === 'typing') ? 'z-0' : 'z-10'}`}
       title={
         reviewActionLane(props.members[0]!) === 0
@@ -283,19 +286,17 @@ function ReviewHistoryCluster(props: {
           padding: '0 12px 0 3px',
           borderRadius: 2,
           fontSize: 11,
-          background: props.members.every((marker) => marker.eventType === 'typing')
-            ? 'var(--sniptale-color-surface-hover)'
-            : HISTORY_EVENT_BACKGROUND,
+          background: HISTORY_EVENT_BACKGROUND,
           borderColor: selected
             ? 'var(--sniptale-color-accent)'
             : 'var(--sniptale-color-border-soft)',
         }}
         className={[
           reviewTimelineItemTone(selected),
+          'review-interaction-item',
           '[&_.sniptale-select-placeholder]:!text-current [&_.sniptale-select-placeholder]:font-medium',
           '!text-[var(--sniptale-color-text-secondary)]',
           '[&_.sniptale-select-chevron]:!h-2 [&_.sniptale-select-chevron]:!w-2 [&_.sniptale-select-chevron]:!right-1',
-          animated ? '!bg-[color-mix(in_srgb,var(--sniptale-color-info)_15%,transparent)]' : '',
         ].join(' ')}
         onChange={(id) => {
           const marker = props.members.find((item) => key(item) === id);
@@ -323,50 +324,6 @@ function ReviewHistoryCluster(props: {
   );
 }
 
-function ReviewCursorKeyRow({ props, top }: { props: TelemetryStripProps; top: number }) {
-  const coverage = useMemo(
-    () =>
-      new Map(
-        (props.cursorFocusKeys ?? [])
-          .filter((key) => (key.anchor === 'manual' || key.authored) && key.sourceCoverage)
-          .map((key) => [key.segmentId, key.sourceCoverage!])
-      ),
-    [props.cursorFocusKeys]
-  );
-  const ratio = Math.max(1, props.width * props.zoom) / Math.max(0.000001, props.duration);
-  const coverageNodes = useMemo(
-    () =>
-      [...coverage].map(([id, span]) => (
-        <span
-          key={id}
-          aria-hidden="true"
-          data-ui="cursorFocusPath.authoredCoverage"
-          className="absolute top-1/2 h-0.5 -translate-y-1/2 bg-[var(--sniptale-color-border-soft)]"
-          style={{ left: span.start * ratio, width: Math.max(0, span.end - span.start) * ratio }}
-        />
-      )),
-    [coverage, ratio]
-  );
-  return props.onCursorFocusKey && props.onAddCursorFocusKey ? (
-    <CursorFocusTimelineKeys
-      top={top}
-      height={20}
-      keys={props.cursorFocusKeys ?? []}
-      {...(props.selectedCursorFocusId ? { selectedId: props.selectedCursorFocusId } : {})}
-      time={props.time}
-      duration={props.duration}
-      pixelsPerSecond={ratio}
-      onSelect={props.onCursorFocusKey}
-      playing={props.playing}
-      {...(props.onNavigateCursorFocus ? { onNavigate: props.onNavigateCursorFocus } : {})}
-      {...(props.onMoveCursorFocus ? { onMove: props.onMoveCursorFocus } : {})}
-      onAdd={props.onAddCursorFocusKey}
-    >
-      {coverageNodes}
-    </CursorFocusTimelineKeys>
-  ) : null;
-}
-
 const CURSOR_MOVEMENT_BACKGROUND =
   'linear-gradient(var(--sniptale-color-border-soft),var(--sniptale-color-border-soft)) center/100% 2px no-repeat';
 
@@ -381,11 +338,48 @@ function ReviewHistoryItem({
     selectedTelemetryRef: TelemetryStripProps['selectedTelemetryRef'];
     animatedIds: TelemetryStripProps['animatedIds'];
     onMarker: TelemetryStripProps['onMarker'];
+    editable: boolean;
+    update: NonNullable<TelemetryStripProps['interactionEditor']>['update'];
+    duration: number;
   };
   ratio: number;
   top: number;
 }) {
   const marker = item.marker;
+  const [draft, setDraft] = useState<{ start: number; end: number }>();
+  const skipClick = useRef(false);
+  const drag = useRef<{
+    node: HTMLButtonElement;
+    pointerId: number;
+    x: number;
+    width: number;
+    edge: 'start' | 'end' | 'move';
+    after?: { start: number; end: number };
+  } | null>(null);
+  useReviewDragEscape(drag, () => setDraft(undefined));
+  const snap = useReviewTimelineSnap();
+  const down = (event: import('react').PointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0 || !props.editable || item.members.length > 1) return;
+    event.stopPropagation();
+    skipClick.current = false;
+    props.onMarker(marker);
+    const edge =
+      event.target instanceof Element
+        ? event.target.closest<HTMLElement>('[data-press-edge]')?.dataset['pressEdge']
+        : undefined;
+    drag.current = {
+      node: event.currentTarget,
+      pointerId: event.pointerId,
+      x: event.clientX,
+      width: event.currentTarget
+        .closest('[data-ui="gallery.videoReview.historyStrip"]')!
+        .getBoundingClientRect().width,
+      edge: edge === 'start' || edge === 'end' ? edge : 'move',
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const range = draft ?? marker;
+
   const selected =
     props.selectedTelemetryRef !== undefined &&
     marker.ref.kind === props.selectedTelemetryRef.kind &&
@@ -421,13 +415,82 @@ function ReviewHistoryItem({
     <button
       key={`${marker.ref.kind}:${marker.ref.id}`}
       type="button"
+      onPointerDown={down}
+      onPointerMove={(event) => {
+        const d = drag.current;
+        if (!d) return;
+        event.stopPropagation();
+        const delta = ((event.clientX - d.x) / d.width) * props.duration;
+        const length = Math.max(0.05, marker.end - marker.start);
+        let start =
+          d.edge === 'end'
+            ? marker.start
+            : Math.max(
+                0,
+                Math.min(props.duration - (d.edge === 'move' ? length : 0.05), marker.start + delta)
+              );
+        let end =
+          d.edge === 'start'
+            ? marker.end
+            : d.edge === 'move'
+              ? start + length
+              : Math.max(start + 0.05, Math.min(props.duration, marker.end + delta));
+        if (!event.altKey) {
+          const v = snap(d.edge === 'end' ? end : start, [], (8 / d.width) * props.duration, {
+            start: 0,
+            end: props.duration,
+          }).time;
+          if (d.edge === 'move') {
+            end += v - start;
+            start = v;
+          } else if (d.edge === 'end') end = v;
+          else start = v;
+        }
+        if (end < start + 0.05 || start < 0 || end > props.duration) return;
+        if (Math.abs(event.clientX - d.x) > 2) {
+          skipClick.current = true;
+          d.after = { start, end };
+          setDraft(d.after);
+          d.node.dataset['reviewDragging'] = 'true';
+        }
+      }}
+      onPointerUp={(event) => {
+        const d = drag.current;
+        drag.current = null;
+        delete event.currentTarget.dataset['reviewDragging'];
+        if (event.currentTarget.hasPointerCapture(event.pointerId))
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        if (d?.after) props.update(marker, d.after.start, d.after.end);
+        setDraft(undefined);
+      }}
+      onLostPointerCapture={() => {
+        drag.current = null;
+        setDraft(undefined);
+      }}
+      onPointerCancel={(event) => {
+        drag.current = null;
+        delete event.currentTarget.dataset['reviewDragging'];
+        setDraft(undefined);
+      }}
+      data-review-action-key={`telemetry:${marker.ref.kind}:${marker.ref.id}`}
+      data-review-snap-priority={cursorLine ? 'none' : 'history'}
+      data-review-snap-start={marker.start}
+      data-review-snap-end={marker.end}
       aria-pressed={selected}
       data-animated={animated ? 'true' : 'false'}
       aria-label={`${translate('gallery.videoReview.telemetry')} · ${description}`}
       title={description}
-      onClick={() => props.onMarker(marker)}
+      onClick={() => {
+        if (skipClick.current) {
+          skipClick.current = false;
+          return;
+        }
+        props.onMarker(marker);
+      }}
       className={[
-        'absolute flex items-center justify-center gap-1 overflow-hidden',
+        'review-timeline-item review-interaction-item absolute flex touch-none select-none',
+        'items-center justify-center gap-1 overflow-hidden',
+        selected ? 'review-timeline-item-selected' : '',
         item.lane === 2 ? 'min-w-0' : 'min-w-1.5',
         marker.eventType === 'typing' ? 'z-0' : 'z-10',
         marker.eventType === 'typing' ? 'px-1 [&_[data-ui]]:justify-start' : '',
@@ -435,23 +498,34 @@ function ReviewHistoryItem({
         tone,
         cursorLine ? '!border-transparent' : '',
         '!text-[var(--sniptale-color-text-secondary)]',
-        animated ? '!bg-[color-mix(in_srgb,var(--sniptale-color-info)_15%,transparent)]' : '',
       ].join(' ')}
       style={{
-        left: item.left * ratio,
-        width: item.width * ratio,
+        left:
+          item.left * ratio +
+          ((range.start - marker.start) / props.duration) * (drag.current?.width ?? 1),
+        width: draft
+          ? Math.max(6, ((range.end - range.start) / props.duration) * (drag.current?.width ?? 1))
+          : item.width * ratio,
         top,
         height: ACTION_MARKER_HEIGHT_PX,
         background: cursorLine
           ? marker.eventType === 'cursor-gap'
             ? 'transparent'
             : CURSOR_MOVEMENT_BACKGROUND
-          : marker.eventType === 'typing'
-            ? undefined
-            : HISTORY_EVENT_BACKGROUND,
+          : HISTORY_EVENT_BACKGROUND,
         opacity: cursorLine && marker.eventType === 'cursor-gap' ? 0.4 : 1,
       }}
     >
+      {props.editable ? (
+        <>
+          <span data-press-edge="start" className={`${reviewTimelineResizeHandleClassName} left-0`}>
+            <span className="h-2.5 w-px bg-current" />
+          </span>
+          <span data-press-edge="end" className={`${reviewTimelineResizeHandleClassName} right-0`}>
+            <span className="h-2.5 w-px bg-current" />
+          </span>
+        </>
+      ) : null}
       {item.lane !== 2 ? (
         <ReviewTimelineLabel
           icon={<ReviewEventIcon kind={marker.eventType} />}

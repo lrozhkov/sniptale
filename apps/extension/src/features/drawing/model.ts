@@ -107,6 +107,9 @@ export interface DrawingBlurObject extends DrawingRotatableObjectBase {
 }
 
 export interface DrawingTextObject extends DrawingRotatableObjectBase {
+  /** Logical wrap column, separate from fitted visible bounds. */
+  readonly wrapWidth?: number;
+  readonly autoWidth?: boolean;
   readonly kind: 'text';
   readonly bounds: DrawingBounds;
   readonly text: string;
@@ -130,6 +133,8 @@ export interface DrawingSimplifySource extends DrawingSimplifySnapshot {
 
 export interface DrawingSimplifyObject extends DrawingRotatableObjectBase {
   readonly kind: 'simplify';
+  /** Retains the previous blur strength when this layer is used as cleanup. */
+  readonly blurAmount?: number;
   readonly bounds: DrawingBounds;
   readonly settings: SimplifySettings;
   readonly result?: DrawingSimplifySnapshot;
@@ -182,7 +187,7 @@ export interface DrawingToolDefaults {
     readonly dynamicWidth: boolean;
     readonly width: number;
   };
-  readonly blur: { readonly amount: number };
+  readonly blur: { readonly amount: number; readonly clean?: boolean };
   readonly text: {
     readonly color: string;
     readonly backgroundColor: string | null;

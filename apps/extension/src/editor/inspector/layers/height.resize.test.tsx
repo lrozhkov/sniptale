@@ -212,11 +212,11 @@ it('recomputes on resize while active and only clamps to the cap after delete fr
   expectLayerListScrollable(false);
 });
 
-it('does not subscribe to resize measurement for full-height floating panels', () => {
+it('observes list overflow without assigning a height to full-height floating panels', () => {
   renderExpandedPanel(['a', 'b', 'c'], { fillContainer: true });
   expect(mocks.headerMock).toHaveBeenLastCalledWith(expect.objectContaining({ streamlined: true }));
 
-  expect(resizeObserverCallback).toBeNull();
+  expect(resizeObserverCallback).not.toBeNull();
   expect(getPanelFrame()?.style.height).toBe('');
   expect(mocks.listMock).toHaveBeenLastCalledWith(
     expect.objectContaining({
@@ -235,4 +235,21 @@ it('ignores resize callbacks when measured state is unchanged', () => {
   expect(mocks.listMock).toHaveBeenCalledTimes(listRenderCount);
   expect(getPanelFrame()?.style.height).toBe('200px');
   expectLayerListScrollable(true);
+});
+
+it('releases and readmits the gutter when list content resizes without new layer identities', () => {
+  renderExpandedPanel(['a', 'b', 'c'], { fillContainer: true });
+  expect(mocks.listMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ reserveScrollbarGutter: true })
+  );
+  setLayoutMetricValues({ listScrollHeight: 80, listClientHeight: 80 });
+  triggerResizeObserver();
+  expect(mocks.listMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ reserveScrollbarGutter: false })
+  );
+  setLayoutMetricValues({ listScrollHeight: 81 });
+  triggerResizeObserver();
+  expect(mocks.listMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ reserveScrollbarGutter: true })
+  );
 });

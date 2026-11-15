@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   )),
   controller: {
     copyRenderedImage: vi.fn(),
+    copyVectorSelection: vi.fn(async () => true),
+    pasteVectorSelection: vi.fn(async () => true),
+    getVectorClipboardAvailability: vi.fn(() => ({ canCopy: false, canPaste: false })),
     deleteSelection: vi.fn(),
     duplicateSelection: vi.fn(),
     exportDocument: vi.fn(),

@@ -46,6 +46,8 @@ type Entry = {
   textureBytes: number;
   reservation: Reservation;
   uniforms: Uniform[];
+  completedContent?: string | undefined;
+  pendingContent?: string | undefined;
 };
 
 const MAX_TEXTURE_BYTES = 256 * 1024 * 1024;
@@ -54,7 +56,7 @@ const UNIFORM_BYTES = 16;
 const TEXTURE_USAGE = 0x04 | 0x10;
 const UNIFORM_USAGE = 0x08 | 0x40;
 
-function mipSizes(source: GPUTexture) {
+function mipSizes(source: Pick<GPUTexture, 'width' | 'height'>) {
   if (
     !Number.isSafeInteger(source.width) ||
     !Number.isSafeInteger(source.height) ||
@@ -75,6 +77,27 @@ function mipSizes(source: GPUTexture) {
   return sizes;
 }
 
+/** Conservative source-texel support of the reduction chain and cubic reconstruction. */
+export function gpuPreviewFilterSupport(
+  source: { width: number; height: number },
+  maximumLevel: number
+) {
+  const sizes = mipSizes(source);
+  const level = Math.max(0, Math.min(sizes.length - 1, Math.ceil(maximumLevel)));
+  // The same-size copy and numerical edge coverage retain two source texels of slack.
+  let x = 2,
+    y = 2;
+  for (let index = 0; index < level; index++) {
+    // Each reduction samples at most three preceding-level texels from its center.
+    x += (3 * source.width) / sizes[index]!.width;
+    y += (3 * source.height) / sizes[index]!.height;
+  }
+  const reconstruction = level === 0 ? 1 : 2;
+  x += (reconstruction * source.width) / sizes[level]!.width;
+  y += (reconstruction * source.height) / sizes[level]!.height;
+  return { x: Math.ceil(x), y: Math.ceil(y) };
+}
+
 /** Owns half-float filter targets. The caller drains the encoder before endFrame or disposal. */
 export async function createGpuPreviewFilter(
   device: GPUDevice,
@@ -90,7 +113,7 @@ export async function createGpuPreviewFilter(
   const sampler = device.createSampler({ minFilter: 'linear', magFilter: 'linear' });
   const entries = new Map<string, Entry>();
   const used = new Set<string>();
-  const prepared = new Map<string, GPUTexture>();
+  const prepared = new Map<string, { source: GPUTexture; content: string | undefined }>();
   let active = false;
   let disposed = false;
   let allocatedBytes = 0;
@@ -178,14 +201,19 @@ export async function createGpuPreviewFilter(
       used.clear();
       prepared.clear();
     },
-    prepare(encoder: GPUCommandEncoder, source: GPUTexture, key: string): GPUTexture {
+    prepare(
+      encoder: GPUCommandEncoder,
+      source: GPUTexture,
+      key: string,
+      content?: string
+    ): GPUTexture {
       if (disposed) throw new Error('GPU preview filter is disposed.');
       if (!active) throw new Error('GPU preview filter frame is not active.');
       const previousSource = prepared.get(key);
       const existing = entries.get(key);
       if (previousSource) {
-        if (previousSource !== source || !existing)
-          throw new Error('GPU preview filter key has conflicting sources.');
+        if (previousSource.source !== source || previousSource.content !== content || !existing)
+          throw new Error('GPU preview filter key has conflicting sources or contents.');
         return existing.texture;
       }
       let entry = existing;
@@ -202,6 +230,12 @@ export async function createGpuPreviewFilter(
       }
       used.add(key);
       const retained = entry;
+      if (content !== undefined && retained.completedContent === content) {
+        prepared.set(key, { source, content });
+        return retained.texture;
+      }
+      retained.completedContent = undefined;
+      retained.pendingContent = content;
       retained.uniforms.forEach((uniform, level) => {
         const input = level === 0 ? source : retained.texture;
         const inputView = input.createView({
@@ -229,17 +263,24 @@ export async function createGpuPreviewFilter(
         pass.draw(3);
         pass.end();
       });
-      prepared.set(key, source);
+      prepared.set(key, { source, content });
       return entry.texture;
     },
-    endFrame() {
+    endFrame(completed = false) {
       if (!active) return;
       active = false;
       if (disposed) {
         clear();
         return;
       }
-      for (const [key, entry] of entries) if (!used.has(key)) release(key, entry);
+      for (const [key, entry] of entries) {
+        if (!used.has(key)) release(key, entry);
+        else {
+          if (completed && entry.pendingContent !== undefined)
+            entry.completedContent = entry.pendingContent;
+          entry.pendingContent = undefined;
+        }
+      }
       prepared.clear();
     },
     dispose() {

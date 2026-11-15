@@ -1,3 +1,4 @@
+import { duplicateAudioProcessing } from '../../../features/video/audio/effects/presets';
 import {
   addProjectSourceVoiceoverDocument,
   applyProjectSourceVoiceoverEdit,
@@ -52,6 +53,8 @@ export function createVideoEditorSourceVoiceoverActions(
         const copy = structuredClone(basis);
         copy.id = crypto.randomUUID();
         copy.take.id = crypto.randomUUID();
+        if (copy.take.audioProcessing)
+          copy.take.audioProcessing = duplicateAudioProcessing(copy.take.audioProcessing);
         const result = addProjectSourceVoiceoverDocument(project, copy);
         if (!result.ok) return state;
         id = copy.id;

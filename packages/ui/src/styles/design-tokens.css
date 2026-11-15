@@ -94,6 +94,8 @@
   --sniptale-color-warning: #f59e0b;
   --sniptale-color-warning-soft: rgba(245, 158, 11, 0.15);
   --sniptale-color-info: #3b82f6;
+  --sniptale-color-canvas-selection: #5b9aff;
+  --sniptale-color-canvas-magnet: #c59af2;
 
   --sniptale-shadow-floating: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
   --sniptale-shadow-floating-strong:
@@ -160,6 +162,8 @@
   --sniptale-color-warning: #d97706;
   --sniptale-color-warning-soft: rgba(217, 119, 6, 0.12);
   --sniptale-color-info: #2563eb;
+  --sniptale-color-canvas-selection: #2563eb;
+  --sniptale-color-canvas-magnet: #9854d8;
 
   --sniptale-shadow-floating:
     0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);

@@ -18,15 +18,14 @@ import { useEffectPresetMatchingControls } from './editing';
 import { readEffectPresentationDocument } from '../../../../../features/video/project/effect-bundle/presentation-document';
 import type { InspectorGroupDefinition } from '../grouped-inspector/types';
 import { EffectVisualPresets } from './presets';
-import { resolveEffectOwner } from '../../../../../features/video/project/effect-instance/owner';
 import { InspectorDetails } from '../shared/details';
 import { useEffectInstanceExport } from '../../../../runtime/effect-export';
 import { getEffectControlSections } from './presentation';
 import {
   resolveEffectLocaleText,
   type ControlDefinition,
-} from '@sniptale/runtime-contracts/effect-v1';
-import { ArrowUp, ArrowDown, Copy, Trash2, Download, RotateCcw } from 'lucide-react';
+} from '@sniptale/runtime-contracts/effect-controls';
+import { Copy, Trash2, Download, RotateCcw } from 'lucide-react';
 import { EditorIconButton } from '@sniptale/ui/editor-chrome';
 
 import type { VideoProjectEffectTarget } from '../../../../../features/video/project/effect-instance/types';
@@ -51,7 +50,7 @@ interface EffectInstanceGroupActions {
   onUpdateEffectInstance(instanceId: string, patch: VideoProjectEffectInstancePatch): void;
 }
 
-export function createEffectInstanceGroup(
+function createEffectInstanceGroup(
   args: EffectInstanceGroupActions & {
     disabled?: boolean;
     separateParameters?: boolean;
@@ -226,7 +225,7 @@ function EffectInstanceCard(props: EffectInstanceCardProps): React.JSX.Element {
         label={translate('videoEditor.effectsLibrary.controlEnabled')}
         onChange={(enabled) => props.onUpdateEffectInstance(instance.id, { enabled })}
       />
-      <EffectInstanceStartTime {...props} />
+
       {validation?.document && snapshot && (
         <EffectVisualPresets
           key={`${instance.id}:${snapshot.sha256}`}
@@ -273,78 +272,6 @@ function EffectInstanceCard(props: EffectInstanceCardProps): React.JSX.Element {
         {content}
       </InspectorDetails>
     </section>
-  );
-}
-
-function EffectInstanceStartTime(props: EffectInstanceCardProps): React.JSX.Element | null {
-  if (props.instance.target.kind === 'transition' || props.instance.target.kind === 'scene') {
-    return null;
-  }
-  const target = props.instance.target;
-  const clip = resolveEffectOwner(props.project, target);
-  if (!clip) return null;
-  const owner = props.instance.rangeMode === 'owner';
-  return (
-    <div className="sniptale-parameter-stack space-y-3">
-      <OptionButtonsField
-        label={translate('videoEditor.effectsLibrary.fxScope')}
-        disabled={props.disabled ?? false}
-        value={owner ? 'owner' : 'interval'}
-        options={[
-          {
-            value: 'owner',
-            label: translate(
-              target.kind === 'clip'
-                ? 'videoEditor.effectsLibrary.wholeClip'
-                : target.kind === 'track'
-                  ? 'videoEditor.effectsLibrary.wholeTrack'
-                  : 'videoEditor.effectsLibrary.wholeVideo'
-            ),
-          },
-          { value: 'interval', label: translate('videoEditor.effectsLibrary.customInterval') },
-        ]}
-        onChange={(value) => {
-          if (value === 'owner' || value === 'interval')
-            props.onUpdateEffectInstance(props.instance.id, { rangeMode: value });
-        }}
-      />
-      {!owner && (
-        <>
-          <NumberInput
-            disabled={props.disabled ?? false}
-            label={translate('videoEditor.effectsLibrary.controlStartTime')}
-            min={clip.startTime}
-            max={clip.startTime + clip.duration - props.instance.duration}
-            step={1 / props.project.fps}
-            unit="s"
-            value={props.instance.startTime}
-            onChange={(startTime) => props.onUpdateEffectInstance(props.instance.id, { startTime })}
-          />
-          <NumberInput
-            disabled={props.disabled ?? false}
-            label={translate('videoEditor.effectsLibrary.fxDuration')}
-            min={1 / props.project.fps}
-            max={clip.duration}
-            step={1 / props.project.fps}
-            unit="s"
-            value={props.instance.duration}
-            onChange={(duration) => props.onUpdateEffectInstance(props.instance.id, { duration })}
-          />
-        </>
-      )}
-      {(props.onSetEffectTargetBypassed || props.onSetClipEffectsBypassed) && (
-        <ToggleField
-          checked={clip.bypassed}
-          disabled={props.disabled ?? false}
-          label={translate('videoEditor.effectsLibrary.bypassOwner')}
-          onChange={(value) =>
-            props.onSetEffectTargetBypassed
-              ? props.onSetEffectTargetBypassed(target, value)
-              : target.kind === 'clip' && props.onSetClipEffectsBypassed?.(target.clipId, value)
-          }
-        />
-      )}
-    </div>
   );
 }
 
@@ -464,36 +391,16 @@ function EffectInstanceActions(props: EffectInstanceCardProps): React.JSX.Elemen
         </p>
       ) : null}
       <div data-ui="video-editor.inspector.actions">
-        {props.instance.kind === 'targetEffect' && (
-          <>
-            <EditorIconButton
-              className={EFFECT_ACTION_CLASS_NAME}
-              title={translate('videoEditor.effectsLibrary.moveUp')}
-              disabled={props.disabled || !props.canMoveUp}
-              onClick={() => props.onMoveEffectInstance(props.instance.id, 'up')}
-            >
-              <ArrowUp size={16} aria-hidden="true" />
-            </EditorIconButton>
-            <EditorIconButton
-              className={EFFECT_ACTION_CLASS_NAME}
-              title={translate('videoEditor.effectsLibrary.moveDown')}
-              disabled={props.disabled || !props.canMoveDown}
-              onClick={() => props.onMoveEffectInstance(props.instance.id, 'down')}
-            >
-              <ArrowDown size={16} aria-hidden="true" />
-            </EditorIconButton>
-          </>
-        )}
-        {props.instance.kind !== 'transition' && (
-          <EditorIconButton
-            className={EFFECT_ACTION_CLASS_NAME}
-            title={translate('videoEditor.effectsLibrary.duplicateInstance')}
-            disabled={props.disabled ?? false}
-            onClick={() => props.onDuplicateEffectInstance(props.instance.id)}
-          >
-            <Copy size={16} aria-hidden="true" />
-          </EditorIconButton>
-        )}
+        (
+        <EditorIconButton
+          className={EFFECT_ACTION_CLASS_NAME}
+          title={translate('videoEditor.effectsLibrary.duplicateInstance')}
+          disabled={props.disabled ?? false}
+          onClick={() => props.onDuplicateEffectInstance(props.instance.id)}
+        >
+          <Copy size={16} aria-hidden="true" />
+        </EditorIconButton>
+        )
         <EditorIconButton
           className={EFFECT_ACTION_CLASS_NAME}
           title={translate('videoEditor.effectsLibrary.exportInstance')}

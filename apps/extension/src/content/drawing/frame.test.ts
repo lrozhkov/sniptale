@@ -84,7 +84,8 @@ it('drops a hover marker after its immutable arrow version changes', () => {
     expect.anything(),
     arrow,
     expect.anything(),
-    target.point,
+    undefined,
+    undefined,
     undefined
   );
   const next = { ...arrow, design: 'standard' as const };
@@ -93,6 +94,7 @@ it('drops a hover marker after its immutable arrow version changes', () => {
     expect.anything(),
     next,
     expect.anything(),
+    undefined,
     undefined,
     undefined
   );
@@ -490,4 +492,120 @@ it('projects and clips a hover outline to its scrolled element root', () => {
   });
   expect(renderDrawingHoverOutline).toHaveBeenCalledWith(context, untouched, { x: 80, y: 70 });
   expect(context.rect).toHaveBeenCalledWith(20, 30, 300, 200);
+});
+
+it.each([false, true])(
+  'keeps an insertion draft marker-free ahead of stale hover; inserted=%s',
+  (inserted) => {
+    const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
+      id: 'captured',
+      kind: 'arrow',
+      design: 'freehand',
+      start: { x: 20, y: 20 },
+      end: { x: 220, y: 20 },
+      bendPoints: [
+        { x: 80, y: 80 },
+        { x: 180, y: 80 },
+      ],
+      color: '#f00',
+      width: 2,
+      dynamicWidth: false,
+    };
+    const target = { index: 1, insert: true, point: { x: 130, y: 100 } };
+    const captured = { x: 130, y: 180 };
+    const object = inserted
+      ? { ...arrow, bendPoints: [arrow.bendPoints![0]!, captured, arrow.bendPoints![1]!] }
+      : arrow;
+    vi.mocked(renderDrawingSelection).mockClear();
+    drawDrawingFrame({
+      canvas: document.createElement('canvas'),
+      objects: [arrow],
+      selectedIds: [arrow.id],
+      draft: { kind: 'bend', original: arrow, object, target, start: target.point },
+      root: { kind: 'viewport', element: null },
+      showChrome: true,
+      renderObjects: false,
+      hoverBend: {
+        object: arrow,
+        target: { point: arrow.bendPoints![1]!, index: 1, insert: false },
+      },
+    });
+    expect(renderDrawingSelection).toHaveBeenLastCalledWith(
+      expect.anything(),
+      arrow,
+      expect.anything(),
+      undefined,
+      undefined,
+      undefined
+    );
+  }
+);
+
+it.each(['start', 'end'] as const)(
+  'resolves ready standard-arrow %s hover from the actual pointer point',
+  (handle) => {
+    const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
+      id: 'endpoint-hover',
+      kind: 'arrow',
+      design: 'standard',
+      start: { x: 20, y: 20 },
+      end: { x: 220, y: 20 },
+      color: '#f00',
+      width: 2,
+      dynamicWidth: false,
+    };
+    drawDrawingFrame({
+      canvas: document.createElement('canvas'),
+      objects: [arrow],
+      selectedIds: [arrow.id],
+      draft: null,
+      root: { kind: 'viewport', element: null },
+      showChrome: true,
+      renderObjects: false,
+      hoverPoint: { clientX: arrow[handle].x + 2, clientY: arrow[handle].y + 2 },
+    });
+    expect(renderDrawingSelection).toHaveBeenLastCalledWith(
+      expect.anything(),
+      arrow,
+      expect.anything(),
+      arrow[handle],
+      undefined,
+      undefined
+    );
+  }
+);
+
+it('hovers a lower layer enclosed by a larger opaque upper layer', () => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+  } as unknown as CanvasRenderingContext2D);
+  vi.mocked(renderDrawingHoverOutline).mockClear();
+  const lower = {
+    id: 'one',
+    kind: 'blur' as const,
+    bounds: { x: 80, y: 80, width: 40, height: 40 },
+  };
+  const upper = {
+    id: 'upper',
+    kind: 'rectangle' as const,
+    color: '#000',
+    fillColor: '#fff',
+    width: 4,
+    bounds: { x: 0, y: 0, width: 200, height: 200 },
+  };
+  drawDrawingFrame({
+    canvas: document.createElement('canvas'),
+    objects: [lower, upper],
+    selectedIds: [],
+    draft: null,
+    root: { kind: 'viewport', element: null },
+    showChrome: true,
+    renderObjects: false,
+    hoverPoint: { clientX: 100, clientY: 100 },
+  });
+  expect(renderDrawingHoverOutline).toHaveBeenCalledOnce();
+  expect(vi.mocked(renderDrawingHoverOutline).mock.calls[0]![1]).toEqual(lower);
 });

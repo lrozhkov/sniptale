@@ -1,7 +1,18 @@
 // @vitest-environment jsdom
 
-import { Rect } from 'fabric';
-import { expect, it } from 'vitest';
+import { FabricImage, Rect } from 'fabric';
+import { Blob as NativeBlob } from 'node:buffer';
+import { createCanvas, loadImage } from 'canvas';
+import { expect, it, vi } from 'vitest';
+import { createImageEditorController } from '../../../core/root';
+import type { EditorControllerInstance } from '../../types';
+import { executeRasterCompute } from '../../../../raster-editing/compute';
+import { createEditorSnapshotHistory, readEditorHistoryState } from '../../../history';
+import {
+  DEFAULT_BROWSER_FRAME_STATE,
+  DEFAULT_EDITOR_FRAME_SETTINGS,
+} from '../../../../../features/editor/document/constants';
+import { useEditorStore } from '../../../../state/useEditorStore';
 import { applyBaseInteractionPatch } from '../../../document/objects/interaction-patches';
 import { createMountedCanvas } from './mount';
 
@@ -144,5 +155,266 @@ it('uses transformed corners for containment and preserves click and Ctrl add se
     expect(canvas.getActiveObjects()).toEqual([separate]);
   } finally {
     await canvas.dispose();
+  }
+});
+
+async function mountedRasterController() {
+  vi.stubGlobal('Blob', NativeBlob);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
+  vi.spyOn(FabricImage, 'fromURL').mockImplementation(async (url, options) => {
+    options?.signal?.throwIfAborted();
+    const decoded = await loadImage(url);
+    const bitmap = document.createElement('canvas');
+    bitmap.width = decoded.width;
+    bitmap.height = decoded.height;
+    const native = createCanvas(decoded.width, decoded.height).getContext('2d');
+    native.drawImage(decoded, 0, 0);
+    const context = bitmap.getContext('2d')!;
+    const pixels = context.createImageData(decoded.width, decoded.height);
+    pixels.data.set(native.getImageData(0, 0, decoded.width, decoded.height).data);
+    context.putImageData(pixels, 0, 0);
+    return new FabricImage(bitmap);
+  });
+  const bitmap = document.createElement('canvas');
+  bitmap.width = bitmap.height = 4;
+  const brush = bitmap.getContext('2d')!;
+  brush.fillStyle = '#ff0000';
+  brush.fillRect(0, 0, 4, 4);
+  const original = bitmap.toDataURL('image/png');
+  const previousFrame = useEditorStore.getState().frame;
+  useEditorStore.setState({
+    frame: { ...DEFAULT_EDITOR_FRAME_SETTINGS, layoutMode: 'fit-image' },
+    browserFrame: { ...DEFAULT_BROWSER_FRAME_STATE },
+  });
+  const rootController = createImageEditorController({
+    createRasterCompute: () => ({ run: executeRasterCompute, cancel: vi.fn(), dispose: vi.fn() }),
+  });
+  const controller: EditorControllerInstance = rootController;
+  const viewport = document.createElement('div'),
+    stage = document.createElement('div'),
+    element = document.createElement('canvas');
+  viewport.append(stage);
+  stage.append(element);
+  document.body.append(viewport);
+  rootController.mount(element, viewport, stage);
+  const canvas = controller.canvas!;
+  controller.canvasDocumentSize = { width: 20, height: 20 };
+  canvas.setDimensions({ width: 20, height: 20 });
+  const source = new FabricImage(bitmap, { originX: 'left', originY: 'top', left: 2, top: 3 });
+  source.sniptaleId = 'mounted-source';
+  source.sniptaleType = 'source-image';
+  source.sniptaleRole = 'source';
+  source.sniptaleLocked = true;
+  source.sniptaleContentLocked = false;
+  controller.source = {
+    id: 'mounted-source',
+    dataUrl: original,
+    name: 'source.png',
+    intrinsicWidth: 4,
+    intrinsicHeight: 4,
+    left: 0,
+    top: 0,
+    displayWidth: 4,
+    displayHeight: 4,
+    visible: true,
+    locked: true,
+  };
+  controller.prepareObject(source);
+  canvas.add(source);
+  canvas.setActiveObject(source);
+  controller.syncRuntimeState();
+  controller.history = createEditorSnapshotHistory(rootController.exportDocument());
+  return {
+    rootController,
+    controller,
+    canvas,
+    source,
+    original,
+    runtime: rootController.getRasterRuntime()!,
+    dispose() {
+      rootController.dispose();
+      viewport.remove();
+      useEditorStore.setState({ frame: previousFrame });
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    },
+  };
+}
+
+it('publishes selected source pixels, fragment preparation and both flips through the mounted controller', async () => {
+  const mounted = await mountedRasterController();
+  const { controller, runtime, source, canvas } = mounted;
+  try {
+    expect(runtime.getSnapshot()).toMatchObject({
+      available: true,
+      targetId: source.sniptaleId,
+      permission: 'allowed',
+    });
+    controller.activeTool = 'pencil';
+    runtime.setTool('fill');
+    expect(controller.activeTool).toBe('select');
+    expect(useEditorStore.getState().activeTool).toBe('select');
+
+    runtime.selectAll();
+    runtime.updateSettings({ color: '#0000ff' });
+    await runtime.fillSelected();
+    expect(runtime.getSnapshot().error).toBeNull();
+    expect([...source.toCanvasElement().getContext('2d')!.getImageData(0, 0, 1, 1).data]).toEqual([
+      0, 0, 255, 255,
+    ]);
+    expect(controller.source).toMatchObject({
+      left: 2,
+      top: 3,
+      displayWidth: 4,
+      displayHeight: 4,
+      locked: true,
+    });
+    expect(readEditorHistoryState(controller.history).index).toBe(1);
+    runtime.selectAll();
+    await runtime.copySelected();
+    const copy = canvas.getActiveObject();
+    expect(copy).toBeInstanceOf(FabricImage);
+    expect(copy).not.toBe(source);
+    expect(copy?.sniptaleType).toBe('image');
+    expect(copy?.objectCaching).toBe(false);
+    expect(readEditorHistoryState(controller.history).index).toBe(2);
+    canvas.setActiveObject(source);
+    runtime.refresh();
+    await runtime.flipHorizontal();
+    await runtime.flipVertical();
+    expect(source.flipX).toBe(true);
+    expect(source.flipY).toBe(true);
+    expect(readEditorHistoryState(controller.history).index).toBe(4);
+  } finally {
+    mounted.dispose();
+  }
+});
+
+it('publishes a prepared background edit through mounted frame history without replacing source pixels', async () => {
+  const mounted = await mountedRasterController();
+  const { rootController, controller, runtime, canvas, source, original } = mounted;
+  try {
+    expect(
+      await rootController.applyFrameSettings(
+        {
+          ...useEditorStore.getState().frame,
+          backgroundMode: 'image',
+          backgroundImageFit: 'stretch',
+          backgroundImageData: original,
+        },
+        { allowBackgroundContentEditing: true }
+      )
+    ).toBe(true);
+    const previous = canvas.getObjects().find((object) => object.sniptaleRole === 'background')!;
+    canvas.setActiveObject(previous);
+    await runtime.adapter.hydrateTarget();
+    runtime.refresh();
+    expect(runtime.getSnapshot()).toMatchObject({
+      targetKind: 'background',
+      permission: 'allowed',
+    });
+    const before = controller.history!.getState().index;
+    runtime.setTool('fill');
+    runtime.selectAll();
+    runtime.updateSettings({ color: '#00ff00' });
+    await runtime.fillSelected();
+    expect(runtime.getSnapshot().error).toBeNull();
+    const background = canvas.getObjects().find((object) => object.sniptaleRole === 'background')!;
+    expect(background).not.toBe(previous);
+    expect(background.sniptaleRasterOriginalData).toBe(original);
+    expect(useEditorStore.getState().frame.backgroundImageData).toBe(
+      background.sniptaleBackgroundImageData
+    );
+    expect(controller.history!.getState().index).toBe(before + 1);
+    expect(source.getSrc()).toBe(original);
+    const derived = await FabricImage.fromURL(useEditorStore.getState().frame.backgroundImageData!);
+    try {
+      expect([
+        ...derived.toCanvasElement().getContext('2d')!.getImageData(0, 0, 1, 1).data,
+      ]).toEqual([0, 255, 0, 255]);
+    } finally {
+      derived.dispose();
+    }
+    const refused = new AbortController();
+    refused.abort();
+    expect(
+      await rootController.applyFrameSettings(
+        { ...useEditorStore.getState().frame, backgroundImageData: original },
+        { signal: refused.signal }
+      )
+    ).toBe(false);
+    expect(controller.history!.getState().index).toBe(before + 1);
+    expect(canvas.getObjects().includes(background)).toBe(true);
+  } finally {
+    mounted.dispose();
+  }
+});
+
+it('admits mounted raster gestures only in Select without pan and cancels drafts without history', async () => {
+  const mounted = await mountedRasterController();
+  const { controller, runtime, canvas, source } = mounted;
+  try {
+    vi.spyOn(canvas.upperCanvasEl, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(0, 0, 20, 20)
+    );
+    const matrix = runtime.getTarget()!.geometry.sourceToScene,
+      viewport = canvas.viewportTransform;
+    const sceneX = matrix[0] + matrix[2] + matrix[4],
+      sceneY = matrix[1] + matrix[3] + matrix[5];
+    const point = {
+      x: viewport[0] * sceneX + viewport[2] * sceneY + viewport[4],
+      y: viewport[1] * sceneX + viewport[3] * sceneY + viewport[5],
+    };
+    const press = () =>
+      canvas.upperCanvasEl.dispatchEvent(
+        Object.assign(
+          new MouseEvent('pointerdown', {
+            bubbles: true,
+            button: 0,
+            clientX: point.x,
+            clientY: point.y,
+          }),
+          { pointerId: 11, isPrimary: true }
+        )
+      );
+    canvas.upperCanvasEl.addEventListener(
+      'pointerdown',
+      (event) => event.stopImmediatePropagation(),
+      true
+    );
+    runtime.setTool('erase');
+    const before = controller.history!.getState().index;
+    controller.isSpacePressed = true;
+    press();
+    expect(runtime.getSnapshot().busy).toBe(false);
+    controller.isSpacePressed = false;
+    controller.activeTool = 'pencil';
+    press();
+    expect(runtime.getSnapshot().busy).toBe(false);
+    controller.activeTool = 'select';
+    press();
+    expect(runtime.getSnapshot().busy).toBe(true);
+    runtime.cancel();
+    await Promise.resolve();
+    expect(runtime.getSnapshot()).toMatchObject({ busy: false, error: null });
+    expect(controller.history!.getState().index).toBe(before);
+    expect(source.sniptaleRasterVisibilityData).toBeUndefined();
+    runtime.setTool('crop');
+    await vi.waitFor(() => expect(runtime.getSnapshot().busy).toBe(false));
+    expect(runtime.beginGesture({ x: 0, y: 0 })).toBe(true);
+    runtime.moveGesture({ x: 2, y: 2 });
+    runtime.cancelCrop();
+    await vi.waitFor(() =>
+      expect(runtime.getSnapshot()).toMatchObject({ busy: false, cropPending: false })
+    );
+    expect(controller.history!.getState().index).toBe(before);
+  } finally {
+    mounted.dispose();
   }
 });

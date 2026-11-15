@@ -21,14 +21,14 @@ import {
 } from '../../workflows/video-review/annotation-acquisition';
 
 const source = readFileSync(
-  'apps/extension/public/video-effects/effects/annotations/sniptale-title/effect.sniptale-effect.json',
+  'apps/extension/public/video-effects/animations/title.sniptale-animation.json',
   'utf8'
 );
 const snapshot = {
   id: `effect:${'a'.repeat(64)}`,
   sha256: 'a'.repeat(64),
   source,
-  schemaVersion: 'sniptale.effect.v1' as const,
+  schemaVersion: 'sniptale.animation.v1' as const,
   kind: 'standalone' as const,
   documentId: 'sniptale-title',
   retainedByteLength: new TextEncoder().encode(source).byteLength,
@@ -688,9 +688,9 @@ it('retains picked alpha through actual Apply, canonical Undo/Redo and persisted
   const { save } = setup(true);
   const { parseColor } = await import('@sniptale/foundation/color');
   const { getCurrentLocale } = await import('../../platform/i18n');
-  const { resolveEffectLocaleText } = await import('@sniptale/runtime-contracts/effect-v1');
+  const { resolveEffectLocaleText } = await import('@sniptale/runtime-contracts/effect-controls');
   const definition = readReviewAnnotationEffectDocument(source)!;
-  const control = definition.controls.find((item) => item.id === 'ink')!;
+  const control = definition.controls.find((item) => item.id === 'accent')!;
   const label = resolveEffectLocaleText(control.label, getCurrentLocale());
   const row = [
     ...host.querySelectorAll<HTMLElement>('[data-ui="shared.ui.compact-inspector.color-field"]'),
@@ -716,7 +716,7 @@ it('retains picked alpha through actual Apply, canonical Undo/Redo and persisted
   )!;
   await settle(() => apply.click());
   const after = session.getSnapshot().document.advancedContent.annotationEffects!.instances[0]!;
-  const ink = after.controls['ink'];
+  const ink = after.controls['accent'];
   if (typeof ink !== 'string') throw new Error('Accepted ink is absent');
   expect(parseColor(ink)).toMatchObject({ red: 68, green: 136, blue: 204 });
   expect(parseColor(ink)!.alpha).toBeCloseTo(128 / 255, 2);

@@ -1,7 +1,14 @@
+import {
+  glTransitionChoices,
+  glTransitionChoiceValue,
+  resolveGlTransitionChoice,
+  type GlTransitionChoiceCatalog,
+} from './gl-transition-choices';
+import { GlTransitionFields } from './gl-transition-fields';
 import type { ComponentType, ReactNode } from 'react';
 import type { CompositionJoinSettings } from '../features/video/project/scene/composition-join';
 import { translate, useAppLocale } from '../platform/i18n';
-import { ColorField, SegmentedRow } from './compact-inspector-controls';
+import { ColorField, SelectField } from './compact-inspector-controls';
 import { PreviewNumericRow } from './compact-inspector-controls/numeric-preview';
 import type { InspectorDisclosureProps } from './compact-inspector-controls/shared';
 
@@ -16,6 +23,8 @@ export function PresentationJoinFields(props: {
   onChange(value: CompositionJoinSettings | null): void;
   onPreview(value: CompositionJoinSettings | null): void;
   children?: ReactNode;
+  glPresetActions?: ReactNode;
+  glCatalog?: GlTransitionChoiceCatalog;
 }) {
   useAppLocale();
   const { value, Details } = props;
@@ -47,23 +56,56 @@ export function PresentationJoinFields(props: {
   };
   return (
     <div className="min-w-0 space-y-1" data-ui="shared.ui.presentation-join-fields">
-      <SegmentedRow<'none' | 'dissolve' | 'fade-black'>
+      <SelectField<string>
         label={props.label}
-        ariaLabel={props.label}
-        layout="stacked"
-        columns={3}
-        value={value?.type ?? 'none'}
+        value={
+          value?.type === 'gl'
+            ? glTransitionChoiceValue(props.glCatalog, value.selection)
+            : (value?.type ?? 'none')
+        }
         options={[
           { value: 'none', label: translate('gallery.videoReview.transitionNone') },
           { value: 'dissolve', label: translate('gallery.videoReview.cutDissolve') },
           { value: 'fade-black', label: translate('gallery.videoReview.cutFadeColor') },
+          ...glTransitionChoices(
+            props.glCatalog,
+            value?.type === 'gl' ? value.selection : undefined
+          ),
         ]}
-        onChange={(type) =>
-          props.onChange(type === 'none' ? null : { before: 0.2, after: 0.2, ...value, type })
-        }
+        onChange={(type) => {
+          if (type === 'none') {
+            props.onChange(null);
+            return;
+          }
+          const timing = { before: value?.before ?? 0.2, after: value?.after ?? 0.2 };
+          if (type === 'dissolve' || type === 'fade-black') {
+            props.onChange({ ...timing, type, ...(value?.color ? { color: value.color } : {}) });
+            return;
+          }
+          const selection = resolveGlTransitionChoice(props.glCatalog, type);
+          if (selection)
+            props.onChange({
+              ...timing,
+              type: 'gl',
+              selection,
+              easing: value?.type === 'gl' ? value.easing : 'LINEAR',
+            });
+        }}
       />
       {value && timing && (
         <>
+          {value.type === 'gl' && (
+            <GlTransitionFields
+              presetActions={props.glPresetActions}
+              selection={value.selection}
+              easing={value.easing}
+              onChangeSelection={(selection) => props.onChange({ ...value, selection })}
+              onChangeEasing={(easing) => props.onChange({ ...value, easing })}
+              onPreviewSelection={(selection) =>
+                props.onPreview(selection ? { ...value, selection } : null)
+              }
+            />
+          )}
           {value.type === 'fade-black' && (
             <ColorField
               {...(props.colorClassName ? { className: props.colorClassName } : {})}
@@ -104,6 +146,8 @@ export function PresentationJoinFields(props: {
   function resize(total: number): CompositionJoinSettings {
     const ratio = timing ? timing.before / (timing.before + timing.after) : 0.5;
     const before = total * ratio;
-    return { ...value, type: value?.type ?? 'dissolve', before, after: total - before };
+    return value
+      ? { ...value, before, after: total - before }
+      : { type: 'dissolve', before, after: total - before };
   }
 }

@@ -4,6 +4,7 @@ import { Canvas, Rect } from 'fabric';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 
+import type { EditorLayerChild } from '../../../features/editor/document/types';
 import { useEditorInspectorLayerEffectsState } from './layer-effects-state';
 
 let container: HTMLDivElement | null = null;
@@ -11,7 +12,7 @@ let root: Root | null = null;
 
 type LayerEffectsHarnessProps = {
   inspector: string;
-  layers: Array<{ id: string; name: string }>;
+  layers: Array<{ id: string; name: string; groupChildren?: EditorLayerChild[] }>;
   setInspector: (inspector: string) => void;
   syncActiveTool: (tool: string) => void;
   selection: {
@@ -277,4 +278,48 @@ it('stays inert while layer-effects is not the active inspector branch', () => {
   });
 
   expect(syncActiveTool).not.toHaveBeenCalled();
+});
+
+it('tracks the actual selected child and clears a deleted target while its parent and sibling remain', () => {
+  const child = {
+    id: 'child-image',
+    name: 'Child image',
+    type: 'image' as const,
+    typeLabel: 'Image',
+  };
+  const sibling = { ...child, id: 'sibling-image', name: 'Sibling image' };
+  const parent = { id: 'parent', name: 'Parent', groupChildren: [child, sibling] };
+  const selected = (id: string) => ({
+    hasSelection: true,
+    selectedObjectCount: 1,
+    selectedObjectId: id,
+    selectedObjectIds: [id],
+  });
+  const base = { inspector: 'layer-effects', setInspector: vi.fn(), syncActiveTool: vi.fn() };
+  const hook = renderHook({ ...base, layers: [parent], selection: selected(child.id) });
+  act(() => hook.getValue()?.openLayerEffects(child.id, 'adjustments', 'brightness'));
+  hook.rerender({ ...base, layers: [parent], selection: selected(sibling.id) });
+  expect(hook.getValue()?.layerEffectsState).toMatchObject({
+    layerId: sibling.id,
+    activeEffectId: 'brightness',
+    category: 'adjustments',
+  });
+  hook.rerender({ ...base, layers: [parent], selection: selected(child.id) });
+  expect(hook.getValue()?.layerEffectsState.layerId).toBe(child.id);
+  const deleted = { ...parent, groupChildren: [sibling] };
+  const empty = {
+    hasSelection: false,
+    selectedObjectCount: 0,
+    selectedObjectId: null,
+    selectedObjectIds: [],
+  };
+  hook.rerender({ ...base, layers: [deleted], selection: empty });
+  expect(hook.getValue()?.layerEffectsState.layerId).toBeNull();
+  hook.rerender({ ...base, layers: [deleted], selection: empty });
+  expect(hook.getValue()?.layerEffectsState.layerId).toBeNull();
+  hook.rerender({ ...base, layers: [deleted], selection: selected(sibling.id) });
+  expect(hook.getValue()?.layerEffectsState).toMatchObject({
+    layerId: sibling.id,
+    activeEffectId: 'brightness',
+  });
 });

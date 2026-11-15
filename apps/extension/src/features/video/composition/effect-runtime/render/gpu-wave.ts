@@ -27,6 +27,7 @@ export async function prepareEffectRuntimeGpuComposition(args: {
   overlayTime: number;
   visualPasses: readonly VideoCompositionVisualPass[];
   rasterScale?: number;
+  prepareFrames?: typeof prepareEffectRuntimeGpuFramePlans;
   signal?: AbortSignal;
 }): Promise<EffectRuntimeGpuPreparedComposition> {
   const ledger = createEffectRuntimeGpuFrameLedger();
@@ -44,7 +45,7 @@ export async function prepareEffectRuntimeGpuComposition(args: {
       const plans = sampled
         ? selectExposurePlans(frame, args.overlayFrame)
         : (frame.effectRuntimePlans ?? []);
-      return prepareEffectRuntimeGpuFramePlans({
+      return (args.prepareFrames ?? prepareEffectRuntimeGpuFramePlans)({
         executor: args.executor,
         plans: plans.map((plan) => scaleEffectRuntimeFramePlan(plan, args.rasterScale)),
         ledger,

@@ -32,5 +32,18 @@
     "reason": "Allowed composition: Application workflows compose review projection, finalization and selection mode. Overlay and selection UI consume those workflows; crop selection reuses overlay drawing controls. These exact six owner edges have no module cycle and retain the existing session, navigation-lock and persistence authorities.",
     "removalCondition": "Remove when any exact edge disappears. Reassess added owner edges, module cycles, or changed workflow and state authority before retaining this composition.",
     "debtId": "accepted.scc.content-review-selection-composition"
+  },
+  {
+    "owners": ["apps/extension/src/editor/controller", "apps/extension/src/editor/raster-editing"],
+    "edges": [
+      ["apps/extension/src/editor/controller", "apps/extension/src/editor/raster-editing"],
+      ["apps/extension/src/editor/raster-editing", "apps/extension/src/editor/controller"]
+    ],
+    "id": "editor-controller-raster-composition",
+    "owner": "apps/extension/src/editor",
+    "classification": "accepted-architecture",
+    "reason": "Allowed composition: controller lifecycle composes the per-canvas raster runtime and explicit adapter callbacks; raster adapters use controller geometry, preview and native publication operations. Controller retains history, currentness and publication authority. This record binds exactly two owner edges, not the reviewed 21 module imports. Module imports, state/runtime authority and module cycles require reassessment when they change.",
+    "removalCondition": "Remove when either exact owner edge disappears. Reassess changed module imports, added owner edges, state/runtime authority or module cycles before retaining this composition; the owner-edge registry does not bind module edges.",
+    "debtId": "accepted.scc.editor-controller-raster-composition"
   }
 ]

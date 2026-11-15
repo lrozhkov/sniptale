@@ -58,6 +58,7 @@ function VideoRecordingSurfaceSlot(props: {
         <DrawingSurface
           active={recording.state.interaction === 'drawing'}
           chromeHidden={props.chromeHidden}
+          serviceUiSuppressed={recording.drawingCaptureSuppressed ?? false}
           controller={recording.drawingOwner.controller}
           escapeImmediately
           onExit={() => recording.onInteractionChange('navigation')}

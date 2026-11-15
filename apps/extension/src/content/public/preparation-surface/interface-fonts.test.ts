@@ -28,8 +28,9 @@ function createRoot(
   owner.body.append(host);
   initializeContentUiRoots(root);
   const add = vi.fn();
-  Object.defineProperty(owner, 'fonts', { configurable: true, value: { add } });
-  return { root, add };
+  const remove = vi.fn();
+  Object.defineProperty(owner, 'fonts', { configurable: true, value: { add, delete: remove } });
+  return { root, add, remove };
 }
 
 function declaration(
@@ -57,12 +58,12 @@ function face(load = () => Promise.resolve()) {
   return value as unknown as FontFace;
 }
 
-it('loads the trusted CSSOM descriptors once per document and leaves authored fonts alone', async () => {
+it('loads trusted CSSOM descriptors once per document and excludes unregistered families', async () => {
   const { root, add } = createRoot([
     declaration(
       'url("chrome-extension://owned/assets/inter-cyrillic-wght-normal.woff2") format("woff2")'
     ),
-    declaration('url("chrome-extension://owned/fonts/marck.woff2")', 'Sniptale Handwritten'),
+    declaration('url("chrome-extension://owned/fonts/marck.woff2")', 'Other Authored Face'),
   ]);
   const loaded = face();
   const createFace = vi.fn(() => loaded);
@@ -93,7 +94,7 @@ it.each([
 });
 
 it('removes a failed installation so a supported reinjection can retry', async () => {
-  const { root, add } = createRoot([
+  const { root, add, remove } = createRoot([
     declaration('url("chrome-extension://owned/assets/inter-latin-wght-normal.woff2")'),
   ]);
   const createFace = vi
@@ -103,13 +104,14 @@ it('removes a failed installation so a supported reinjection can retry', async (
   await expect(installContentInterfaceFonts(root, { createFace })).rejects.toThrow(
     'font unavailable'
   );
-  expect(add).not.toHaveBeenCalled();
+  expect(add).toHaveBeenCalledOnce();
+  expect(remove).toHaveBeenCalledExactlyOnceWith(createFace.mock.results[0]!.value);
   await installContentInterfaceFonts(root, { createFace });
   expect(createFace).toHaveBeenCalledTimes(2);
-  expect(add).toHaveBeenCalledOnce();
+  expect(add).toHaveBeenCalledTimes(2);
 });
 
-it('does not register a delayed face after its root retires or suppress a new root installation', async () => {
+it('withdraws a delayed face after its root retires without removing a new root installation', async () => {
   const rules = [
     declaration('url("chrome-extension://owned/assets/inter-latin-wght-normal.woff2")'),
   ];
@@ -123,12 +125,13 @@ it('does not register a delayed face after its root retires or suppress a new ro
   await Promise.resolve();
   expect(oldFace.load).toHaveBeenCalledOnce();
   root.host.remove();
-  const { root: currentRoot, add } = createRoot(rules, root.ownerDocument);
+  const { root: currentRoot, add, remove } = createRoot(rules, root.ownerDocument);
   const currentFace = face();
   await installContentInterfaceFonts(currentRoot, { createFace: () => currentFace });
   complete();
   await oldInstall;
-  expect(oldAdd).not.toHaveBeenCalled();
+  expect(oldAdd).toHaveBeenCalledExactlyOnceWith(oldFace);
+  expect(remove).toHaveBeenCalledExactlyOnceWith(oldFace);
   expect(add).toHaveBeenCalledExactlyOnceWith(currentFace);
   expect(add).not.toHaveBeenCalledWith(oldFace);
 });
@@ -158,7 +161,7 @@ it.each(['assets/golos-ui-vf.woff2', 'assets/replacement-font.woff2'])(
       declaration(source, 'Sniptale Sans', '400 700'),
       declaration(
         'url("chrome-extension://owned/fonts/marck.woff2")',
-        'Sniptale Handwritten',
+        'Other Authored Face',
         '400'
       ),
     ]);
@@ -262,4 +265,14 @@ it('registers both bundled roles without admitting another authored family', asy
     'Sniptale Text',
   ]);
   expect(add).toHaveBeenCalledTimes(2);
+});
+
+it('registers the bundled drawing face for geometry without loading it before use', async () => {
+  const { root, add } = createRoot([
+    declaration('url("chrome-extension://owned/fonts/marck.woff2")', 'Sniptale Handwritten', '400'),
+  ]);
+  const drawingFace = face();
+  await installContentInterfaceFonts(root, { createFace: () => drawingFace });
+  expect(add).toHaveBeenCalledExactlyOnceWith(drawingFace);
+  expect(drawingFace.load).not.toHaveBeenCalled();
 });

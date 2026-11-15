@@ -319,3 +319,38 @@ it('serializes simplify patches over fresh defaults and preserves inactive branc
   expect(set).toHaveBeenCalledTimes(2);
   expect(stored.defaults.pencil).toEqual(customized.pencil);
 });
+
+it('round-trips the optional cleanup preference without changing legacy defaults', () => {
+  const clean = { ...customized, blur: { amount: 6, clean: true } };
+  expect(parseDrawingToolPreferences({ schemaVersion: 1, defaults: clean }, fallback)).toEqual({
+    defaults: clean,
+    unsafeForWrite: false,
+  });
+  expect(
+    parseDrawingToolPreferences(
+      { schemaVersion: 1, defaults: { ...clean, blur: { amount: 6, clean: 'yes' } } },
+      fallback
+    )
+  ).toEqual({ defaults: fallback, unsafeForWrite: true });
+});
+
+it('rebases cleanup and disjoint stale-context patches without discarding inactive settings', async () => {
+  let stored: unknown = { schemaVersion: 1, defaults: customized };
+  vi.spyOn(browserStorage.local, 'get').mockImplementation(async () => ({
+    [DRAWING_TOOL_PREFERENCES_STORAGE_KEY]: stored,
+  }));
+  vi.spyOn(browserStorage.local, 'set').mockImplementation(async (value) => {
+    stored = value[DRAWING_TOOL_PREFERENCES_STORAGE_KEY];
+  });
+  const result = await Promise.all([
+    saveDrawingToolPreferences({ blur: { clean: true } }, fallback),
+    saveDrawingToolPreferences({ pencil: { width: 8 } }, fallback),
+  ]);
+  expect(result).toEqual(['applied', 'applied']);
+  await expect(loadDrawingToolPreferences(fallback)).resolves.toMatchObject({
+    blur: { amount: customized.blur.amount, clean: true },
+    pencil: { width: 8 },
+    simplify: customized.simplify,
+    marker: customized.marker,
+  });
+});

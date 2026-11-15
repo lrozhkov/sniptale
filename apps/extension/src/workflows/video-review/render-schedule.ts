@@ -1,4 +1,4 @@
-import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import { buildReviewTimeMap, reviewSegmentSourceTime } from '../../features/video/review/timeline';
 import type { ReviewEdit } from '../../features/video/review/types';
 import type { VideoExportSampleWindow } from '../../features/video/project/export/size-estimate';
 type Segment = ReturnType<typeof buildReviewTimeMap>[number];
@@ -34,9 +34,8 @@ export function reviewRenderFrameSchedule(
               { length: count },
               (_, k) => segment.resultStart + (startFrame + k) / fps
             ),
-            sourceTimes: Array.from(
-              { length: count },
-              (_, k) => segment.sourceStart + ((startFrame + k) / fps) * segment.rate
+            sourceTimes: Array.from({ length: count }, (_, k) =>
+              reviewSegmentSourceTime(segment, segment.resultStart + (startFrame + k) / fps)
             ),
           },
         ];

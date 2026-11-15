@@ -1,3 +1,15 @@
+import { ReviewTrackWorkspace, ReviewTrackWorkspaceTabs } from './track-workspace';
+import { ReviewWebcamInspector } from './webcam-inspector';
+import { reviewInteractionFamily } from '../../features/video/review/interaction-timeline';
+
+import { ReviewCursorMotionInspector } from './cursor-motion-editor';
+import { ReviewTimelineCloneScope } from './timeline-clone-action';
+import { ReviewTimelineMultiSelectionContext } from './selection-actions';
+import { ReviewTimelineBatchInspector } from './timeline-batch-inspector';
+import { ReviewTrackItemsInspector } from './track-items-inspector';
+import { reviewTrackTitleKeys } from './track-items';
+import type { QuickEditTrack } from '../../features/video/review/advanced/types';
+import { ReviewProjectInfo } from './project-info';
 import { prepareLibraryBackup } from '../../workflows/sync-transfer/retained-library';
 import { createSyncProductClient } from '../../platform/runtime-messaging/sync-product-client';
 import {
@@ -7,7 +19,7 @@ import {
 import { ReviewCursorPathEditor, ReviewCursorPathSettings } from './cursor-path-editor';
 import { ReviewAnnotationInspector } from './annotation-effects-inspector';
 import { reviewSubtitleMainOffset } from '../../features/video/review/subtitle-export';
-import { ReviewOriginalSpeechPanel } from './speech-panel';
+import { ReviewSourceSpeechBinding } from './speech-panel';
 import { ReviewTextDocumentPanel } from './text-panel';
 import { computeQuickEditSceneSize } from '../../features/video/review/advanced/scene';
 import {
@@ -35,7 +47,16 @@ import { ReviewSceneProperties } from './advanced-panels';
 import type { useCanvasComments } from './use-canvas-comments';
 import type { useReviewAudio } from './use-review-audio';
 import { reviewErrorMessage } from './feedback';
-import { useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react';
+import {
+  useId,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from 'react';
 import { translate } from '../../platform/i18n';
 import type { LoadedReview } from './use-session';
 import type { useReviewEditorState } from './use-editor-state';
@@ -50,6 +71,7 @@ type InspectorState = Pick<
   | 'advancedFailed'
   | 'retryAdvanced'
   | 'setCursorFocusPath'
+  | 'cursorMotion'
   | 'cursorFocusPath'
   | 'cursorFocusKeys'
   | 'selectCursorFocusKey'
@@ -89,6 +111,7 @@ type InspectorState = Pick<
   | 'watermark'
   | 'presentation'
   | 'timeline'
+  | 'interactionEditor'
   | 'setKeyAnimations'
   | 'setActionAudio'
   | 'performAction'
@@ -99,6 +122,7 @@ type InspectorState = Pick<
   | 'setCanvas'
   | 'setCaptions'
   | 'setWindowHeader'
+  | 'setSourceFilters'
   | 'setOverlaysVisible'
   | 'resetAdvanced'
   | 'setCameraFollowDefaults'
@@ -134,23 +158,13 @@ function ReviewInspectorFragment({ state }: { state: InspectorState }) {
   );
 }
 
-export function ReviewInspectorBinding({
-  onRenameProject,
-  resource,
-  state,
-  canvasComments,
-  audio,
-  onBack,
-  onClose,
-  fullHeight,
-  onToggleHeight,
-  navigation,
-  resizeHandle,
-  preview,
-  onJoinPreview,
-  recording,
-}: {
+type ReviewInspectorBindingProps = {
   recording?: ReactNode;
+  inspectorTrack?: QuickEditTrack;
+  trackTab?: 'list' | 'settings';
+  onTrackTab?(tab: 'list' | 'settings'): void;
+  onProject?: (() => void) | undefined;
+  backLabel?: string | undefined;
   onJoinPreview?: ((slot: 'intro' | 'outro', target?: 'fade' | 'join') => void) | undefined;
   preview?: ReactNode;
   resizeHandle?: ReactNode;
@@ -164,8 +178,58 @@ export function ReviewInspectorBinding({
   onBack(): void;
   onClose(): void;
   onRenameProject?: ((name: string) => Promise<void>) | undefined;
-}) {
+};
+
+export function ReviewInspectorBinding({
+  onRenameProject,
+  inspectorTrack = 'source',
+  trackTab = 'list',
+  onTrackTab,
+  resource,
+  state,
+  canvasComments,
+  audio,
+  onBack,
+  onClose,
+  fullHeight,
+  onToggleHeight,
+  navigation,
+  resizeHandle,
+  preview,
+  onJoinPreview,
+  recording,
+  onProject,
+  backLabel,
+}: ReviewInspectorBindingProps) {
   const { editing, snapshot, composer, busy, run } = state;
+  const workspaceId = useId();
+  const hasTrackSettings =
+    inspectorTrack === 'source' ||
+    (state.advanced.ui.mode === 'advanced' &&
+      ['originalAudio', 'webcam', 'cursorMotion', 'text', 'voiceover', 'music'].includes(
+        inspectorTrack
+      ));
+  const activeTab = hasTrackSettings ? trackTab : 'list';
+  const projectInfo = (
+    <ReviewProjectInfo
+      resource={resource}
+      name={snapshot.snapshot.workspace.project?.name ?? resource.filename}
+      busy={busy}
+      onRename={onRenameProject}
+      index={editing.exporter.index}
+      camera={state.webcam.camera}
+      cameraPending={state.webcam.pending}
+      cameraAttempt={state.webcam.resourceAttempt}
+      active={
+        inspectorTrack === 'source' &&
+        activeTab === 'settings' &&
+        ['track', 'project'].includes(navigation.shown)
+      }
+    />
+  );
+
+  const multiSelection = useContext(ReviewTimelineMultiSelectionContext);
+  const batch = (multiSelection?.keys.length ?? 0) > 1;
   const [historySelection, setHistorySelection] = useState<typeof state.activeSelection>();
   const active = useRef(true);
   const live = useRef({ session: state.session, resource });
@@ -183,13 +247,113 @@ export function ReviewInspectorBinding({
     <ReviewIntervalMap.Provider value={state.timeline.timeMap.getSegments()}>
       <ReviewInspector
         recording={recording}
+        trackHeader={
+          <ReviewTrackWorkspaceTabs
+            id={workspaceId}
+            track={inspectorTrack}
+            tab={activeTab}
+            hasSettings={hasTrackSettings}
+            onTabChange={(tab) => onTrackTab?.(tab)}
+          />
+        }
+        trackWorkspace={
+          <ReviewTrackWorkspace
+            track={inspectorTrack}
+            id={workspaceId}
+            tab={activeTab}
+            list={
+              inspectorTrack === 'text' ? (
+                reviewInspectorTextDocument(state, canvasComments)
+              ) : inspectorTrack === 'keyboard' ||
+                inspectorTrack === 'mouse' ||
+                inspectorTrack === 'actions' ? (
+                <ReviewRecordedHistory
+                  state={state}
+                  family={inspectorTrack === 'actions' ? undefined : inspectorTrack}
+                  onSelection={(selection) => {
+                    setHistorySelection(selection);
+                    navigation.setSection('selected');
+                  }}
+                />
+              ) : (
+                <ReviewTrackItemsInspector
+                  key={inspectorTrack}
+                  track={inspectorTrack}
+                  state={state}
+                  resource={resource}
+                  audio={audio}
+                  navigation={navigation}
+                />
+              )
+            }
+            settings={
+              !hasTrackSettings ? undefined : inspectorTrack === 'originalAudio' ? (
+                <ReviewSourceSpeechBinding
+                  resource={resource}
+                  editor={state}
+                  audio={audio}
+                  flush={() => flushReviewTextVoiceBuffers(state, canvasComments)}
+                />
+              ) : inspectorTrack === 'webcam' ? (
+                <ReviewWebcamInspector editor={state.webcam} />
+              ) : ['source', 'cursorMotion', 'text', 'voiceover', 'music'].includes(
+                  inspectorTrack
+                ) ? (
+                <div className="space-y-4">
+                  {inspectorTrack === 'source' ? (
+                    <section className="space-y-2">
+                      <h3 className="text-sm font-semibold">
+                        {translate('gallery.videoReview.aboutProject')}
+                      </h3>
+                      {projectInfo}
+                    </section>
+                  ) : null}
+                  {state.advanced.ui.mode === 'advanced' ? (
+                    <ReviewScenePropertiesBinding
+                      track={inspectorTrack}
+                      file={resource.file}
+                      state={state}
+                      source={resource.source}
+                      audio={audio}
+                      onJoinPreview={onJoinPreview}
+                    />
+                  ) : null}
+                </div>
+              ) : undefined
+            }
+          />
+        }
+        trackTitle={translate(reviewTrackTitleKeys[inspectorTrack])}
+        historyTitle={
+          inspectorTrack === 'keyboard' || inspectorTrack === 'mouse'
+            ? translate(reviewTrackTitleKeys[inspectorTrack])
+            : undefined
+        }
+        trackItems={
+          inspectorTrack !== 'text' && inspectorTrack !== 'actions' ? (
+            <ReviewTrackItemsInspector
+              key={`${resource.filename}:${inspectorTrack}`}
+              track={inspectorTrack}
+              state={state}
+              resource={resource}
+              audio={audio}
+              navigation={navigation}
+            />
+          ) : undefined
+        }
+        onProject={() => {
+          multiSelection?.clear();
+          onProject?.();
+        }}
+        backLabel={backLabel}
+        project={projectInfo}
         textDocument={reviewInspectorTextDocument(state, canvasComments)}
         speech={
           <ReviewSourceSpeechBinding
             resource={resource}
-            state={state}
+            editor={state}
             audio={audio}
-            canvasComments={canvasComments}
+            flush={() => flushReviewTextVoiceBuffers(state, canvasComments)}
           />
         }
         preview={preview}
@@ -223,6 +387,11 @@ export function ReviewInspectorBinding({
         actionHistory={
           <ReviewRecordedHistory
             state={state}
+            family={
+              inspectorTrack === 'keyboard' || inspectorTrack === 'mouse'
+                ? inspectorTrack
+                : undefined
+            }
             onSelection={(selection) => {
               setHistorySelection(selection);
               navigation.setSection('selected');
@@ -236,12 +405,19 @@ export function ReviewInspectorBinding({
             <ReviewCommentComposer state={state} annotation={composer.annotation} />
           ) : null
         }
-        selectionLabel={reviewSelectionLabel({
-          selection: state.activeSelection,
-          markers: state.projected.markers,
-          advanced: state.advanced,
-          editing: state.editing,
-        })}
+        selectionLabel={
+          batch
+            ? translate('gallery.videoReview.timelineSelectionCount').replace(
+                '{count}',
+                String(multiSelection!.keys.length)
+              )
+            : reviewSelectionLabel({
+                selection: state.activeSelection,
+                markers: state.projected.markers,
+                advanced: state.advanced,
+                editing: state.editing,
+              })
+        }
         selectionPreferenceScope={state.activeSelection.kind}
         selectionHasSections={hasSelectionSections(state)}
         scene={
@@ -268,34 +444,26 @@ export function ReviewInspectorBinding({
         onAdd={state.add}
         onSelect={state.selectComment}
         onHover={state.setHovered}
-        onOpenVideoEditor={() =>
-          void run(async () => {
-            await flushReviewTextVoiceBuffers(state, canvasComments);
-            const saved = await state.session.saveBuffered();
-            if (!isCurrent() || !state.composer.endCheckpointEditAfterFlush()) return;
-            const canLeave = await prepareReviewCheckpointExit(state.session, isCurrent, saved);
-            if (!canLeave()) return;
-            await openVideoEditorPage(null, null, {
-              aggregateId: saved.workspace.aggregateId,
-              revision: saved.workspace.revision,
-              createdAt: saved.workspace.createdAt,
-              sourceAssetId: saved.workspace.sourceAssetId,
-            });
-          })
-        }
+        onOpenVideoEditor={() => openReviewInspectorInVideoEditor(state, canvasComments, isCurrent)}
         {...reviewInspectorNoteActions(state, resource)}
       >
-        <ReviewSelectionBinding
-          onBackToHistory={
-            state.activeSelection === historySelection
-              ? () => navigation.setSection('history')
-              : undefined
-          }
-          state={state}
-          resource={resource}
-          audio={audio}
-          canvasComments={canvasComments}
-        />
+        {batch ? (
+          <ReviewTimelineBatchInspector state={state} duration={resource.source.duration} />
+        ) : (
+          <ReviewTimelineCloneScope state={state} duration={resource.source.duration}>
+            <ReviewSelectionBinding
+              onBackToHistory={
+                state.activeSelection === historySelection
+                  ? () => navigation.setSection('history')
+                  : undefined
+              }
+              state={state}
+              resource={resource}
+              audio={audio}
+              canvasComments={canvasComments}
+            />
+          </ReviewTimelineCloneScope>
+        )}
       </ReviewInspector>
     </ReviewIntervalMap.Provider>
   );
@@ -351,56 +519,15 @@ function reviewInspectorTextDocument(
   );
 }
 
-/** Original speech controls bind to the existing audio and timeline authorities. */
-function ReviewSourceSpeechBinding({
-  resource,
-  state,
-  audio,
-  canvasComments,
-}: {
-  resource: LoadedReview;
-  state: InspectorState;
-  audio: ReturnType<typeof useReviewAudio>;
-  canvasComments: ReturnType<typeof useCanvasComments>;
-}) {
-  return (
-    <ReviewOriginalSpeechPanel
-      key="original"
-      mainVideo={state.video.current ?? undefined}
-      resultTime={state.timeline.sceneOutputTime}
-      masterAudio={state.advanced.audio.original}
-      masterDisabled={state.busy}
-      onMasterVolumeChange={(volume) => audio.setOriginal({ volume })}
-      onJump={(time) => {
-        state.video.current?.pause();
-        state.seek(time, false);
-      }}
-      session={resource.session}
-      original={{
-        file: resource.file,
-        sourceAssetId: state.snapshot.snapshot.workspace.sourceAssetId,
-      }}
-      selection={
-        state.playbackRange ?? (state.selection.kind === 'range' ? state.selection : undefined)
-      }
-      beforeAction={state.beforeAction}
-      flushAdvanced={() => flushReviewTextVoiceBuffers(state, canvasComments)}
-      registerSpeechFlush={state.registerSpeechFlush}
-      sourceAudioAvailable={!!state.editing.exporter.index?.audioCodec}
-      {...(state.advanced.ui.mode === 'basic'
-        ? { onEnableAdvanced: () => state.setMode('advanced') }
-        : {})}
-    />
-  );
-}
-
 const EMPTY_HISTORY_ITEMS: readonly never[] = [];
 
 /** Recorded action navigation and animation edits share the state action guard. */
 function ReviewRecordedHistory({
   state,
+  family,
   onSelection,
 }: {
+  family?: 'keyboard' | 'mouse' | undefined;
   state: InspectorState;
   onSelection(selection: InspectorState['activeSelection']): void;
 }) {
@@ -438,7 +565,11 @@ function ReviewRecordedHistory({
     <ReviewActionHistory
       {...commands}
       captureCapabilities={state.projected.captureCapabilities}
-      markers={state.projected.markers}
+      markers={
+        family
+          ? state.projected.markers.filter((m) => reviewInteractionFamily(m) === family)
+          : state.projected.markers
+      }
       activeRef={state.activeSelection.kind === 'telemetry' ? state.activeSelection.ref : undefined}
       keyAnimations={state.advanced.keyAnimations ?? EMPTY_HISTORY_ITEMS}
       actionAudio={state.advanced.actionAudio ?? EMPTY_HISTORY_ITEMS}
@@ -579,7 +710,9 @@ function ReviewScenePropertiesBinding({
   source,
   audio,
   onJoinPreview,
+  track,
 }: {
+  track?: QuickEditTrack;
   file: File;
   onJoinPreview?: ((slot: 'intro' | 'outro', target?: 'fade' | 'join') => void) | undefined;
   state: InspectorState;
@@ -589,6 +722,8 @@ function ReviewScenePropertiesBinding({
   const { busy, editing } = state;
   return (
     <ReviewSceneProperties
+      {...(track ? { track } : {})}
+      headerIdentity={state.snapshot.snapshot.workspace.aggregateId}
       cropPreview={{ file, time: state.time }}
       cursorPath={
         <ReviewCursorPathSettings
@@ -634,6 +769,8 @@ function ReviewScenePropertiesBinding({
         onRetry: state.watermark.retry,
         imagePreviewUrl: state.watermark.imagePreviewUrl,
       }}
+      sourceFilters={state.advanced.sourceFilters}
+      onSourceFilters={state.setSourceFilters}
       windowHeader={state.advanced.windowHeader}
       onWindowHeader={state.setWindowHeader}
       audio={state.advanced.audio}
@@ -667,6 +804,10 @@ function ReviewSelectionBinding({
   onBackToHistory?: (() => void) | undefined;
 }) {
   const video = state.video;
+  if (state.activeSelection.kind === 'cursor-motion' && state.advanced.ui.mode === 'advanced')
+    return (
+      <ReviewCursorMotionInspector editor={state.cursorMotion} busy={state.busy || state.playing} />
+    );
   if (state.activeSelection.kind === 'cursor-focus')
     return (
       <ReviewCursorPathEditor
@@ -697,6 +838,7 @@ function ReviewSelectionBinding({
         editor={state.annotationEffects}
         id={state.activeSelection.id}
         source={snapshot?.source}
+        sourceDigest={snapshot?.sha256}
         duration={resource.source.duration}
         busy={state.busy || state.editing.exporter.phase !== 'idle'}
       />
@@ -741,6 +883,7 @@ function ReviewSelectionBinding({
       }}
       onActionAudioAudition={(target, style) => auditionRecordedActionAudio(state, target, style)}
       onStopActionAudioAudition={state.actionSoundPreview.stopAudition}
+      interactionEditor={state.interactionEditor}
       onClickAnimation={(ids, patch) => changeRecordedClicks(state, ids, patch)}
       {...(onBackToHistory ? { onOpenHistory: onBackToHistory } : {})}
       markers={state.projected.markers}
@@ -888,6 +1031,7 @@ function hasSelectionSections(state: InspectorState): boolean {
     state.activeSelection.kind === 'telemetry' ||
     (state.advanced.ui.mode === 'advanced' &&
       [
+        'cursor-motion',
         'zoom',
         'canvas-comment',
         'audio',
@@ -917,4 +1061,25 @@ function reviewTextCutRange(editor: InspectorState['text'], ids: readonly string
     start: Math.min(...intervals.map((range) => range.start)),
     end: Math.max(...intervals.map((range) => range.end)),
   };
+}
+
+/** Transfers only a flushed checkpoint while the originating inspector still owns the session. */
+function openReviewInspectorInVideoEditor(
+  state: Pick<InspectorState, 'run' | 'composer' | 'flushAdvanced' | 'session'>,
+  canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>,
+  isCurrent: () => boolean
+) {
+  void state.run(async () => {
+    await flushReviewTextVoiceBuffers(state, canvasComments);
+    const saved = await state.session.saveBuffered();
+    if (!isCurrent() || !state.composer.endCheckpointEditAfterFlush()) return;
+    const canLeave = await prepareReviewCheckpointExit(state.session, isCurrent, saved);
+    if (!canLeave()) return;
+    await openVideoEditorPage(null, null, {
+      aggregateId: saved.workspace.aggregateId,
+      revision: saved.workspace.revision,
+      createdAt: saved.workspace.createdAt,
+      sourceAssetId: saved.workspace.sourceAssetId,
+    });
+  });
 }

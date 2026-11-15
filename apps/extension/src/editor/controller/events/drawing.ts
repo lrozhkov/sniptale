@@ -1,6 +1,7 @@
 import type { Canvas, FabricObject, TPointerEvent, Transform } from 'fabric';
 import {
   createDrawingObject,
+  createDrawingCleanup,
   clampDrawingTextWidth,
   resolveDrawingTextHeight,
   type DrawingObject,
@@ -8,7 +9,7 @@ import {
 import { useEditorStore } from '../../state/useEditorStore';
 import { cropDown } from '../crop-workflow/pointer';
 import { activateTextTarget, isTextTarget } from './text-target';
-import { completeDrawWorkflowFromBindings } from './draw-completion';
+import { releaseFreehandDrawWorkflowFromBindings } from './draw-completion';
 import type { EditorControllerEventBindings, EditorControllerEventHandlers } from './types';
 import { handleStepMouseDown } from '../tools/step-drawing/pointer';
 import { isEditorDrawingSelection } from '../../drawing/object/metadata';
@@ -99,11 +100,10 @@ function startBlur(
     amount: useEditorStore.getState().toolSettings.blur.amount,
     bounds: { x: point.x, y: point.y, width: 1, height: 1 },
   };
-  const object = createEditorDrawingBlurObject({
-    drawing,
-    labelIndex: bindings.nextLabelIndex('blur'),
-    source,
-  });
+  const labelIndex = bindings.nextLabelIndex('blur');
+  const object = useEditorStore.getState().toolSettings.blur.clean
+    ? createEditorDrawingSimplifyObject(createDrawingCleanup(drawing), labelIndex)
+    : createEditorDrawingBlurObject({ drawing, labelIndex, source });
   bindings.prepareObject(object);
   bindings.startDrawSession('blur', point, object, pointerId);
 }
@@ -202,6 +202,16 @@ export function createEditorDrawingEventHandlers(
   const updateDraftOnce = (event: TPointerEvent) => {
     const session = bindings.getDrawSession();
     if (!session || !isEditorDrawingSessionPointer(session, event)) return false;
+    if (
+      (session.tool === 'pencil' || session.tool === 'marker') &&
+      'buttons' in event &&
+      (event.buttons & 1) === 0
+    ) {
+      // Chorded mouse input can release the primary button without a pointerup.
+      lastHandledMoveEvent = null;
+      releaseFreehandDrawWorkflowFromBindings(bindings);
+      return true;
+    }
     if (lastHandledMoveEvent === event) return true;
     lastHandledMoveEvent = event;
     updateEditorDrawingDraft(bindings, [event]);
@@ -277,7 +287,7 @@ export function createEditorDrawingEventHandlers(
         lastHandledMoveEvent = null;
         textTargetCandidate = null;
         selectionModifierGesture = null;
-        completeDrawWorkflowFromBindings(bindings);
+        releaseFreehandDrawWorkflowFromBindings(bindings);
         return;
       }
       const canvas = bindings.getCanvas();
@@ -294,7 +304,7 @@ export function createEditorDrawingEventHandlers(
         textTargetCandidate = null;
         return;
       }
-      completeDrawWorkflowFromBindings(bindings);
+      releaseFreehandDrawWorkflowFromBindings(bindings);
     },
     handleWindowPointerMove: (event) => {
       const canvas = bindings.getCanvas();
@@ -307,16 +317,18 @@ export function createEditorDrawingEventHandlers(
       const drawSession = bindings.getDrawSession();
       if (!drawSession || !isEditorDrawingSessionPointer(drawSession, event)) return;
       lastHandledMoveEvent = null;
-      completeDrawWorkflowFromBindings(bindings);
+      releaseFreehandDrawWorkflowFromBindings(bindings);
     },
     handlePointerCancel: (event) => {
+      if (event && 'isPrimary' in event && event.isPrimary === false) return;
       textTargetCandidate = null;
       selectionModifierGesture = null;
       lastHandledMoveEvent = null;
       const drawSession = bindings.getDrawSession();
       if (drawSession && !isEditorDrawingSessionPointer(drawSession, event)) return;
-      endEditorCanvasTransform(bindings.getCanvas(), event);
+      const cancelled = endEditorCanvasTransform(bindings.getCanvas(), event);
       if (drawSession) bindings.cancelTransientInteraction();
+      else if (cancelled) bindings.syncRuntimeState();
     },
   };
 }

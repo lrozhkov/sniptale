@@ -14,6 +14,7 @@ import {
 import type { FrameAnnotationCommandId } from '../../features/highlighter/frame-annotation/commands';
 import type { FrameAnnotationCoordinateSpace } from '../../features/highlighter/frame-annotation/coordinate-space';
 import { FrameAnnotationResizeHandleLayer } from '../../features/highlighter/frame-annotation/interaction/resize-handles';
+import { FRAME_ANNOTATION_Z_INDEX } from '../../features/highlighter/frame-annotation/interaction/z-index';
 import type { ResizeDirection } from '../../features/highlighter/contracts';
 import { FrameStepBadgeInteractiveSurface } from '../../features/highlighter/frame-annotation/step-badge/interactive-surface';
 import { FrameProjectionReadOnlyOverlays } from './projection-read-only';
@@ -217,7 +218,7 @@ function FrameResizeOverlay(props: FrameProjectionOverlayProps) {
       style={{
         position: 'absolute',
         inset: 0,
-        zIndex: 0,
+        zIndex: FRAME_ANNOTATION_Z_INDEX.resizeHandles,
         pointerEvents: 'none',
         transform: `scale(${1 / props.scale})`,
         transformOrigin: 'top left',

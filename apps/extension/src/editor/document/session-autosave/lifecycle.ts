@@ -29,6 +29,7 @@ export function activateAutosaveContext(
     state.releaseHydratedDocument?.();
     state.releaseHydratedDocument = null;
     state.documentAssetsByRuntimeUrl = new Map();
+    state.documentAssetsByVectorDefinitionId = new Map();
   }
   state.pendingDocument = null;
   state.lastWriteError = null;
@@ -72,6 +73,7 @@ export type PreparedEditorSessionDocument = Pick<
   | 'sourceUrl'
   | 'releaseDocumentAssets'
   | 'documentAssetsByRuntimeUrl'
+  | 'documentAssetsByVectorDefinitionId'
 >;
 
 /** Transfers hydrated resource ownership after the loaded canvas has been admitted. */
@@ -94,6 +96,7 @@ export function adoptPreparedAutosaveDocument(
   );
   state.releaseHydratedDocument = entry.releaseDocumentAssets ?? null;
   state.documentAssetsByRuntimeUrl = entry.documentAssetsByRuntimeUrl ?? new Map();
+  state.documentAssetsByVectorDefinitionId = new Map(entry.documentAssetsByVectorDefinitionId);
   setEditorSaveState('saved');
 }
 
@@ -115,14 +118,7 @@ export async function restoreAutosaveDraft(
   return entry;
 }
 
-export async function discardAutosaveDraft(
-  state: EditorSessionAutosaveState,
-  _aggregateId?: string | null
-): Promise<void> {
-  state.hydration = null;
-  state.hydrationGeneration += 1;
-  state.lastCheckpointReceipt = null;
-  cancelPendingAutosaveRequest(state);
+function resetAutosaveDocumentState(state: EditorSessionAutosaveState): void {
   interruptImagePresentation(state);
   releaseAutosaveInteraction(state);
   retireAutosaveCheckpointEdit(state);
@@ -131,7 +127,19 @@ export async function discardAutosaveDraft(
   state.releaseHydratedDocument?.();
   state.releaseHydratedDocument = null;
   state.documentAssetsByRuntimeUrl = new Map();
+  state.documentAssetsByVectorDefinitionId = new Map();
   state.pendingDocument = null;
+}
+
+export async function discardAutosaveDraft(
+  state: EditorSessionAutosaveState,
+  _aggregateId?: string | null
+): Promise<void> {
+  state.hydration = null;
+  state.hydrationGeneration += 1;
+  state.lastCheckpointReceipt = null;
+  cancelPendingAutosaveRequest(state);
+  resetAutosaveDocumentState(state);
   state.lastWriteError = null;
   state.hasUnsavedChanges = false;
   state.activeContext = null;
@@ -148,15 +156,7 @@ export function disposeAutosaveState(state: EditorSessionAutosaveState): void {
   state.hydration = null;
   state.hydrationGeneration += 1;
   state.coordinator?.dispose();
-  interruptImagePresentation(state);
-  releaseAutosaveInteraction(state);
-  retireAutosaveCheckpointEdit(state);
-  state.presentationPending = false;
-  state.presentationRetryAttempt = 0;
-  state.releaseHydratedDocument?.();
-  state.releaseHydratedDocument = null;
-  state.documentAssetsByRuntimeUrl = new Map();
-  state.pendingDocument = null;
+  resetAutosaveDocumentState(state);
   state.activeContext = null;
   state.contextGeneration += 1;
   state.presentationRetryPromise = null;

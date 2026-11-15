@@ -1,3 +1,4 @@
+import { gpuPreviewTextureBytes, MAX_TEXTURE_BYTES } from '../../canvas/gpu-preview-plan';
 import type { EffectRuntimeGpuPlanResult } from '../../../../../contracts/effect-runtime/types';
 import type { EffectRuntimeGpuPass } from '../../../../../contracts/effect-runtime/gpu-plan';
 import {
@@ -8,12 +9,13 @@ import {
 } from '../../canvas/gpu-preview';
 import {
   EFFECT_RUNTIME_RESOURCE_LIMITS,
+  assertEffectRasterDimensions,
   EffectRuntimeResourceError,
 } from '../runtime/resource-limits';
 import { buildEffectRuntimeGpuOperationLayers } from './gpu-plan-layers';
 
 /** Materialize valid complex plans on a borrowed device; never close caller-owned wire resources. */
-export async function materializeEffectRuntimeGpuPlan(
+async function materializeEffectRuntimeGpuPlan(
   plan: EffectRuntimeGpuPlanResult,
   gpu: GpuPreviewRenderer,
   signal: AbortSignal
@@ -182,6 +184,8 @@ export function buildEffectRuntimeGpuPlan(plan: EffectRuntimeGpuPlanResult): Gpu
 
 /** Check the entire final graph, including editor wrappers, before choosing same-device chunks. */
 export async function prepareEffectRuntimeGpuScene(args: {
+  /** Enhanced exports admit texture-sized stages; ordinary scene scheduling is unchanged. */
+  boundTextures?: boolean;
   layers: readonly GpuPreviewLayer[];
   gpu: GpuPreviewRenderer;
   signal: AbortSignal;
@@ -235,11 +239,84 @@ export async function prepareEffectRuntimeGpuScene(args: {
     }
     return result;
   };
+  const replaceGroup = (
+    layers: readonly GpuPreviewLayer[],
+    target: GpuPreviewGroup,
+    bitmap: ImageBitmap,
+    memo = new Map<GpuPreviewGroup, GpuPreviewGroup>()
+  ): readonly GpuPreviewLayer[] => {
+    const result = layers.map((layer) => {
+      if (layer.source === target) {
+        // Group cache hints were ignored by the backend; do not turn them into bitmap identities.
+        const { cache: _cache, ...placement } = layer;
+        return { ...placement, source: bitmap };
+      }
+      if (!isGroup(layer.source)) return layer;
+      const group = layer.source;
+      let source = memo.get(group);
+      if (!source) {
+        const children = replaceGroup(group.layers, target, bitmap, memo);
+        source = children === group.layers ? group : { ...group, layers: children };
+        memo.set(group, source);
+      }
+      return source === group ? layer : { ...layer, source };
+    });
+    return result.every((layer, index) => layer === layers[index]) ? layers : result;
+  };
   try {
-    if (fits(args.layers)) return { layers: args.layers, release };
-    const layers = await compact(args.layers);
-    // Preserve existing rejection when non-effect scene content itself exceeds backend limits.
+    let layers = fits(args.layers) ? args.layers : await compact(args.layers);
     if (!fits(layers)) throw new Error('GPU preview scene budget exceeded.');
+    let retainedBytes = [...owned].reduce(
+      (sum, bitmap) => sum + bitmap.width * bitmap.height * 4,
+      0
+    );
+    while (args.boundTextures && gpuPreviewTextureBytes(layers) > MAX_TEXTURE_BYTES) {
+      args.signal.throwIfAborted();
+      const currentBytes = gpuPreviewTextureBytes(layers);
+      type Candidate = { group: GpuPreviewGroup; bytes: number; benefit: number };
+      const seen = new Set<GpuPreviewGroup>();
+      const inspect = (
+        children: readonly GpuPreviewLayer[],
+        selected?: Candidate
+      ): Candidate | undefined => {
+        for (const layer of children) {
+          if (!isGroup(layer.source) || seen.has(layer.source)) continue;
+          const group = layer.source;
+          seen.add(group);
+          let bytes: number | undefined;
+          try {
+            bytes = assertEffectRasterDimensions(group.output.width, group.output.height) * 4;
+          } catch (error) {
+            if (!(error instanceof EffectRuntimeResourceError)) throw error;
+          }
+          if (
+            bytes !== undefined &&
+            retainedBytes + bytes <= EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterBytes &&
+            owned.size < EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterEntries
+          ) {
+            const cost = gpuPreviewTextureBytes(group.layers);
+            const benefit = currentBytes - gpuPreviewTextureBytes(layers, group);
+            if (cost <= MAX_TEXTURE_BYTES && benefit > (selected?.benefit ?? 0))
+              selected = { group, bytes, benefit };
+          }
+          selected = inspect(group.layers, selected);
+        }
+        return selected;
+      };
+      const selected = inspect(layers);
+      if (!selected) throw new EffectRuntimeResourceError();
+      const group = selected.group;
+      const bitmap = await args.gpu.render({
+        output: group.output,
+        logical: group.logical,
+        layers: group.layers,
+        signal: args.signal,
+      });
+      owned.add(bitmap);
+      retainedBytes += selected.bytes;
+      args.signal.throwIfAborted();
+      layers = replaceGroup(layers, group, bitmap);
+    }
     return { layers, release };
   } catch (error) {
     release();
@@ -252,12 +329,34 @@ type GpuPlanResources = ReadonlyMap<number, EffectRuntimeGpuPlanResult['resource
 function resolveGpuPlanResource(resources: GpuPlanResources, id: number) {
   const resource = resources.get(id);
   if (!resource) throw new Error('Effect GPU resource reference is unavailable.');
-  return { source: resource.bitmap, width: resource.width, height: resource.height };
+  return {
+    source:
+      resource.kind === 'paint'
+        ? {
+            kind: 'paint' as const,
+            width: resource.width,
+            height: resource.height,
+            paint: resource.paint,
+          }
+        : resource.bitmap,
+    width: resource.width,
+    height: resource.height,
+  };
 }
 
 function resolveGpuPlanCoverage(resources: GpuPlanResources, id: number) {
   const resource = resources.get(id);
-  if (!resource || resource.kind !== 'coverage')
+  if (
+    !resource ||
+    (resource.kind !== 'coverage' && !(resource.kind === 'paint' && resource.coverage))
+  )
     throw new Error('Effect GPU coverage reference is unavailable.');
-  return resource.bitmap;
+  return resource.kind === 'paint'
+    ? {
+        kind: 'paint' as const,
+        width: resource.width,
+        height: resource.height,
+        paint: resource.paint,
+      }
+    : resource.bitmap;
 }

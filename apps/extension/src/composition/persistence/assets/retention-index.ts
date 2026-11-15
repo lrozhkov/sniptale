@@ -15,6 +15,7 @@ import type { AssetOwner } from './contracts';
 import type { collectDurableAssetSnapshot } from './retention-authority';
 
 const CLAIM_STORES = [
+  'editor_vector_library',
   'recordings',
   'project_assets',
   'project_exports',

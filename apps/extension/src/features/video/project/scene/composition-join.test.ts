@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../transition/gl-catalog';
 import { expect, it } from 'vitest';
 import { evaluateCompositionJoin, parseCompositionJoinSettings } from './composition-join';
 
@@ -70,4 +71,21 @@ it.each([
   { type: 'fade-black', before: 1, after: 1, color: '#ffffff00' },
 ])('rejects unsupported transition %j', (raw) => {
   expect(parseCompositionJoinSettings(raw)).toBeNull();
+});
+
+it('admits only a pinned GL implementation and complete typed settings for a composition join', () => {
+  const selection = createGlTransitionSelection('BowTie')!;
+  const value = { type: 'gl', before: 0.2, after: 0.3, selection, easing: 'EASE_IN_OUT' };
+  expect(parseCompositionJoinSettings(value)).toEqual(value);
+  for (const invalid of [
+    { ...value, selection: { ...selection, version: 'future' } },
+    { ...value, selection: { ...selection, wgslSha256: '0'.repeat(64) } },
+    { ...value, selection: { ...selection, values: {} } },
+    { ...value, selection: { ...selection, shader: 'https://example.test/code' } },
+    { ...value, shader: 'remote' },
+    { ...value, easing: 'unknown' },
+    { ...value, color: '#000000' },
+    { ...value, selection: undefined },
+  ])
+    expect(parseCompositionJoinSettings(invalid)).toBeNull();
 });

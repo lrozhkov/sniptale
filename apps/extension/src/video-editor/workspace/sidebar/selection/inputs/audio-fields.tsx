@@ -1,5 +1,6 @@
+import { getProjectAudioProcessingSelection } from '../../../../../features/video/project/audio-processing';
 import { ProjectAudioDurationModeField } from '../shared/duration-mode';
-import { ProjectSourceAudioEditor } from './source-audio';
+import { ProjectSourceAudioEditor, ProjectAudioProcessingEditor } from './source-audio';
 import { ProjectOriginalAudioEditor } from './original-audio';
 import { InspectorDetails } from '../shared/details';
 import { Link2, Unlink } from 'lucide-react';
@@ -63,7 +64,19 @@ export function renderAudioFields(
   >
 ) {
   const clip = props.selectedClip;
-  if (!clip || !isAudioClip(clip)) return null;
+  if (!clip || (!isAudioClip(clip) && !isVideoClip(clip))) return null;
+  const processing = (
+    <ProjectAudioProcessingEditor
+      key={clip.id}
+      project={props.project}
+      target={{ kind: 'clip', clipId: clip.id }}
+    />
+  );
+  if (isVideoClip(clip))
+    return getProjectAudioProcessingSelection(props.project, { kind: 'clip', clipId: clip.id })
+      .clipIds.length
+      ? processing
+      : null;
   return (
     <>
       <ProjectAudioDurationModeField project={props.project} clip={clip} />
@@ -73,6 +86,7 @@ export function renderAudioFields(
         onUpdateClipAudioEnvelope: props.onUpdateClipAudioEnvelope,
         onUpdateClipVolume: props.onUpdateClipVolume,
       })}
+      {processing}
       <InspectorDetails
         preferenceId="audio-fields:source-audio"
         label={translate('videoEditor.sidebar.sourceAudio')}

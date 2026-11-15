@@ -22,8 +22,8 @@ it('keeps Oxfmt as the sole formatter configuration authority', () => {
     expect.arrayContaining([
       'package-lock.json',
       'tooling/configs/',
-      'packages/runtime-contracts/src/effect-v1/fixtures/sniptale-effect-v1.schema.json',
-      'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conformance.sniptale-effect.json',
+      'apps/extension/src/features/video/project/recording-events/fixtures.json',
+      'apps/extension/src/features/video/project/cursor-trajectory/fixtures.json',
       '*.md',
     ])
   );

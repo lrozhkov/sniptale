@@ -130,6 +130,9 @@ vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
 }));
 
 vi.mock('../assets', async () => ({
+  collectPreparedAssetCleanupFailures: (
+    await vi.importActual<typeof import('../assets/opfs-store')>('../assets/opfs-store')
+  ).collectPreparedAssetCleanupFailures,
   readAssetFile: vi.fn(
     async (ref: { size: number; mimeType: string }, filename: string) =>
       new File([new Uint8Array(ref.size)], filename, { type: ref.mimeType })

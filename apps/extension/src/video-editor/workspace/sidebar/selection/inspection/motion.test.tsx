@@ -189,7 +189,7 @@ function clickGroup(title: string) {
   });
 }
 
-it('groups border settings and phases while preserving the camera mode command', () => {
+it('groups border settings and phases without a focus-type switch', () => {
   const props = createMotionPanelProps({
     border: createQuickEditBorder(),
     borderTarget: 'viewport',
@@ -209,14 +209,8 @@ it('groups border settings and phases while preserving the camera mode command',
   expect(container?.textContent).toContain('gallery.videoReview.borderHold');
   expect(container?.textContent).not.toContain('gallery.videoReview.motionBlur');
   clickGroup('videoEditor.sidebar.inspectorGroupAppearance');
-  const mode = container?.querySelector<HTMLButtonElement>(
-    '[title="gallery.videoReview.zoomRegionLabel"]'
-  );
-  expect(mode).toBeTruthy();
-  act(() => mode!.click());
-  expect(props.onUpdateMotionRegion).toHaveBeenCalledWith(props.selectedMotionRegion!.id, {
-    focusEdit: { kind: 'border' as const, enabled: false },
-  });
+  expect(container?.querySelector('[aria-label="gallery.videoReview.focusType"]')).toBeNull();
+  expect(props.onUpdateMotionRegion).not.toHaveBeenCalled();
 });
 
 it('keeps window selection with its target and exposes an independent clock only for viewport borders', () => {
@@ -507,8 +501,9 @@ it.each(['window', 'scene'] as const)(
   }
 );
 
-it('keeps scene-plane controls out of the window camera inspector', () => {
+it('keeps scene-plane controls out of the window 3D inspector', () => {
   const props = createMotionPanelProps({
+    effect: '3d',
     sourceBinding: {
       clipId: 'window',
       coordinateSpace: 'source-window',

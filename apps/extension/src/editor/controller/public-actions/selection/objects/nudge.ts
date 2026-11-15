@@ -1,4 +1,4 @@
-import type { Canvas, FabricObject } from 'fabric';
+import { Point, type Canvas, type FabricObject } from 'fabric';
 
 import { syncSourceStateFromObject } from '../../../document/source';
 
@@ -29,10 +29,15 @@ export function nudgeEditorSelection(options: {
 
   let nextSource = source;
   activeObjects.forEach((object) => {
-    object.set({
-      left: (object.left ?? 0) + deltaX,
-      top: (object.top ?? 0) + deltaY,
-    });
+    if (object.parent) {
+      const position = object.getXY();
+      object.setXY(new Point(position.x + deltaX, position.y + deltaY));
+    } else {
+      object.set({
+        left: (object.left ?? 0) + deltaX,
+        top: (object.top ?? 0) + deltaY,
+      });
+    }
     ensureObjectReachable(object);
     object.setCoords();
     normalizeFrameAnnotationProxyGeometry(object);
@@ -46,6 +51,7 @@ export function nudgeEditorSelection(options: {
     nextSource = syncSourceStateFromObject(nextSource, object);
   });
 
+  activeObjects[0]?.parent?.triggerLayout();
   setSource(nextSource);
   canvas.getActiveObject?.()?.setCoords?.();
   canvas.requestRenderAll();
