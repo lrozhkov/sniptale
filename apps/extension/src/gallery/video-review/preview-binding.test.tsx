@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { DEFAULT_QUICK_PREVIEW_PREFERENCES } from '../../features/video/preview/quick-preferences';
 import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
-import { act, type ComponentProps } from 'react';
+import { act, Suspense, useState, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewPreviewBinding } from './preview-binding';
@@ -355,6 +355,48 @@ it('maps transport seeks and playback events while preserving non-point selectio
   vi.mocked(state.seek).mockClear();
   frame().onSeek(3);
   expect(state.seek).not.toHaveBeenCalled();
+});
+
+it('retains the point selection when native playback reports the same time again', async () => {
+  selection = { kind: 'point', time: 3 };
+  const previous = selection;
+  await render();
+  stage().onTime(2);
+  expect(selection).toBe(previous);
+});
+
+it('keeps the displayed timeline available while a native playback observation prepares its next view', async () => {
+  const pending = new Promise<void>(() => {});
+  function TimelinePoint({ time }: { time: number }) {
+    if (time > 0) throw pending;
+    return <span>Displayed point</span>;
+  }
+  function Harness() {
+    const [anchor, setAnchor] = useState<typeof selection>({ kind: 'point', time: 0 });
+    const [observedTime, setObservedTime] = useState(0);
+    return (
+      <Suspense fallback={<span>Preparing timeline</span>}>
+        <ReviewPreviewBinding
+          state={{
+            ...state,
+            setSelection: setAnchor,
+            onTime: (time) => {
+              setObservedTime(time);
+              return time;
+            },
+          }}
+          sceneActive
+          resource={{ file: new File(['video'], 'clip.webm'), url: 'blob:video', session }}
+        />
+        <TimelinePoint time={Math.max(observedTime, anchor.kind === 'point' ? anchor.time : 0)} />
+      </Suspense>
+    );
+  }
+  await act(async () => root.render(<Harness />));
+  expect(host.textContent).toContain('Displayed point');
+  await act(async () => stage().onTime(1));
+  expect(host.textContent).not.toContain('Preparing timeline');
+  expect(host.querySelector('span')?.style.display).not.toBe('none');
 });
 
 it('keeps the authored text inspector mounted during recording playback', async () => {

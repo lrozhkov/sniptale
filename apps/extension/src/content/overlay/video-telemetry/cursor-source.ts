@@ -142,11 +142,14 @@ export function createCursorObservationSource(options: {
         return false;
       }
     })();
-    running = work;
-    void work.finally(() => {
-      if (running === work) running = null;
+    const completion = work.then((drained) => {
+      if (running !== completion) return drained;
+      running = null;
+      // Flush includes input accepted after the empty-queue check, including the final Stop.
+      return drained && (queue.length || loss || terminal) ? pump() : drained;
     });
-    return work;
+    running = completion;
+    return completion;
   }
   function append(input: PendingRecord) {
     if (closed) return;

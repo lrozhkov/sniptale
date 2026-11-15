@@ -107,6 +107,44 @@ describe('bounded browser cursor source', () => {
     expect(attempts[1]).toEqual(attempts[0]);
     expect(send).toHaveBeenCalledTimes(2);
   });
+  it('drains Stop queued during pump completion before its final flush resolves', async () => {
+    const terminalSend = deferred();
+    const stopped = deferred();
+    const packets: RecordingCursorObservationPacket[] = [];
+    let finished = false;
+    let finalFlush: Promise<boolean> | undefined;
+    const { source } = setup(async (packet) => {
+      packets.push(packet);
+      if (packets.length === 1) {
+        queueMicrotask(() =>
+          queueMicrotask(() => {
+            source.boundary(moment(2), 'stop');
+            source.close();
+            finalFlush = source.flush();
+            void finalFlush.then(() => {
+              finished = true;
+            });
+            stopped.resolve();
+          })
+        );
+      } else await terminalSend.promise;
+    });
+    source.sample(moment(1), point);
+    const initialFlush = source.flush();
+    await stopped.promise;
+    for (let turn = 0; turn < 6; turn++) await Promise.resolve();
+    expect.soft(packets).toHaveLength(2);
+    expect.soft(finished).toBe(false);
+    terminalSend.resolve();
+    expect(await finalFlush).toBe(true);
+    expect(await initialFlush).toBe(true);
+    expect(packets.flatMap((packet) => packet.records).at(-1)).toEqual({
+      kind: 'boundary',
+      activeTimeUs: 2000,
+      reason: 'stop',
+    });
+    expect(source.pendingCount).toBe(0);
+  });
   it('keeps source event time and applies calibration before the first drain', async () => {
     const gate = deferred();
     let offset = 0;

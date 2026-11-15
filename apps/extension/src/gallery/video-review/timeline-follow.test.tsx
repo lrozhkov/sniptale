@@ -11,13 +11,18 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
 const environment = {
   host: null as HTMLDivElement | null,
   root: null as Root | null,
+  resize: [] as Array<() => void>,
 };
 
 beforeEach(() => {
+  environment.resize = [];
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal(
     'ResizeObserver',
     class {
+      constructor(callback: ResizeObserverCallback) {
+        environment.resize.push(() => callback([], this));
+      }
       observe() {}
       unobserve() {}
       disconnect() {}
@@ -225,4 +230,48 @@ it('keeps paging when a paused zoom scroll arrives after Play', () => {
   act(() => viewport.dispatchEvent(new Event('scroll')));
   renderTimeline({ ...props, playing: true, time: 8 });
   expect(viewport.scrollLeft).toBeGreaterThan(left);
+});
+
+it('follows visible playback samples without reading layout until the page changes', () => {
+  const { host, props } = renderTimeline({ duration: 10, time: 0 });
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  changeZoom(host, '50');
+  renderTimeline({ ...props, playing: true, time: 0.1 });
+  const widthReads = vi.spyOn(viewport, 'clientWidth', 'get');
+  widthReads.mockClear();
+  let left = viewport.scrollLeft;
+  const scrollReads = vi.fn(() => left);
+  Object.defineProperty(viewport, 'scrollLeft', {
+    configurable: true,
+    get: scrollReads,
+    set: (value: number) => {
+      left = value;
+    },
+  });
+  for (const time of [0.2, 0.3, 1.5, 2.3]) renderTimeline({ ...props, playing: true, time });
+  expect(widthReads).not.toHaveBeenCalled();
+  expect(scrollReads).not.toHaveBeenCalled();
+  expect(left).toBe(0);
+  renderTimeline({ ...props, playing: true, time: 2.375 });
+  expect(left).toBe(680);
+  expect(widthReads).not.toHaveBeenCalled();
+  expect(scrollReads).toHaveBeenCalledOnce();
+});
+
+it('holds a hidden viewport and resumes paging with its newly measured width', () => {
+  const { host, props } = renderTimeline({ duration: 10, time: 0 });
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  changeZoom(host, '50');
+  renderTimeline({ ...props, playing: true, time: 0.1 });
+  const width = vi.spyOn(viewport, 'clientWidth', 'get').mockReturnValue(0);
+  act(() => environment.resize.forEach((resize) => resize()));
+  renderTimeline({ ...props, playing: true, time: 8 });
+  expect(viewport.scrollLeft).toBe(0);
+  width.mockReturnValue(400);
+  act(() => environment.resize.forEach((resize) => resize()));
+  expect(viewport.scrollLeft).toBe(1200);
 });

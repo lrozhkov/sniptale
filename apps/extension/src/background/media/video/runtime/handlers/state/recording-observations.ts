@@ -39,7 +39,7 @@ function forwardBlockObservations(
     !lease ||
     sender?.id !== chrome.runtime.id ||
     sender.frameId !== 0 ||
-    sender.documentLifecycle !== 'active' ||
+    (sender.documentLifecycle !== 'active' && sender.documentLifecycle !== 'pending_deletion') ||
     typeof documentId !== 'string' ||
     !documentId ||
     typeof tabId !== 'number' ||
@@ -61,6 +61,15 @@ function forwardBlockObservations(
     binding.streamInstanceId,
     tabId,
   ]);
+  const outgoing = sender.documentLifecycle === 'pending_deletion';
+  if (
+    outgoing &&
+    (observationForwarding[kind]?.key !== key ||
+      observationForwarding[kind]?.documentId !== documentId)
+  ) {
+    sendResponse({ success: false, error: 'RECORDING_OBSERVATIONS_SOURCE_UNAVAILABLE' });
+    return { handled: true, keepChannelOpen: false };
+  }
   if (observationForwarding[kind]?.key !== key)
     observationForwarding[kind] = { key, documentId: null, pending: 0, tail: Promise.resolve() };
   const forwarding = observationForwarding[kind];
@@ -72,6 +81,9 @@ function forwardBlockObservations(
   const snapshot = structuredClone(packet);
   forwarding.pending++;
   const work = forwarding.tail.then(async () => {
+    // An outgoing document can drain its admitted stream only until its successor is admitted.
+    if (outgoing && forwarding.documentId !== documentId)
+      throw new Error('Source document is unavailable');
     if (forwarding.documentId !== documentId) {
       const frames = await browserWebNavigation.getAllFrames({ tabId });
       if (!frames?.some((frame) => frame.frameId === 0 && frame.documentId === documentId))

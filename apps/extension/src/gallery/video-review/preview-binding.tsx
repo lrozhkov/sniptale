@@ -2,7 +2,7 @@ import type { PreviewRendererStatus } from '../../features/video/preview/prefere
 import { useReviewZoomPreview } from './zoom-editor';
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
 import { resolveReviewCursorFocusPath } from '../../features/video/review/advanced/cursor-focus-path';
-import { useMemo, type ReactNode } from 'react';
+import { startTransition, useMemo, type ReactNode } from 'react';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
 import { resolveReviewOutputProfile } from '../../workflows/video-review/render-settings';
@@ -424,10 +424,14 @@ function ReviewPreviewStage({
         if (anchor) state.seek(anchor.kind === 'point' ? anchor.time : anchor.start);
       }}
       onTime={(value) => {
-        const next = state.onTime(value);
-        state.setSelection((current) =>
-          current.kind === 'point' ? { kind: 'point', time: next } : current
-        );
+        startTransition(() => {
+          const next = state.onTime(value);
+          state.setSelection((current) =>
+            current.kind === 'point' && current.time !== next
+              ? { kind: 'point', time: next }
+              : current
+          );
+        });
       }}
       onPlaying={(playing) => {
         if (playing && !state.voiceoverSilent)

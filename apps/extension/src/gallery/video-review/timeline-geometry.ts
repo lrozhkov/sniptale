@@ -34,7 +34,7 @@ export function useReviewTimelineGeometry() {
   useEffect(() => {
     const node = viewport.current;
     if (!node) return;
-    const measure = () => setWidth(Math.max(1, node.clientWidth));
+    const measure = () => setWidth(Math.max(0, node.clientWidth));
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);
@@ -182,7 +182,7 @@ function useReviewPlaybackFollow(
       props.playbackRange ||
       suspended.current ||
       zoom <= 1 ||
-      node.clientWidth <= 0 ||
+      width <= 0 ||
       props.duration <= 0 ||
       !Number.isFinite(props.duration) ||
       !Number.isFinite(props.time) ||
@@ -191,7 +191,7 @@ function useReviewPlaybackFollow(
       return;
     const x = (props.time / props.duration) * width * zoom;
     // Keep the page still until its trailing edge; retain context at the next page's start.
-    if (x >= node.scrollLeft && x < node.scrollLeft + width * 0.95) return;
+    if (x >= position.current.left && x < position.current.left + width * 0.95) return;
     const target = x - width * 0.1;
     node.scrollLeft = Math.max(0, Math.min(width * (zoom - 1), target));
     // Read back the browser-clamped value so our own asynchronous scroll event is not user input.
