@@ -1,4 +1,4 @@
-import fs from 'node:fs';
+import KNIP_CONFIG from '../../../configs/qa/knip.json';
 
 import { expect, it } from 'vitest';
 
@@ -43,7 +43,7 @@ it('rejects unknown non-empty knip issue categories', async () => {
 });
 
 it('keeps the native knip config within the authoritative audit scope', () => {
-  const config = JSON.parse(fs.readFileSync('tooling/configs/qa/knip.json', 'utf8'));
+  const config = KNIP_CONFIG;
 
   expect(config).not.toHaveProperty('$comment');
   expect(config.entry).not.toContain('src/**/*.{ts,tsx,js,mjs,cjs}');
@@ -51,6 +51,7 @@ it('keeps the native knip config within the authoritative audit scope', () => {
   expect(config.include).toEqual(['unresolved', 'unlisted', 'binaries']);
   expect(config.ignoreBinaries).toEqual([
     'codeql',
+    'fc-query',
     'flock',
     'gcc',
     'import',
