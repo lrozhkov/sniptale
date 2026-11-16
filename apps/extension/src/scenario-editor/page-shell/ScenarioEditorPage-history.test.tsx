@@ -402,3 +402,76 @@ it('restores both history branches through the React owner without treating load
   expect(edited).toHaveBeenCalledTimes(2);
   expect(io.save).not.toHaveBeenCalled();
 });
+
+it('keeps consecutive numeric pointer holds as separate Undo actions and ordered captures', async () => {
+  await render();
+  const link = container.querySelector<HTMLAnchorElement>('a[href="#first"]');
+  if (!link) throw new Error('Missing step navigation');
+  await act(async () => link.click());
+  await click('Numbering');
+  await click('Restart numbering');
+  const input = () => container.querySelector<HTMLInputElement>('input[aria-label="Start at"]')!;
+  const increase = container.querySelector<HTMLButtonElement>('[aria-label="Start at increase"]');
+  if (!increase) throw new Error('Missing numeric stepper');
+  const pointer = async (type: string, target: EventTarget) => {
+    await act(async () =>
+      target.dispatchEvent(
+        new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        })
+      )
+    );
+  };
+  await pointer('pointerdown', increase);
+  for (const elapsed of [220, 70, 70]) {
+    await act(async () => vi.advanceTimersByTimeAsync(elapsed));
+  }
+  expect(input().value).toBe('4');
+  await pointer('pointerup', increase);
+  await pointer('pointerdown', increase);
+  await pointer('pointerup', increase);
+  expect(input().value).toBe('5');
+  await click('Undo');
+  expect(input().value).toBe('4');
+  await click('Undo');
+  expect(input().value).toBe('1');
+  await click('Redo');
+  expect(input().value).toBe('4');
+  await click('Redo');
+  expect(input().value).toBe('5');
+  await settleAutosave();
+  const captures = io.save.mock.calls.slice(0, 3);
+  expect(captures.map(([project]) => project.items[0].numbering?.restartAt)).toEqual([1, 4, 5]);
+  expect(new Set(captures.map(([, options]) => options.historyActionId)).size).toBe(3);
+});
+
+it('keeps a caret click inside the focused field in the current text edit', async () => {
+  await render();
+  await editField('input[aria-label="Scenario"]', 'Local guide A');
+  const title = container.querySelector<HTMLInputElement>('input[aria-label="Scenario"]')!;
+  await act(async () =>
+    title.dispatchEvent(
+      new MouseEvent('pointerdown', {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      })
+    )
+  );
+  await act(async () =>
+    title.dispatchEvent(
+      new MouseEvent('pointerup', {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      })
+    )
+  );
+  await editField('input[aria-label="Scenario"]', 'Local guide AB');
+  await click('Undo');
+  expect(title.value).toBe('Local guide');
+  await click('Redo');
+  expect(title.value).toBe('Local guide AB');
+});

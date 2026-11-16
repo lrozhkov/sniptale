@@ -137,7 +137,16 @@ function ScenarioEditorPage() {
     <main
       className="guide-page"
       tabIndex={-1}
-      onPointerDownCapture={(event) => state.beginInteraction(event.pointerId)}
+      onPointerDownCapture={(event) => {
+        const field = event.target;
+        const continuingFieldEdit =
+          field === event.currentTarget.ownerDocument.activeElement &&
+          (field instanceof HTMLTextAreaElement ||
+            (field instanceof HTMLInputElement &&
+              ['text', 'number', 'search'].includes(field.type)));
+        if (event.button === 0 && !continuingFieldEdit) state.sealEdit();
+        state.beginInteraction(event.pointerId);
+      }}
       onBlurCapture={(event) => {
         state.sealEdit();
         const field = event.target;
