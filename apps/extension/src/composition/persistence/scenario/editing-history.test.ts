@@ -145,3 +145,27 @@ it('applies the pooled byte limit to UTF-8 bytes rather than string character co
   expect(characters).toBeLessThan(EDITOR_HISTORY_LIMITS.maxBytes);
   expect(parseScenarioEditingHistory({ version: 1, past, future: [] }, current)).toBeNull();
 });
+
+it('preserves editing branches for an admitted metadata-only revision and refuses revision exhaustion', () => {
+  const current = project();
+  const existing = {
+    ...createScenarioProjectEntry({ project: current, existing: undefined }),
+    editingHistory: { version: 1 as const, past: [], future: [{ ...current, name: 'Future' }] },
+  };
+  const before = structuredClone(existing);
+  const metadata = createScenarioProjectEntry({
+    existing,
+    project: existing.project,
+    historyPolicy: 'preserve',
+  });
+  expect(metadata.editingHistory).toEqual(existing.editingHistory);
+  expect(metadata.workspaceRevision).toBe(existing.workspaceRevision + 1);
+  expect(existing).toEqual(before);
+  expect(() =>
+    createScenarioProjectEntry({
+      existing: { ...existing, workspaceRevision: Number.MAX_SAFE_INTEGER },
+      project: existing.project,
+      historyPolicy: 'preserve',
+    })
+  ).toThrow('revisions are exhausted');
+});

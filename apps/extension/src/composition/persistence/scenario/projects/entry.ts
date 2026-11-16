@@ -26,14 +26,21 @@ export function createScenarioProjectEntry(args: {
   storageClass?: LibraryStorageClass;
   updatedAt?: number;
   historyPolicy?: 'append' | 'preserve' | 'discard';
-  /** Exclusive history is a private fresh canonical snapshot, never a caller's mutable state. */
+  /**
+   * Exclusive ownership requires private, freshly admitted saved and editing snapshots.
+   * The caller must not expose or mutate those snapshots.
+   */
   historyOwnership?: 'borrowed' | 'exclusive';
   historyActionId?: string;
 }): ScenarioProjectEntry {
-  if (args.existing?.editingHistory !== undefined)
+  const editingHistory = args.existing?.editingHistory;
+  if (editingHistory !== undefined && args.project !== args.existing?.project)
     throw new Error('Scenario editing history mutation is not available.');
   if (args.historyActionId !== undefined && !isScenarioHistoryActionId(args.historyActionId))
     throw new Error('Invalid scenario history action identity.');
+  const workspaceRevision = (args.existing?.workspaceRevision ?? 0) + 1;
+  if (!Number.isSafeInteger(workspaceRevision))
+    throw new Error('Local Scenario revisions are exhausted.');
   const updatedAt = createScenarioProjectRevision(args.existing, args.updatedAt);
   const history =
     args.historyPolicy === 'discard'
@@ -46,6 +53,14 @@ export function createScenarioProjectEntry(args: {
   return {
     ...(args.historyActionId === undefined ? {} : { lastAcceptedActionId: args.historyActionId }),
     ...(history.length ? { history } : {}),
+    ...(editingHistory === undefined
+      ? {}
+      : {
+          editingHistory:
+            args.historyOwnership === 'exclusive'
+              ? editingHistory
+              : structuredClone(editingHistory),
+        }),
     id: args.project.id,
     project: {
       ...args.project,
@@ -62,6 +77,6 @@ export function createScenarioProjectEntry(args: {
           updatedAt
         )
       : createLibraryLifecycle('library', updatedAt),
-    workspaceRevision: (args.existing?.workspaceRevision ?? 0) + 1,
+    workspaceRevision,
   };
 }

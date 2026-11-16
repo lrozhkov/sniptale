@@ -1245,4 +1245,7 @@ Native unit format 3 shares unchanged Guide items and Tour slides across current
 
 Resource admission, reachability and source promotion share one collector over current content, saved revisions and both editing branches. It reads references without serializing snapshot payloads.
 
-This storage generation has no page checkpoint producer. Existing content constructors refuse checkpoint-bearing entries. Portable archive encoding and sync publication also refuse them. These gates prevent silent history loss before runtime and transfer owners connect capture, resource retention and portable graph admission. They do not complete durable Undo/Redo reopening.
+This storage generation has no page checkpoint producer. Metadata-only revisions preserve the checkpoint when the caller retains the admitted project object. Content replacement still requires a checkpoint-aware writer. Portable archive encoding and sync publication also refuse them. These gates prevent silent history loss before runtime and transfer owners connect capture, resource retention and portable graph admission. They do not complete durable Undo/Redo reopening.
+
+
+Explicit Library removal clears selected resource references from current content, saved revisions and both editing branches. It preserves branch order and historical timestamps. The operation retains existing image slots, captions and layout. It does not append an editing action. The native transaction publishes the sanitized graph and removes child ownership together. Revision exhaustion refuses the transaction and preserves its predecessor.

@@ -1,4 +1,5 @@
 import { enableScenarioDeletionReadGuard } from './aggregate-mutations.test-support';
+import { removeScenarioAssetReferences } from './asset-reference-removal';
 import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { createScenarioProjectStore } from './storage';
@@ -908,3 +909,55 @@ it.each(['past', 'future'] as const)(
     ).toBe('library');
   }
 );
+
+it('clears saved revisions and prunes orphaned children without resetting editing branches', async () => {
+  const project = createGuideProject('Metadata cleanup', 'metadata-cleanup', 1);
+  const step = createGuideStep('Image', 'step');
+  step.blocks.push(
+    createGuideImageBlock({
+      id: 'image',
+      assetId: 'old',
+      editDocumentId: 'old-document',
+      width: 10,
+      height: 10,
+      source: { kind: 'import', filename: 'old.png' },
+    })
+  );
+  project.items.push(step);
+  const first = await commitScenarioAggregateMutation(project, {
+    children: {
+      assetPuts: [createAsset(project.id, 'old')],
+      editorDocumentPuts: [createDocument(project.id, 'old-document')],
+    },
+  });
+  await commitScenarioAggregateMutation({ ...first.project, items: [] });
+  const stored = await getScenarioProjectEntry(project.id);
+  if (!stored) throw new Error('Missing stored Scenario');
+  const editingHistory = {
+    version: 1 as const,
+    past: [first.project],
+    future: [{ ...first.project, name: 'Future' }],
+  };
+  await createScenarioProjectStore(db.transaction([...stores.keys()])).put({
+    ...stored,
+    editingHistory,
+  });
+  await clearScenarioSavedHistory(project.id, stored.project.updatedAt);
+  const cleared = await getScenarioProjectEntry(project.id);
+  if (!cleared) throw new Error('Missing Scenario after archive cleanup');
+  expect(cleared.history).toBeUndefined();
+  expect(cleared.editingHistory).toEqual(editingHistory);
+  expect(await pruneScenarioResources(project.id)).toBe(0);
+  const sanitized = removeScenarioAssetReferences(
+    cleared,
+    new Set(['old']),
+    cleared.project.updatedAt + 1
+  );
+  await createScenarioProjectStore(db.transaction([...stores.keys()])).put(sanitized);
+  expect(await pruneScenarioResources(project.id)).toBe(2);
+  const after = await getScenarioProjectEntry(project.id);
+  expect(after?.editingHistory).toEqual(sanitized.editingHistory);
+  expect(after?.history).toBeUndefined();
+  expect(getStore('scenario_assets').has('old')).toBe(false);
+  expect(getStore('scenario_step_editor_documents').has('old-document')).toBe(false);
+});
