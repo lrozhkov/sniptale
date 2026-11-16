@@ -68,6 +68,8 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
       input.scene.annotationEffects.lane.instances.some((instance) => instance.enabled)) ||
     !!input.scene.cursorMotions?.some((m) => m.enabled) ||
     !!input.scene.captions?.settings?.enabled ||
+    !!input.cut?.edits.some((edit) => edit.kind === 'freeze') ||
+    input.scene.webcam?.timeDomain === 'result' ||
     !!input.cut?.edits.some((edit) => edit.kind === 'cut' && edit.transition?.type === 'dissolve');
   const active = manual && input.visible !== false && pageVisible;
   const retained =

@@ -96,6 +96,7 @@ export function ReviewOriginalAudioInspector(props: {
                 <span>{translate('gallery.videoReview.muteAudioRange')}</span>
               </ReviewButton>
               <ReviewButton
+                selectionAction="delete"
                 label={translate('gallery.videoReview.removeEdit')}
                 className={`${reviewDeleteButtonClassName} !w-full justify-start`}
                 onClick={() => props.audio.removeOriginal(range.id)}

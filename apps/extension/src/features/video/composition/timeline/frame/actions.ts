@@ -1,4 +1,7 @@
-import { projectSourceInteractionActions } from '../../../project/source-interaction-documents';
+import {
+  isResultSourceInteractionAction,
+  projectSourceInteractionActions,
+} from '../../../project/source-interaction-documents';
 import { recordingEventProjectActions } from '../../../project/recording-events/project-facts';
 import { resolveCursorSourcePointMapping } from './cursor';
 import { getVideoClipPresentationTime } from '../../../project/timeline/rate';
@@ -39,7 +42,7 @@ function resolveActionState(
   if (!interval) return null;
   const clip = project.clips.find((item) => item.id === interval.clipId);
   const phaseTime =
-    clip?.type === 'VIDEO' && clip.playbackWindow
+    clip?.type === 'VIDEO' && clip.playbackWindow && presentation.occurrence.timeDomain !== 'result'
       ? getVideoClipPresentationTime(clip, currentTime)
       : currentTime;
   return {
@@ -153,8 +156,9 @@ export function resolveVideoCompositionActionSourceMapping(
     !hasCameraMediaAt(project, clip, currentTime) ||
     clip.sourceInstanceId !== anchor.sourceInstanceId ||
     (anchor.kind === 'source' && clip.assetId !== anchor.assetId) ||
-    anchor.sourceTime < clip.sourceStart ||
-    anchor.sourceTime >= clip.sourceStart + clip.sourceDuration
+    (!isResultSourceInteractionAction(project, occurrence.event) &&
+      (anchor.sourceTime < clip.sourceStart ||
+        anchor.sourceTime >= clip.sourceStart + clip.sourceDuration))
   )
     return null;
   if (

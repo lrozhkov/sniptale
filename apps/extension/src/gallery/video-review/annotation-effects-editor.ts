@@ -1,3 +1,4 @@
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { transformReviewAnnotationAnchors } from '../../features/video/review/annotation-effects/layout';
 import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
 import type { EffectBundleCatalogEntry } from '../../features/video/project/effect-bundle/catalog';
@@ -34,6 +35,8 @@ type Choice = {
   documentId: string;
   start: number;
   end?: number;
+  endMax?: number;
+  timeDomain?: 'result';
   locale: string;
   presetId?: string;
   attachment?: ReviewAnnotationEffect['attachment'];
@@ -168,7 +171,13 @@ export function useReviewAnnotationEffects(
       parsed.instances.every((item) => {
         const document = documents.get(item.snapshotId);
         return (
-          item.end <= workspace.source.duration &&
+          item.end <=
+            (item.timeDomain === 'result'
+              ? buildReviewTimeMap(
+                  workspace.source.duration,
+                  args.session.getSnapshot().document.edits
+                ).at(-1)!.resultEnd
+              : workspace.source.duration) &&
           document &&
           reviewAnnotationEffectMatchesDocument(item, document)
         );

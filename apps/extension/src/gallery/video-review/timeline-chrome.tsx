@@ -1,3 +1,4 @@
+import { ReviewSelectionActionsToolbar } from './selection-actions';
 import { ReviewPlaybackPresentationClockContext } from './playback-presentation-clock';
 import { documentAutosaveLabels } from '../../ui/document-autosave-labels';
 import { ReviewTrackRow } from './track-row';
@@ -21,7 +22,6 @@ import {
   BetweenHorizontalStart,
   Undo2,
   Redo2,
-  StickyNote,
   FileVideo,
 } from 'lucide-react';
 import {
@@ -262,6 +262,7 @@ export function ReviewToolbar(props: {
   resultDuration?: number;
   historyControls?: ReactNode;
   utilityControls?: ReactNode;
+  navigationControls?: ReactNode;
   modeControl?: ReactNode;
   inspectorControls?: ReactNode;
   tools?: ReactNode;
@@ -315,7 +316,7 @@ export function ReviewToolbar(props: {
         >
           <SkipForward size={16} strokeWidth={2.2} aria-hidden="true" />
         </ReviewButton>
-        <div className="min-w-0 text-center">
+        <div className="flex h-8 min-w-0 items-center justify-center text-center">
           {props.playbackRange ? (
             <ReviewLoopSummary
               range={props.playbackRange}
@@ -331,45 +332,51 @@ export function ReviewToolbar(props: {
         Math.abs(props.resultDuration - props.duration) > 0.05 ? (
           <output
             title={translate('gallery.videoReview.resultDuration')}
-            className="ml-1 text-xs tabular-nums text-[var(--sniptale-color-text-muted)]"
+            className="review-result-duration"
           >
             → {reviewTimeLabel(props.resultDuration)}
           </output>
         ) : null}
       </div>
       <div data-toolbar-side="trailing" className="flex min-w-0 items-center justify-end gap-0.5">
+        <ReviewSelectionActionsToolbar />
         <div
           data-ui="gallery.videoReview.noteHistoryTools"
           className="flex min-w-max flex-1 items-center justify-center"
         >
           {props.historyControls}
         </div>
-        <ReviewZoomSlider value={props.zoom} onChange={props.onZoom} />
-        <ReviewButton
-          label={translate('gallery.videoReview.fit')}
-          className={plain}
-          onClick={() => props.onZoom(1)}
-        >
-          <BetweenHorizontalStart size={16} strokeWidth={2} />
-        </ReviewButton>
-        {props.onOpenExport ? (
-          <>
-            <ReviewToolbarSeparator />
-            {props.inspectorControls}
-            <ReviewButton
-              data-ui="gallery.videoReview.openExport"
-              label={translate('gallery.videoReview.exportSection')}
-              toolbarLabel={translate('gallery.videoReview.exportSection')}
-              toolbarPriority={3}
-              aria-pressed={!!props.exportActive}
-              className={plain}
-              onClick={props.onOpenExport}
-            >
-              <FileVideo size={16} aria-hidden="true" />
-            </ReviewButton>
-          </>
-        ) : null}
-        {props.utilityControls ?? <ReviewKeyboardHelp />}
+        <div data-toolbar-viewport className="flex shrink-0 items-center gap-0.5">
+          {props.navigationControls}
+          <ReviewZoomSlider value={props.zoom} onChange={props.onZoom} />
+          <ReviewButton
+            label={translate('gallery.videoReview.fit')}
+            className={plain}
+            onClick={() => props.onZoom(1)}
+          >
+            <BetweenHorizontalStart size={16} strokeWidth={2} />
+          </ReviewButton>
+        </div>
+        <div data-toolbar-utilities className="flex shrink-0 items-center gap-0.5">
+          {props.onOpenExport ? (
+            <>
+              <ReviewToolbarSeparator />
+              {props.inspectorControls}
+              <ReviewButton
+                data-ui="gallery.videoReview.openExport"
+                label={translate('gallery.videoReview.exportSection')}
+                toolbarLabel={translate('gallery.videoReview.exportSection')}
+                toolbarPriority={3}
+                aria-pressed={!!props.exportActive}
+                className={plain}
+                onClick={props.onOpenExport}
+              >
+                <FileVideo size={16} aria-hidden="true" />
+              </ReviewButton>
+            </>
+          ) : null}
+          {props.utilityControls ?? <ReviewKeyboardHelp />}
+        </div>
       </div>
     </div>
   );
@@ -423,7 +430,6 @@ export function ReviewHistoryControls(props: {
   onHistory(
     direction: import('../../features/video/review/types').ReviewHistoryDirection | 'reset'
   ): void | Promise<unknown>;
-  onAddNote?(): void;
   autosave?: {
     enabled: boolean;
     error: string | null;
@@ -437,19 +443,6 @@ export function ReviewHistoryControls(props: {
 }) {
   return (
     <>
-      {props.onAddNote ? (
-        <ReviewButton
-          label={translate('gallery.videoReview.addComment')}
-          toolbarPriority={2}
-          toolbarLabel={translate('gallery.videoReview.toolbarNote')}
-          className={plain}
-          disabled={props.busy}
-          onClick={props.onAddNote}
-        >
-          <StickyNote size={16} aria-hidden="true" />
-        </ReviewButton>
-      ) : null}
-      {props.onAddNote ? <ReviewToolbarSeparator /> : null}
       {(['undo', 'redo'] as const).map((direction) => (
         <ReviewButton
           key={direction}

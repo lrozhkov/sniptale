@@ -1,7 +1,14 @@
-import { withProjectSourceCursorFocus } from '../source-interaction-documents';
+import {
+  isResultSourceCursorSegment,
+  withProjectSourceCursorFocus,
+} from '../source-interaction-documents';
 import { getClipSourceObservationTime, mapProjectTimeToSourcePoint } from '../timeline/source-time';
 import { resolvePreparedCursorTrajectoryPosition } from '../cursor-trajectory/project-window';
-import { getSourceTimedClipProjectOffset } from '../timeline/rate';
+import {
+  getVideoClipInteractionTime,
+  getVideoClipInteractionTimelineTime,
+  getSourceTimedClipProjectOffset,
+} from '../timeline/rate';
 import { deriveRecordedCursorFocusPath } from './recorded';
 import {
   simplifyCursorFocusPath,
@@ -233,7 +240,9 @@ export function resolveProjectCursorFocus(
       runId = clip.id;
       const point = mapProjectTimeToSourcePoint([clip], currentTime, clip.id);
       if (!point) continue;
-      sourceTime = point.sourceTime;
+      sourceTime = isResultSourceCursorSegment(project, segment)
+        ? getVideoClipInteractionTime(clip, currentTime)
+        : point.sourceTime;
     }
     const point = evaluateCursorFocusSegment(segment, sourceTime, path.smoothing);
     if (point)
@@ -373,7 +382,9 @@ export function resolveProjectCursorFocusPath(
   if (!resolved) {
     resolved = resolveAuthoredCursorFocusPath(
       withProjectSourceCursorFocus(project, deriveProjectCursorFocusPath(project)),
-      project.cursorFocusPath
+      project.cursorFocusPath,
+      (segment, edit) =>
+        isResultSourceCursorSegment(project, segment) === isResultSourceCursorSegment(project, edit)
     );
     resolvedPaths.set(project, resolved);
   }
@@ -384,7 +395,9 @@ export function resolveProjectCursorFocusPath(
     return resolved;
   return resolveAuthoredCursorFocusPath(
     withProjectSourceCursorFocus(project, deriveProjectCursorFocusPath(project, retainedKeyId)),
-    project.cursorFocusPath
+    project.cursorFocusPath,
+    (segment, edit) =>
+      isResultSourceCursorSegment(project, segment) === isResultSourceCursorSegment(project, edit)
   );
 }
 
@@ -592,6 +605,17 @@ export function projectCursorFocusKeyOccurrences(
       (binding.kind === 'source' && clip.assetId !== binding.assetId)
     )
       return [];
+    if (isResultSourceCursorSegment(project, segment)) {
+      const first = getVideoClipInteractionTime(clip, clip.startTime);
+      const last = getVideoClipInteractionTime(clip, clip.startTime + clip.duration);
+      return segment.keys
+        .filter((key) => key.time >= first && key.time <= last)
+        .map((key) => ({
+          key,
+          clip,
+          time: getVideoClipInteractionTimelineTime(clip, key.time),
+        }));
+    }
     const first = clip.playbackWindow
       ? mapProjectTimeToSourcePoint([clip], clip.startTime, clip.id)?.sourceTime
       : clip.sourceStart;

@@ -16,6 +16,7 @@ const identity = (value: unknown): value is string =>
 export function parseReviewAudioClip(value: unknown): QuickEditAudioClip | null {
   if (
     !isRecord(value) ||
+    (value['timeDomain'] !== undefined && value['timeDomain'] !== 'result') ||
     !identity(value['id']) ||
     !identity(value['assetId']) ||
     (value['tempo'] !== undefined && !isBoundedNumber(value['tempo'], 0.25, 4)) ||
@@ -47,6 +48,7 @@ export function parseReviewAudioClip(value: unknown): QuickEditAudioClip | null 
       : parseReviewVoiceTextSnapshot(value['textSnapshot']);
   if (sourceAnchor === null || transcript === null || textSnapshot === null) return null;
   return {
+    ...(value['timeDomain'] === 'result' ? { timeDomain: 'result' as const } : {}),
     ...(audioProcessing ? { audioProcessing } : {}),
     ...(textSnapshot ? { textSnapshot } : {}),
     ...(sourceAnchor ? { sourceAnchor } : {}),

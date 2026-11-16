@@ -1,3 +1,4 @@
+import { reviewTimelineHint } from './timeline-hints';
 import { useReviewTimelineSnap } from './timeline-magnets';
 import { SNAP_THRESHOLD_PX } from '../../features/video/review/snap';
 import { useEffect, useRef, useState } from 'react';
@@ -61,6 +62,10 @@ export function ReviewWebcamPositionMarker(props: {
       data-review-snap-end={position.time}
       aria-label={label}
       title={label}
+      data-review-hint={reviewTimelineHint(
+        `${translate('gallery.videoReview.webcamPosition')} ${index + 1}`,
+        preview ?? position.time
+      )}
       aria-pressed={selected}
       className={
         'absolute inset-y-0 z-20 flex w-7 -translate-x-1/2 items-center justify-center rounded-sm ' +
@@ -87,8 +92,13 @@ export function ReviewWebcamPositionMarker(props: {
           time: position.time,
           width: event.currentTarget.parentElement!.getBoundingClientRect().width,
           moved: false,
-          admission: deferReviewGesture(admit, () =>
-            editor.select({ kind: 'webcam-position', id: position.id })
+          admission: deferReviewGesture(
+            admit,
+            () => {
+              editor.select({ kind: 'webcam-position', id: position.id });
+              editor.navigate(position.id);
+            },
+            'click'
           ),
         };
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -127,7 +137,7 @@ export function ReviewWebcamPositionMarker(props: {
                     ((event.clientX - current.x) / Math.max(1, current.width)) * duration
                 )
               )
-            : editor.navigate(position.id)
+            : current.admission.select()
         );
       }}
       onPointerCancel={cancel}

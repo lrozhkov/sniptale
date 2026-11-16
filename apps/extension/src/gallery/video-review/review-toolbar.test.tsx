@@ -81,30 +81,20 @@ it('annotation addition is advanced-only, admitted through the note owner and bl
     expect(button()).toBeNull();
     await render('advanced');
     const trigger = button()!;
-    expect(trigger.getAttribute('aria-pressed')).toBe('true');
-    expect(trigger.getAttribute('aria-haspopup')).toBeNull();
+    expect(trigger.getAttribute('aria-haspopup')).toBe('listbox');
     expect(
-      host.querySelector(
-        `[aria-label="${translate('gallery.videoReview.annotationEffectsChoose')}"]`
-      )
-    ).not.toBeNull();
-    expect(
-      host
-        .querySelector(`[aria-label="${translate('gallery.videoReview.pointerTool')}"]`)
-        ?.getAttribute('aria-pressed')
-    ).not.toBe('true');
+      host.querySelector(`[aria-label="${translate('gallery.videoReview.pointerTool')}"]`)
+    ).toBeNull();
     await act(async () => trigger.click());
-    expect(toggle).not.toHaveBeenCalled();
+    const option = document.querySelector<HTMLButtonElement>('[role="option"]')!;
+    expect(option).not.toBeNull();
+    await act(async () => option.click());
+    expect(tool.onChoose).not.toHaveBeenCalled();
     act(() => admitted?.());
-    expect(toggle).toHaveBeenCalledExactlyOnceWith(trigger);
+    expect(tool.onChoose).toHaveBeenCalledExactlyOnceWith('title');
     await render('advanced', true);
     expect(button()?.disabled).toBe(true);
-    await act(async () => button()?.click());
-    expect(toggle).toHaveBeenCalledTimes(1);
-    const selector = () =>
-      host.querySelector<HTMLButtonElement>(
-        `[aria-label="${translate('gallery.videoReview.annotationEffectsChoose')}"]`
-      )!;
+    const selector = () => button()!;
     tool.value = '';
     await render('advanced');
     expect(selector().getAttribute('aria-describedby')).toBeNull();
@@ -385,14 +375,10 @@ it('offers five direct focus types, retains the choice, and preserves admission 
     await act(async () => button('focusLens').click());
     expect(onToggle).toHaveBeenCalledTimes(5);
     await render(true);
-    await act(async () =>
-      host
-        .querySelector<HTMLButtonElement>(
-          `[aria-label="${translate('gallery.videoReview.pointerTool')}"]`
-        )!
-        .click()
-    );
-    expect(setCutting).toHaveBeenCalledWith(false);
+    expect(
+      host.querySelector(`[aria-label="${translate('gallery.videoReview.pointerTool')}"]`)
+    ).toBeNull();
+    expect(setCutting).not.toHaveBeenCalled();
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();

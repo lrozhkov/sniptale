@@ -1,3 +1,6 @@
+import { projectReviewWebcam } from '../../features/video/review/timeline-placement';
+import type { ReviewTimeSegment } from '../../features/video/review/time-segment';
+import { reviewInsertionRange, reviewInsertionTarget } from './range-placement';
 import { useEffect, useRef, useState } from 'react';
 import {
   createQuickEditWebcam,
@@ -74,6 +77,9 @@ type WebcamEditorArgs = {
   scene: { width: number; height: number };
   sourceDuration: number;
   time: number;
+  sourceTime?: number;
+  segments?: readonly ReviewTimeSegment[];
+  insertionRange?: { start: number; end: number } | null;
   selection: ReviewSelection;
   select(selection: ReviewSelection): void;
   pause(): void;
@@ -103,7 +109,7 @@ function canResizeHiddenCameraRange(
 
 /** Authored camera edits use the existing history writer and selection authority. */
 export function useReviewWebcamEditor(args: WebcamEditorArgs) {
-  const camera = args.advanced.advanced.webcam;
+  const camera = projectReviewWebcam(args.advanced.advanced.webcam, args.segments);
   const latest = useRef(args);
   latest.current = args;
   const acquisition = useReviewWebcamAcquisition(args);
@@ -111,7 +117,11 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
   const mutate = (update: (camera: QuickEditWebcam) => QuickEditWebcam) => {
     if (!latest.current.allowed() || acquisition.busy()) return;
     latest.current.advanced.setWebcam((current) =>
-      current ? (parseQuickEditWebcam(update(current)) ?? current) : current
+      current
+        ? (parseQuickEditWebcam(
+            update(projectReviewWebcam(current, latest.current.segments) ?? current)
+          ) ?? current)
+        : current
     );
   };
   const choose = (selection: ReviewWebcamSelection) => {
@@ -146,12 +156,34 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
       (item) =>
         (!replace || item.id !== hidden?.id) && item.start < range.end && item.end > range.start
     );
+  const hideRange = reviewInsertionRange({
+    time: args.time,
+    duration: args.sourceDuration,
+    seconds: 2,
+    range: args.insertionRange,
+    occupied: camera?.hiddenRanges,
+  });
   return {
+    hideRange,
+    addHidden: () => {
+      if (!hideRange || !canHide(hideRange)) return;
+      const id = crypto.randomUUID();
+      mutate((current) => ({
+        ...current,
+        hiddenRanges: [
+          ...current.hiddenRanges,
+          { id, start: hideRange.start, end: hideRange.end },
+        ].sort((a, b) => a.start - b.start),
+      }));
+      choose({ kind: 'webcam-hidden', id });
+      args.seek(hideRange.start);
+    },
     camera,
     pending: acquisition.pending,
     failed: acquisition.failed,
     candidate: acquisition.candidate,
     time: args.time,
+    sourceTime: args.sourceTime ?? args.time,
     duration: args.sourceDuration,
     available: !!camera || !!acquisition.candidate,
     retry: acquisition.retry,
@@ -203,7 +235,10 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
       mutate((current) => setReviewWebcamSplit(current, selectedPosition?.id, split)),
     addPosition: () => {
       if (!camera || !latest.current.allowed()) return;
-      const time = Math.round(args.time * 1000) / 1000;
+      const time =
+        Math.round(
+          (reviewInsertionTarget(args.time, args.insertionRange)?.start ?? args.time) * 1000
+        ) / 1000;
       if (time < 0.001 || time >= args.sourceDuration) return;
       const existing = camera.positions.find((item) => item.time === time);
       if (existing) {

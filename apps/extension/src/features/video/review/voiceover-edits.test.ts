@@ -530,7 +530,7 @@ it('inserts silence without losing crossing voiceover samples and restores them 
   for (const change of [
     { rate: 1 },
     { sourceEnd: 4.1 },
-    { frameTime: 5 },
+    { frameTime: -1 },
     { frameDuration: 0 },
     { freezeId: '' },
     { resultEnd: 4 },

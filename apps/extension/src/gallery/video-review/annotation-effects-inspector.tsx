@@ -323,6 +323,7 @@ function AnnotationParameters(
     reviewInspectorActions(
       <>
         <ReviewButton
+          selectionAction="duplicate"
           label={translate('gallery.videoReview.annotationDuplicate')}
           className={reviewTextButtonClassName}
           disabled={disabled}
@@ -332,6 +333,7 @@ function AnnotationParameters(
           <span>{translate('gallery.videoReview.annotationDuplicate')}</span>
         </ReviewButton>
         <ReviewButton
+          selectionAction="delete"
           label={translate('gallery.videoReview.deleteSelected')}
           className={reviewDeleteButtonClassName}
           disabled={disabled}

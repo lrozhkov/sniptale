@@ -118,6 +118,7 @@ type ReviewStageProps = {
         onRendererStatus?: ((status: PreviewRendererStatus | null) => void) | undefined;
         onRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
         sourceFrameRate?: number | undefined;
+        waitingReason?: string | undefined;
       }
     | undefined;
   outerFadePlan?: PresentationSequencePlan | undefined;
@@ -439,6 +440,7 @@ export function ReviewStage(props: ReviewStageProps) {
         )}
         <ReviewStagePresentationFeedback
           presentation={presentation}
+          waitingReason={props.preview?.waitingReason}
           showFrameRate={props.preview?.preferences.showFrameRate ?? false}
           captions={props.captions}
           onCaptionSelect={props.onCaptionSelect}

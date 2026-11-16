@@ -1,7 +1,10 @@
+import { reviewInsertionRange } from './range-placement';
+import { ProductSelect } from '@sniptale/ui/product-form-controls';
+import { REVIEW_KEY_CATALOG } from '../../features/video/review/interaction-keys';
 import { ReviewInspectorSections, reviewInspectorActions } from './inspector-sections';
 import { evaluateCursorMotion } from '../../features/video/project/cursor-motion';
-import { Keyboard, Mouse, Copy, Trash2 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { Mouse, Copy, Trash2 } from 'lucide-react';
+import { useRef, type ReactNode } from 'react';
 import { ReviewKeyboardChord } from './keyboard-chord';
 import { translate } from '../../platform/i18n';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
@@ -35,7 +38,14 @@ type Input = Pick<
   setMode(mode: 'basic' | 'advanced'): void;
   setActiveSelection(value: ReviewSelection): void;
   seek(time: number, snap?: boolean): void;
+  seekResult?(time: number): void;
+  sourceDuration?: number;
+  toResult?(time: number): number;
   time: number;
+  insertionRange?: { start: number; end: number } | null;
+  pause?(): void;
+  blockedRanges?: readonly { start: number; end: number }[];
+  insertionPoint?(time: number): { x: number; y: number } | null;
   beforeAction: ReviewBeforeAction;
   canStart(): boolean;
   duration: number;
@@ -45,7 +55,8 @@ type Input = Pick<
 export function createReviewInteractionEditor(input: Input) {
   const select = (marker: ReviewTelemetryMarker) => {
     input.setActiveSelection({ kind: 'telemetry', ref: marker.ref });
-    input.seek(marker.start, false);
+    if (marker.timeDomain === 'result' && input.seekResult) input.seekResult(marker.start);
+    else input.seek(marker.start, false);
   };
   const update = (marker: ReviewTelemetryMarker, start: number, end: number, enabled = true) =>
     input.beforeAction(() => {
@@ -55,7 +66,10 @@ export function createReviewInteractionEditor(input: Input) {
         !Number.isFinite(end) ||
         start < 0 ||
         end < start ||
-        end > input.duration
+        end >
+          (marker.timeDomain === 'result'
+            ? input.duration
+            : (input.sourceDuration ?? input.duration))
       )
         return;
       input.setInteractionTimeline((current) => ({
@@ -66,6 +80,7 @@ export function createReviewInteractionEditor(input: Input) {
           ),
           {
             ref: marker.ref,
+            ...(marker.timeDomain ? { timeDomain: marker.timeDomain } : {}),
             start,
             end,
             enabled,
@@ -103,11 +118,20 @@ export function createReviewInteractionEditor(input: Input) {
         ],
       }));
     });
+  const insertionRange = (range?: { start: number; end: number }) =>
+    reviewInsertionRange({
+      time: range?.start ?? input.time,
+      duration: input.duration,
+      seconds: 0.2,
+      range: range ?? input.insertionRange,
+      occupied: input.blockedRanges,
+    });
   const add = (
     family: ReviewInteractionFamily,
     range?: Extract<ReviewAnchor, { kind: 'range' }>,
     original?: ReviewTelemetryMarker,
-    onAdded?: () => void
+    onAdded?: () => void,
+    key?: string
   ) =>
     input.beforeAction(() => {
       if (
@@ -116,17 +140,24 @@ export function createReviewInteractionEditor(input: Input) {
         (input.advanced.interactionTimeline?.presses.length ?? 0) >= 10000
       )
         return;
-      const start = Math.max(0, Math.min(input.duration - 0.05, range?.start ?? input.time));
-      const end = Math.min(input.duration, Math.max(start + 0.05, range?.end ?? start + 0.2));
-      const cursor = evaluateCursorMotion(input.advanced.cursorMotions, start);
+      const target = insertionRange(range);
+      if (!target) return;
+      const { start, end } = target;
+      input.pause?.();
+      const cursor =
+        input.insertionPoint?.(start) ?? evaluateCursorMotion(input.advanced.cursorMotions, start);
       const p: ReviewAuthoredPress = {
+        timeDomain: 'result',
         id: `authored-press:${crypto.randomUUID()}`,
         family,
         start,
         end,
         label:
           original?.target ??
-          (family === 'keyboard' ? 'Enter' : translate('gallery.videoReview.eventClick')),
+          (family === 'keyboard'
+            ? (key ?? translate('gallery.videoReview.chooseChordKey'))
+            : translate('gallery.videoReview.eventClick')),
+        ...(key ? { keys: [key] } : {}),
         button: original?.mouseButton ?? 0,
         x: original?.focusPoint?.x ?? cursor?.x ?? 0.5,
         y: original?.focusPoint?.y ?? cursor?.y ?? 0.5,
@@ -156,6 +187,7 @@ export function createReviewInteractionEditor(input: Input) {
           },
         ]);
       select({
+        timeDomain: 'result',
         ref: { kind: 'action', id: p.id },
         eventType: family === 'keyboard' ? 'KEY' : 'CLICK',
         start,
@@ -176,6 +208,7 @@ export function createReviewInteractionEditor(input: Input) {
   };
   return {
     add,
+    insertionRange,
     select,
     update,
     changePress,
@@ -189,13 +222,19 @@ export function createReviewInteractionEditor(input: Input) {
     },
     copy: (marker: ReviewTelemetryMarker) => {
       const family = reviewInteractionFamily(marker);
+      const start =
+        marker.timeDomain === 'result'
+          ? marker.start
+          : (input.toResult?.(marker.start) ?? marker.start);
+      const end =
+        marker.timeDomain === 'result' ? marker.end : (input.toResult?.(marker.end) ?? marker.end);
       if (family)
         add(
           family,
           {
             kind: 'range',
-            start: Math.min(marker.end, input.duration - 0.05),
-            end: Math.min(input.duration, marker.end + Math.max(0.05, marker.end - marker.start)),
+            start: Math.min(end, input.duration - 0.05),
+            end: Math.min(input.duration, end + Math.max(0.05, end - start)),
           },
           marker
         );
@@ -214,31 +253,46 @@ export function ReviewInteractionAdd({
   range?: Extract<ReviewAnchor, { kind: 'range' }> | undefined;
   onAdded(): void;
 }) {
+  const intent = useRef<Extract<ReviewAnchor, { kind: 'range' }> | null>(null);
+  if (family === 'keyboard')
+    return (
+      <ProductSelect
+        aria-label={translate('gallery.videoReview.addKeyPress')}
+        placeholder={translate('gallery.videoReview.addKeyPress')}
+        value=""
+        controlSize="sm"
+        className={reviewTextButtonClassName}
+        containerClassName="!w-auto !min-w-0"
+        menuWidth={240}
+        options={REVIEW_KEY_CATALOG.map((item) => ({ value: item.value, label: item.label }))}
+        disabled={!editor.insertionRange(range)}
+        onPointerDown={() => {
+          intent.current = editor.insertionRange(range);
+        }}
+        onKeyDownCapture={(event) => {
+          if (['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(event.key))
+            intent.current = editor.insertionRange(range);
+        }}
+        onChange={(key) => {
+          const target = intent.current ?? editor.insertionRange(range);
+          if (target) editor.add(family, target, undefined, onAdded, key);
+          intent.current = null;
+        }}
+      />
+    );
   return (
     <ReviewButton
-      label={translate(
-        family === 'keyboard'
-          ? 'gallery.videoReview.addKeyPress'
-          : 'gallery.videoReview.addMousePress'
-      )}
+      label={translate('gallery.videoReview.addMousePress')}
       className={reviewIconButtonClassName}
-      toolbarLabel={translate(
-        family === 'keyboard'
-          ? 'gallery.videoReview.addKeyPress'
-          : 'gallery.videoReview.addMousePress'
-      )}
-      onClick={() => {
-        editor.add(family, range, undefined, onAdded);
-      }}
+      disabled={!editor.insertionRange(range)}
+      toolbarLabel={translate('gallery.videoReview.addMousePress')}
+      onClick={() => editor.add(family, range, undefined, onAdded)}
     >
-      {family === 'keyboard' ? (
-        <Keyboard size={16} aria-hidden="true" />
-      ) : (
-        <Mouse size={16} aria-hidden="true" />
-      )}
+      <Mouse size={16} aria-hidden="true" />
     </ReviewButton>
   );
 }
+
 export function ReviewInteractionProperties({
   editor,
   marker,
@@ -314,6 +368,7 @@ export function ReviewInteractionProperties({
             reviewInspectorActions(
               <>
                 <ReviewButton
+                  selectionAction="duplicate"
                   className={reviewTextButtonClassName}
                   label={translate('gallery.videoReview.createCopy')}
                   onClick={() => editor.copy(marker)}
@@ -322,6 +377,7 @@ export function ReviewInteractionProperties({
                   {translate('gallery.videoReview.createCopy')}
                 </ReviewButton>
                 <ReviewButton
+                  selectionAction="delete"
                   className={`${reviewTextButtonClassName} ${reviewDeleteButtonClassName}`}
                   label={translate('common.actions.delete')}
                   onClick={() => editor.remove(marker)}

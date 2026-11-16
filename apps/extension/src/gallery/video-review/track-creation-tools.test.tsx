@@ -64,8 +64,10 @@ function mount(overrides: Partial<Input> = {}) {
       sourceId: 'source',
       track: 'text',
       blocked: false,
+      onPause: vi.fn(),
+      atEnd: false,
       beforeAction: undefined,
-      range: undefined,
+      range: { kind: 'range', start: 0, end: 3 },
       text: editor,
       onRecordVoiceover: record,
       onImportFile: importFile,
@@ -78,7 +80,6 @@ function mount(overrides: Partial<Input> = {}) {
       selection,
       onSelect: select,
       onSeek: vi.fn(),
-      onTextRangeCommit: creation.active ? creation.commitText : undefined,
     });
     return (
       <>
@@ -129,33 +130,31 @@ function mount(overrides: Partial<Input> = {}) {
   };
 }
 
-it('creates text from a selected source range projected through cuts and speed', () => {
-  const f = mount({ range: { kind: 'range', start: 4, end: 10 } });
+it('creates text immediately in the supplied result interval across cuts and speed', () => {
+  const f = mount({ range: { kind: 'range', start: 2, end: 6 } });
   act(() => f.button('textFragmentAdd').click());
   expect(f.document().fragments).toHaveLength(1);
   expect(f.document().fragments[0]).toMatchObject({ start: 2, end: 6, timeDomain: 'result' });
 });
 
-it('draws text on its empty lane and cancels the next gesture with Escape', () => {
+it('inserts a default interval immediately and does not arm a drawing gesture', () => {
   const f = mount();
   act(() => f.button('textFragmentAdd').click());
-  expect(f.button('textFragmentAdd').getAttribute('aria-pressed')).toBe('true');
+  expect(f.document().fragments).toHaveLength(1);
+  expect(f.document().fragments[0]).toMatchObject({ start: 0, end: 3, timeDomain: 'result' });
+  expect(f.button('textFragmentAdd').getAttribute('aria-pressed')).not.toBe('true');
   f.pointer('pointerdown', 400);
   f.pointer('pointermove', 1000);
-  expect(f.document().fragments).toHaveLength(0);
   f.pointer('pointerup', 1000);
-  expect(f.document().fragments[0]).toMatchObject({ start: 2, end: 6 });
-  expect(f.button('textFragmentAdd').getAttribute('aria-pressed')).toBe('false');
-  act(() => f.button('textFragmentAdd').click());
-  f.pointer('pointerdown', 400);
-  f.pointer('pointermove', 1100);
-  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-  f.pointer('pointerup', 1100);
   expect(f.document().fragments).toHaveLength(1);
 });
 
-it('refuses a fully removed text range without changing the document', () => {
-  const f = mount({ range: { kind: 'range', start: 2, end: 4 } });
+it('refuses absent or too short insertion intervals without changing the document', () => {
+  const f = mount({ range: undefined });
+  expect(f.button('textFragmentAdd').disabled).toBe(true);
+  act(() => f.button('textFragmentAdd').click());
+  expect(f.document().fragments).toEqual([]);
+  f.render({ range: { kind: 'range', start: 7.99, end: 8 } });
   expect(f.button('textFragmentAdd').disabled).toBe(true);
   act(() => f.button('textFragmentAdd').click());
   expect(f.document().fragments).toEqual([]);

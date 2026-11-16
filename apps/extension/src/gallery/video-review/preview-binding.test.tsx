@@ -231,6 +231,7 @@ beforeEach(() => {
       resourceAttempt: 0,
       selection: { kind: 'none' },
       time: 0,
+      sourceTime: 0,
       place: vi.fn(),
       selectVisible: vi.fn(),
     },
@@ -456,10 +457,11 @@ it('selects fullscreen focus through the cut map and commits its overlay gesture
 
 it('shows webcam recovery and dismisses both feedback owners', async () => {
   state.webcam.pending = true;
-  await render();
-  expect(host.querySelector('[role="status"]')).not.toBeNull();
+  await render(true, DEFAULT_QUICK_PREVIEW_PREFERENCES);
+  expect(host.querySelector('[role="status"]')).toBeNull();
+  expect(stage().preview?.waitingReason).toContain('webcam');
   state.webcam.failed = true;
-  await render();
+  await render(true, DEFAULT_QUICK_PREVIEW_PREFERENCES);
   act(() => host.querySelector<HTMLButtonElement>('button')!.click());
   expect(state.webcam.retry).toHaveBeenCalledOnce();
   (io.feedback.mock.lastCall![0] as { onDismiss(): void }).onDismiss();
@@ -703,7 +705,7 @@ it('shows a retryable history failure while keeping the existing video transport
     incomplete: false,
     retry,
   };
-  await render();
+  await render(true, DEFAULT_QUICK_PREVIEW_PREFERENCES);
   expect(host.querySelector('[role="alert"]')?.textContent).toContain(
     'gallery.videoReview.recordingHistoryFailed'
   );
@@ -715,10 +717,9 @@ it('shows a retryable history failure while keeping the existing video transport
   expect(retry).toHaveBeenCalledOnce();
   expect(frame().disabled).toBe(false);
   state.history = { ...state.history, failed: false, pending: true, initialLoading: true };
-  await render();
-  expect(host.querySelector('[role="status"]')?.textContent).toContain(
-    'gallery.videoReview.recordingHistoryLoading'
-  );
+  await render(true, DEFAULT_QUICK_PREVIEW_PREFERENCES);
+  expect(stage().preview?.waitingReason).toContain('gallery.videoReview.recordingHistoryLoading');
+  expect(host.querySelector('[role="status"]')).toBeNull();
   expect(host.querySelector('[role="alert"]')).toBeNull();
 });
 

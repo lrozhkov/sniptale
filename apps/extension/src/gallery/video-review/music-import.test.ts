@@ -89,6 +89,9 @@ beforeEach(() => {
     time: 2,
     source: { duration: 10 },
     playbackRange: null,
+    selection: { kind: 'point', time: 2 },
+    activeSelection: { kind: 'none' },
+    timeline: { outputTime: null },
     flushAdvanced: vi.fn(async () => undefined),
     audio: { setSelectedId: selected },
   } as unknown as Parameters<typeof useReviewMusicImport>[0];
@@ -309,7 +312,7 @@ it('captures voiceover lane and source clock independently of music result place
       state.session.getSnapshot().document.edits
     ).getSegments()
   );
-  expect(content.audio.voiceover[0]!.sourceAnchor?.[0]?.start).toBe(4);
+  expect(content.audio.voiceover[0]).toMatchObject({ timelineStart: 1, timeDomain: 'result' });
   expect(selected).toHaveBeenCalledWith(content.audio.voiceover[0]!.id, 'voiceover');
   expect(io.publish).toHaveBeenCalledOnce();
 });
@@ -344,7 +347,7 @@ it('bounds an imported voiceover to the captured source selection', async () => 
   await act(async () => api.drawer!.onSelect('voice'));
   expect(content.audio.voiceover).toHaveLength(1);
   expect(content.audio.voiceover[0]).toMatchObject({ timelineStart: 3, duration: 2 });
-  expect(content.audio.voiceover[0]!.sourceAnchor?.[0]?.start).toBe(3);
+  expect(content.audio.voiceover[0]!.timeDomain).toBe('result');
   expect(commit).toHaveBeenCalledOnce();
   expect(io.publish).toHaveBeenCalledOnce();
 });

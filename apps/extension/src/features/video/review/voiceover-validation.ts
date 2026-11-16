@@ -74,9 +74,7 @@ export function parseVoiceoverSegments(value: unknown): ReviewTimeSegment[] | nu
         raw['freezeId'].length > 128 ||
         !number(raw['frameTime']) ||
         !number(raw['frameDuration']) ||
-        raw['frameDuration'] <= 0 ||
-        (sourceEnd !== 0 && raw['frameTime'] > sourceEnd) ||
-        raw['frameTime'] + raw['frameDuration'] < sourceEnd - 1e-6
+        raw['frameDuration'] <= 0
       )
         return null;
       result.push({

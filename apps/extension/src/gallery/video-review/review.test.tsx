@@ -125,8 +125,7 @@ it('integrates selection, recoverable text, drawing, history and report actions 
     await click('addComment');
     await fill('First note');
     expect(
-      host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.addComment"]')
-        ?.disabled
+      host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.save"]')?.disabled
     ).toBe(false);
     expect(host.querySelector('input[type="number"]')).toBeNull();
     const stage = host.querySelector<HTMLDivElement>('[data-ui="gallery.videoReview.stage"]')!;
@@ -361,10 +360,6 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
     container: 'webm',
     rotation: 0,
   });
-  const key = async (key: string) =>
-    act(async () => {
-      fixture.key(new KeyboardEvent('keydown', { key }));
-    });
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
     const video = host.querySelector('video')!;
@@ -378,28 +373,6 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
     });
     await dragTimePlane(host, 140);
     expect(video.currentTime).toBe(1.4);
-    await click('cutMode');
-    const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
-    vi.mocked(plane.releasePointerCapture).mockClear();
-    for (const [kind, x] of [
-      ['pointerdown', 200],
-      ['pointermove', 300],
-    ] as const)
-      await act(async () =>
-        (kind === 'pointerdown'
-          ? host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!
-          : plane
-        ).dispatchEvent(new MouseEvent(kind, { bubbles: true, clientX: x }))
-      );
-    await key('Escape');
-    expect(video.currentTime).toBe(1.4);
-    expect(plane.getAttribute('aria-valuenow')).toBe('1.4');
-    expect(plane.releasePointerCapture).toHaveBeenCalled();
-    for (const kind of ['pointermove', 'pointerup'])
-      await act(async () =>
-        plane.dispatchEvent(new MouseEvent(kind, { bubbles: true, clientX: 350 }))
-      );
-    expect(fixture.snapshot.workspace.history).toHaveLength(0);
     await click('addComment');
     await fixture.fill('Restored selection');
     await click('save');
@@ -407,16 +380,8 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
       anchor: { kind: 'point', time: 1.4 },
     });
     await click('undo');
-    expect(fixture.button('cutMode').getAttribute('aria-pressed')).toBe('false');
+    await fixture.selectRulerRange(0, 1);
     await click('cutMode');
-    await dragTimePlane(host, 0);
-    await key('ArrowLeft');
-    expect(video.currentTime).toBe(0);
-    await key('ArrowRight');
-    expect(video.currentTime).toBe(1);
-    await key('ArrowLeft');
-    expect(video.currentTime).toBe(0);
-    await dragTimePlane(host, 0, 100);
     expect(fixture.snapshot.workspace.history.at(-1)?.after).toMatchObject({
       kind: 'cut',
       start: 0,
@@ -441,12 +406,10 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
     await click('deleteSelected');
     expect(fixture.snapshot.workspace.history.at(-1)?.after).toBeNull();
     await click('undo');
-    await click('cutMode');
     await dragTimePlane(host, 150);
     await click('addComment');
     await fixture.fill('Exact annotation');
     await click('save');
-    await click('cutMode');
     await act(async () =>
       host.querySelector<HTMLButtonElement>('[title="Exact annotation"]')!.click()
     );
@@ -647,6 +610,8 @@ it('toggles the persisted advanced mode and restores it after reopening the edit
     await act(async () => new Promise((resolve) => setTimeout(resolve, 1100)));
     expect(fixture.snapshot.workspace.advanced.ui).toEqual({
       mode: 'advanced',
+      annotationMagnetEnabled: true,
+      liveSeekEnabled: true,
       advancedTracksInitialized: true,
       tracks: { actions: true, zoom: true, audio: true },
       overlaysVisible: true,

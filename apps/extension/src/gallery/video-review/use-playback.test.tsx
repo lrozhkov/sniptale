@@ -4,6 +4,13 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { useReviewPlayback } from './use-playback';
 
+function signalNativePlayback(hook: ReturnType<typeof useReviewPlayback>, playing: boolean) {
+  const node = hook.video.current;
+  if (node && node.paused === playing)
+    Object.defineProperty(node, 'paused', { configurable: true, value: !playing });
+  hook.setPlaying(playing);
+}
+
 it('previews cuts, speed and mute in source time, restores audio, and cancels its frame loop', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const cancel = vi.fn();
@@ -44,7 +51,7 @@ it('previews cuts, speed and mute in source time, restores audio, and cancels it
     expect(hook.time).toBe(2);
     act(() => hook.seek(2.7, false));
     expect(hook.time).toBe(2.7);
-    act(() => hook.setPlaying(true));
+    act(() => signalNativePlayback(hook, true));
     act(() => hook.onTime(2.7));
     expect(hook.time).toBe(4);
     expect(hook.video.current!.playbackRate).toBe(4);
@@ -136,7 +143,7 @@ it.each([2.123456789, 0.12956810631229235])(
         get: () => currentTime,
         set: seek,
       });
-      act(() => hook.setPlaying(true));
+      act(() => signalNativePlayback(hook, true));
       act(() => hook.onTime(currentTime));
       act(() => hook.onTime(currentTime));
       expect(currentTime).toBeGreaterThanOrEqual(end);
@@ -182,7 +189,7 @@ it('traverses cut source time while recording, preserves kept speed and restores
   }
   try {
     act(() => root.render(<Harness />));
-    act(() => hook.setPlaying(true));
+    act(() => signalNativePlayback(hook, true));
     act(() => hook.onTime(3));
     expect(hook.time).toBe(3);
     expect(hook.video.current!.playbackRate).toBe(1);
@@ -206,7 +213,7 @@ it('owns replaceable unsnapped loops, rejects cut-only ranges and clears only ex
     act(() => test.hook.setPlaybackRange({ start: 1.23, end: 5 }));
     expect(test.hook.time).toBe(1.23);
     expect(test.play).not.toHaveBeenCalled();
-    act(() => test.hook.setPlaying(true));
+    act(() => signalNativePlayback(test.hook, true));
     const beforeCut = test.hook.seekRevision;
     act(() => test.hook.onTime(2.5));
     expect(test.hook.seekRevision).toBe(beforeCut);
@@ -247,11 +254,11 @@ it('returns before a cut crossing the loop end, restarts native ended, and suspe
   const test = playbackHarness();
   try {
     act(() => test.hook.setPlaybackRange({ start: 1, end: 3 }));
-    act(() => test.hook.setPlaying(true));
+    act(() => signalNativePlayback(test.hook, true));
     act(() => test.hook.onTime(2.1));
     expect(test.hook.time).toBe(1);
     act(() => test.hook.setPlaybackRange({ start: 8, end: 10 }));
-    act(() => test.hook.setPlaying(false)); // Native pause may precede ended.
+    act(() => signalNativePlayback(test.hook, false)); // Native pause may precede ended.
     act(() => test.hook.onEnded());
     expect(test.hook.time).toBe(8);
     expect(test.play).toHaveBeenCalledOnce();
@@ -259,9 +266,9 @@ it('returns before a cut crossing the loop end, restarts native ended, and suspe
     act(() => test.hook.seek(2.5, false));
     act(() => test.hook.onTime(3));
     expect(test.hook.time).toBe(3);
-    expect(test.hook.playbackRange).toEqual({ start: 8, end: 10 });
+    expect(test.hook.playbackRange).toBeNull();
     test.update({ retainCutTime: false, silent: false });
-    expect(test.hook.time).toBe(8);
+    expect(test.hook.time).toBe(2.5);
   } finally {
     test.dispose();
   }
@@ -273,7 +280,7 @@ it('clamps duration changes, clears and pauses an invalidated range, and never p
     act(() => test.hook.setPlaybackRange({ start: 4, end: 9 }));
     test.update({ duration: 7 });
     expect(test.hook.playbackRange).toEqual({ start: 4, end: 7 });
-    act(() => test.hook.setPlaying(true));
+    act(() => signalNativePlayback(test.hook, true));
     test.update({
       edits: [{ id: 'all', kind: 'cut', start: 0, end: 7, requestedStart: 0, requestedEnd: 7 }],
     });
@@ -291,8 +298,18 @@ function playbackHarness() {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('requestAnimationFrame', () => 1);
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
-  const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
-  const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+  const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(function (
+    this: HTMLMediaElement
+  ) {
+    Object.defineProperty(this, 'paused', { configurable: true, value: true });
+  });
+  let clock = 0;
+  vi.spyOn(performance, 'now').mockImplementation(() => (clock += 101));
+  const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(async function (
+    this: HTMLMediaElement
+  ) {
+    Object.defineProperty(this, 'paused', { configurable: true, value: false });
+  });
   const invalid = vi.fn();
   const root = createRoot(document.createElement('div'));
   let hook!: ReturnType<typeof useReviewPlayback>;
@@ -371,7 +388,7 @@ it.each([1.123456789, 3.123456789])(
       });
       act(() => test.hook.setPlaybackRange({ start: start > 2 ? 2.5 : start, end: 5 }));
       expect(currentTime).toBeGreaterThanOrEqual(start);
-      act(() => test.hook.setPlaying(true));
+      act(() => signalNativePlayback(test.hook, true));
       act(() => test.hook.onTime(currentTime));
       expect(seek).toHaveBeenCalledOnce();
       act(() => test.hook.onTime(5));
@@ -451,7 +468,7 @@ it('reloads a failed decoder once, restores the source position and audio, and r
     test.update({ onRecovered: recovered, onFailure: failure });
     act(() => test.hook.setPlaybackRange({ start: 4, end: 8 }));
     act(() => test.hook.seek(5, false));
-    act(() => test.hook.setPlaying(true));
+    act(() => signalNativePlayback(test.hook, true));
     const node = test.hook.video.current!;
     Object.defineProperty(node, 'error', { configurable: true, value: { code: 3 } });
     Object.defineProperty(node, 'readyState', { configurable: true, value: 3 });
@@ -592,7 +609,7 @@ it('keeps native playback exact while the current manual publication owns the di
   const video = test.hook.video.current!;
   Object.defineProperty(video, 'paused', { configurable: true, value: false });
   try {
-    act(() => test.hook.setPlaying(true));
+    act(() => signalNativePlayback(test.hook, true));
     const active = test.hook.setPresentationActive;
     const publish = test.hook.onPresentedTime;
     act(() => active('first', true));
@@ -653,7 +670,7 @@ it.each(['time', 'presented', 'ended', 'frame', 'pause'] as const)(
         advance = callback;
         return 1;
       });
-      act(() => test.hook.setPlaying(true));
+      act(() => signalNativePlayback(test.hook, true));
       if (path === 'presented') {
         act(() => test.hook.setPresentationActive('source', true));
         act(() => test.hook.onPresentedTime('source', browserTime));
@@ -714,9 +731,16 @@ it('clears a previous transport failure only after an explicit Play succeeds', a
     test.update({ onRecovered: recovered, onFailure: failure });
     act(() => test.hook.play());
     expect(recovered).not.toHaveBeenCalled();
-    await act(async () => accept());
+    await act(async () => {
+      Object.defineProperty(test.hook.video.current!, 'paused', {
+        configurable: true,
+        value: false,
+      });
+      accept();
+    });
     expect(recovered).toHaveBeenCalledOnce();
     expect(failure).not.toHaveBeenCalled();
+    act(() => test.hook.pause());
     test.play.mockRejectedValueOnce(new Error('Playback refused'));
     await act(async () => test.hook.play());
     expect(recovered).toHaveBeenCalledOnce();
@@ -767,7 +791,7 @@ it('holds an automatic loop at its exact target until audio is prepared', async 
     test.update({ prepareAfterSeek, edits: [] });
     act(() => test.hook.setPlaybackRange({ start: 1, end: 2 }));
     paused = false;
-    act(() => test.hook.setPlaying(true));
+    act(() => signalNativePlayback(test.hook, true));
     await act(async () => test.hook.onTime(2.1));
     expect(paused).toBe(true);
     expect(node.currentTime).toBe(1);

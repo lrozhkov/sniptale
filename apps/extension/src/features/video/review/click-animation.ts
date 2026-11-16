@@ -105,7 +105,14 @@ export function scheduleReviewClicks(
       });
     }
     if (!marker.focusPoint) return [];
-    const window = reviewCueWindow(segments, marker.start, style.offset, style.before, style.after);
+    const window = reviewCueWindow(
+      segments,
+      marker.start,
+      style.offset,
+      style.before,
+      style.after,
+      marker.timeDomain
+    );
     if (!window) return [];
     const { anchor, start, end } = window;
     return end > start

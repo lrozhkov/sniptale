@@ -1,3 +1,4 @@
+import { getVideoClipInteractionTime, getVideoClipInteractionRate } from '../timeline/rate';
 import { getVideoProjectActionPresentation } from '../action-presentation';
 import { getVideoProjectFeedbackRuns } from '../action-feedback/projection';
 import { mapProjectTimeToSourcePoint } from '../timeline/source-time';
@@ -75,11 +76,20 @@ export async function prepareRecordingEventsProject(
           )
             continue;
           for (const override of document.timeline.overrides) {
+            const resultClock =
+              override.timeDomain === 'result' || override.source?.timeDomain === 'result';
+            const lower = resultClock
+              ? getVideoClipInteractionTime(clip, from)
+              : Math.min(first, last);
+            const upper = resultClock
+              ? getVideoClipInteractionTime(clip, to)
+              : Math.max(first, last);
+            const margin = resultClock ? padding * getVideoClipInteractionRate(clip) : reach;
             if (
               !override.enabled ||
               !override.sourceRange ||
-              override.end < Math.min(first, last) - reach ||
-              override.start > Math.max(first, last) + reach
+              override.end < lower - margin ||
+              override.start > upper + margin
             )
               continue;
             ranges.push([

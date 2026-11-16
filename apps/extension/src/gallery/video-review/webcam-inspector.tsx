@@ -5,6 +5,7 @@ import {
   Clock3,
   Move,
   Plus,
+  EyeOff,
   Trash2,
   Layers2,
   Compass,
@@ -90,12 +91,13 @@ export function ReviewWebcamInspector({
               if (range) editor.hide(range);
             }}
           >
-            <Plus size={15} aria-hidden="true" />
+            <EyeOff size={15} aria-hidden="true" />
             <span>{translate('gallery.videoReview.webcamHideRange')}</span>
           </ReviewButton>
         </>
       ) : null}
       <ReviewButton
+        selectionAction="delete"
         label={translate(
           editor.selection.kind === 'webcam'
             ? 'gallery.videoReview.webcamDisable'

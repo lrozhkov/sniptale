@@ -74,6 +74,7 @@ vi.mock('./inspector-binding', async (original) => ({
 vi.mock('./timeline-binding', () => ({
   ReviewTimelineBinding: (props: ComponentProps<typeof ReviewTimelineBinding>) => (
     <>
+      {props.navigationControls}
       {props.historyControls}
       {props.utilityControls}
     </>
@@ -340,13 +341,13 @@ it('makes the live seek toolbar toggle available after metadata and keeps it out
     })
   );
   expect(button().disabled).toBe(false);
-  expect(button().getAttribute('aria-pressed')).toBe('false');
+  expect(button().getAttribute('aria-pressed')).toBe('true');
   const before = loaded.session.getSnapshot();
   await act(async () => button().click());
-  expect(button().getAttribute('aria-pressed')).toBe('true');
+  expect(button().getAttribute('aria-pressed')).toBe('false');
   expect(loaded.session.getSnapshot().snapshot).toEqual(before.snapshot);
   expect(loaded.session.getSnapshot().dirty).toBe(before.dirty);
   await act(async () => button().click());
-  expect(button().getAttribute('aria-pressed')).toBe('false');
+  expect(button().getAttribute('aria-pressed')).toBe('true');
   expect(loaded.session.getSnapshot().snapshot).toEqual(before.snapshot);
 });

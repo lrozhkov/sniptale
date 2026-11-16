@@ -1,5 +1,5 @@
 import type { ReviewEdit } from '../../features/video/review/types';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   createReviewRecordingActionAudioSource,
   type RecordingProjectActionAudioSource,
@@ -42,15 +42,16 @@ export function useReviewTransport(args: {
 }) {
   const { session, source } = args.resource;
   const playbackAudio = useRef<ReturnType<typeof useReviewEditorAudioRuntime> | null>(null);
+  const playIntent = useRef(0);
+  const starting = useRef(false);
   function failTransport(reason?: ReviewActionAudioUnavailable['reason']) {
-    playbackAudio.current?.stopPlayback();
     pause();
     args.onTransportFailure(reason);
   }
   const {
     video,
-    pause,
-    seekResult,
+    pause: pausePlayback,
+    seekResult: seekResultPlayback,
     readResultTime,
     heldResultTime,
     time,
@@ -60,7 +61,7 @@ export function useReviewTransport(args: {
     playheadClock,
     setPresentationActive,
     onPresentedTime,
-    seek,
+    seek: seekPlayback,
     play,
     playbackRange,
     setPlaybackRange,
@@ -83,6 +84,26 @@ export function useReviewTransport(args: {
     onRecovered: args.onTransportRecovered,
     onInvalidRange: args.onInvalidRange,
   });
+  const pause = useCallback(() => {
+    ++playIntent.current;
+    starting.current = false;
+    playbackAudio.current?.stopPlayback();
+    pausePlayback();
+  }, [pausePlayback]);
+  const seek = useCallback(
+    (time: number, snap?: boolean) => {
+      pause();
+      seekPlayback(time, snap);
+    },
+    [pause, seekPlayback]
+  );
+  const seekResult = useCallback(
+    (time: number) => {
+      pause();
+      seekResultPlayback(time);
+    },
+    [pause, seekResultPlayback]
+  );
   const timeline = useReviewTimeMap(source, args.edits, time, heldResultTime, readResultTime);
   const actionPlan = useMemo(
     () =>
@@ -189,10 +210,21 @@ export function useReviewTransport(args: {
     onPresentedTime,
     seek,
     play: async () => {
-      const active = playing || video.current?.paused === false;
+      const active = playing || video.current?.paused === false || starting.current;
+      if (active) {
+        pause();
+        return;
+      }
+      const intent = ++playIntent.current;
+      starting.current = true;
       if (!active && !args.silent) {
-        if (!(await actionSoundPreview.preparePlayback())) return;
-      } else if (active) actionSoundPreview.stopPlayback();
+        if (!(await actionSoundPreview.preparePlayback())) {
+          if (intent === playIntent.current) starting.current = false;
+          return;
+        }
+      }
+      if (intent !== playIntent.current) return;
+      starting.current = false;
       play();
     },
     timeline,

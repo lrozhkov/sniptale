@@ -135,6 +135,10 @@ it('authors cursor intervals and points; edits, copies and toggles without accep
     expect(editor.selected!.start).toBe(6);
     act(() => setTime(0));
     act(() => editor.add());
+    expect(editor.selected!.start).toBe(6);
+    expect(message).toHaveBeenCalledWith('gallery.videoReview.cursorMotionNoSpace');
+    act(() => setTime(3));
+    act(() => editor.add());
     expect(editor.selected!.start).toBe(3);
     act(() => setTime(11.99));
     act(() => editor.add());

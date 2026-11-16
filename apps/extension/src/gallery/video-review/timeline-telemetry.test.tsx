@@ -619,7 +619,9 @@ it.each([
     expect(update).toHaveBeenCalledExactlyOnceWith(m, start, end);
     expect(button.dataset['reviewDragging']).toBeUndefined();
     await act(async () => button.click());
-    expect(onMarker).toHaveBeenCalledTimes(1);
+    expect(onMarker).not.toHaveBeenCalled();
+    await act(async () => button.click());
+    expect(onMarker).toHaveBeenCalledExactlyOnceWith(m);
     update.mockClear();
     await event('pointerdown', 200, target);
     await event('pointermove', nextX);

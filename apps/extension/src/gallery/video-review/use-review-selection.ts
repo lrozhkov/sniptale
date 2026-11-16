@@ -6,7 +6,7 @@ import { originalAudioRangeViews } from '../../features/video/review/advanced/or
 import { createTrackProjection } from './track-projection';
 import { reviewVoiceoverRange } from '../../features/video/review/voiceover-edits';
 import { retimeReviewVoiceover } from '../../features/video/review/voiceover-timing';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   ReviewDocument,
   ReviewOperation,
@@ -193,9 +193,11 @@ export function useReviewSelectionLifecycle(args: {
     )
       args.setSelection({ kind: 'none' });
   }, [args]);
+  const clearAnnotation = useRef(args.clearAnnotation);
+  clearAnnotation.current = args.clearAnnotation;
   useEffect(() => {
-    if (args.selection.kind !== 'annotation') args.clearAnnotation();
-  }, [args]);
+    if (args.selection.kind !== 'annotation') clearAnnotation.current();
+  }, [args.selection.kind]);
   return remove;
 }
 

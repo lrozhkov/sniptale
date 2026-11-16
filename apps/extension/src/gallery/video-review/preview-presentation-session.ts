@@ -361,6 +361,7 @@ class ManualPresentationSession {
         camera = await capturePresentationCamera(
           snapshot,
           sourceTime,
+          time,
           cameraState,
           cameraSource,
           this.admission.cameraResources,
@@ -831,6 +832,7 @@ class ManualPresentationSession {
 async function capturePresentationCamera(
   snapshot: PresentationSnapshot,
   sourceTime: number,
+  resultTime: number,
   state: PresentationCameraState,
   source: CameraSource | null,
   resources: RenderResources,
@@ -840,15 +842,16 @@ async function capturePresentationCamera(
   if (!binding) return undefined;
   if (state.phase === 'failed') throw new Error('Camera preview unavailable');
   if (state.phase !== 'ready' || !source) throw new PendingPresentation();
-  const mapped = quickEditWebcamFrameAt(binding.settings, sourceTime, state.duration);
+  const mapped = quickEditWebcamFrameAt(binding.settings, sourceTime, state.duration, resultTime);
   if (!mapped) return undefined;
-  const screen = quickEditWebcamScreenPlacementAt(binding.settings, sourceTime);
+  const screen = quickEditWebcamScreenPlacementAt(binding.settings, sourceTime, resultTime);
   const split = screen.width < 1 || screen.height < 1 || !!screen.clip || !!screen.cameraOverlay;
   const selected =
     !binding.disabled && ['webcam', 'webcam-position'].includes(binding.editor.selection.kind);
   const result = await source.captureFrame(
     {
       sourceTime,
+      resultTime,
       settings: binding.settings,
       placement: split
         ? undefined

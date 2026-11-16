@@ -979,3 +979,28 @@ it('resizes a freeze duration through the shared end handle without moving its s
   expect(onFreezeDurationChange).toHaveBeenCalledExactlyOnceWith(freeze, 3);
   expect(freeze).toMatchObject({ start: 1, end: 1, frameTime: 0.98, duration: 2 });
 });
+
+it('reports an unchanged visible source window once while the playhead traverses inserted time', () => {
+  const onHistoryRange = vi.fn();
+  const edits = [
+    {
+      id: 'hold',
+      kind: 'freeze' as const,
+      start: 2,
+      end: 2,
+      requestedStart: 2,
+      requestedEnd: 2,
+      duration: 2,
+      frameTime: 1.96,
+      frameDuration: 0.04,
+    },
+  ];
+  const { props } = renderTimeline({ edits, resultTime: 2, onHistoryRange });
+  expect(onHistoryRange).toHaveBeenCalledExactlyOnceWith({ start: 0, end: 4 });
+  for (let frame = 1; frame <= 8; frame++) {
+    act(() =>
+      environment.root!.render(<ReviewTimeline {...props} time={2} resultTime={2 + frame / 10} />)
+    );
+  }
+  expect(onHistoryRange).toHaveBeenCalledOnce();
+});

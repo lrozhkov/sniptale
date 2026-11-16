@@ -839,7 +839,11 @@ function ReviewSelectionBinding({
         id={state.activeSelection.id}
         source={snapshot?.source}
         sourceDigest={snapshot?.sha256}
-        duration={resource.source.duration}
+        duration={
+          instance?.timeDomain === 'result'
+            ? state.timeline.resultDuration
+            : resource.source.duration
+        }
         busy={state.busy || state.editing.exporter.phase !== 'idle'}
       />
     );

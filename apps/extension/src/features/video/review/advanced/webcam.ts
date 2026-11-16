@@ -53,6 +53,8 @@ interface QuickEditWebcamPosition {
 
 /** Authored camera content. Disabled content still retains its immutable source. */
 export interface QuickEditWebcam {
+  /** Placement and visibility clock; camera pixels always retain source time. */
+  timeDomain?: 'result';
   assetId: string;
   enabled: boolean;
   /** Positive values delay the camera: cameraTime = mainSourceTime - offsetSeconds. */
@@ -148,6 +150,7 @@ export function parseQuickEditWebcam(value: unknown): QuickEditWebcam | null {
     !value['assetId'].startsWith('project-asset:') ||
     value['assetId'].length === 'project-asset:'.length ||
     typeof value['enabled'] !== 'boolean' ||
+    (value['timeDomain'] !== undefined && value['timeDomain'] !== 'result') ||
     typeof value['mirrored'] !== 'boolean' ||
     !isBoundedNumber(value['offsetSeconds'], -MAX_TIME, MAX_TIME) ||
     !isCameraAppearance(value['appearance'])
@@ -172,6 +175,7 @@ export function parseQuickEditWebcam(value: unknown): QuickEditWebcam | null {
   }
   return {
     assetId: value['assetId'],
+    ...(value['timeDomain'] === 'result' ? { timeDomain: 'result' as const } : {}),
     enabled: value['enabled'],
     offsetSeconds: value['offsetSeconds'],
     mirrored: value['mirrored'],
@@ -258,8 +262,10 @@ export function quickEditWebcamPlacementAt(webcam: QuickEditWebcam, sourceTime: 
 /** Screen panel follows the same authored transition as the camera pane. */
 export function quickEditWebcamScreenPlacementAt(
   webcam: QuickEditWebcam,
-  sourceTime: number
+  sourceTime: number,
+  resultTime = sourceTime
 ): CameraScreenPanel {
+  if (webcam.timeDomain === 'result') sourceTime = resultTime;
   const index = webcam.positions.findLastIndex((position) => position.time <= sourceTime);
   const current = webcam.positions[index];
   if (!current)
@@ -286,9 +292,11 @@ export function quickEditWebcamScreenPlacementAt(
 export function quickEditWebcamFrameAt(
   webcam: QuickEditWebcam,
   sourceTime: number,
-  cameraDuration: number
+  cameraDuration: number,
+  resultTime = sourceTime
 ): { time: number; placement: QuickEditWebcamPlacement; crop?: QuickEditWebcamCrop } | null {
   const time = sourceTime - webcam.offsetSeconds;
+  const visualTime = webcam.timeDomain === 'result' ? resultTime : sourceTime;
   if (
     !webcam.enabled ||
     !Number.isFinite(sourceTime) ||
@@ -296,13 +304,13 @@ export function quickEditWebcamFrameAt(
     !Number.isFinite(cameraDuration) ||
     time < 0 ||
     time >= cameraDuration ||
-    isCameraHiddenAt(webcam.hiddenRanges, sourceTime)
+    isCameraHiddenAt(webcam.hiddenRanges, visualTime)
   )
     return null;
   return {
     time,
-    placement: quickEditWebcamPlacementAt(webcam, sourceTime),
-    crop: quickEditWebcamCropAt(webcam, sourceTime),
+    placement: quickEditWebcamPlacementAt(webcam, visualTime),
+    crop: quickEditWebcamCropAt(webcam, visualTime),
   };
 }
 

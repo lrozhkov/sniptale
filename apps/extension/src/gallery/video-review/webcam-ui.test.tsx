@@ -58,6 +58,11 @@ beforeEach(() => {
       tags: [],
     },
     time: 3,
+    get sourceTime() {
+      return editor.time;
+    },
+    hideRange: null,
+    addHidden: vi.fn(),
     duration: 12,
     available: true,
     retry: vi.fn(() => undefined),
@@ -297,7 +302,7 @@ it('explains unavailable hide intervals and edits an existing hidden interval wi
   expect(host.textContent).toBe('');
 });
 
-it('keeps camera markers on the source axis and creates hide intervals through admitted drags', () => {
+it('keeps camera markers on the source axis and does not create hide intervals through lane drags', () => {
   editor.camera!.hiddenRanges = [{ id: 'hidden', start: 2, end: 3 }];
   editor.camera!.positions = [
     {
@@ -330,10 +335,10 @@ it('keeps camera markers on the source axis and creates hide intervals through a
   pointer(track, 'pointerdown', 400);
   pointer(track, 'pointermove', 700);
   pointer(track, 'pointerup', 700);
-  expect(editor.hide).toHaveBeenCalledWith({ start: 4, end: 7 });
+  expect(editor.hide).not.toHaveBeenCalled();
   pointer(track, 'pointerdown', 500);
   pointer(track, 'pointerup', 500);
-  expect(editor.hide).toHaveBeenCalledTimes(1);
+  expect(editor.hide).not.toHaveBeenCalled();
   expect(host.querySelector('[aria-label="gallery.videoReview.compactTrackHeight"]')).toBeNull();
   act(() =>
     root.render(
@@ -568,7 +573,7 @@ it.each([false, true])(
     expect(editor.hide).not.toHaveBeenCalled();
     pointer(handle, 'pointerup', 150);
     expect(editor.resizeHidden).toHaveBeenCalledExactlyOnceWith('hidden', { start: 1.5, end: 4 });
-    expect(editor.select).toHaveBeenCalledWith({ kind: 'webcam-hidden', id: 'hidden' });
+    expect(editor.select).not.toHaveBeenCalled();
     expect(editor.duration).toBe(12);
   }
 );

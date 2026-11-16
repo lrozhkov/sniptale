@@ -1,3 +1,5 @@
+import { reviewTimelineHint } from './timeline-hints';
+import { reviewInsertionRange } from './range-placement';
 import { reviewCursorMotionShapeTitleKeys } from './track-items';
 import { useRef, useState, type PointerEvent } from 'react';
 import { MousePointer2, Trash2, Copy, Flag, CirclePlus, Eye, EyeOff } from 'lucide-react';
@@ -35,6 +37,10 @@ import { useReviewTimelineSnap } from './timeline-magnets';
 export function useReviewCursorMotions(args: {
   advanced: QuickEditAdvancedState;
   time: number;
+  insertionRange?: { start: number; end: number } | null;
+  insertionPoint?(): { x: number; y: number } | null;
+  pause?(): void;
+  blockedRanges?: readonly { start: number; end: number }[];
   duration: number;
   selection: ReviewSelection;
   onChange(motions: CursorMotion[]): void;
@@ -61,23 +67,28 @@ export function useReviewCursorMotions(args: {
   };
   const add = () => {
     if (motions.length >= 512 || !args.canStart()) return;
-    let start = Math.min(Math.max(0, args.time), Math.max(0, args.duration - 0.1));
-    for (const m of [...motions].sort((a, b) => a.start - b.start))
-      if (start >= m.start && start < m.end) start = m.end;
-    const next =
-      motions.filter((m) => m.start > start).sort((a, b) => a.start - b.start)[0]?.start ??
-      args.duration;
-    const end = Math.min(start + 3, next, args.duration);
-    if (end - start < 0.1) {
+    const range = reviewInsertionRange({
+      time: args.time,
+      duration: args.duration,
+      seconds: 3,
+      range: args.insertionRange,
+      occupied: [...motions, ...(args.blockedRanges ?? [])],
+      minimum: 0.1,
+    });
+    if (!range) {
       args.setMessage(translate('gallery.videoReview.cursorMotionNoSpace'));
       return;
     }
+    const { start, end } = range;
+    args.pause?.();
+    const point = args.insertionPoint?.() ?? { x: 0.5, y: 0.5 };
     const id = crypto.randomUUID();
     const first = crypto.randomUUID();
     const m: CursorMotion = {
       id,
       start,
       end,
+      timeDomain: 'result',
       enabled: true,
       shape: 'arrow',
       size: 48,
@@ -86,8 +97,13 @@ export function useReviewCursorMotions(args: {
       shadow: true,
       easing: 'smooth',
       points: [
-        { id: first, at: 0, x: 0.3, y: 0.4 },
-        { id: crypto.randomUUID(), at: 1, x: 0.65, y: 0.6 },
+        { id: first, at: 0, x: point.x, y: point.y },
+        {
+          id: crypto.randomUUID(),
+          at: 1,
+          x: Math.min(0.9, point.x + 0.2),
+          y: Math.min(0.9, point.y + 0.1),
+        },
       ],
     };
     args.onChange([...motions, m]);
@@ -167,6 +183,16 @@ export function useReviewCursorMotions(args: {
     pointId,
     time: args.time,
     duration: args.duration,
+    canAdd:
+      motions.length < 512 &&
+      !!reviewInsertionRange({
+        time: args.time,
+        duration: args.duration,
+        seconds: 3,
+        range: args.insertionRange,
+        occupied: [...motions, ...(args.blockedRanges ?? [])],
+        minimum: 0.1,
+      }),
     add,
     choose,
     update,
@@ -279,7 +305,10 @@ function CursorMotionPill({
   busy: boolean;
   compact: boolean;
 }) {
-  const snap = useReviewTimelineSnap();
+  const snap = useReviewTimelineSnap({
+    output: projection.output,
+    fromDisplay: projection.display.displayToResult,
+  });
   const [draft, setDraft] = useState<{ start: number; end: number }>();
   const drag = useRef<
     | {
@@ -294,12 +323,13 @@ function CursorMotionPill({
       }
     | undefined
   >(undefined);
+  const suppressClick = useRef(false);
   const range = draft ?? m;
   const selected = editor.selected?.id === m.id;
   const down = (event: PointerEvent<HTMLDivElement>) => {
     if (busy || event.button !== 0) return;
     event.stopPropagation();
-    editor.choose(m.id);
+    suppressClick.current = false;
     const target = event.target instanceof Element ? event.target : null;
     const point = target?.closest<HTMLElement>('[data-motion-point]')?.dataset['motionPoint'];
     const edge = target?.closest<HTMLElement>('[data-motion-edge]')?.dataset['motionEdge'];
@@ -314,9 +344,9 @@ function CursorMotionPill({
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const pointPosition = (at: number) => {
-    const start = projection.display.sourceToDisplay(m.start);
-    const end = projection.display.sourceToDisplay(m.end, 'end');
-    const time = projection.display.sourceToDisplay(m.start + at * (m.end - m.start));
+    const start = projection.display.resultToDisplay(m.start);
+    const end = projection.display.resultToDisplay(m.end, 'end');
+    const time = projection.display.resultToDisplay(m.start + at * (m.end - m.start));
     return ((time - start) / Math.max(0.001, end - start)) * 100;
   };
   return (
@@ -325,9 +355,15 @@ function CursorMotionPill({
       tabIndex={0}
       aria-pressed={selected}
       aria-label={translate('gallery.videoReview.cursorMotionTrack')}
+      data-review-hint={reviewTimelineHint(
+        translate('gallery.videoReview.cursorMotionTrack'),
+        m.start,
+        m.end
+      )}
       data-review-removal-key={`cursor-motion:${m.id}`}
-      data-review-snap-start={m.start}
-      data-review-snap-end={m.end}
+      data-review-snap-domain="display"
+      data-review-snap-start={projection.display.resultToDisplay(m.start)}
+      data-review-snap-end={projection.display.resultToDisplay(m.end, 'end')}
       className={[
         'review-timeline-item review-interaction-item absolute touch-none select-none rounded border px-3 text-xs',
         selected
@@ -338,10 +374,13 @@ function CursorMotionPill({
       style={{
         top: reviewTrackMetrics(compact).inset,
         height: reviewTrackMetrics(compact).body,
-        left: `${projection.focus.position(range.start) * 100}%`,
-        width: `${(projection.focus.position(range.end, 'end') - projection.focus.position(range.start)) * 100}%`,
+        left: `${projection.position(range.start) * 100}%`,
+        width: `${(projection.position(range.end, 'end') - projection.position(range.start)) * 100}%`,
       }}
-      onClick={() => editor.choose(m.id)}
+      onClick={() => {
+        if (!suppressClick.current) editor.choose(m.id);
+        suppressClick.current = false;
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Enter') editor.choose(m.id);
       }}
@@ -350,11 +389,18 @@ function CursorMotionPill({
         const d = drag.current;
         if (!d) return;
         e.stopPropagation();
-        const delta = projection.focus.delta(
-          d.point ? m.start + (d.at ?? 0) * (m.end - m.start) : d.edge === 'end' ? d.end : d.start,
-          e.clientX - d.x,
-          d.width
-        );
+        if (Math.abs(e.clientX - d.x) > 3) suppressClick.current = true;
+        if (!suppressClick.current) return;
+        const anchor = d.point
+          ? m.start + (d.at ?? 0) * (m.end - m.start)
+          : d.edge === 'end'
+            ? d.end
+            : d.start;
+        const delta =
+          projection.display.displayToResult(
+            projection.display.resultToDisplay(anchor) +
+              ((e.clientX - d.x) / d.width) * projection.display.duration
+          ) - anchor;
         if (d.point) {
           const index = m.points.findIndex((p) => p.id === d.point);
           if (index <= 0 || index >= m.points.length - 1) return;
@@ -365,7 +411,6 @@ function CursorMotionPill({
           editor.update(m.id, {
             points: m.points.map((p) => (p.id === d.point ? { ...p, at } : p)),
           });
-          editor.pickPoint(d.point, m.start + at * (m.end - m.start));
           return;
         }
         let start =
@@ -439,7 +484,9 @@ function CursorMotionPill({
               }}
               onClick={(e) => {
                 e.stopPropagation();
-                editor.pickPoint(p.id, m.start + p.at * (m.end - m.start));
+                if (!suppressClick.current)
+                  editor.pickPoint(p.id, m.start + p.at * (m.end - m.start));
+                suppressClick.current = false;
               }}
             />
           ) : null
@@ -570,6 +617,7 @@ export function ReviewCursorMotionInspector({
           reviewInspectorActions(
             <>
               <ReviewButton
+                selectionAction="duplicate"
                 label={translate('gallery.videoReview.focusDuplicate')}
                 className={`${reviewTextButtonClassName} w-full justify-start`}
                 onClick={() => editor.copy(m.id)}
@@ -578,6 +626,7 @@ export function ReviewCursorMotionInspector({
                 <span>{translate('gallery.videoReview.focusDuplicate')}</span>
               </ReviewButton>
               <ReviewButton
+                selectionAction="delete"
                 label={translate('gallery.videoReview.deleteSelected')}
                 className={`${reviewDeleteButtonClassName} w-full justify-start`}
                 onClick={() => editor.remove(m.id)}
@@ -603,7 +652,7 @@ export function ReviewCursorMotionAdd({
     <ReviewButton
       label={translate('gallery.videoReview.cursorMotionAdd')}
       toolbarLabel={translate('gallery.videoReview.cursorMotionAdd')}
-      disabled={busy}
+      disabled={busy || !editor.canAdd}
       onClick={editor.add}
       className={reviewIconButtonClassName}
     >

@@ -253,12 +253,13 @@ function BindingHarness({
       onComment={vi.fn()}
       onSeek={state.seek}
       onPlay={state.play}
+      onPause={state.pause}
       onOpenExport={vi.fn()}
     />
   );
 }
 
-it('retains a refused choice, completes one placement and ignores an old activation result', async () => {
+it('inserts annotations immediately, retries refusal and ignores a replaced source', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal(
     'ResizeObserver',
@@ -285,22 +286,28 @@ it('retains a refused choice, completes one placement and ignores an old activat
     host.querySelector<HTMLButtonElement>(
       `[aria-label="${translate('gallery.videoReview.annotationEffectsAdd')}"]`
     )!;
-  const selector = () =>
-    host.querySelector<HTMLButtonElement>(
-      `[aria-label="${translate('gallery.videoReview.annotationEffectsChoose')}"]`
-    )!;
   try {
-    await act(async () =>
-      root.render(
-        <BindingHarness
-          loaded={loaded}
-          onAdd={add}
-          onState={(state) => {
-            current = state;
-          }}
-        />
-      )
-    );
+    const render = async (value = loaded) =>
+      act(async () =>
+        root.render(
+          <BindingHarness
+            loaded={value}
+            onAdd={add}
+            onState={(state) => {
+              current = state;
+            }}
+          />
+        )
+      );
+    const choose = async () => {
+      await act(async () => trigger().click());
+      const choice = [...dialog.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+        (node) => node.textContent === catalogFixture.label[getCurrentLocale()]
+      )!;
+      expect(choice).not.toBeNull();
+      await act(async () => choice.click());
+    };
+    await render();
     await act(async () =>
       host
         .querySelector<HTMLButtonElement>(
@@ -309,214 +316,30 @@ it('retains a refused choice, completes one placement and ignores an old activat
         .click()
     );
     await act(async () => current?.setSelection({ kind: 'range', start: 2, end: 3 }));
-    await act(async () => trigger().click());
-    expect(
-      dialog.querySelector('[data-ui="gallery.videoReview.annotationEffectsPicker"]')
-    ).toBeNull();
-    expect(selector()).not.toBeNull();
-    expect(selector().textContent).toContain(catalogFixture.label[getCurrentLocale()]);
-    expect(
-      host
-        .querySelector('[data-ui="gallery.videoReview.annotationEffectsLane"]')
-        ?.getAttribute('tabindex')
-    ).toBe('0');
-    expect(add).not.toHaveBeenCalled();
-    await act(async () => selector().click());
-    const choice = [...dialog.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
-      (node) => node.textContent === catalogFixture.label[getCurrentLocale()]
-    )!;
-    expect(choice).not.toBeNull();
-    await act(async () => choice.click());
-    expect(add).not.toHaveBeenCalled();
-    expect(loaded.session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
-    expect(trigger().getAttribute('aria-pressed')).toBe('true');
-    let captured = false;
-    const currentLane = () => {
-      const node = host.querySelector<HTMLDivElement>(
-        '[data-ui="gallery.videoReview.annotationEffectsLane"]'
-      )!;
-      vi.spyOn(node, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 200, 400, 32));
-      Object.assign(node, {
-        setPointerCapture: () => {
-          captured = true;
-        },
-        hasPointerCapture: () => captured,
-        releasePointerCapture: () => {
-          captured = false;
-        },
-      });
-      return node;
-    };
-    let lane = currentLane();
-    for (const [type, x] of [
-      ['pointerdown', 100],
-      ['pointermove', 300],
-      ['pointerup', 300],
-    ] as const) {
-      const event = new MouseEvent(type, { bubbles: true, clientX: x, button: 0 });
-      Object.defineProperty(event, 'pointerId', { value: 1 });
-      await act(async () => lane.dispatchEvent(event));
-    }
+    expect(trigger().getAttribute('aria-haspopup')).toBe('listbox');
+    await choose();
     expect(add).toHaveBeenCalledTimes(1);
-    expect(add).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        catalog: catalogFixture,
-        documentId: 'sniptale-title',
-        start: 1,
-        end: 3,
-        plane: { width: 640, height: 360 },
-      })
-    );
-    expect(selector().textContent).toContain(catalogFixture.label[getCurrentLocale()]);
     expect(loaded.session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
-
-    for (const [type, x] of [
-      ['pointerdown', 100],
-      ['pointermove', 300],
-      ['pointerup', 300],
-    ] as const) {
-      const event = new MouseEvent(type, { bubbles: true, clientX: x, button: 0 });
-      Object.defineProperty(event, 'pointerId', { value: 1 });
-      await act(async () => lane.dispatchEvent(event));
-    }
+    add.mockResolvedValueOnce('new-instance');
+    await choose();
     expect(add).toHaveBeenCalledTimes(2);
-    let completeOld: (id: string) => void = () => {};
+    expect(
+      host.querySelector('[data-ui="gallery.videoReview.annotationEffectsRangePreview"]')
+    ).toBeNull();
+    let completeOld!: (id: string) => void;
     add.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
           completeOld = resolve;
         })
     );
-    await act(async () =>
-      lane.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
-      )
-    );
+    await choose();
     expect(add).toHaveBeenCalledTimes(3);
-    await act(async () => trigger().click());
-    await act(async () => trigger().click());
-    await act(async () => selector().click());
-    await act(async () => dialog.querySelector<HTMLButtonElement>('[role="option"]')!.click());
+    await render(replacement);
     await act(async () => completeOld('old-instance'));
-    expect(trigger().getAttribute('aria-pressed')).toBe('true');
-    lane = currentLane();
-    expect(lane.isConnected).toBe(true);
-    expect(lane.getAttribute('tabindex')).toBe('0');
-    expect(selector().textContent).toContain(catalogFixture.label[getCurrentLocale()]);
-    add.mockResolvedValueOnce('new-instance');
-    await act(async () =>
-      lane.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
-      )
-    );
-    expect(add).toHaveBeenCalledTimes(4);
-    expect(trigger().getAttribute('aria-pressed')).toBe('false');
-    expect(selector()).toBeNull();
-    lane = currentLane();
-    await act(async () =>
-      lane.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
-      )
-    );
-    expect(add).toHaveBeenCalledTimes(4);
-    await act(async () => trigger().click());
-    await act(async () => selector().click());
-    await act(async () => dialog.querySelector<HTMLButtonElement>('[role="option"]')!.click());
-    lane = currentLane();
-    for (const [type, x] of [
-      ['pointerdown', 100],
-      ['pointermove', 250],
-    ] as const) {
-      const event = new MouseEvent(type, { bubbles: true, clientX: x, button: 0 });
-      Object.defineProperty(event, 'pointerId', { value: 1 });
-      await act(async () => lane.dispatchEvent(event));
-    }
-    expect(captured).toBe(true);
-    lane.focus();
-    await act(async () =>
-      lane.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'v', code: 'KeyV', bubbles: true, cancelable: true })
-      )
-    );
-    expect(trigger().getAttribute('aria-pressed')).toBe('false');
-    expect(selector()).toBeNull();
-    expect(captured).toBe(false);
-    await act(async () =>
-      lane.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 250, button: 0 }))
-    );
-    expect(add).toHaveBeenCalledTimes(4);
-    await act(async () => trigger().click());
-    expect(selector().textContent).toContain(catalogFixture.label[getCurrentLocale()]);
-    await act(async () => selector().click());
-    await act(async () => dialog.querySelector<HTMLButtonElement>('[role="option"]')!.click());
-    const oldHash = catalogFixture.sourceSha256;
-    catalogFixture.sourceSha256 = 'updated-catalog';
-    await act(async () =>
-      root.render(
-        <BindingHarness
-          loaded={loaded}
-          onAdd={add}
-          onState={(state) => {
-            current = state;
-          }}
-        />
-      )
-    );
-    expect(selector().textContent).toContain(catalogFixture.label[getCurrentLocale()]);
-    expect(
-      host
-        .querySelector('[data-ui="gallery.videoReview.annotationEffectsLane"]')
-        ?.getAttribute('tabindex')
-    ).toBe('0');
-    catalogFixture.sourceSha256 = oldHash;
-    await act(async () =>
-      root.render(
-        <BindingHarness
-          loaded={loaded}
-          onAdd={add}
-          failure="unsupported"
-          onState={(state) => {
-            current = state;
-          }}
-        />
-      )
-    );
-    const failure = dialog.querySelector('[role="alert"]');
-    expect(failure?.textContent).toBe(
-      translate('gallery.videoReview.annotationEffectsUnsupported')
-    );
-    expect(failure?.querySelector('button')).toBeNull();
-    expect(selector().disabled).toBe(false);
-    expect(loaded.session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
-    await act(async () => selector().click());
-    await act(async () => dialog.querySelector<HTMLButtonElement>('[role="option"]')!.click());
-    await act(async () =>
-      root.render(
-        <BindingHarness
-          loaded={replacement}
-          onAdd={add}
-          onState={(state) => {
-            current = state;
-          }}
-        />
-      )
-    );
-    expect(selector()).toBeNull();
     expect(trigger()).toBeNull();
     expect(loaded.session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
     expect(replacement.session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
-    await act(async () =>
-      host
-        .querySelector<HTMLButtonElement>(
-          '[data-review-header-track="annotationEffects"] [data-review-track-select]'
-        )!
-        .click()
-    );
-    await act(async () => trigger().click());
-    await act(async () =>
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-    );
-    expect(trigger().getAttribute('aria-pressed')).toBe('false');
   } finally {
     await act(async () => root.unmount());
     await loaded.session.dispose();
@@ -850,11 +673,11 @@ it('admits track changes and falls back after disabling or replacing the source'
     expect(annotation()).toBeNull();
     await act(async () => select('annotationEffects').click());
     await act(async () => annotation()!.click());
-    expect(annotation()?.getAttribute('aria-pressed')).toBe('true');
+    expect(annotation()?.getAttribute('aria-haspopup')).toBe('listbox');
     hold = true;
     await act(async () => select('zoom').click());
     expect(select('annotationEffects').getAttribute('aria-pressed')).toBe('true');
-    expect(annotation()?.getAttribute('aria-pressed')).toBe('true');
+    expect(annotation()?.getAttribute('aria-haspopup')).toBe('listbox');
     await act(async () => continuation?.());
     expect(select('zoom').getAttribute('aria-pressed')).toBe('true');
     expect(annotation()).toBeNull();

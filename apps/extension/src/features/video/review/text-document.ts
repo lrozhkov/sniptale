@@ -95,6 +95,7 @@ export function editReviewTextFragment(
     text?: string;
     start?: number;
     end?: number;
+    timeDomain?: 'source' | 'result';
     showInVideo?: boolean;
     style?: ReviewCaptionStyle | null;
     language?: string;
@@ -104,6 +105,7 @@ export function editReviewTextFragment(
   if (!current) return { ok: false, reason: 'stale' };
   const textChanged = patch.text !== undefined && patch.text !== current.text;
   const timingChanged =
+    (patch.timeDomain !== undefined && patch.timeDomain !== current.timeDomain) ||
     (patch.start !== undefined && patch.start !== current.start) ||
     (patch.end !== undefined && patch.end !== current.end);
   const { style, ...fields } = patch;

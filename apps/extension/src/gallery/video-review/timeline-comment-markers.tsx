@@ -1,3 +1,4 @@
+import { reviewTimelineHint } from './timeline-hints';
 import { MessageSquare } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
@@ -57,6 +58,12 @@ function ReviewCommentMarker(props: CommentMarkerProps) {
     <button
       type="button"
       title={`${caption}${cutHint ? ` · ${cutHint}` : ''}`}
+      data-review-hint={reviewTimelineHint(
+        translate('gallery.videoReview.commentText'),
+        time,
+        anchor.kind === 'range' ? anchor.end : undefined,
+        [caption, cutHint].filter(Boolean).join('\n')
+      )}
       data-cut-suppressed={covered.length ? 'true' : 'false'}
       aria-label={[
         translate('gallery.videoReview.commentText'),

@@ -1,3 +1,7 @@
+import {
+  reviewVoiceoverSourceAtOffset,
+  reviewVoiceoverSampleDelta,
+} from '../../features/video/review/voiceover-timing';
 import type { AudioTrimRange } from '../../composition/audio-recording/session-types';
 import type { ReviewTimeSegment } from '../../features/video/review/timeline';
 import {
@@ -22,6 +26,9 @@ export async function saveReviewVoiceoverTake(args: {
   take: Blob;
   onRetained?: () => void;
   sourceStart: number;
+  sourceEnd?: number;
+  resultStart?: number;
+  resultEnd?: number;
   segments: readonly ReviewTimeSegment[];
   audio: ReturnType<typeof useReviewAudio>;
   session: ReviewSession;
@@ -83,7 +90,10 @@ export async function saveReviewVoiceoverTake(args: {
         args.sourceStart,
         args.segments,
         args.trim.trimStart,
-        args.onRetained
+        args.onRetained,
+        args.sourceEnd,
+        args.resultStart,
+        args.resultEnd
       ),
   });
   const prepared = args.preparedTakes.get(args.take);
@@ -101,18 +111,31 @@ async function commitRecordedClip(
   placement: number,
   segments: readonly ReviewTimeSegment[],
   trimOffset: number,
-  onRetained?: () => void
+  onRetained?: () => void,
+  sourceEnd?: number,
+  resultStart?: number,
+  resultEnd?: number
 ): Promise<void> {
   const before = session.getSnapshot().document.advancedContent;
   if (before.audio.voiceover.some((clip) => clip.id === clipId && clip.assetId === assetId)) {
     if (onRetained && (await session.hasDurableVoiceoverClip(clipId, assetId))) onRetained();
     return;
   }
-  const clip = {
-    ...importedAudioClip(assetId, duration, placement, placement + duration),
-    id: clipId,
-  };
-  const anchored = anchorReviewVoiceoverAtSource(clip, segments, trimOffset);
+  const trimmedStart = reviewVoiceoverSourceAtOffset(placement, trimOffset, 1, segments);
+  const at = resultStart === undefined ? placement : resultStart + trimOffset;
+  const limit =
+    resultStart === undefined
+      ? placement +
+        (sourceEnd === undefined
+          ? duration
+          : Math.min(duration, reviewVoiceoverSampleDelta(trimmedStart, sourceEnd, 1, segments)))
+      : Math.min(at + duration, resultEnd ?? segments.at(-1)?.resultEnd ?? at + duration);
+  if (limit <= at) throw new Error('Recording is outside the insertion interval');
+  const clip = { ...importedAudioClip(assetId, duration, at, limit), id: clipId };
+  const anchored =
+    resultStart === undefined
+      ? anchorReviewVoiceoverAtSource(clip, segments, trimOffset)
+      : { ...clip, timeDomain: 'result' as const };
   const voiceoverSegments = before.audio.voiceoverSegments ?? [...segments];
   try {
     await session.commitDurable({

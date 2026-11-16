@@ -1,3 +1,4 @@
+import { duplicateProjectSourceInteractionDocuments } from '../../../../features/video/project/source-interaction-documents';
 import { duplicateAudioProcessing } from '../../../../features/video/audio/effects/presets';
 import { sliceClipPlaybackWindow } from '../../../../features/video/project/timeline/rate';
 import { materializeVideoProjectCursorSourceObservations } from '../../../../features/video/project/cursor-source-observations';
@@ -221,6 +222,15 @@ export function duplicateProjectClipsWithResult(
     new Set(duplicateIds),
     sourceInstances
   );
+  const copiedInteractions = project.sourceInteractionDocuments
+    ? duplicateProjectSourceInteractionDocuments(
+        project.sourceInteractionDocuments,
+        sourceInstances,
+        () => crypto.randomUUID()
+      )
+    : undefined;
+  if (copiedInteractions === null) return null;
+  if (copiedInteractions) nextProject.sourceInteractionDocuments = copiedInteractions.documents;
   nextProject.actionEvents = [
     ...project.actionEvents,
     ...project.actionEvents.flatMap((event) => {
@@ -271,25 +281,36 @@ export function duplicateProjectClipsWithResult(
       segments: [
         ...project.cursorFocusPath.segments,
         ...project.cursorFocusPath.segments.flatMap((segment) => {
-          if (segment.binding.kind !== 'recording-source') return [];
+          if (segment.binding.kind === 'project') return [];
           const sourceInstanceId = sourceInstances.get(segment.binding.sourceInstanceId);
           return sourceInstanceId
             ? [
                 {
                   ...segment,
-                  id: crypto.randomUUID(),
+                  id:
+                    copiedInteractions?.cursorIds.get(
+                      JSON.stringify([segment.binding.sourceInstanceId, segment.id])
+                    ) ?? crypto.randomUUID(),
                   binding: { ...segment.binding, sourceInstanceId },
                   keys: segment.keys.map((key) => ({
                     ...key,
-                    id: duplicateFocusKeyId(
-                      key,
-                      segment.binding.kind === 'recording-source'
-                        ? segment.binding.sourceInstanceId
-                        : '',
-                      sourceInstanceId,
-                      duplicateCursorIds,
-                      duplicateActionIds
-                    ),
+                    id:
+                      copiedInteractions?.cursorIds.get(
+                        JSON.stringify([
+                          segment.binding.kind !== 'project'
+                            ? segment.binding.sourceInstanceId
+                            : '',
+                          segment.id,
+                          key.id,
+                        ])
+                      ) ??
+                      duplicateFocusKeyId(
+                        key,
+                        segment.binding.kind !== 'project' ? segment.binding.sourceInstanceId : '',
+                        sourceInstanceId,
+                        duplicateCursorIds,
+                        duplicateActionIds
+                      ),
                     ...(key.incoming ? { incoming: { ...key.incoming } } : {}),
                     ...(key.outgoing ? { outgoing: { ...key.outgoing } } : {}),
                   })),

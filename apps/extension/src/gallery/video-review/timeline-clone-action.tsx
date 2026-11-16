@@ -77,6 +77,7 @@ export function ReviewTimelineCloneScope({
       value={
         available ? (
           <ReviewButton
+            selectionAction="duplicate"
             label={translate('gallery.videoReview.focusDuplicate')}
             disabled={disabled}
             className={`${reviewTextButtonClassName} !w-full justify-start`}

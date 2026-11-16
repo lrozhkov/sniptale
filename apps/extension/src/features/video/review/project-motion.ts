@@ -19,7 +19,8 @@ export function planReviewProjectMotion(
   applied: boolean
 ): VideoProject | null {
   if (!content.zoom.regions.length) return project;
-  if (content.zoom.regions.some((r) => r.effect === '3d')) project = { ...project, version: 55 };
+  if (project.version < 55 && content.zoom.regions.some((r) => r.effect === '3d'))
+    project = { ...project, version: 55 };
   if (content.zoom.regions.some((region) => region.border && region.spotlight)) return null;
   const clips = project.clips.filter(
     (clip): clip is VideoProjectVideoClip =>

@@ -13,6 +13,8 @@ import {
   effectiveCameraTransitionDuration,
   activeCameraPosition,
   cameraSourceTime,
+  cameraTimingRate,
+  cameraTimelineTime,
   canAddCameraPosition,
   resolveCameraClip,
   type CameraPositionEdit,
@@ -124,7 +126,7 @@ export function editCameraPosition(
     const crop = visual.cameraAppearance ?? DEFAULT_CAMERA_APPEARANCE;
     const duration =
       Math.max(0, Math.min(0.5, clip.startTime + clip.duration - 1 / project.fps - time)) *
-      (clip.playbackRate ?? 1);
+      cameraTimingRate(clip);
     positions = [
       ...positions,
       {
@@ -185,14 +187,11 @@ export function cameraPositionSeekTime(
   const next = clip.cameraPositions?.find((item) => item.sourceTime > position.sourceTime);
   const end = Math.min(
     position.sourceTime + effectiveCameraTransitionDuration(clip, position),
-    (next?.sourceTime ?? Infinity) - (clip.playbackRate ?? 1) / project.fps
+    (next?.sourceTime ?? Infinity) - cameraTimingRate(clip) / project.fps
   );
   return Math.max(
     clip.startTime,
-    Math.min(
-      clip.startTime + clip.duration - 1 / project.fps,
-      clip.startTime + (end - clip.sourceStart) / (clip.playbackRate ?? 1)
-    )
+    Math.min(clip.startTime + clip.duration - 1 / project.fps, cameraTimelineTime(clip, end))
   );
 }
 
@@ -205,10 +204,15 @@ function updatePositionTiming(
   const index = positions.findIndex((item) => item.id === edit.id);
   const position = positions[index];
   if (!position) return null;
-  const frame = (clip.playbackRate ?? 1) / fps;
-  const minimum = Math.max(clip.sourceStart, (positions[index - 1]?.sourceTime ?? -frame) + frame);
+  const frame = cameraTimingRate(clip) / fps;
+  const minimum = Math.max(
+    cameraSourceTime(clip, clip.startTime),
+    (positions[index - 1]?.sourceTime ?? -frame) + frame
+  );
   const maximum = Math.min(
-    clip.sourceStart + clip.sourceDuration - frame,
+    (clip.cameraTiming?.timeDomain === 'result'
+      ? cameraSourceTime(clip, clip.startTime + clip.duration)
+      : clip.sourceStart + clip.sourceDuration) - frame,
     (positions[index + 1]?.sourceTime ?? Infinity) - frame
   );
   if (edit.sourceTime !== undefined && (!Number.isFinite(edit.sourceTime) || minimum > maximum))
@@ -299,12 +303,19 @@ function editCameraVisibility(
   } else {
     const current =
       edit.id === undefined ? undefined : ranges.find((range) => range.id === edit.id);
-    const duration = Math.max(
-      project.assets.find((asset) => asset.id === clip.assetId)?.metadata.duration ??
-        clip.sourceStart + clip.sourceDuration,
-      clip.cameraTiming ? clip.sourceStart + clip.sourceDuration : 0,
-      ranges.at(-1)?.end ?? 0
-    );
+    const duration =
+      clip.cameraTiming?.timeDomain === 'result'
+        ? Math.max(
+            cameraSourceTime(clip, project.duration),
+            cameraSourceTime(clip, clip.startTime + clip.duration),
+            ranges.at(-1)?.end ?? 0
+          )
+        : Math.max(
+            project.assets.find((asset) => asset.id === clip.assetId)?.metadata.duration ??
+              clip.sourceStart + clip.sourceDuration,
+            clip.cameraTiming ? clip.sourceStart + clip.sourceDuration : 0,
+            ranges.at(-1)?.end ?? 0
+          );
     if (
       (edit.id !== undefined && !current) ||
       !isCameraHiddenRange({ id: edit.id ?? 'candidate', start: edit.start, end: edit.end }) ||

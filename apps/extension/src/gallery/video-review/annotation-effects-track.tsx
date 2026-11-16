@@ -1,3 +1,4 @@
+import { reviewTimelineHint } from './timeline-hints';
 import { useReviewTimelineSnap } from './timeline-magnets';
 import { ReviewTrackVisibilityButton } from './track-row';
 import { reviewTrackMetrics, ReviewTrackCuts, ReviewTrackRow } from './track-row';
@@ -22,7 +23,7 @@ import { useReviewDragEscape } from './timeline-drag';
 import { ReviewTimelineLabel } from './timeline-label';
 import type { ReviewTrackProjection } from './track-projection';
 
-type Range = Pick<ReviewAnnotationEffect, 'start' | 'end'>;
+type Range = Pick<ReviewAnnotationEffect, 'start' | 'end' | 'timeDomain'>;
 type Drag = {
   id: string | null;
   before: Range;
@@ -87,21 +88,35 @@ function boundedRange(
 /** Source-clock plates; overlap rows are disposable and never change compositing order. */
 export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
   const display = incoming.projection?.display;
+  const instances = useMemo(
+    () =>
+      display
+        ? incoming.instances.map((item) => ({
+            ...item,
+            start:
+              item.timeDomain === 'result'
+                ? display.resultToDisplay(item.start)
+                : display.sourceToDisplay(item.start),
+            end:
+              item.timeDomain === 'result'
+                ? display.resultToDisplay(item.end, 'end')
+                : display.sourceToDisplay(item.end, 'end'),
+          }))
+        : incoming.instances,
+    [incoming.instances, display]
+  );
   const props: TrackProps = display
     ? {
         ...incoming,
         duration: display.duration,
         time: display.sourceToDisplay(incoming.time),
-        instances: incoming.instances.map((item) => ({
-          ...item,
-          start: display.sourceToDisplay(item.start),
-          end: display.sourceToDisplay(item.end, 'end'),
-        })),
+        instances,
         snapTimes: incoming.snapTimes.map((time) => display.sourceToDisplay(time)),
         onPreview: (range) =>
           incoming.onPreview({
-            start: display.displayToSource(range.start),
-            end: display.displayToSource(range.end),
+            start: display.displayToResult(range.start),
+            end: display.displayToResult(range.end),
+            timeDomain: 'result',
           }),
         onPlace: (range, anchor) =>
           incoming.onPlace?.(
@@ -164,13 +179,15 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
     }
     return result;
   }, [props.instances]);
+  const snapshotIds = [...new Set(incoming.instances.map((instance) => instance.snapshotId))]
+    .sort()
+    .join(',');
+  const neededSnapshots = useMemo(() => new Set(snapshotIds.split(',')), [snapshotIds]);
   const labels = useMemo(
     () =>
       new Map(
         props.snapshots
-          .filter((snapshot) =>
-            props.instances.some((instance) => instance.snapshotId === snapshot.id)
-          )
+          .filter((snapshot) => neededSnapshots.has(snapshot.id))
           .map((snapshot) => {
             const document = readReviewAnnotationEffectDocument(snapshot.source, snapshot.sha256);
             return [
@@ -181,7 +198,7 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
             ];
           })
       ),
-    [props.snapshots, props.instances, locale]
+    [props.snapshots, neededSnapshots, locale]
   );
   const metrics = reviewTrackMetrics(props.compact);
   const height = metrics.step;
@@ -208,9 +225,12 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
               : { start: current.before.start },
             current.node
           );
-        } else {
+        } else if (current.moved) {
           props.onPreview(current.after);
           props.onCommit();
+        } else {
+          props.onCancel();
+          if (current.id && current.edge === 'move') props.onSelect(current.id);
         }
       });
   };
@@ -401,6 +421,12 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
               data-annotation-effect-row={rows.get(instance.id)}
               data-enabled={instance.enabled}
               title={`${name} ${interval}`}
+              data-review-hint={reviewTimelineHint(
+                name,
+                range.start,
+                range.end,
+                instance.enabled ? undefined : translate('gallery.videoReview.itemDisabled')
+              )}
               className={[
                 'absolute touch-none cursor-grab overflow-hidden rounded border px-3 text-[11px]',
                 'focus-visible:outline focus-visible:outline-2',
@@ -465,7 +491,6 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
                 };
                 drag.current = current;
                 current.admission = deferReviewGesture(props.beforeAction, () => {
-                  props.onSelect(instance.id);
                   current.ready = props.onBegin(instance.id);
                   if (current.ready) {
                     props.onPreview(current.after);
@@ -485,6 +510,8 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
                 )
                   return;
                 event.stopPropagation();
+                current.moved ||= Math.abs(event.clientX - current.x) > 3;
+                if (!current.moved) return;
                 let next = boundedRange(
                   current.before,
                   current.edge,

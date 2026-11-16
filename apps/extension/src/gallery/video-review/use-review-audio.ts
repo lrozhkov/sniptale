@@ -132,10 +132,12 @@ function createReviewAudioClipActions(
     patch: (clips: QuickEditAudioClip[]) => QuickEditAudioClip[],
     discrete = false
   ) => args.setAudio((audio) => ({ ...audio, [lane]: patch(audio[lane]) }), discrete);
-  const laneDuration = (lane: ReviewAudioLane) =>
-    args.audio[lane].some((clip) => clip.sourceAnchor) && args.audio.voiceoverSegments
-      ? args.audio.voiceoverSegments.at(-1)!.sourceEnd
-      : args.timelineDuration;
+  const laneDuration = (lane: ReviewAudioLane, clip?: QuickEditAudioClip) =>
+    clip?.timeDomain === 'result'
+      ? args.timelineDuration
+      : args.audio[lane].some((clip) => clip.sourceAnchor) && args.audio.voiceoverSegments
+        ? args.audio.voiceoverSegments.at(-1)!.sourceEnd
+        : args.timelineDuration;
   const updateClip = (
     lane: ReviewAudioLane,
     id: string,
@@ -148,7 +150,7 @@ function createReviewAudioClipActions(
         clips.map((clip) => {
           if (clip.id !== id) return clip;
           const next = patch(clip);
-          return next.id === id ? clampQuickEditAudioClip(next, laneDuration(lane)) : next;
+          return next.id === id ? clampQuickEditAudioClip(next, laneDuration(lane, next)) : next;
         }),
       discrete
     );
@@ -172,7 +174,7 @@ function createReviewAudioClipActions(
         moveQuickEditAudioClip(
           clip,
           timelineStart,
-          laneDuration(lane),
+          laneDuration(lane, clip),
           args.audio.voiceoverSegments
         )
       ),
@@ -188,7 +190,7 @@ function createReviewAudioClipActions(
           clip,
           edge,
           timelineTime,
-          laneDuration(lane),
+          laneDuration(lane, clip),
           assetDuration ?? args.assets.get(clip.assetId)?.duration,
           args.audio.voiceoverSegments
         )

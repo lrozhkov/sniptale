@@ -1,3 +1,7 @@
+import { reviewInsertionTarget, reviewResultInsertionContext } from './range-placement';
+import { createTrackProjection } from './track-projection';
+import { projectReviewCursorMotions } from '../../features/video/review/timeline-placement';
+import { evaluateCursorFocusSegment } from '../../features/video/project/cursor-focus-path/evaluator';
 import { createReviewInteractionEditor } from './interaction-editor';
 import { useReviewCursorMotions } from './cursor-motion-editor';
 import { useReviewRecordingHistory } from './use-recording-history';
@@ -132,21 +136,62 @@ export function useReviewEditorState(resource: LoadedReview) {
     ]
   );
   const state = assembleReviewEditorState(core, wiring);
-  const cursorMotion = useReviewCursorMotions({
-    advanced: state.advanced,
+  const cursorProjection = useMemo(
+    () => createTrackProjection(source.duration, state.snapshot.document.edits),
+    [source.duration, state.snapshot.document.edits]
+  );
+  const cursorMotions = useMemo(
+    () =>
+      projectReviewCursorMotions(
+        state.advanced.cursorMotions,
+        state.timeline.timeMap.getSegments()
+      ),
+    [state.advanced.cursorMotions, state.timeline.timeMap]
+  );
+  const cursorInsertion = reviewResultInsertionContext({
     time: state.time,
-    duration: source.duration,
+    resultTime: state.timeline.sceneOutputTime,
+    range:
+      state.playbackRange ??
+      (state.activeSelection.kind === 'none' && state.selection.kind === 'range'
+        ? state.selection
+        : null),
+    projection: cursorProjection,
+  });
+  const cursorMotion = useReviewCursorMotions({
+    advanced: { ...state.advanced, ...(cursorMotions ? { cursorMotions } : {}) },
+    time: cursorInsertion.time,
+    insertionRange: cursorInsertion.range,
+    insertionPoint: () =>
+      state.insertionPoint(
+        reviewInsertionTarget(
+          state.time,
+          state.playbackRange ??
+            (state.activeSelection.kind === 'none' && state.selection.kind === 'range'
+              ? state.selection
+              : null)
+        )?.start ?? state.time
+      ),
+    pause: state.pause,
+    duration: cursorInsertion.duration,
     selection: state.activeSelection,
     onChange: state.setCursorMotions,
     onEnabledChange: state.setCursorMotionEnabled,
     select: state.setActiveSelection,
-    seek: state.seek,
+    seek: state.seekResult,
     canStart: state.canStart,
     setMessage: state.setMessage,
   });
   const interactionEditor = createReviewInteractionEditor({
     ...state,
-    duration: source.duration,
+    time: cursorInsertion.time,
+    insertionRange: cursorInsertion.range,
+    duration: cursorInsertion.duration,
+    sourceDuration: source.duration,
+    toResult: (time) =>
+      state.timeline.timeMap.sourceToTimeline(time) ?? state.timeline.sceneOutputTime,
+    insertionPoint: (time) =>
+      state.insertionPoint(state.timeline.timeMap.timelineToSource(time) ?? state.time),
   });
   return { ...state, interactionEditor, cursorMotion, clickCues, keyCues };
 }
@@ -155,6 +200,11 @@ export function useReviewEditorState(resource: LoadedReview) {
 function useReviewEditorCore(resource: LoadedReview) {
   const base = useReviewEditorBase(resource);
   const timeline = useReviewEditorTimeline(resource, base);
+  const insertionProjection = useMemo(
+    () => createTrackProjection(resource.source.duration, base.snapshot.document.edits),
+    [resource.source.duration, base.snapshot.document.edits]
+  );
+  base.stopForEdit.current = timeline.pause;
   const styles = [...(base.advanced.keyAnimations ?? []), ...(base.advanced.clickAnimations ?? [])];
   const reach =
     Math.max(
@@ -226,6 +276,9 @@ function useReviewEditorCore(resource: LoadedReview) {
     timelineHistory.telemetry,
   ]);
   const presentationPending = useRef(false);
+  const webcamResultClock =
+    base.advanced.webcam?.timeDomain === 'result' ||
+    timeline.timeline.timeMap.getSegments().some((segment) => segment.kind === 'freeze');
   const webcam = useReviewWebcamEditor({
     session: base.session,
     advanced: base.advancedState,
@@ -235,12 +288,34 @@ function useReviewEditorCore(resource: LoadedReview) {
       canvas: base.features.canvas,
       windowHeader: base.features.windowHeader,
     }),
-    sourceDuration: resource.source.duration,
-    time: timeline.time,
+    sourceDuration: webcamResultClock ? timeline.timeline.resultDuration : resource.source.duration,
+    time: webcamResultClock ? timeline.timeline.sceneOutputTime : timeline.time,
+    sourceTime:
+      timeline.timeline.timeMap.timelineToSource(timeline.timeline.sceneOutputTime) ??
+      timeline.time,
+    segments: timeline.timeline.timeMap.getSegments(),
+    insertionRange: webcamResultClock
+      ? reviewResultInsertionContext({
+          time: timeline.time,
+          resultTime: timeline.timeline.sceneOutputTime,
+          range:
+            timeline.playbackRange ??
+            (base.activeSelection.kind === 'none' && base.selection.kind === 'range'
+              ? base.selection
+              : null),
+          projection: insertionProjection,
+        }).range
+      : reviewInsertionTarget(
+          timeline.time,
+          timeline.playbackRange ??
+            (base.activeSelection.kind === 'none' && base.selection.kind === 'range'
+              ? base.selection
+              : null)
+        ),
     selection: base.activeSelection,
     select: base.setActiveSelection,
     pause: timeline.pause,
-    seek: (time) => timeline.seek(time, false),
+    seek: webcamResultClock ? timeline.seekResult : (time) => timeline.seek(time, false),
     allowed: () =>
       !base.busy &&
       !presentationPending.current &&
@@ -334,6 +409,8 @@ function useReviewEditorCore(resource: LoadedReview) {
         .catch(() => base.setMessage(translate('gallery.videoReview.saveFailed')));
     },
     setActiveSelection: (next: Parameters<typeof base.setActiveSelection>[0]) => {
+      const selection = typeof next === 'function' ? next(base.activeSelection) : next;
+      if (selection.kind !== 'none') timeline.pause();
       if (!annotationEffects.hasPending()) return base.setActiveSelection(next);
       void annotationEffects
         .flush()
@@ -355,7 +432,9 @@ function useReviewEditorBase(resource: LoadedReview) {
   const snapshot = useReviewSnapshot(session);
   const composer = useReviewComposer(session);
   const exporter = useReviewExport(resource);
-  const advancedState = useReviewAdvanced(session);
+  const stopForEdit = useRef<() => void>(() => {});
+  const beforeEdit = useCallback(() => stopForEdit.current(), []);
+  const advancedState = useReviewAdvanced(session, beforeEdit);
   const advanced = advancedState.advanced;
   const features = useMemo(
     () => resolveQuickEditEffectiveState(advanced, { facts: resource.telemetry, source }),
@@ -368,6 +447,8 @@ function useReviewEditorBase(resource: LoadedReview) {
   const [hovered, setHovered] = useState<ReviewAnnotation | null>(null);
   const [voiceoverSilent, setVoiceoverSilent] = useState(false);
   const { selection: activeSelection, setSelection: selectActive } = useReviewSelection();
+  const activeSelectionRef = useRef(activeSelection);
+  activeSelectionRef.current = activeSelection;
   const {
     actionBusy,
     isBusy,
@@ -395,8 +476,11 @@ function useReviewEditorBase(resource: LoadedReview) {
     void speechGuard.perform(() => transitions.beforeAction(action));
   };
   const setActiveSelection: typeof selectActive = (next) => {
+    const selection = typeof next === 'function' ? next(activeSelectionRef.current) : next;
+    if (selection.kind !== 'none') beforeEdit();
+    activeSelectionRef.current = selection;
     advancedState.endTyping();
-    void speechGuard.perform(() => selectActive(next));
+    void speechGuard.perform(() => selectActive(selection));
   };
   const run = (action: () => Promise<unknown>, success?: string) =>
     Promise.resolve(speechGuard.perform(() => transitions.perform(() => raw(action, success))));
@@ -412,6 +496,7 @@ function useReviewEditorBase(resource: LoadedReview) {
   const busy = actionBusy || backgroundImport.pending || transitions.pending;
   return {
     session,
+    stopForEdit,
     source,
     snapshot,
     composer,
@@ -514,7 +599,11 @@ function useReviewEditorTimeline(
     interactionEnabled: advanced.ui.tracks,
     actionsApplied: features.actionsApplied,
     onSeek: (next) => {
-      if (selection.kind === 'point') setSelection({ kind: 'point', time: next });
+      setSelection((current) =>
+        current.kind === 'point' || next < current.start || next >= current.end
+          ? { kind: 'point', time: next }
+          : current
+      );
     },
     boundaries: () =>
       cuts.cutting && advanced.ui.mode !== 'advanced' ? exporter.index?.boundaries : undefined,
@@ -542,7 +631,14 @@ function useReviewEditorTimeline(
     sourceDuration: source.duration,
     sourceTime: time,
     file: resource.file,
-    timelineSelection: selection,
+    timelineSelection: (() => {
+      const target = reviewInsertionTarget(
+        time,
+        playbackRange ??
+          (activeSelection.kind === 'none' && selection.kind === 'range' ? selection : null)
+      );
+      return target ? { kind: 'range' as const, ...target } : { kind: 'point' as const, time };
+    })(),
     exporter,
     edits: snapshot.document.edits,
     pause,
@@ -609,6 +705,11 @@ function assembleReviewEditorState(
     telemetry,
     ...reviewAdvancedControls(advancedState, setActiveSelection, core.beforeAction),
     projected,
+    insertionPoint: (at: number) => {
+      const path = wiring.cursorFocusPath;
+      const segment = path.segments.find((part) => at >= part.start && at <= part.end);
+      return segment ? evaluateCursorFocusSegment(segment, at, path.smoothing) : null;
+    },
     cursorFocusPath: wiring.cursorFocusPath,
     cursorFocusKeys: wiring.cursorFocusKeys,
     selectCursorFocusKey: (id: string | undefined, time: number) =>
@@ -621,12 +722,14 @@ function assembleReviewEditorState(
       core.beforeAction(() => {
         const moved = moveCursorFocusTimelineKey(wiring.cursorFocusPath, key, time);
         advancedState.setCursorFocusPath(moved.path);
-        core.setSelection({ kind: 'point', time: moved.time });
-        setActiveSelection({ kind: 'cursor-focus', id: moved.id, time: moved.time });
-        core.seek(moved.time, false);
+        if (core.activeSelection.kind === 'cursor-focus' && core.activeSelection.id === key.id)
+          setActiveSelection({ kind: 'cursor-focus', id: moved.id, time: moved.time });
       }),
-    addCursorFocusKey: (time: number) =>
+    addCursorFocusKey: (requestedTime: number) =>
       core.beforeAction(() => {
+        const time =
+          reviewInsertionTarget(requestedTime, core.playbackRange)?.start ?? requestedTime;
+        core.pause();
         const id = crypto.randomUUID();
         advancedState.setCursorFocusPath(
           addReviewCursorFocusKey(wiring.cursorFocusPath, time, core.source.duration, id)
@@ -669,6 +772,7 @@ function reviewAdvancedControls(
     setTrackVisibility: advancedState.setTrackVisibility,
     setOverlaysVisible: advancedState.setOverlaysVisible,
     setWorkspaceColor: advancedState.setWorkspaceColor,
+    setTimelinePreferences: advancedState.setTimelinePreferences,
     setInteractionTimeline: advancedState.setInteractionTimeline,
     setKeyAnimations: advancedState.setKeyAnimations,
     setActionAudio: advancedState.setActionAudio,

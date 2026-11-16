@@ -1,6 +1,6 @@
 import { reviewTextSourceInterval } from '../../features/video/review/text-timing';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { ReviewTextTypingTarget } from '../../features/video/review/text-types';
 import {
   addReviewTextFragment,
@@ -114,7 +114,7 @@ export function useReviewText(args: {
     () => createTrackProjection(args.sourceDuration, args.edits),
     [args.sourceDuration, args.edits]
   );
-  const document = args.document ?? createReviewTextDocument();
+  const document = useMemo(() => args.document ?? createReviewTextDocument(), [args.document]);
   const mutate = (
     operation: (current: ReviewTextDocument) => ReviewTextEditResult,
     typing?: ReviewTextTypingTarget
@@ -141,7 +141,9 @@ export function useReviewText(args: {
         if (timingRevision !== undefined && fragment?.timingRevision !== timingRevision)
           return { ok: false, reason: 'stale' };
         const limit =
-          fragment?.timeDomain === 'source' ? args.sourceDuration : projection.resultDuration;
+          (patch.timeDomain ?? fragment?.timeDomain) === 'source'
+            ? args.sourceDuration
+            : projection.resultDuration;
         if (
           (patch.start !== undefined && patch.start < 0) ||
           (patch.end !== undefined && patch.end > limit)
@@ -153,14 +155,20 @@ export function useReviewText(args: {
         ? { kind: 'text', fragmentId: id, field: 'text' }
         : undefined
     );
-  const add = (select = true, sourceRange?: { start: number; end: number }) =>
+  const add = (
+    select = true,
+    sourceRange?: { start: number; end: number },
+    timeDomain: 'source' | 'result' = 'source'
+  ) =>
     guard(() => {
       args.pause();
       const id = crypto.randomUUID();
       const start = Math.max(
         0,
         Math.min(
-          projection.output(sourceRange?.start ?? args.sourceTime),
+          sourceRange && timeDomain === 'result'
+            ? sourceRange.start
+            : projection.output(sourceRange?.start ?? args.sourceTime),
           sourceRange ? projection.resultDuration : projection.resultDuration - 0.05
         )
       );
@@ -171,7 +179,11 @@ export function useReviewText(args: {
             start,
             end: Math.min(
               projection.resultDuration,
-              sourceRange ? projection.output(sourceRange.end) : start + 3
+              sourceRange
+                ? timeDomain === 'result'
+                  ? sourceRange.end
+                  : projection.output(sourceRange.end)
+                : start + 3
             ),
           })
         )
@@ -180,12 +192,18 @@ export function useReviewText(args: {
         if (select) args.select({ kind: 'text', id });
       }
     });
-  const sourceInterval = (fragment: ReviewTextFragment) =>
-    fragment.sourceAnchor
-      ? reviewTextSourceInterval(fragment, segments)
-      : fragment.timeDomain === 'source'
-        ? { start: fragment.start, end: fragment.end }
-        : { start: projection.source(fragment.start), end: projection.source(fragment.end, 'end') };
+  const sourceInterval = useCallback(
+    (fragment: ReviewTextFragment) =>
+      fragment.sourceAnchor
+        ? reviewTextSourceInterval(fragment, segments)
+        : fragment.timeDomain === 'source'
+          ? { start: fragment.start, end: fragment.end }
+          : {
+              start: projection.source(fragment.start),
+              end: projection.source(fragment.end, 'end'),
+            },
+    [segments, projection]
+  );
   return {
     document,
     captions: args.captions ?? createReviewCaptionSettings(),

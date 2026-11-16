@@ -260,16 +260,17 @@ function reviewPresentationMetadata(
 export function useReviewExport(resource: LoadedReview) {
   const { sourceIndex, indexing } = useReviewSourceIndex(resource.file);
   const { document, snapshot } = resource.session.getSnapshot();
-  const advanced = { ui: snapshot.workspace.advanced.ui, ...document.advancedContent };
+  const advanced = useMemo(
+    () => ({ ui: snapshot.workspace.advanced.ui, ...document.advancedContent }),
+    [snapshot.workspace.advanced.ui, document.advancedContent]
+  );
   const { index, renderSettings, setRenderSettings, checkingCodecs } = useReviewExportSettings(
     sourceIndex,
     advanced
   );
-  const { hasBookends, duration: presentationDuration } = reviewPresentationMetadata(
-    index,
-    advanced,
-    document.edits,
-    renderSettings
+  const { hasBookends, duration: presentationDuration } = useMemo(
+    () => reviewPresentationMetadata(index, advanced, document.edits, renderSettings),
+    [index, advanced, document.edits, renderSettings]
   );
   const { phase, progress, timeEstimate, changePhase, setProgress, setTimeEstimate } =
     useReviewExportProgress();

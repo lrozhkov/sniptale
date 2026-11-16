@@ -69,6 +69,7 @@ export function reviewClickSections(props: {
   sections.push(
     reviewInspectorActions(
       <ReviewButton
+        selectionAction="reset"
         className={`${reviewTextButtonClassName} !w-full justify-start`}
         label={translate('gallery.videoReview.clickReset')}
         onClick={() => props.onChange(null)}

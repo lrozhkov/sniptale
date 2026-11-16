@@ -165,7 +165,8 @@ export async function buildReviewGpuScene(args: {
     currentScene.cursorMotions,
     sourceTime,
     base.videoRect,
-    currentScene.source.height
+    currentScene.source.height,
+    currentGeometry.resultTime
   );
   const originalLayers: GpuPreviewLayer[] = [
     ...(artwork.decoration
@@ -254,7 +255,8 @@ export async function buildReviewGpuScene(args: {
             currentScene.cursorMotions,
             sourceTime,
             plane.video,
-            currentScene.source.height
+            currentScene.source.height,
+            currentGeometry.resultTime
           )!.rect,
           clip: { rect: plane.clip, radius: radius * plane.clipScale },
         };

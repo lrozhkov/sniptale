@@ -854,7 +854,9 @@ it.each([false, true])(
       act(() => vi.advanceTimersByTime(999));
       expect(host.textContent).not.toContain(message);
       act(() => vi.advanceTimersByTime(1));
-      expect(host.textContent).toContain(message);
+      expect(
+        host.querySelector('[data-ui="gallery.videoReview.previewWaiting"]')?.getAttribute('title')
+      ).toContain(message);
       presentation.phase = 'ready';
       renderStage({});
       expect(host.textContent).not.toContain(message);

@@ -362,6 +362,7 @@ export function ReviewCanvasCommentEditor(props: CanvasCommentEditorProps) {
           reviewInspectorActions(
             <>
               <ReviewButton
+                selectionAction="delete"
                 label={translate('gallery.videoReview.overlayDelete')}
                 disabled={props.busy}
                 className={`${reviewDeleteButtonClassName} !w-full justify-start`}

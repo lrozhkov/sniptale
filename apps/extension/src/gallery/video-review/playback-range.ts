@@ -2,7 +2,11 @@ import { reviewPlaybackTime, reviewPlaybackSettings } from '../../features/video
 import type { ReviewEdit } from '../../features/video/review/types';
 
 /** Disposable source-time transport restriction; never part of the document. */
-export type ReviewPlaybackRange = { start: number; end: number };
+export type ReviewPlaybackRange = {
+  start: number;
+  end: number;
+  result?: { start: number; end: number };
+};
 
 /** Normalize gesture endpoints into a usable source interval. */
 export function createReviewPlaybackRange(

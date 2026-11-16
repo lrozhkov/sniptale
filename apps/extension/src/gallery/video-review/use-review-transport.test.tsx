@@ -117,7 +117,7 @@ it('stops scheduled audio before pausing the native video transport', async () =
   expect(bridge.preparePlayback).not.toHaveBeenCalled();
   expect(bridge.stopPlayback).toHaveBeenCalledOnce();
   expect(bridge.stopPlayback.mock.invocationCallOrder[0]).toBeLessThan(
-    bridge.play.mock.invocationCallOrder[0]!
+    bridge.pause.mock.invocationCallOrder[0]!
   );
   const pause = vi.spyOn(bridge.video.current!, 'pause').mockImplementation(() => {});
   bridge.options!.onFailure();

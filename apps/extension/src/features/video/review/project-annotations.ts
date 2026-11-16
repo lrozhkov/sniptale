@@ -95,13 +95,17 @@ export function planReviewProjectAnnotations(args: {
       trackId,
       name,
       type: 'EFFECT',
-      sourceRange: {
-        assetId: args.source.assetId,
-        sourceInstanceId: args.source.sourceInstanceId,
-        start: annotation.start,
-        end: annotation.end,
-        ...(dormant ? { dormant: true as const } : {}),
-      },
+      ...(annotation.timeDomain === 'result'
+        ? {}
+        : {
+            sourceRange: {
+              assetId: args.source.assetId,
+              sourceInstanceId: args.source.sourceInstanceId,
+              start: annotation.start,
+              end: annotation.end,
+              ...(dormant ? { dormant: true as const } : {}),
+            },
+          }),
       attachment:
         annotation.attachment === 'content'
           ? {

@@ -157,7 +157,7 @@ it('disposes switched resources and ignores their delayed result', async () => {
   await act(async () => pending.resolve(prepared(0)));
   expect(value.failed).toBe(false);
   expect(value.pending).toBe(false);
-  expect(next.read).toHaveBeenCalledWith(12);
+  expect(next.read).toHaveBeenCalledWith(12, { start: 9, end: 15 });
 });
 it('supports StrictMode cleanup and keeps legacy sources on their original telemetry', async () => {
   io.create.mockImplementation(reader);
@@ -223,11 +223,13 @@ it('bounds reuse of an expanded animation window while the playhead advances', a
   owner.covers = () => true;
   io.create.mockReturnValue(owner);
   await act(async () => root.render(<Probe time={10} options={{ reach: 5 }} />));
-  expect(owner.read).toHaveBeenCalledWith(10, { start: 5, end: 15 });
+  expect(owner.read).toHaveBeenCalledWith(10, { start: 0, end: 20 });
   await act(async () => root.render(<Probe time={10.5} options={{ reach: 5 }} />));
   expect(owner.read).toHaveBeenCalledTimes(1);
   await act(async () => root.render(<Probe time={11.1} options={{ reach: 5 }} />));
-  expect(owner.read).toHaveBeenCalledTimes(2);
+  expect(owner.read).toHaveBeenCalledTimes(1);
+  await act(async () => root.render(<Probe time={19} options={{ reach: 5 }} />));
+  expect(owner.read).toHaveBeenCalledTimes(1);
 });
 
 it('keeps strict archived history readable through rounded media EOF, End and seek-back without Retry', async () => {

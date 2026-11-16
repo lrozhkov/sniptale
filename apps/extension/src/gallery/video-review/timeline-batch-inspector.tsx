@@ -1,5 +1,5 @@
 import { useContext, useLayoutEffect, useState } from 'react';
-import { Copy, Trash2, VolumeX, X } from 'lucide-react';
+import { Copy, Trash2, Volume2, VolumeX, X } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewSelection } from '../../features/video/review/types';
 import type { useReviewEditorState } from './use-editor-state';
@@ -73,6 +73,15 @@ export function ReviewTimelineBatchInspector({
       canCloneReviewSelection(item, state.advanced, selections, state.snapshot.document.edits)
     );
   const mutableAudio = complete && selections.every((item) => item.kind === 'audio');
+  const allMuted =
+    mutableAudio &&
+    selections.every(
+      (item) =>
+        item.kind === 'audio' &&
+        state.advanced.audio[item.lane].some(
+          (clip) => clip.id === item.id && (clip.muted || clip.volume === 0)
+        )
+    );
   const disabled = pending || state.busy || state.editing.exporter.phase !== 'idle';
   const apply = async (operation: 'remove' | 'mute' | 'clone') => {
     if (
@@ -135,7 +144,11 @@ export function ReviewTimelineBatchInspector({
                       (item) =>
                         item.kind === 'audio' && item.lane === 'voiceover' && item.id === clip.id
                     )
-                      ? { ...clip, volume: 0 }
+                      ? {
+                          ...clip,
+                          muted: !allMuted,
+                          volume: allMuted && clip.volume === 0 ? 1 : clip.volume,
+                        }
                       : clip
                   ),
                   music: before.audio.music.map((clip) =>
@@ -143,7 +156,11 @@ export function ReviewTimelineBatchInspector({
                       (item) =>
                         item.kind === 'audio' && item.lane === 'music' && item.id === clip.id
                     )
-                      ? { ...clip, volume: 0 }
+                      ? {
+                          ...clip,
+                          muted: !allMuted,
+                          volume: allMuted && clip.volume === 0 ? 1 : clip.volume,
+                        }
                       : clip
                   ),
                 },
@@ -185,6 +202,7 @@ export function ReviewTimelineBatchInspector({
             <>
               {cloneable ? (
                 <ReviewButton
+                  selectionAction="duplicate"
                   label={translate('gallery.videoReview.timelineSelectionClone')}
                   disabled={disabled}
                   className={`${reviewTextButtonClassName} !w-full justify-start`}
@@ -196,17 +214,33 @@ export function ReviewTimelineBatchInspector({
               ) : null}
               {mutableAudio ? (
                 <ReviewButton
-                  label={translate('gallery.videoReview.timelineSelectionMute')}
+                  label={translate(
+                    allMuted
+                      ? 'gallery.videoReview.timelineSelectionUnmute'
+                      : 'gallery.videoReview.timelineSelectionMute'
+                  )}
+                  aria-pressed={allMuted}
                   disabled={disabled}
                   className={`${reviewTextButtonClassName} !w-full justify-start`}
                   onClick={() => void apply('mute')}
                 >
-                  <VolumeX size={15} aria-hidden="true" />
-                  <span>{translate('gallery.videoReview.timelineSelectionMute')}</span>
+                  {allMuted ? (
+                    <Volume2 size={15} aria-hidden="true" />
+                  ) : (
+                    <VolumeX size={15} aria-hidden="true" />
+                  )}
+                  <span>
+                    {translate(
+                      allMuted
+                        ? 'gallery.videoReview.timelineSelectionUnmute'
+                        : 'gallery.videoReview.timelineSelectionMute'
+                    )}
+                  </span>
                 </ReviewButton>
               ) : null}
               {removable ? (
                 <ReviewButton
+                  selectionAction="delete"
                   label={translate('gallery.videoReview.timelineSelectionDelete')}
                   disabled={disabled}
                   className={`${reviewDeleteButtonClassName} !w-full justify-start`}

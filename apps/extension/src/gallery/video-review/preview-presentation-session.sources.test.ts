@@ -502,6 +502,7 @@ it('keeps primary decoding strict and independent of pending camera acquisition'
       retry: vi.fn(),
       selectVisible: vi.fn(),
       time: 1.25,
+      sourceTime: 1.25,
     },
   });
   cameraFactory.mock.lastCall![3].loaded(10);

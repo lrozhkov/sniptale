@@ -166,12 +166,13 @@ it.each(['source', 'result'] as const)(
     expect(current.fragments[0]?.start).toBe(1);
     await pointer(block, 'pointerup', 300);
     expect(current.fragments[0]).toMatchObject({
-      start: domain === 'source' ? 2 : 1.5,
-      end: domain === 'source' ? 3 : 2.5,
+      start: domain === 'source' ? 1 : 1.5,
+      end: domain === 'source' ? 1.5 : 2.5,
+      timeDomain: 'result',
       revision: 0,
       timingRevision: 1,
     });
-    expect(select).toHaveBeenCalledWith('text');
+    expect(select).not.toHaveBeenCalled();
     const accepted = structuredClone(current);
     await pointer(block, 'pointerdown', 300);
     await pointer(block, 'pointermove', 400);
@@ -286,7 +287,11 @@ it.each(['source', 'result'] as const)(
     expect(readout()).toContain(duration(0.01));
     await pointer(block, 'pointerup', 2000);
     expect(readout()).toBeUndefined();
-    expect(current.fragments[0]).toMatchObject({ start: 1.99, end: 2 });
+    expect(current.fragments[0]).toMatchObject({
+      start: domain === 'source' ? 0.99 : 1.99,
+      end: domain === 'source' ? 1 : 2,
+      timeDomain: 'result',
+    });
   }
 );
 
@@ -302,14 +307,16 @@ it.each(['source', 'result'] as const)(
     const near = domain === 'source' ? 295 : 595;
     await pointer(block.querySelector('[data-text-edge="end"]')!, 'pointerdown', initial);
     await pointer(block, 'pointermove', near);
-    expect(host.querySelector<HTMLElement>('[data-resizing]')?.style.left).toBe(`${near + 5}px`);
+    expect(
+      Number.parseFloat(host.querySelector<HTMLElement>('[data-resizing]')!.style.left)
+    ).toBeCloseTo(near + 5, 3);
     await pointer(block, 'pointermove', near, true);
     expect(
       Number.parseFloat(host.querySelector<HTMLElement>('[data-resizing]')!.style.left)
     ).toBeCloseTo(near, 3);
     await pointer(block, 'pointermove', near);
     await pointer(block, 'pointerup', near);
-    expect(current.fragments[0]?.end).toBe(3);
+    expect(current.fragments[0]?.end).toBe(domain === 'source' ? 1.5 : 3);
   }
 );
 

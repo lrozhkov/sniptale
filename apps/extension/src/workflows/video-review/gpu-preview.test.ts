@@ -252,7 +252,7 @@ it('admits authored camera, watermark and edge fades while excluding independent
       },
     },
   };
-  expect(reviewGpuPreviewConcurrency({ ...scene, captions })).toBe(1);
+  expect(reviewGpuPreviewConcurrency({ ...scene, captions })).toBe(2);
   expect(
     reviewGpuPreviewConcurrency({
       ...scene,
@@ -430,6 +430,81 @@ it('keeps pending authored drift and zoom frames in distinct artwork destination
   f.owner.dispose();
   for (const painter of f.painters) expect(painter.dispose).toHaveBeenCalledTimes(1);
   expect(f.input.painter.dispose).not.toHaveBeenCalled();
+});
+
+it('keeps caption artwork isolated while two GPU frames complete out of order', async () => {
+  const f = fixture(2);
+  const style = {
+    position: 'bottom' as const,
+    fontSize: 0.04,
+    color: '#ffffff',
+    background: '#000000',
+  };
+  const authored = {
+    ...scene,
+    captions: { document: undefined, segments: [], settings: { enabled: true, style } },
+  };
+  const draw = vi.fn();
+  const captions = {
+    plan: {
+      conflicts: [],
+      cues: [1, 2, 3].map((time) => ({
+        id: String(time),
+        fragmentId: String(time),
+        start: time,
+        end: time + 1,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 30,
+        lines: [String(time)],
+        pixels: 16,
+        padding: 2,
+        lineHeight: 18,
+        style,
+      })),
+    },
+    draw,
+    assertExportable() {},
+  };
+  const first = Promise.withResolvers<typeof f.bitmap>();
+  const second = Promise.withResolvers<typeof f.bitmap>();
+  const firstEntered = Promise.withResolvers<void>();
+  const secondEntered = Promise.withResolvers<void>();
+  io.render
+    .mockImplementationOnce(() => {
+      firstEntered.resolve();
+      return first.promise;
+    })
+    .mockImplementationOnce(() => {
+      secondEntered.resolve();
+      return second.promise;
+    });
+  const render = (time: number) =>
+    f.owner.render({
+      ...f.input,
+      scene: authored,
+      captions,
+      sourceTime: time,
+      geometry: reviewPresentedGeometry(authored, dimensions, time),
+    });
+  const a = render(1);
+  await firstEntered.promise;
+  const b = render(2);
+  await secondEntered.promise;
+  expect(draw).toHaveBeenCalledTimes(2);
+  const firstContext = draw.mock.calls[0]![0];
+  const secondContext = draw.mock.calls[1]![0];
+  expect(firstContext).not.toBe(secondContext);
+  await expect(render(3)).rejects.toThrow('overlap');
+  second.resolve(f.bitmap);
+  await b;
+  await render(3);
+  expect(draw.mock.calls[2]![0]).toBe(secondContext);
+  expect(draw.mock.calls[0]![0]).toBe(firstContext);
+  first.resolve(f.bitmap);
+  await a;
+  f.owner.dispose();
 });
 
 it('borrows the unmodified frame through GPU completion and closes only the completed bitmap', async () => {

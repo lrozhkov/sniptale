@@ -118,7 +118,8 @@ export function createReviewRecordingHistorySource(
       try {
         let prepared = await events.prepare(project, range, active);
         active.throwIfAborted();
-        if (options.includeCursor !== false) prepared = await cursor.prepare(prepared, time);
+        if (options.includeCursor !== false)
+          prepared = await cursor.prepare(prepared, time, range, active);
         active.throwIfAborted();
         const group = prepared.actionFeedback?.find(
           (group) => group.recordingId === telemetry.recordingId

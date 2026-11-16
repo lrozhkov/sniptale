@@ -9,6 +9,7 @@ export type ReviewActionSoundDescriptor =
   | { family: 'typing' };
 
 export interface ReviewTelemetryMarker {
+  timeDomain?: 'result';
   ref: { kind: 'action' | 'signal' | 'cursor'; id: string };
   eventType: string;
   target?: string;

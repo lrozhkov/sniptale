@@ -27,7 +27,6 @@ import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { ReviewTimelineTools, ReviewFragmentAction } from './edit-actions';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
 import {
-  MousePointer2,
   StickyNote,
   Settings2,
   ZoomIn,
@@ -36,7 +35,6 @@ import {
   RectangleHorizontal,
   PanelsTopLeft,
   Volume2,
-  Sticker,
   RotateCw,
 } from 'lucide-react';
 import type { useReviewEdits } from './use-edits';
@@ -48,6 +46,8 @@ type Editing = ReturnType<typeof useReviewEdits>;
 /** Annotation choice belongs to the disposable placement tool, before any resource acquisition. */
 export type ReviewAnnotationTool = {
   active: boolean;
+  available?: boolean;
+  hint?: string | undefined;
   value: string;
   options: readonly { value: string; label: string }[];
   phase: 'loading' | 'ready' | 'failed';
@@ -61,7 +61,6 @@ export type ReviewAnnotationTool = {
 };
 
 type ToolbarProps = {
-  onAddNote?: (() => void) | undefined;
   selectedTrack?: QuickEditTrack | null;
   trackHasActions?: boolean;
   trackTools?: ReactNode;
@@ -77,6 +76,8 @@ type ToolbarProps = {
     onToggle(type?: ReviewFocusType): void;
   };
   originalAudioEditor?: ReturnType<typeof useReviewAudio>;
+  originalInsertionRange?: Extract<ReviewAnchor, { kind: 'range' }> | null;
+  onAddOriginal?(): void;
   editing: {
     mode: 'cut' | 'speed' | null;
     rate: Editing['rate'];
@@ -109,37 +110,8 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
   const advanced = props.advanced;
   const track = props.selectedTrack === undefined ? 'source' : props.selectedTrack;
   const features = resolveQuickEditEffectiveFeatures(advanced);
-  const pointerActive =
-    !props.focusTool?.active &&
-    !props.annotationTool?.active &&
-    !props.originalAudioEditor?.originalTool &&
-    props.editing.mode === null;
   return (
     <>
-      <div
-        className="flex shrink-0 items-center gap-0.5"
-        data-ui="gallery.videoReview.primaryTools"
-      >
-        <ReviewButton
-          label={translate('gallery.videoReview.pointerTool')}
-          aria-pressed={pointerActive}
-          className={plain}
-          disabled={busy}
-          onClick={() => admit(() => props.editing.setCutting(false))}
-        >
-          <MousePointer2 size={16} aria-hidden="true" />
-        </ReviewButton>
-        {props.onAddNote ? (
-          <ReviewButton
-            label={translate('gallery.videoReview.addComment')}
-            className={plain}
-            disabled={busy}
-            onClick={() => admit(() => props.onAddNote?.())}
-          >
-            <StickyNote size={16} aria-hidden="true" />
-          </ReviewButton>
-        ) : null}
-      </div>
       <div
         className="flex min-w-max flex-1 flex-nowrap items-center justify-center gap-0.5 px-2"
         data-ui="gallery.videoReview.editingTools"
@@ -164,22 +136,10 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
             cutHint={props.placementHints?.cut}
             speedHint={props.placementHints?.speed}
             cutAvailable={
-              !props.placementHints?.cut &&
-              (props.rulerRange ||
-                props.selectedObject ||
-                !props.originalAudioEditor?.originalRangeSelected) &&
-              (props.selectedObject ||
-                props.selection.kind !== 'range' ||
-                props.editing.canApply('cut', props.selection))
+              !props.placementHints?.cut && props.editing.canApply('cut', props.selection)
             }
             speedAvailable={
-              !props.placementHints?.speed &&
-              (props.rulerRange ||
-                props.selectedObject ||
-                !props.originalAudioEditor?.originalRangeSelected) &&
-              (props.selectedObject ||
-                props.selection.kind !== 'range' ||
-                props.editing.canApply('speed', props.selection))
+              !props.placementHints?.speed && props.editing.canApply('speed', props.selection)
             }
             busy={busy}
             rate={props.editing.rate}
@@ -320,7 +280,7 @@ function ReviewFocusToolControl({
           key={type}
           label={translate(label)}
           toolbarLabel={translate(label)}
-          title={tool.hint ?? translate('gallery.videoReview.focusRangeHint')}
+          title={tool.hint ?? translate(label)}
           aria-pressed={tool.active && (tool.type ?? 'zoom') === type}
           className={plain}
           disabled={busy || !(tool.availableFor?.(type) ?? tool.available)}
@@ -341,48 +301,48 @@ function ReviewAnnotationToolControl(props: {
   const { tool, busy, admit } = props;
   const hint = annotationTypeHint(tool);
   return (
-    <ReviewToolGroup
-      active={tool.active}
-      label={translate('gallery.videoReview.annotationEffects')}
+    <div
+      className="flex items-center gap-1"
+      onPointerDownCapture={(event) => {
+        if (event.target instanceof Element && event.target.closest('[aria-haspopup="listbox"]'))
+          tool.onToggle(event.currentTarget);
+      }}
+      onKeyDownCapture={(event) => {
+        if (
+          event.target instanceof Element &&
+          event.target.closest('[aria-haspopup="listbox"]') &&
+          ['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(event.key)
+        )
+          tool.onToggle(event.currentTarget);
+      }}
     >
-      <ReviewButton
-        label={translate('gallery.videoReview.annotationEffectsAdd')}
-        toolbarLabel={translate('gallery.videoReview.annotationEffects')}
-        title={translate(
-          tool.active
-            ? 'gallery.videoReview.annotationEffectsDraw'
-            : 'gallery.videoReview.annotationEffectsAdd'
-        )}
-        aria-pressed={tool.active}
-        className={plain}
-        disabled={busy || tool.pending}
-        onClick={(event) => {
-          const node = event.currentTarget;
-          admit(() => tool.onToggle(node));
-        }}
-      >
-        <Sticker size={16} aria-hidden />
-      </ReviewButton>
-      {tool.active ? (
-        <>
-          <ProductSelect
-            menuClassName="sniptale-parameter-menu"
-            aria-label={translate('gallery.videoReview.annotationEffectsChoose')}
-            dataUi="gallery.videoReview.annotationType"
-            controlSize="sm"
-            className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
-            containerClassName="!w-auto !min-w-0 max-w-48 shrink-0"
-            menuWidth={280}
-            value={tool.value}
-            placeholder={hint}
-            options={tool.options}
-            disabled={busy || tool.pending || tool.phase !== 'ready' || !tool.options.length}
-            onChange={(value) => admit(() => tool.onChoose(value))}
-          />
-          <ReviewAnnotationToolFeedback {...props} hint={hint} />
-        </>
-      ) : null}
-    </ReviewToolGroup>
+      <ProductSelect
+        menuClassName="sniptale-parameter-menu"
+        aria-label={translate('gallery.videoReview.annotationEffectsAdd')}
+        dataUi="gallery.videoReview.annotationType"
+        controlSize="sm"
+        className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
+        containerClassName="!w-auto !min-w-0 max-w-64 shrink-0"
+        menuWidth={280}
+        value=""
+        placeholder={
+          tool.phase === 'ready' && tool.options.length
+            ? translate('gallery.videoReview.annotationEffectsAdd')
+            : hint
+        }
+        options={tool.options}
+        title={tool.hint}
+        disabled={
+          busy ||
+          tool.pending ||
+          tool.available === false ||
+          tool.phase !== 'ready' ||
+          !tool.options.length
+        }
+        onChange={(value) => admit(() => tool.onChoose(value))}
+      />
+      <ReviewAnnotationToolFeedback {...props} hint={hint} />
+    </div>
   );
 }
 
@@ -487,7 +447,14 @@ function ReviewOriginalAudioTool({
 }: {
   props: Pick<
     ToolbarProps,
-    'editing' | 'rulerRange' | 'edits' | 'advanced' | 'selection' | 'selectedObject'
+    | 'editing'
+    | 'rulerRange'
+    | 'edits'
+    | 'advanced'
+    | 'selection'
+    | 'selectedObject'
+    | 'originalInsertionRange'
+    | 'onAddOriginal'
   >;
   editor: ReturnType<typeof useReviewAudio>;
   busy: boolean;
@@ -495,11 +462,11 @@ function ReviewOriginalAudioTool({
 }) {
   const sourceAudioReady = !!props.editing.exporter.index?.audioCodec;
   const volumeIssue =
-    props.rulerRange && editor
+    props.originalInsertionRange && editor
       ? reviewOriginalAudioPlacementIssue({
-          range: props.rulerRange,
+          range: props.originalInsertionRange,
           edits: props.edits,
-          available: editor.canAddOriginal(props.rulerRange),
+          available: editor.canAddOriginal(props.originalInsertionRange),
           ranges: props.advanced.audio.original.ranges,
         })
       : null;
@@ -516,42 +483,13 @@ function ReviewOriginalAudioTool({
       <ReviewButton
         label={translate('gallery.videoReview.originalAudioRange')}
         toolbarLabel={translate('gallery.videoReview.volume')}
-        title={volumeHint ?? translate('gallery.videoReview.originalAudioRangeHint')}
-        aria-pressed={editor.originalTool}
+        title={volumeHint ?? translate('gallery.videoReview.originalAudioRange')}
         className={plain}
-        disabled={busy || !sourceAudioReady || !!volumeHint}
-        onClick={() =>
-          admit(() => {
-            props.editing.setCutting(false);
-            if (props.rulerRange) {
-              if (!volumeHint && editor?.addOriginal(props.rulerRange))
-                editor.setOriginalTool(true);
-            } else if (editor?.originalTool) editor.setOriginalTool(false);
-            else if (!props.selectedObject && props.selection.kind === 'range') {
-              if (!editor?.addOriginal(props.selection)) editor?.setOriginalTool(true);
-            } else editor?.setOriginalTool(!editor.originalTool);
-          })
-        }
+        disabled={busy || !sourceAudioReady || !!volumeHint || !props.originalInsertionRange}
+        onClick={() => admit(() => props.onAddOriginal?.())}
       >
         <Volume2 size={16} aria-hidden="true" />
       </ReviewButton>
-      {editor.originalTool && sourceAudioReady ? (
-        <ProductSelect
-          menuClassName="sniptale-parameter-menu"
-          aria-label={translate('gallery.videoReview.volume')}
-          controlSize="sm"
-          className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
-          containerClassName="!w-auto !min-w-0 shrink-0"
-          menuWidth={112}
-          value={String(editor.defaultOriginalVolume)}
-          disabled={busy}
-          options={[0, 0.25, 0.5, 0.75, 1, 1.5, 2].map((volume) => ({
-            value: String(volume),
-            label: `${Math.round(volume * 100)}%`,
-          }))}
-          onChange={(value) => admit(() => editor?.setDefaultOriginalVolume(Number(value)))}
-        />
-      ) : null}
     </ReviewToolGroup>
   );
 }

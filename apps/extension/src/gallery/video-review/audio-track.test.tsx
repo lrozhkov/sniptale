@@ -298,7 +298,7 @@ it('drags clip blocks with move and trim edges and commits clamped values', asyn
   await send('pointerdown', 0);
   await send('pointermove', 100);
   await send('pointerup', 100);
-  expect(onSelect).toHaveBeenCalledWith('a1');
+  expect(onSelect).not.toHaveBeenCalled();
   expect(onMoveClip).toHaveBeenCalledWith('voiceover', 'a1', 3);
   await send('pointerdown', 0);
   await send('pointermove', -300);
@@ -660,7 +660,7 @@ it('retains an audio clip move when pointerup precedes note admission', async ()
   expect(onSelect).not.toHaveBeenCalled();
   expect(onMoveClip).not.toHaveBeenCalled();
   await act(async () => admit());
-  expect(onSelect).toHaveBeenCalledExactlyOnceWith('music');
+  expect(onSelect).not.toHaveBeenCalled();
   expect(onMoveClip).toHaveBeenCalledExactlyOnceWith('music', 'music', 4);
 });
 

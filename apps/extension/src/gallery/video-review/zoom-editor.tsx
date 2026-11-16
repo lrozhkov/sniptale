@@ -32,9 +32,10 @@ import {
 type ZoomState = QuickEditAdvancedState['zoom'];
 
 function sourceAnchorPatch(
-  range: Pick<QuickEditZoomRegion, 'start' | 'end'>,
+  range: Pick<QuickEditZoomRegion, 'start' | 'end' | 'timeDomain'>,
   timeMap?: readonly ReviewTimeSegment[]
 ): Pick<QuickEditZoomRegion, 'sourceAnchor'> {
+  if (range.timeDomain === 'result') return {};
   const anchor = timeMap ? reviewFocusSourceRange(range, timeMap) : null;
   return anchor ? { sourceAnchor: anchor } : {};
 }
@@ -54,7 +55,7 @@ function fitsActiveWindow(
       start,
       end,
       dormant: false,
-      ...sourceAnchorPatch({ start, end }, timeMap),
+      ...sourceAnchorPatch({ ...region, start, end }, timeMap),
     })
   );
 }
@@ -515,15 +516,29 @@ export function useReviewZoomEditor(args: ZoomEditorArgs) {
   };
   const commitDrag = (
     id: string,
-    range: { start: number; end: number },
+    range: { start: number; end: number; timeDomain?: 'result' },
     edge: 'start' | 'end' | 'move',
     sourceAnchor?: QuickEditZoomRegion['sourceAnchor']
   ) =>
-    args.setZoom((zoom) =>
-      sourceAnchor && args.timeMap
+    args.setZoom((zoom) => {
+      if (range.timeDomain === 'result') {
+        const current = zoom.regions.find((item) => item.id === id);
+        if (
+          !current ||
+          range.start < 0 ||
+          range.end > args.timelineDuration ||
+          range.end <= range.start
+        )
+          return zoom;
+        const { sourceAnchor: _anchor, ...base } = current;
+        const next = fitQuickEditZoomTransitions({ ...base, ...range });
+        if (quickEditFocusConflicts(zoom.regions, next)) return zoom;
+        return { ...zoom, regions: zoom.regions.map((item) => (item.id === id ? next : item)) };
+      }
+      return sourceAnchor && args.timeMap
         ? applySourceZoomCommit(zoom, id, sourceAnchor, args.timeMap)
-        : applyZoomCommit(args.timelineDuration, zoom, id, range, edge, args.timeMap)
-    );
+        : applyZoomCommit(args.timelineDuration, zoom, id, range, edge, args.timeMap);
+    });
   const selected = (zoom: ZoomState): QuickEditZoomRegion | null =>
     zoom.regions.find((item) => item.id === selection) ?? null;
   return {
@@ -536,20 +551,20 @@ export function useReviewZoomEditor(args: ZoomEditorArgs) {
     linkSelection,
     setLinkSelection,
     add,
-    addRegion: (candidate: QuickEditZoomRegion) => {
-      const region = withReviewFocusType(candidate, insertionType);
+    addRegion: (candidate: QuickEditZoomRegion, type: ReviewFocusType = insertionType) => {
+      const region = withReviewFocusType(candidate, type);
       if (
         !(region.start >= 0 && region.end <= args.timelineDuration && region.start < region.end) ||
         quickEditFocusConflicts(args.zoom.regions, {
           ...region,
-          ...sourceAnchorPatch(region, args.timeMap),
+          ...(region.timeDomain === 'result' ? {} : sourceAnchorPatch(region, args.timeMap)),
         })
       )
         return null;
       const created = fitQuickEditZoomTransitions({
         ...region,
         id: `zoom-${crypto.randomUUID()}`,
-        ...sourceAnchorPatch(region, args.timeMap),
+        ...(region.timeDomain === 'result' ? {} : sourceAnchorPatch(region, args.timeMap)),
       });
       args.setZoom((zoom) => ({
         ...zoom,

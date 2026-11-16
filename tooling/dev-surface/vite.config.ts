@@ -125,6 +125,35 @@ function isolatedSandbox(): Plugin {
   };
 }
 
+/** Editor hooks and preparation are one runtime; reload a settled source batch together. */
+function settledSourceReload(): Plugin {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return {
+    name: 'sniptale:dev-surface-settled-reload',
+    apply: 'serve',
+    enforce: 'pre',
+    handleHotUpdate(context) {
+      if (
+        !['apps/extension/src', 'packages', 'tooling/test/harness'].some((directory) =>
+          context.file.startsWith(`${resolve(root, directory)}/`)
+        )
+      )
+        return;
+      if (/\.(?:css|scss)$/u.test(context.file)) return;
+      if (timer) clearTimeout(timer);
+      context.server.moduleGraph.invalidateAll();
+      timer = setTimeout(() => {
+        timer = undefined;
+        context.server.ws.send({ type: 'full-reload' });
+      }, 900);
+      return [];
+    },
+    closeBundle() {
+      if (timer) clearTimeout(timer);
+    },
+  };
+}
+
 export default defineConfig({
   root,
   cacheDir: resolve(root, '.tmp/dev-surface/vite-cache'),
@@ -139,6 +168,7 @@ export default defineConfig({
     ],
   },
   plugins: [
+    settledSourceReload(),
     {
       name: 'sniptale:dev-surface-entry',
       apply: 'serve',

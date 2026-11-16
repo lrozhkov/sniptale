@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom';
+import { ReviewSelectionCommandSlotsContext } from './selection-command-slots';
 import {
   ReviewSelectionActionsContext,
   ReviewTimelineMultiSelectionContext,
@@ -104,7 +105,7 @@ export function ReviewInspectorSections({
   const actionPanel =
     actions && actionTarget?.commandHost
       ? createPortal(
-          <>
+          <ReviewSelectionCommandSlotsContext value={actionTarget.commandSlots}>
             {selectionCount > 1 ? (
               <span
                 className="review-selection-count"
@@ -124,7 +125,7 @@ export function ReviewInspectorSections({
               </span>
             ) : null}
             {actions.content}
-          </>,
+          </ReviewSelectionCommandSlotsContext>,
           actionTarget.commandHost
         )
       : null;

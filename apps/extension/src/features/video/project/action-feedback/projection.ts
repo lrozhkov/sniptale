@@ -1,5 +1,8 @@
 import {
   getVideoClipPresentationTime,
+  getVideoClipInteractionTime,
+  getVideoClipInteractionRate,
+  areVideoClipInteractionClocksContinuous,
   getMediaClipSourceTime,
   areVideoClipSourceClocksContinuous,
 } from '../timeline/rate';
@@ -120,7 +123,10 @@ function sourceClips(
     })
     .sort((a, b) => a.startTime - b.startTime || a.id.localeCompare(b.id));
 }
-function clipRuns(clips: readonly VideoProjectVideoClip[]): VideoProjectVideoClip[][] {
+function clipRuns(
+  clips: readonly VideoProjectVideoClip[],
+  resultClock = false
+): VideoProjectVideoClip[][] {
   const runs: VideoProjectVideoClip[][] = [];
   for (const clip of clips) {
     const run = runs.at(-1),
@@ -128,7 +134,9 @@ function clipRuns(clips: readonly VideoProjectVideoClip[]): VideoProjectVideoCli
     if (
       previous &&
       Math.abs(previous.startTime + previous.duration - clip.startTime) < 1e-6 &&
-      areVideoClipSourceClocksContinuous(previous, clip)
+      (resultClock
+        ? areVideoClipInteractionClocksContinuous(previous, clip)
+        : areVideoClipSourceClocksContinuous(previous, clip))
     )
       run!.push(clip);
     else runs.push([clip]);
@@ -179,14 +187,15 @@ function segments(clips: readonly VideoProjectVideoClip[], visual = false): Revi
   return result;
 }
 
-/** Gates an authored result-time cue through a physical clip and its retained visual hold. */
+/** Gate cue visibility through physical placement and its declared animation clock. */
 export function projectVideoProjectFeedbackInterval(
   clip: VideoProjectVideoClip,
   start: number,
-  end: number
+  end: number,
+  timeDomain?: 'result'
 ) {
   const physicalEnd = clip.startTime + clip.duration;
-  if (!clip.playbackWindow) {
+  if (!clip.playbackWindow || timeDomain === 'result') {
     const interval = {
       clipId: clip.id,
       start: Math.max(clip.startTime, start),
@@ -204,24 +213,38 @@ export function projectVideoProjectFeedbackInterval(
   };
   return interval.end > interval.start ? interval : null;
 }
-/** Maps retained source fragments without restricting continuity to one track. */
+/** Map each retained interaction clock through matching placements without restricting continuity to one track. */
 export function getVideoProjectFeedbackRuns(
   project: VideoProject,
   identity:
     | Pick<VideoProjectActionFeedback, 'recordingId' | 'sourceInstanceId'>
-    | { assetId: string; sourceInstanceId: string }
+    | { assetId: string; sourceInstanceId: string },
+  timeDomain?: 'result'
 ): readonly {
   clips: readonly VideoProjectVideoClip[];
   segments: readonly ReviewTimeSegment[];
   visualSegments: readonly ReviewTimeSegment[];
 }[] {
-  return clipRuns(sourceClips(project, identity)).map((clips) => ({
-    clips,
-    segments: segments(clips),
-    visualSegments: clips.some((clip) => clip.playbackWindow)
-      ? segments(clips, true)
-      : segments(clips),
-  }));
+  return clipRuns(sourceClips(project, identity), timeDomain === 'result').map((clips) => {
+    if (timeDomain === 'result') {
+      const retained: ReviewTimeSegment[] = clips.map((clip) => ({
+        sourceStart: getVideoClipInteractionTime(clip, clip.startTime),
+        sourceEnd: getVideoClipInteractionTime(clip, clip.startTime + clip.duration),
+        resultStart: clip.startTime,
+        resultEnd: clip.startTime + clip.duration,
+        kind: 'keep',
+        rate: getVideoClipInteractionRate(clip),
+      }));
+      return { clips, segments: retained, visualSegments: retained };
+    }
+    return {
+      clips,
+      segments: segments(clips),
+      visualSegments: clips.some((clip) => clip.playbackWindow)
+        ? segments(clips, true)
+        : segments(clips),
+    };
+  });
 }
 
 /** Recorded command appearance shares Gallery defaults while source facts stay immutable. */

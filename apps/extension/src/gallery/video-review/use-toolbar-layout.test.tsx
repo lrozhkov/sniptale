@@ -6,14 +6,24 @@ import { useReviewToolbarLayout } from './use-toolbar-layout';
 
 it('collapses captions in priority order and restores them after resize or tool changes', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    callback(0);
+    return 0;
+  });
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
   let measure = () => {};
   vi.stubGlobal(
     'ResizeObserver',
     class {
-      constructor(callback: () => void) {
-        measure = callback;
+      constructor(callback: ResizeObserverCallback) {
+        measure = () =>
+          callback(
+            [{ contentRect: new DOMRect(0, 0, available, 32) } as ResizeObserverEntry],
+            this
+          );
       }
       observe() {}
+      unobserve() {}
       disconnect() {}
     }
   );
@@ -79,14 +89,26 @@ it('collapses captions in priority order and restores them after resize or tool 
 
 it('shows the autosave divider only when compact controls are physically close', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    callback(0);
+    return 0;
+  });
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
   let measure = () => {};
   vi.stubGlobal(
     'ResizeObserver',
     class {
-      constructor(callback: () => void) {
-        measure = callback;
+      constructor(callback: ResizeObserverCallback) {
+        measure = () => {
+          available += 1;
+          callback(
+            [{ contentRect: new DOMRect(0, 0, available, 32) } as ResizeObserverEntry],
+            this
+          );
+        };
       }
       observe() {}
+      unobserve() {}
       disconnect() {}
     }
   );
@@ -94,8 +116,11 @@ it('shows the autosave divider only when compact controls are physically close',
   document.body.appendChild(host);
   const root = createRoot(host);
   let gap = 80;
+  let available = 500;
   let balanced = false;
-  const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(500);
+  const width = vi
+    .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+    .mockImplementation(() => available);
   const content = vi
     .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
     .mockImplementation(function (this: HTMLElement) {

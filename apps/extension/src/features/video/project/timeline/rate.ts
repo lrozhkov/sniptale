@@ -97,6 +97,90 @@ export function getVideoClipSourceTime(clip: VideoProjectVideoClip, currentTime:
   );
 }
 
+type CameraLayoutTimedClip = Pick<
+  VideoProjectVideoClip,
+  'startTime' | 'sourceStart' | 'playbackRate' | 'playbackWindow'
+> & { cameraTiming?: Pick<NonNullable<VideoProjectVideoClip['cameraTiming']>, 'layoutClock'> };
+
+/** Retained camera layout seconds per current timeline second. */
+export function getCameraLayoutRate(clip: CameraLayoutTimedClip): number {
+  const clock = clip.cameraTiming?.layoutClock;
+  return clock ? (clip.playbackRate ?? 1) / clock.rate : 1;
+}
+
+type InteractionTimedClip = Pick<
+  VideoProjectVideoClip,
+  'startTime' | 'sourceStart' | 'playbackRate' | 'playbackWindow' | 'sourceInteractionTiming'
+>;
+
+function retainedClockOrigin(
+  clip: Pick<VideoProjectVideoClip, 'startTime' | 'sourceStart' | 'playbackWindow'>,
+  clock: VideoProjectVideoClip['sourceInteractionTiming'],
+  rate: number
+): number {
+  return clock
+    ? clock.time +
+        (clip.sourceStart - clock.sourceTime) / clock.rate +
+        (clip.playbackWindow?.offset ?? 0) * rate
+    : clip.startTime;
+}
+
+/** Retained interaction seconds per current timeline second. */
+export function getVideoClipInteractionRate(clip: InteractionTimedClip): number {
+  return clip.sourceInteractionTiming
+    ? (clip.playbackRate ?? 1) / clip.sourceInteractionTiming.rate
+    : 1;
+}
+
+/** Authored result time advances through holds independently from physical source pixels. */
+export function getVideoClipInteractionTime(clip: InteractionTimedClip, time: number): number {
+  const rate = getVideoClipInteractionRate(clip);
+  return (
+    retainedClockOrigin(clip, clip.sourceInteractionTiming, rate) + (time - clip.startTime) * rate
+  );
+}
+
+/** Locate a retained authored boundary in the current physical placement. */
+export function getVideoClipInteractionTimelineTime(
+  clip: InteractionTimedClip,
+  time: number
+): number {
+  const rate = getVideoClipInteractionRate(clip);
+  return (
+    clip.startTime + (time - retainedClockOrigin(clip, clip.sourceInteractionTiming, rate)) / rate
+  );
+}
+
+/** Result authoring joins only through adjacent placements with the same clock phase and speed. */
+export function areVideoClipInteractionClocksContinuous(
+  left: VideoProjectVideoClip,
+  right: VideoProjectVideoClip
+): boolean {
+  return (
+    Math.abs(getVideoClipInteractionRate(left) - getVideoClipInteractionRate(right)) < 1e-6 &&
+    Math.abs(
+      getVideoClipInteractionTime(left, left.startTime + left.duration) -
+        getVideoClipInteractionTime(right, right.startTime)
+    ) < 1e-6
+  );
+}
+
+/** Read retained layout time independently from camera pixels and clip placement. */
+export function getCameraLayoutTime(clip: CameraLayoutTimedClip, time: number): number {
+  const rate = getCameraLayoutRate(clip);
+  return (
+    retainedClockOrigin(clip, clip.cameraTiming?.layoutClock, rate) + (time - clip.startTime) * rate
+  );
+}
+
+/** Locate an immutable layout boundary in the current timeline placement. */
+export function getCameraLayoutTimelineTime(clip: CameraLayoutTimedClip, time: number): number {
+  const rate = getCameraLayoutRate(clip);
+  return (
+    clip.startTime + (time - retainedClockOrigin(clip, clip.cameraTiming?.layoutClock, rate)) / rate
+  );
+}
+
 export function getSourceTimedClipProjectDuration(
   clip: Pick<VideoProjectVideoClip | VideoProjectAudioClip, 'playbackRate' | 'sourceDuration'>
 ): number {

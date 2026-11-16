@@ -1,5 +1,8 @@
 import { useReviewFreezePlayback } from './use-freeze-playback';
-import { createReviewPlaybackPresentationClock } from './playback-presentation-clock';
+import {
+  createReviewPlaybackPresentationClock,
+  REVIEW_PLAYBACK_UI_INTERVAL_MS,
+} from './playback-presentation-clock';
 import {
   createReviewPlaybackRange,
   reviewPlaybackRangeStart,
@@ -43,6 +46,7 @@ function useReviewSourcePlayback(props: ReviewPlaybackProps) {
   const latest = useRef(props);
   latest.current = props;
   const pendingResume = useRef<{ node: HTMLVideoElement; source: string } | null>(null);
+  const playIntent = useRef(0);
   const [resumeRevision, requestResume] = useState(0);
   const prepareAfterSeek = (node: HTMLVideoElement) => {
     if (!latest.current.prepareAfterSeek) return false;
@@ -91,12 +95,16 @@ function useReviewSourcePlayback(props: ReviewPlaybackProps) {
       if (pendingResume.current === request) pendingResume.current = null;
     };
   }, [resumeRevision]);
+  const lastUiPublish = useRef(-Infinity);
   const publishTime = useCallback(
-    (value: number) => {
+    (value: number, background = false) => {
       // Browser media clocks can round the terminal timestamp beyond the project endpoint.
       if (!Number.isFinite(value)) return;
       const time = Math.max(0, Math.min(latest.current.duration, value));
       playheadClock.publish(time);
+      const now = performance.now();
+      if (background && now - lastUiPublish.current < REVIEW_PLAYBACK_UI_INTERVAL_MS) return;
+      lastUiPublish.current = now;
       setTime(time);
     },
     [playheadClock]
@@ -119,7 +127,7 @@ function useReviewSourcePlayback(props: ReviewPlaybackProps) {
       )
         return;
       // Observed playback time must yield to frame preparation and direct editor commands.
-      startTransition(() => publishTime(value));
+      startTransition(() => publishTime(value, true));
     },
     [publishTime]
   );
@@ -200,6 +208,8 @@ function useReviewSourcePlayback(props: ReviewPlaybackProps) {
   }, [audioSettingsKey, props.duration]);
   usePlaybackFrames(playing, video, tick);
   const seekSource = (value: number) => {
+    const range = rangeRef.current;
+    if (range && (value < range.start || value >= range.end)) setRange(null);
     const node = video.current;
     const resume = !!node && (!node.paused || pendingResume.current !== null);
     pendingResume.current = null;
@@ -212,6 +222,10 @@ function useReviewSourcePlayback(props: ReviewPlaybackProps) {
   };
   return {
     playheadClock,
+    cancelPendingPlay: () => {
+      ++playIntent.current;
+      pendingResume.current = null;
+    },
     video,
     recovering: recovery.recovering,
     time,
@@ -264,6 +278,7 @@ function useReviewSourcePlayback(props: ReviewPlaybackProps) {
       seekSource(next);
     },
     play: () => {
+      const intent = ++playIntent.current;
       pendingResume.current = null;
       const node = video.current;
       if (!node) return;
@@ -276,14 +291,29 @@ function useReviewSourcePlayback(props: ReviewPlaybackProps) {
         latest.current.onPreparedPlay?.();
         void node.play().then(
           () => {
-            if (video.current === node && node.currentSrc === source)
+            if (
+              intent === playIntent.current &&
+              video.current === node &&
+              node.currentSrc === source &&
+              !node.paused
+            ) {
+              setPlaying(true);
               latest.current.onRecovered?.();
+            }
           },
           () => {
-            if (video.current === node && node.currentSrc === source) latest.current.onFailure();
+            if (
+              intent === playIntent.current &&
+              video.current === node &&
+              node.currentSrc === source
+            )
+              latest.current.onFailure();
           }
         );
-      } else node.pause();
+      } else {
+        node.pause();
+        setPlaying(false);
+      }
     },
   };
 }

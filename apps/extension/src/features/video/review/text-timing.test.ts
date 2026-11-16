@@ -86,6 +86,62 @@ function operation(before: ReviewEdit | null, after: ReviewEdit | null): ReviewO
   if (!parsed) throw new Error('Invalid test operation');
   return parsed;
 }
+
+it.each(['speed', 'cut', 'shorten-freeze'] as const)(
+  'keeps recognized result words valid when a new command applies %s',
+  (kind) => {
+    const original = baseline();
+    const hold: ReviewEdit = {
+      id: 'hold',
+      kind: 'freeze',
+      start: 9,
+      end: 9,
+      requestedStart: 9,
+      requestedEnd: 9,
+      duration: 2,
+      frameTime: 8.98,
+      frameDuration: 0.04,
+    };
+    const beforeEdit = kind === 'shorten-freeze' ? hold : null;
+    const afterEdit =
+      kind === 'speed' ? speed(8, 12) : kind === 'cut' ? cut(9, 11) : { ...hold, duration: 0.5 };
+    const command = parseReviewOperation(
+      {
+        id: 'result-word-timing',
+        at: 1,
+        target: 'edit',
+        before: beforeEdit,
+        after: afterEdit,
+        preserveTextAnchors: true,
+        preserveResultText: true,
+      },
+      source.duration
+    );
+    if (command?.target !== 'edit') throw new Error('Invalid result timing operation');
+    if (command.before) original.edits = [command.before];
+    const before = structuredClone(original);
+    const changed = applyReviewOperation(original, command!, source);
+    const fragment = changed.advancedContent.text!.fragments[0]!;
+    const expected =
+      kind === 'speed'
+        ? [
+            { text: 'One', start: 8, end: 8.5 },
+            { text: 'two', start: 9, end: 10 },
+          ]
+        : kind === 'cut'
+          ? [
+              { text: 'One', start: 8, end: 9 },
+              { text: 'two', start: 9, end: 10 },
+            ]
+          : [
+              { text: 'One', start: 8, end: 9 },
+              { text: 'two', start: 9.5, end: 10.5 },
+            ];
+    expect(fragment.words).toEqual(expected);
+    expect(parseReviewTextDocument(changed.advancedContent.text)).not.toBeNull();
+    expect(original).toEqual(before);
+  }
+);
 function clip(fragment: ReviewTextFragment): QuickEditAudioClip {
   return {
     id: 'take',
@@ -99,6 +155,61 @@ function clip(fragment: ReviewTextFragment): QuickEditAudioClip {
     fadeOut: 0,
   };
 }
+
+it.each(['remove', 'move'] as const)(
+  'retains recognized text when freeze %s removes or reorders individual word intervals',
+  (kind) => {
+    const original = baseline({
+      ...phrase(),
+      start: 8,
+      end: 20,
+      words: [
+        { text: 'One', start: 10, end: 10.5 },
+        { text: 'two', start: 11.5, end: 12 },
+      ],
+    });
+    const hold: ReviewEdit = {
+      id: 'hold',
+      kind: 'freeze',
+      start: 9,
+      end: 9,
+      requestedStart: 9,
+      requestedEnd: 9,
+      duration: 2,
+      frameTime: 8.98,
+      frameDuration: 0.04,
+    };
+    const command = parseReviewOperation(
+      {
+        id: 'move-word-timing',
+        at: 1,
+        target: 'edit',
+        before: hold,
+        after:
+          kind === 'remove'
+            ? null
+            : { ...hold, start: 11, end: 11, requestedStart: 11, requestedEnd: 11 },
+        preserveTextAnchors: true,
+        preserveResultText: true,
+      },
+      source.duration
+    );
+    if (command?.target !== 'edit' || !command.before)
+      throw new Error('Invalid freeze timing operation');
+    original.edits = [command.before];
+    const snapshot = structuredClone(original);
+    const changed = applyReviewOperation(original, command, source);
+    const fragment = changed.advancedContent.text!.fragments[0]!;
+    expect(fragment.text).toBe('One two');
+    expect(fragment.words).toEqual(
+      kind === 'remove'
+        ? [{ text: 'two', start: 9.5, end: 10 }]
+        : [{ text: 'One', start: 12, end: 12.5 }]
+    );
+    expect(parseReviewTextDocument(changed.advancedContent.text)).not.toBeNull();
+    expect(original).toEqual(snapshot);
+  }
+);
 
 for (const domain of ['source', 'result'] as const) {
   for (const edit of [

@@ -470,6 +470,7 @@ function ReviewFocusActions(props: {
   return (
     <>
       <ReviewButton
+        selectionAction="reset"
         label={translate('gallery.videoReview.zoomResetPosition')}
         className={`${reviewTextButtonClassName} !w-full justify-start`}
         onClick={props.onReset}
@@ -479,6 +480,7 @@ function ReviewFocusActions(props: {
       </ReviewButton>
       {props.onDuplicate ? (
         <ReviewButton
+          selectionAction="duplicate"
           label={translate('gallery.videoReview.focusDuplicate')}
           title={translate(
             region.dormant
@@ -494,6 +496,7 @@ function ReviewFocusActions(props: {
         </ReviewButton>
       ) : null}
       <ReviewButton
+        selectionAction="delete"
         label={translate('gallery.videoReview.zoomDelete')}
         className={`${reviewDeleteButtonClassName} !w-full justify-start`}
         onClick={props.onDelete}
@@ -625,6 +628,7 @@ export function ReviewZoomLinkInspector(props: {
         sections={[
           reviewInspectorActions(
             <ReviewButton
+              selectionAction="delete"
               label={translate('gallery.videoReview.zoomLinkRemove')}
               className={`${reviewDeleteButtonClassName} !w-full justify-start`}
               onClick={props.onRemove}

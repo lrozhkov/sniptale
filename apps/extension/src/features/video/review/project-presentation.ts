@@ -254,7 +254,7 @@ function insertBookend(
       : authoredTransition;
   return {
     ...composition,
-    version: window ? 43 : composition.version,
+    version: window && composition.version < 43 ? 43 : composition.version,
     duration: side === 'intro' ? project.duration + placement.duration : start + placement.duration,
     tracks: [...composition.tracks, ...tracks, fillTrack],
     clips: [
@@ -424,7 +424,12 @@ function fitMainPlacement(
       },
     });
   }
-  const fitted: VideoProject = { ...project, version: 43, duration, clips };
+  const fitted: VideoProject = {
+    ...project,
+    version: project.version < 43 ? 43 : project.version,
+    duration,
+    clips,
+  };
   fitted.cursorTrack = materializeVideoProjectCursorSourceObservations(fitted);
   return fitted;
 }

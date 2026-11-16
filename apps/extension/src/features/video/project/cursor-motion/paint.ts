@@ -61,9 +61,10 @@ export function cursorMotionArtwork(
   motions: readonly CursorMotion[] | undefined,
   time: number,
   video: { x: number; y: number; width: number; height: number },
-  sourceHeight: number
+  sourceHeight: number,
+  resultTime = time
 ) {
-  const evaluated = evaluateCursorMotion(motions, time);
+  const evaluated = evaluateCursorMotion(motions, time, resultTime);
   if (!evaluated) return null;
   const { motion, x, y } = evaluated;
   const raster = appleCursorRaster({

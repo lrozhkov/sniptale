@@ -1,5 +1,6 @@
 import {
   parseVideoProjectSourceInteractionDocuments,
+  hasResultSourceInteractionContent,
   hasValidVideoProjectSourceInteractionReferences,
 } from '../source-interaction-documents';
 import {
@@ -134,6 +135,9 @@ function isTransition(value: unknown): boolean {
 /** Minimum schema for present clip fields, independent of later shape admission. */
 function minimumClipSchemaVersion(value: unknown): number {
   if (!isRecord(value)) return 2;
+  if (value['sourceInteractionTiming'] !== undefined) return 56;
+  if (isRecord(value['cameraTiming']) && value['cameraTiming']['timeDomain'] === 'result')
+    return 56;
   if (value['audioProcessing'] !== undefined) return 53;
   if (value['sourceFilters'] !== undefined) return 52;
   if (value['transcript'] !== undefined) return 44;
@@ -202,10 +206,31 @@ function minimumMotionSchemaVersion(value: unknown): number {
 /** Refuse fields that the declared reader version does not support. */
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
+  const interactions = parseVideoProjectSourceInteractionDocuments(
+    value['sourceInteractionDocuments']
+  );
+  const clips = value['clips'];
+  const hasOrigins =
+    !Array.isArray(clips) ||
+    (clips.length <= MAX_VIDEO_PROJECT_ITEMS &&
+      (interactions ?? []).every(
+        (document) =>
+          !hasResultSourceInteractionContent(document) ||
+          clips.every(
+            (clip: unknown) =>
+              !isRecord(clip) ||
+              clip['type'] !== 'VIDEO' ||
+              clip['assetId'] !== document.binding.assetId ||
+              clip['sourceInstanceId'] !== document.binding.sourceInstanceId ||
+              clip['sourceInteractionTiming'] !== undefined
+          )
+      ));
   return (
-    isBoundedNumber(version, 2, 55) &&
+    hasOrigins &&
+    isBoundedNumber(version, 2, 56) &&
     Number.isInteger(version) &&
     (version >= 54 || value['sourceInteractionDocuments'] === undefined) &&
+    (version >= 56 || !(interactions ?? []).some(hasResultSourceInteractionContent)) &&
     (version >= 54 ||
       !Array.isArray(value['actionEvents']) ||
       value['actionEvents'].every(

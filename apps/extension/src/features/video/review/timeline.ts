@@ -42,9 +42,7 @@ function validateReviewEditIntervals(duration: number, edits: readonly ReviewEdi
       edit.frameTime < 0 ||
       edit.frameTime >= duration ||
       edit.frameDuration <= 0 ||
-      edit.frameDuration > 172800 ||
-      (edit.start !== 0 && edit.frameTime > edit.start) ||
-      edit.frameTime + edit.frameDuration < edit.start - 1e-6
+      edit.frameDuration > 172800
     )
       throw new Error('Review freeze interval is invalid.');
   }

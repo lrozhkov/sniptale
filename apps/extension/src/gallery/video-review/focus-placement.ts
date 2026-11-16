@@ -1,14 +1,16 @@
-import { useEffect, useState } from 'react';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
-import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
-import { quickEditFocusConflicts } from '../../features/video/review/advanced/focus-layout';
+import {
+  quickEditFocusType,
+  resolveQuickEditFocusLink,
+  quickEditFocusConflicts,
+} from '../../features/video/review/advanced/focus-layout';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { withReviewFocusType, type ReviewFocusType, type useReviewZoomEditor } from './zoom-editor';
 import type { ReviewTrackProjection } from './track-projection';
 import type { ReviewPlaybackRange } from './playback-range';
 import type { useReviewAudio } from './use-review-audio';
-import { reviewRangePlacementIssue } from './range-placement';
+import { reviewInsertionRange, reviewResultInsertionContext } from './range-placement';
 import { translate } from '../../platform/i18n';
 
 type FocusPlacementInput = {
@@ -21,107 +23,109 @@ type FocusPlacementInput = {
   edits: readonly ReviewEdit[];
   selectedObject: boolean;
   time: number;
+  outputTime: number | null;
+  source: { duration: number };
+  insertionPoint?(time: number): { x: number; y: number } | null;
+  onPause(): void;
   setSelection(value: ReviewAnchor): void;
   onSeek(time: number): void;
+  onSeekResult?(time: number): void;
   setTrackVisibility(track: 'zoom', visible: boolean): void;
 };
 
-/** The focus drawing tool uses source-axis ranges and the existing result-time insertion owner. */
+/** Direct insertion keeps source anchors and the existing focus mutation owner. */
 export function useFocusPlacement(props: FocusPlacementInput, projection: ReviewTrackProjection) {
-  const target = props.playbackRange
-    ? { kind: 'range' as const, ...props.playbackRange }
-    : props.selection;
-  const { drawing: enabled, setDrawing: setEnabled } = props.zoom;
-  const [preview, setPreview] = useState<ReviewAnchor | null>(null);
-  const visible = resolveQuickEditEffectiveFeatures(props.advanced).zoomTrackVisible;
-  const active = enabled && visible && !props.audio.originalTool && !props.editing.mode;
-  useEffect(() => {
-    if (!visible || props.audio.originalTool || props.editing.mode) setEnabled(false);
-  }, [visible, props.audio.originalTool, props.editing.mode, setEnabled]);
-  useEffect(() => {
-    if (!active) setPreview(null);
-  }, [active]);
+  const selectedRange =
+    props.playbackRange ??
+    (!props.selectedObject && props.selection.kind === 'range' ? props.selection : null);
+  const { setDrawing: setEnabled } = props.zoom;
+  const context = reviewResultInsertionContext({
+    time: props.time,
+    resultTime: props.outputTime,
+    range: selectedRange,
+    projection,
+  });
+  const targetFor = (type: ReviewFocusType) =>
+    reviewInsertionRange({
+      ...context,
+      seconds: 2,
+      minimum: 0.001,
+      occupied: [
+        ...props.advanced.zoom.regions
+          .filter(
+            (region) =>
+              !region.dormant &&
+              (type === 'zoom' || type === '3d') &&
+              quickEditFocusType(region) === type
+          )
+          .map((region) => ({
+            start: region.start,
+            end: (
+              resolveQuickEditFocusLink(props.advanced.zoom.regions, region.id)?.target ?? region
+            ).end,
+          })),
+      ],
+    });
   const candidate = (range: ReviewAnchor, type: ReviewFocusType = props.zoom.insertionType) => {
-    if (
-      range.kind !== 'range' ||
-      range.end - range.start < 0.001 ||
-      props.edits.some(
-        (edit) => edit.kind === 'cut' && edit.start < range.end && edit.end > range.start
-      )
-    )
-      return null;
-    const start = projection.output(range.start);
-    const end = projection.output(range.end);
-    if (end - start < 0.001) return null;
+    if (range.kind !== 'range' || range.end - range.start < 0.001) return null;
+    const start = range.start;
+    const end = range.end;
     const region = withReviewFocusType(
       createQuickEditZoomRegion({
         id: 'draft',
-        sourceAnchor: { start: range.start, end: range.end },
         at: start,
         duration: end - start,
         endMax: end,
       }),
       type
     );
+    region.timeDomain = 'result';
+    const point = props.insertionPoint?.(projection.source(range.start)) ?? { x: 0.5, y: 0.5 };
+    region.transform = { ...region.transform, centerX: point.x, centerY: point.y };
+    const area = region.spotlight ?? region.border;
+    if (area)
+      area.area = {
+        ...area.area,
+        x: Math.max(0, Math.min(1 - area.area.width, point.x - area.area.width / 2)),
+        y: Math.max(0, Math.min(1 - area.area.height, point.y - area.area.height / 2)),
+      };
     return quickEditFocusConflicts(props.advanced.zoom.regions, region) ? null : region;
   };
   const commit = (range: ReviewAnchor, type: ReviewFocusType = props.zoom.insertionType) => {
     const region = candidate(range, type);
     if (!region || props.advanced.zoom.regions.length >= 512) return;
-    if (props.zoom.addRegion(region)) {
-      setEnabled(!!props.playbackRange);
+    props.onPause();
+    if (props.zoom.addRegion(region, type)) {
+      setEnabled(false);
       props.setSelection({
         kind: 'point',
-        time: range.kind === 'range' ? range.start : props.time,
+        time: projection.source(range.kind === 'range' ? range.start : context.time),
       });
-      props.onSeek(range.kind === 'range' ? range.start : props.time);
+      props.onSeekResult?.(range.kind === 'range' ? range.start : context.time);
     }
   };
   return {
     clear: () => setEnabled(false),
-    preview,
-    setPreview,
-    commit,
     tool: {
       type: props.zoom.insertionType,
       onType: props.zoom.setInsertionType,
-      active,
-      available: props.playbackRange
-        ? !!candidate(target) && props.advanced.zoom.regions.length < 512
-        : active || props.selectedObject || target.kind !== 'range' || !!candidate(target),
-      availableFor: (type: ReviewFocusType) =>
-        props.playbackRange
-          ? !!candidate(target, type) && props.advanced.zoom.regions.length < 512
-          : active || props.selectedObject || target.kind !== 'range' || !!candidate(target, type),
-      hint:
-        target.kind === 'range' && (props.playbackRange || !props.selectedObject)
-          ? focusPlacementHint(
-              reviewRangePlacementIssue({
-                range: target,
-                edits: props.edits,
-                available: !!candidate(target),
-                limit: props.advanced.zoom.regions.length >= 512,
-                occupied: !candidate(target) && target.end - target.start >= 0.001,
-              })
-            )
-          : undefined,
+      active: false,
+      available: !!targetFor(props.zoom.insertionType) && props.advanced.zoom.regions.length < 512,
+      availableFor: (type: ReviewFocusType) => {
+        const range = targetFor(type);
+        return !!range && !!candidate(range, type) && props.advanced.zoom.regions.length < 512;
+      },
+      hint: targetFor(props.zoom.insertionType)
+        ? undefined
+        : translate('gallery.videoReview.placement_occupied'),
       onToggle: (type: ReviewFocusType = props.zoom.insertionType) => {
         props.zoom.setInsertionType(type);
         props.audio.setOriginalTool(false);
         props.editing.setCutting(false);
-        if (props.playbackRange || (!active && !props.selectedObject && target.kind === 'range')) {
-          props.setTrackVisibility('zoom', true);
-          commit(target, type);
-        } else if (active && type === props.zoom.insertionType) setEnabled(false);
-        else {
-          props.setTrackVisibility('zoom', true);
-          setEnabled(true);
-        }
+        props.setTrackVisibility('zoom', true);
+        const range = targetFor(type);
+        if (range) commit(range, type);
       },
     },
   };
-}
-
-function focusPlacementHint(issue: ReturnType<typeof reviewRangePlacementIssue>) {
-  return issue ? translate(`gallery.videoReview.placement_${issue}`) : undefined;
 }

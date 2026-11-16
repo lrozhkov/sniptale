@@ -1,3 +1,4 @@
+import { LoaderCircle } from 'lucide-react';
 import type { ReviewAnnotationEditing } from './annotation-effects-overlay';
 import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
 import { DelayedLoadingFallback } from '@sniptale/ui/loading-delay';
@@ -205,11 +206,13 @@ export function useStagePresentation(
 export function ReviewStagePresentationFeedback({
   presentation,
   showFrameRate,
+  waitingReason,
   captions,
   onCaptionSelect,
 }: {
   presentation: ReturnType<typeof useReviewPreviewPresentation>;
   showFrameRate: boolean;
+  waitingReason?: string | undefined;
   captions?: PresentationProps['captions'];
   onCaptionSelect?: PresentationProps['onCaptionSelect'];
 }) {
@@ -218,6 +221,16 @@ export function ReviewStagePresentationFeedback({
   const failed = cameraFailed || presentation.status.phase === 'failed';
   const replacing =
     manual && presentation.status.phase === 'pending' && presentation.status.actualRaster !== null;
+  const waiting = [
+    waitingReason,
+    manual && !failed && presentation.status.phase !== 'ready'
+      ? translate(
+          replacing ? 'gallery.videoReview.previewUpdating' : 'gallery.videoReview.previewLoading'
+        )
+      : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
   return (
     <>
       {manual &&
@@ -260,59 +273,68 @@ export function ReviewStagePresentationFeedback({
               })}
           </div>
         )}
-      {manual && (cameraFailed || presentation.status.phase !== 'ready') ? (
-        <DelayedLoadingFallback
-          key={failed ? 'failed' : presentation.status.phase}
-          delayMs={failed ? 0 : 1000}
-          fallback={
-            <div
-              role={failed ? 'alert' : 'status'}
-              className={[
-                'absolute inset-x-0 top-0 z-40 flex items-center gap-2',
-                'bg-[var(--sniptale-color-surface-panel)] px-3 py-1 text-xs',
-              ].join(' ')}
-            >
-              <span>
-                {translate(
-                  cameraFailed
-                    ? 'gallery.videoReview.webcamFailed'
-                    : presentation.status.phase === 'failed'
-                      ? 'gallery.videoReview.previewFailed'
-                      : replacing
-                        ? 'gallery.videoReview.previewUpdating'
-                        : 'gallery.videoReview.previewLoading'
-                )}
-              </span>
-              {failed ? (
-                <ReviewButton
-                  label={translate('gallery.videoReview.retry')}
-                  onClick={presentation.retry}
-                />
-              ) : null}
-            </div>
-          }
-        />
-      ) : null}
-      {showFrameRate ? (
-        <output
-          data-ui="gallery.videoReview.previewFPS"
+      {failed ? (
+        <div
+          role="alert"
           className={[
-            'pointer-events-none absolute bottom-2 left-2 z-40 rounded px-1.5 py-0.5 text-xs',
-            'tabular-nums bg-[var(--sniptale-color-surface-panel)]',
+            'absolute inset-x-0 top-0 z-40 flex items-center gap-2',
+            'bg-[var(--sniptale-color-surface-panel)] px-3 py-1 text-xs',
           ].join(' ')}
-          title={translate(
-            manual
-              ? 'gallery.videoReview.previewPresentedFrameRate'
-              : 'gallery.videoReview.previewNativeFrameRate'
-          )}
         >
-          {(manual
-            ? presentation.status.presentedFPS
-            : presentation.status.nativeVideoFPS
-          )?.toFixed(1) ?? '—'}{' '}
-          FPS
-        </output>
+          <span>
+            {translate(
+              cameraFailed
+                ? 'gallery.videoReview.webcamFailed'
+                : 'gallery.videoReview.previewFailed'
+            )}
+          </span>
+          <ReviewButton
+            label={translate('gallery.videoReview.retry')}
+            onClick={presentation.retry}
+          />
+        </div>
       ) : null}
+      <div
+        data-ui="gallery.videoReview.previewPerformance"
+        className={[
+          'absolute bottom-2 left-2 z-40 flex items-center gap-1.5 rounded',
+          'bg-[var(--sniptale-color-surface-panel)] px-1.5 py-0.5 text-xs tabular-nums empty:hidden',
+        ].join(' ')}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        {waiting ? (
+          <DelayedLoadingFallback
+            delayMs={1000}
+            fallback={
+              <span
+                role="status"
+                data-ui="gallery.videoReview.previewWaiting"
+                className="inline-flex items-center"
+                title={waiting}
+                aria-label={waiting}
+              >
+                <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />
+              </span>
+            }
+          />
+        ) : null}
+        {showFrameRate ? (
+          <output
+            data-ui="gallery.videoReview.previewFPS"
+            title={translate(
+              manual
+                ? 'gallery.videoReview.previewPresentedFrameRate'
+                : 'gallery.videoReview.previewNativeFrameRate'
+            )}
+          >
+            {(manual
+              ? presentation.status.presentedFPS
+              : presentation.status.nativeVideoFPS
+            )?.toFixed(1) ?? '—'}{' '}
+            FPS
+          </output>
+        ) : null}
+      </div>
     </>
   );
 }

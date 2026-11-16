@@ -1,25 +1,16 @@
+import { reviewTimelineHint } from './timeline-hints';
 import { ReviewTrackVisibilityButton } from './track-row';
 import { reviewTrackMetrics, ReviewTrackCuts, ReviewTrackRow } from './track-row';
 import { ReviewWebcamHiddenMarker } from './webcam-hidden-marker';
 import { ReviewWebcamPositionMarker } from './webcam-position-marker';
-import { useEffect, useRef, useState, type PointerEvent } from 'react';
-import { Camera, Eye, EyeOff, Scissors } from 'lucide-react';
+import { Camera, Eye, EyeOff } from 'lucide-react';
 import { translate } from '../../platform/i18n';
-import { reviewCompactTrackButtonClassName, reviewTimelineItemTone } from './controls';
-import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
-import { useReviewDragEscape } from './timeline-drag';
+import { reviewCompactTrackButtonClassName } from './controls';
+import { type ReviewBeforeAction } from './note-transitions';
 import type { ReviewTrackProjection } from './track-projection';
 import type { useReviewWebcamEditor } from './webcam-editor';
 
 type Range = { start: number; end: number };
-type Drag = {
-  node: HTMLDivElement;
-  pointerId: number;
-  start: number;
-  range: Range;
-  admission: ReturnType<typeof deferReviewGesture>;
-};
-
 /** Camera uses source-axis intervals; hiding it never cuts or changes the main transport. */
 export function ReviewWebcamTrack(props: {
   compact?: boolean;
@@ -31,8 +22,8 @@ export function ReviewWebcamTrack(props: {
   const original = props.editor;
   const display = projection.display;
   const sourceRange = (range: Range) => ({
-    start: display.displayToSource(range.start),
-    end: display.displayToSource(range.end),
+    start: display.displayToResult(range.start),
+    end: display.displayToResult(range.end),
   });
   const editor: typeof original = {
     ...original,
@@ -41,42 +32,23 @@ export function ReviewWebcamTrack(props: {
           ...original.camera,
           hiddenRanges: original.camera.hiddenRanges.map((range) => ({
             ...range,
-            start: display.sourceToDisplay(range.start),
-            end: display.sourceToDisplay(range.end, 'end'),
+            start: display.resultToDisplay(range.start),
+            end: display.resultToDisplay(range.end, 'end'),
           })),
           positions: original.camera.positions.map((position) => ({
             ...position,
-            time: display.sourceToDisplay(position.time),
+            time: display.resultToDisplay(position.time),
           })),
         }
       : original.camera,
     hide: (range) => original.hide(sourceRange(range)),
     resizeHidden: (id, range) => original.resizeHidden(id, sourceRange(range)),
     canResizeHidden: (id, range) => original.canResizeHidden(id, sourceRange(range)),
-    movePosition: (id, time) => original.movePosition(id, display.displayToSource(time)),
+    movePosition: (id, time) => original.movePosition(id, display.displayToResult(time)),
   };
   const camera = editor.camera;
   const compact = props.compact ?? false;
   const metrics = reviewTrackMetrics(compact);
-  const [preview, setPreview] = useState<Range | null>(null);
-  const drag = useRef<Drag | null>(null);
-  const clear = () => setPreview(null);
-  const cancel = () => {
-    const current = drag.current;
-    drag.current = null;
-    current?.admission.cancel();
-    if (current?.node.hasPointerCapture(current.pointerId))
-      current.node.releasePointerCapture(current.pointerId);
-    clear();
-  };
-  useReviewDragEscape(drag, clear);
-  useEffect(() => {
-    window.addEventListener('blur', cancel);
-    return () => {
-      window.removeEventListener('blur', cancel);
-      drag.current?.admission.cancel();
-    };
-  }, []);
   if (!camera)
     return (
       <ReviewTrackRow
@@ -89,20 +61,6 @@ export function ReviewWebcamTrack(props: {
       </ReviewTrackRow>
     );
   const admit = props.beforeAction ?? ((action: () => void) => action());
-  const timeAt = (event: PointerEvent<HTMLDivElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    return (
-      Math.round(
-        Math.max(
-          0,
-          Math.min(
-            projection.display.duration,
-            ((event.clientX - rect.left) / Math.max(1, rect.width)) * projection.display.duration
-          )
-        ) * 1000
-      ) / 1000
-    );
-  };
   return (
     <ReviewTrackRow
       track="webcam"
@@ -125,53 +83,23 @@ export function ReviewWebcamTrack(props: {
     >
       <div
         data-ui="gallery.videoReview.webcamTrack"
+        data-review-hint={reviewTimelineHint(
+          translate('gallery.videoReview.webcam'),
+          0,
+          projection.display.duration,
+          camera.enabled ? undefined : translate('gallery.videoReview.itemDisabled')
+        )}
         data-review-snap-domain="display"
         className="relative rounded bg-[var(--sniptale-color-surface-hover)]"
         style={{ height: metrics.step, touchAction: 'none' }}
         onPointerDown={(event) => {
           event.stopPropagation();
           if (
-            event.button !== 0 ||
-            (event.target instanceof Element && event.target.closest('button'))
+            event.button === 0 &&
+            !(event.target instanceof Element && event.target.closest('button'))
           )
-            return;
-          const start = timeAt(event);
-          const admission = deferReviewGesture(props.beforeAction, () =>
-            editor.select({ kind: 'webcam' })
-          );
-          drag.current = {
-            node: event.currentTarget,
-            pointerId: event.pointerId,
-            start,
-            range: { start, end: start },
-            admission,
-          };
-          event.currentTarget.setPointerCapture(event.pointerId);
+            admit(() => editor.select({ kind: 'webcam' }));
         }}
-        onPointerMove={(event) => {
-          event.stopPropagation();
-          const current = drag.current;
-          if (!current) return;
-          const time = timeAt(event);
-          current.range = {
-            start: Math.min(current.start, time),
-            end: Math.max(current.start, time),
-          };
-          setPreview(current.range);
-        }}
-        onPointerUp={(event) => {
-          event.stopPropagation();
-          const current = drag.current;
-          if (!current) return;
-          drag.current = null;
-          if (event.currentTarget.hasPointerCapture(event.pointerId))
-            event.currentTarget.releasePointerCapture(event.pointerId);
-          clear();
-          if (current.range.end - current.range.start >= 0.05)
-            current.admission.commit(() => editor.hide(current.range));
-        }}
-        onPointerCancel={cancel}
-        onLostPointerCapture={cancel}
       >
         <ReviewTrackCuts projection={projection} />
         <ReviewWebcamTrackMarkers
@@ -180,21 +108,6 @@ export function ReviewWebcamTrack(props: {
           admit={admit}
           compact={compact}
         />
-        {preview ? (
-          <div
-            className={`pointer-events-none absolute z-30 flex items-center justify-center
-              overflow-hidden rounded border ${reviewTimelineItemTone(false, 'cut')}`}
-            style={{
-              top: metrics.inset,
-              height: metrics.body,
-              left: `${(preview.start / projection.display.duration) * 100}%`,
-              width: `${((preview.end - preview.start) / projection.display.duration) * 100}%`,
-              opacity: editor.canHide(preview) ? 1 : 0.4,
-            }}
-          >
-            <Scissors size={12} aria-hidden />
-          </div>
-        ) : null}
       </div>
     </ReviewTrackRow>
   );

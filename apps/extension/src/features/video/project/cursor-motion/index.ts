@@ -8,6 +8,7 @@ export interface CursorMotion {
   id: string;
   start: number;
   end: number;
+  timeDomain?: 'result';
   enabled: boolean;
   shape: CursorMotionShape;
   size: number;
@@ -25,6 +26,7 @@ const motionFields = new Set([
   'id',
   'start',
   'end',
+  'timeDomain',
   'enabled',
   'shape',
   'size',
@@ -70,6 +72,7 @@ export function parseCursorMotions(value: unknown): CursorMotion[] | null {
       !bounded(start, 0, 86400) ||
       !bounded(end, 0, 86400) ||
       end <= start ||
+      (raw['timeDomain'] !== undefined && raw['timeDomain'] !== 'result') ||
       typeof enabled !== 'boolean' ||
       !isShape(shape) ||
       !bounded(size, 12, 160) ||
@@ -109,6 +112,7 @@ export function parseCursorMotions(value: unknown): CursorMotion[] | null {
       id,
       start,
       end,
+      ...(raw['timeDomain'] === 'result' ? { timeDomain: 'result' as const } : {}),
       enabled,
       shape,
       size,
@@ -118,7 +122,16 @@ export function parseCursorMotions(value: unknown): CursorMotion[] | null {
       easing,
       points,
     };
-    if (enabled && result.some((other) => other.enabled && other.start < end && other.end > start))
+    if (
+      enabled &&
+      result.some(
+        (other) =>
+          other.enabled &&
+          other.timeDomain === motion.timeDomain &&
+          other.start < end &&
+          other.end > start
+      )
+    )
       return null;
     ids.add(id);
     result.push(motion);
@@ -161,9 +174,15 @@ export function cursorMotionSegment(motion: CursorMotion): CursorFocusSegment {
   }
   return segment;
 }
-export function evaluateCursorMotion(motions: readonly CursorMotion[] | undefined, time: number) {
-  const motion = motions?.find((m) => m.enabled && time >= m.start && time < m.end);
-  const point = motion && evaluateCursorFocusSegment(cursorMotionSegment(motion), time, 0.5);
+export function evaluateCursorMotion(
+  motions: readonly CursorMotion[] | undefined,
+  time: number,
+  resultTime = time
+) {
+  const clock = (motion: CursorMotion) => (motion.timeDomain === 'result' ? resultTime : time);
+  const motion = motions?.find((m) => m.enabled && clock(m) >= m.start && clock(m) < m.end);
+  const point =
+    motion && evaluateCursorFocusSegment(cursorMotionSegment(motion), clock(motion), 0.5);
   return motion && point ? { motion, ...point } : null;
 }
 /** Retain old source facts; authored intervals replace only the corresponding focus intervals. */

@@ -392,15 +392,27 @@ it('moves the range body without changing duration and bounds movement by neighb
     f.send('pointerdown', 300, range);
     f.send('pointermove', 500);
     f.send('pointerup', 500);
-    expect(f.editor.selectedOriginal).toMatchObject({ id, start: 4, end: 6 });
+    expect(f.editor.originalRanges.find((range) => range.id === id)).toMatchObject({
+      id,
+      start: 4,
+      end: 6,
+    });
     f.send('pointerdown', 500, range);
     f.send('pointermove', 950);
     f.send('pointerup', 950);
-    expect(f.editor.selectedOriginal).toMatchObject({ id, start: 4, end: 6 });
+    expect(f.editor.originalRanges.find((range) => range.id === id)).toMatchObject({
+      id,
+      start: 4,
+      end: 6,
+    });
     f.send('pointerdown', 500, range);
     f.send('pointermove', 0);
     f.send('pointerup', 0);
-    expect(f.editor.selectedOriginal).toMatchObject({ id, start: 0, end: 2 });
+    expect(f.editor.originalRanges.find((range) => range.id === id)).toMatchObject({
+      id,
+      start: 0,
+      end: 2,
+    });
   } finally {
     f.close();
   }

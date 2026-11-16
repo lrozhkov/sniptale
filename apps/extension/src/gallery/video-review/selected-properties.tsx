@@ -419,6 +419,7 @@ function SelectedEdit(
           sections={[
             reviewInspectorActions(
               <ReviewButton
+                selectionAction="delete"
                 label={translate('gallery.videoReview.deleteSelected')}
                 className={reviewDeleteButtonClassName}
                 disabled={busy}
@@ -484,6 +485,7 @@ function SelectedEdit(
         sections={[
           reviewInspectorActions(
             <ReviewButton
+              selectionAction="delete"
               label={translate('gallery.videoReview.deleteSelected')}
               className={`${reviewDeleteButtonClassName} !w-full justify-start`}
               onClick={() => void editing.remove()}
@@ -688,9 +690,11 @@ export function reviewSelectionLabel(
         ? 'gallery.videoReview.focus3d'
         : region?.border
           ? 'gallery.videoReview.focusBorder'
-          : region?.spotlight
-            ? 'gallery.videoReview.focusSpotlight'
-            : 'gallery.videoReview.zoomRegionLabel'
+          : region?.spotlight?.effect === 'magnify'
+            ? 'gallery.videoReview.focusLens'
+            : region?.spotlight
+              ? 'gallery.videoReview.focusSpotlight'
+              : 'gallery.videoReview.zoomRegionLabel'
     );
   }
   if (selection.kind === 'zoom-link') return translate('gallery.videoReview.zoomLinkSettings');
@@ -786,6 +790,7 @@ export function ReviewSelectedTextProperties(props: {
         sections={[
           reviewInspectorActions(
             <ReviewButton
+              selectionAction="delete"
               label={translate('gallery.videoReview.textFragmentDelete')}
               className={`${reviewDeleteButtonClassName} !w-full justify-start`}
               onClick={() => props.editor.remove([fragment.id])}

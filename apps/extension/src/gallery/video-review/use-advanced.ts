@@ -16,10 +16,14 @@ import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 type PendingSave = { revision: number; value: QuickEditAdvancedState };
 
 /** UI chrome autosave remains outside user history; rendered content uses the history owner. */
-export function useReviewAdvanced(session: Session) {
+export function useReviewAdvanced(session: Session, beforeEdit?: () => void) {
   const snapshot = useReviewSnapshot(session);
   const persisted = snapshot.snapshot.workspace.advanced;
-  const contentState = useReviewAdvancedContent(session, snapshot.document.advancedContent);
+  const contentState = useReviewAdvancedContent(
+    session,
+    snapshot.document.advancedContent,
+    beforeEdit
+  );
   const [backgroundGesture, setBackgroundGesture] = useState<{
     session: Session;
     base: QuickEditAdvancedState['background'];
@@ -40,6 +44,7 @@ export function useReviewAdvanced(session: Session) {
   }, [session]);
   const stage = useCallback(
     (update: (current: QuickEditAdvancedState) => QuickEditAdvancedState) => {
+      beforeEdit?.();
       const next = update(currentRef.current);
       currentRef.current = next;
       const entry: PendingSave = {
@@ -73,7 +78,7 @@ export function useReviewAdvanced(session: Session) {
         EDITOR_AUTOSAVE_POLICY
       );
     },
-    [session]
+    [session, beforeEdit]
   );
   const controls = useTrackControlRequests({
     prepare: async () => {
@@ -187,6 +192,11 @@ function reviewAdvancedUiCommands(
         },
       }));
     },
+    setTimelinePreferences: (
+      preferences: Partial<
+        Pick<QuickEditAdvancedState['ui'], 'liveSeekEnabled' | 'annotationMagnetEnabled'>
+      >
+    ) => stage((current) => ({ ...current, ui: { ...current.ui, ...preferences } })),
     setWorkspaceColor: (theme: 'light' | 'dark', color: string | null) =>
       stage((current) => {
         const workspaceColors = { ...current.ui.workspaceColors };

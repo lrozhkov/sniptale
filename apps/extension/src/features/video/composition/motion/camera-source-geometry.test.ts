@@ -10,6 +10,30 @@ import {
 } from '../timeline/frame/cursor';
 import { boundCameraSourceGeometry, cameraSourceGeometryBreaks } from './camera-source-geometry';
 
+it('keeps result geometry seams separate from source media coverage after a freeze', () => {
+  const { clip, project } = fixture();
+  Object.assign(clip, {
+    startTime: 4,
+    duration: 1,
+    sourceStart: 2,
+    sourceDuration: 2,
+    playbackRate: 2,
+  });
+  clip.cameraTiming = { offsetSeconds: 2.5, transitions: 'bounded', timeDomain: 'result' };
+  clip.cameraPositions = [
+    {
+      id: 'position',
+      sourceTime: 4.5,
+      transform: clip.transform,
+      fitMode: clip.fitMode,
+      transition: { kind: 'smooth', duration: 0.2 },
+    },
+  ];
+  clip.cameraHiddenRanges = [{ id: 'hidden', start: 4.1, end: 4.2 }];
+  const breaks = cameraSourceGeometryBreaks(clip, project);
+  for (const time of [4.1, 4.2, 4.25, 4.5, 4.7]) expect(breaks).toContain(time);
+});
+
 function fixture() {
   const project = createVideoProjectFromRecording({
     recordingId: 'geometry',

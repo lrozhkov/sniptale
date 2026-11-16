@@ -116,9 +116,12 @@ export function useReviewLiveSeek(
   state: LiveSeekState,
   preferences: QuickPreviewPreferences,
   raster: { width: number; height: number } | null,
-  blocked: boolean
+  blocked: boolean,
+  preference?: { enabled: boolean; onChange(enabled: boolean): void }
 ) {
-  const [enabled, setEnabled] = useState(false);
+  const [localEnabled, setLocalEnabled] = useState(true);
+  const enabled = preference?.enabled ?? localEnabled;
+  const setEnabled = preference?.onChange ?? setLocalEnabled;
   const canvas = useRef<HTMLCanvasElement>(null);
   const queue = useRef<ReturnType<typeof createReviewLiveSeekQueue> | null>(null);
   const [presented, setPresented] = useState<{
@@ -136,11 +139,12 @@ export function useReviewLiveSeek(
   const latest = useRef({ time: state.time, enabled, blocked, resource });
   latest.current = { time: state.time, enabled, blocked, resource };
   const dismiss = useCallback(() => {
-    if (handoff.current) return;
+    if (handoff.current || !shown.current) return;
     setPresented(null);
     shown.current = null;
   }, []);
   const cancelHandoff = useCallback(() => {
+    if (!handoff.current && !shown.current) return;
     handoff.current = null;
     shown.current = null;
     setPresented(null);
@@ -206,6 +210,7 @@ export function useReviewLiveSeek(
     keyCues,
     clickCues,
   ]);
+  const anchorTime = enabled && !blocked ? state.time : null;
   useEffect(() => {
     if (!handoff.current) dismiss();
     if (!enabled || blocked || !input) return;
@@ -275,7 +280,7 @@ export function useReviewLiveSeek(
     input,
     enabled,
     blocked,
-    state.time,
+    anchorTime,
     resource,
     source,
     advanced,
@@ -288,9 +293,9 @@ export function useReviewLiveSeek(
       cancelHandoff();
   }, [enabled, blocked, resource, cancelHandoff]);
   const hover = useCallback(
-    (time: number | null) => {
+    (time: number | null, resultTime?: number) => {
       if (handoff.current && time !== null) return;
-      const result = time === null ? null : map.sourceToTimeline(time);
+      const result = time === null ? null : (resultTime ?? map.sourceToTimeline(time));
       const end = map.getDuration();
       queue.current?.request(
         result === null

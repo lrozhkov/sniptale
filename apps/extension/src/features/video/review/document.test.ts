@@ -22,6 +22,185 @@ const source: ReviewSource = {
   mimeType: 'video/mp4',
   size: 1000,
 };
+
+it('retimes every authored lane with freeze resize and deletion while retaining immutable source data', async () => {
+  const { createQuickEditWebcam } = await import('./advanced/webcam');
+  const { createQuickEditAudioClip } = await import('./advanced/audio');
+  const content = createQuickEditAdvancedContent();
+  const effect = {
+    id: 'crossing',
+    snapshotId: `effect:${'a'.repeat(64)}`,
+    enabled: true,
+    start: 3,
+    end: 8,
+    timeDomain: 'result' as const,
+    attachment: 'content' as const,
+    transform: { x: 0, y: 0, width: 0.5, height: 0.5, rotation: 0 },
+    controls: {},
+    order: 0,
+  };
+  const { timeDomain: _effectClock, ...sourceEffect } = effect;
+  content.annotationEffects = {
+    enabled: true,
+    instances: [
+      effect,
+      { ...effect, id: 'inside', start: 4.25, end: 4.75 },
+      { ...sourceEffect, id: 'source' },
+    ],
+  };
+  const motion = {
+    id: 'crossing',
+    start: 3,
+    end: 8,
+    timeDomain: 'result' as const,
+    enabled: true,
+    shape: 'arrow' as const,
+    size: 48,
+    color: '#000000',
+    outline: '#ffffff',
+    shadow: false,
+    easing: 'linear' as const,
+    points: [
+      { id: 'a', at: 0, x: 0, y: 0 },
+      { id: 'b', at: 1, x: 1, y: 1 },
+    ],
+  };
+  const { timeDomain: _clock, ...sourceMotion } = motion;
+  content.cursorMotions = [
+    motion,
+    { ...motion, id: 'inside', start: 4.25, end: 4.75 },
+    { ...sourceMotion, id: 'source' },
+  ];
+  const camera = createQuickEditWebcam('camera', { width: 160, height: 90 }, source);
+  content.webcam = {
+    ...camera,
+    timeDomain: 'result',
+    hiddenRanges: [
+      { id: 'crossing', start: 3, end: 8 },
+      { id: 'inside', start: 4.25, end: 4.75 },
+    ],
+    positions: [
+      {
+        id: 'inside',
+        time: 4.5,
+        placement: camera.placement,
+        transition: { type: 'none', duration: 0 },
+      },
+      {
+        id: 'after',
+        time: 8,
+        placement: camera.placement,
+        transition: { type: 'ease-in-out', duration: 1 },
+      },
+    ],
+  };
+  const press = {
+    id: 'after',
+    family: 'mouse' as const,
+    start: 8,
+    end: 8.25,
+    timeDomain: 'result' as const,
+    button: 0,
+    x: 0.5,
+    y: 0.5,
+    label: 'Click',
+  };
+  const { timeDomain: _pressClock, ...sourcePress } = press;
+  content.interactionTimeline = {
+    presses: [
+      press,
+      { ...press, id: 'inside', start: 4.5, end: 4.75 },
+      { ...sourcePress, id: 'source' },
+    ],
+    overrides: [
+      {
+        ref: { kind: 'action', id: 'recorded' },
+        start: 8,
+        end: 8.5,
+        enabled: true,
+        timeDomain: 'result',
+      },
+    ],
+  };
+  const audio = createQuickEditAudioClip({
+    id: 'audio',
+    assetId: 'asset',
+    timelineStart: 8,
+    duration: 2,
+    endMax: 14,
+  });
+  content.audio.music = [{ ...audio, timeDomain: 'result' }];
+  content.audio.voiceover = [{ ...audio, id: 'voice', timeDomain: 'result' }];
+  const freeze = {
+    id: 'freeze',
+    kind: 'freeze' as const,
+    start: 4,
+    end: 4,
+    requestedStart: 4,
+    requestedEnd: 4,
+    duration: 2,
+    frameTime: 3.98,
+    frameDuration: 0.04,
+  };
+  const original = {
+    annotations: [],
+    canvasComments: [],
+    edits: [freeze],
+    advancedContent: content,
+  };
+  const snapshot = structuredClone(original);
+  const resized = applyReviewOperation(
+    original,
+    { id: 'resize', at: 1, target: 'edit', before: freeze, after: { ...freeze, duration: 3 } },
+    source
+  );
+  expect(resized.advancedContent.annotationEffects?.instances[0]).toMatchObject({
+    start: 3,
+    end: 9,
+  });
+  expect(resized.advancedContent.cursorMotions?.[0]).toMatchObject({ start: 3, end: 9 });
+  expect(resized.advancedContent.webcam?.positions).toMatchObject([
+    { id: 'inside', time: 4.5, transition: { duration: 0 } },
+    { id: 'after', time: 9, transition: { duration: 1 } },
+  ]);
+  expect(resized.advancedContent.interactionTimeline?.presses).toMatchObject([
+    { id: 'after', start: 9, end: 9.25 },
+    { id: 'inside', start: 4.5 },
+    { id: 'source', start: 8 },
+  ]);
+  expect(resized.advancedContent.interactionTimeline?.overrides[0]).toMatchObject({
+    start: 9,
+    end: 9.5,
+  });
+  expect(resized.advancedContent.audio.music[0]).toMatchObject({ timelineStart: 9, duration: 2 });
+  expect(resized.advancedContent.audio.voiceover[0]).toMatchObject({
+    timelineStart: 9,
+    duration: 2,
+  });
+  const deleted = applyReviewOperation(
+    original,
+    { id: 'remove', at: 1, target: 'edit', before: freeze, after: null },
+    source
+  );
+  expect(deleted.advancedContent.annotationEffects?.instances.map((item) => item.id)).toEqual([
+    'crossing',
+    'source',
+  ]);
+  expect(deleted.advancedContent.cursorMotions?.map((item) => item.id)).toEqual([
+    'crossing',
+    'source',
+  ]);
+  expect(deleted.advancedContent.webcam?.hiddenRanges).toEqual([
+    { id: 'crossing', start: 3, end: 6 },
+  ]);
+  expect(deleted.advancedContent.webcam?.positions).toMatchObject([{ id: 'after', time: 6 }]);
+  expect(deleted.advancedContent.interactionTimeline?.presses.map((item) => item.id)).toEqual([
+    'after',
+    'source',
+  ]);
+  expect(deleted.advancedContent.audio.music[0]).toMatchObject({ timelineStart: 6, duration: 2 });
+  expect(original).toEqual(snapshot);
+});
 const annotation: ReviewAnnotation = {
   id: 'a',
   text: 'Check this',

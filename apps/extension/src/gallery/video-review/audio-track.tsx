@@ -1,3 +1,4 @@
+import { reviewTimelineHint } from './timeline-hints';
 import { useReviewTimelineSnap, type ReviewTimelineSnap } from './timeline-magnets';
 import { ReviewTrackVisibilityButton } from './track-row';
 import { reviewTrackMetrics, ReviewTrackRow, ReviewTrackCuts } from './track-row';
@@ -143,7 +144,7 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
         const clip = retimeReviewVoiceover(stored, props.voiceoverSegments);
         const shown = preview?.clip.id === clip.id ? preview.clip : clip;
         const pieces =
-          props.lane === 'music' && props.projection
+          props.lane === 'music' && props.projection && shown.timeDomain !== 'result'
             ? props.projection.slices(shown.timelineStart, shown.timelineStart + shown.duration)
             : [undefined];
         return { clip, shown, pieces };
@@ -193,7 +194,13 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
     setPreview(null);
     if (current?.node.hasPointerCapture(current.pointerId))
       current.node.releasePointerCapture(current.pointerId);
-    if (!current || !shown || !current.moved) return;
+    if (!current) return;
+    if (!current.moved) {
+      if (current.edge === 'move') current.admission.select();
+      else current.admission.cancel();
+      return;
+    }
+    if (!shown) return;
     const assetId = props.clips.find((clip) => clip.id === current.original.id)?.assetId ?? '';
     const assetDuration =
       props.assets?.get(assetId)?.duration ?? props.waveforms?.get(assetId)?.duration;
@@ -248,11 +255,19 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
               label={props.label}
               assets={props.assets}
               waveforms={props.waveforms}
-              projection={props.projection}
+              projection={
+                clip.timeDomain === 'result'
+                  ? (props.cutsProjection ?? props.projection)
+                  : props.projection
+              }
               sourceProjection={props.cutsProjection}
               voiceoverSegments={props.voiceoverSegments}
               snapTimes={props.snapTimes}
-              duration={props.duration}
+              duration={
+                clip.timeDomain === 'result'
+                  ? (props.cutsProjection?.resultDuration ?? props.duration)
+                  : props.duration
+              }
               drag={drag}
               lane={props.lane}
               clips={props.clips}
@@ -326,6 +341,14 @@ function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
       data-review-removal-key={`audio:${clip.id}`}
       tabIndex={0}
       aria-label={accessibleLabel}
+      data-review-hint={reviewTimelineHint(
+        props.label,
+        shownRange.start,
+        shownRange.end,
+        [filename, props.cutSuppressed ? translate('gallery.videoReview.voiceoverCut') : '']
+          .filter(Boolean)
+          .join('\n')
+      )}
       data-cut-suppressed={props.cutSuppressed ? 'true' : 'false'}
       title={
         props.cutSuppressed
@@ -413,7 +436,11 @@ function reviewAudioClipGesture(
     onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => {
       if (event.button !== 0 || props.busy) return;
       event.stopPropagation();
-      const admission = deferReviewGesture(props.beforeAction, () => props.onSelect(clip.id));
+      const admission = deferReviewGesture(
+        props.beforeAction,
+        () => props.onSelect(clip.id),
+        'click'
+      );
       const edge =
         event.target instanceof Element
           ? event.target.closest('[data-audio-edge]')?.getAttribute('data-audio-edge')
@@ -443,12 +470,26 @@ function reviewAudioClipGesture(
       const current = props.drag.current;
       if (!current || current.width <= 0) return;
       current.moved ||= Math.abs(event.clientX - current.x) > 3;
+      const display = props.sourceProjection?.display ?? props.projection?.display;
+      const reference =
+        current.original.timelineStart + (current.edge === 'end' ? current.original.duration : 0);
       const delta =
-        props.projection?.delta(
-          current.sourceAtPointer,
-          event.clientX - current.x,
-          current.width
-        ) ?? ((event.clientX - current.x) / current.width) * props.duration;
+        current.original.timeDomain === 'result' && display
+          ? display.displayToResult(
+              Math.max(
+                0,
+                Math.min(
+                  display.duration,
+                  display.resultToDisplay(reference, current.edge === 'end' ? 'end' : 'start') +
+                    ((event.clientX - current.x) * display.duration) / current.width
+                )
+              )
+            ) - reference
+          : (props.projection?.delta(
+              current.sourceAtPointer,
+              event.clientX - current.x,
+              current.width
+            ) ?? ((event.clientX - current.x) / current.width) * props.duration);
       const stored = props.clips.find((item) => item.id === current.original.id);
       if (!stored) return;
       const original = retimeReviewVoiceover(stored, props.voiceoverSegments);

@@ -80,11 +80,13 @@ function stubReviewDom(inspectorWidth: number) {
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(function (
     this: HTMLMediaElement
   ) {
+    Object.defineProperty(this, 'paused', { configurable: true, value: true });
     this.dispatchEvent(new Event('pause'));
   });
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(async function (
     this: HTMLMediaElement
   ) {
+    Object.defineProperty(this, 'paused', { configurable: true, value: false });
     this.dispatchEvent(new Event('play'));
   });
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (
@@ -274,6 +276,34 @@ export function createEditorFixture(
   };
   const click = async (key: string) => {
     if (
+      key === 'addComment' &&
+      !host.querySelector('[aria-label="gallery.videoReview.addComment"]')
+    ) {
+      const surface = host.querySelector<HTMLElement>(
+        '[data-ui="gallery.videoReview.previewFrame"]'
+      )!;
+      surface.tabIndex = -1;
+      surface.focus();
+      await act(async () =>
+        window.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'm', code: 'KeyM', bubbles: true })
+        )
+      );
+      return;
+    }
+    if (
+      ['cutMode', 'speedMode'].includes(key) &&
+      !host.querySelector(`[aria-label="gallery.videoReview.${key}"]`)
+    ) {
+      await act(async () =>
+        host
+          .querySelector<HTMLButtonElement>(
+            '[data-review-header-track="source"] [data-review-track-select]'
+          )!
+          .click()
+      );
+    }
+    if (
       key === 'advancedEditing' &&
       !host.querySelector('[aria-label="gallery.videoReview.advancedEditing"]')
     ) {
@@ -371,38 +401,30 @@ export function createEditorFixture(
           )!
           .click()
       );
-      const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
-      const at = start ?? Number(plane.getAttribute('aria-valuenow'));
-      const until = end ?? Math.min(Number(plane.getAttribute('aria-valuemax')), at + 2);
-      if (button('zoomRegionLabel').getAttribute('aria-pressed') !== 'true')
-        await click('zoomRegionLabel');
-      const gutter = Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
-      const duration = Number(plane.getAttribute('aria-valuemax'));
-      Object.assign(plane, {
-        getBoundingClientRect: () => new DOMRect(-gutter, 0, gutter + 400, 80),
-        setPointerCapture: vi.fn(),
-        releasePointerCapture: vi.fn(),
-        hasPointerCapture: () => true,
-      });
-      for (const [type, time] of [
-        ['pointerdown', at],
-        ['pointermove', until],
-        ['pointerup', until],
-      ] as const) {
-        const event = new MouseEvent(type, {
-          bubbles: true,
-          button: 0,
-          clientX: (time / duration) * 400,
+      if (start !== undefined && end !== undefined) {
+        const ruler = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.ruler"]')!;
+        const duration = Number(ruler.getAttribute('aria-valuemax'));
+        Object.assign(ruler, {
+          getBoundingClientRect: () => new DOMRect(0, 0, 400, 28),
+          setPointerCapture: vi.fn(),
+          releasePointerCapture: vi.fn(),
+          hasPointerCapture: () => true,
         });
-        Object.defineProperty(event, 'pointerId', { value: 1 });
-        const target =
-          type === 'pointerdown'
-            ? host.querySelector('[data-ui="gallery.videoReview.zoomLane"]')!
-            : plane;
-        await act(async () => {
-          target.dispatchEvent(event);
-        });
+        for (const [type, time] of [
+          ['pointerdown', start],
+          ['pointermove', end],
+          ['pointerup', end],
+        ] as const) {
+          const event = new MouseEvent(type, {
+            bubbles: true,
+            button: 0,
+            clientX: (time / duration) * 400,
+          });
+          Object.defineProperty(event, 'pointerId', { value: 1 });
+          await act(async () => ruler.dispatchEvent(event));
+        }
       }
+      await click('zoomRegionLabel');
     },
     fill,
     show,

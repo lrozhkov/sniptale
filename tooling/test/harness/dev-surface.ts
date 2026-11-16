@@ -252,7 +252,11 @@ async function readInventory(): Promise<Inventory> {
   const reviewProjects: Candidate[] = [];
   for (const item of reviews) {
     if (item.lifecycle.trashedAt !== undefined || item.unavailableReason || !item.source) continue;
-    const snapshot = await readVideoWorkspace(item.aggregateId);
+    const snapshot = await readVideoWorkspace(item.aggregateId).catch((error: unknown) => {
+      if (error instanceof Error && 'diagnostic' in error)
+        console.error('[dev-surface] Workspace admission:', JSON.stringify(error.diagnostic));
+      throw error;
+    });
     if (!snapshot) continue;
     const workspace = snapshot.workspace;
     const candidate = {
@@ -486,6 +490,7 @@ export async function startDevSurface() {
       mount,
     });
     Object.assign(status, prepared, { status: 'ready' });
+    console.info('[dev-surface] Preparation ready.');
     if (config.profile === 'video-editor') {
       const { useVideoEditorStore } =
         await import('../../../apps/extension/src/video-editor/state/store');
@@ -502,6 +507,7 @@ export async function startDevSurface() {
     }
     if (feedback) feedback.hidden = true;
   } catch (error) {
+    console.error('[dev-surface] Preparation failed:', error);
     status.status = 'error';
     status.error =
       error instanceof SurfacePreparationError
@@ -510,6 +516,12 @@ export async function startDevSurface() {
     if (feedback) {
       feedback.hidden = false;
       feedback.textContent = status.error;
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.textContent = 'Reload development surface';
+      retry.style.marginInlineStart = '12px';
+      retry.addEventListener('click', () => location.reload());
+      feedback.append(retry);
     }
   }
 }

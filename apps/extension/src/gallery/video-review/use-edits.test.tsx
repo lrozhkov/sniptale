@@ -76,13 +76,12 @@ it('keeps creation defaults separate from inspector edits and preserves both aft
   }
   try {
     act(() => root.render(<Harness />));
-    await act(async () => hook.toggle('speed'));
     await act(async () => {
       await hook.changeRate(4);
       await hook.changeAudio('mute');
     });
     expect(operations).toHaveLength(0);
-    await act(async () => hook.commitRange({ kind: 'range', start: 2, end: 4 }));
+    await act(async () => hook.commitRange({ kind: 'range', start: 2, end: 4 }, null, 'speed'));
     expect(operations).toHaveLength(1);
     expect(hook.selected).toMatchObject({ kind: 'speed', rate: 4, audio: 'mute' });
     const original = hook.selected!;
@@ -107,24 +106,23 @@ it('keeps creation defaults separate from inspector edits and preserves both aft
       after: { id: original.id, rate: 2 },
     });
     expect(hook.rate).toBe(1.5);
-    await act(async () => hook.toggle('cut'));
     expect(operations).toHaveLength(2);
-    expect(hook.mode).toBe('cut');
+    expect(hook.mode).toBeNull();
     expect(hook.selected?.id).toBe(original.id);
     await act(async () => hook.select(hook.selected!));
-    expect(hook.mode).toBe('cut');
+    expect(hook.mode).toBeNull();
     expect(hook.rate).toBe(1.5);
     await act(async () => hook.commitRange({ kind: 'range', start: 4, end: 6 }, hook.selected));
     expect(operations[2]).toMatchObject({
       before: { kind: 'speed', rate: 2 },
       after: { kind: 'speed', rate: 2, start: 4, end: 6 },
     });
-    expect(hook.mode).toBe('cut');
+    expect(hook.mode).toBeNull();
     expect(hook.rate).toBe(1.5);
     await act(async () => hook.remove());
     expect(operations[3]).toMatchObject({ before: { kind: 'speed' }, after: null });
     expect(hook.selected).toBeNull();
-    expect(hook.mode).toBe('cut');
+    expect(hook.mode).toBeNull();
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();
@@ -153,17 +151,17 @@ it('switches tools without applying a stale range while another timeline object 
   try {
     act(() => root.render(<Harness selectedObject />));
     await act(async () => hook.toggle('cut'));
-    expect(hook.mode).toBe('cut');
-    expect(commit).not.toHaveBeenCalled();
-    await act(async () => hook.toggle('speed'));
-    expect(hook.mode).toBe('speed');
-    expect(commit).not.toHaveBeenCalled();
+    expect(hook.mode).toBeNull();
+    expect(commit).toHaveBeenCalledTimes(1);
     await act(async () => hook.toggle('speed'));
     expect(hook.mode).toBeNull();
-    expect(commit).not.toHaveBeenCalled();
+    expect(commit).toHaveBeenCalledTimes(2);
+    await act(async () => hook.toggle('speed'));
+    expect(hook.mode).toBeNull();
+    expect(commit).toHaveBeenCalledTimes(3);
     act(() => root.render(<Harness selectedObject={false} />));
     await act(async () => hook.toggle('cut'));
-    expect(commit).toHaveBeenCalledOnce();
+    expect(commit).toHaveBeenCalledTimes(4);
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();
@@ -345,7 +343,7 @@ it('keeps each cut transition through resize and refuses failed property commits
 });
 
 it.each(['cut', 'speed'] as const)(
-  'returns to pointer after accepted %s placement and retains the tool after refusal',
+  'places %s immediately, retries a refused command without arming a drawing mode',
   async (kind) => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     const root = createRoot(document.createElement('div'));
@@ -368,10 +366,9 @@ it.each(['cut', 'speed'] as const)(
     try {
       act(() => root.render(<Harness />));
       await act(async () => hook.toggle(kind));
-      await act(async () => hook.commitRange({ kind: 'range', start: 2, end: 4 }));
-      expect(hook.mode).toBe(kind);
+      expect(hook.mode).toBeNull();
       expect(select).not.toHaveBeenCalled();
-      await act(async () => hook.commitRange({ kind: 'range', start: 2, end: 4 }));
+      await act(async () => hook.toggle(kind));
       expect(hook.mode).toBeNull();
       expect(hook.cutting).toBe(false);
       expect(select).toHaveBeenCalledWith(expect.any(String));

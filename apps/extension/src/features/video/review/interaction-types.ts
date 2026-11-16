@@ -1,5 +1,6 @@
 export type ReviewInteractionFamily = 'keyboard' | 'mouse';
 export type ReviewAuthoredPress = {
+  timeDomain?: 'result';
   id: string;
   family: ReviewInteractionFamily;
   start: number;
@@ -11,6 +12,7 @@ export type ReviewAuthoredPress = {
   y: number;
 };
 type ReviewInteractionOverride = {
+  timeDomain?: 'result';
   ref: { kind: 'action' | 'signal' | 'cursor'; id: string };
   start: number;
   end: number;

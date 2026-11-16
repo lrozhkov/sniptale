@@ -88,6 +88,7 @@ export function ReviewAudioClipEditor(props: {
         <span>{translate('gallery.videoReview.audioClipMute')}</span>
       </ReviewButton>
       <ReviewButton
+        selectionAction="delete"
         label={translate('gallery.videoReview.audioClipDelete')}
         disabled={props.busy}
         className={`${reviewDeleteButtonClassName} !w-full justify-start`}

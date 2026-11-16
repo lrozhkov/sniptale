@@ -67,6 +67,40 @@ function number(label: string, value: string) {
   });
   act(() => field.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' })));
 }
+
+it('adds a result-clock hide interval after a freeze independently of the camera source extent', () => {
+  const props = fixture();
+  props.clip.cameraTiming = { offsetSeconds: 0, transitions: 'bounded', timeDomain: 'result' };
+  act(() => root.render(<CameraVisibilityControls {...props} currentTime={11} />));
+  expect(button('cameraHideInterval').disabled).toBe(false);
+  act(() => button('cameraHideInterval').click());
+  expect(props.onEdit).toHaveBeenLastCalledWith(props.clip.id, {
+    kind: 'hide',
+    start: 11,
+    end: 12,
+  });
+});
+
+it('edits retained hide intervals in current timeline seconds after movement and a rate change', () => {
+  const props = fixture();
+  props.clip.cameraTiming = {
+    offsetSeconds: 0,
+    transitions: 'bounded',
+    timeDomain: 'result',
+    layoutClock: { time: 4, sourceTime: 2, rate: 1 },
+  };
+  props.clip.cameraHiddenRanges = [{ id: 'hidden', start: 5, end: 6 }];
+  act(() => root.render(<CameraVisibilityControls {...props} currentTime={10.75} />));
+  expect(input('cameraHiddenStart').value).toBe('10.5');
+  expect(input('cameraHiddenEnd').value).toBe('11');
+  number('cameraHiddenEnd', '11.25');
+  expect(props.onEdit).toHaveBeenLastCalledWith(props.clip.id, {
+    kind: 'hide',
+    id: 'hidden',
+    start: 5,
+    end: 6.5,
+  });
+});
 it('adds a source-clock interval, commits one bound once and removes only its ID', () => {
   const props = fixture();
   act(() => root.render(<CameraVisibilityControls {...props} />));

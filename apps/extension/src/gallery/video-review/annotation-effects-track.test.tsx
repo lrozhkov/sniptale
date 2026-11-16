@@ -148,7 +148,7 @@ it.each(['body', 'start', 'end'])(
     expect(begin).toHaveBeenCalledWith('first');
     expect(preview).toHaveBeenCalled();
     expect(commit).toHaveBeenCalledOnce();
-    expect(select).toHaveBeenCalledWith('first');
+    expect(select).not.toHaveBeenCalled();
   }
 );
 

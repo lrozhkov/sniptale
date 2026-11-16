@@ -105,7 +105,11 @@ export function useReviewEditorWiring(args: {
   const comments = useReviewCommentActions({
     composer: args.composer,
     time: args.time,
-    playbackRange: args.playbackRange,
+    playbackRange:
+      args.playbackRange ??
+      (args.activeSelection.kind === 'none' && args.timelineSelection.kind === 'range'
+        ? args.timelineSelection
+        : null),
     video: args.video,
     pause: args.pause,
     seek: args.seek,

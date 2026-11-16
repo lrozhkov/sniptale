@@ -40,7 +40,8 @@ function pendingAfterAcknowledgement(
 /** The UI owns unsaved field captures; the session owns their ordered durable publication. */
 export function useReviewAdvancedContent(
   session: Session,
-  documentContent: QuickEditAdvancedContent
+  documentContent: QuickEditAdvancedContent,
+  beforeEdit?: () => void
 ) {
   const [, setVersion] = useState(0);
   const [saveFailed, setSaveFailed] = useState(false);
@@ -116,6 +117,7 @@ export function useReviewAdvancedContent(
   }, []);
   const stage = useCallback(
     (mutate: ContentMutation, target?: ReviewTextTypingTarget) => {
+      beforeEdit?.();
       const previous = pending.current.at(-1);
       const base = previous?.value ?? session.getSnapshot().document.advancedContent;
       const value = mutate(base);
@@ -150,7 +152,7 @@ export function useReviewAdvancedContent(
       setSaveFailed(false);
       schedule();
     },
-    [session, schedule]
+    [session, schedule, beforeEdit]
   );
   useRecoveryLifecycle(flush, mounted);
   useEffect(

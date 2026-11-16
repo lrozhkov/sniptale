@@ -1,3 +1,4 @@
+import { reviewInsertionTarget } from './range-placement';
 import type { RefObject } from 'react';
 import type { ReviewAnchor, ReviewAnnotation } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
@@ -37,7 +38,7 @@ export function useReviewCommentActions(args: {
     const anchor: ReviewAnchor = marker
       ? { kind: 'point', time: marker.start }
       : args.playbackRange
-        ? { kind: 'range', ...args.playbackRange }
+        ? { kind: 'range', ...reviewInsertionTarget(args.time, args.playbackRange)! }
         : { kind: 'point', time: args.time };
     args.seek(anchor.kind === 'point' ? anchor.time : anchor.start, false);
     args.composer.change(

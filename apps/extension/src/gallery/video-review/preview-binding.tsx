@@ -137,7 +137,8 @@ export function ReviewPreviewBinding({
       aria-busy={state.recovering}
       className="flex min-h-0 min-w-0 flex-col overflow-hidden p-3"
     >
-      {state.history?.failed || state.history?.initialLoading || state.history?.incomplete ? (
+      {state.history?.failed ||
+      (state.history?.incomplete && !state.history.pending && !state.history.initialLoading) ? (
         <div
           role={state.history.failed ? 'alert' : 'status'}
           className="flex items-center gap-2 text-xs"
@@ -146,9 +147,7 @@ export function ReviewPreviewBinding({
             {translate(
               state.history.failed
                 ? 'gallery.videoReview.recordingHistoryFailed'
-                : state.history.initialLoading
-                  ? 'gallery.videoReview.recordingHistoryLoading'
-                  : 'gallery.videoReview.recordingHistoryIncomplete'
+                : 'gallery.videoReview.recordingHistoryIncomplete'
             )}
           </span>
           {state.history.failed ? (
@@ -159,7 +158,7 @@ export function ReviewPreviewBinding({
           ) : null}
         </div>
       ) : null}
-      {state.webcam.failed || state.webcam.pending ? (
+      {state.webcam.failed ? (
         <div
           role={state.webcam.failed ? 'alert' : 'status'}
           className="flex items-center gap-2 text-xs"
@@ -356,6 +355,18 @@ function ReviewPreviewStage({
               onRaster: onPreviewRaster,
               onRendererStatus: onPreviewRendererStatus,
               sourceFrameRate: state.exporter.index?.frameRate,
+              waitingReason:
+                [
+                  state.history?.pending || state.history?.initialLoading
+                    ? translate('gallery.videoReview.recordingHistoryLoading')
+                    : null,
+                  state.webcam.pending ? translate('gallery.videoReview.webcamLoading') : null,
+                  state.recovering || state.backgroundImport.pending
+                    ? translate('gallery.videoReview.previewLoading')
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join('\n') || undefined,
             }
           : undefined
       }
@@ -413,7 +424,7 @@ function ReviewPreviewStage({
       annotations={snapshot.document.annotations}
       canvasComments={canvasComments}
       overlaysVisible={features.overlaysVisible}
-      time={state.time}
+      time={state.timeline.timeMap.timelineToSource(state.timeline.sceneOutputTime) ?? state.time}
       busy={busy}
       onRegion={(region) => {
         if (composer.annotation && !busy) composer.change({ ...composer.annotation, region });

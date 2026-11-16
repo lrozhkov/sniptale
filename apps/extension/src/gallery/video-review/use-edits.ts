@@ -1,4 +1,5 @@
 import type { CompositionJoinSettings } from '../../features/video/project/scene/composition-join';
+import { reviewEditInsertionRange } from './range-placement';
 import { useRef, useState } from 'react';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import {
@@ -38,9 +39,16 @@ export function useReviewEdits(props: {
   const selected = props.edits.find((edit) => edit.id === selectedEditId) ?? null;
   const toggle = async (kind: 'cut' | 'speed' = 'cut') => {
     props.pause();
-    if (!selected && !props.selectedObject && props.selection?.kind === 'range')
-      return commitRange(props.selection, null, kind);
-    setMode(mode === kind ? null : kind);
+    const selection = props.selection;
+    const range = reviewEditInsertionRange(
+      kind,
+      selection?.kind === 'point' ? selection.time : (selection?.start ?? 0),
+      props.duration,
+      props.edits,
+      selection?.kind === 'range' ? selection : null
+    );
+    if (range) return commitRange(range, null, kind);
+    props.onInvalid?.();
   };
   const candidate = (
     kind: 'cut' | 'speed',
@@ -99,9 +107,11 @@ export function useReviewEdits(props: {
     try {
       if (await props.commit(before, after)) {
         if (!before) setMode(null);
-        setSelectedEditId(after.id);
-        props.setSelection({ kind: 'point', time: after.start });
-        if (!before) props.seek(after.start);
+        if (!before) {
+          setSelectedEditId(after.id);
+          props.setSelection({ kind: 'point', time: after.start });
+          props.seek(after.start);
+        }
         return true;
       }
       return false;
@@ -131,6 +141,25 @@ export function useReviewEdits(props: {
         ? props.commit(selected, { ...selected, audio: value })
         : undefined,
     selected,
+    moveFreeze: (edit: ReviewEdit, time: number) => {
+      if (
+        edit.kind !== 'freeze' ||
+        !Number.isFinite(time) ||
+        time < 0 ||
+        time > props.duration ||
+        props.edits.some((item) => item.kind === 'cut' && item.start <= time && time < item.end)
+      )
+        return;
+      props.pause();
+      if (Math.abs(edit.start - time) < 1e-7) return;
+      return props.commit(edit, {
+        ...edit,
+        start: time,
+        end: time,
+        requestedStart: time,
+        requestedEnd: time,
+      });
+    },
     changeFreezeDuration,
     changeSelectedFreezeDuration: (duration: number) =>
       selected ? changeFreezeDuration(selected, duration) : undefined,

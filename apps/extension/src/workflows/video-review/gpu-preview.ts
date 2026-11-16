@@ -105,7 +105,6 @@ export function reviewGpuPreviewConcurrency(
 ): 1 | 2 {
   const plan = scene.outerFadePlan;
   return scene.webcam?.enabled ||
-    scene.captions?.settings?.enabled ||
     (annotationMaximumInFlight !== 2 &&
       scene.annotationEffects?.lane.enabled &&
       scene.annotationEffects.lane.instances.some((instance) => instance.enabled)) ||
@@ -262,12 +261,12 @@ export function createReviewGpuPreview(args: {
   ): Promise<boolean | ReviewGpuPresentedFrame> {
     if (disabled || disposed) return false;
     const { scene, dimensions, geometry } = input;
+    // Caption layout is immutable; each request slot owns its caption canvas and GPU texture.
     const safe =
       reviewGpuPreviewConcurrency(scene, input.annotations?.maximumInFlight) === 2 &&
       !input.camera &&
       !input.transition &&
       !input.cameraOverride &&
-      !input.captions &&
       (!input.annotations || input.annotations.maximumInFlight === 2);
     if (
       active &&

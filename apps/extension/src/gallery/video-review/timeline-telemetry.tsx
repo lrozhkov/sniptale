@@ -1,3 +1,4 @@
+import { reviewTimelineHint } from './timeline-hints';
 import { useReviewDragEscape } from './timeline-drag';
 import { useReviewTimelineSnap } from './timeline-magnets';
 import { reviewTimelineResizeHandleClassName } from './controls';
@@ -362,7 +363,6 @@ function ReviewHistoryItem({
     if (event.button !== 0 || !props.editable || item.members.length > 1) return;
     event.stopPropagation();
     skipClick.current = false;
-    props.onMarker(marker);
     const edge =
       event.target instanceof Element
         ? event.target.closest<HTMLElement>('[data-press-edge]')?.dataset['pressEdge']
@@ -480,6 +480,19 @@ function ReviewHistoryItem({
       data-animated={animated ? 'true' : 'false'}
       aria-label={`${translate('gallery.videoReview.telemetry')} · ${description}`}
       title={description}
+      data-review-hint={reviewTimelineHint(
+        reviewEventLabel(marker.eventType),
+        marker.start,
+        marker.end,
+        [
+          reviewMouseButtonLabel(marker.mouseButton),
+          marker.target,
+          item.lane === 0 ? translate('gallery.videoReview.historyKeyboardCoverage') : '',
+          animated ? translate('gallery.videoReview.clickAnimation') : '',
+        ]
+          .filter(Boolean)
+          .join('\n')
+      )}
       onClick={() => {
         if (skipClick.current) {
           skipClick.current = false;

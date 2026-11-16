@@ -1,3 +1,4 @@
+import { Plus, Trash2 } from 'lucide-react';
 import {
   CameraFollowMovementChoice,
   CameraFollowZoneChoice,
@@ -195,13 +196,18 @@ function CursorKeyActions({
           props.onChange(addReviewCursorFocusKey(props.path, props.time, duration, id));
           select(id, props.time);
         }}
-      />
+      >
+        <Plus size={16} aria-hidden="true" />
+      </ReviewButton>
       <ReviewButton
         className={reviewTextButtonClassName}
+        selectionAction="delete"
         label={translate('common.actions.delete')}
         disabled={props.disabled || selected?.anchor !== 'manual'}
         onClick={() => selected && props.onChange(deleteCursorFocusKey(props.path, selected.id))}
-      />
+      >
+        <Trash2 size={16} aria-hidden="true" />
+      </ReviewButton>
     </>
   );
 }

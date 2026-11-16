@@ -1,3 +1,4 @@
+import { reviewTimelineHint } from './timeline-hints';
 import { useReviewTimelineSnap } from './timeline-magnets';
 import { SNAP_THRESHOLD_PX } from '../../features/video/review/snap';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -122,6 +123,11 @@ export function ReviewWebcamHiddenMarker(props: {
       <button
         type="button"
         title={translate('gallery.videoReview.webcamHidden')}
+        data-review-hint={reviewTimelineHint(
+          translate('gallery.videoReview.webcamHidden'),
+          visible.start,
+          visible.end
+        )}
         aria-label={`${translate('gallery.videoReview.webcamHidden')} ${range.start}–${range.end}`}
         className="absolute inset-0 flex items-center justify-center"
         onClick={(event) => {
@@ -158,9 +164,7 @@ export function ReviewWebcamHiddenMarker(props: {
               edge,
               range,
               next: range,
-              admission: deferReviewGesture(admit, () =>
-                editor.select({ kind: 'webcam-hidden', id })
-              ),
+              admission: deferReviewGesture(admit, () => {}, 'click'),
             };
             pending.current = drag.current.admission;
             event.currentTarget.setPointerCapture(event.pointerId);

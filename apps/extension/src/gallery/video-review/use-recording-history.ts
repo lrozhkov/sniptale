@@ -46,9 +46,24 @@ function covers(view: View | null, owner: Owner, request: Request): boolean {
       view.request.range.end < request.range.end)
   )
     return false;
+  if (view.request.reach < request.reach) return false;
+  if (request.explicit) return true;
+  const range = view.request.range;
   return (
-    view.request.reach >= request.reach &&
-    (request.reach <= 1 || Math.abs(view.request.time - request.time) <= 1)
+    !!range &&
+    range.start <= Math.max(0, request.time - request.reach) &&
+    range.end >= Math.min(owner.project!.duration, request.time + request.reach)
+  );
+}
+
+/** Refresh before the proved window runs out; the current view remains usable during prefetch. */
+function needsPrefetch(view: View | null, owner: Owner, request: Request): boolean {
+  if (request.explicit || !view?.request.range) return false;
+  const reserve = Math.max(1, request.reach);
+  return (
+    view.request.range.start > Math.max(0, request.time - request.reach - reserve) ||
+    view.request.range.end <
+      Math.min(owner.project!.duration, request.time + request.reach + reserve)
   );
 }
 /** Each preview or viewport owns one active read and one latest request. */
@@ -66,11 +81,11 @@ export function useReviewRecordingHistory(
   const includeCursor = options.includeCursor !== false;
   const interactionTimeline = options.interactionTimeline;
   const reach = Math.max(1, options.reach ?? 1);
-  const range =
-    options.range ??
-    (reach > 1
-      ? { start: Math.max(0, time - reach), end: Math.min(resource.source.duration, time + reach) }
-      : undefined);
+  const range = options.range ?? {
+    // Bounded lookahead absorbs archive latency instead of chasing each moving frame.
+    start: Math.max(0, time - reach - Math.max(2, reach * 2)),
+    end: Math.min(resource.source.duration, time + reach + Math.max(2, reach * 2)),
+  };
   const explicit = options.range !== undefined;
   const rangeStart = range?.start;
   const rangeEnd = range?.end;
@@ -127,7 +142,7 @@ export function useReviewRecordingHistory(
   useEffect(() => {
     if (!owner || owner.disposed || owner.failed) return;
     owner.latest = request;
-    if (covers(view, owner, request)) return;
+    if (covers(view, owner, request) && !needsPrefetch(view, owner, request)) return;
     owner.requested = true;
     if (owner.running) return;
     owner.running = true;

@@ -9,6 +9,7 @@ import { isVideoProjectAsset } from '../project/validation/assets';
 import { isVideoProjectTrack } from '../project/validation/tracks';
 import type { QuickEditWebcam, QuickEditWebcamPlacement } from './advanced/webcam';
 import type { ReviewProjectTimelinePlan } from './project-timeline';
+import { projectReviewWebcam } from './timeline-placement';
 
 /** Admitted camera media and the translated camera track supplied by the workflow. */
 export interface ReviewProjectCameraResource {
@@ -30,7 +31,11 @@ export function planReviewProjectCamera(args: {
   tracks: VideoProjectTrack[];
   clips: VideoProjectVideoClip[];
 } | null {
-  const { webcam, resource } = args;
+  const { resource } = args;
+  const webcam = projectReviewWebcam(
+    args.webcam,
+    args.timeline.slices.map((slice) => slice.segment)
+  );
   if (!webcam) return resource ? null : { assets: [], tracks: [], clips: [] };
   if (
     !resource ||
@@ -99,7 +104,20 @@ export function planReviewProjectCamera(args: {
       ...(webcam.shadowDirection ? { cameraShadowDirection: { ...webcam.shadowDirection } } : {}),
       ...(webcam.screenBehavior ? { cameraScreenBehavior: webcam.screenBehavior } : {}),
       ...(webcam.split ? { cameraSplit: webcam.split } : {}),
-      cameraTiming: { offsetSeconds: webcam.offsetSeconds, transitions: 'bounded' },
+      cameraTiming: {
+        offsetSeconds: webcam.offsetSeconds,
+        transitions: 'bounded',
+        ...(webcam.timeDomain
+          ? {
+              timeDomain: webcam.timeDomain,
+              layoutClock: {
+                time: primary.startTime - (primary.playbackWindow?.offset ?? 0),
+                sourceTime: primary.sourceStart,
+                rate: primary.playbackRate ?? 1,
+              },
+            }
+          : {}),
+      },
       cameraAppearance: structuredClone(webcam.appearance),
       cameraMirrored: webcam.mirrored,
       cameraHiddenRanges: structuredClone(webcam.hiddenRanges),

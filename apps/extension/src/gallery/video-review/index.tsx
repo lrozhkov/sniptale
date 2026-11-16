@@ -1,6 +1,7 @@
 import { ReviewPlaybackPresentationClockContext } from './playback-presentation-clock';
 import { useReviewLiveSeek } from './use-live-seek';
-import { Magnet, ScanLine } from 'lucide-react';
+import { Magnet } from 'lucide-react';
+import { ReviewLiveSeekIcon } from './live-seek-icon';
 import { ReviewButton, reviewIconButtonClassName } from './controls';
 import { resolveReviewTimelineSelection } from './timeline-batch-selection';
 import { ReviewInspectorToolbarNavigation } from './review-toolbar';
@@ -164,13 +165,17 @@ function ReviewEditor({
     retryProject: state.retryAdvanced,
   });
   const previewPreferences = previewSettings.preferences;
-  const [annotationMagnetEnabled, setAnnotationMagnetEnabled] = useState(true);
+  const annotationMagnetEnabled = state.advanced.ui.annotationMagnetEnabled !== false;
   const liveSeek = useReviewLiveSeek(
     resource,
     state,
     previewPreferences.preferences,
     previewSettings.raster,
-    state.playing || state.busy || state.editing.exporter.phase !== 'idle' || !editorReady
+    state.playing || state.busy || state.editing.exporter.phase !== 'idle' || !editorReady,
+    {
+      enabled: state.advanced.ui.liveSeekEnabled !== false,
+      onChange: (liveSeekEnabled) => state.setTimelinePreferences({ liveSeekEnabled }),
+    }
   );
   const reportPresentedTime = state.onPresentedTime;
   const reportHoverPresentedTime = liveSeek.onPresentedTime;
@@ -232,12 +237,42 @@ function ReviewEditor({
           <div
             ref={panels.container}
             data-ui="gallery.videoReview.workspace"
+            onPointerDownCapture={(event) => {
+              const target = event.target;
+              if (
+                target instanceof Element &&
+                target.closest('[data-ui="gallery.videoReview.timeline"]') &&
+                target.closest(
+                  '[data-review-removal-key],[data-review-action-key],[data-cursor-focus-key]'
+                )
+              )
+                state.pause();
+              if (
+                target instanceof Element &&
+                target.closest('[data-ui="gallery.videoReview.inspector"]') &&
+                target.closest(
+                  'input,textarea,select,[role="slider"],[role="spinbutton"],[role="combobox"],[contenteditable="true"]'
+                )
+              )
+                state.pause();
+            }}
+            onFocusCapture={(event) => {
+              const target = event.target;
+              if (
+                target instanceof Element &&
+                target.closest('[data-ui="gallery.videoReview.inspector"]') &&
+                target.matches(
+                  'input,textarea,select,[role="slider"],[role="spinbutton"],[role="combobox"],[contenteditable="true"]'
+                )
+              )
+                state.pause();
+            }}
             style={{
               ...workspaceColor.style,
               gridTemplateColumns: `minmax(0,1fr) ${panels.inspectorWidth}px`,
               gridTemplateRows: `minmax(0,1fr) ${timelineRow}`,
             }}
-            className="grid h-full min-h-0 min-w-[1254px]"
+            className="grid h-full min-h-0 min-w-0"
           >
             <div className="contents" inert={voiceover.recording}>
               <ReviewPreviewBinding
@@ -338,7 +373,6 @@ function ReviewEditor({
                 onPlaybackRange={state.setPlaybackRange}
                 zoomAnchor={state.zoomAnchor}
                 beforeAction={state.beforeAction}
-                onAddNote={() => state.add()}
                 historyControls={<ReviewHistoryControlBinding state={state} />}
                 inspectorControls={
                   <ReviewInspectorToolbarNavigation
@@ -347,7 +381,7 @@ function ReviewEditor({
                     busy={busy || editing.exporter.phase !== 'idle'}
                   />
                 }
-                utilityControls={
+                navigationControls={
                   <>
                     {features.mode === 'advanced' && (
                       <ReviewButton
@@ -356,7 +390,11 @@ function ReviewEditor({
                         className={reviewIconButtonClassName}
                         aria-pressed={annotationMagnetEnabled}
                         data-ui="gallery.videoReview.annotationMagnetToggle"
-                        onClick={() => setAnnotationMagnetEnabled(!annotationMagnetEnabled)}
+                        onClick={() =>
+                          state.setTimelinePreferences({
+                            annotationMagnetEnabled: !annotationMagnetEnabled,
+                          })
+                        }
                       >
                         <Magnet size={16} aria-hidden="true" />
                       </ReviewButton>
@@ -369,17 +407,19 @@ function ReviewEditor({
                       data-ui="gallery.videoReview.liveSeekToggle"
                       onClick={() => liveSeek.setEnabled(!liveSeek.enabled)}
                     >
-                      <ScanLine size={16} aria-hidden="true" />
+                      <ReviewLiveSeekIcon />
                     </ReviewButton>
-                    <ReviewKeyboardHelp
-                      onBasicMode={
-                        features.mode === 'advanced' ? () => state.setMode('basic') : undefined
-                      }
-                      busy={busy || editing.exporter.phase !== 'idle'}
-                      onNewProject={projectCommands.newProject}
-                      onBackup={() => void state.run(() => backupReview(state, canvasComments))}
-                    />
                   </>
+                }
+                utilityControls={
+                  <ReviewKeyboardHelp
+                    onBasicMode={
+                      features.mode === 'advanced' ? () => state.setMode('basic') : undefined
+                    }
+                    busy={busy || editing.exporter.phase !== 'idle'}
+                    onNewProject={projectCommands.newProject}
+                    onBackup={() => void state.run(() => backupReview(state, canvasComments))}
+                  />
                 }
                 editing={editing}
                 edits={snapshot.document.edits}
@@ -408,6 +448,8 @@ function ReviewEditor({
                 setMode={state.setMode}
                 telemetryAvailable={state.projected.markers.length > 0}
                 time={state.time}
+                onPause={state.pause}
+                insertionPoint={state.insertionPoint}
                 playing={state.playing}
                 navigationRevision={state.navigationRevision}
                 markers={state.projected.markers}
@@ -527,7 +569,8 @@ function useReviewEditorNavigation(
     },
     onMarker: (marker: Parameters<Parameters<typeof ReviewTimelineBinding>[0]['onMarker']>[0]) => {
       if (!state.canStart()) return;
-      state.seek(marker.start, false);
+      if (marker.timeDomain === 'result') state.seekResult(marker.start);
+      else state.seek(marker.start, false);
       state.setActiveSelection({ kind: 'telemetry', ref: marker.ref });
       navigation.setSection('selected');
     },

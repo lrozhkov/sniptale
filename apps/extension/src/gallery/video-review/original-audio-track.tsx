@@ -1,3 +1,4 @@
+import { reviewTimelineHint } from './timeline-hints';
 import { useReviewTimelineSnap, type ReviewTimelineSnap } from './timeline-magnets';
 import { ReviewTrackVisibilityButton } from './track-row';
 import { SNAP_THRESHOLD_PX, snapTimelineTime } from '../../features/video/review/snap';
@@ -29,6 +30,8 @@ type Drag = {
   from: number;
   to: number;
   at: number;
+  x: number;
+  moved: boolean;
   start: number;
   end: number;
   min: number;
@@ -228,6 +231,12 @@ function ReviewOriginalGainBlock(props: {
       aria-pressed={props.selected}
       aria-label={translate('gallery.videoReview.originalAudioRange')}
       title={`${translate('gallery.videoReview.originalAudioRange')}: ${Math.round(range.volume * 100)}%`}
+      data-review-hint={reviewTimelineHint(
+        translate('gallery.videoReview.originalAudioRange'),
+        start,
+        end,
+        `${Math.round(range.volume * 100)}%`
+      )}
       data-ui="gallery.videoReview.originalAudioRange"
       data-audio-id={range.id}
       data-review-removal-key={`original-audio:${range.id}`}
@@ -343,12 +352,18 @@ function useOriginalAudioGesture(
         const neighbors = overlay
           ? []
           : (props.original.ranges?.filter((other) => other.id !== id) ?? []);
-        const admission = deferReviewGesture(props.beforeAction, () => {
-          if (id && lifetime.canCommit('item')) props.editor?.selectOriginal(id);
-        });
+        const admission = deferReviewGesture(
+          props.beforeAction,
+          () => {
+            if (id && lifetime.canCommit('item')) props.editor?.selectOriginal(id);
+          },
+          'click'
+        );
         drag.current = {
           admission,
           node: event.currentTarget,
+          x: event.clientX,
+          moved: false,
           at,
           start: range?.start ?? at,
           end: range?.end ?? at,
@@ -376,6 +391,8 @@ function useOriginalAudioGesture(
         if (!drag.current || event.pointerId !== drag.current.pointerId) return;
         const at = originalAudioPointerTime(event, duration, props, drag.current, snap);
         const current = drag.current;
+        current.moved ||= Math.abs(event.clientX - current.x) > 3;
+        if (!current.moved) return;
         const length = current.end - current.start;
         if (current.edge === 'move') {
           const free = current.start + at - current.at;
@@ -410,6 +427,11 @@ function useOriginalAudioGesture(
         setPreview(null);
         event.currentTarget.releasePointerCapture(event.pointerId);
         event.stopPropagation();
+        if (current.id && !current.moved) {
+          if (current.edge === 'move') current.admission.select();
+          else current.admission.cancel();
+          return;
+        }
         current.admission.commit(() => {
           if (!lifetime.canCommit(current.id ? 'item' : 'range')) return;
           if (current.id)
