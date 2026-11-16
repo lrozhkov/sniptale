@@ -28,6 +28,7 @@ function Harness({ echo }: { echo: boolean }) {
   return (
     <>
       <output>{authored}</output>
+      <output data-preview>{preview ?? 'none'}</output>
       <ReviewPreviewNumberRow
         label="Amount"
         min={0}
@@ -47,6 +48,36 @@ function Harness({ echo }: { echo: boolean }) {
 function range() {
   return host.querySelector<HTMLInputElement>('input[type="range"]')!;
 }
+
+it.each([true, false])('clears an external stepper preview on Undo (echo=%s)', async (echo) => {
+  await act(async () => root.render(<Harness echo={echo} />));
+  const field = host.querySelector<HTMLInputElement>('input[aria-label="Amount"]')!;
+  const button = host.querySelector<HTMLButtonElement>('button[aria-label="Amount increase"]')!;
+  act(() => {
+    field.focus();
+    button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+  });
+  expect(host.querySelector('output[data-preview]')!.textContent).toBe('3');
+  act(() =>
+    field.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'z',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+  );
+  expect(host.querySelector('output[data-preview]')!.textContent).toBe('none');
+  expect(field.value).toBe('2');
+  expect(commit).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(new MouseEvent('pointerup')));
+  act(() => {
+    button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    window.dispatchEvent(new MouseEvent('pointerup'));
+  });
+  expect(commit).toHaveBeenCalledExactlyOnceWith(3);
+});
 function key(type: string, key: string) {
   act(() => range().dispatchEvent(new KeyboardEvent(type, { key, bubbles: true })));
 }

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { TourDocument, TourImageSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
@@ -12,6 +12,7 @@ import {
 import { createTranslator, translate } from '../../../platform/i18n';
 import { TourImageFraming } from './image-framing';
 import { TourDocumentSettings } from './document-settings';
+import { TourInspectorNumericRow } from './numeric-row';
 
 vi.mock('../../../composition/background-resources/catalog', () => ({
   useBackgroundCatalog: () => ({ status: 'ready', presets: [] }),
@@ -76,6 +77,81 @@ function pointer(node: Element, type: string, x: number) {
   Object.defineProperty(event, 'pointerId', { value: 1 });
   act(() => node.dispatchEvent(event));
 }
+it.each(['Escape', 'pointercancel'])(
+  'uses a later stage placement after canceling a numeric hold with %s',
+  (ending) => {
+    const props = fixture();
+    props.onChange.mockImplementation((slide) => {
+      props.slide = slide;
+      props.tour = { ...props.tour, slides: [slide] };
+      root.render(<TourImageFraming {...props} />);
+      return true;
+    });
+    act(() => root.render(<TourImageFraming {...props} />));
+    const label = props.t('scenario.editor.tourImagePositionX');
+    const field = host.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
+    const increase = [...host.querySelectorAll('button')].find(
+      (node) => node.getAttribute('aria-label') === `${label} increase`
+    )!;
+    act(() => field.focus());
+    pointer(increase, 'pointerdown', 100);
+    expect(Number(field.value)).toBeGreaterThan(50);
+    if (ending === 'Escape')
+      act(() =>
+        field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      );
+    else pointer(increase, 'pointercancel', 100);
+    pointer(increase, 'pointerup', 100);
+    expect(props.onChange).not.toHaveBeenCalled();
+    const viewport = host
+      .querySelector('.tour-stage-host')!
+      .shadowRoot!.querySelector('.tour-image-viewport')!;
+    pointer(viewport, 'pointerdown', 100);
+    pointer(viewport, 'pointermove', 150);
+    pointer(viewport, 'pointerup', 150);
+    expect(props.onChange).toHaveBeenCalledOnce();
+    const accepted = props.slide.imagePlacement!.center.x;
+    expect(Number(field.value)).toBeCloseTo(accepted * 100, 1);
+    act(() => increase.click());
+    expect(props.onChange).toHaveBeenCalledTimes(2);
+    expect(props.slide.imagePlacement!.center.x).toBeCloseTo(accepted + 0.001, 10);
+  }
+);
+
+it('restores an external Tour numeric preview without accepting the canceled edit', () => {
+  const preview = vi.fn();
+  const commit = vi.fn();
+  function Field() {
+    const [value, setValue] = useState(10);
+    return (
+      <TourInspectorNumericRow
+        label="Duration"
+        value={value}
+        min={0}
+        max={100}
+        disabled={false}
+        onPreview={(next) => {
+          preview(next);
+          setValue(next);
+        }}
+        onChange={(next) => {
+          commit(next);
+          setValue(next);
+        }}
+      />
+    );
+  }
+  act(() => root.render(<Field />));
+  const field = host.querySelector<HTMLInputElement>('input[type="text"]')!;
+  const increase = host.querySelector('button')!;
+  pointer(increase, 'pointerdown', 100);
+  expect(field.value).toBe('11');
+  pointer(increase, 'pointercancel', 100);
+  expect(preview).toHaveBeenLastCalledWith(10);
+  expect(field.value).toBe('10');
+  expect(commit).not.toHaveBeenCalled();
+});
+
 it('uses the real window renderer without action hints and commits one completed pan', () => {
   const props = fixture();
   act(() => root.render(<TourImageFraming {...props} />));

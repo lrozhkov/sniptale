@@ -431,6 +431,66 @@ it.each(['pointerup', 'pointercancel', 'Escape'] as const)(
   }
 );
 
+it.each(['Escape', 'Undo', 'pointercancel', 'blur', 'unmount', 'boundary'])(
+  'releases the annotation gesture after a numeric hold ends with %s',
+  (ending) => {
+    const value = fixture('callout');
+    let open = false;
+    vi.mocked(value.editor.beginGesture).mockImplementation(() => {
+      if (open) return false;
+      open = true;
+      return true;
+    });
+    vi.mocked(value.editor.cancelGesture).mockImplementation(() => {
+      open = false;
+    });
+    vi.mocked(value.editor.commitGesture).mockImplementation(async () => {
+      open = false;
+      return true;
+    });
+    render(value);
+    const startLabel = translate('gallery.videoReview.annotationStart');
+    const start = input(startLabel);
+    const step = (label: string, direction: string) => {
+      const button = [...host.querySelectorAll('button')].find(
+        (node) => node.getAttribute('aria-label') === `${label} ${direction}`
+      );
+      if (!button) throw new Error(`Missing stepper ${label}`);
+      act(() => button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+    };
+    act(() => start.focus());
+    step(startLabel, ending === 'boundary' ? 'decrease' : 'increase');
+    expect(value.editor.beginGesture).toHaveBeenCalledOnce();
+    act(() => {
+      if (ending === 'unmount') root.render(null);
+      else if (ending === 'Escape' || ending === 'Undo')
+        start.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: ending === 'Escape' ? 'Escape' : 'z',
+            ctrlKey: ending === 'Undo',
+            bubbles: true,
+            cancelable: true,
+          })
+        );
+      else if (ending === 'pointercancel')
+        start.dispatchEvent(new MouseEvent('pointercancel', { bubbles: true }));
+      else window.dispatchEvent(new MouseEvent(ending === 'boundary' ? 'pointerup' : ending));
+    });
+    expect(value.editor.cancelGesture).toHaveBeenCalledOnce();
+    expect(value.editor.commitGesture).not.toHaveBeenCalled();
+    act(() => window.dispatchEvent(new MouseEvent('pointerup')));
+    if (ending === 'unmount') render(value);
+    const endLabel = translate('gallery.videoReview.annotationEnd');
+    act(() => input(endLabel).focus());
+    step(endLabel, 'decrease');
+    expect(value.editor.previewGesture).toHaveBeenLastCalledWith(
+      expect.objectContaining({ end: expect.any(Number) })
+    );
+    act(() => window.dispatchEvent(new MouseEvent('pointerup')));
+    expect(value.editor.commitGesture).toHaveBeenCalledOnce();
+  }
+);
+
 it('derives the preset label from accepted controls across rerender and reopening the menu', async () => {
   const value = fixture('callout');
   const preset = value.document.controlPresets![0]!;

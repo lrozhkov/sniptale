@@ -30,6 +30,12 @@ export function useInspectorNumericDraft(
       setPreview(next);
       onPreview?.(next);
     },
+    onCancelValue: (origin: number | null) => {
+      originRef.current = null;
+      const restored = origin ?? value;
+      setPreview(restored);
+      onPreview?.(restored);
+    },
     onCommitValue: (next: number) => {
       const origin = originRef.current ?? value;
       originRef.current = null;

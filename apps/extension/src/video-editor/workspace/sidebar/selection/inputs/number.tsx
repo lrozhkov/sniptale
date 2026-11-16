@@ -37,10 +37,13 @@ export function NumberInput({
   disabled?: boolean;
 }) {
   const gesture = useRef<'pointer' | 'keyboard' | null>(null);
+  const previewing = useRef(false);
   const inspector = useInspectorLayout();
   const finish = () => {
+    const active = gesture.current !== null || previewing.current;
     gesture.current = null;
-    onCommit?.();
+    previewing.current = false;
+    if (active) onCommit?.();
   };
   const numericValue = Number.isFinite(value) ? value : 0;
   const commitValue = useDedupedNumberChange(onChange, numericValue);
@@ -64,12 +67,20 @@ export function NumberInput({
       revealScrub={revealScrub}
       disabled={disabled}
       onPreviewValue={(next) => {
+        previewing.current = true;
         onPreview?.();
         commitValue(next);
       }}
       onCommitValue={(next) => {
         commitValue(next);
-        if (!gesture.current) onCommit?.();
+        if (!gesture.current) {
+          previewing.current = false;
+          onCommit?.();
+        }
+      }}
+      onCancelValue={(origin) => {
+        if (origin !== null) commitValue(origin);
+        finish();
       }}
       {...scrubProps}
     />

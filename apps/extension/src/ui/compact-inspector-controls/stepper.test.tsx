@@ -24,7 +24,7 @@ it.each([false, true])(
   }
 );
 
-it('uses the latest callback and skips repeat while the current value is being saved', () => {
+it('stops a hold when disabled and does not resume it when enabled again', () => {
   vi.useFakeTimers();
   const container = document.createElement('div');
   const root = createRoot(container);
@@ -46,10 +46,10 @@ it('uses the latest callback and skips repeat while the current value is being s
     expect(latest).not.toHaveBeenCalled();
     render(latest);
     act(() => vi.advanceTimersByTime(70));
-    expect(latest).toHaveBeenCalledExactlyOnceWith(1);
+    expect(latest).not.toHaveBeenCalled();
     act(() => window.dispatchEvent(new Event('pointerup')));
     act(() => vi.advanceTimersByTime(500));
-    expect(latest).toHaveBeenCalledTimes(1);
+    expect(latest).not.toHaveBeenCalled();
   } finally {
     act(() => root.unmount());
     vi.useRealTimers();

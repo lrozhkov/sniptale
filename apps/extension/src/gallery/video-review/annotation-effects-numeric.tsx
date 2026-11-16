@@ -78,6 +78,7 @@ export function AnnotationNumeric(props: {
         revealScrub={props.revealScrub ?? false}
         scrub={active.current ? frozen.current : props.scrub}
         onPreviewValue={preview}
+        onCancelValue={cancel}
         onCommitValue={(value) => {
           if (!preview(value)) return;
           active.current = false;

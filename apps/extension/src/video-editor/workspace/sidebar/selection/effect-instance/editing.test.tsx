@@ -132,7 +132,7 @@ it.each(['button', 'svg'])(
       )!;
       act(() =>
         (target === 'svg' ? increase.querySelector('svg')! : increase).dispatchEvent(
-          new Event('pointerdown', { bubbles: true, cancelable: true })
+          new MouseEvent('pointerdown', { button: 0, bubbles: true, cancelable: true })
         )
       );
       expect(read('live')).toBe('21');

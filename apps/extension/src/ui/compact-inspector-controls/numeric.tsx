@@ -29,6 +29,8 @@ export interface NumericValueFieldProps {
   getStepValue?: ((value: number, direction: 1 | -1) => number) | undefined;
   onCommitValue: (value: number) => void;
   onPreviewValue: (value: number) => void;
+  /** Release a consumer-owned preview after a canceled or unchanged stepper hold. */
+  onCancelValue?: ((origin: number | null) => void) | undefined;
   precision?: number | undefined;
   scrub?: CompactInspectorNumericScrub | undefined;
   step?: number | undefined;
@@ -47,6 +49,7 @@ export function NumericValueField(props: NumericValueFieldProps) {
     getStepValue: props.getStepValue,
     onCommitValue: props.onCommitValue,
     onPreviewValue: props.onPreviewValue,
+    onCancelValue: props.onCancelValue,
     precision: props.precision,
     step,
     unit,
@@ -109,7 +112,13 @@ function NumericValueFieldView({
       ) : (
         value
       )}
-      <NumericStepper disabled={props.disabled} label={props.label} onStep={state.applyStep} />
+      <NumericStepper
+        disabled={props.disabled}
+        label={props.label}
+        onStep={state.previewStep}
+        onFinish={state.finishStep}
+        onCancel={state.cancelStep}
+      />
       {quietFocus && !inspector && (
         <span
           aria-hidden="true"

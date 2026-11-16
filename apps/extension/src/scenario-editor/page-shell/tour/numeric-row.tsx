@@ -49,6 +49,10 @@ export function TourInspectorNumericRow({
         setPreview(value);
         onPreview?.(value);
       }}
+      onCancelValue={(origin) => {
+        setPreview(null);
+        if (origin !== null) onPreview?.(origin);
+      }}
       onCommitValue={(value) => {
         setPreview(null);
         onChange(value);

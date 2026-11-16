@@ -87,6 +87,7 @@ export function PreviewNumericRow(
             props.onPreview?.(value);
           }
         }}
+        onCancelValue={cancel}
         onCommitValue={(value) => {
           if (cancelled.current) return;
           const baseline = initial.current ?? props.value;

@@ -104,7 +104,7 @@ it('steps focused wheel through irregular domain boundaries and commits without 
   expect(onCommitValue).toHaveBeenCalledTimes(2);
 });
 
-it('repeats stepper changes while a direction button is held', () => {
+it('previews stepper repeats and commits the completed hold once', () => {
   vi.useFakeTimers();
   const { onCommitValue, onPreviewValue } = renderNumeric({ step: 5, value: 10 });
   const increase = container?.querySelector<HTMLButtonElement>(
@@ -118,17 +118,18 @@ it('repeats stepper changes while a direction button is held', () => {
     vi.advanceTimersByTime(220);
     vi.advanceTimersByTime(70);
     vi.advanceTimersByTime(70);
-    window.dispatchEvent(
-      createPointerEvent('pointerup', { bubbles: true, pointerId: 1, pointerType: 'mouse' })
-    );
   });
 
   expect(onPreviewValue).toHaveBeenNthCalledWith(1, 15);
   expect(onPreviewValue).toHaveBeenNthCalledWith(2, 20);
   expect(onPreviewValue).toHaveBeenNthCalledWith(3, 25);
-  expect(onCommitValue).toHaveBeenNthCalledWith(1, 15);
-  expect(onCommitValue).toHaveBeenNthCalledWith(2, 20);
-  expect(onCommitValue).toHaveBeenNthCalledWith(3, 25);
+  expect(onCommitValue).not.toHaveBeenCalled();
+  act(() =>
+    window.dispatchEvent(
+      createPointerEvent('pointerup', { bubbles: true, pointerId: 1, pointerType: 'mouse' })
+    )
+  );
+  expect(onCommitValue).toHaveBeenCalledExactlyOnceWith(25);
 });
 
 it('keeps units display-only while editing and restores invalid drafts', () => {
@@ -150,6 +151,92 @@ it('keeps units display-only while editing and restores invalid drafts', () => {
 
   expect(input().value).toBe('90');
   expect(onCommitValue).not.toHaveBeenCalled();
+});
+
+it.each(['pointercancel', 'Escape', 'Undo', 'blur', 'unmount'])(
+  'restores the accepted value without committing a held stepper on %s',
+  (interruption) => {
+    vi.useFakeTimers();
+    const { onCommitValue, onPreviewValue } = renderNumeric({ value: 10, step: 5 });
+    const button = container!.querySelector('button')!;
+    act(() => {
+      button.dispatchEvent(createPointerEvent('pointerdown', { bubbles: true }));
+      vi.advanceTimersByTime(300);
+    });
+    expect(input().value).toBe('20');
+    act(() => {
+      if (interruption === 'unmount') {
+        root!.unmount();
+        root = null;
+      } else if (interruption === 'Escape' || interruption === 'Undo') {
+        window.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: interruption === 'Escape' ? 'Escape' : 'z',
+            ctrlKey: interruption === 'Undo',
+            bubbles: true,
+            cancelable: true,
+          })
+        );
+      } else if (interruption === 'blur') window.dispatchEvent(new Event('blur'));
+      else window.dispatchEvent(createPointerEvent('pointercancel'));
+    });
+    expect(onPreviewValue).toHaveBeenLastCalledWith(10);
+    if (root) expect(input().value).toBe('10');
+    act(() => {
+      window.dispatchEvent(createPointerEvent('pointerup'));
+      vi.advanceTimersByTime(500);
+    });
+    expect(onCommitValue).not.toHaveBeenCalled();
+    expect(onPreviewValue).toHaveBeenCalledTimes(3);
+  }
+);
+
+it('keeps two completed holds separate and ignores another pointer release', () => {
+  vi.useFakeTimers();
+  const { onCommitValue } = renderNumeric({ value: 10, step: 5 });
+  const button = container!.querySelector('button')!;
+  act(() => {
+    button.dispatchEvent(createPointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
+    window.dispatchEvent(createPointerEvent('pointerup', { pointerId: 2 }));
+    vi.advanceTimersByTime(300);
+  });
+  expect(onCommitValue).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(createPointerEvent('pointerup', { pointerId: 1 })));
+  expect(onCommitValue).toHaveBeenCalledExactlyOnceWith(20);
+  act(() => {
+    button.dispatchEvent(createPointerEvent('pointerdown', { bubbles: true, pointerId: 3 }));
+    window.dispatchEvent(createPointerEvent('pointerup', { pointerId: 3 }));
+  });
+  expect(onCommitValue).toHaveBeenCalledTimes(2);
+  expect(onCommitValue).toHaveBeenNthCalledWith(1, 20);
+  expect(onCommitValue).toHaveBeenNthCalledWith(2, 25);
+});
+
+it('does not accept an empty stepper action at the numeric boundary', () => {
+  const { onCommitValue } = renderNumeric({ value: 100 });
+  act(() => {
+    container!
+      .querySelector('button')!
+      .dispatchEvent(createPointerEvent('pointerdown', { bubbles: true }));
+    window.dispatchEvent(createPointerEvent('pointerup'));
+  });
+  expect(onCommitValue).not.toHaveBeenCalled();
+});
+
+it.each([false, true])('keeps an indeterminate value isolated until accepted=%s', (accept) => {
+  const { onCommitValue, onPreviewValue } = renderNumeric({ value: null, step: 5 });
+  act(() => {
+    container!
+      .querySelector('button')!
+      .dispatchEvent(createPointerEvent('pointerdown', { bubbles: true }));
+  });
+  expect(input().value).toBe('5');
+  expect(onPreviewValue).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(createPointerEvent(accept ? 'pointerup' : 'pointercancel')));
+  expect(input().value).toBe(accept ? '5' : '');
+  expect(onCommitValue).toHaveBeenCalledTimes(accept ? 1 : 0);
+  if (accept) expect(onCommitValue).toHaveBeenCalledWith(5);
+  expect(onPreviewValue).not.toHaveBeenCalled();
 });
 
 it('keeps the unit visible outside the input when the stepper changes an active edit field', () => {
