@@ -1,3 +1,4 @@
+import { collectVideoProjectHistorySources } from '../../../features/video/project/history-capture';
 import { parseCapturedReview } from './review-snapshot';
 import { parseRecordingEntry } from '../recordings/index.guards';
 import { parseScenarioAssetEntry } from '../scenario/read-guards';
@@ -110,24 +111,11 @@ function parseCapturedRootDependencies(value: unknown): CapturedRootDependency[]
 
 /** Recording identities used by media and authored source bindings share the same original dependency. */
 export function collectCapturedProjectRecordingIds(project: VideoProjectMetadata): Set<string> {
-  const ids = new Set<string>();
-  if (project.source.kind === 'recording') ids.add(project.source.recordingId);
-  if (project.baseRecordingId) ids.add(project.baseRecordingId);
-  for (const asset of project.assets) {
-    if (asset.source.kind === 'recording') ids.add(asset.source.recordingId);
-    if (asset.source.kind === 'project-asset' && asset.source.originRecordingId)
-      ids.add(asset.source.originRecordingId);
-    if (asset.recordingPart) ids.add(asset.recordingPart.recordingId);
-  }
-  for (const group of project.cursorTrack?.sourceObservations ?? []) ids.add(group.recordingId);
-  for (const sample of project.cursorTrack?.samples ?? [])
-    if (sample.sourceAnchor) ids.add(sample.sourceAnchor.recordingId);
-  for (const segment of project.cursorFocusPath?.segments ?? [])
-    if (segment.binding.kind === 'recording-source') ids.add(segment.binding.recordingId);
-  for (const group of project.actionFeedback ?? []) ids.add(group.recordingId);
-  for (const event of project.actionEvents ?? [])
-    if (event.anchor.kind === 'recording-source') ids.add(event.anchor.recordingId);
-  return ids;
+  return new Set(
+    collectVideoProjectHistorySources(project)
+      .filter((source) => source.kind === 'recording')
+      .map((source) => source.id)
+  );
 }
 
 /** Select only resources reachable from editable materials, excluding export-only reviews. */

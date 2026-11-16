@@ -12,6 +12,24 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'sync-project-snapshot-native-admission',
+    productionFile: 'apps/extension/src/composition/persistence/sync-capture/project-snapshot.ts',
+    exclusive: true,
+    reason:
+      'Project snapshot helpers and graph admission serve native freeze and replica application. ' +
+      'Direct, guard, capture, recording, binary and Scenario consumer tests prove the retained graph.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/sync-capture/project-snapshot.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/capture.integration.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/guards.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/freeze.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/freeze.recording.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-video-project.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-video-project.binary.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-video-project.scenario.test.ts',
+    ],
+  },
+  {
     owner: 'native-database-migrations',
     productionFile:
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts',

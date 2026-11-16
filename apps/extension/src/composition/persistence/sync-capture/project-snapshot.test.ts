@@ -215,3 +215,23 @@ it('admits authored focus paths and retains recording source bindings in the dep
   expect(isSupportedCaptureProject(project)).toBe(true);
   expect([...collectCapturedProjectRecordingIds(project)]).toEqual(['external-recording']);
 });
+
+it('preserves recording traversal order when the shared collector filters other source families', () => {
+  const project = createVideoProjectEntry().project;
+  project.source = { kind: 'recording', recordingId: 'z-source' };
+  project.baseRecordingId = 'a-base';
+  project.assets = [
+    material('owned', {
+      kind: 'project-asset',
+      projectAssetId: 'private',
+      originRecordingId: 'm-origin',
+    }),
+    material('library', { kind: 'library-asset', mediaId: 'unrelated-library' }),
+    material('recording', { kind: 'recording', recordingId: 'z-source' }),
+  ];
+  expect([...collectCapturedProjectRecordingIds(project)]).toEqual([
+    'z-source',
+    'a-base',
+    'm-origin',
+  ]);
+});
