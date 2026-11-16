@@ -108,3 +108,26 @@ it('admits portable HTML bodies and refuses local pointers or malformed catalogu
     parsePortableScenarioProjectMetadata({ ...value, exports: [{ ...row, size: 0 }] })
   ).toThrow();
 });
+
+it('refuses native editing branches at the portable boundary until graph transfer admission exists', () => {
+  const project = createGuideProject('Guide', 'guide', 1);
+  const entry = { id: project.id, project, createdAt: 1, updatedAt: 1, workspaceRevision: 1 };
+  const editingHistory = {
+    version: 1 as const,
+    past: [],
+    future: [{ ...project, name: 'Future' }],
+  };
+  expect(() => encodePortableScenarioProjectEntry({ ...entry, editingHistory })).toThrow(
+    'transfer is not available'
+  );
+  const portable = encodePortableScenarioProjectEntry(entry);
+  expect(() =>
+    parsePortableScenarioProjectMetadata({
+      entry: { ...portable, editingHistory },
+      assets: [],
+      exports: [],
+      exportThumbnails: [],
+      stepDocuments: [],
+    })
+  ).toThrow('Portable scenario project children are invalid');
+});

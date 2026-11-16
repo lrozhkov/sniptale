@@ -141,7 +141,7 @@ it('adds empty scenario units and DB48 reference indexes before publishing curre
     ['video_workspace_history'],
   ]);
   expect(openCursor.mock.calls).toEqual(REFERENCE_INDEX_STORES.map(() => []).concat([[], []]));
-  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 13 });
+  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 14 });
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(getAll).not.toHaveBeenCalled();
   expect(tx.abort).not.toHaveBeenCalled();

@@ -235,6 +235,7 @@ export function parseCapturedScenarioRows(value: unknown): CapturedScenarioRows 
   if (
     !entry ||
     entry.history?.length ||
+    entry.editingHistory !== undefined ||
     !assets ||
     !documents ||
     !exports ||
@@ -324,7 +325,7 @@ export async function freezeScenarioInTransaction(
   id: string
 ): Promise<CapturedScenarioRows> {
   const entry = parseScenarioProjectEntry((await readScenarioStorage(tx, id)).logical);
-  if (!entry || entry.id !== id) invalid();
+  if (!entry || entry.id !== id || entry.editingHistory !== undefined) invalid();
   const { history, ...current } = entry;
   const historyBytes = history?.length ? new TextEncoder().encode(JSON.stringify(history)) : null;
   const assets = await readScenarioChildRows(

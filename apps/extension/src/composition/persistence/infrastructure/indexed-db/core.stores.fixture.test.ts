@@ -894,3 +894,17 @@ it('adds the Scenario deletion fence without changing released content or immuta
   expect(target.indexes).toEqual({ ...source.indexes, scenario_project_revisions: [] });
   expect(target.domainVersions).toEqual({ ...source.domainVersions, scenarioProjects: 13 });
 });
+
+it('admits editing branch unit references without changing released Scenario data or files', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 63
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 64
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, scenarioProjects: 14 });
+});

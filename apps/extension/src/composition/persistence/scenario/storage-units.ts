@@ -1,3 +1,4 @@
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 import { sameHistoryArray, sameHistoryRecord } from '@sniptale/foundation/history/equal';
 import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { TOUR_LIMITS } from '@sniptale/runtime-contracts/scenario/types/tour';
@@ -65,13 +66,28 @@ export function materializeScenarioUnitStorage(
   rows: unknown[],
   units: unknown[]
 ): unknown {
-  if (!isRecord(head) || head['historyFormatVersion'] !== 2)
+  if (!isRecord(head) || (head['historyFormatVersion'] !== 2 && head['historyFormatVersion'] !== 3))
     return units.length ? unavailable(head, rows, units) : materializeScenarioStorage(head, rows);
   const projectId = head['id'];
+  const editing = head['editingHistory'];
+  const hasEditingHistory = head['historyFormatVersion'] === 3;
+  if (
+    hasEditingHistory
+      ? !isRecord(editing) ||
+        Object.keys(editing).length !== 3 ||
+        editing['version'] !== 1 ||
+        !Array.isArray(editing['past']) ||
+        !Array.isArray(editing['future']) ||
+        editing['past'].length + editing['future'].length > EDITOR_HISTORY_LIMITS.maxActions
+      : editing !== undefined
+  )
+    return unavailable(head, rows, units);
   if (
     typeof projectId !== 'string' ||
     rows.length > SCENARIO_HISTORY_LIMIT ||
-    units.length > (GUIDE_LIMITS.maxItems + TOUR_LIMITS.maxSlides) * (SCENARIO_HISTORY_LIMIT + 1)
+    units.length >
+      (GUIDE_LIMITS.maxItems + TOUR_LIMITS.maxSlides) *
+        (SCENARIO_HISTORY_LIMIT + 1 + (hasEditingHistory ? EDITOR_HISTORY_LIMITS.maxActions : 0))
   )
     return unavailable(head, rows, units);
   const parsedUnits = indexScenarioUnits(units, projectId);
@@ -123,9 +139,27 @@ export function materializeScenarioUnitStorage(
     if (!content) return unavailable(head, rows, units);
     history.push({ ...row, project: content });
   }
+  let editingHistory;
+  if (
+    hasEditingHistory &&
+    isRecord(editing) &&
+    Array.isArray(editing['past']) &&
+    Array.isArray(editing['future'])
+  ) {
+    const past = editing['past'].map(project);
+    const future = editing['future'].map(project);
+    if (past.some((value) => value === null) || future.some((value) => value === null))
+      return unavailable(head, rows, units);
+    editingHistory = { version: 1, past, future };
+  }
   if (used.size !== indexed.size) return unavailable(head, rows, units);
   return materializeScenarioStorage(
-    { ...head, project: current, historyFormatVersion: 1 },
+    {
+      ...head,
+      project: current,
+      historyFormatVersion: 1,
+      ...(editingHistory ? { editingHistory } : {}),
+    },
     history
   );
 }
@@ -183,7 +217,7 @@ export function encodeScenarioUnitStorage(entry: ScenarioProjectEntry, existingU
       tour: { ...settings, slides: slides.map((slide) => reference(slide, 'tour')) },
     };
   }
-  const { history, ...current } = entry;
+  const { history, editingHistory, ...current } = entry;
   const rows = (history ?? []).map((version) => ({
     ...version,
     projectId: entry.id,
@@ -192,7 +226,16 @@ export function encodeScenarioUnitStorage(entry: ScenarioProjectEntry, existingU
   const head = {
     ...current,
     project: project(entry.project),
-    historyFormatVersion: 2,
+    historyFormatVersion: editingHistory === undefined ? 2 : 3,
+    ...(editingHistory === undefined
+      ? {}
+      : {
+          editingHistory: {
+            version: 1,
+            past: editingHistory.past.map(project),
+            future: editingHistory.future.map(project),
+          },
+        }),
     savedVersionRevisions: rows.map((row) => row.revision),
   };
   return { head, rows, units: [...used.values()] };

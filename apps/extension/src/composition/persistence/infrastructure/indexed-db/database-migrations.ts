@@ -1092,6 +1092,18 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       );
     },
   },
+  contractOnlyMigration({
+    domainVersions: [{ domainId: 'scenarioProjects', from: 13, to: 14 }],
+    fromDatabaseVersion: 63,
+    toDatabaseVersion: 64,
+    stores: [SCENARIO_PROJECTS_STORE, SCENARIO_PROJECT_HISTORY_STORE, SCENARIO_PROJECT_UNITS_STORE],
+    validationStores: [
+      SCENARIO_PROJECTS_STORE,
+      SCENARIO_PROJECT_HISTORY_STORE,
+      SCENARIO_PROJECT_UNITS_STORE,
+    ],
+    diagnostic: 'Scenario editing history stores are unavailable.',
+  }),
 ];
 
 function projectPrototypeAnimationPreferences(value: unknown) {

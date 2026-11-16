@@ -30,6 +30,8 @@ export function createScenarioProjectEntry(args: {
   historyOwnership?: 'borrowed' | 'exclusive';
   historyActionId?: string;
 }): ScenarioProjectEntry {
+  if (args.existing?.editingHistory !== undefined)
+    throw new Error('Scenario editing history mutation is not available.');
   if (args.historyActionId !== undefined && !isScenarioHistoryActionId(args.historyActionId))
     throw new Error('Invalid scenario history action identity.');
   const updatedAt = createScenarioProjectRevision(args.existing, args.updatedAt);

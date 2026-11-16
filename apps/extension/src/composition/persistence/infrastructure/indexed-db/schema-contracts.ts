@@ -151,7 +151,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'scenarioProjects',
-    schemaVersion: 13,
+    schemaVersion: 14,
     stores: [
       { storeName: SCENARIO_PROJECT_REVISIONS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_PROJECTS_STORE, dataClass: 'durable-authority' },

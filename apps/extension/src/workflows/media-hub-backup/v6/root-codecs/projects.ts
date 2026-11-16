@@ -148,7 +148,7 @@ type EncodedScenarioProjectEntry = PortableScenarioProjectMetadata['entry'] & {
 
 export interface PortableScenarioProjectMetadata {
   assets: PortableScenarioAsset[];
-  entry: Omit<ScenarioProjectEntry, 'project' | 'history'> & {
+  entry: Omit<ScenarioProjectEntry, 'project' | 'history' | 'editingHistory'> & {
     project: JsonValue;
   };
   historyObjectId?: string;
@@ -164,6 +164,8 @@ export interface PortableScenarioProjectMetadata {
 export function encodePortableScenarioProjectEntry(
   entry: ScenarioProjectEntry
 ): EncodedScenarioProjectEntry {
+  if (entry.editingHistory !== undefined)
+    throw new Error('Scenario editing history transfer is not available.');
   const versions = parseScenarioSavedVersions(
     entry.history,
     entry.id,
@@ -171,7 +173,7 @@ export function encodePortableScenarioProjectEntry(
     entry.project.updatedAt
   );
   if (!versions) throw new Error('Saved guide history is invalid.');
-  const { history: _history, ...rest } = entry;
+  const { history: _history, editingHistory: _editingHistory, ...rest } = entry;
   return {
     ...rest,
     project: encodePortableGuideProject(entry.project),
@@ -380,6 +382,7 @@ function isPortableScenarioProjectMetadata(
     typeof value['entry']['id'] === 'string' &&
     isJsonValue(value['entry']['project']) &&
     value['entry']['history'] === undefined &&
+    value['entry']['editingHistory'] === undefined &&
     (value['historyObjectId'] === undefined ||
       (typeof value['historyObjectId'] === 'string' &&
         value['historyObjectId'].length > 0 &&

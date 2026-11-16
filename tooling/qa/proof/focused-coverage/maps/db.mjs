@@ -325,6 +325,23 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'shared-db-scenario-project-entry',
+    productionFile: 'apps/extension/src/composition/persistence/scenario/projects/entry.ts',
+    reason:
+      'Canonical Scenario entry construction serves project, asset, export and capture writers. ' +
+      'Checkpoint admission and native producer suites prove those consumers.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/scenario/editing-history.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.identity.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/project.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/assets.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/exports.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/index.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/project.capture-format.test.ts',
+    ],
+  },
+  {
     owner: 'shared-db-scenario-aggregate-mutations',
     productionFile: 'apps/extension/src/composition/persistence/scenario/aggregate-mutations.ts',
     reason: 'Scenario suites cover aggregate CAS, rollback, and graph deletion.',

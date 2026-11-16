@@ -591,3 +591,37 @@ it.each([false, true])(
     }
   }
 );
+
+it('refuses native editing checkpoints before sync graph transfer can discard their branches', async () => {
+  const project = createGuideProject('Guide', 'guide', 1);
+  const entry = {
+    ...createScenarioProjectEntry({ existing: undefined, project, updatedAt: 2 }),
+    editingHistory: { version: 1 as const, past: [], future: [{ ...project, name: 'Future' }] },
+  };
+  const database = await initDB();
+  const tx = database.transaction([...SCENARIO_CAPTURE_STORES], 'readwrite');
+  await writeScenarioStorage(tx, {
+    entry,
+    existing: undefined,
+    storage: await readScenarioStorage(tx, project.id),
+  });
+  await tx.done;
+  const before = structuredClone(stores);
+  const read = database.transaction([...SCENARIO_CAPTURE_STORES], 'readonly');
+  await expect(freezeScenarioInTransaction(read, project.id)).rejects.toThrow(
+    'Invalid native Scenario sync snapshot'
+  );
+  expect(stores).toEqual(before);
+  expect(
+    parseCapturedScenarioRows({
+      entry,
+      assets: [],
+      documents: [],
+      exports: [],
+      refs: [],
+      media: [],
+      thumbnails: [],
+      presentation: null,
+    })
+  ).toBeNull();
+});

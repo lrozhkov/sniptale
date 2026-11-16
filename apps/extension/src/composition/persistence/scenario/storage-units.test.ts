@@ -243,3 +243,80 @@ it('keeps global canonical identity, template, Tour navigation and hostile-input
     )
   ).toBeNull();
 });
+
+it('stores both editing branches through shared native units rather than inline project copies', () => {
+  const source = entry();
+  const future = {
+    ...source.project,
+    name: 'Future',
+    items: [{ ...source.project.items[0]!, title: 'Future-only step' }, source.project.items[1]!],
+  };
+  const logical = {
+    ...source,
+    editingHistory: {
+      version: 1 as const,
+      past: [{ ...source.project, name: 'Before' }],
+      future: [future],
+    },
+  };
+  const native = encodeScenarioUnitStorage(logical, []);
+  expect(native.head.historyFormatVersion).toBe(3);
+  expect(native.units).toHaveLength(5);
+  expect(JSON.stringify(native.head)).not.toContain('Future-only step');
+  expect(
+    parseScenarioProjectEntry(
+      materializeScenarioUnitStorage(native.head, native.rows, native.units)
+    )
+  ).toEqual(logical);
+  const branched = encodeScenarioUnitStorage(
+    { ...logical, editingHistory: { ...logical.editingHistory, future: [] } },
+    native.units
+  );
+  expect(branched.units).toHaveLength(4);
+  expect(branched.units.some((row) => row.value === future.items[0])).toBe(false);
+  expect(
+    parseScenarioProjectEntry(
+      materializeScenarioUnitStorage(branched.head, branched.rows, branched.units)
+    )
+  ).toEqual({ ...logical, editingHistory: { ...logical.editingHistory, future: [] } });
+});
+
+it('refuses incomplete or mismatched editing branch graphs without changing their physical evidence', () => {
+  const source = entry();
+  const editingHistory = {
+    version: 1 as const,
+    past: [],
+    future: [{ ...source.project, name: 'Future' }],
+  };
+  const native = encodeScenarioUnitStorage({ ...source, editingHistory }, []);
+  const branch = native.head.project;
+  const heads = [
+    { ...native.head, historyFormatVersion: 2 },
+    { ...native.head, editingHistory: undefined },
+    { ...native.head, editingHistory: { ...native.head.editingHistory, version: 2 } },
+    {
+      ...native.head,
+      editingHistory: { version: 1, past: [], future: [{ ...branch, id: 'foreign' }] },
+    },
+    {
+      ...native.head,
+      editingHistory: {
+        version: 1,
+        past: [],
+        future: [{ ...branch, items: [{ unitId: 'guide:missing', revision: 1 }] }],
+      },
+    },
+    { ...native.head, editingHistory: { version: 1, past: [], future: Array(51).fill(branch) } },
+  ];
+  const original = structuredClone(native);
+  for (const head of heads)
+    expect(
+      parseScenarioProjectEntry(materializeScenarioUnitStorage(head, native.rows, native.units))
+    ).toBeNull();
+  expect(native).toEqual(original);
+  expect(
+    parseScenarioProjectEntry(
+      materializeScenarioUnitStorage(native.head, native.rows, native.units)
+    )
+  ).toMatchObject({ editingHistory });
+});

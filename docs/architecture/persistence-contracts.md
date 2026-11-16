@@ -1233,3 +1233,14 @@ Native deletion retains the highest local revision in the same transaction that 
 Recreation and archive replacement use a revision above the retained counter. Ready publication prepares that target revision and checks it again before commit. An intervening creation and deletion invalidates the old publication. Exact committed replay retains the accepted revision.
 
 Native reads do not change the counter. Invalid or exhausted counters refuse the affected write and preserve the last committed content. This identity fence does not store editing history or replace the autosave coordinator.
+
+
+## Scenario editing checkpoint storage
+
+Physical database version 64 advances the scenarioProjects contract to version 14. The migration preserves existing records, stores and files. Earlier writers refuse the newer database before mutation.
+
+Optional `editingHistory` retains separate `past` and `future` branches. Their order determines the navigation cursor. Saved revisions retain their separate chronology and budget. An explicit empty checkpoint differs from an absent legacy checkpoint.
+
+Native unit format 3 shares unchanged Guide items and Tour slides across current content, saved revisions and both editing branches. The checkpoint permits 50 transitions and 8 MiB of pooled payload. Empty history retains current content independently of this budget. Admission checks project identities, complete unit references and UTF-8 byte sizes. Reads do not repair or prune physical evidence.
+
+This storage generation has no page checkpoint producer. Existing content constructors refuse checkpoint-bearing entries. Portable archive encoding and sync publication also refuse them. These gates prevent silent history loss before runtime and transfer owners connect capture, resource retention and portable graph admission. They do not complete durable Undo/Redo reopening.
