@@ -228,6 +228,8 @@ export async function resolveEditorPageRestoreSource(
   }
 
   const bootstrapPayload = await consumePendingEditorBootstrapPayload(locationState.bootstrapId);
+  // A transport payload cannot replace the observed lifetime or original of a stored asset.
+  if (locationState.assetId) return resolveEditorAssetSource(locationState.assetId);
   if (bootstrapPayload) {
     return {
       kind: 'bootstrap',
@@ -237,10 +239,6 @@ export async function resolveEditorPageRestoreSource(
         bootstrapPayload.capturedAt ?? null
       ),
     };
-  }
-
-  if (locationState.assetId) {
-    return resolveEditorAssetSource(locationState.assetId);
   }
 
   return { kind: 'empty' };

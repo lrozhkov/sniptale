@@ -738,3 +738,19 @@ it('retains raster and vector resource publication proof for the document codec 
     ])
   );
 });
+
+it('selects native lifetime and delayed acknowledgement proof for Image source restore', async () => {
+  const module = await importOwnerMap();
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      'apps/extension/src/editor/document/page-session/index.ts'
+    )
+  ).toEqual(
+    expect.arrayContaining([
+      'apps/extension/src/editor/document/page-session/index.test.ts',
+      'apps/extension/src/editor/shell/page/runtime.bootstrap.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.history.integration.test.ts',
+      'apps/extension/src/editor/document/session-autosave/durable-history.test.ts',
+    ])
+  );
+});

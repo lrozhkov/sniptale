@@ -265,7 +265,7 @@ describe('editor aggregate restore', () => {
     });
   });
 
-  it('falls back to bootstrap and then immutable original', async () => {
+  it('uses bootstrap for a new image and the native original for an asset URL', async () => {
     mocks.restore.mockResolvedValue(undefined);
     mocks.bootstrap.mockResolvedValueOnce({
       dataUrl: 'data:image/png;base64,YQ==',
@@ -274,7 +274,7 @@ describe('editor aggregate restore', () => {
     mocks.getEntry.mockResolvedValueOnce({ createdAt: 250 });
     const { resolveEditorPageRestoreSource } = await import('./');
     await expect(
-      resolveEditorPageRestoreSource({ assetId: 'image-2', bootstrapId: 'boot' }, 'image-2', {
+      resolveEditorPageRestoreSource({ assetId: null, bootstrapId: 'boot' }, 'image-2', {
         restoreDraft: mocks.restore,
       })
     ).resolves.toEqual({
@@ -330,4 +330,64 @@ it('does not restore an older switch URL over a newer navigation owner', async (
   history.replaceState({}, '', '/editor?assetId=newer');
   undo();
   expect(location.search).toBe('?assetId=newer');
+});
+
+it('uses the native lifetime and source instead of a stale bootstrap for an existing asset URL', async () => {
+  mocks.restore.mockResolvedValue(undefined);
+  mocks.bootstrap.mockResolvedValue({
+    dataUrl: 'data:image/png;base64,b2xk',
+    title: 'Old bootstrap',
+  });
+  mocks.getEntry.mockResolvedValue({
+    id: 'native-capture',
+    filename: 'capture.png',
+    workspaceRevision: 0,
+    createdAt: 100,
+    sourceTitle: 'Native capture',
+  });
+  mocks.getBlob.mockResolvedValue(new Blob(['native'], { type: 'image/png' }));
+  mocks.toDataUrl.mockResolvedValue('data:image/png;base64,bmF0aXZl');
+  const { resolveEditorPageRestoreSource } = await import('./');
+  await expect(
+    resolveEditorPageRestoreSource(
+      { assetId: 'native-capture', bootstrapId: 'old' },
+      'native-capture',
+      { restoreDraft: mocks.restore }
+    )
+  ).resolves.toMatchObject({
+    kind: 'asset',
+    assetId: 'native-capture',
+    nativeRevision: 0,
+    sourceGeneration: 'observed-generation',
+    sourceTitle: 'Native capture',
+    dataUrl: 'data:image/png;base64,bmF0aXZl',
+  });
+});
+
+it('does not resurrect a removed native asset from its obsolete bootstrap', async () => {
+  mocks.restore.mockResolvedValue(undefined);
+  mocks.bootstrap.mockResolvedValue({ dataUrl: 'data:image/png;base64,b2xk' });
+  mocks.getEntry.mockResolvedValue(undefined);
+  mocks.getBlob.mockResolvedValue(undefined);
+  const { resolveEditorPageRestoreSource } = await import('./');
+  await expect(
+    resolveEditorPageRestoreSource({ assetId: 'removed', bootstrapId: 'old' }, 'removed', {
+      restoreDraft: mocks.restore,
+    })
+  ).resolves.toEqual({ kind: 'empty' });
+});
+
+it('refuses a missing native original instead of replacing it from bootstrap pixels', async () => {
+  mocks.restore.mockResolvedValue(undefined);
+  mocks.bootstrap.mockResolvedValue({ dataUrl: 'data:image/png;base64,b2xk' });
+  mocks.getEntry.mockResolvedValue({ id: 'native-capture', workspaceRevision: 0 });
+  mocks.getBlob.mockResolvedValue(undefined);
+  const { resolveEditorPageRestoreSource } = await import('./');
+  await expect(
+    resolveEditorPageRestoreSource(
+      { assetId: 'native-capture', bootstrapId: 'old' },
+      'native-capture',
+      { restoreDraft: mocks.restore }
+    )
+  ).rejects.toMatchObject({ name: 'MissingEditorOriginalError' });
 });

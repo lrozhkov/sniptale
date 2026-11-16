@@ -1,5 +1,17 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'editor-native-image-restore',
+    productionFile: 'apps/extension/src/editor/document/page-session/index.ts',
+    reason:
+      'Image restore tests cover native generations, parallel writers, retries and delayed acknowledgements.',
+    testFiles: [
+      'apps/extension/src/editor/document/page-session/index.test.ts',
+      'apps/extension/src/editor/shell/page/runtime.bootstrap.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.history.integration.test.ts',
+      'apps/extension/src/editor/document/session-autosave/durable-history.test.ts',
+    ],
+  },
+  {
     owner: 'review-inserted-time-contract',
     productionFile: 'apps/extension/src/features/video/review/time-segment.ts',
     reason:
