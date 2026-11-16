@@ -16,6 +16,7 @@ it('keeps committed focused coverage owner maps valid', async () => {
 });
 
 it.each([
+  ['assets/ready-media-claims.ts', 'media-library/delete-cascade.pending-publication.test.ts'],
   [
     'infrastructure/indexed-db/database-migrations.ts',
     'infrastructure/indexed-db/upgrade/branch-integration.test.ts',

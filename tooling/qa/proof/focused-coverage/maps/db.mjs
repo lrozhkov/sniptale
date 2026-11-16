@@ -1,5 +1,17 @@
 export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   {
+    owner: 'durable-ready-media-locators',
+    productionFile: 'apps/extension/src/composition/persistence/assets/ready-media-claims.ts',
+    exclusive: true,
+    reason:
+      'Ready media locators serve native journals and replica retention. ' +
+      'Direct locator tests and pending-publication consumer tests prove complete source families.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/assets/ready-media-claims.test.ts',
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.pending-publication.test.ts',
+    ],
+  },
+  {
     owner: 'native-database-migrations',
     productionFile:
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts',
