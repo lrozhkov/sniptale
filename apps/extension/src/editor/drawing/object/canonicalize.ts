@@ -1,4 +1,4 @@
-import { ActiveSelection, FabricImage, type Canvas, type FabricObject } from 'fabric';
+import { ActiveSelection, FabricImage, type Canvas, type FabricObject, type Group } from 'fabric';
 import type { SourceState } from '../../document/model/source-state';
 import { carryEditorSimplifySourceContext } from '../simplify-runtime';
 import { createEditorDrawingSimplifyObject } from './simplify';
@@ -39,13 +39,28 @@ function createCanonicalObject(
   });
 }
 
-export function replaceEditorDrawingObjectWithCanonicalGeometry(args: {
+type CanonicalReplacementOptions = {
   canvas: Canvas;
   object: FabricObject;
   prepareObject: (object: FabricObject) => void;
   source: SourceState | null;
   synchronizeTransform?: boolean;
-}): FabricObject {
+};
+
+export function replaceEditorDrawingObjectWithCanonicalGeometry(
+  args: CanonicalReplacementOptions
+): FabricObject {
+  return replaceCanonicalGeometry(args);
+}
+
+function refreshCollectionCoordinates(collection: Canvas | Group): void {
+  collection.getObjects().forEach((object) => object.setCoords());
+}
+
+function replaceCanonicalGeometry(
+  args: CanonicalReplacementOptions,
+  deferredCollections?: Set<Canvas | Group>
+): FabricObject {
   const previous = readEditorDrawingObject(args.object);
   let drawing = args.synchronizeTransform
     ? synchronizeEditorDrawingObjectFromFabric(args.object)
@@ -68,7 +83,8 @@ export function replaceEditorDrawingObjectWithCanonicalGeometry(args: {
   if (index < 0) return args.object;
   collection.remove(args.object);
   collection.insertAt(index, replacement);
-  collection.getObjects().forEach((object) => object.setCoords());
+  if (deferredCollections) deferredCollections.add(collection);
+  else refreshCollectionCoordinates(collection);
   args.prepareObject(replacement);
   if (drawing.kind === 'simplify')
     carryEditorSimplifySourceContext(args.canvas, args.object, replacement);
@@ -110,8 +126,15 @@ export function restoreCanonicalEditorDrawingObjects(args: {
   prepareObject: (object: FabricObject) => void;
   source: SourceState | null;
 }): void {
-  [...args.canvas.getObjects()].forEach((object) => {
-    const replacement = replaceEditorDrawingObjectWithCanonicalGeometry({ ...args, object });
-    if (replacement === object && readEditorDrawingObject(object)) args.prepareObject(object);
-  });
+  const collections = new Set<Canvas | Group>();
+  try {
+    [...args.canvas.getObjects()].forEach((object) => {
+      const replacement = replaceCanonicalGeometry({ ...args, object }, collections);
+      if (replacement === object && readEditorDrawingObject(object)) args.prepareObject(object);
+    });
+  } finally {
+    // Each replacement can affect sibling bounds; refresh once after the batch,
+    // including completed replacements when a later preparation fails.
+    collections.forEach(refreshCollectionCoordinates);
+  }
 }
