@@ -1,3 +1,4 @@
+import { commitProjectAggregatePresentation } from '../aggregate-presentations';
 import { deferCheckpointInTransaction, consumeCheckpointInTransaction } from './checkpoints';
 import { createScenarioReplicaFixture } from './test-support/scenario-replica.test-support';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -1178,4 +1179,70 @@ it('refuses deferred HTML publication behind a pending checkpoint before its fir
   await expect(applyPreparedScenarioReplica(f.input)).rejects.toThrow();
   expect(f.fixture.rows).toEqual(before);
   expect(f.fixture.rows.get('asset_residency')!.has(f.copyId)).toBe(false);
+});
+
+it('rebases sync after a local deletion and accepts a successor after preview refresh', async () => {
+  const f = setup();
+  const id = f.input.root.entry.id;
+  // A local deletion before sync enrollment retained a higher native revision.
+  f.fixture.rows.get('scenario_project_revisions')!.set(id, {
+    version: 1,
+    projectId: id,
+    revision: 20,
+  });
+  // This shared fixture keys presentation rows by ID; native reads use the compound key.
+  const transaction = f.database.transaction.bind(f.database);
+  vi.spyOn(f.database, 'transaction').mockImplementation((names, mode) => {
+    const tx = transaction(names, mode);
+    return {
+      abort: () => tx.abort(),
+      get done() {
+        return tx.done;
+      },
+      objectStore(name: string) {
+        const store = tx.objectStore(name);
+        return {
+          ...store,
+          get: (key: IDBValidKey) =>
+            store.get(
+              name === 'aggregate_presentations' && Array.isArray(key) && typeof key[1] === 'string'
+                ? key[1]
+                : key
+            ),
+        };
+      },
+    };
+  });
+  expect(await applyPreparedScenarioReplica(f.input)).toMatchObject({
+    status: 'applied',
+    generation: 1,
+  });
+  const current = await f.current();
+  if (!current) throw new Error('Missing accepted Scenario');
+  expect(current.workspaceRevision).toBe(21);
+  const stateBefore = [...f.fixture.rows.get('sync_capture')!.values()]
+    .map(parseSyncCaptureRecord)
+    .find((row) => row?.kind === 'root-state');
+  expect(stateBefore?.nativeRevision).toBe(current.workspaceRevision);
+  await commitProjectAggregatePresentation({
+    expectedWorkspaceRevision: current.workspaceRevision,
+    ref: { kind: 'scenario', id },
+    thumbnailBlob: new Blob(['preview'], { type: 'image/png' }),
+  });
+  const stateAfter = [...f.fixture.rows.get('sync_capture')!.values()]
+    .map(parseSyncCaptureRecord)
+    .find((row) => row?.kind === 'root-state');
+  expect(stateAfter?.nativeDigest).not.toBe(stateBefore?.nativeDigest);
+  const next = structuredClone(f.input);
+  next.operationId = 'successor-after-local-deletion';
+  next.sourceDigest = 'b'.repeat(64);
+  next.expectedLocalGeneration = 1;
+  next.expectedBasis = [f.input.operationId];
+  next.expectedWorkspaceRevision = current.workspaceRevision;
+  next.root.entry.project.name = 'Accepted successor';
+  expect(await applyPreparedScenarioReplica(next)).toMatchObject({
+    status: 'applied',
+    generation: 2,
+  });
+  expect((await f.current())?.project.name).toBe('Accepted successor');
 });

@@ -76,6 +76,7 @@ it('adds empty scenario history and DB48 reference indexes before publishing cur
     [VIDEO_GL_TRANSITION_PRESETS_STORE, { keyPath: 'id' }],
     ['editor_vector_library', { keyPath: 'key' }],
     ['image_workspace_identities', { keyPath: 'aggregateId' }],
+    ['scenario_project_revisions', { keyPath: 'projectId' }],
   ]);
   expect(createIndex.mock.calls).toEqual([
     ['projectId', 'projectId'],
@@ -143,7 +144,7 @@ it('adds empty scenario history and DB48 reference indexes before publishing cur
     ['video_workspace_history'],
   ]);
   expect(openCursor.mock.calls).toEqual(REFERENCE_INDEX_STORES.map(() => []).concat([[], []]));
-  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 12 });
+  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 13 });
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(getAll).not.toHaveBeenCalled();
   expect(tx.abort).not.toHaveBeenCalled();

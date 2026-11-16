@@ -159,6 +159,7 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
     ['video_gl_transition_presets', { keyPath: 'id' }],
     ['editor_vector_library', { keyPath: 'key' }],
     ['image_workspace_identities', { keyPath: 'aggregateId' }],
+    ['scenario_project_revisions', { keyPath: 'projectId' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   const olderContracts = Object.entries(betaV14Fixture.domainVersions).map(
@@ -229,6 +230,7 @@ it('admits speech without rewriting workspace history or the durable asset graph
     ['video_gl_transition_presets', { keyPath: 'id' }],
     ['editor_vector_library', { keyPath: 'key' }],
     ['image_workspace_identities', { keyPath: 'aggregateId' }],
+    ['scenario_project_revisions', { keyPath: 'projectId' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(transaction.objectStore.mock.calls).toEqual(
@@ -334,6 +336,10 @@ it('upgrades each retained source contract only after all required stores valida
       expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('image_workspace_identities', {
         keyPath: 'aggregateId',
       });
+    else if (migration.toDatabaseVersion === 63)
+      expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('scenario_project_revisions', {
+        keyPath: 'projectId',
+      });
     else expect(db.createObjectStore).not.toHaveBeenCalled();
     names.clear();
     expect(() => migration.validate(db, transaction)).toThrow();
@@ -375,6 +381,7 @@ it('admits compact source gain without workspace migration and refuses incompati
     ['video_gl_transition_presets', { keyPath: 'id' }],
     ['editor_vector_library', { keyPath: 'key' }],
     ['image_workspace_identities', { keyPath: 'aggregateId' }],
+    ['scenario_project_revisions', { keyPath: 'projectId' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(
@@ -422,6 +429,7 @@ it('annotation admission preserves rows and aborts before publishing contracts o
     ['video_gl_transition_presets', { keyPath: 'id' }],
     ['editor_vector_library', { keyPath: 'key' }],
     ['image_workspace_identities', { keyPath: 'aggregateId' }],
+    ['scenario_project_revisions', { keyPath: 'projectId' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.objectStore.mock.calls).toEqual(
@@ -622,7 +630,7 @@ it('creates the complete fresh schema with empty unindexed connection authority'
   const tx = { abort: vi.fn(), objectStore: vi.fn() };
   handleDatabaseUpgrade(db, 0, DB_VERSION, tx);
   expect([...names].sort()).toEqual([...EXPECTED_STORES].sort());
-  expect(names).toHaveLength(51);
+  expect(names).toHaveLength(52);
   expect(db.createObjectStore).toHaveBeenCalledWith('sync_connection', { keyPath: 'key' });
   expect(db.createObjectStore).toHaveBeenCalledWith('secret_protection', { keyPath: 'key' });
   expect(connectionIndex).not.toHaveBeenCalled();

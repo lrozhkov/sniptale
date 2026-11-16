@@ -26,7 +26,7 @@ function normalizeKey(key: unknown): string {
 }
 
 const db = {
-  get: vi.fn(async (name: string, id: string) => getStore(name).get(id)),
+  get: vi.fn(async (name: string, id: string) => getStore(name).get(normalizeKey(id))),
   getAllFromIndex: vi.fn(async (name: string, _index: string, projectId: string) =>
     [...getStore(name).values()].filter(
       (value) => (value as { projectId?: string }).projectId === projectId
@@ -89,6 +89,7 @@ const db = {
             unitId?: string;
           }) => {
             const key =
+              (name === 'scenario_project_revisions' ? value.projectId : undefined) ??
               (value.projectId && value.revision !== undefined
                 ? JSON.stringify(
                     value.unitId
@@ -260,6 +261,7 @@ beforeEach(() => {
     'scenario_assets',
     'scenario_exports',
     'scenario_projects',
+    'scenario_project_revisions',
     'scenario_project_history',
     'scenario_project_units',
     'scenario_step_editor_documents',

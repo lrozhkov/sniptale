@@ -1,3 +1,4 @@
+import { readRetainedScenarioRevision } from './revisions';
 import { readScenarioVideoDependencyRows } from '../media-library/deletion-index';
 import type { IDBPTransaction } from 'idb';
 import { promoteScenarioSourceLifecycles } from './library-publication';
@@ -332,8 +333,12 @@ export async function putScenarioProjectBackupRestore(args: {
   const lifecycle =
     args.root.entry.lifecycle ?? createLibraryLifecycle('library', args.root.entry.updatedAt);
   const { lastAcceptedActionId: _closedAction, ...restoredEntry } = args.root.entry;
+  const fence = await readRetainedScenarioRevision(args.tx, restoredEntry.id);
+  const revision = Math.max(restoredEntry.workspaceRevision, (fence ?? -1) + 1);
+  if (!Number.isSafeInteger(revision)) throw new Error('Local Scenario revisions are exhausted.');
   await args.stores.projects.put({
     ...restoredEntry,
+    workspaceRevision: revision,
     lifecycle: promoteLibraryLifecycle(lifecycle, Date.now()),
   });
   await publishScenarioAssets(args.root, args.stores);

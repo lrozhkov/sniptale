@@ -638,7 +638,7 @@ async function publishScenarioReplica(
     rootKey: key.rootKey,
     generation,
     basis: [input.operationId],
-    nativeRevision: revision,
+    nativeRevision: native.entry.workspaceRevision,
     nativeDigest: digestCapturedScenarioRows(native),
   };
   const applied: SyncCaptureAppliedOperation = {

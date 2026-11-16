@@ -6,7 +6,12 @@ import { parseScenarioProjectEntry } from './read-guards';
 import { scenarioStorageHead, scenarioStorageRows } from './storage-format';
 import { createScenarioProjectStore, readAllScenarioStorage, readScenarioStorage } from './storage';
 
-const names = ['scenario_projects', 'scenario_project_history', 'scenario_project_units'];
+const names = [
+  'scenario_projects',
+  'scenario_project_history',
+  'scenario_project_units',
+  'scenario_project_revisions',
+];
 afterEach(() => vi.restoreAllMocks());
 
 function seed(id = 'guide') {

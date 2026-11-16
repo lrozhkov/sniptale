@@ -73,6 +73,7 @@ export function restoreTransaction(
     scenario_assets: target.assets,
     scenario_exports: target.exports,
     scenario_projects: target.projects,
+    scenario_project_revisions: graph,
     scenario_step_editor_documents: target.stepDocuments,
     asset_owners: target.owners,
     asset_refs: target.refs,

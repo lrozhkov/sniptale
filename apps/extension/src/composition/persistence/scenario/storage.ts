@@ -1,3 +1,4 @@
+import { retainScenarioRevision } from './revisions';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   SCENARIO_PROJECTS_STORE,
@@ -152,8 +153,10 @@ export function createScenarioProjectStore(tx: ScenarioStorageWriteTransaction) 
     async delete(key: IDBValidKey): Promise<void> {
       if (typeof key !== 'string') throw new Error('Invalid scenario project key.');
       const stored = await readScenarioStorage(tx, key);
-      if (stored.logical !== undefined && !parseScenarioProjectEntry(stored.logical))
+      const existing = parseScenarioProjectEntry(stored.logical);
+      if (stored.logical !== undefined && !existing)
         throw new Error('Unavailable scenario project cannot be deleted.');
+      if (existing) await retainScenarioRevision(tx, key, existing.workspaceRevision);
       const store = tx.objectStore(SCENARIO_PROJECT_HISTORY_STORE);
       for (const rowKey of await store.index('projectId').getAllKeys(key))
         await store.delete(rowKey);

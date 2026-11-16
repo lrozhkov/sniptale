@@ -878,3 +878,19 @@ it('admits retained raster documents without changing any released row, store, i
     scenarioProjects: 11,
   });
 });
+
+it('adds the Scenario deletion fence without changing released content or immutable bytes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 62
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 63
+  )!;
+  expect(target.records).toEqual({ ...source.records, scenario_project_revisions: [] });
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores.filter((name) => name !== 'scenario_project_revisions')).toEqual(
+    source.stores
+  );
+  expect(target.indexes).toEqual({ ...source.indexes, scenario_project_revisions: [] });
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, scenarioProjects: 13 });
+});

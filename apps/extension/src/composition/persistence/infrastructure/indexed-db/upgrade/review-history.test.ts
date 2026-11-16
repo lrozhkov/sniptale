@@ -78,6 +78,7 @@ it('adds empty history stores and DB48 reference indexes before publishing curre
     [VIDEO_GL_TRANSITION_PRESETS_STORE, { keyPath: 'id' }],
     ['editor_vector_library', { keyPath: 'key' }],
     ['image_workspace_identities', { keyPath: 'aggregateId' }],
+    ['scenario_project_revisions', { keyPath: 'projectId' }],
   ]);
   expect(indexes.mock.calls).toEqual([
     ['aggregateId', 'aggregateId'],

@@ -80,6 +80,7 @@ function getStoreNames() {
   return [
     'sync_capture',
     'scenario_projects',
+    'scenario_project_revisions',
     'scenario_assets',
     'scenario_exports',
     'scenario_step_editor_documents',

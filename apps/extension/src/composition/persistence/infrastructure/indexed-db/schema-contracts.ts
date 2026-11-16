@@ -34,6 +34,7 @@ import {
   SCENARIO_ASSETS_STORE,
   SCENARIO_EXPORTS_STORE,
   SCENARIO_PENDING_ASSETS_STORE,
+  SCENARIO_PROJECT_REVISIONS_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_PROJECT_UNITS_STORE,
@@ -150,8 +151,9 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'scenarioProjects',
-    schemaVersion: 12,
+    schemaVersion: 13,
     stores: [
+      { storeName: SCENARIO_PROJECT_REVISIONS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_PROJECT_HISTORY_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_PROJECT_UNITS_STORE, dataClass: 'durable-authority' },

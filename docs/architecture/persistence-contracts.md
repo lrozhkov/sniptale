@@ -1222,3 +1222,14 @@ The identity ledger distinguishes replacement lifetimes that reuse an aggregate 
 Working copies retain their captured history. The native publication result supplies their revision, generation and owned resource maps. A newer live edit prevents automatic rebinding to a completed copy. Library copies retain the existing current-image baseline behavior.
 
 Archive layout `library-folders-v6` and Image sync operation version 3 admit portable history references. Portable records contain object IDs and omit native publication receipts. Privacy projection applies to every retained snapshot. Existing archive inventory, asset ownership, deletion and recovery remain authoritative for historical resources. Missing remote history JSON requires bounded, verified recovery before publication locks. Large bitmap resources can remain deferred.
+
+
+## Scenario identity reuse
+
+Physical database version 63 adds `scenario_project_revisions` and advances the scenarioProjects contract to version 13. The additive migration preserves existing records and files. Earlier writers refuse the newer database before mutation.
+
+Native deletion retains the highest local revision in the same transaction that removes the root. The record contains only a project identifier and counter. It survives ordinary deletion and requires no sync profile. Global erasure includes this store through the database registry.
+
+Recreation and archive replacement use a revision above the retained counter. Ready publication prepares that target revision and checks it again before commit. An intervening creation and deletion invalidates the old publication. Exact committed replay retains the accepted revision.
+
+Native reads do not change the counter. Invalid or exhausted counters refuse the affected write and preserve the last committed content. This identity fence does not store editing history or replace the autosave coordinator.

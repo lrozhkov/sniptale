@@ -35,6 +35,7 @@ import {
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   SCENARIO_ASSETS_STORE,
+  SCENARIO_PROJECT_REVISIONS_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_PROJECT_UNITS_STORE,
@@ -1068,6 +1069,26 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
         db,
         [IMAGE_WORKSPACE_IDENTITIES_STORE],
         'Image lifetime store is unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'scenarioProjects', from: 12, to: 13 }],
+    fromDatabaseVersion: 62,
+    toDatabaseVersion: 63,
+    risk: 'additive',
+    stores: [SCENARIO_PROJECT_REVISIONS_STORE],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    migrate(db) {
+      db.createObjectStore(SCENARIO_PROJECT_REVISIONS_STORE, { keyPath: 'projectId' });
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [SCENARIO_PROJECT_REVISIONS_STORE],
+        'Scenario revision store is unavailable.'
       );
     },
   },

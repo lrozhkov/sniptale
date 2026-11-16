@@ -25,6 +25,8 @@ import {
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_PROJECT_UNITS_STORE,
+  SCENARIO_PROJECT_REVISIONS_STORE,
+  SYNC_CAPTURE_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   STORE_NAME,
   initDB,
@@ -116,6 +118,7 @@ interface PreparedCommitScenarioAggregateMutationOptions extends Omit<
   'children'
 > {
   children?: PreparedScenarioAggregateChildMutation;
+  publicationRevision?: number;
 }
 
 type ScenarioAggregateMutationResult = ScenarioProjectSnapshot;
@@ -284,11 +287,21 @@ export async function commitScenarioAggregateMutation(
       projectId: project.id,
     });
     const committedAt = Date.now();
-    const targetEntry = createScenarioAggregateEntry({
+    let targetEntry = createScenarioAggregateEntry({
       existing: existing ?? undefined,
       options: { ...preparedOptions, publicationUpdatedAt: committedAt },
       project,
     });
+    const fenceTx = db.transaction(
+      [SCENARIO_PROJECT_REVISIONS_STORE, SYNC_CAPTURE_STORE],
+      'readonly'
+    );
+    const fence = await readScenarioRevisionFence(fenceTx, project.id);
+    await fenceTx.done;
+    if (fence !== null && targetEntry.workspaceRevision <= fence)
+      targetEntry = { ...targetEntry, workspaceRevision: fence + 1 };
+    if (!Number.isSafeInteger(targetEntry.workspaceRevision))
+      throw new Error('Local Scenario revisions are exhausted.');
     const payload: ScenarioAggregatePublicationPayload = {
       baseRevision: existing?.workspaceRevision ?? null,
       children: preparedChildren!,
@@ -401,6 +414,13 @@ async function commitScenarioAggregateInTransaction(
     const fence = await readScenarioRevisionFence(tx, project.id);
     if (fence !== null && entry.workspaceRevision <= fence)
       entry = { ...entry, workspaceRevision: fence + 1 };
+    if (!Number.isSafeInteger(entry.workspaceRevision))
+      throw new Error('Local Scenario revisions are exhausted.');
+    if (
+      options.publicationRevision !== undefined &&
+      options.publicationRevision !== entry.workspaceRevision
+    )
+      throw new StaleScenarioAggregateRevisionError(project.id);
     await applyScenarioAssetMutations(tx, project.id, options.children, physicalDelete);
     await promoteScenarioSourceLifecycles(tx, entry, entry.updatedAt);
     await writeScenarioStorage(tx, { storage, existing, entry });
@@ -670,10 +690,17 @@ async function publishScenarioAssetJournal(
           : { expectedUpdatedAt: payload.expectedUpdatedAt }),
         ...(payload.storageClass === undefined ? {} : { storageClass: payload.storageClass }),
         publicationUpdatedAt: payload.committedAt,
+        publicationRevision: payload.targetEntry.workspaceRevision,
       })
     );
     return finishScenarioAggregateCommit(committed, lifecyclePermit);
   } catch (error) {
+    if (
+      allowSuperseded &&
+      error instanceof StaleScenarioAggregateRevisionError &&
+      (await discardSupersededScenarioPublication(db, payload.children, journal, lifecyclePermit))
+    )
+      return null;
     if (allowSuperseded && error instanceof UnavailableBorrowedScenarioSourceError) {
       await cancelAssetPublication(journal, lifecyclePermit);
       return null;

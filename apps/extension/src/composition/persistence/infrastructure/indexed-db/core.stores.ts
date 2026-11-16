@@ -8,7 +8,7 @@ import { ROW_REFERENCE_INDEX } from './row-index-contract';
 // This is the first stable beta persistence generation. Alpha databases use a different name and
 // are intentionally excluded from the supported migration graph.
 export const DB_NAME = 'sniptale-db';
-export const DB_VERSION = 62;
+export const DB_VERSION = 63;
 export const LEGACY_ALPHA_DB_NAMES = ['sniptale-video-db'] as const;
 export const ALPHA_RESET_JOURNAL_KEY = 'sniptale.persistence.alpha-reset.v1';
 export const DATABASE_RESET_JOURNAL_KEY = 'sniptale.persistence.database-reset.v1';
@@ -26,6 +26,7 @@ export const DIAGNOSTICS_META_STORE = 'diagnostics_meta';
 export const DIAGNOSTICS_EVENTS_STORE = 'diagnostics_events';
 export const VIDEO_PROJECTS_STORE = 'video_projects';
 export const VIDEO_PROJECT_REVISIONS_STORE = 'video_project_revisions';
+export const SCENARIO_PROJECT_REVISIONS_STORE = 'scenario_project_revisions';
 export const SCENARIO_PROJECTS_STORE = 'scenario_projects';
 export const SCENARIO_PROJECT_HISTORY_STORE = 'scenario_project_history';
 export const SCENARIO_PROJECT_UNITS_STORE = 'scenario_project_units';
@@ -75,6 +76,7 @@ export const EXPECTED_STORES = [
   DIAGNOSTICS_EVENTS_STORE,
   VIDEO_PROJECTS_STORE,
   VIDEO_PROJECT_REVISIONS_STORE,
+  SCENARIO_PROJECT_REVISIONS_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_PROJECT_UNITS_STORE,
@@ -129,6 +131,7 @@ export const EXPECTED_INDEXES = {
   [DIAGNOSTICS_EVENTS_STORE]: ['recordingId'],
   [VIDEO_PROJECTS_STORE]: ['updatedAt', 'usageReferenceKeys', ROW_REFERENCE_INDEX],
   [VIDEO_PROJECT_REVISIONS_STORE]: [],
+  [SCENARIO_PROJECT_REVISIONS_STORE]: [],
   [SCENARIO_PROJECTS_STORE]: ['updatedAt'],
   [SCENARIO_PROJECT_HISTORY_STORE]: ['projectId'],
   [SCENARIO_PROJECT_UNITS_STORE]: ['projectId'],

@@ -1,3 +1,4 @@
+import { readRetainedScenarioRevision } from '../scenario/revisions';
 import { queueOperationKey, parseSyncQueueOperation } from './queue-model';
 import {
   deferCheckpointInTransaction,
@@ -218,13 +219,14 @@ export async function captureScenarioProjectInTransaction(
   );
 }
 
-/** Preserve the enrolled Scenario clock across deletion and recreation of one identity. */
+/** Preserve the local and enrolled Scenario clocks across deletion and recreation of one identity. */
 export async function readScenarioRevisionFence(
-  tx: CaptureTransaction,
+  tx: Pick<IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>, 'objectStore'>,
   projectId: string
 ): Promise<number | null> {
+  const retained = await readRetainedScenarioRevision(tx, projectId);
   const profile = await readEnabledCaptureProfile(tx);
-  if (!profile) return null;
+  if (!profile) return retained;
   const rootKey = captureRootKey(profile.spaceId, 'scenario-project', projectId);
   const state = await readCaptureRootState(
     tx,
@@ -234,10 +236,10 @@ export async function readScenarioRevisionFence(
     },
     false
   );
-  if (!state) return null;
+  if (!state) return retained;
   if (state.nativeRevision === undefined)
     throw new Error('Scenario revision fence is unavailable.');
-  return state.nativeRevision;
+  return Math.max(state.nativeRevision, retained ?? 0);
 }
 
 /** Capture the native Library publication before the caller commits its source transaction. */
