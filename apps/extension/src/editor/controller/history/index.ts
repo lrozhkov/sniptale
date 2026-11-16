@@ -34,6 +34,7 @@ type EditorHistoryAssets = {
   bytesByToken: Map<string, number>;
   cost: ReturnType<typeof createEditorHistoryCostIndex>;
   actionLimit: number;
+  byteLimit: number;
   descriptions: Map<string, EditorHistoryDescription>;
   actions: Map<string, Map<string, EditorHistoryAction>>;
   deferred?: ReturnType<typeof createDeferredEditorHistory>;
@@ -126,6 +127,7 @@ export function createEditorSnapshotHistory(
     bytesByToken,
     cost: createEditorHistoryCostIndex(bytesByToken),
     actionLimit: limits.maxActions,
+    byteLimit: limits.maxBytes,
     descriptions: new Map(),
     actions: new Map(),
   };
@@ -158,12 +160,26 @@ function bindEditorHistoryAssets(
   });
 }
 
+/** Defers graph collection and binds the reader to the accepted history revision. */
+export function prepareEditorHistoryCheckpoint(
+  history: SnapshotHistory<string> | null,
+  proposedDocument?: EditorDocument
+): () => EditorImageHistoryCheckpoint | null {
+  const revision = history?.getRevision();
+  return () =>
+    history?.getRevision() === revision
+      ? captureEditorHistoryCheckpoint(history, proposedDocument)
+      : null;
+}
+
 /** Captures a ready graph without encoding pending work or expanding media and past documents. */
 export function captureEditorHistoryCheckpoint(
-  history: SnapshotHistory<string> | null
+  history: SnapshotHistory<string> | null,
+  proposedDocument?: EditorDocument
 ): EditorImageHistoryCheckpoint | null {
   const assets = history && historyAssets.get(history);
   if (!history || !assets || assets.deferred?.getCount()) return null;
+  if (proposedDocument) return captureProposedEditorHistory(history, assets, proposedDocument);
   return {
     version: 1,
     epoch: assets.epoch,
@@ -178,6 +194,39 @@ export function captureEditorHistoryCheckpoint(
       entry.action ? structuredClone(entry.action) : null
     ),
   };
+}
+
+/** Explicit saves may propose a document before its live edit is admitted, as caption edits do. */
+function captureProposedEditorHistory(
+  history: SnapshotHistory<string>,
+  assets: EditorHistoryAssets,
+  document: EditorDocument
+): EditorImageHistoryCheckpoint | null {
+  const bytesByToken = new Map(assets.bytesByToken);
+  const cost = createEditorHistoryCostIndex(bytesByToken);
+  const snapshots = history.getSnapshots();
+  for (const snapshot of snapshots) cost.register(snapshot, assets.cost.tokensFor(snapshot));
+  const detached: EditorHistoryAssets = {
+    ...assets,
+    byValue: new Map(assets.byValue),
+    byToken: new Map(assets.byToken),
+    kindsByToken: new Map(assets.kindsByToken),
+    bytesByToken,
+    cost,
+    descriptions: new Map(assets.descriptions),
+    actions: new Map([...assets.actions].map(([before, actions]) => [before, new Map(actions)])),
+    allocationPrefix: `${IMAGE_HISTORY_VALUE_TOKEN_PREFIX}${crypto.randomUUID()}:`,
+  };
+  delete detached.deferred;
+  const candidate = SnapshotHistory.restore(snapshots, history.getState().index, {
+    limit: assets.actionLimit + 1,
+    maxBytes: assets.byteLimit,
+    measureBytes: cost.measure,
+    measureWindowBytes: cost.measureWindow,
+  });
+  historyAssets.set(candidate, detached);
+  pushEditorSnapshotHistory({ history: candidate, muted: false, exportDocument: () => document });
+  return captureEditorHistoryCheckpoint(candidate);
 }
 
 /** Creates a new runtime lifetime only after its complete retained graph has been admitted. */
@@ -200,6 +249,7 @@ export function restoreEditorHistoryCheckpoint(
     allocationPrefix: `${IMAGE_HISTORY_VALUE_TOKEN_PREFIX}${crypto.randomUUID()}:`,
     cost: createEditorHistoryCostIndex(tokenBytes),
     actionLimit: limits.maxActions,
+    byteLimit: limits.maxBytes,
     descriptions: new Map(),
     actions: new Map(),
   };

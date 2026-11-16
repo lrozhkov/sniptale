@@ -14,6 +14,7 @@ import {
 import type { initDB } from '../infrastructure/indexed-db/core';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   IMAGE_WORKSPACES_STORE,
   THUMBNAILS_STORE,
   ASSET_OPERATIONS_STORE,
@@ -45,6 +46,7 @@ export function createProjectMutationStores(
       SYNC_CAPTURE_STORE,
       VIDEO_PROJECTS_STORE,
       PROJECT_EXPORTS_STORE,
+      IMAGE_WORKSPACE_IDENTITIES_STORE,
       IMAGE_WORKSPACES_STORE,
       THUMBNAILS_STORE,
       STORE_NAME,
@@ -81,6 +83,7 @@ export function createProjectDeletionStores(db: ProjectMutationDatabase) {
       VIDEO_PROJECT_REVISIONS_STORE,
       SYNC_CAPTURE_STORE,
       VIDEO_PROJECTS_STORE,
+      IMAGE_WORKSPACE_IDENTITIES_STORE,
       IMAGE_WORKSPACES_STORE,
       THUMBNAILS_STORE,
       SCENARIO_ASSETS_STORE,

@@ -1,5 +1,40 @@
 export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   {
+    owner: 'native-database-migrations',
+    productionFile:
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts',
+    exclusive: true,
+    reason:
+      'Migration fixtures and branch integration prove additive admission, retained records and malformed prototype refusal.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.fixture.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/branch-integration.test.ts',
+    ],
+  },
+  {
+    owner: 'sync-capture-project-fixture',
+    productionFile:
+      'apps/extension/src/composition/persistence/sync-capture/test-support/freeze.ts',
+    reason:
+      'Frozen project and recording tests use this database fixture to prove detached capture boundaries.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/sync-capture/freeze.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/freeze.recording.test.ts',
+    ],
+  },
+  {
+    owner: 'sync-capture-project-apply-prototype',
+    productionFile:
+      'apps/extension/src/composition/persistence/sync-capture/test-support/apply-video-project.ts',
+    reason:
+      'Capture integration proves duplicate application, stale source refusal and atomic replica publication.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/sync-capture/capture.integration.test.ts',
+    ],
+  },
+  {
     owner: 'review-attachment-target-retention-consumers',
     productionFile: 'apps/extension/src/composition/persistence/assets/retention-index.ts',
     allowCrossOwner: true,
@@ -352,6 +387,8 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/mutation-inventory.test.ts',
       'apps/extension/src/composition/persistence/projects/index.delete.test.ts',
       'apps/extension/src/composition/persistence/projects/index.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/checkpoint-schedule.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/capture.integration.test.ts',
     ],
   },
   {

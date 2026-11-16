@@ -37,6 +37,7 @@ function stores(): VideoProjectBackupRestoreStores {
     assets: store(),
     exports,
     media: store(),
+    imageIdentities: store(),
     videoWorkspaces: store(),
     videoDrafts: store(),
     operations: store(),

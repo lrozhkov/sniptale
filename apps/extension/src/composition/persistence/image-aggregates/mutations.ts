@@ -4,6 +4,7 @@ import type {
   CommitImagePresentationInput,
   SaveImageAggregateCopyFromDocumentInput,
   ImageWorkspacePublicationResult,
+  ImageAggregateCopyResult,
 } from './contracts';
 import { freezeImageInTransaction, isImageCaptureSource } from '../sync-capture/image-snapshot';
 import { commitImagePresentationCacheInTransaction } from '../sync-capture/presentation';
@@ -25,6 +26,7 @@ import {
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
   IMAGE_WORKSPACES_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   PROJECT_ASSETS_STORE,
   MEDIA_LIBRARY_STORE,
   initDB,
@@ -36,6 +38,19 @@ import type { StoredProjectAssetEntry } from '../projects/contracts';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import type { ImageContentState, MediaLibraryEntry } from '../media-library/contracts';
 import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
+import { imageWorkspaceAssetBindings } from '../image-workspaces/assets';
+import {
+  readImageWorkspaceIdentity,
+  createImageWorkspaceIdentity,
+} from '../image-workspaces/identity';
+import {
+  parsePersistedImageHistory,
+  type PersistedImageHistory,
+} from '../image-workspaces/history-contracts';
+import {
+  preparePersistedImageHistory,
+  hydratePersistedImageHistory,
+} from '../image-workspaces/history-codec';
 import { parseAggregatePresentationEntry } from '../aggregate-presentations/parser';
 import { createAggregatePresentationKey } from '../aggregate-presentations/contracts';
 import { promoteLibraryLifecycle } from '../library-lifecycle/contracts';
@@ -46,9 +61,8 @@ import {
   ImagePresentationNotCurrentError,
   StaleImageWorkspaceError,
 } from './errors';
-import { getMediaLibraryEntry } from '../media-library/index.library';
 import { createOriginalImageDocument } from './original-document';
-import { readImageWorkspace } from '../image-workspaces/read';
+import { readImageOriginalSource, readImageWorkspace } from '../image-workspaces/read';
 import { getAggregatePresentation } from '../aggregate-presentations';
 import {
   buildPhysicalDeleteOperation,
@@ -80,6 +94,7 @@ const IMAGE_SNAPSHOT_STORES = [
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   IMAGE_WORKSPACES_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
   ASSET_REFS_STORE,
   ASSET_OWNERS_STORE,
@@ -88,9 +103,14 @@ const IMAGE_SNAPSHOT_STORES = [
 
 interface PreparedImageWorkspaceInput extends Omit<
   CommitImageWorkspaceInput,
-  'document' | 'reusableAssetsByRuntimeUrl' | 'reusableAssetsByVectorDefinitionId'
+  | 'document'
+  | 'history'
+  | 'reusableHistoryAssetsByValue'
+  | 'reusableAssetsByRuntimeUrl'
+  | 'reusableAssetsByVectorDefinitionId'
 > {
   document: PersistedEditorDocument;
+  history?: PersistedImageHistory | null;
   initialStorageClass?: 'temporary' | 'library';
   refs: AssetRef[];
   publicationId?: string;
@@ -99,6 +119,17 @@ interface PreparedImageWorkspaceInput extends Omit<
 
 type ImageMutationDatabase = Parameters<Parameters<typeof runWithIndexedDbMutation>[0]>[0];
 type PreparedNewImageAggregate = { originalBlob: Blob; thumbnailBlob: Blob };
+
+async function assertImageGeneration(
+  tx: Parameters<typeof readImageWorkspaceIdentity>[0],
+  aggregateId: string,
+  expectedGeneration: string | null | undefined
+): Promise<void> {
+  if (expectedGeneration === undefined) return;
+  const identity = await readImageWorkspaceIdentity(tx, aggregateId);
+  if (identity?.retired || (identity?.generation ?? null) !== expectedGeneration)
+    throw new StaleImageWorkspaceError(aggregateId);
+}
 
 function createNewImageAggregateRoot(
   input: PreparedImageWorkspaceInput,
@@ -211,6 +242,11 @@ async function commitImageWorkspaceMutation(
     const presentationStore = tx.objectStore(AGGREGATE_PRESENTATIONS_STORE);
     const now = Date.now();
     if (input.sourceGuard) {
+      await assertImageGeneration(
+        tx,
+        input.sourceGuard.aggregateId,
+        input.sourceGuard.sourceGeneration
+      );
       const guardedMedia = parseMediaLibraryEntry(
         await mediaStore.get(input.sourceGuard.aggregateId)
       );
@@ -234,10 +270,15 @@ async function commitImageWorkspaceMutation(
         throw new ImagePresentationNotCurrentError(input.sourceGuard.aggregateId);
       }
     }
+    const rootWasMissing = (await mediaStore.get(input.aggregateId)) === undefined;
+    const identity = await readImageWorkspaceIdentity(tx, input.aggregateId);
     if (
-      (await mediaStore.get(input.aggregateId)) === undefined &&
-      (await readImageRevisionFence(tx, input.aggregateId)) !== null
+      identity?.retired ||
+      (rootWasMissing && (identity !== null || (input.expectedGeneration ?? null) !== null)) ||
+      (!rootWasMissing && (identity?.generation ?? null) !== (input.expectedGeneration ?? null))
     )
+      throw new StaleImageWorkspaceError(input.aggregateId);
+    if (rootWasMissing && (await readImageRevisionFence(tx, input.aggregateId)) !== null)
       throw new ImageAggregateCollisionError(input.aggregateId);
     const media = await persistImageAggregateRootIfMissing({
       input,
@@ -252,6 +293,9 @@ async function commitImageWorkspaceMutation(
       readRoot: () => mediaStore.get(input.aggregateId),
       readWorkspace: () => workspaceStore.get(input.aggregateId),
     });
+    const generation = rootWasMissing
+      ? await createImageWorkspaceIdentity(tx, input.aggregateId)
+      : identity?.generation;
     if ((media.workspaceRevision ?? 0) !== input.expectedRevision) {
       throw new StaleImageWorkspaceError(input.aggregateId);
     }
@@ -273,13 +317,25 @@ async function commitImageWorkspaceMutation(
     if (existing && existing.revision !== input.expectedRevision) {
       throw new StaleImageWorkspaceError(input.aggregateId);
     }
+    const history = input.history === undefined ? existing?.history : (input.history ?? undefined);
+    const assets = imageWorkspaceAssetBindings({
+      document: input.document,
+      ...(history ? { history } : {}),
+    });
+    const refs = new Map(input.refs.map((ref) => [ref.assetId, ref]));
+    for (const asset of assets) {
+      if (refs.has(asset.assetId)) continue;
+      const ref = parseAssetRef(await tx.objectStore(ASSET_REFS_STORE).get(asset.assetId));
+      if (!ref) throw new Error('Retained Image history resource is missing.');
+      refs.set(ref.assetId, ref);
+    }
     const physicalDelete = buildPhysicalDeleteOperation([]);
     await replaceEditorDocumentAssetOwnership({
-      nextDocument: input.document,
-      nextRefs: input.refs,
+      nextDocument: { assets },
+      nextRefs: [...refs.values()],
       ownerId: input.aggregateId,
       ownerKind: IMAGE_WORKSPACE_OWNER_KIND,
-      previousDocument: existing?.document ?? null,
+      previousDocument: existing ? { assets: imageWorkspaceAssetBindings(existing) } : null,
       physicalDelete,
       stores: {
         owners: tx.objectStore(ASSET_OWNERS_STORE),
@@ -295,6 +351,8 @@ async function commitImageWorkspaceMutation(
       aggregateId: input.aggregateId,
       createdAt: existing?.createdAt ?? media.createdAt,
       document: input.document,
+      ...(input.publicationId ? { publicationId: input.publicationId } : {}),
+      ...(history ? { history } : {}),
       revision,
       sourceTitle: input.sourceTitle ?? existing?.sourceTitle ?? media.sourceTitle,
       sourceUrl:
@@ -330,7 +388,12 @@ async function commitImageWorkspaceMutation(
     if (physicalDelete.assetIds.length > 0) {
       await completePhysicalDeleteOperation(physicalDelete, lifecyclePermit).catch(() => undefined);
     }
-    return { revision, updatedAt: now, ...(checkpointReceipt ? { checkpointReceipt } : {}) };
+    return {
+      revision,
+      updatedAt: now,
+      ...(generation ? { sourceGeneration: generation } : {}),
+      ...(checkpointReceipt ? { checkpointReceipt } : {}),
+    };
   } catch (error) {
     try {
       tx.abort();
@@ -378,15 +441,43 @@ async function prepareImportedOriginalReuse(
   };
 }
 
-export async function commitImageWorkspace(
+/** Retains one acquired publication across retries; parallel calls share its current execution. */
+export function createImageWorkspaceCommit(
+  input: CommitImageWorkspaceInput
+): () => Promise<CommitImageWorkspaceResult> {
+  let publish: (() => Promise<CommitImageWorkspaceResult>) | undefined;
+  let execution: Promise<CommitImageWorkspaceResult> | undefined;
+  return () => {
+    if (execution) return execution;
+    execution = (async () => {
+      const prepared = publish ?? (await prepareImageWorkspaceCommit(input));
+      publish = prepared;
+      return prepared();
+    })();
+    void execution.catch(() => {
+      execution = undefined;
+    });
+    return execution;
+  };
+}
+
+export function commitImageWorkspace(
   input: CommitImageWorkspaceInput
 ): Promise<CommitImageWorkspaceResult> {
+  return createImageWorkspaceCommit(input)();
+}
+
+async function prepareImageWorkspaceCommit(
+  input: CommitImageWorkspaceInput
+): Promise<() => Promise<CommitImageWorkspaceResult>> {
   // Cold database admission reserves the exclusive transition gate; it must settle before
   // staged assets hold shared transition leases or admission could queue behind them.
   const db = await initDB();
   await recoverImageWorkspacePublications();
   const originalWitness = await prepareImportedOriginalReuse(db, input);
   const reusableAssetsByRuntimeUrl = new Map(input.reusableAssetsByRuntimeUrl);
+  for (const [value, ref] of input.reusableHistoryAssetsByValue ?? [])
+    if (value.startsWith('data:')) reusableAssetsByRuntimeUrl.set(value, ref);
   if (originalWitness)
     reusableAssetsByRuntimeUrl.set(input.document.sourceImageData, originalWitness.ref);
   const preparedDocument = await preparePersistedEditorDocument(input.document, {
@@ -396,41 +487,68 @@ export async function commitImageWorkspace(
       : {}),
   });
   const {
+    history: _history,
+    reusableHistoryAssetsByValue: _reusableHistoryAssetsByValue,
     reusableAssetsByRuntimeUrl: _reusableAssetsByRuntimeUrl,
     reusableAssetsByVectorDefinitionId: _reusableAssetsByVectorDefinitionId,
     ...serializableInput
   } = input;
-  const preparedInput: PreparedImageWorkspaceInput = {
-    ...serializableInput,
-    document: preparedDocument.document,
-    refs: preparedDocument.refs,
-    ...(originalWitness ? { originalWitness } : {}),
-  };
+  const preparedObjects = [...preparedDocument.objects];
   let journalCreated = false;
   try {
+    const preparedHistory = input.history
+      ? await preparePersistedImageHistory(input.history, {
+          ...(input.reusableHistoryAssetsByValue
+            ? { reusableAssetsByValue: input.reusableHistoryAssetsByValue }
+            : {}),
+          reusableImagesByRuntimeUrl: preparedDocument.runtimeAssetsByUrl,
+        })
+      : undefined;
+    if (preparedHistory) preparedObjects.push(...preparedHistory.objects);
+    const refs = [
+      ...new Map(
+        [...preparedDocument.refs, ...(preparedHistory?.refs ?? [])].map((ref) => [
+          ref.assetId,
+          ref,
+        ])
+      ).values(),
+    ];
+    const preparedInput: PreparedImageWorkspaceInput = {
+      ...serializableInput,
+      expectedGeneration: input.expectedGeneration ?? null,
+      document: preparedDocument.document,
+      ...(input.history === undefined ? {} : { history: preparedHistory?.history ?? null }),
+      refs,
+      ...(originalWitness ? { originalWitness } : {}),
+    };
     const journal = await createAssetPublicationJournal({
-      assetRefs: preparedDocument.objects.map(({ ref }) => ref),
+      assetRefs: preparedObjects.map(({ ref }) => ref),
       domain: IMAGE_WORKSPACE_PUBLICATION_DOMAIN,
       payload: preparedInput,
     });
     journalCreated = true;
-    let result: ImageWorkspacePublicationResult | undefined;
-    await publishReadyJournalWithRetry(journal, async (ready, permit) => {
-      const published = await publishImageWorkspaceJournal(ready, false, permit);
-      if (!published) throw new Error('Image workspace publication was superseded.');
-      result = published;
-    });
-    await releaseAssetReadyProtection(preparedDocument.objects.map(({ ref }) => ref.assetId));
-    if (!result) throw new Error('Image workspace publication produced no result.');
-    return {
-      ...result,
-      documentAssetsByRuntimeUrl: preparedDocument.runtimeAssetsByUrl,
-      documentAssetsByVectorDefinitionId: preparedDocument.vectorAssetsByDefinitionId,
+    return async () => {
+      let result: ImageWorkspacePublicationResult | undefined;
+      await publishReadyJournalWithRetry(journal, async (ready, permit) => {
+        const published = await publishPreparedImageWorkspace(ready, preparedInput, false, permit);
+        if (!published) throw new Error('Image workspace publication was superseded.');
+        result = published;
+      });
+      await releaseAssetReadyProtection(preparedObjects.map(({ ref }) => ref.assetId));
+      if (!result) throw new Error('Image workspace publication produced no result.');
+      return {
+        ...result,
+        documentAssetsByRuntimeUrl: preparedDocument.runtimeAssetsByUrl,
+        documentAssetsByVectorDefinitionId: preparedDocument.vectorAssetsByDefinitionId,
+        ...(input.history === undefined
+          ? {}
+          : { historyAssetsByValue: preparedHistory?.assetsByValue ?? new Map() }),
+      };
     };
   } catch (error) {
     if (!journalCreated) {
       const failures = await collectPreparedAssetCleanupFailures(
-        preparedDocument.objects.map(({ ref }) => ref.assetId)
+        preparedObjects.map(({ ref }) => ref.assetId)
       );
       if (failures.length > 0) {
         throw new AggregateError([error, ...failures], 'Image workspace save cleanup failed.', {
@@ -452,8 +570,19 @@ function parseImageWorkspacePublicationPayload(value: unknown): PreparedImageWor
   )
     return null;
   const document = parsePersistedEditorDocument(value['document']);
+  const history =
+    value['history'] === undefined || value['history'] === null
+      ? value['history']
+      : parsePersistedImageHistory(value['history']);
+  const expectedGeneration = value['expectedGeneration'];
   if (
     !document ||
+    (value['history'] !== undefined && value['history'] !== null && !history) ||
+    (expectedGeneration !== undefined &&
+      expectedGeneration !== null &&
+      (typeof expectedGeneration !== 'string' ||
+        !expectedGeneration.length ||
+        expectedGeneration.length > 200)) ||
     !isString(value['aggregateId']) ||
     !isNumber(value['expectedRevision']) ||
     !Number.isInteger(value['expectedRevision']) ||
@@ -523,6 +652,7 @@ function parseImageWorkspacePublicationPayload(value: unknown): PreparedImageWor
         aggregateId: rawSourceGuard['aggregateId'],
         presentationRevision: rawSourceGuard['presentationRevision'],
         workspaceRevision: rawSourceGuard['workspaceRevision'],
+        sourceGeneration: rawSourceGuard['sourceGeneration'],
       }
     : null;
   if (
@@ -530,7 +660,12 @@ function parseImageWorkspacePublicationPayload(value: unknown): PreparedImageWor
     (!sourceGuard ||
       !isString(sourceGuard.aggregateId) ||
       !Number.isInteger(sourceGuard.presentationRevision) ||
-      !Number.isInteger(sourceGuard.workspaceRevision))
+      !Number.isInteger(sourceGuard.workspaceRevision) ||
+      (sourceGuard.sourceGeneration !== undefined &&
+        sourceGuard.sourceGeneration !== null &&
+        (typeof sourceGuard.sourceGeneration !== 'string' ||
+          !sourceGuard.sourceGeneration.length ||
+          sourceGuard.sourceGeneration.length > 200)))
   ) {
     return null;
   }
@@ -538,7 +673,9 @@ function parseImageWorkspacePublicationPayload(value: unknown): PreparedImageWor
     aggregateId: value['aggregateId'],
     ...(originalWitness ? { originalWitness } : {}),
     document,
+    ...(history === undefined ? {} : { history }),
     expectedRevision: value['expectedRevision'],
+    ...(expectedGeneration === undefined ? {} : { expectedGeneration }),
     ...(captureTime === undefined ? {} : { captureTime }),
     refs: refs as AssetRef[],
     ...(value['imageContentState'] === undefined
@@ -569,57 +706,152 @@ async function publishImageWorkspaceJournal(
   journal: AssetReadyJournal,
   allowSuperseded = false,
   lifecyclePermit?: DurableAssetLifecyclePermit
-): Promise<ImageWorkspacePublicationResult | null> {
+): Promise<ImageWorkspacePublicationResult | null | 'defer'> {
   if (journal.domain !== IMAGE_WORKSPACE_PUBLICATION_DOMAIN || journal.operationId) {
     throw new Error('Invalid image workspace publication journal.');
   }
   const input = parseImageWorkspacePublicationPayload(journal.payload);
+  if (!input) throw new Error('Invalid image workspace publication payload.');
+  const status = await readImageWorkspacePublicationStatus(
+    journal,
+    input,
+    allowSuperseded,
+    lifecyclePermit
+  );
+  if (status.kind === 'deferred') return 'defer';
+  if (status.kind === 'finished') return status.result;
+  if (input.history)
+    await hydratePersistedImageHistory({ history: input.history, refs: input.refs });
+  return commitPreparedImageWorkspacePublication(journal, input, lifecyclePermit);
+}
+
+async function publishPreparedImageWorkspace(
+  journal: AssetReadyJournal,
+  input: PreparedImageWorkspaceInput,
+  allowSuperseded: boolean,
+  lifecyclePermit?: DurableAssetLifecyclePermit
+): Promise<ImageWorkspacePublicationResult | null> {
+  const status = await readImageWorkspacePublicationStatus(
+    journal,
+    input,
+    allowSuperseded,
+    lifecyclePermit
+  );
+  if (status.kind === 'deferred')
+    throw new Error('Prepared Image publication has no lifetime evidence.');
+  return status.kind === 'finished'
+    ? status.result
+    : commitPreparedImageWorkspacePublication(journal, input, lifecyclePermit);
+}
+
+async function readImageWorkspacePublicationStatus(
+  journal: AssetReadyJournal,
+  input: PreparedImageWorkspaceInput,
+  allowSuperseded: boolean,
+  lifecyclePermit?: DurableAssetLifecyclePermit
+): Promise<
+  | { kind: 'ready' }
+  | { kind: 'deferred' }
+  | { kind: 'finished'; result: ImageWorkspacePublicationResult | null }
+> {
+  const bindings = imageWorkspaceAssetBindings({
+    document: input.document,
+    ...(input.history ? { history: input.history } : {}),
+  });
+  const refIds = new Set(input.refs.map((ref) => ref.assetId));
   if (
-    !input ||
-    journal.assetRefs.some(
-      (journalRef) => !input.refs.some((inputRef) => inputRef.assetId === journalRef.assetId)
-    ) ||
-    input.document.assets.some(
-      (asset) => !input.refs.some((inputRef) => inputRef.assetId === asset.assetId)
-    )
+    journal.domain !== IMAGE_WORKSPACE_PUBLICATION_DOMAIN ||
+    journal.operationId ||
+    refIds.size !== input.refs.length ||
+    journal.assetRefs.some((journalRef) => !refIds.has(journalRef.assetId)) ||
+    bindings.some((asset) => !refIds.has(asset.assetId))
   ) {
     throw new Error('Invalid image workspace publication payload.');
   }
   const db = await initDB();
-  const existing = parseImageWorkspaceEntry(
-    await db.get(IMAGE_WORKSPACES_STORE, input.aggregateId)
+  const snapshot = db.transaction(
+    [
+      MEDIA_LIBRARY_STORE,
+      IMAGE_WORKSPACES_STORE,
+      AGGREGATE_PRESENTATIONS_STORE,
+      IMAGE_WORKSPACE_IDENTITIES_STORE,
+    ],
+    'readonly'
   );
+  const mediaRead: Promise<unknown> = snapshot
+    .objectStore(MEDIA_LIBRARY_STORE)
+    .get(input.aggregateId);
+  const workspaceRead: Promise<unknown> = snapshot
+    .objectStore(IMAGE_WORKSPACES_STORE)
+    .get(input.aggregateId);
+  const presentationRead: Promise<unknown> = snapshot
+    .objectStore(AGGREGATE_PRESENTATIONS_STORE)
+    .get(createAggregatePresentationKey({ id: input.aggregateId, kind: 'image' }));
+  const [rawMedia, rawWorkspace, rawPresentation, identity] = await Promise.all([
+    mediaRead,
+    workspaceRead,
+    presentationRead,
+    readImageWorkspaceIdentity(snapshot, input.aggregateId),
+  ]);
+  await snapshot.done;
+  const existing = parseImageWorkspaceEntry(rawWorkspace);
+  const sameGeneration =
+    !identity?.retired && (identity?.generation ?? null) === (input.expectedGeneration ?? null);
+  const ownPublication = existing?.publicationId === journal.journalId;
   if (
-    !input.requireMissingRoot &&
+    (!input.requireMissingRoot || ownPublication) &&
+    !identity?.retired &&
+    (sameGeneration || ownPublication) &&
+    rawMedia !== undefined &&
     existing?.revision === input.expectedRevision + 1 &&
-    JSON.stringify(existing.document) === JSON.stringify(input.document)
+    JSON.stringify(existing.document) ===
+      JSON.stringify(parsePersistedEditorDocument(input.document)) &&
+    (input.history === undefined ||
+      JSON.stringify(existing.history ?? null) === JSON.stringify(input.history))
   ) {
-    return { revision: existing.revision, updatedAt: existing.updatedAt };
+    return {
+      kind: 'finished',
+      result: {
+        revision: existing.revision,
+        updatedAt: existing.updatedAt,
+        ...(identity ? { sourceGeneration: identity.generation } : {}),
+      },
+    };
   }
-  const rawMedia: unknown = await db.get(MEDIA_LIBRARY_STORE, input.aggregateId);
-  const rawWorkspace: unknown = await db.get(IMAGE_WORKSPACES_STORE, input.aggregateId);
-  const rawPresentation: unknown = await db.get(
-    AGGREGATE_PRESENTATIONS_STORE,
-    createAggregatePresentationKey({ id: input.aggregateId, kind: 'image' })
-  );
+  // A pre-lifetime creation journal cannot distinguish never-published from published-then-deleted.
+  if (
+    allowSuperseded &&
+    input.expectedGeneration === undefined &&
+    !input.requireExistingRoot &&
+    rawMedia === undefined &&
+    rawWorkspace === undefined &&
+    rawPresentation === undefined &&
+    identity === null
+  )
+    return { kind: 'deferred' };
   const existingMedia = parseMediaLibraryEntry(rawMedia);
   const occupiedSidecar = rawWorkspace !== undefined || rawPresentation !== undefined;
   const incompatibleRoot =
     rawMedia !== undefined && (!existingMedia || !isEditableImageAggregateRoot(existingMedia));
   const permanentlySuperseded = input.requireMissingRoot
-    ? rawMedia !== undefined || occupiedSidecar
-    : (input.requireExistingRoot === true && rawMedia === undefined) ||
+    ? rawMedia !== undefined || occupiedSidecar || !sameGeneration
+    : !sameGeneration ||
+      (input.requireExistingRoot === true && rawMedia === undefined) ||
       incompatibleRoot ||
       (rawMedia === undefined && occupiedSidecar) ||
       (rawWorkspace !== undefined && !parseImageWorkspaceEntry(rawWorkspace)) ||
       (existingMedia?.workspaceRevision ?? 0) !== input.expectedRevision;
   if (allowSuperseded && permanentlySuperseded) {
-    const unownedStagedAssetIds: string[] = [];
+    const unownedStagedAssetIds = new Set<string>();
+    const rolesByAssetId = new Map<string, string[]>();
+    for (const binding of bindings) {
+      const roles = rolesByAssetId.get(binding.assetId) ?? [];
+      roles.push(binding.role);
+      rolesByAssetId.set(binding.assetId, roles);
+    }
     for (const stagedRef of journal.assetRefs) {
       const ref: unknown = await db.get(ASSET_REFS_STORE, stagedRef.assetId);
-      const roles = input.document.assets
-        .filter((asset) => asset.assetId === stagedRef.assetId)
-        .map((asset) => asset.role);
+      const roles = rolesByAssetId.get(stagedRef.assetId) ?? [];
       const owners = await Promise.all(
         roles.map((role) =>
           db.get(ASSET_OWNERS_STORE, [IMAGE_WORKSPACE_OWNER_KIND, input.aggregateId, role])
@@ -634,17 +866,25 @@ async function publishImageWorkspaceJournal(
       if ((ref !== undefined) !== isOwnedByThisWorkspace) {
         throw new StaleImageWorkspaceError(input.aggregateId);
       }
-      if (!isOwnedByThisWorkspace) unownedStagedAssetIds.push(stagedRef.assetId);
+      if (!isOwnedByThisWorkspace) unownedStagedAssetIds.add(stagedRef.assetId);
     }
     await cancelAssetPublication(
       {
         ...journal,
-        assetRefs: journal.assetRefs.filter((ref) => unownedStagedAssetIds.includes(ref.assetId)),
+        assetRefs: journal.assetRefs.filter((ref) => unownedStagedAssetIds.has(ref.assetId)),
       },
       lifecyclePermit
     );
-    return null;
+    return { kind: 'finished', result: null };
   }
+  return { kind: 'ready' };
+}
+
+async function commitPreparedImageWorkspacePublication(
+  journal: AssetReadyJournal,
+  input: PreparedImageWorkspaceInput,
+  lifecyclePermit?: DurableAssetLifecyclePermit
+): Promise<ImageWorkspacePublicationResult> {
   const sourceRef = input.refs.find((ref) => ref.assetId === input.document.sourceImage.assetId);
   if (!sourceRef) throw new Error('Image workspace source ref is missing.');
   const prepared =
@@ -667,7 +907,8 @@ async function publishImageWorkspaceJournal(
 export const imageWorkspacePublicationAdapter: AssetPublicationAdapter = {
   domain: IMAGE_WORKSPACE_PUBLICATION_DOMAIN,
   publish: async (journal, permit) => {
-    await publishImageWorkspaceJournal(journal, true, permit);
+    const result = await publishImageWorkspaceJournal(journal, true, permit);
+    return result === 'defer' ? 'defer' : undefined;
   },
 };
 
@@ -679,6 +920,7 @@ export async function commitImagePresentation(input: CommitImagePresentationInpu
   await runWithIndexedDbMutation(async (db, permit) => {
     const tx = db.transaction([...IMAGE_SNAPSHOT_STORES, ASSET_RESIDENCY_STORE], 'readwrite');
     try {
+      await assertImageGeneration(tx, input.aggregateId, input.expectedGeneration);
       const media = parseMediaLibraryEntry(
         await tx.objectStore(MEDIA_LIBRARY_STORE).get(input.aggregateId)
       );
@@ -708,11 +950,13 @@ export async function commitImagePresentation(input: CommitImagePresentationInpu
 
 export async function promoteImageAggregate(
   aggregateId: string,
-  expectedWorkspaceRevision: number
+  expectedWorkspaceRevision: number,
+  expectedGeneration?: string | null
 ): Promise<void> {
   await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(IMAGE_SNAPSHOT_STORES, 'readwrite');
     try {
+      await assertImageGeneration(tx, aggregateId, expectedGeneration);
       const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
       const media = parseMediaLibraryEntry(await mediaStore.get(aggregateId));
       if (!media) throw new ImageAggregateNotFoundError(aggregateId);
@@ -759,12 +1003,13 @@ function assertEditableImageRoot(
 
 export async function restoreImageAggregateOriginal(
   aggregateId: string,
-  expectedWorkspaceRevision: number
+  expectedWorkspaceRevision: number,
+  expectedGeneration?: string | null
 ): Promise<{ revision: number; updatedAt: number }> {
-  const source = assertEditableImageRoot(
-    aggregateId,
-    (await getMediaLibraryEntry(aggregateId)) ?? null
-  );
+  const original = await readImageOriginalSource(aggregateId);
+  if (expectedGeneration !== undefined && original.sourceGeneration !== expectedGeneration)
+    throw new StaleImageWorkspaceError(aggregateId);
+  const source = assertEditableImageRoot(aggregateId, original.asset ?? null);
   const [document, thumbnailBlob] = await Promise.all([
     createOriginalImageDocument(source),
     createImageThumbnailBlob(source.blob),
@@ -773,6 +1018,8 @@ export async function restoreImageAggregateOriginal(
     aggregateId,
     document,
     expectedRevision: expectedWorkspaceRevision,
+    expectedGeneration: original.sourceGeneration,
+    history: null,
     imageContentState: 'original',
     sourceFavicon: source.sourceFavicon,
     sourceTitle: source.sourceTitle,
@@ -781,6 +1028,7 @@ export async function restoreImageAggregateOriginal(
   await commitImagePresentation({
     aggregateId,
     expectedWorkspaceRevision: result.revision,
+    expectedGeneration: result.sourceGeneration ?? null,
     previewBlob: source.blob,
     thumbnailBlob,
   });
@@ -793,23 +1041,26 @@ export async function copyImageAggregate(input: {
   targetAggregateId: string;
 }): Promise<string> {
   await recoverImageWorkspacePublications();
-  const [sourceMediaValue, sourceWorkspace, sourcePresentation] = await Promise.all([
-    getMediaLibraryEntry(input.aggregateId),
-    readImageWorkspace(input.aggregateId),
-    getAggregatePresentation({ id: input.aggregateId, kind: 'image' }),
-  ]);
-  const sourceMedia = assertEditableImageRoot(input.aggregateId, sourceMediaValue ?? null);
-  if (
-    (sourceMedia.workspaceRevision ?? 0) !== input.expectedWorkspaceRevision ||
-    (sourceWorkspace && sourceWorkspace.revision !== input.expectedWorkspaceRevision) ||
-    !sourcePresentation ||
-    sourcePresentation.presentationRevision !== input.expectedWorkspaceRevision
-  ) {
-    throw new ImagePresentationNotCurrentError(input.aggregateId);
-  }
-  const document = sourceWorkspace?.document ?? (await createOriginalImageDocument(sourceMedia));
+  const original = await readImageOriginalSource(input.aggregateId);
+  const sourceMedia = assertEditableImageRoot(input.aggregateId, original.asset ?? null);
+  const sourcePresentation = await getAggregatePresentation({
+    id: input.aggregateId,
+    kind: 'image',
+  });
+  const sourceWorkspace = await readImageWorkspace(input.aggregateId, { includeHistory: false });
   try {
-    return await saveImageAggregateCopyFromDocument({
+    if (sourceWorkspace && (sourceWorkspace.sourceGeneration ?? null) !== original.sourceGeneration)
+      throw new StaleImageWorkspaceError(input.aggregateId);
+    if (
+      (sourceMedia.workspaceRevision ?? 0) !== input.expectedWorkspaceRevision ||
+      (sourceWorkspace && sourceWorkspace.revision !== input.expectedWorkspaceRevision) ||
+      !sourcePresentation ||
+      sourcePresentation.presentationRevision !== input.expectedWorkspaceRevision
+    ) {
+      throw new ImagePresentationNotCurrentError(input.aggregateId);
+    }
+    const document = sourceWorkspace?.document ?? (await createOriginalImageDocument(sourceMedia));
+    const copy = await saveImageAggregateCopyFromDocument({
       document,
       ...(sourceMedia.imageContentState === undefined
         ? {}
@@ -824,8 +1075,10 @@ export async function copyImageAggregate(input: {
         aggregateId: input.aggregateId,
         presentationRevision: input.expectedWorkspaceRevision,
         workspaceRevision: input.expectedWorkspaceRevision,
+        sourceGeneration: original.sourceGeneration,
       },
     });
+    return copy.aggregateId;
   } finally {
     sourceWorkspace?.releaseDocumentAssets?.();
   }
@@ -833,10 +1086,11 @@ export async function copyImageAggregate(input: {
 
 export async function saveImageAggregateCopyFromDocument(
   input: SaveImageAggregateCopyFromDocumentInput
-): Promise<string> {
+): Promise<ImageAggregateCopyResult> {
   const result = await commitImageWorkspace({
     aggregateId: input.targetAggregateId,
     document: input.document,
+    ...(input.history ? { history: input.history } : {}),
     expectedRevision: 0,
     ...(input.imageContentState === undefined
       ? {}
@@ -850,9 +1104,14 @@ export async function saveImageAggregateCopyFromDocument(
   await commitImagePresentation({
     aggregateId: input.targetAggregateId,
     expectedWorkspaceRevision: result.revision,
+    expectedGeneration: result.sourceGeneration ?? null,
     previewBlob: input.previewBlob,
     thumbnailBlob: input.thumbnailBlob,
   });
-  await promoteImageAggregate(input.targetAggregateId, result.revision);
-  return input.targetAggregateId;
+  await promoteImageAggregate(
+    input.targetAggregateId,
+    result.revision,
+    result.sourceGeneration ?? null
+  );
+  return { ...result, aggregateId: input.targetAggregateId };
 }

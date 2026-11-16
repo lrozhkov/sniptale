@@ -5,6 +5,7 @@ import { createMockDocument } from '../instance/bindings/test-fixtures-document'
 import { createDefaultRichShapeObject } from '../../../features/editor/document/rich-shape';
 import {
   captureEditorHistoryCheckpoint,
+  prepareEditorHistoryCheckpoint,
   restoreEditorHistoryCheckpoint,
   createEditorSnapshotHistory,
   pushEditorSnapshotHistory,
@@ -85,6 +86,59 @@ it('captures only ready history without forcing pending encoding', () => {
   expect(captureEditorHistoryCheckpoint(history)).toBeNull();
   expect(committed).not.toHaveBeenCalled();
   flushDeferredEditorHistory(history);
+  expect(captureEditorHistoryCheckpoint(history)?.snapshots).toHaveLength(2);
+});
+
+it('prepares a lazy capture without building the graph and refuses a changed history revision', () => {
+  const history = createEditorSnapshotHistory(createMockDocument());
+  const snapshots = vi.spyOn(history, 'getSnapshots');
+  const capture = prepareEditorHistoryCheckpoint(history);
+  expect(snapshots).not.toHaveBeenCalled();
+  expect(capture()?.snapshots).toHaveLength(1);
+  const obsolete = prepareEditorHistoryCheckpoint(history);
+  pushEditorSnapshotHistory({
+    history,
+    muted: false,
+    exportDocument: () => ({ ...createMockDocument(), displayName: 'Changed' }),
+  });
+  snapshots.mockClear();
+  expect(obsolete()).toBeNull();
+  expect(snapshots).not.toHaveBeenCalled();
+});
+
+it('captures a prospective caption step without changing live history or its Redo branch', () => {
+  const base = { ...createMockDocument(), displayName: 'Original' };
+  const history = createEditorSnapshotHistory(base);
+  const future = { ...base, displayName: 'Future' };
+  pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => future });
+  undoEditorSnapshot(history);
+  const before = captureEditorHistoryCheckpoint(history);
+  const proposed = captureEditorHistoryCheckpoint(history, { ...base, displayName: 'Renamed' })!;
+  expect(captureEditorHistoryCheckpoint(history)).toEqual(before);
+  expect(readCurrentEditorSnapshot(history)).toEqual(base);
+  expect(history.getState().canRedo).toBe(true);
+  const reopened = restoreEditorHistoryCheckpoint(proposed)!;
+  expect(readCurrentEditorSnapshot(reopened)?.displayName).toBe('Renamed');
+  expect(readEditorHistoryEntries(reopened).at(-1)?.action?.operation).toBe('rename');
+  expect(undoEditorSnapshot(reopened)).toEqual(base);
+  expect(redoEditorSnapshot(reopened)?.displayName).toBe('Renamed');
+  expect(reopened.getState().canRedo).toBe(false);
+});
+
+it('keeps Redo for an unchanged explicit document and applies existing retention to a proposal', () => {
+  const base = createMockDocument();
+  const history = createEditorSnapshotHistory(base, { maxActions: 1, maxBytes: 1_000_000 });
+  const first = { ...base, displayName: 'First' };
+  pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => first });
+  undoEditorSnapshot(history);
+  expect(captureEditorHistoryCheckpoint(history, base)).toEqual(
+    captureEditorHistoryCheckpoint(history)
+  );
+  redoEditorSnapshot(history);
+  const proposal = captureEditorHistoryCheckpoint(history, { ...base, displayName: 'Second' })!;
+  const reopened = restoreEditorHistoryCheckpoint(proposal)!;
+  expect(reopened.getState()).toMatchObject({ size: 2, index: 1 });
+  expect(undoEditorSnapshot(reopened)).toEqual(first);
   expect(captureEditorHistoryCheckpoint(history)?.snapshots).toHaveLength(2);
 });
 

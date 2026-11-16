@@ -4,6 +4,7 @@ import { createProjectMutationStores } from '../../projects/mutation-stores';
 import { captureMediaInTransaction } from '../capture';
 import type { AssetRef } from '../../assets/contracts';
 import type { CapturedChange, SyncCaptureProfile } from '../contracts';
+import { readImageWorkspaceIdentity } from '../../image-workspaces/identity';
 
 interface ImageReceiptFixtureContext {
   table(name: string): Map<string, unknown>;
@@ -46,6 +47,12 @@ export async function createImageReceiptFixture(
           workspaceRevision: 0,
           lifecycle: { storageClass: 'library', updatedAt: 1, savedAt: 1 },
         });
+  const identity = await readImageWorkspaceIdentity(
+    {
+      objectStore: (name) => ({ get: async (id) => table(name).get(id) }),
+    },
+    media.id
+  );
   const ref: AssetRef = {
     assetId: 'receipt-source',
     createdAt: 1,
@@ -127,6 +134,7 @@ export async function createImageReceiptFixture(
     mutations.commitImageWorkspace({
       aggregateId: media.id,
       expectedRevision: revision,
+      expectedGeneration: identity?.generation ?? null,
       requireExistingRoot: true,
       reusableAssetsByRuntimeUrl: new Map([[document.sourceImageData, ref]]),
       document: { ...document, frame: { ...document.frame, paddingLeft: padding } },

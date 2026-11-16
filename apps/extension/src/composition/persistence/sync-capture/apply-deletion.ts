@@ -1,4 +1,5 @@
 import { readCheckpointInTransaction } from './checkpoints';
+import { readImageWorkspaceIdentity } from '../image-workspaces/identity';
 import { readAppliedCaptureReceipt } from './guards';
 import { assetResidencyCopyId } from '../assets/residency-records';
 import {
@@ -50,6 +51,7 @@ import {
   VIDEO_PROJECTS_STORE,
   VIDEO_PROJECT_REVISIONS_STORE,
   SCENARIO_ASSETS_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   IMAGE_WORKSPACES_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
@@ -186,6 +188,8 @@ async function assertCausalState(
 }
 
 async function assertNoWorkspaceSidecars(tx: Transaction, aggregateId: string): Promise<void> {
+  const identity = await readImageWorkspaceIdentity(tx, aggregateId).catch(() => refuse());
+  if (identity && !identity.retired) refuse();
   for (const store of [
     IMAGE_WORKSPACES_STORE,
     VIDEO_WORKSPACES_STORE,
@@ -557,6 +561,7 @@ async function commitDeletion(
       VIDEO_PROJECTS_STORE,
       VIDEO_PROJECT_REVISIONS_STORE,
       SCENARIO_ASSETS_STORE,
+      IMAGE_WORKSPACE_IDENTITIES_STORE,
       IMAGE_WORKSPACES_STORE,
       VIDEO_WORKSPACES_STORE,
       VIDEO_WORKSPACE_DRAFTS_STORE,

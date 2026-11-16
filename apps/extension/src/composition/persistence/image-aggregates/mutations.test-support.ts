@@ -18,7 +18,18 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
-  initDB: mocks.initDB,
+  initDB: async () => {
+    const db = await mocks.initDB();
+    return {
+      ...db,
+      transaction:
+        db.transaction ??
+        (() => ({
+          done: Promise.resolve(),
+          objectStore: (name: string) => ({ get: (key: IDBValidKey) => db.get(name, key) }),
+        })),
+    };
+  },
 }));
 
 vi.mock('../settings', async (importOriginal) => ({
@@ -83,6 +94,10 @@ vi.mock('../media-library/index.library', () => ({
 vi.mock('../image-workspaces/read', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../image-workspaces/read')>()),
   readImageWorkspace: mocks.getWorkspace,
+  readImageOriginalSource: async (id: string) => {
+    const asset = await mocks.getMedia(id);
+    return { asset, blob: asset?.blob, sourceGeneration: null };
+  },
 }));
 
 vi.mock('../aggregate-presentations', async (importOriginal) => ({
@@ -179,7 +194,12 @@ export function installTransaction(args: ImageTransactionFixture) {
   puts.presentation.mockImplementation(
     async (value: { aggregateId: string }) => void presentationById.set(value.aggregateId, value)
   );
+  const identities = new Map<string, unknown>();
   const stores = {
+    image_workspace_identities: {
+      get: async (id: string) => identities.get(id),
+      put: async (value: { aggregateId: string }) => void identities.set(value.aggregateId, value),
+    },
     sync_capture: { get: vi.fn(async () => undefined) },
     aggregate_presentations: {
       get: vi.fn(async (key: [string, string]) => {

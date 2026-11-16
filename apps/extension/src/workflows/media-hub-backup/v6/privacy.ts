@@ -1,3 +1,4 @@
+import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { RecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import type { MediaLibraryEntry } from '../../../composition/persistence/media-library/contracts';
@@ -8,7 +9,7 @@ import { getTourImages } from '../../../features/scenario/project/public';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { ScenarioProjectEntry } from '../../../composition/persistence/scenario/contracts';
 import type { ScenarioPageDescriptor } from '@sniptale/runtime-contracts/scenario/types/geometry';
-import type { MediaHubBackupExportOptions } from './contracts';
+import type { MediaHubBackupExportOptions, MediaHubBackupPrivacyFlags } from './contracts';
 
 export function projectRecordingGroupMemberPrivacy(
   member: RecordingGroupMember,
@@ -51,6 +52,9 @@ export function projectStoredEditorDocumentPrivacy(
     ? {
         ...document.browserFrame,
         favicon: options.includeSourceMetadata ? document.browserFrame.favicon : null,
+        faviconSource: options.includeSourceMetadata
+          ? document.browserFrame.faviconSource
+          : undefined,
         title: options.includeSourceMetadata ? document.browserFrame.title : '',
         url: options.includeSourceMetadata
           ? (sanitizeProvenanceUrl(document.browserFrame.url) ?? '')
@@ -84,8 +88,9 @@ export function projectImageWorkspacePrivacy(
   workspace: StoredImageWorkspaceEntry,
   options: MediaHubBackupExportOptions
 ): StoredImageWorkspaceEntry {
+  const { publicationId: _publicationId, ...metadata } = workspace;
   return {
-    ...workspace,
+    ...metadata,
     document: projectStoredEditorDocumentPrivacy(workspace.document, options),
     sourceTitle: options.includeSourceMetadata ? workspace.sourceTitle : null,
     sourceUrl: options.includeSourceMetadata ? sanitizeProvenanceUrl(workspace.sourceUrl) : null,
@@ -162,4 +167,52 @@ export function projectRecordingMetadataPrivacy(
   options: MediaHubBackupExportOptions
 ): { recordingMetadata?: RecordingMetadata } {
   return options.includeTelemetry && recordingMetadata ? { recordingMetadata } : {};
+}
+
+/** Applies source privacy to encoded history without expanding pooled drawings or raster bytes. */
+export function projectImageHistorySnapshotPrivacy(
+  snapshot: string,
+  options: MediaHubBackupPrivacyFlags
+): string {
+  const value: unknown = JSON.parse(snapshot);
+  if (!isPlainRecord(value) || !isPlainRecord(value['frame']))
+    throw new Error('Image history snapshot metadata is invalid.');
+  const frame = value['frame'];
+  const browserFrame = value['browserFrame'];
+  if (typeof frame['browserTitle'] !== 'string' || typeof frame['browserUrl'] !== 'string')
+    throw new Error('Image history frame metadata is invalid.');
+  if (browserFrame !== undefined && !isPlainRecord(browserFrame))
+    throw new Error('Image history browser metadata is invalid.');
+  if (
+    browserFrame &&
+    (typeof browserFrame['title'] !== 'string' || typeof browserFrame['url'] !== 'string')
+  )
+    throw new Error('Image history browser metadata is invalid.');
+  return JSON.stringify({
+    ...value,
+    frame: {
+      ...frame,
+      browserTitle: options.includeSourceMetadata ? frame['browserTitle'] : '',
+      browserUrl: options.includeSourceMetadata
+        ? (sanitizeProvenanceUrl(frame['browserUrl']) ?? '')
+        : '',
+    },
+    ...(browserFrame
+      ? {
+          browserFrame: {
+            ...browserFrame,
+            title: options.includeSourceMetadata ? browserFrame['title'] : '',
+            url: options.includeSourceMetadata
+              ? (sanitizeProvenanceUrl(
+                  typeof browserFrame['url'] === 'string' ? browserFrame['url'] : null
+                ) ?? '')
+              : '',
+            faviconDataUrl: options.includeSourceMetadata ? browserFrame['faviconDataUrl'] : null,
+            faviconSource: options.includeSourceMetadata
+              ? browserFrame['faviconSource']
+              : undefined,
+          },
+        }
+      : {}),
+  });
 }

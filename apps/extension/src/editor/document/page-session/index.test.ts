@@ -1,3 +1,4 @@
+import { MissingAssetObjectError } from '../../../composition/persistence/assets';
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -19,6 +20,20 @@ vi.mock('../../../composition/persistence/media-library/index.library.ts', async
   ...(await original()),
   getMediaAssetBlob: mocks.getBlob,
   getMediaLibraryEntry: mocks.getEntry,
+}));
+vi.mock('../../../composition/persistence/image-workspaces/read', async (original) => ({
+  ...(await original()),
+  readImageOriginalSource: async () => {
+    const [blob, asset] = await Promise.all([
+      mocks.getBlob().catch((error: unknown) => {
+        if (error instanceof Error && error.name === 'NotFoundError')
+          throw new MissingAssetObjectError('original');
+        throw error;
+      }),
+      mocks.getEntry(),
+    ]);
+    return { blob, asset, sourceGeneration: 'observed-generation' };
+  },
 }));
 vi.mock('../../../workflows/editor/bootstrap', async (original) => ({
   ...(await original()),
@@ -285,6 +300,7 @@ describe('editor aggregate restore', () => {
       assetId: 'image-2',
       filename: 'original.png',
       nativeRevision: 7,
+      sourceGeneration: 'observed-generation',
       capturedAt: 150,
     });
   });

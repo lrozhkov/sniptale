@@ -1,3 +1,4 @@
+import type { ImageWorkspaceIdentity } from '../image-workspaces/identity';
 import {
   publishPreparedVideoProjectRevisionInTransaction,
   publishPreparedVideoProjectSidecarsInTransaction,
@@ -84,6 +85,7 @@ interface PreparedVideoProjectArchiveRoot extends PreparedVideoProjectRevision {
 
 export interface VideoProjectBackupRestoreStores extends VideoProjectRevisionPublicationStores {
   assets: Store<StoredProjectAssetEntry>;
+  imageIdentities: Store<ImageWorkspaceIdentity>;
   exports: IndexStore<StoredProjectExportEntry>;
   media: Store<MediaLibraryEntry>;
   videoWorkspaces: Store<VideoWorkspace>;

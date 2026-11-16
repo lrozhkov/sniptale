@@ -1,3 +1,4 @@
+import { imageWorkspaceAssetBindings } from '../image-workspaces/assets';
 import {
   parseEditorVectorBacking,
   EDITOR_VECTOR_OWNER_KIND,
@@ -53,7 +54,7 @@ function documentOwners(store: string, raw: unknown): AssetOwner[] | null {
   if (store === 'image_workspaces') {
     const entry = parseImageWorkspaceEntry(raw);
     return entry
-      ? entry.document.assets.map((asset) => ({
+      ? imageWorkspaceAssetBindings(entry).map((asset) => ({
           ownerKind: 'image-workspace',
           ownerId: entry.aggregateId,
           assetId: asset.assetId,

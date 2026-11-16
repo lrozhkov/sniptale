@@ -43,6 +43,13 @@ vi.mock('../../../../composition/persistence/assets', async (importOriginal) => 
     async (_ref, filename: string) => new File(['source'], filename, { type: 'image/png' })
   ),
 }));
+// This metadata fixture has no readers. Resource-session tests own reader contention proof.
+vi.mock('../../../../composition/persistence/assets/resource-sessions', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../../composition/persistence/assets/resource-sessions')
+  >()),
+  tryAssetResourceCleanup: async (operation: () => Promise<unknown>) => operation(),
+}));
 vi.mock('../../../../composition/persistence/infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: mocks.runMutation,
 }));

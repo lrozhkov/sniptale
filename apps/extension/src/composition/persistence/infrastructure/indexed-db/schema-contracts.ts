@@ -15,6 +15,7 @@ import {
   EDITOR_VECTOR_LIBRARY_STORE,
   FRAME_ANNOTATION_RASTER_JOBS_STORE,
   IMAGE_WORKSPACES_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
@@ -114,11 +115,12 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 39,
+    schemaVersion: 40,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
       { storeName: IMAGE_WORKSPACES_STORE, dataClass: 'durable-authority' },
+      { storeName: IMAGE_WORKSPACE_IDENTITIES_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_WORKSPACES_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_WORKSPACE_HISTORY_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_WORKSPACE_DRAFTS_STORE, dataClass: 'durable-authority' },

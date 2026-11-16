@@ -1,3 +1,4 @@
+import { createImageWorkspaceIdentity } from '../image-workspaces/identity';
 import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
 import {
   captureVideoProjectInTransaction,
@@ -32,6 +33,7 @@ import {
   SYNC_CAPTURE_STORE,
   RECORDING_TELEMETRY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   IMAGE_WORKSPACES_STORE,
   THUMBNAILS_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
@@ -136,6 +138,7 @@ async function publishProjectMediaAsset(args: {
         SYNC_CAPTURE_STORE,
         RECORDING_TELEMETRY_STORE,
         VIDEO_WORKSPACE_DRAFTS_STORE,
+        IMAGE_WORKSPACE_IDENTITIES_STORE,
         IMAGE_WORKSPACES_STORE,
         THUMBNAILS_STORE,
         AGGREGATE_PRESENTATIONS_STORE,
@@ -243,6 +246,8 @@ async function publishProjectMediaAsset(args: {
             : buildProjectExportMediaEntry(args.entry as StoredProjectExportEntry);
         const currentMedia = parseMediaLibraryEntry(await mediaStore.get(mediaEntry.id));
         if (currentMedia?.lifecycle) mediaEntry.lifecycle = currentMedia.lifecycle;
+        if (!currentMedia && (mediaEntry.kind === 'image' || mediaEntry.kind === 'screenshot'))
+          await createImageWorkspaceIdentity(tx, mediaEntry.id);
         await tx.objectStore(MEDIA_LIBRARY_STORE).put(mediaEntry);
         await captureMediaInTransaction(tx, mediaEntry.id, publication);
       }

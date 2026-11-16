@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   warn: vi.fn(),
   hydrate: vi.fn(),
   recover: vi.fn(),
+  hydrateHistory: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
@@ -27,6 +28,7 @@ vi.mock('../image-aggregates/mutations', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../image-aggregates/mutations')>()),
   recoverImageWorkspacePublications: mocks.recover,
 }));
+vi.mock('./history-codec', () => ({ hydratePersistedImageHistory: mocks.hydrateHistory }));
 
 import {
   recoverAndGetImageWorkspace,
@@ -51,7 +53,17 @@ function createWorkspace(aggregateId: string, updatedAt: number) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.initDB.mockResolvedValue({ get: mocks.get, getAll: mocks.getAll });
+  mocks.initDB.mockResolvedValue({
+    get: mocks.get,
+    getAll: mocks.getAll,
+    transaction: () => ({
+      done: Promise.resolve(),
+      objectStore: (name: string) => ({
+        get: (key: IDBValidKey) =>
+          name === 'image_workspace_identities' ? Promise.resolve(undefined) : mocks.get(name, key),
+      }),
+    }),
+  });
   mocks.hydrate.mockImplementation(async () => ({
     assetsByVectorDefinitionId: new Map(),
     assetsByRuntimeUrl: new Map([['blob:source', { assetId: 'image-1-source' }]]),
@@ -139,5 +151,25 @@ it('transfers hydrated vector refs and release ownership to the native workspace
   expect(opened?.documentAssetsByVectorDefinitionId).toBe(refs);
   expect(release).not.toHaveBeenCalled();
   opened?.releaseDocumentAssets?.();
+  expect(release).toHaveBeenCalledOnce();
+});
+
+it('releases hydrated document resources if persisted history cannot be opened', async () => {
+  const entry = {
+    ...createWorkspace('image-1', 10),
+    history: {
+      version: 1,
+      epoch: 'epoch',
+      cursor: 0,
+      snapshots: [{ assetId: 'history-snapshot' }],
+      values: [],
+      actions: [null],
+    },
+  };
+  const release = vi.fn();
+  mocks.get.mockResolvedValueOnce(entry).mockResolvedValue({ assetId: 'fixture-ref' });
+  mocks.hydrate.mockResolvedValueOnce({ document: createEditorDocumentFixture(), release });
+  mocks.hydrateHistory.mockRejectedValueOnce(new Error('History asset unavailable'));
+  await expect(recoverAndGetImageWorkspace('image-1')).rejects.toThrow('History asset unavailable');
   expect(release).toHaveBeenCalledOnce();
 });

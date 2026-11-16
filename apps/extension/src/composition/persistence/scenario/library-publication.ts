@@ -1,3 +1,4 @@
+import { createImageWorkspaceIdentity } from '../image-workspaces/identity';
 import { captureMediaInTransaction } from '../sync-capture/capture';
 import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
 import { getScenarioResourceReferences } from '../../../features/scenario/project/public';
@@ -6,6 +7,7 @@ import type { ScenarioProjectEntry } from './contracts';
 import {
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   SCENARIO_ASSETS_STORE,
@@ -166,7 +168,10 @@ export async function publishScenarioAssetToLibrary(
     });
   }
   if (!existing) {
-    await mediaStore.put!(buildScenarioLibraryEntry(asset));
+    const entry = buildScenarioLibraryEntry(asset);
+    if (entry.kind === 'image' || entry.kind === 'screenshot')
+      await createImageWorkspaceIdentity(tx, mediaId);
+    await mediaStore.put!(entry);
     await captureMediaInTransaction(tx, mediaId);
   }
   return !existing;
@@ -181,6 +186,7 @@ export async function backfillScenarioLibraryAssets(): Promise<number> {
         SCENARIO_ASSETS_STORE,
         ASSET_REFS_STORE,
         ASSET_OWNERS_STORE,
+        IMAGE_WORKSPACE_IDENTITIES_STORE,
         MEDIA_LIBRARY_STORE,
         PROJECT_ASSETS_STORE,
         STORE_NAME,

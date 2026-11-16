@@ -45,6 +45,7 @@ export function commitHistoryForController(controller: EditorControllerInstance)
         isCurrent: () => controller.history === history && controller.canvas === canvas,
         onCommitted: () => {
           if (!controller.drawSession) controller.syncRuntimeState();
+          controller.autosaveService?.scheduleAutosave(document);
         },
         onFailure: () => {
           reportEditorActionFailure(

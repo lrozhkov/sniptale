@@ -4,7 +4,7 @@ const {
   readEditorPageLocationStateMock,
   resolveEditorPageRestoreSourceMock,
   waitForEditorControllerCanvasMock,
-  getMediaLibraryEntryMock,
+  readImageOriginalSourceMock,
   restoreImageAggregateOriginalMock,
   getAggregatePresentationMock,
 } = vi.hoisted(() => ({
@@ -12,7 +12,7 @@ const {
   readEditorPageLocationStateMock: vi.fn(),
   resolveEditorPageRestoreSourceMock: vi.fn(),
   waitForEditorControllerCanvasMock: vi.fn(),
-  getMediaLibraryEntryMock: vi.fn(),
+  readImageOriginalSourceMock: vi.fn(),
   restoreImageAggregateOriginalMock: vi.fn(),
   getAggregatePresentationMock: vi.fn(),
 }));
@@ -24,15 +24,12 @@ vi.mock('../../../composition/persistence/aggregate-presentations', async (impor
   getAggregatePresentation: getAggregatePresentationMock,
 }));
 
-vi.mock(
-  '../../../composition/persistence/media-library/index.library.ts',
-  async (importOriginal) => ({
-    ...(await importOriginal<
-      typeof import('../../../composition/persistence/media-library/index.library.ts')
-    >()),
-    getMediaLibraryEntry: getMediaLibraryEntryMock,
-  })
-);
+vi.mock('../../../composition/persistence/image-workspaces/read', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/image-workspaces/read')
+  >()),
+  readImageOriginalSource: readImageOriginalSourceMock,
+}));
 
 vi.mock('../../../composition/persistence/image-aggregates', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/image-aggregates')>()),
@@ -65,6 +62,51 @@ import {
 } from './runtime.bootstrap.test-support';
 import { useEditorStore } from '../../state/useEditorStore';
 import { beginEditorDocumentOpenOperation } from '../../document/file-actions/operation';
+import { createEditorDocumentFixture } from '../../document/page-session/document.test-support';
+import {
+  createEditorSnapshotHistory,
+  captureEditorHistoryCheckpoint,
+  pushEditorSnapshotHistory,
+  undoEditorSnapshot,
+  redoEditorSnapshot,
+  readCurrentEditorSnapshot,
+} from '../../controller/history';
+
+it('restores the saved history cursor and Redo after loading the native document', async () => {
+  const base = createEditorDocumentFixture();
+  const history = createEditorSnapshotHistory(base);
+  const first = { ...base, displayName: 'First' };
+  const second = { ...base, displayName: 'Second' };
+  for (const document of [first, second])
+    pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => document });
+  undoEditorSnapshot(history);
+  const controller = {
+    ...createEditorPageController(),
+    history: createEditorSnapshotHistory(base),
+    syncRuntimeState: vi.fn(),
+  };
+  const autosaveService = createEditorPageAutosaveService();
+  resolveEditorPageRestoreSourceMock.mockResolvedValue({
+    kind: 'draft',
+    capturedAt: 1,
+    entry: {
+      document: first,
+      history: captureEditorHistoryCheckpoint(history),
+      sourceTitle: 'First',
+    },
+  });
+  await bootstrapEditorPageSession(createEditorPageRuntime(), {
+    autosaveService,
+    controller,
+  } as never);
+  expect(controller.loadDocument).toHaveBeenCalledWith(first);
+  expect(readCurrentEditorSnapshot(controller.history)).toEqual(first);
+  expect(controller.history.getState()).toMatchObject({ index: 1, size: 3, canRedo: true });
+  expect(redoEditorSnapshot(controller.history)).toEqual(second);
+  expect(undoEditorSnapshot(controller.history)).toEqual(first);
+  expect(undoEditorSnapshot(controller.history)).toEqual(base);
+  expect(autosaveService.saveNow).not.toHaveBeenCalled();
+});
 
 async function verifiesBootstrapPayloadOpen() {
   const controller = createEditorPageController();
@@ -233,6 +275,7 @@ async function verifiesAssetRestore() {
     kind: 'asset',
     assetId: 'asset-2',
     nativeRevision: 7,
+    sourceGeneration: 'source-generation',
     dataUrl: 'data:image/png;base64,3',
     filename: 'capture.png',
     sourceTitle: 'Asset title',
@@ -245,6 +288,7 @@ async function verifiesAssetRestore() {
   expect(autosaveService.updateContext).toHaveBeenCalledWith({
     requireExistingRoot: true,
     durableRevision: 7,
+    sourceGeneration: 'source-generation',
     sourceUrl: 'https://asset.example',
     sourceTitle: 'Asset title',
   });
@@ -258,18 +302,21 @@ async function verifiesAssetRestore() {
 
 async function verifiesExplicitRecovery() {
   readEditorPageLocationStateMock.mockReturnValue({ assetId: 'image-1', bootstrapId: null });
-  getMediaLibraryEntryMock.mockResolvedValue({ id: 'image-1', workspaceRevision: 4 });
+  readImageOriginalSourceMock.mockResolvedValue({
+    asset: { id: 'image-1', workspaceRevision: 4 },
+    sourceGeneration: 'opened-generation',
+  });
   restoreImageAggregateOriginalMock.mockResolvedValue({ revision: 5 });
 
   await recoverMissingEditorPageDocument();
 
   expect(restoreImageAggregateOriginalMock).toHaveBeenCalledOnce();
-  expect(restoreImageAggregateOriginalMock).toHaveBeenCalledWith('image-1', 4);
+  expect(restoreImageAggregateOriginalMock).toHaveBeenCalledWith('image-1', 4, 'opened-generation');
 }
 
 async function verifiesRecoveryRequiresExistingLibraryEntry() {
   readEditorPageLocationStateMock.mockReturnValue({ assetId: 'image-1', bootstrapId: null });
-  getMediaLibraryEntryMock.mockResolvedValue(undefined);
+  readImageOriginalSourceMock.mockResolvedValue({ asset: undefined, sourceGeneration: null });
 
   await expect(recoverMissingEditorPageDocument()).rejects.toThrow();
   expect(restoreImageAggregateOriginalMock).not.toHaveBeenCalled();

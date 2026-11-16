@@ -284,6 +284,7 @@ it('preserves the actual replace restore when it commits during pending Save pre
     assets: empty(),
     exports: { ...empty(), index: () => ({ getAll: async () => [] }) },
     media: empty(),
+    imageIdentities: empty(),
     videoWorkspaces: empty(),
     videoDrafts: empty(),
     operations: empty(),

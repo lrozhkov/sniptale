@@ -1,3 +1,5 @@
+import { decodePortableImageHistory, projectImageHistoryMetadata } from './image-history';
+import { MAX_EXPANDED_ROOT_METADATA_BYTES } from '../contracts';
 import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { ArchiveReader } from '../../../../composition/archive-transfer';
@@ -76,9 +78,10 @@ function createRoleInventory(
 }
 type RoleInventory = ReturnType<typeof createRoleInventory>;
 
-function collectMediaRoles(
+async function collectMediaRoles(
   metadata: PortableMediaMetadata,
-  { body, pointer, document, presentation }: RoleInventory
+  { body, pointer, document, presentation, nativeMimeTypes }: RoleInventory,
+  reader: ArchiveReader | null
 ) {
   body(metadata.originalObjectId, metadata.entry.mimeType, metadata.entry.size);
   for (const attachment of [
@@ -96,6 +99,51 @@ function collectMediaRoles(
     body(asset.objectId, asset.entry.mimeType, asset.entry.size);
   if (metadata.thumbnail) pointer(metadata.thumbnail.objectId);
   if (metadata.workspace) document(metadata.workspace.document);
+  const history = metadata.workspace?.history;
+  if (history) {
+    const jsonIds = new Set<string>();
+    const references = new Map<string, string>();
+    const resources = [
+      ...history.snapshots.map(({ objectId }) => ({ objectId, mime: 'application/json' })),
+      ...history.values.map((unit) => ({
+        objectId: unit.objectId,
+        mime:
+          unit.kind === 'json'
+            ? 'application/json'
+            : unit.dataUrl.header.split(';', 1)[0]!.toLowerCase(),
+      })),
+    ];
+    let metadataBytes = 0;
+    for (const { objectId, mime } of resources) {
+      const object = pointer(objectId);
+      if (object.mimeType.toLowerCase() !== mime)
+        throw new Error('Image history resource MIME does not match.');
+      body(objectId, nativeMimeTypes.get(objectId) ?? mime, object.size);
+      references.set(objectId, objectId);
+      if (mime === 'application/json' && !jsonIds.has(objectId)) {
+        jsonIds.add(objectId);
+        metadataBytes += object.size;
+        if (object.size > 64 * 1024 * 1024 || metadataBytes > MAX_EXPANDED_ROOT_METADATA_BYTES)
+          throw new Error('Image history exceeds the archive metadata budget.');
+      }
+    }
+    if (reader) {
+      const native = decodePortableImageHistory({ history, assetsByObjectId: references });
+      const projected = await projectImageHistoryMetadata({
+        history: native,
+        readJson: async (id) => {
+          const object = pointer(id);
+          const entry = reader.entry(object.path);
+          if (!entry || entry.size !== object.size)
+            throw new Error('Image history resource size does not match.');
+          return entry.text(object.size);
+        },
+        projectSnapshot: (snapshot) => snapshot,
+      });
+      if (projected.values.length !== history.values.length)
+        throw new Error('Image history contains unused resources.');
+    }
+  }
   presentation(metadata.presentation);
   if (metadata.webSnapshot) {
     const web = metadata.webSnapshot;
@@ -189,7 +237,7 @@ async function collectTypedInventory(
       );
     }
   } else if (descriptor.rootKind === 'media') {
-    collectMediaRoles(parsePortableMediaMetadata(envelope.metadata), inventory);
+    await collectMediaRoles(parsePortableMediaMetadata(envelope.metadata), inventory, reader);
   } else if (descriptor.rootKind === 'scenario-project') {
     await collectScenarioRoles(
       parsePortableScenarioProjectMetadata(envelope.metadata),

@@ -20,6 +20,7 @@ import {
   isSharedBackupLayout,
   assertReviewProjectLayout,
   assertCursorAttachmentLayout,
+  assertImageHistoryLayout,
 } from './layout';
 import { decodeBackupMetadata } from './metadata-transport';
 import { assertBackupByteBudget } from './errors';
@@ -177,6 +178,7 @@ async function inspectRoot(args: {
   assertArchiveRootMetadataIdentity(args.descriptor, decoded.envelope.metadata);
   assertReviewProjectLayout(decoded.envelope.metadata, args.manifest.layout);
   assertCursorAttachmentLayout(decoded.envelope.metadata, args.manifest.layout);
+  assertImageHistoryLayout(decoded.envelope.metadata, args.manifest.layout);
   if (isSharedBackupLayout(args.manifest.layout))
     await assertArchiveRootObjectInventory(
       decoded.envelope,

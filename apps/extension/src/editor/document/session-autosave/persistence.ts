@@ -1,5 +1,6 @@
 import {
-  commitImageWorkspace,
+  createImageWorkspaceCommit,
+  type CommitImageWorkspaceResult,
   StaleImageWorkspaceError,
 } from '../../../composition/persistence/image-aggregates';
 import { createAutosaveCoordinator } from '@sniptale/platform/data/autosave';
@@ -14,10 +15,10 @@ import {
   settleAutosaveCheckpointEdit,
   cancelPendingAutosaveRequest,
   interruptImagePresentation,
-  type ActiveEditorSessionContext,
   type EditorCheckpointExit,
   type EditorSessionAutosaveState,
   type EditorAutosaveCapture,
+  type EditorSaveSnapshot,
 } from './state';
 
 const logger = createLogger({ namespace: 'EditorSession' });
@@ -30,14 +31,62 @@ function setEditorSaveErrorMessage(message: string | null): void {
   useEditorStore.getState().setSaveErrorMessage(message);
 }
 
-async function persistEditorSessionDocument(args: {
-  context: ActiveEditorSessionContext;
-  document: EditorDocument;
-  revision: number;
-  contextGeneration: number;
-  hydrationGeneration: number;
-  state: EditorSessionAutosaveState;
-}): Promise<void> {
+function captureDocumentForSave(
+  state: EditorSessionAutosaveState,
+  getDocument: () => EditorDocument
+): Pick<EditorSaveSnapshot, 'document' | 'history'> {
+  const document = getDocument();
+  const history = state.prepareHistory?.(document, 'explicit')?.();
+  if (history === null) throw new Error('Editor history is still loading.');
+  return { document, ...(history ? { history } : {}) };
+}
+
+/** Captures Save As without publishing to the source; the token protects later UI adoption. */
+export function captureEditorSaveSnapshot(
+  state: EditorSessionAutosaveState,
+  getDocument: () => EditorDocument
+): EditorSaveSnapshot {
+  if (!state.activeContext || state.hydration) throw new Error('Editor document is still loading.');
+  const snapshot = captureDocumentForSave(state, getDocument);
+  const { contextGeneration, hydrationGeneration, autosaveRevision, interactionRevision } = state;
+  return {
+    ...snapshot,
+    isCurrent: () =>
+      state.contextGeneration === contextGeneration &&
+      state.hydrationGeneration === hydrationGeneration &&
+      state.autosaveRevision === autosaveRevision &&
+      state.interactionRevision === interactionRevision &&
+      !state.interactionActive &&
+      !state.pendingCompletionActive &&
+      !state.hydration,
+  };
+}
+
+function adoptWorkspaceAcknowledgement(
+  state: EditorSessionAutosaveState,
+  capture: EditorAutosaveCapture,
+  result: CommitImageWorkspaceResult
+): boolean {
+  if (!isSameContext(state, capture) || !state.activeContext) return false;
+  if (state.activeContext.durableRevision > result.revision) return false;
+  state.activeContext.durableRevision = result.revision;
+  state.activeContext.sourceGeneration = result.sourceGeneration ?? null;
+  state.activeContext.requireExistingRoot = true;
+  state.documentAssetsByRuntimeUrl = result.documentAssetsByRuntimeUrl;
+  if (result.historyAssetsByValue) state.historyAssetsByValue = result.historyAssetsByValue;
+  // A later insertion can publish a definition while this older document awaits its ACK.
+  state.documentAssetsByVectorDefinitionId = new Map([
+    ...result.documentAssetsByVectorDefinitionId,
+    ...state.documentAssetsByVectorDefinitionId,
+  ]);
+  return true;
+}
+
+async function persistEditorSessionDocument(
+  args: EditorAutosaveCapture & {
+    state: EditorSessionAutosaveState;
+  }
+): Promise<void> {
   const edit = checkpointEditForAutosave(args.state);
   let writing = false;
   try {
@@ -47,30 +96,53 @@ async function persistEditorSessionDocument(args: {
       edit.writes++;
       writing = true;
     }
-    const result = await commitImageWorkspace({
-      aggregateId: args.context.aggregateId,
-      ...(args.context.capturedAt === undefined ? {} : { captureTime: args.context.capturedAt }),
-      document: args.document,
-      expectedRevision: args.context.durableRevision,
-      ...(args.context.requireExistingRoot ? { requireExistingRoot: true } : {}),
-      sourceUrl: args.context.sourceUrl,
-      sourceTitle: args.document.displayName ?? args.context.sourceTitle,
-      reusableAssetsByRuntimeUrl: args.state.documentAssetsByRuntimeUrl,
-      reusableAssetsByVectorDefinitionId: args.state.documentAssetsByVectorDefinitionId,
-    });
+    let result: CommitImageWorkspaceResult | undefined;
+    const unfinished = args.state.pendingCommit;
+    if (unfinished && isCurrentCapture(args.state, unfinished.capture)) {
+      const acknowledged = await unfinished.commit();
+      if (edit) edit.committed = true;
+      if (args.state.pendingCommit === unfinished) args.state.pendingCommit = null;
+      if (!isCurrentCapture(args.state, args)) return;
+      if (
+        unfinished.capture.revision === args.revision &&
+        unfinished.capture.document === args.document
+      )
+        result = acknowledged;
+      else {
+        if (!adoptWorkspaceAcknowledgement(args.state, unfinished.capture, acknowledged)) return;
+        args.context = args.state.activeContext ?? args.context;
+      }
+    } else if (unfinished) args.state.pendingCommit = null;
+    if (!result) {
+      if (!isCurrentCapture(args.state, args)) return;
+      const { state: _state, ...capture } = args;
+      const publication = {
+        capture,
+        commit: createImageWorkspaceCommit({
+          aggregateId: args.context.aggregateId,
+          ...(args.context.capturedAt === undefined
+            ? {}
+            : { captureTime: args.context.capturedAt }),
+          document: args.document,
+          ...(args.history ? { history: args.history } : {}),
+          reusableHistoryAssetsByValue: args.state.historyAssetsByValue,
+          expectedRevision: args.context.durableRevision,
+          expectedGeneration: args.context.sourceGeneration ?? null,
+          ...(args.context.requireExistingRoot ? { requireExistingRoot: true } : {}),
+          sourceUrl: args.context.sourceUrl,
+          sourceTitle: args.document.displayName ?? args.context.sourceTitle,
+          reusableAssetsByRuntimeUrl: args.state.documentAssetsByRuntimeUrl,
+          reusableAssetsByVectorDefinitionId: args.state.documentAssetsByVectorDefinitionId,
+        }),
+      };
+      args.state.pendingCommit = publication;
+      result = await publication.commit();
+      if (args.state.pendingCommit === publication) args.state.pendingCommit = null;
+    }
 
     if (edit) edit.committed = true;
-    if (!isSameContext(args.state, args)) return;
-    if (args.state.activeContext?.aggregateId === args.context.aggregateId) {
-      args.state.activeContext.durableRevision = result.revision;
-      args.state.activeContext.requireExistingRoot = true;
-      args.state.documentAssetsByRuntimeUrl = result.documentAssetsByRuntimeUrl;
-      // A later insertion can publish a definition while this older document awaits its ACK.
-      args.state.documentAssetsByVectorDefinitionId = new Map([
-        ...result.documentAssetsByVectorDefinitionId,
-        ...args.state.documentAssetsByVectorDefinitionId,
-      ]);
-    }
+    if (!adoptWorkspaceAcknowledgement(args.state, args, result)) return;
+    args.context = args.state.activeContext ?? args.context;
     if (!isCurrentCapture(args.state, args)) return;
     args.state.lastWriteError = null;
     args.state.presentationRetryAttempt = 0;
@@ -118,7 +190,8 @@ function isCurrentCapture(
 function isSameContext(state: EditorSessionAutosaveState, capture: EditorAutosaveCapture): boolean {
   return (
     state.contextGeneration === capture.contextGeneration &&
-    state.activeContext?.aggregateId === capture.context.aggregateId
+    state.activeContext?.aggregateId === capture.context.aggregateId &&
+    (state.activeContext?.sourceGeneration ?? null) === (capture.context.sourceGeneration ?? null)
   );
 }
 
@@ -133,14 +206,18 @@ function getAutosaveCoordinator(state: EditorSessionAutosaveState) {
     capture: () => {
       if (!state.activeContext || !state.pendingDocument || !state.enabled || state.hydration)
         return null;
+      const history = state.pendingHistoryCapture?.();
+      if (history === null) return null;
       const captured = {
         context: state.activeContext,
         contextGeneration: state.contextGeneration,
         hydrationGeneration: state.hydrationGeneration,
         document: state.pendingDocument,
+        ...(history ? { history } : {}),
         revision: state.autosaveRevision,
       };
       state.pendingDocument = null;
+      state.pendingHistoryCapture = undefined;
       return captured;
     },
     commit: async (capture) => {
@@ -150,7 +227,11 @@ function getAutosaveCoordinator(state: EditorSessionAutosaveState) {
         await persistEditorSessionDocument({ ...capture, state });
       } catch (error) {
         if (!isCurrentCapture(state, capture)) return;
-        if (capture.revision === state.autosaveRevision) state.pendingDocument = capture.document;
+        if (capture.revision === state.autosaveRevision) {
+          state.pendingDocument = capture.document;
+          const history = capture.history;
+          state.pendingHistoryCapture = history ? () => history : undefined;
+        }
         throw error;
       }
     },
@@ -170,6 +251,7 @@ export function queuePendingAutosave(
   if (!state.enabled) return;
 
   state.pendingDocument = document;
+  state.pendingHistoryCapture = state.prepareHistory?.(document, 'background');
   setEditorSaveErrorMessage(null);
   setEditorSaveState('idle');
   schedulePendingAutosaveWrite(state);
@@ -294,13 +376,16 @@ export async function saveEditorSessionSnapshot(
   if (hydration ? state.hydration !== hydration || !hydration.isCurrent() : state.hydration)
     throw new Error('Editor document is still loading.');
 
+  const { document, history } = captureDocumentForSave(state, getDocument);
   cancelPendingAutosaveRequest(state);
   state.pendingDocument = null;
+  state.pendingHistoryCapture = undefined;
   const captured: EditorAutosaveCapture = {
     context: state.activeContext,
     contextGeneration: state.contextGeneration,
     hydrationGeneration: state.hydrationGeneration,
-    document: getDocument(),
+    document,
+    ...(history ? { history } : {}),
     revision: ++state.autosaveRevision,
   };
   interruptImagePresentation(state);

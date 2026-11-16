@@ -58,6 +58,7 @@ it.each([3, 4] as const)(
       assets: empty,
       exports: empty,
       media: empty,
+      imageIdentities: empty,
       videoWorkspaces: empty,
       videoDrafts: empty,
       operations: empty,

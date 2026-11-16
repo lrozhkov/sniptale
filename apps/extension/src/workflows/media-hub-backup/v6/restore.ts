@@ -43,6 +43,7 @@ import {
   isSharedBackupLayout,
   assertReviewProjectLayout,
   assertCursorAttachmentLayout,
+  assertImageHistoryLayout,
 } from './layout';
 import { decodeBackupMetadata } from './metadata-transport';
 import { assertArchiveRootObjectInventory } from './root-codecs/object-inventory';
@@ -139,6 +140,7 @@ async function loadEnvelope(
   assertArchiveRootMetadataIdentity(descriptor, decoded.metadata);
   assertReviewProjectLayout(decoded.metadata, manifest.layout);
   assertCursorAttachmentLayout(decoded.metadata, manifest.layout);
+  assertImageHistoryLayout(decoded.metadata, manifest.layout);
   if (isSharedBackupLayout(manifest.layout))
     await assertArchiveRootObjectInventory(decoded, reader, manifest.sharedObjects ?? []);
   return decoded;

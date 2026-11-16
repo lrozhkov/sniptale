@@ -7,6 +7,9 @@ import { EditorFloatingDocumentBar, ImageDocumentOperationsProvider } from './do
 import { DocumentAutosaveStatus } from './document-autosave-status';
 import type { EditorFloatingDocumentController } from './document-bar';
 import type { EditorToolbarContentProps } from '../toolbar/types';
+import { createEditorDocumentFixture } from '../../document/page-session/document.test-support';
+import type { EditorDocument } from '../../../features/editor/document/types';
+import type { ImageAggregateCopyResult } from '../../../composition/persistence/image-aggregates';
 
 const mocks = vi.hoisted(() => ({
   autosaveDiscard: vi.fn(async () => undefined),
@@ -30,6 +33,7 @@ const mocks = vi.hoisted(() => ({
   autosaveRebindAggregate: vi.fn(),
   autosaveLastWriteError: null as unknown,
   autosaveEnabled: true,
+  autosaveCaptureCurrent: true,
   autosaveSetEnabled: vi.fn((enabled: boolean) => {
     mocks.autosaveEnabled = enabled;
   }),
@@ -74,8 +78,20 @@ const storeState = vi.hoisted(() => ({
 }));
 
 vi.mock('../../state/useEditorStore', () => ({
-  useEditorStore: (selector: (state: typeof storeState.value) => unknown) =>
-    selector(storeState.value),
+  useEditorStore: Object.assign(
+    (selector: (state: typeof storeState.value) => unknown) => selector(storeState.value),
+    {
+      getState: () => ({
+        ...storeState.value,
+        setSaveErrorMessage: (message: string | null) => {
+          storeState.value.saveErrorMessage = message;
+        },
+        setSaveState: (state: typeof storeState.value.saveState) => {
+          storeState.value.saveState = state;
+        },
+      }),
+    }
+  ),
 }));
 vi.mock('../../application/controller-context', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../application/controller-context')>()),
@@ -89,11 +105,16 @@ vi.mock('../../application/controller-context', async (importOriginal) => ({
       isEnabled: () => mocks.autosaveEnabled,
       setEnabled: mocks.autosaveSetEnabled,
       getDurableRevision: vi.fn(() => 1),
+      getSourceGeneration: vi.fn(() => null),
+      captureSnapshot: (read: () => EditorDocument) => ({
+        document: read(),
+        isCurrent: () => mocks.autosaveCaptureCurrent,
+      }),
       getLastWriteError: vi.fn(() => mocks.autosaveLastWriteError),
     },
     clearSelection: mocks.clearSelection,
     closeDocument: vi.fn(),
-    exportDocument: vi.fn(),
+    exportDocument: vi.fn(createEditorDocumentFixture),
     renderForExport: vi.fn(async () => 'data:image/png;base64,YQ=='),
   }),
 }));
@@ -186,6 +207,17 @@ export function getButton(dataUi: string) {
   return button as HTMLButtonElement;
 }
 
+export function createCopyReceipt(aggregateId: string): ImageAggregateCopyResult {
+  return {
+    aggregateId,
+    revision: 1,
+    updatedAt: 1,
+    sourceGeneration: 'copy-generation',
+    documentAssetsByRuntimeUrl: new Map(),
+    documentAssetsByVectorDefinitionId: new Map(),
+  };
+}
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.clearAllMocks();
@@ -196,12 +228,15 @@ beforeEach(() => {
   mocks.embed.onClose = null;
   mocks.autosaveLastWriteError = null;
   mocks.autosaveEnabled = true;
+  mocks.autosaveCaptureCurrent = true;
   mocks.getMediaLibraryEntry.mockResolvedValue({
     lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 1 },
   });
   mocks.promoteImageAggregate.mockResolvedValue(undefined);
   mocks.commitImagePresentation.mockResolvedValue(undefined);
-  mocks.saveImageAggregateCopyFromDocument.mockResolvedValue('image-copy');
+  mocks.saveImageAggregateCopyFromDocument.mockImplementation(async (input) =>
+    createCopyReceipt(input.targetAggregateId)
+  );
   storeState.value = {
     pageTitle: 'Captured page',
     saveErrorMessage: null,

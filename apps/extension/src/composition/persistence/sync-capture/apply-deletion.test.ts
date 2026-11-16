@@ -221,6 +221,62 @@ it('refuses a competing deletion after the first commit', async () => {
   expect(f.table('sync_capture')).toEqual(before);
 });
 
+it('accepts a later descendant tombstone while retaining the retired Image lifetime', async () => {
+  const f = await setup();
+  await applyCatalogDeletionNative(f.input);
+  const identity = structuredClone(f.table('image_workspace_identities').get(f.input.rootId));
+  expect(identity).toMatchObject({ retired: true });
+  // The receiver skips the remote restore and observes its subsequent deletion.
+  const descendant = {
+    ...f.input,
+    operationId: 'delete-after-remote-restore',
+    sourceDigest: 'd'.repeat(64),
+    expectedLocalGeneration: 2,
+    expectedBasis: ['delete'],
+  };
+  expect(await applyCatalogDeletionNative(descendant)).toEqual({
+    status: 'applied',
+    generation: 3,
+  });
+  expect(f.table('image_workspace_identities').get(f.input.rootId)).toEqual(identity);
+  expect(f.table('sync_capture').get(f.stateKey)).toMatchObject({
+    generation: 3,
+    basis: [descendant.operationId],
+    deleted: true,
+  });
+  const before = structuredClone(f.nativeRows);
+  expect(await applyCatalogDeletionNative(descendant)).toEqual({
+    status: 'duplicate',
+    generation: 3,
+  });
+  expect(f.nativeRows).toEqual(before);
+});
+
+it.each(['live', 'malformed'] as const)(
+  'refuses descendant deletion with %s orphan lifetime evidence',
+  async (kind) => {
+    const f = await setup();
+    await applyCatalogDeletionNative(f.input);
+    f.table('image_workspace_identities').set(f.input.rootId, {
+      version: 1,
+      aggregateId: f.input.rootId,
+      generation: kind === 'malformed' ? 42 : 'live-orphan',
+      retired: kind !== 'live',
+    });
+    const before = structuredClone(f.nativeRows);
+    await expect(
+      applyCatalogDeletionNative({
+        ...f.input,
+        operationId: 'descendant',
+        sourceDigest: 'd'.repeat(64),
+        expectedLocalGeneration: 2,
+        expectedBasis: ['delete'],
+      })
+    ).rejects.toThrow();
+    expect(f.nativeRows).toEqual(before);
+  }
+);
+
 it.each(['media', 'video-project'] as const)(
   'refuses a delayed delete after restore or same-ID recreation of %s',
   async (kind) => {

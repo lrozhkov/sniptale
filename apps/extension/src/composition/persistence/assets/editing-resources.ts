@@ -1,3 +1,4 @@
+import { imageWorkspaceAssetBindings } from '../image-workspaces/assets';
 import type { IDBPTransaction } from 'idb';
 import type { AssetRef } from './contracts';
 import { parseAssetOwner, parseAssetRef } from './guards';
@@ -219,7 +220,7 @@ class EditingResourceProjection {
         workspace.aggregateId === media.id &&
         workspace.revision === media.workspaceRevision
     );
-    for (const asset of workspace.document.assets) await this.ref(asset.assetId);
+    for (const asset of imageWorkspaceAssetBindings(workspace)) await this.ref(asset.assetId);
   }
 
   private async sourceAsset(id: string) {

@@ -1,3 +1,6 @@
+import { retireImageWorkspaceIdentity } from '../image-workspaces/identity';
+import { parseMediaLibraryEntry } from './read-guards';
+import { imageWorkspaceAssetBindings } from '../image-workspaces/assets';
 import { retireNativeRecordingHistoryInTransaction } from '../recordings/native-history/retirement';
 import { retireRecordingEventSourcesInTransaction } from '../recordings/recording-events/retirement';
 import { RECORDING_EVENTS_SNAPSHOT_ROLE } from '../recordings/recording-events/contracts';
@@ -189,9 +192,12 @@ export async function deleteMediaSidecars(
   const imageWorkspace = parseImageWorkspaceEntry(
     await tx.objectStore(IMAGE_WORKSPACES_STORE).get(mediaId)
   );
+  const media = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId));
+  if (imageWorkspace || media?.kind === 'image' || media?.kind === 'screenshot')
+    await retireImageWorkspaceIdentity(tx, mediaId);
   if (imageWorkspace) {
     await removeEditorDocumentOwnership({
-      document: imageWorkspace.document,
+      document: { assets: imageWorkspaceAssetBindings(imageWorkspace) },
       ownerId: mediaId,
       ownerKind: 'image-workspace',
       physicalDelete,

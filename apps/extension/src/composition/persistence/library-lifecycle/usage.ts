@@ -1,3 +1,4 @@
+import { imageWorkspaceAssetBindings } from '../image-workspaces/assets';
 import { listAggregatePresentations } from '../aggregate-presentations';
 import {
   listStoredImageWorkspaces,
@@ -103,7 +104,9 @@ export async function getLibraryStorageUsage(
       const storageClass = parent.lifecycle?.storageClass ?? 'library';
       const trashed = parent.lifecycle?.trashedAt !== undefined;
       addBytes(jsonBytes(workspace), storageClass, trashed);
-      for (const assetId of new Set(workspace.document.assets.map((asset) => asset.assetId))) {
+      for (const assetId of new Set(
+        imageWorkspaceAssetBindings(workspace).map((asset) => asset.assetId)
+      )) {
         addPhysicalAsset(assetId, storageClass, trashed);
       }
     }

@@ -106,6 +106,26 @@ describe('presentation scheduling admission', () => {
 });
 
 describe('automatic presentation recovery', () => {
+  it('does not publish an old render after the same root starts another lifetime', async () => {
+    const { createEditorSessionAutosaveService } = await import('./');
+    const autosave = createEditorSessionAutosaveService();
+    const rendered = Promise.withResolvers<string>();
+    autosave.activate({
+      aggregateId: 'image-1',
+      durableRevision: 4,
+      sourceGeneration: 'opened',
+      sourceTitle: null,
+      sourceUrl: null,
+      renderPresentation: () => rendered.promise,
+    });
+    autosave.schedulePresentation();
+    await vi.advanceTimersByTimeAsync(3_000);
+    autosave.updateContext({ sourceGeneration: 'replacement' });
+    rendered.resolve('data:image/png;base64,QUJD');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(commitPresentationMock).not.toHaveBeenCalled();
+    autosave.dispose();
+  });
   it.each(['render', 'thumbnail', 'commit'] as const)(
     'retries transient %s failures without rewriting the workspace',
     async (stage) => {
@@ -488,21 +508,26 @@ describe('image aggregate autosave', () => {
     expect(commitWorkspaceMock).toHaveBeenCalledOnce();
     queuePendingAutosave(recoveredChainState, createDocument('after-failure'));
     await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
-    expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
+    expect(commitWorkspaceMock).toHaveBeenCalledTimes(3);
+    expect(commitWorkspaceMock.mock.calls[1]![0]).toBe(commitWorkspaceMock.mock.calls[0]![0]);
+    expect(commitWorkspaceMock.mock.calls[2]![0]).toMatchObject({
+      document: createDocument('after-failure'),
+      expectedRevision: 1,
+    });
 
     const detachedState = createAutosaveState();
     activateAutosaveContext(detachedState, context);
     queuePendingAutosave(detachedState, createDocument('detached'));
     detachedState.activeContext = null;
     await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
-    expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
+    expect(commitWorkspaceMock).toHaveBeenCalledTimes(3);
 
     const emptyState = createAutosaveState();
     activateAutosaveContext(emptyState, context);
     queuePendingAutosave(emptyState, createDocument('cleared'));
     emptyState.pendingDocument = null;
     await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
-    expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
+    expect(commitWorkspaceMock).toHaveBeenCalledTimes(3);
   });
 });
 

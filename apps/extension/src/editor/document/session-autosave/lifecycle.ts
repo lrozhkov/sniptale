@@ -12,6 +12,7 @@ import {
   type EditorSessionAutosaveState,
 } from './state';
 import { setEditorSaveState } from './persistence';
+import type { ImageAggregateCopyResult } from '../../../composition/persistence/image-aggregates';
 
 export function activateAutosaveContext(
   state: EditorSessionAutosaveState,
@@ -29,9 +30,12 @@ export function activateAutosaveContext(
     state.releaseHydratedDocument?.();
     state.releaseHydratedDocument = null;
     state.documentAssetsByRuntimeUrl = new Map();
+    state.historyAssetsByValue = new Map();
     state.documentAssetsByVectorDefinitionId = new Map();
   }
   state.pendingDocument = null;
+  state.pendingHistoryCapture = undefined;
+  state.pendingCommit = null;
   state.lastWriteError = null;
   state.hasUnsavedChanges = false;
   state.activeContext = context;
@@ -44,10 +48,29 @@ export function activateAutosaveContext(
 
 export function rebindAutosaveAggregate(
   state: EditorSessionAutosaveState,
-  context: ActiveEditorSessionContext
+  context: ActiveEditorSessionContext,
+  publication?: ImageAggregateCopyResult
 ): void {
   const enabled = state.enabled;
-  activateAutosaveContext(state, context, { preserveHydratedDocument: true });
+  activateAutosaveContext(
+    state,
+    publication
+      ? {
+          ...context,
+          aggregateId: publication.aggregateId,
+          durableRevision: publication.revision,
+          sourceGeneration: publication.sourceGeneration ?? null,
+          requireExistingRoot: true,
+        }
+      : context,
+    { preserveHydratedDocument: true }
+  );
+  state.documentAssetsByRuntimeUrl = publication?.documentAssetsByRuntimeUrl ?? new Map();
+  state.documentAssetsByVectorDefinitionId = new Map(
+    publication?.documentAssetsByVectorDefinitionId
+  );
+  state.historyAssetsByValue = publication?.historyAssetsByValue ?? new Map();
+  state.lastCheckpointReceipt = publication?.checkpointReceipt ?? null;
   state.enabled = enabled;
 }
 
@@ -69,10 +92,12 @@ export type PreparedEditorSessionDocument = Pick<
   ImageWorkspaceEntry,
   | 'aggregateId'
   | 'revision'
+  | 'sourceGeneration'
   | 'sourceTitle'
   | 'sourceUrl'
   | 'releaseDocumentAssets'
   | 'documentAssetsByRuntimeUrl'
+  | 'historyAssetsByValue'
   | 'documentAssetsByVectorDefinitionId'
 >;
 
@@ -87,6 +112,7 @@ export function adoptPreparedAutosaveDocument(
     {
       aggregateId: entry.aggregateId,
       durableRevision: entry.revision,
+      sourceGeneration: entry.sourceGeneration ?? null,
       requireExistingRoot: true,
       renderPresentation,
       sourceUrl: entry.sourceUrl,
@@ -96,6 +122,7 @@ export function adoptPreparedAutosaveDocument(
   );
   state.releaseHydratedDocument = entry.releaseDocumentAssets ?? null;
   state.documentAssetsByRuntimeUrl = entry.documentAssetsByRuntimeUrl ?? new Map();
+  state.historyAssetsByValue = entry.historyAssetsByValue ?? new Map();
   state.documentAssetsByVectorDefinitionId = new Map(entry.documentAssetsByVectorDefinitionId);
   setEditorSaveState('saved');
 }
@@ -127,8 +154,11 @@ function resetAutosaveDocumentState(state: EditorSessionAutosaveState): void {
   state.releaseHydratedDocument?.();
   state.releaseHydratedDocument = null;
   state.documentAssetsByRuntimeUrl = new Map();
+  state.historyAssetsByValue = new Map();
   state.documentAssetsByVectorDefinitionId = new Map();
   state.pendingDocument = null;
+  state.pendingHistoryCapture = undefined;
+  state.pendingCommit = null;
 }
 
 export async function discardAutosaveDraft(

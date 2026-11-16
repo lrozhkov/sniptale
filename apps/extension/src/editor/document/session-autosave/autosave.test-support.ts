@@ -42,6 +42,8 @@ vi.mock('../../../features/media-hub/events', async (importOriginal) => ({
 vi.mock('../../../composition/persistence/image-aggregates', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/image-aggregates')>()),
   commitImageWorkspace: commitWorkspaceMock,
+  createImageWorkspaceCommit: (input: CommitImageWorkspaceInput) => () =>
+    commitWorkspaceMock(input),
   commitImagePresentation: commitPresentationMock,
 }));
 
@@ -71,11 +73,14 @@ export function createWorkspaceCommitResult(
   revision: number,
   resources: Pick<
     CommitImageWorkspaceInput,
-    'reusableAssetsByRuntimeUrl' | 'reusableAssetsByVectorDefinitionId'
+    'reusableAssetsByRuntimeUrl' | 'reusableAssetsByVectorDefinitionId' | 'expectedGeneration'
   > = {}
 ): CommitImageWorkspaceResult {
   return {
     revision,
+    ...(typeof resources.expectedGeneration === 'string'
+      ? { sourceGeneration: resources.expectedGeneration }
+      : {}),
     updatedAt: 10,
     documentAssetsByVectorDefinitionId: resources.reusableAssetsByVectorDefinitionId ?? new Map(),
     documentAssetsByRuntimeUrl: resources.reusableAssetsByRuntimeUrl ?? new Map(),

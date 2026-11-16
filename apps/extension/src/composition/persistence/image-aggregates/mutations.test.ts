@@ -594,7 +594,12 @@ it('atomically saves unsaved editor state as a revision-one library copy', async
       targetAggregateId: 'stale-tab-copy',
       thumbnailBlob,
     })
-  ).resolves.toBe('stale-tab-copy');
+  ).resolves.toMatchObject({
+    aggregateId: 'stale-tab-copy',
+    revision: 1,
+    sourceGeneration: expect.any(String),
+    documentAssetsByRuntimeUrl: expect.any(Map),
+  });
   expect(puts.media).toHaveBeenCalledWith(
     expect.objectContaining({
       id: 'stale-tab-copy',

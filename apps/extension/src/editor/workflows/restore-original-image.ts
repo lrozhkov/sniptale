@@ -14,13 +14,20 @@ import {
 
 type OriginalImageController = {
   originalDocument: EditorDocument | null;
-  autosaveService: { getDurableRevision: () => number | null } | null;
+  autosaveService: {
+    getDurableRevision: () => number | null;
+    getSourceGeneration: () => string | null;
+  } | null;
   restoreOriginalDocument: (document: EditorDocument, isCurrent: () => boolean) => Promise<void>;
 };
 
 const logger = createLogger({ namespace: 'EditorOriginalRestore' });
 
-async function refreshOriginalPresentation(aggregateId: string, revision: number): Promise<void> {
+async function refreshOriginalPresentation(
+  aggregateId: string,
+  revision: number,
+  generation: string | null
+): Promise<void> {
   try {
     const previewBlob = await getMediaAssetBlob(aggregateId);
     if (!previewBlob) return;
@@ -28,6 +35,7 @@ async function refreshOriginalPresentation(aggregateId: string, revision: number
     await commitImagePresentation({
       aggregateId,
       expectedWorkspaceRevision: revision,
+      expectedGeneration: generation,
       previewBlob,
       thumbnailBlob,
     });
@@ -56,6 +64,10 @@ export async function restoreOriginalEditorImage(
   await controller.restoreOriginalDocument(original, isCurrent);
   const revision = controller.autosaveService?.getDurableRevision();
   if (aggregateId && revision !== null && revision !== undefined && isCurrent()) {
-    await refreshOriginalPresentation(aggregateId, revision);
+    await refreshOriginalPresentation(
+      aggregateId,
+      revision,
+      controller.autosaveService?.getSourceGeneration() ?? null
+    );
   }
 }

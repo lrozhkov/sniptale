@@ -289,17 +289,19 @@ describe('image autosave latest flush', () => {
       await vi.advanceTimersByTimeAsync(0);
       if (!releasedBeforeResume) {
         expect(outcome).toBe('pending');
-        expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
+        expect(commitWorkspaceMock).toHaveBeenCalledTimes(retry ? 3 : 2);
         autosave.scheduleAutosave(createDocument('final gesture'));
         autosave.setInteractionActive(false);
       }
       await flushed;
       expect(outcome).toBe('saved');
-      expect(commitWorkspaceMock).toHaveBeenCalledTimes(releasedBeforeResume ? 2 : 3);
+      expect(commitWorkspaceMock).toHaveBeenCalledTimes(
+        (releasedBeforeResume ? 2 : 3) + (retry ? 1 : 0)
+      );
       expect(commitWorkspaceMock).toHaveBeenLastCalledWith(
         expect.objectContaining({
           document: createDocument('final gesture'),
-          expectedRevision: releasedBeforeResume ? 1 : 2,
+          expectedRevision: (releasedBeforeResume ? 1 : 2) + (retry ? 1 : 0),
         })
       );
       expect(autosave.hasUnsavedChanges()).toBe(false);
@@ -387,10 +389,11 @@ describe('image autosave mode', () => {
     expect(useEditorStore.getState().saveState).toBe('error');
     expect(useEditorStore.getState().saveErrorMessage).not.toBeNull();
     await autosave.flushAutosave(() => createDocument('fallback'));
-    expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
+    expect(commitWorkspaceMock).toHaveBeenCalledTimes(3);
     expect(commitWorkspaceMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ document: createDocument('newest'), expectedRevision: 0 })
+      expect.objectContaining({ document: createDocument('newest'), expectedRevision: 1 })
     );
+    expect(commitWorkspaceMock.mock.calls[1]![0]).toBe(commitWorkspaceMock.mock.calls[0]![0]);
     expect(autosave.hasUnsavedChanges()).toBe(false);
     expect(useEditorStore.getState().saveState).toBe('saved');
     expect(useEditorStore.getState().saveErrorMessage).toBeNull();

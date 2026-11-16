@@ -1,3 +1,4 @@
+import { decodePortableImageHistory } from '../media-hub-backup/v6/root-codecs/image-history';
 import type { AssetRef } from '../../composition/persistence/assets';
 import { preparePortableMediaOriginal } from '../media-hub-backup/v6/root-codecs/media';
 import { isImageCaptureSource } from '../../composition/persistence/sync-capture/image-snapshot';
@@ -41,11 +42,18 @@ export function preparePortableImageRows(
     throw new Error('Portable Image source child differs from its root.');
   const revision = media.workspaceRevision ?? 0;
   const assets = metadata.workspace?.document.assets ?? [];
-  const refsByObjectId = new Map(assets.map(({ objectId }) => [objectId, refFor(objectId)]));
+  const history = metadata.workspace?.history;
+  const ids = new Set([
+    ...assets.map(({ objectId }) => objectId),
+    ...(history?.snapshots.map(({ objectId }) => objectId) ?? []),
+    ...(history?.values.map(({ objectId }) => objectId) ?? []),
+  ]);
+  const refsByObjectId = new Map([...ids].map((id) => [id, refFor(id)]));
+  const assetsByObjectId = new Map([...refsByObjectId].map(([id, ref]) => [id, ref.assetId]));
   const document = metadata.workspace
     ? decodePortableEditorDocument({
         document: metadata.workspace.document,
-        assetsByObjectId: new Map([...refsByObjectId].map(([id, ref]) => [id, ref.assetId])),
+        assetsByObjectId,
       })
     : null;
   const workspace =
@@ -53,6 +61,9 @@ export function preparePortableImageRows(
       ? parseImageWorkspaceEntry({
           ...metadata.workspace,
           document,
+          ...(history
+            ? { history: decodePortableImageHistory({ history, assetsByObjectId }) }
+            : {}),
         })
       : null;
   if (

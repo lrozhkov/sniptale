@@ -1,5 +1,8 @@
 import { expect, it, vi } from 'vitest';
-import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../editor/document/constants';
+import {
+  DEFAULT_EDITOR_FRAME_SETTINGS,
+  DEFAULT_BROWSER_FRAME_STATE,
+} from '../editor/document/constants';
 import type { EditorDocument } from '../editor/document/types';
 import {
   encodeEditorImageHistorySnapshot,
@@ -14,7 +17,11 @@ import {
 import type { EditorHistoryAction } from './action';
 import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
 
-function fixture(steps = 2): EditorImageHistoryCheckpoint {
+function fixture(
+  steps = 2,
+  browserFrame?: EditorDocument['browserFrame'],
+  extraObject?: Record<string, unknown>
+): EditorImageHistoryCheckpoint {
   const values: EditorImageHistoryValue[] = [];
   const ids = new Map<string, string>();
   const snapshots: string[] = [];
@@ -32,6 +39,7 @@ function fixture(steps = 2): EditorImageHistoryCheckpoint {
     sourceDisplayWidth: 20,
     sourceDisplayHeight: 20,
     frame: DEFAULT_EDITOR_FRAME_SETTINGS,
+    ...(browserFrame ? { browserFrame } : {}),
     canvasJson: '{}',
   };
   for (let index = 0; index <= steps; index++) {
@@ -41,6 +49,7 @@ function fixture(steps = 2): EditorImageHistoryCheckpoint {
         objects: [
           { type: 'image', sniptaleId: 'source', src: base.sourceImageData },
           { type: 'rect', sniptaleId: 'card', sniptaleLabel: 'Card', left: index },
+          ...(extraObject ? [extraObject] : []),
         ],
       }),
     };
@@ -193,6 +202,21 @@ it('refuses inline object versions that bypass the checkpoint pool contract', ()
   ).toBeNull();
 });
 
+it('retains SVG image sources once inside their shared JSON object version', () => {
+  const svg = `data:image/svg+xml;charset=utf-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg"><text>' + 'Frame '.repeat(1500) + '</text></svg>')}`;
+  const input = fixture(4, undefined, { type: 'image', sniptaleType: 'browser-frame', src: svg });
+  expect(input.values.some((unit) => unit.kind === 'image' && unit.value === svg)).toBe(false);
+  expect(
+    input.values.filter((unit) => unit.kind === 'json' && unit.value.includes(svg))
+  ).toHaveLength(1);
+  expect(parseEditorImageHistoryCheckpoint(input)?.checkpoint).toEqual(input);
+  const units = new Map(input.values.map((unit) => [unit.id, unit.value]));
+  const decoded = decodeEditorImageHistorySnapshot(input.snapshots[0]!, (token) =>
+    units.get(token)
+  );
+  expect(decoded).toMatchObject({ canvasJson: expect.stringContaining(svg) });
+});
+
 it('refuses an embedded large bitmap in an object version instead of expanding it for each state', () => {
   const input = fixture();
   const image = input.values.find((unit) => unit.kind === 'image')!;
@@ -247,4 +271,25 @@ it('retains current content outside the byte budget and rejects excess actions o
     parseEditorImageHistoryCheckpoint(fixture(1), { maxActions: 0, maxBytes: 100_000 })
   ).toBeNull();
   expect(parseEditorImageHistoryCheckpoint(fixture(1), { maxActions: 2, maxBytes: 0 })).toBeNull();
+});
+
+it('admits a pooled normalized PNG favicon across the retained graph and rejects a malformed one', () => {
+  const png =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII=';
+  const favicon = 'data:image/png;base64,' + btoa(atob(png) + '\0'.repeat(7000));
+  const checkpoint = fixture(20, {
+    ...DEFAULT_BROWSER_FRAME_STATE,
+    faviconEnabled: true,
+    faviconDataUrl: favicon,
+  });
+  expect(checkpoint.values.some((unit) => unit.kind === 'image' && unit.value === favicon)).toBe(
+    true
+  );
+  expect(parseEditorImageHistoryCheckpoint(checkpoint)?.checkpoint).toEqual(checkpoint);
+  const invalid = fixture(2, {
+    ...DEFAULT_BROWSER_FRAME_STATE,
+    faviconEnabled: true,
+    faviconDataUrl: 'data:image/png;base64,' + 'QUJD'.repeat(2300),
+  });
+  expect(parseEditorImageHistoryCheckpoint(invalid)).toBeNull();
 });

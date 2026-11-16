@@ -18,6 +18,7 @@ import {
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   SCENARIO_ASSETS_STORE,
@@ -178,6 +179,7 @@ function getMutationStoreNames(children: PreparedScenarioAggregateChildMutation 
     | typeof ASSET_REFS_STORE
     | typeof ASSET_OWNERS_STORE
     | typeof ASSET_OPERATIONS_STORE
+    | typeof IMAGE_WORKSPACE_IDENTITIES_STORE
     | typeof MEDIA_LIBRARY_STORE
     | typeof PROJECT_ASSETS_STORE
     | typeof STORE_NAME
@@ -187,6 +189,7 @@ function getMutationStoreNames(children: PreparedScenarioAggregateChildMutation 
     SCENARIO_PROJECT_HISTORY_STORE,
     SCENARIO_PROJECT_UNITS_STORE,
     SCENARIO_ASSETS_STORE,
+    IMAGE_WORKSPACE_IDENTITIES_STORE,
     MEDIA_LIBRARY_STORE,
     STORE_NAME,
   ];
@@ -196,6 +199,7 @@ function getMutationStoreNames(children: PreparedScenarioAggregateChildMutation 
       ASSET_REFS_STORE,
       ASSET_OWNERS_STORE,
       ASSET_OPERATIONS_STORE,
+      IMAGE_WORKSPACE_IDENTITIES_STORE,
       MEDIA_LIBRARY_STORE,
       VIDEO_PROJECTS_STORE,
       PROJECT_ASSETS_STORE

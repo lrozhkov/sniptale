@@ -15,6 +15,22 @@ it('keeps committed focused coverage owner maps valid', async () => {
   expect(module.collectFocusedCoverageOwnerMappingViolations()).toEqual([]);
 });
 
+it.each([
+  [
+    'infrastructure/indexed-db/database-migrations.ts',
+    'infrastructure/indexed-db/upgrade/branch-integration.test.ts',
+  ],
+  ['projects/mutation-stores.ts', 'sync-capture/checkpoint-schedule.test.ts'],
+  ['sync-capture/test-support/apply-video-project.ts', 'sync-capture/capture.integration.test.ts'],
+  ['sync-capture/test-support/freeze.ts', 'sync-capture/freeze.test.ts'],
+])('selects the native consumer for %s', async (production, consumer) => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/composition/persistence';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/${production}`)).toContain(
+    `${root}/${consumer}`
+  );
+});
+
 it.each(['action-kernel/owned-route-handlers.ts', 'authorization/owned.ts'])(
   'selects registered editor catalog and Simplify proof for %s',
   async (owner) => {

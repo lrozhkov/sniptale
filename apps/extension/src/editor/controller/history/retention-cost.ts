@@ -84,6 +84,9 @@ export function createEditorHistoryCostIndex(tokenBytes: ReadonlyMap<string, num
   }
 
   return {
+    tokensFor(snapshot: string): ReadonlySet<string> {
+      return requireCost(snapshot).tokens;
+    },
     register(snapshot: string, tokens: ReadonlySet<string>) {
       if (snapshots.has(snapshot)) return;
       const metadata = new TextEncoder().encode(snapshot).byteLength;

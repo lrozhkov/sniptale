@@ -30,12 +30,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function isCanvasSvgSource(key: string, value: unknown): boolean {
+  // SVG sources stay in the shared object JSON; raster units use binary byte aliases.
+  return key === 'src' && typeof value === 'string' && /^data:image\/svg\+xml[;,]/.test(value);
+}
+
 function encodeSharedValue(
   value: unknown,
   key: string,
   encoding: EditorImageHistoryValuePool
 ): unknown {
   if (
+    isCanvasSvgSource(key, value) ||
     typeof value !== 'string' ||
     value.length < IMAGE_HISTORY_VALUE_INLINE_LIMIT ||
     (key !== 'sniptaleDrawingJson' && !value.startsWith('data:')) ||
@@ -171,7 +177,7 @@ function restoreSharedFields(
         const objects = restoreObjectVersions(child, decoding);
         current[key] = objects;
         pending.push({ value: objects, depth: depth + 1 });
-      } else if (typeof child === 'string' && fieldNames.has(key))
+      } else if (typeof child === 'string' && fieldNames.has(key) && !isCanvasSvgSource(key, child))
         current[key] =
           (key === 'sniptaleDrawingJson'
             ? readObjectMetadata(child, decoding)

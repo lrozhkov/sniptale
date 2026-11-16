@@ -1,3 +1,6 @@
+import { decodePortableImageHistory } from '../root-codecs/image-history';
+import { hydratePersistedImageHistory } from '../../../../composition/persistence/image-workspaces/history-codec';
+import { restoreImageWorkspaceIdentity } from '../../../../composition/persistence/image-workspaces/identity';
 import { createRecordingEventsStore } from '../../../../composition/persistence/recordings/recording-events/store';
 import { stageRecordingEventsStream } from '../../../../composition/persistence/recordings/recording-events/snapshot';
 import {
@@ -81,6 +84,7 @@ import {
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   RECORDING_TELEMETRY_STORE,
@@ -346,18 +350,21 @@ async function prepareThumbnail(args: {
   return thumbnail;
 }
 
-function prepareWorkspace(args: {
+async function prepareWorkspace(args: {
   mediaId: string;
   metadata: PortableMedia;
   objects: StagedObjectMap;
-}): { refs: AssetRef[]; workspace: StoredImageWorkspaceEntry | null } {
+}): Promise<{ refs: AssetRef[]; workspace: StoredImageWorkspaceEntry | null }> {
   if (!args.metadata.workspace) return { refs: [], workspace: null };
   const portableAssets = args.metadata.workspace.document.assets;
+  const history = args.metadata.workspace.history;
+  const objectIds = new Set([
+    ...portableAssets.map(({ objectId }) => objectId),
+    ...(history?.snapshots.map(({ objectId }) => objectId) ?? []),
+    ...(history?.values.map(({ objectId }) => objectId) ?? []),
+  ]);
   const assetsByObjectId = new Map(
-    portableAssets.map(({ objectId }) => [
-      objectId,
-      requireObject(args.objects, objectId).ref.assetId,
-    ])
+    [...objectIds].map((objectId) => [objectId, requireObject(args.objects, objectId).ref.assetId])
   );
   const document = decodePortableEditorDocument({
     document: args.metadata.workspace.document,
@@ -367,11 +374,18 @@ function prepareWorkspace(args: {
     ...args.metadata.workspace,
     aggregateId: args.mediaId,
     document,
+    ...(history ? { history: decodePortableImageHistory({ history, assetsByObjectId }) } : {}),
   });
   if (!workspace) throw new Error('Restored image workspace is invalid.');
-  const refs = [...new Set(portableAssets.map(({ objectId }) => objectId))].map(
-    (objectId) => requireObject(args.objects, objectId).ref
-  );
+  const refs = [
+    ...new Map(
+      [...objectIds].map((objectId) => {
+        const ref = requireObject(args.objects, objectId).ref;
+        return [ref.assetId, ref] as const;
+      })
+    ).values(),
+  ];
+  if (workspace.history) await hydratePersistedImageHistory({ history: workspace.history, refs });
   return { refs, workspace };
 }
 
@@ -460,7 +474,7 @@ async function prepareMediaRoot(args: {
       targetId: restoredEntry.id,
     }),
   ]);
-  const workspace = prepareWorkspace({
+  const workspace = await prepareWorkspace({
     mediaId: restoredEntry.id,
     metadata: args.metadata,
     objects: args.objects,
@@ -647,6 +661,7 @@ async function commitPreparedMediaRoot(args: {
         SYNC_CAPTURE_STORE,
         SYNC_OUTBOX_STORE,
         THUMBNAILS_STORE,
+        IMAGE_WORKSPACE_IDENTITIES_STORE,
         IMAGE_WORKSPACES_STORE,
         VIDEO_WORKSPACES_STORE,
         VIDEO_WORKSPACE_HISTORY_STORE,
@@ -749,6 +764,8 @@ async function commitPreparedMediaRoot(args: {
       );
       if (previousInlineCopy)
         await retireAssetResidencyCopyInTransaction(tx, previousInlineCopy, permit);
+      if (args.prepared.media.kind === 'image' || args.prepared.media.kind === 'screenshot')
+        await restoreImageWorkspaceIdentity(tx, args.prepared.media.id);
       await publishPreparedMedia({ ...args, stores });
       if (args.cursorStage) {
         if (!args.prepared.recording || !args.metadata.recording?.cursorAttachment)

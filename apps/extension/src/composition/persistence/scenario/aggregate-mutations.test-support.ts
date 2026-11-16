@@ -77,6 +77,7 @@ const db = {
           put: async (value: {
             key?: string;
             assetId?: string;
+            aggregateId?: string;
             id?: string;
             operationId?: string;
             ownerId?: string;
@@ -96,6 +97,7 @@ const db = {
                   )
                 : undefined) ??
               value.key ??
+              value.aggregateId ??
               value.id ??
               value.stepId ??
               value.operationId ??
@@ -242,6 +244,7 @@ beforeEach(() => {
     'project_export_inputs',
     'video_project_revisions',
     'image_workspaces',
+    'image_workspace_identities',
     'video_workspaces',
     'video_workspace_history',
     'video_workspace_drafts',

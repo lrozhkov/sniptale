@@ -20,6 +20,7 @@ import {
   VIDEO_GL_TRANSITION_PRESETS_STORE,
   VOICE_INPUT_HISTORY_STORE,
   IMAGE_WORKSPACES_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   SYNC_CAPTURE_STORE,
   SYNC_OUTBOX_STORE,
@@ -1050,6 +1051,26 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
     diagnostic: 'Retained raster document stores are unavailable.',
   }),
   editorVectorLibraryMigration,
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 39, to: 40 }],
+    fromDatabaseVersion: 61,
+    toDatabaseVersion: 62,
+    risk: 'additive',
+    stores: [IMAGE_WORKSPACE_IDENTITIES_STORE],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    migrate(db) {
+      db.createObjectStore(IMAGE_WORKSPACE_IDENTITIES_STORE, { keyPath: 'aggregateId' });
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [IMAGE_WORKSPACE_IDENTITIES_STORE],
+        'Image lifetime store is unavailable.'
+      );
+    },
+  },
 ];
 
 function projectPrototypeAnimationPreferences(value: unknown) {

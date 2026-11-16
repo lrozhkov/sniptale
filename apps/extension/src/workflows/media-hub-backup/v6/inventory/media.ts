@@ -1,3 +1,9 @@
+import {
+  encodePortableImageHistory,
+  projectImageHistoryMetadata,
+  type PortableImageHistory,
+} from '../root-codecs/image-history';
+import { MAX_EXPANDED_ROOT_METADATA_BYTES } from '../contracts';
 import type { PortableRecordingEventsAttachment } from '../root-codecs/recording-events';
 import { portableRecordingTelemetry } from '../root-codecs/cursor-trajectory';
 import {
@@ -35,7 +41,11 @@ import {
   parseProjectExportEntry,
 } from '../../../../composition/persistence/projects/read-guards';
 import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
-import { parseAssetRef, readAssetFile } from '../../../../composition/persistence/assets';
+import {
+  parseAssetRef,
+  readAssetFile,
+  type AssetRef,
+} from '../../../../composition/persistence/assets';
 import { parseImageWorkspaceEntry } from '../../../../composition/persistence/image-workspaces/parser';
 import type {
   MediaLibraryEntry,
@@ -65,6 +75,7 @@ import {
 } from '../root-codecs/media';
 import {
   projectImageWorkspacePrivacy,
+  projectImageHistorySnapshotPrivacy,
   projectMediaEntryPrivacy,
   projectRecordingGroupMemberPrivacy,
 } from '../privacy';
@@ -521,9 +532,69 @@ async function buildWorkspace(args: {
       await args.collector.addAsset(args.db, asset.assetId, `${args.entry.id}-${asset.role}`)
     );
   }
-  const { document, ...workspaceMetadata } = privateWorkspace;
+  const {
+    document,
+    history,
+    publicationId: _publicationId,
+    ...workspaceMetadata
+  } = privateWorkspace;
+  let portableHistory: PortableImageHistory | undefined;
+  if (history) {
+    const jsonIds = new Set([
+      ...history.snapshots.map(({ assetId }) => assetId),
+      ...history.values.filter((unit) => unit.kind === 'json').map(({ assetId }) => assetId),
+    ]);
+    const jsonRefs = new Map<string, AssetRef>();
+    let bytes = 0;
+    for (const id of jsonIds) {
+      const ref = parseAssetRef(await args.db.get(ASSET_REFS_STORE, id));
+      if (
+        !ref ||
+        ref.assetId !== id ||
+        ref.mimeType.split(';', 1)[0]!.toLowerCase() !== 'application/json' ||
+        ref.size > 64 * 1024 * 1024
+      )
+        throw new Error('Image history JSON resource is invalid.');
+      bytes += ref.size;
+      if (bytes > MAX_EXPANDED_ROOT_METADATA_BYTES)
+        throw new Error('Image history exceeds the archive metadata budget.');
+      jsonRefs.set(id, ref);
+    }
+    const projected = await projectImageHistoryMetadata({
+      history,
+      readJson: async (id) => {
+        const ref = jsonRefs.get(id);
+        if (!ref) throw new Error('Image history JSON resource is missing.');
+        return (await readAssetFile(ref, `${args.entry.id}-history`)).text();
+      },
+      projectSnapshot: (snapshot) => projectImageHistorySnapshotPrivacy(snapshot, args.options),
+    });
+    const snapshotObjectIds = projected.snapshots.map(({ json }, index) =>
+      args.collector.add(
+        new Blob([json], { type: 'application/json' }),
+        `${args.entry.id}-history-${index}.json`
+      )
+    );
+    for (const unit of projected.values)
+      if (!objectsByAssetId.has(unit.assetId))
+        objectsByAssetId.set(
+          unit.assetId,
+          await args.collector.addAsset(
+            args.db,
+            unit.assetId,
+            `${args.entry.id}-history-${unit.id}`
+          )
+        );
+    portableHistory = encodePortableImageHistory({
+      history,
+      objectsByAssetId,
+      snapshotObjectIds,
+      values: projected.values,
+    });
+  }
   return {
     ...workspaceMetadata,
+    ...(portableHistory ? { history: portableHistory } : {}),
     document: encodePortableEditorDocument({ document, objectsByAssetId }),
   };
 }

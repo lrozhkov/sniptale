@@ -1,3 +1,4 @@
+import { restoreEditorHistoryCheckpoint } from '../controller/history';
 import { getMediaLibraryEntry } from '../../composition/persistence/media-library';
 import { recoverAndGetImageWorkspace } from '../../composition/persistence/image-workspaces';
 import type { ImageEditorController } from '../controller';
@@ -97,8 +98,18 @@ async function applyImageSwitch(args: {
   const hydration = autosave.beginHydration(ownsOperation);
   let restoreLocation: (() => void) | undefined;
   try {
+    const history =
+      source.kind === 'draft' && source.entry.history
+        ? restoreEditorHistoryCheckpoint(source.entry.history)
+        : null;
+    if (source.kind === 'draft' && source.entry.history && !history)
+      throw new Error('Stored image history is invalid.');
     await loadPreparedImage(controller, source);
     if (!ownsOperation()) return false;
+    if (history) {
+      controller.history = history;
+      controller.syncRuntimeState();
+    }
     const store = useEditorStore.getState();
     if (source.kind === 'draft' && source.entry.document.displayName === undefined)
       store.setPageTitle(source.entry.sourceTitle ?? '');
@@ -111,6 +122,7 @@ async function applyImageSwitch(args: {
         : {
             aggregateId: args.id,
             revision: source.nativeRevision,
+            sourceGeneration: source.sourceGeneration,
             sourceTitle: source.sourceTitle,
             sourceUrl: source.sourceUrl,
           }

@@ -33,6 +33,14 @@ vi.mock('../../platform/navigation/extension-pages/editor', () => ({
     new URL(`/editor?assetId=${assetId}`, window.location.origin).toString(),
 }));
 import { openRecentEditorImage } from './switch-image';
+import {
+  createEditorSnapshotHistory,
+  captureEditorHistoryCheckpoint,
+  pushEditorSnapshotHistory,
+  undoEditorSnapshot,
+  redoEditorSnapshot,
+  readCurrentEditorSnapshot,
+} from '../controller/history';
 const entry = { id: 'target', kind: 'screenshot', lifecycle: { storageClass: 'library' } };
 beforeEach(() => {
   vi.clearAllMocks();
@@ -108,6 +116,51 @@ it('prepares and saves before loading, then adopts the destination and changes U
   expect(location.search).toBe('?assetId=target');
   expect(a.release).not.toHaveBeenCalled();
   expect(a.finish).toHaveBeenCalledWith(true);
+});
+it('adopts the target history cursor and Redo when switching to an existing image', async () => {
+  const a = setup();
+  const history = createEditorSnapshotHistory(a.original);
+  const future = { ...a.target, displayName: 'Future' };
+  for (const document of [a.target, future])
+    pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => document });
+  undoEditorSnapshot(history);
+  mocks.prepare.mockResolvedValue({
+    kind: 'draft',
+    capturedAt: 1,
+    entry: {
+      ...a.preparedEntry,
+      history: captureEditorHistoryCheckpoint(history),
+    },
+  });
+  await openRecentEditorImage({ id: 'target', controller: a.controller });
+  expect(readCurrentEditorSnapshot(a.controller.history)).toEqual(a.target);
+  expect(a.controller.history.getState()).toMatchObject({ index: 1, size: 3, canRedo: true });
+  expect(redoEditorSnapshot(a.controller.history)).toEqual(future);
+  expect(undoEditorSnapshot(a.controller.history)).toEqual(a.target);
+  expect(undoEditorSnapshot(a.controller.history)).toEqual(a.original);
+  expect(a.finish).toHaveBeenCalledWith(true);
+});
+
+it('preserves the source canvas when the target history cannot be admitted', async () => {
+  const a = setup();
+  const before = a.controller.history;
+  mocks.prepare.mockResolvedValue({
+    kind: 'draft',
+    capturedAt: 1,
+    entry: {
+      ...a.preparedEntry,
+      history: { version: 1, cursor: -1 },
+    },
+  });
+  await expect(openRecentEditorImage({ id: 'target', controller: a.controller })).rejects.toThrow(
+    'history is invalid'
+  );
+  expect(a.controller.loadDocument).not.toHaveBeenCalled();
+  expect(a.controller.exportDocument()).toEqual(a.original);
+  expect(a.controller.history).toBe(before);
+  expect(location.search).toBe('?assetId=current');
+  expect(a.autosave.adoptPreparedDocument).not.toHaveBeenCalled();
+  expect(a.release).toHaveBeenCalledOnce();
 });
 it.each(['missing', 'trashed', 'read', 'save', 'deleted-during-save'])(
   'preserves the current document on %s refusal',

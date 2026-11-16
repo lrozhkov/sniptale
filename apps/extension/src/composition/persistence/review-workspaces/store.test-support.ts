@@ -106,6 +106,7 @@ function createWorkspaceFixtureRows(id: string): Map<string, Map<string, unknown
       'recording_recovery_blocks',
       'scenario_assets',
       'image_workspaces',
+      'image_workspace_identities',
       'aggregate_presentations',
       'thumbnails',
       'editor_vector_library',

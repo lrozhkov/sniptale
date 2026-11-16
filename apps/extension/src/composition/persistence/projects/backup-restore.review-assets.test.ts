@@ -24,6 +24,7 @@ function stores(): VideoProjectBackupRestoreStores {
     assets: store(),
     exports: { ...store(), index: vi.fn(() => ({ getAll: vi.fn(async () => []) })) },
     media: store(),
+    imageIdentities: store(),
     videoWorkspaces: store(),
     videoDrafts: store(),
     operations: store(),

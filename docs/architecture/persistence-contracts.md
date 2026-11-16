@@ -1204,3 +1204,21 @@ Physical database version 57 admits Gallery advanced schema 31 and Native projec
 The additive 56→57 migration changes contracts only. It preserves project heads, history, recovery drafts, source references and immutable media bytes. Older writers refuse the newer database before they can discard audio settings.
 
 DSP settings contain fixed processor identities and parameters. They contain no executable code. Reads of older supported projects do not add processing settings or write project migrations. User audio presets retain their separate browser storage authority.
+
+## Durable Image history
+
+Physical database version 62 adds `image_workspace_identities` and advances the mediaLibrary contract to version 40. The additive 61→62 migration preserves existing documents, history, assets and presentations. Earlier writers refuse the newer database before mutation.
+
+Image history retains a cursor, actions and references to immutable snapshot and object versions. Unchanged raster bytes and drawing payloads share retained resources. Ordinary history retention permits 100 transitions and 32 MiB of pooled payload. Current content remains available when history retention removes transitions.
+
+Native admission limits history JSON to 512 MiB and 100,000 values before file reads. These admission limits do not replace the smaller runtime retention budget. Canvas SVG sources remain in bounded object JSON. Raster resources retain their existing validators.
+
+History capture and autosave have separate responsibilities. An accepted edit prepares a revision guard without serializing the retained graph. The existing autosave coordinator captures the graph for a coalesced save. Full checkpoint capture still depends on retained metadata. This contract does not promise constant execution time for the complete save.
+
+The existing Image writer prepares immutable resources and publishes the document, history cursor, ownership and sync capture through its existing journal and CAS. Warm saves reuse known resources without encoding or writing their bytes again. The writer retains one prepared publication after a retryable failure. A retry resumes that publication before a newer buffered save. Disabling autosave pauses new background saves and retains completed work.
+
+The identity ledger distinguishes replacement lifetimes that reuse an aggregate ID and revision. Deletion retires the lifetime. Restore creates a new generation. Delayed saves, presentations, promotions and resets must match their observed generation before publication. An acknowledgement cannot replace a newer durable revision or rebind another editor context.
+
+Working copies retain their captured history. The native publication result supplies their revision, generation and owned resource maps. A newer live edit prevents automatic rebinding to a completed copy. Library copies retain the existing current-image baseline behavior.
+
+Archive layout `library-folders-v6` and Image sync operation version 3 admit portable history references. Portable records contain object IDs and omit native publication receipts. Privacy projection applies to every retained snapshot. Existing archive inventory, asset ownership, deletion and recovery remain authoritative for historical resources. Missing remote history JSON requires bounded, verified recovery before publication locks. Large bitmap resources can remain deferred.

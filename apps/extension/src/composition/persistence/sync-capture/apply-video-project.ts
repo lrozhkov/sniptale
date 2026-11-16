@@ -45,6 +45,7 @@ import {
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_EXPORT_INPUTS_STORE,
@@ -417,6 +418,7 @@ async function assertLocalPredecessor(
 
 function publicationStores(tx: ApplyTransaction) {
   return {
+    imageIdentities: tx.objectStore(IMAGE_WORKSPACE_IDENTITIES_STORE),
     assets: tx.objectStore(PROJECT_ASSETS_STORE),
     media: tx.objectStore(MEDIA_LIBRARY_STORE),
     refs: tx.objectStore(ASSET_REFS_STORE),
@@ -781,6 +783,7 @@ export async function applyPreparedVideoProjectRevision(
         ASSET_REFS_STORE,
         ASSET_OWNERS_STORE,
         ASSET_OPERATIONS_STORE,
+        IMAGE_WORKSPACE_IDENTITIES_STORE,
         IMAGE_WORKSPACES_STORE,
         SCENARIO_ASSETS_STORE,
         SYNC_CAPTURE_STORE,

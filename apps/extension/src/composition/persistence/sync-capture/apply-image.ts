@@ -1,3 +1,6 @@
+import { hydratePersistedImageHistory } from '../image-workspaces/history-codec';
+import { restoreImageWorkspaceIdentity } from '../image-workspaces/identity';
+import { imageWorkspaceAssetBindings } from '../image-workspaces/assets';
 import { readCompatibleImageReplicaPredecessorInTransaction } from './freeze';
 import { readCheckpointInTransaction } from './checkpoints';
 import { parseAppliedCaptureReceipt } from './guards';
@@ -54,6 +57,7 @@ import {
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
   MEDIA_LIBRARY_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   IMAGE_WORKSPACES_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
   SYNC_CAPTURE_STORE,
@@ -207,7 +211,9 @@ function parseImageReplicaDocument(value: Record<string, unknown>, media: MediaL
   if (refs.some((ref) => ref === null)) return null;
   const documentRefs = refs.filter((ref) => ref !== null);
   const ids = new Set(documentRefs.map((ref) => ref.assetId));
-  const needed = new Set(workspace?.document.assets.map((asset) => asset.assetId) ?? []);
+  const needed = new Set(
+    workspace ? imageWorkspaceAssetBindings(workspace).map((asset) => asset.assetId) : []
+  );
   if (
     ids.size !== documentRefs.length ||
     ids.size !== needed.size ||
@@ -398,6 +404,7 @@ async function checkedImageOriginalDigest(
     [
       MEDIA_LIBRARY_STORE,
       PROJECT_ASSETS_STORE,
+      IMAGE_WORKSPACE_IDENTITIES_STORE,
       IMAGE_WORKSPACES_STORE,
       AGGREGATE_PRESENTATIONS_STORE,
       ASSET_REFS_STORE,
@@ -473,6 +480,11 @@ async function hydrateImageReplica(
           : {}),
       }
     : null;
+  if (input.workspace?.history)
+    await hydratePersistedImageHistory({
+      history: input.workspace.history,
+      refs: input.documentRefs,
+    });
   const unchangedOriginalDigest = await checkedImageOriginalDigest(input, originalBlob);
   return { originalBlob, presentation, unchangedOriginalDigest };
 }
@@ -628,7 +640,7 @@ async function publishImageReplicaNative(
     await releaseMediaSource(tx, admission.previous.media, operation);
   if (admission.previous?.workspace)
     await removeEditorDocumentOwnership({
-      document: admission.previous.workspace.document,
+      document: { assets: imageWorkspaceAssetBindings(admission.previous.workspace) },
       ownerId: input.media.id,
       ownerKind: 'image-workspace',
       physicalDelete: operation,
@@ -656,6 +668,7 @@ async function publishImageReplicaNative(
     projectAssets: tx.objectStore(PROJECT_ASSETS_STORE),
     projectExports: tx.objectStore(PROJECT_EXPORTS_STORE),
   };
+  await restoreImageWorkspaceIdentity(tx, input.media.id);
   await publishPreparedMediaSourceInTransaction(source, stores);
   await publishPreparedMediaProjectChildInTransaction(source, stores);
   if (input.workspace)
@@ -786,6 +799,7 @@ export async function applyPreparedImageReplica(
         SYNC_CAPTURE_STORE,
         SYNC_CONNECTION_STORE,
         MEDIA_LIBRARY_STORE,
+        IMAGE_WORKSPACE_IDENTITIES_STORE,
         IMAGE_WORKSPACES_STORE,
         AGGREGATE_PRESENTATIONS_STORE,
         ASSET_OWNERS_STORE,

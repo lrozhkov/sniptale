@@ -17,6 +17,7 @@ import {
   EDITOR_VECTOR_LIBRARY_STORE,
   FRAME_ANNOTATION_RASTER_JOBS_STORE,
   IMAGE_WORKSPACES_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
@@ -177,6 +178,7 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, MEDIA_LIBRARY_STORE, 'id', ['createdAt', 'kind']);
   createStore(db, THUMBNAILS_STORE, 'assetId');
   createStore(db, IMAGE_WORKSPACES_STORE, 'aggregateId', ['updatedAt']);
+  createStore(db, IMAGE_WORKSPACE_IDENTITIES_STORE, 'aggregateId');
   createStore(db, VIDEO_WORKSPACES_STORE, 'aggregateId', ['updatedAt', 'usageReferenceKeys']);
   createStore(db, VIDEO_WORKSPACE_HISTORY_STORE, ['aggregateId', 'ordinal'], ['aggregateId']);
   createStore(db, VIDEO_WORKSPACE_DRAFTS_STORE, 'aggregateId', ['updatedAt']);

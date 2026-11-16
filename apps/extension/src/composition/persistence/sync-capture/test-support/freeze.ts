@@ -56,6 +56,7 @@ export function createProjectFreezeFixture() {
     assets: memoryStore(),
     exports: memoryStore(),
     media: memoryStore(),
+    imageIdentities: memoryStore(),
     videoWorkspaces: memoryStore(),
     videoDrafts: memoryStore(),
     operations: memoryStore(),

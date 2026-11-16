@@ -1,3 +1,7 @@
+import {
+  decodePortableImageHistory,
+  encodePortableImageHistory,
+} from '../media-hub-backup/v6/root-codecs/image-history';
 import type { AssetResidencyCopy } from '../../composition/persistence/assets/residency-records';
 import type { ArchiveObjectRef } from '../../composition/archive-transfer';
 import {
@@ -83,11 +87,22 @@ export async function encodeCapturedImageRoot(
   const nativeIdentities = new Map<string, string>();
   const retained = new Map<string, { ref: ArchiveObjectRef; copy: AssetResidencyCopy }>();
   const sourceBindings = new Map<string, AssetRef>();
+  const nativeDocumentAssets = new Map(
+    rows.workspace?.document.assets.map((asset) => [asset.role, asset]) ?? []
+  );
   if (rows.originalRef) sourceBindings.set(portable.originalObjectId, rows.originalRef);
   for (const asset of portable.workspace?.document.assets ?? []) {
-    const native = rows.workspace?.document.assets.find((item) => item.role === asset.role);
+    const native = nativeDocumentAssets.get(asset.role);
     const ref = native ? refs.get(native.assetId) : undefined;
     if (ref) sourceBindings.set(asset.objectId, ref);
+  }
+  const historyUnits = new Map(
+    rows.workspace?.history?.values.map((unit) => [unit.id, unit]) ?? []
+  );
+  for (const unit of portable.workspace?.history?.values ?? []) {
+    const native = historyUnits.get(unit.id);
+    const ref = native ? refs.get(native.assetId) : undefined;
+    if (ref) sourceBindings.set(unit.objectId, ref);
   }
   const objects: typeof inventory.objects = [];
   for (const object of inventory.objects) {
@@ -141,6 +156,20 @@ export async function encodeCapturedImageRoot(
       objectsByAssetId: canonicalIds,
     });
   }
+  if (portable.workspace?.history) {
+    const history = portable.workspace.history;
+    const native = decodePortableImageHistory({
+      history,
+      assetsByObjectId: new Map([
+        ...history.snapshots.map(({ objectId }) => [objectId, objectId] as const),
+        ...history.values.map(({ objectId }) => [objectId, objectId] as const),
+      ]),
+    });
+    portable.workspace.history = encodePortableImageHistory({
+      history: native,
+      objectsByAssetId: canonicalIds,
+    });
+  }
   portable.originalObjectId = canonical(portable.originalObjectId);
   if (portable.presentation) {
     portable.presentation.thumbnailObjectId = canonical(portable.presentation.thumbnailObjectId);
@@ -165,8 +194,10 @@ export async function encodeCapturedImageRoot(
     [...retained.values()].map((object) => object.ref)
   );
   const bindings: { objectId: string; ref: AssetRef }[] = [];
+  const boundIds = new Set<string>();
+  const objectsById = new Map(objects.map((object) => [object.ref.objectId, object]));
   const bind = (objectId: string, ref: AssetRef | undefined) => {
-    const object = objects.find((candidate) => candidate.ref.objectId === objectId);
+    const object = objectsById.get(objectId);
     const remote = retained.get(objectId);
     const descriptor = object?.ref ?? remote?.ref;
     const remoteRef = remote?.copy.target.kind === 'opfs' ? remote.copy.target.ref : undefined;
@@ -182,13 +213,19 @@ export async function encodeCapturedImageRoot(
       throw new Error('Captured image object differs from its native reference.');
     // A copied alias cannot become a local file claim when real local bytes won deduplication.
     if (object && deferred.copies.has(ref.assetId)) return;
-    const existing = bindings.find((binding) => binding.objectId === objectId);
-    if (!existing) bindings.push({ objectId, ref });
+    if (!boundIds.has(objectId)) {
+      boundIds.add(objectId);
+      bindings.push({ objectId, ref });
+    }
   };
   if (rows.originalRef) bind(portable.originalObjectId, rows.originalRef);
   for (const asset of portable.workspace?.document.assets ?? []) {
-    const source = rows.workspace?.document.assets.find((entry) => entry.role === asset.role);
+    const source = nativeDocumentAssets.get(asset.role);
     bind(asset.objectId, source ? refs.get(source.assetId) : undefined);
+  }
+  for (const unit of portable.workspace?.history?.values ?? []) {
+    const native = historyUnits.get(unit.id);
+    bind(unit.objectId, native ? refs.get(native.assetId) : undefined);
   }
   return {
     envelope,

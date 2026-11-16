@@ -1543,6 +1543,8 @@ it(
       blob: original,
       storageClass: 'library',
     });
+    // This case replays journals accepted before the lifetime ledger existed.
+    table('image_workspace_identities').delete(saved.id);
     const source = captures()[0];
     if (!source) throw new Error('Missing initial native source capture');
     await publishCapture(source);

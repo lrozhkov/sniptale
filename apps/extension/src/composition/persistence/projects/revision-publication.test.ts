@@ -24,6 +24,7 @@ function publicationStores(tx: Transaction): VideoProjectRevisionPublicationStor
     refs: tx.objectStore('asset_refs'),
     owners: tx.objectStore('asset_owners'),
     media: tx.objectStore('media_library'),
+    imageIdentities: tx.objectStore('image_workspace_identities'),
     videoWorkspaces: tx.objectStore('video_workspaces'),
     videoDrafts: tx.objectStore('video_workspace_drafts'),
     thumbnails: tx.objectStore('thumbnails'),
@@ -188,6 +189,37 @@ it('publishes sidecars after the caller phase with the assigned local revision',
     presentationRevision: 9,
   });
   expect(root.presentation!.presentationRevision).toBe(400);
+});
+
+it('issues a fresh lifetime for restored image children and preserves reused identities', async () => {
+  const fixture = createReviewWorkspaceStoreFixture(() => false);
+  const root = prepared();
+  const asset = root.assets[0]!;
+  asset.entry = { ...asset.entry, mimeType: 'image/png' };
+  asset.ref = { ...asset.ref, mimeType: 'image/png' };
+  delete asset.videoReview;
+  const id = `project-asset:${asset.entry.id}`;
+  const identities = fixture.rows.get('image_workspace_identities')!;
+  identities.set(id, { version: 1, aggregateId: id, generation: 'previous', retired: true });
+  const tx = fixture.database.transaction([...fixture.rows.keys()], 'readwrite');
+  await publishPreparedVideoProjectRevisionInTransaction({
+    root,
+    stores: publicationStores(tx),
+    workspaceRevision: 9,
+  });
+  await tx.done;
+  const accepted = fixture.rows.get('image_workspace_identities')!.get(id);
+  expect(accepted).toMatchObject({ version: 1, aggregateId: id, retired: false });
+  expect(accepted).not.toMatchObject({ generation: 'previous' });
+  asset.reusePublished = true;
+  const retry = fixture.database.transaction([...fixture.rows.keys()], 'readwrite');
+  await publishPreparedVideoProjectRevisionInTransaction({
+    root,
+    stores: publicationStores(retry),
+    workspaceRevision: 10,
+  });
+  await retry.done;
+  expect(fixture.rows.get('image_workspace_identities')!.get(id)).toEqual(accepted);
 });
 
 it('rolls project asset and sidecar publication back when the caller aborts', async () => {

@@ -128,8 +128,70 @@ it('retains shared originals and assigns each retained slot without deleting its
     },
   });
   expect(put.mock.calls.map(([owner]) => owner.role)).toEqual(
-    nextDocument.assets.map(({ role }) => role)
+    nextDocument.assets.slice(document.assets.length).map(({ role }) => role)
   );
   expect(remove).not.toHaveBeenCalled();
   expect(physicalDelete.assetIds).toEqual([]);
+});
+
+it('writes only new owner roles and byte refs when a large retained graph receives one change', async () => {
+  const assets = Array.from({ length: 1_000 }, (_, index) => ({
+    assetId: `version-${index}`,
+    role: `history:value:${index}`,
+  }));
+  const next = [...assets, { assetId: 'new-version', role: 'history:value:new' }];
+  const putOwner = vi.fn();
+  const putRef = vi.fn();
+  const remove = vi.fn();
+  const physicalDelete = buildPhysicalDeleteOperation([]);
+  await replaceEditorDocumentAssetOwnership({
+    nextDocument: { assets: next },
+    previousDocument: { assets },
+    nextRefs: next.map(({ assetId }) => ref(assetId)),
+    ownerId: 'image-1',
+    ownerKind: 'image-workspace',
+    physicalDelete,
+    stores: {
+      owners: { put: putOwner, delete: remove, index: () => ({ count: async () => 1 }) },
+      refs: { put: putRef, delete: remove },
+    },
+  });
+  expect(putOwner).toHaveBeenCalledExactlyOnceWith({
+    assetId: 'new-version',
+    ownerId: 'image-1',
+    ownerKind: 'image-workspace',
+    role: 'history:value:new',
+  });
+  expect(putRef).toHaveBeenCalledExactlyOnceWith(ref('new-version'));
+  expect(remove).not.toHaveBeenCalled();
+  expect(physicalDelete.assetIds).toEqual([]);
+});
+
+it('does not write unchanged graphs and refuses missing bindings before changing ownership', async () => {
+  const assets = [{ assetId: 'existing', role: 'source-image' }];
+  const effect = vi.fn();
+  const args = {
+    nextDocument: { assets },
+    previousDocument: { assets },
+    nextRefs: [ref('existing')],
+    ownerId: 'image',
+    ownerKind: 'image-workspace',
+    physicalDelete: buildPhysicalDeleteOperation([]),
+    stores: {
+      owners: { put: effect, delete: effect, index: () => ({ count: async () => 1 }) },
+      refs: { put: effect, delete: effect },
+    },
+  };
+  await replaceEditorDocumentAssetOwnership(args);
+  expect(effect).not.toHaveBeenCalled();
+  await expect(replaceEditorDocumentAssetOwnership({ ...args, nextRefs: [] })).rejects.toThrow(
+    'ref is missing'
+  );
+  await expect(
+    replaceEditorDocumentAssetOwnership({
+      ...args,
+      nextDocument: { assets: [...assets, ...assets] },
+    })
+  ).rejects.toThrow('roles must be unique');
+  expect(effect).not.toHaveBeenCalled();
 });

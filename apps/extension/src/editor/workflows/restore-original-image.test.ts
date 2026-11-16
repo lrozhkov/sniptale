@@ -36,7 +36,7 @@ it('uses immutable asset bytes after reopening a persisted draft', async () => {
   readOriginal.mockResolvedValue(original);
   const controller = {
     originalDocument: edited,
-    autosaveService: { getDurableRevision: () => 7 },
+    autosaveService: { getDurableRevision: () => 7, getSourceGeneration: () => null },
     restoreOriginalDocument: vi.fn(async () => undefined),
   };
 
@@ -53,7 +53,10 @@ it('publishes the original preview at the committed workspace revision before co
   let revision = 7;
   const controller = {
     originalDocument: original,
-    autosaveService: { getDurableRevision: vi.fn(() => revision) },
+    autosaveService: {
+      getDurableRevision: vi.fn(() => revision),
+      getSourceGeneration: () => 'opened-generation',
+    },
     restoreOriginalDocument: vi.fn(async () => {
       revision = 8;
     }),
@@ -64,6 +67,7 @@ it('publishes the original preview at the committed workspace revision before co
   expect(persistence.commitPresentation).toHaveBeenCalledWith({
     aggregateId: 'image-1',
     expectedWorkspaceRevision: 8,
+    expectedGeneration: 'opened-generation',
     previewBlob: expect.any(Blob),
     thumbnailBlob: expect.any(Blob),
   });
@@ -75,12 +79,40 @@ it('keeps the restored document when advisory preview generation fails', async (
   persistence.commitPresentation.mockRejectedValueOnce(new Error('preview unavailable'));
   const controller = {
     originalDocument: createEditorDocumentFixture(),
-    autosaveService: { getDurableRevision: () => 2 },
+    autosaveService: { getDurableRevision: () => 2, getSourceGeneration: () => null },
     restoreOriginalDocument: vi.fn(async () => undefined),
   };
 
   await expect(restoreOriginalEditorImage(controller, 'image-1')).resolves.toBeUndefined();
   expect(controller.restoreOriginalDocument).toHaveBeenCalledOnce();
+});
+
+it('keeps the committed lifetime while original preview bytes are being read', async () => {
+  useEditorStore.getState().setSessionId('image-1');
+  const original = createEditorDocumentFixture();
+  readOriginal.mockResolvedValue(original);
+  let generation = 'opened';
+  const entered = Promise.withResolvers<void>();
+  const bytes = Promise.withResolvers<Blob>();
+  persistence.getBlob.mockImplementationOnce(() => {
+    entered.resolve();
+    return bytes.promise;
+  });
+  const operation = restoreOriginalEditorImage(
+    {
+      originalDocument: original,
+      autosaveService: { getDurableRevision: () => 8, getSourceGeneration: () => generation },
+      restoreOriginalDocument: async () => undefined,
+    },
+    'image-1'
+  );
+  await entered.promise;
+  generation = 'replacement';
+  bytes.resolve(new Blob(['original'], { type: 'image/png' }));
+  await operation;
+  expect(persistence.commitPresentation).toHaveBeenCalledWith(
+    expect.objectContaining({ expectedGeneration: 'opened' })
+  );
 });
 
 it('uses the opening document before the first save and refuses a missing persisted original', async () => {
@@ -89,7 +121,7 @@ it('uses the opening document before the first save and refuses a missing persis
   readOriginal.mockResolvedValue(null);
   const controller = {
     originalDocument: original,
-    autosaveService: { getDurableRevision: vi.fn(() => 0) },
+    autosaveService: { getDurableRevision: vi.fn(() => 0), getSourceGeneration: () => null },
     restoreOriginalDocument: vi.fn(async () => undefined),
   };
 
@@ -116,7 +148,7 @@ it('rejects a restore when a different image starts opening while source bytes a
   const openingDocument = createEditorDocumentFixture();
   const controller = {
     originalDocument: openingDocument,
-    autosaveService: { getDurableRevision: () => 2 },
+    autosaveService: { getDurableRevision: () => 2, getSourceGeneration: () => null },
     restoreOriginalDocument: vi.fn(async () => undefined),
   };
 

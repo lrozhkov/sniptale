@@ -73,6 +73,7 @@ it('adds empty scenario units and DB48 reference indexes before publishing curre
     [VIDEO_VISUAL_PREFERENCES_STORE, { keyPath: ['kind', 'packId'] }],
     [VIDEO_GL_TRANSITION_PRESETS_STORE, { keyPath: 'id' }],
     ['editor_vector_library', { keyPath: 'key' }],
+    ['image_workspace_identities', { keyPath: 'aggregateId' }],
   ]);
   expect(createIndex.mock.calls).toEqual([
     ['projectId', 'projectId'],

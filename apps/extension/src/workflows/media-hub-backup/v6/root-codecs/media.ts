@@ -1,3 +1,4 @@
+import { parsePortableImageHistory, type PortableImageHistory } from './image-history';
 import {
   isPortableRecordingEventsAttachment,
   type PortableRecordingEventsAttachment,
@@ -83,8 +84,9 @@ export interface PortableMediaMetadata {
     packageObjectId: string;
     screenshotObjectId: string;
   };
-  workspace?: Omit<StoredImageWorkspaceEntry, 'document'> & {
+  workspace?: Omit<StoredImageWorkspaceEntry, 'document' | 'history' | 'publicationId'> & {
     document: PortableEditorDocument;
+    history?: PortableImageHistory;
   };
   presentation?: PortableAggregatePresentation;
 }
@@ -211,8 +213,18 @@ export function parsePortableMediaMetadata(value: unknown): PortableMediaMetadat
   if (reviewAssets) metadata.reviewAssets = reviewAssets;
   else delete metadata.reviewAssets;
   if (metadata.workspace !== undefined) {
-    if (!isRecord(metadata.workspace)) throw new Error('Portable image workspace is invalid.');
+    if (
+      !isRecord(metadata.workspace) ||
+      Object.hasOwn(metadata.workspace, 'publicationId') ||
+      Object.hasOwn(metadata.workspace, 'sourceGeneration')
+    )
+      throw new Error('Portable image workspace is invalid.');
     assertPortableEditorDocument(metadata.workspace.document);
+    if (metadata.workspace.history !== undefined) {
+      const history = parsePortableImageHistory(metadata.workspace.history);
+      if (!history) throw new Error('Portable image history is invalid.');
+      metadata.workspace.history = history;
+    }
   }
   return metadata as PortableMediaMetadata;
 }

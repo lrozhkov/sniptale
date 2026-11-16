@@ -1,8 +1,6 @@
+import { readImageOriginalSource } from '../../../composition/persistence/image-workspaces/read';
 import { ensureNativeEditingRootAvailable } from '../../../workflows/sync-transfer/editing-admission';
-import {
-  getMediaAssetBlob,
-  getMediaLibraryEntry,
-} from '../../../composition/persistence/media-library/index.library.ts';
+import { getMediaLibraryEntry } from '../../../composition/persistence/media-library/index.library.ts';
 import {
   consumePendingEditorBootstrapPayload,
   type EditorBootstrapPayload,
@@ -25,6 +23,7 @@ interface EditorPageAssetRestoreSource {
   kind: 'asset';
   assetId: string;
   nativeRevision: number;
+  sourceGeneration: string | null;
   dataUrl: string;
   filename: string | null;
   sourceFaviconUrl: string | null;
@@ -156,18 +155,14 @@ export function ensureEditorPageAggregateId(locationState: EditorPageLocationSta
 }
 
 async function resolveEditorAssetSource(assetId: string): Promise<EditorPageRestoreSource> {
-  const [blob, asset] = await Promise.all([
-    getMediaAssetBlob(assetId).catch((error: unknown) => {
-      if (
-        error instanceof MissingAssetObjectError ||
-        (error instanceof Error && error.name === 'NotFoundError')
-      ) {
+  const { blob, asset, sourceGeneration } = await readImageOriginalSource(assetId).catch(
+    (error: unknown) => {
+      if (error instanceof MissingAssetObjectError) {
         throw new MissingEditorOriginalError();
       }
       throw error;
-    }),
-    getMediaLibraryEntry(assetId),
-  ]);
+    }
+  );
 
   if (!blob) {
     if (asset) throw new MissingEditorOriginalError();
@@ -178,6 +173,7 @@ async function resolveEditorAssetSource(assetId: string): Promise<EditorPageRest
     kind: 'asset',
     assetId,
     nativeRevision: asset?.workspaceRevision ?? 0,
+    sourceGeneration,
     dataUrl: await blobToDataUrl(blob),
     filename: asset?.filename ?? null,
     sourceFaviconUrl: asset?.sourceFavicon ?? null,

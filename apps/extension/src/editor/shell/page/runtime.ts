@@ -1,7 +1,12 @@
+import {
+  prepareEditorHistoryCheckpoint,
+  flushDeferredEditorHistory,
+  restoreEditorHistoryCheckpoint,
+} from '../../controller/history';
 import { createRuntimeMessagingTransport } from '../../../platform/runtime-messaging';
 import { createSimplifyComputeClient } from '../../../workflows/simplify/compute-client';
 import type { EditorEmbedMode } from '../../../features/editor/contracts/embed';
-import { getMediaLibraryEntry } from '../../../composition/persistence/media-library/index.library.ts';
+import { readImageOriginalSource } from '../../../composition/persistence/image-workspaces/read';
 import { getAggregatePresentation } from '../../../composition/persistence/aggregate-presentations';
 import { restoreImageAggregateOriginal } from '../../../composition/persistence/image-aggregates';
 import type { EditorBootstrapPayload } from '../../../workflows/editor/bootstrap';
@@ -78,6 +83,7 @@ async function openRestoredEditorAsset(
   services.autosaveService.updateContext({
     requireExistingRoot: true,
     durableRevision: restoreSource.nativeRevision,
+    sourceGeneration: restoreSource.sourceGeneration,
     sourceUrl: restoreSource.sourceUrl,
     sourceTitle: restoreSource.sourceTitle,
   });
@@ -100,8 +106,16 @@ async function openRestoredEditorDraft(
   isCurrent: () => boolean
 ): Promise<void> {
   runtime.setPageTitle(restoreSource.entry.sourceTitle ?? '');
+  const history = restoreSource.entry.history
+    ? restoreEditorHistoryCheckpoint(restoreSource.entry.history)
+    : null;
+  if (restoreSource.entry.history && !history) throw new Error('Stored image history is invalid.');
   await services.controller.loadDocument(restoreSource.entry.document);
   if (!isCurrent()) return;
+  if (history) {
+    services.controller.history = history;
+    services.controller.syncRuntimeState();
+  }
   useEditorStore.getState().setCapturedAt(restoreSource.capturedAt);
 
   const durableRevision = services.autosaveService.getDurableRevision();
@@ -129,9 +143,14 @@ export function resolveEditorPageSessionSeed() {
 export async function recoverMissingEditorPageDocument(): Promise<void> {
   const aggregateId = readEditorPageLocationState().assetId;
   if (!aggregateId) throw new Error('No library image is selected for recovery.');
-  const media = await getMediaLibraryEntry(aggregateId);
+  const original = await readImageOriginalSource(aggregateId);
+  const media = original.asset;
   if (!media) throw new Error('The library image is unavailable for recovery.');
-  await restoreImageAggregateOriginal(aggregateId, media.workspaceRevision ?? 0);
+  await restoreImageAggregateOriginal(
+    aggregateId,
+    media.workspaceRevision ?? 0,
+    original.sourceGeneration
+  );
 }
 
 export function createEditorPageServices(
@@ -142,7 +161,17 @@ export function createEditorPageServices(
     createSimplifyCompute: () =>
       createSimplifyComputeClient({ send: (request) => transport.sendRuntimeMessage(request) }),
   });
-  const autosaveService = createEditorSessionAutosaveService();
+  const autosaveService = createEditorSessionAutosaveService({
+    prepareHistory: (document, mode) => {
+      if (mode === 'explicit') flushDeferredEditorHistory(controller.history);
+      const history = controller.history;
+      const capture = prepareEditorHistoryCheckpoint(
+        history,
+        mode === 'explicit' ? document : undefined
+      );
+      return () => (controller.history === history ? capture() : null);
+    },
+  });
   if (embedMode !== 'scenario') controller.autosaveService = autosaveService;
 
   return {

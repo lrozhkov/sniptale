@@ -1,3 +1,4 @@
+import { imageWorkspaceAssetBindings } from '../image-workspaces/assets';
 import type { IDBPTransaction } from 'idb';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -166,7 +167,9 @@ function parseImageRows(
   if (refs.some((ref) => ref === null)) return null;
   const admittedRefs = refs.filter((ref) => ref !== null);
   const ids = new Set(admittedRefs.map((ref) => ref.assetId));
-  const required = new Set(workspace?.document.assets.map((asset) => asset.assetId) ?? []);
+  const required = new Set(
+    workspace ? imageWorkspaceAssetBindings(workspace).map((asset) => asset.assetId) : []
+  );
   if (
     ids.size !== admittedRefs.length ||
     ids.size !== required.size ||
@@ -188,9 +191,14 @@ function parseImageRows(
       presentation.presentationRevision > (media.workspaceRevision ?? 0))
   )
     return null;
+  let portableWorkspace = workspace;
+  if (workspace) {
+    const { publicationId: _publicationId, ...entry } = workspace;
+    portableWorkspace = entry;
+  }
   return {
     media,
-    workspace,
+    workspace: portableWorkspace,
     presentation,
     refs: admittedRefs,
     ...(originalRef ? { originalRef } : {}),
@@ -251,7 +259,9 @@ async function readImageRowsInTransaction(
     .objectStore(AGGREGATE_PRESENTATIONS_STORE)
     .get(['image', mediaId]);
   const refs: unknown[] = [];
-  for (const id of new Set(workspace?.document.assets.map((asset) => asset.assetId) ?? []))
+  for (const id of new Set(
+    workspace ? imageWorkspaceAssetBindings(workspace).map((asset) => asset.assetId) : []
+  ))
     refs.push(await tx.objectStore(ASSET_REFS_STORE).get(id));
   return {
     media,

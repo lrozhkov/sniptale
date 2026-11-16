@@ -147,7 +147,7 @@ export async function parsePortableSyncRoot(value: unknown, reviewSourceMediaId?
       ]);
       if (metadata.entry.id !== envelope.descriptor.rootId)
         throw new Error('Portable image identity differs from its root.');
-      await assertArchiveRootObjectInventory(envelope, metadataOnlyReader, []);
+      await assertArchiveRootObjectInventory(envelope, null, []);
       validatePortableImageRows(envelope, metadata);
       return { kind: 'image' as const, envelope, metadata };
     }
@@ -347,6 +347,9 @@ export function portableSyncEditingObjectIds(
           ...new Set([
             parsed.metadata.originalObjectId,
             ...(parsed.metadata.workspace?.document.assets.map((asset) => asset.objectId) ?? []),
+            ...(parsed.metadata.workspace?.history?.snapshots.map(({ objectId }) => objectId) ??
+              []),
+            ...(parsed.metadata.workspace?.history?.values.map(({ objectId }) => objectId) ?? []),
           ]),
         ]
       : parsed.envelope.objects.map((object) => object.objectId);

@@ -244,7 +244,12 @@ it('counts only declared web snapshot refs and preserves bounded legacy media si
 it('accounts for temporary aggregate graphs, thumbnails, and presentation ownership', async () => {
   const workspace = {
     aggregateId: 'image-1',
-    document: { assets: [{ assetId: 'workspace-asset' }, { assetId: 'workspace-asset' }] },
+    document: {
+      assets: [
+        { assetId: 'workspace-asset', role: 'source' },
+        { assetId: 'workspace-asset', role: 'canvas' },
+      ],
+    },
   };
   const videoProject = {
     id: 'video-1',
@@ -566,7 +571,12 @@ it('includes a 1.5 MB image and 2 MB retained resource once alongside workspace 
   const assetBytes = 2 * 1024 * 1024;
   const workspace = {
     aggregateId: 'image',
-    document: { assets: [{ assetId: 'shared' }, { assetId: 'shared' }] },
+    document: {
+      assets: [
+        { assetId: 'shared', role: 'source' },
+        { assetId: 'shared', role: 'canvas' },
+      ],
+    },
   };
   mocks.listMediaLibrary.mockResolvedValue([
     {

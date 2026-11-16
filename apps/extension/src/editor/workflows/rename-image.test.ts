@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createEditorDocumentFixture } from '../document/page-session/document.test-support';
 import { createEditorSessionAutosaveService } from '../document/session-autosave';
+import type { CommitImageWorkspaceInput } from '../../composition/persistence/image-aggregates';
 import { useEditorStore } from '../state/useEditorStore';
 import { renameEditorImage } from './rename-image';
 import { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
@@ -16,6 +17,7 @@ const mocks = vi.hoisted(() => ({ commit: vi.fn() }));
 vi.mock('../../composition/persistence/image-aggregates', async (original) => ({
   ...(await original<typeof import('../../composition/persistence/image-aggregates')>()),
   commitImageWorkspace: mocks.commit,
+  createImageWorkspaceCommit: (input: CommitImageWorkspaceInput) => () => mocks.commit(input),
 }));
 let autosave: ReturnType<typeof createEditorSessionAutosaveService>;
 const document = createEditorDocumentFixture();

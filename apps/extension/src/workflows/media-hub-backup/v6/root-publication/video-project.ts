@@ -8,6 +8,7 @@ import {
   SYNC_CAPTURE_STORE,
   SYNC_OUTBOX_STORE,
   STORE_NAME,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   IMAGE_WORKSPACES_STORE,
   SCENARIO_ASSETS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
@@ -75,6 +76,7 @@ const VIDEO_PROJECT_RESTORE_STORES = [
   ASSET_REFS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_OPERATIONS_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   IMAGE_WORKSPACES_STORE,
   SCENARIO_ASSETS_STORE,
 ] as const;
@@ -273,6 +275,7 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
             ...(thumbnail ? { thumbnail } : {}),
           },
           stores: {
+            imageIdentities: tx.objectStore(IMAGE_WORKSPACE_IDENTITIES_STORE),
             assets: tx.objectStore(PROJECT_ASSETS_STORE),
             exports: tx.objectStore(PROJECT_EXPORTS_STORE),
             media: tx.objectStore(MEDIA_LIBRARY_STORE),

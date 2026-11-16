@@ -9,12 +9,14 @@ export const MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT = 'library-folders-v2';
 export const MEDIA_HUB_BACKUP_SHARED_LAYOUT = 'library-folders-v3';
 const MEDIA_HUB_BACKUP_PROJECT_LAYOUT = 'library-folders-v4';
 export const MEDIA_HUB_BACKUP_CURSOR_LAYOUT = 'library-folders-v5';
+export const MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT = 'library-folders-v6';
 export type MediaHubBackupLayout =
   | typeof MEDIA_HUB_BACKUP_LAYOUT
   | typeof MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT
   | typeof MEDIA_HUB_BACKUP_SHARED_LAYOUT
   | typeof MEDIA_HUB_BACKUP_PROJECT_LAYOUT
-  | typeof MEDIA_HUB_BACKUP_CURSOR_LAYOUT;
+  | typeof MEDIA_HUB_BACKUP_CURSOR_LAYOUT
+  | typeof MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT;
 
 /** Admitted shared layouts use the same byte and alias resource profile. */
 export function isSharedBackupLayout(
@@ -22,11 +24,13 @@ export function isSharedBackupLayout(
 ): value is
   | typeof MEDIA_HUB_BACKUP_SHARED_LAYOUT
   | typeof MEDIA_HUB_BACKUP_PROJECT_LAYOUT
-  | typeof MEDIA_HUB_BACKUP_CURSOR_LAYOUT {
+  | typeof MEDIA_HUB_BACKUP_CURSOR_LAYOUT
+  | typeof MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT {
   return (
     value === MEDIA_HUB_BACKUP_SHARED_LAYOUT ||
     value === MEDIA_HUB_BACKUP_PROJECT_LAYOUT ||
-    value === MEDIA_HUB_BACKUP_CURSOR_LAYOUT
+    value === MEDIA_HUB_BACKUP_CURSOR_LAYOUT ||
+    value === MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT
   );
 }
 
@@ -45,6 +49,7 @@ export function assertReviewProjectLayout(value: unknown, layout: MediaHubBackup
   if (
     layout !== MEDIA_HUB_BACKUP_PROJECT_LAYOUT &&
     layout !== MEDIA_HUB_BACKUP_CURSOR_LAYOUT &&
+    layout !== MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT &&
     hasReviewProjectMetadata(value)
   )
     throw new Error('Review project metadata requires library-folders-v4.');
@@ -63,8 +68,25 @@ export function hasCursorAttachmentMetadata(value: unknown): boolean {
 
 /** An older layout cannot silently discard root-owned capture history. */
 export function assertCursorAttachmentLayout(value: unknown, layout: MediaHubBackupLayout): void {
-  if (layout !== MEDIA_HUB_BACKUP_CURSOR_LAYOUT && hasCursorAttachmentMetadata(value))
+  if (
+    layout !== MEDIA_HUB_BACKUP_CURSOR_LAYOUT &&
+    layout !== MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT &&
+    hasCursorAttachmentMetadata(value)
+  )
     throw new Error('Recording history attachments require library-folders-v5.');
+}
+
+/** Only the Image root workspace owns this capability marker. */
+export function hasImageHistoryMetadata(value: unknown): boolean {
+  return (
+    isRecord(value) && isRecord(value['workspace']) && Object.hasOwn(value['workspace'], 'history')
+  );
+}
+
+/** Older readers must refuse before they can silently discard the retained cursor and states. */
+export function assertImageHistoryLayout(value: unknown, layout: MediaHubBackupLayout): void {
+  if (layout !== MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT && hasImageHistoryMetadata(value))
+    throw new Error('Image history requires library-folders-v6.');
 }
 
 /** Selects the required writer layout without downgrading an already selected newer contract. */
@@ -72,6 +94,8 @@ export function resolveMediaHubBackupMetadataLayout(
   layout: MediaHubBackupLayout,
   value: unknown
 ): MediaHubBackupLayout {
+  if (layout === MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT || hasImageHistoryMetadata(value))
+    return MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT;
   if (layout === MEDIA_HUB_BACKUP_CURSOR_LAYOUT || hasCursorAttachmentMetadata(value))
     return MEDIA_HUB_BACKUP_CURSOR_LAYOUT;
   return hasReviewProjectMetadata(value) ? MEDIA_HUB_BACKUP_PROJECT_LAYOUT : layout;

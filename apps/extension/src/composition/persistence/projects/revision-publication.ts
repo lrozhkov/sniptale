@@ -1,3 +1,7 @@
+import {
+  restoreImageWorkspaceIdentity,
+  type ImageWorkspaceIdentity,
+} from '../image-workspaces/identity';
 import type { AssetOwner, AssetRef } from '../assets';
 import type { AggregatePresentationEntry } from '../aggregate-presentations/contracts';
 import type { MediaLibraryEntry, MediaThumbnailEntry } from '../media-library/contracts';
@@ -34,6 +38,7 @@ interface PublicationStore<T> {
 export interface VideoProjectRevisionPublicationStores {
   assets: PublicationStore<StoredProjectAssetEntry>;
   media: PublicationStore<MediaLibraryEntry>;
+  imageIdentities: PublicationStore<ImageWorkspaceIdentity> & { get(id: string): Promise<unknown> };
   videoWorkspaces: PublicationStore<VideoWorkspace>;
   videoDrafts: PublicationStore<VideoWorkspaceDraft> & { delete(key: string): Promise<unknown> };
   owners: PublicationStore<AssetOwner>;
@@ -75,11 +80,17 @@ export async function publishPreparedVideoProjectRevisionInTransaction(args: {
         drafts: args.stores.videoDrafts,
       });
     if (asset.publishToLibrary !== false) {
-      await args.stores.media.put({
+      const media = {
         ...buildProjectAssetMediaEntry(asset.entry),
         filename: asset.filename,
         originalFilename: asset.filename,
-      });
+      };
+      if (media.kind === 'image' || media.kind === 'screenshot')
+        await restoreImageWorkspaceIdentity(
+          { objectStore: () => args.stores.imageIdentities },
+          media.id
+        );
+      await args.stores.media.put(media);
     }
   }
 }

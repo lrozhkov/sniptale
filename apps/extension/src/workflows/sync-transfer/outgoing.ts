@@ -1,4 +1,5 @@
 import { openArchiveRootObjectSource } from '../media-hub-backup/v6/object-source';
+import { MAX_EXPANDED_ROOT_METADATA_BYTES } from '../media-hub-backup/v6/contracts';
 import type { AssetResidencyCopy } from '../../composition/persistence/assets/residency-records';
 import {
   runWithPersistenceMutationTransition,
@@ -6,6 +7,7 @@ import {
 } from '../../composition/persistence/infrastructure/mutation-barrier';
 import {
   RemoteContentMismatch,
+  readVerifiedRemoteObjectBlob,
   verifyRemoteObject as verifyRemote,
 } from './remote-object-integrity';
 import { runWithAssetResourceRead } from '../../composition/persistence/assets/resource-sessions';
@@ -31,6 +33,7 @@ import {
   commitPreparedOutgoingOperation,
   collectNativeOutgoingAssetRefs,
   loadNativeOutgoingRecoveryCopy,
+  restoreNativeOutgoingAsset,
   loadNativeOutgoingCapture,
   loadPreparedOutgoingOperation,
   readOutgoingOperation,
@@ -253,6 +256,9 @@ function bytePreservingAssetIds(capture: CapturedChange): ReadonlySet<string> {
       return new Set([
         ...(change.rows.originalRef ? [change.rows.originalRef.assetId] : []),
         ...(change.rows.workspace?.document.assets.map((asset) => asset.assetId) ?? []),
+        ...(change.rows.workspace?.history?.values
+          .filter((unit) => unit.kind === 'image')
+          .map((unit) => unit.assetId) ?? []),
       ]);
     case 'video-review':
       return new Set([
@@ -272,6 +278,84 @@ function bytePreservingAssetIds(capture: CapturedChange): ReadonlySet<string> {
         ),
         ...change.rows.exports.flatMap((entry) => (entry.html ? [entry.html.assetId] : [])),
       ]);
+  }
+}
+
+/** Privacy projection needs JSON locally. Fetch it before holding any publication lease. */
+async function recoverImageHistoryMetadata(
+  capture: CapturedChange,
+  recovery?: OutgoingResourceRecovery
+) {
+  if (capture.change.kind !== 'image') return;
+  const { rows } = capture.change;
+  const history = rows.workspace?.history;
+  if (!history) return;
+  const ids = new Set([
+    ...history.snapshots.map(({ assetId }) => assetId),
+    ...history.values.filter((unit) => unit.kind === 'json').map(({ assetId }) => assetId),
+  ]);
+  const refs = new Map(rows.refs.map((ref) => [ref.assetId, ref]));
+  const metadataRefs = [];
+  let bytes = 0;
+  for (const id of ids) {
+    const ref = refs.get(id);
+    check(
+      ref &&
+        ref.mimeType.split(';', 1)[0]!.trim().toLowerCase() === 'application/json' &&
+        ref.size <= 64 * 1024 * 1024
+    );
+    bytes += ref.size;
+    check(bytes <= MAX_EXPANDED_ROOT_METADATA_BYTES);
+    metadataRefs.push(ref);
+  }
+  for (const ref of metadataRefs) {
+    recovery?.signal.throwIfAborted();
+    try {
+      await readAssetFile(ref, ref.assetId);
+      continue;
+    } catch (error) {
+      recovery?.signal.throwIfAborted();
+      if (
+        !recovery ||
+        !(
+          error instanceof MissingAssetObjectError ||
+          (error instanceof AssetObjectSizeMismatchError && error.actualSize === 0) ||
+          (error instanceof DOMException && error.name === 'NotFoundError')
+        )
+      )
+        throw error;
+    }
+    check(recovery);
+    const copy = await loadNativeOutgoingRecoveryCopy({
+      capture,
+      ref,
+      authorization: recovery.authorization,
+    });
+    const filename = copy.remote.key.split('/').at(-1);
+    check(
+      filename &&
+        isSyncObjectRemoteKey(capture.spaceId, filename, copy.remote.key) &&
+        (ref.sha256 === null || ref.sha256 === copy.remote.sha256)
+    );
+    const sourceBlob = await readVerifiedRemoteObjectBlob(
+      recovery.remote,
+      copy.remote.key,
+      {
+        size: ref.size,
+        sha256: copy.remote.sha256,
+        mimeType: ref.mimeType,
+        maxBytes: 64 * 1024 * 1024,
+      },
+      recovery.signal
+    );
+    const result = await restoreNativeOutgoingAsset({
+      capture,
+      copy,
+      authorization: recovery.authorization,
+      sourceBlob,
+      signal: recovery.signal,
+    });
+    if (result === 'busy') throw new Error('Image history recovery is busy.');
   }
 }
 
@@ -329,6 +413,7 @@ export async function prepareCapturedOutgoing(
   }
   check(parsed.phase === 'native');
   const capture = await loadNativeOutgoingCapture(parsed);
+  await recoverImageHistoryMetadata(capture, recovery);
   return runWithPersistenceMutationTransition((transition) =>
     runWithAssetResourceRead(() =>
       runWithDurableAssetOperation(async () => {

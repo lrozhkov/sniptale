@@ -30,6 +30,7 @@ import {
   isSharedBackupLayout,
   assertReviewProjectLayout,
   assertCursorAttachmentLayout,
+  assertImageHistoryLayout,
   resolveMediaHubBackupMetadataLayout,
   type MediaHubBackupLayout,
 } from './layout';
@@ -238,6 +239,7 @@ export async function exportMediaHubBackupV6(args: {
       const payload = await item.load(args.signal);
       assertReviewProjectLayout(payload.metadata, args.plan.manifest.layout);
       assertCursorAttachmentLayout(payload.metadata, args.plan.manifest.layout);
+      assertImageHistoryLayout(payload.metadata, args.plan.manifest.layout);
       const prepared = shared?.roots[index];
       const envelope =
         prepared?.metadata ??
