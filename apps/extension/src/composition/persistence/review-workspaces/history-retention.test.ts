@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import {
   applyReviewOperation,
@@ -8,7 +8,10 @@ import {
 } from '../../../features/video/review/document';
 import type { VideoWorkspace } from './contracts';
 import { createHistoryRetentionWorkspace } from './history-retention.test-support';
-import { compactVideoWorkspaceHistory } from './history-retention';
+import {
+  compactVideoWorkspaceHistory,
+  retainedWorkspaceReplacementStart,
+} from './history-retention';
 import { inspectVideoWorkspace } from './parser';
 
 it.each([0, 600, 1190])(
@@ -137,4 +140,53 @@ it('retains project metadata through compaction and complete baseline admission'
   expect(compacted.start).toBeGreaterThan(0);
   expect(compacted.workspace.formatVersion).toBe(4);
   expect(inspectVideoWorkspace(compacted.workspace).workspace?.project).toEqual(input.project);
+});
+
+it('does not serialize unchanged admitted operations again for retention', () => {
+  const admitted = inspectVideoWorkspace(createHistoryRetentionWorkspace({ fragments: 1 }));
+  if (!admitted.workspace) throw new Error('Invalid proof');
+  const retained = compactVideoWorkspaceHistory(admitted.workspace).workspace;
+  const stringify = vi.spyOn(JSON, 'stringify');
+  try {
+    compactVideoWorkspaceHistory(retained);
+    expect(stringify).not.toHaveBeenCalled();
+  } finally {
+    stringify.mockRestore();
+  }
+});
+
+it('admits only a matching retained baseline after immutable operation reuse', () => {
+  const admitted = inspectVideoWorkspace(createHistoryRetentionWorkspace({ fragments: 1 }));
+  if (!admitted.workspace) throw new Error('Invalid proof');
+  const previous = admitted.workspace;
+  const compacted = compactVideoWorkspaceHistory(previous);
+  const baseline = compacted.workspace.baseline;
+  if (!baseline) throw new Error('Missing retained baseline');
+  expect(retainedWorkspaceReplacementStart(previous, previous)).toBe(0);
+  expect(retainedWorkspaceReplacementStart(previous, compacted.workspace)).toBe(compacted.start);
+  expect(
+    retainedWorkspaceReplacementStart(previous, {
+      ...compacted.workspace,
+      history: [],
+      baseline: { ...baseline, annotations: [] },
+    })
+  ).toBeUndefined();
+  expect(
+    retainedWorkspaceReplacementStart(previous, {
+      ...compacted.workspace,
+      history: [{ ...compacted.workspace.history[0]!, id: 'unknown-step' }],
+    })
+  ).toBeUndefined();
+  const empty = {
+    ...compacted.workspace,
+    history: [],
+    cursor: 0,
+    baseline: replayReviewHistory(
+      previous.history,
+      previous.cursor,
+      previous.source,
+      reviewDocumentBaseline(previous)
+    ),
+  };
+  expect(retainedWorkspaceReplacementStart(previous, empty)).toBe(previous.cursor);
 });

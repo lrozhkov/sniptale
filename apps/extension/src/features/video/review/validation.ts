@@ -326,8 +326,44 @@ export function parseCanvasComment(value: unknown, duration: number): CanvasComm
   };
 }
 
-/** Parses both undo values, preserving no unvalidated extension properties. */
+const admittedOperations = new WeakMap<
+  object,
+  { operation: ReviewOperation; duration: number; bytes?: number }
+>();
+const operationEncoder = new TextEncoder();
+
+function freezeOperationValue(value: unknown): void {
+  if (value === null || typeof value !== 'object' || Object.isFrozen(value)) return;
+  for (const child of Object.values(value)) freezeOperationValue(child);
+  Object.freeze(value);
+}
+
+/** Reuses only detached immutable outputs admitted for the same source duration. */
 export function parseReviewOperation(value: unknown, duration: number): ReviewOperation | null {
+  if (isRecord(value)) {
+    // Only this parser's outputs enter the memo; external frozen objects are not trusted.
+    const admitted = admittedOperations.get(value);
+    if (admitted?.duration === duration) return admitted.operation;
+  }
+  const parsed = parseReviewOperationValue(value, duration);
+  if (!parsed) return null;
+  const detached = structuredClone(parsed);
+  freezeOperationValue(detached);
+  admittedOperations.set(detached, { operation: detached, duration });
+  return detached;
+}
+
+/** Measures the canonical JSON encoding once for immutable admitted operations. */
+export function reviewOperationEncodedBytes(operation: ReviewOperation): number {
+  const admitted = admittedOperations.get(operation);
+  if (admitted?.bytes !== undefined) return admitted.bytes;
+  const bytes = operationEncoder.encode(JSON.stringify(operation)).byteLength;
+  if (admitted) admitted.bytes = bytes;
+  return bytes;
+}
+
+/** Parses both undo values, preserving no unvalidated extension properties. */
+function parseReviewOperationValue(value: unknown, duration: number): ReviewOperation | null {
   if (!isRecord(value) || !identity(value['id']) || !finite(value['at']) || value['at'] < 0)
     return null;
   const metadata = { id: value['id'], at: value['at'] };

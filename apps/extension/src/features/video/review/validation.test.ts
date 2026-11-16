@@ -3,6 +3,7 @@ import {
   parseReviewAnnotation,
   parseReviewDocumentBaseline,
   parseReviewOperation,
+  reviewOperationEncodedBytes,
   parseReviewSource,
   sameReviewVideoContainer,
 } from './validation';
@@ -388,4 +389,61 @@ it('associates decoder codec parameters with the same validated video container'
   expect(sameReviewVideoContainer('video/mp4; codecs="avc1"', 'video/webm')).toBe(false);
   expect(sameReviewVideoContainer('image/png', 'image/png')).toBe(false);
   expect(sameReviewVideoContainer('video/webm\r\nX: injected', 'video/webm')).toBe(false);
+});
+
+it('reuses detached immutable operation admission only for the same duration', () => {
+  const raw = { id: 'cached', at: 1, target: 'annotation', before: null, after: annotation };
+  const parsed = parseReviewOperation(raw, 10);
+  expect(parsed).not.toBeNull();
+  expect(parseReviewOperation(parsed, 10)).toBe(parsed);
+  expect(parseReviewOperation(parsed, 0.5)).toBeNull();
+  expect(parseReviewOperation(parsed, 20)).toEqual(parsed);
+  expect(parseReviewOperation(parsed, 20)).not.toBe(parsed);
+  expect(Object.isFrozen(raw)).toBe(false);
+  expect(Object.isFrozen(raw.after)).toBe(false);
+  if (parsed?.target !== 'annotation' || !parsed.after) throw new Error('Invalid proof');
+  expect(() => {
+    parsed.after!.text = 'changed';
+  }).toThrow();
+  expect(Object.isFrozen(parsed.after.anchor)).toBe(true);
+  raw.after = { ...annotation, text: 'external update' };
+  expect(parseReviewOperation(raw, 10)).toMatchObject({ after: { text: 'external update' } });
+  expect(parsed.after.text).toBe('Comment');
+});
+
+it('keeps byte accounting exact for Unicode and never caches mutable caller operations', () => {
+  const raw = {
+    id: 'bytes',
+    at: 1,
+    target: 'annotation' as const,
+    before: null,
+    after: { ...annotation, anchor: { kind: 'point' as const, time: 1 }, text: '界🙂' },
+  };
+  const parsed = parseReviewOperation(raw, 10);
+  if (!parsed) throw new Error('Invalid proof');
+  const expected = new TextEncoder().encode(JSON.stringify(parsed)).byteLength;
+  expect(reviewOperationEncodedBytes(parsed)).toBe(expected);
+  expect(reviewOperationEncodedBytes(parsed)).toBe(expected);
+  expect(reviewOperationEncodedBytes(raw)).toBe(expected);
+  raw.after.text += 'longer';
+  expect(reviewOperationEncodedBytes(raw)).toBeGreaterThan(expected);
+  expect(reviewOperationEncodedBytes(parsed)).toBe(expected);
+});
+
+it('detaches and freezes nested compound content without freezing the caller document', () => {
+  const before = createQuickEditAdvancedContent();
+  const after = {
+    ...before,
+    audio: { ...before.audio, original: { ...before.audio.original, muted: true } },
+  };
+  const parsed = parseReviewOperation(
+    { id: 'compound-freeze', at: 1, target: 'advancedContent', before, after },
+    10
+  );
+  if (parsed?.target !== 'advancedContent') throw new Error('Invalid proof');
+  expect(Object.isFrozen(before.audio.original)).toBe(false);
+  expect(Object.isFrozen(parsed.before.audio.original)).toBe(true);
+  before.audio.original.volume = 0.2;
+  expect(parsed.before.audio.original.volume).not.toBe(0.2);
+  expect(parseReviewOperation(parsed, 10)).toBe(parsed);
 });
