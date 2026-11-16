@@ -1,7 +1,7 @@
 import { createImageWorkspaceIdentity } from '../image-workspaces/identity';
 import { captureMediaInTransaction } from '../sync-capture/capture';
 import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
-import { getScenarioResourceReferences } from '../../../features/scenario/project/public';
+import { collectScenarioResourceReferences } from './resource-references';
 import { promoteReferencedMediaLifecycles } from '../library-lifecycle/promotion';
 import type { ScenarioProjectEntry } from './contracts';
 import {
@@ -242,13 +242,7 @@ export async function promoteScenarioSourceLifecycles(
   entry: ScenarioProjectEntry,
   now: number
 ): Promise<void> {
-  const childIds = new Set<string>();
-  for (const project of [
-    entry.project,
-    ...(entry.history ?? []).map((version) => version.project),
-  ]) {
-    for (const id of getScenarioResourceReferences(project).assets) childIds.add(id);
-  }
+  const { assets: childIds } = collectScenarioResourceReferences(entry);
   const mediaIds = new Set<string>();
   for (const id of childIds) {
     const child = parseScenarioAssetEntry(await tx.objectStore(SCENARIO_ASSETS_STORE).get(id));

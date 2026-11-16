@@ -1243,4 +1243,6 @@ Optional `editingHistory` retains separate `past` and `future` branches. Their o
 
 Native unit format 3 shares unchanged Guide items and Tour slides across current content, saved revisions and both editing branches. The checkpoint permits 50 transitions and 8 MiB of pooled payload. Empty history retains current content independently of this budget. Admission checks project identities, complete unit references and UTF-8 byte sizes. Reads do not repair or prune physical evidence.
 
+Resource admission, reachability and source promotion share one collector over current content, saved revisions and both editing branches. It reads references without serializing snapshot payloads.
+
 This storage generation has no page checkpoint producer. Existing content constructors refuse checkpoint-bearing entries. Portable archive encoding and sync publication also refuse them. These gates prevent silent history loss before runtime and transfer owners connect capture, resource retention and portable graph admission. They do not complete durable Undo/Redo reopening.

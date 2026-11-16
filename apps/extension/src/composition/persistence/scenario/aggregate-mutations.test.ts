@@ -1,5 +1,8 @@
-import { captureRootKey, pendingCheckpointKey } from '../sync-capture/contracts';
 import { enableScenarioDeletionReadGuard } from './aggregate-mutations.test-support';
+import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
+import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import { createScenarioProjectStore } from './storage';
+import { captureRootKey, pendingCheckpointKey } from '../sync-capture/contracts';
 import {
   stores,
   getStore,
@@ -27,7 +30,10 @@ import {
   scenarioAssetPublicationAdapter,
 } from './aggregate-mutations';
 import { deleteOrphanedScenarioAggregateChild, deleteScenarioAggregate } from './aggregate-cleanup';
-import { backfillScenarioLibraryAssets } from './library-publication';
+import {
+  backfillScenarioLibraryAssets,
+  promoteScenarioSourceLifecycles,
+} from './library-publication';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 import { parseScenarioProjectEntry } from './read-guards';
 
@@ -842,3 +848,63 @@ it('does not borrow a later pending receipt when an already-committed asset jour
   expect(replayed).not.toHaveProperty('checkpointReceipt');
   expect(getStore('sync_capture').get(pending.key)).toEqual(pending);
 });
+
+it.each(['past', 'future'] as const)(
+  'retains and promotes resources reachable only from the %s editing branch',
+  async (branch) => {
+    const project = createGuideProject('Branch resources', 'branch-resources', 1);
+    const step = createGuideStep('Retained image', 'step');
+    step.blocks.push(
+      createGuideImageBlock({
+        id: 'image',
+        assetId: 'branch-image',
+        editDocumentId: 'branch-document',
+        width: 10,
+        height: 10,
+        source: { kind: 'import', filename: 'retained.png' },
+      })
+    );
+    project.items.push(step);
+    const first = await commitScenarioAggregateMutation(project, {
+      children: {
+        assetPuts: [createAsset(project.id, 'branch-image')],
+        editorDocumentPuts: [createDocument(project.id, 'branch-document')],
+      },
+    });
+    const stored = await getScenarioProjectEntry(project.id);
+    if (!stored) throw new Error('Missing native Scenario');
+    const updatedAt = first.project.updatedAt + 1;
+    const checkpoint = {
+      ...stored,
+      project: { ...first.project, items: [], updatedAt },
+      updatedAt,
+      workspaceRevision: first.workspaceRevision + 1,
+      editingHistory: {
+        version: 1 as const,
+        past: branch === 'past' ? [first.project] : [],
+        future: branch === 'future' ? [first.project] : [],
+      },
+    };
+    await createScenarioProjectStore(db.transaction([...stores.keys()])).put(checkpoint);
+    const before = structuredClone(stores);
+    expect(await pruneScenarioResources(project.id)).toBe(0);
+    expect(stores).toEqual(before);
+    expect(getStore('scenario_assets').has('branch-image')).toBe(true);
+    expect(getStore('scenario_step_editor_documents').has('branch-document')).toBe(true);
+    const libraryId = 'scenario-asset:branch-image';
+    const origin = parseMediaLibraryEntry(getStore('media_library').get(libraryId));
+    if (!origin) throw new Error('Missing logical Scenario source');
+    getStore('media_library').set(libraryId, {
+      ...origin,
+      lifecycle: createLibraryLifecycle('temporary', updatedAt),
+    });
+    const { initDB } = await import('../infrastructure/indexed-db/core');
+    const database = await initDB();
+    const tx = database.transaction([...SCENARIO_CAPTURE_STORES], 'readwrite');
+    await promoteScenarioSourceLifecycles(tx, checkpoint, updatedAt + 1);
+    await tx.done;
+    expect(
+      parseMediaLibraryEntry(getStore('media_library').get(libraryId))?.lifecycle?.storageClass
+    ).toBe('library');
+  }
+);

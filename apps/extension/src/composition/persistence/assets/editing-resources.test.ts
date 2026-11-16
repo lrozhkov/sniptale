@@ -375,77 +375,90 @@ it('uses exact Scenario children from Montage without reading the unrelated Scen
   expect((await f.project(montage.id)).refs.map((ref) => ref.assetId)).toEqual(['child-bytes']);
 });
 
-it('materializes Scenario retained history and keeps history documents and detached Tour audio', async () => {
-  const f = fixture();
-  const project = createGuideProject('Guide', 'guide', 100);
-  const old = structuredClone(project);
-  const step = createGuideStep('Old image', 'old-step');
-  step.blocks.push(
-    createGuideImageBlock({
-      id: 'old-image',
-      assetId: 'child',
-      editDocumentId: 'old-edit',
-      width: 10,
-      height: 10,
-      source: { kind: 'import', filename: 'old.png' },
-    })
-  );
-  old.items.push(step);
-  project.tour = createTourDocument('tour');
-  project.tour.audioResources = [{ assetId: 'audio', duration: 2, name: 'Take.wav' }];
-  const entry = {
-    ...createScenarioProjectEntry({ project, existing: undefined, updatedAt: 200 }),
-    workspaceRevision: 2,
-    history: [{ revision: 1, savedAt: 100, project: old }],
-  };
-  const encoded = encodeScenarioUnitStorage(entry, []);
-  f.seed('scenario_projects', entry.id, encoded.head);
-  for (const row of encoded.rows)
-    f.seed('scenario_project_history', [row.projectId, row.revision], row);
-  for (const row of encoded.units)
-    f.seed('scenario_project_units', [row.projectId, row.unitId, row.revision], row);
-  for (const [id, mimeType, width, height, duration] of [
-    ['child', 'image/png', 10, 10, undefined],
-    ['audio', 'audio/wav', 0, 0, 2],
-  ] as const) {
-    f.seed('scenario_assets', id, {
-      id,
+it.each(['saved', 'past', 'future'] as const)(
+  'materializes Scenario %s history and keeps its documents and detached Tour audio',
+  async (branch) => {
+    const f = fixture();
+    const project = createGuideProject('Guide', 'guide', 100);
+    const old = structuredClone(project);
+    const step = createGuideStep('Old image', 'old-step');
+    step.blocks.push(
+      createGuideImageBlock({
+        id: 'old-image',
+        assetId: 'child',
+        editDocumentId: 'old-edit',
+        width: 10,
+        height: 10,
+        source: { kind: 'import', filename: 'old.png' },
+      })
+    );
+    old.items.push(step);
+    old.tour = createTourDocument('tour');
+    old.tour.audioResources = [{ assetId: 'audio', duration: 2, name: 'Take.wav' }];
+    const entry = {
+      ...createScenarioProjectEntry({ project, existing: undefined, updatedAt: 200 }),
+      workspaceRevision: 2,
+      ...(branch === 'saved'
+        ? { history: [{ revision: 1, savedAt: 100, project: old }] }
+        : {
+            editingHistory: {
+              version: 1 as const,
+              past: branch === 'past' ? [old] : [],
+              future: branch === 'future' ? [old] : [],
+            },
+          }),
+    };
+    const encoded = encodeScenarioUnitStorage(entry, []);
+    f.seed('scenario_projects', entry.id, encoded.head);
+    for (const row of encoded.rows)
+      f.seed('scenario_project_history', [row.projectId, row.revision], row);
+    for (const row of encoded.units)
+      f.seed('scenario_project_units', [row.projectId, row.unitId, row.revision], row);
+    for (const [id, mimeType, width, height, duration] of [
+      ['child', 'image/png', 10, 10, undefined],
+      ['audio', 'audio/wav', 0, 0, 2],
+    ] as const) {
+      f.seed('scenario_assets', id, {
+        id,
+        projectId: project.id,
+        assetId: `bytes-${id}`,
+        galleryAssetId: null,
+        mimeType,
+        width,
+        height,
+        size: 6,
+        createdAt: 1,
+        ...(duration ? { duration } : {}),
+      });
+      f.seed('asset_refs', `bytes-${id}`, reference(`bytes-${id}`, mimeType, 6));
+      f.owner('scenario-asset', id, `bytes-${id}`);
+    }
+    f.seed('scenario_step_editor_documents', 'old-edit', {
+      stepId: 'old-edit',
       projectId: project.id,
-      assetId: `bytes-${id}`,
-      galleryAssetId: null,
-      mimeType,
-      width,
-      height,
-      size: 6,
       createdAt: 1,
-      ...(duration ? { duration } : {}),
+      updatedAt: 1,
+      document: createPersistedEditorDocumentFixture(
+        createEditorDocumentFixture(),
+        'history-document'
+      ),
     });
-    f.seed('asset_refs', `bytes-${id}`, reference(`bytes-${id}`, mimeType, 6));
-    f.owner('scenario-asset', id, `bytes-${id}`);
+    f.seed('asset_refs', 'history-document', reference('history-document', 'image/png', 6));
+    const result = await collectNativeEditingResources(f.tx(), {
+      rootKind: 'scenario-project',
+      rootId: project.id,
+    });
+    expect(result.refs.map((ref) => ref.assetId).sort()).toEqual(
+      ['bytes-child', 'bytes-audio', 'history-document'].sort()
+    );
+    f.rows.get('asset_refs')!.delete('history-document');
+    const beforeFailure = structuredClone(f.rows);
+    await expect(
+      collectNativeEditingResources(f.tx(), { rootKind: 'scenario-project', rootId: project.id })
+    ).rejects.toThrow('unavailable');
+    expect(f.rows).toEqual(beforeFailure);
   }
-  f.seed('scenario_step_editor_documents', 'old-edit', {
-    stepId: 'old-edit',
-    projectId: project.id,
-    createdAt: 1,
-    updatedAt: 1,
-    document: createPersistedEditorDocumentFixture(
-      createEditorDocumentFixture(),
-      'history-document'
-    ),
-  });
-  f.seed('asset_refs', 'history-document', reference('history-document', 'image/png', 6));
-  const result = await collectNativeEditingResources(f.tx(), {
-    rootKind: 'scenario-project',
-    rootId: project.id,
-  });
-  expect(result.refs.map((ref) => ref.assetId).sort()).toEqual(
-    ['bytes-child', 'bytes-audio', 'history-document'].sort()
-  );
-  f.rows.get('asset_refs')!.delete('history-document');
-  await expect(
-    collectNativeEditingResources(f.tx(), { rootKind: 'scenario-project', rootId: project.id })
-  ).rejects.toThrow('unavailable');
-});
+);
 
 it('keeps screenshot provenance and its editable document in a native Review closure', async () => {
   const f = fixture();

@@ -325,6 +325,19 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'scenario-retained-resource-closure',
+    productionFile: 'apps/extension/src/composition/persistence/scenario/resource-references.ts',
+    reason:
+      'Retained Scenario references serve editing admission, cleanup and source promotion. ' +
+      'Direct projection and native aggregate identity suites cover these consumers.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/scenario/resource-references.test.ts',
+      'apps/extension/src/composition/persistence/assets/editing-resources.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.identity.test.ts',
+    ],
+  },
+  {
     owner: 'shared-db-scenario-project-entry',
     productionFile: 'apps/extension/src/composition/persistence/scenario/projects/entry.ts',
     reason:

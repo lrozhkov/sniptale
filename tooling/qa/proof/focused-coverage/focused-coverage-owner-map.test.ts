@@ -16,6 +16,8 @@ it('keeps committed focused coverage owner maps valid', async () => {
 });
 
 it.each([
+  ['scenario/resource-references.ts', 'scenario/aggregate-mutations.identity.test.ts'],
+  ['scenario/resource-references.ts', 'assets/editing-resources.test.ts'],
   ['scenario/projects/entry.ts', 'scenario/editing-history.test.ts'],
   ['scenario/projects/entry.ts', 'scenario/aggregate-mutations.test.ts'],
   ['scenario/projects/entry.ts', 'scenario/aggregate-mutations.identity.test.ts'],

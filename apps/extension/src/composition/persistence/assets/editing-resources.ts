@@ -19,7 +19,7 @@ import {
 } from '../scenario/read-guards';
 import { parseScenarioStepEditorDocumentEntry } from '../scenario/editor-documents/index.guards';
 import { readScenarioStorage } from '../scenario/storage';
-import { getScenarioResourceReferences } from '../../../features/scenario/project/public';
+import { collectScenarioResourceReferences } from '../scenario/resource-references';
 import { freezeMediaInTransaction } from '../sync-capture/freeze';
 import { collectCapturedProjectRecordingIds } from '../sync-capture/project-snapshot';
 import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
@@ -429,16 +429,7 @@ class EditingResourceProjection {
   async scenario(id: string) {
     const entry = parseScenarioProjectEntry((await readScenarioStorage(this.tx, id)).logical);
     requireResource(entry && entry.id === id);
-    const assets = new Set<string>();
-    const documents = new Set<string>();
-    for (const project of [
-      entry.project,
-      ...(entry.history ?? []).map((version) => version.project),
-    ]) {
-      const references = getScenarioResourceReferences(project);
-      for (const asset of references.assets) assets.add(asset);
-      for (const document of references.documents) documents.add(document);
-    }
+    const { assets, documents } = collectScenarioResourceReferences(entry);
     for (const asset of assets) await this.scenarioAsset(asset, id);
     for (const stepId of documents) {
       const document = parseScenarioStepEditorDocumentEntry(
