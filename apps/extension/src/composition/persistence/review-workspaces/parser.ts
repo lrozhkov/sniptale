@@ -19,6 +19,7 @@ import { buildReviewTimeMap } from '../../../features/video/review/timeline';
 import {
   parseReviewAnnotation,
   parseReviewOperation,
+  type ReviewOperationLifetime,
   parseReviewSource,
   parseReviewDocumentBaseline,
 } from '../../../features/video/review/validation';
@@ -71,13 +72,14 @@ const aggregateId = (value: unknown): value is string =>
 function parseWorkspaceHistory(
   raw: unknown[],
   source: ReviewSource,
-  report: Report
+  report: Report,
+  operationLifetime: ReviewOperationLifetime
 ): { history: ReviewOperation[]; discardedHeaderChanges: Set<number> } | null {
   const history: ReviewOperation[] = [];
   const ids = new Set<string>();
   const discardedHeaderChanges = new Set<number>();
   for (const [index, value] of raw.entries()) {
-    const operation = parseReviewOperation(value, source.duration);
+    const operation = parseReviewOperation(value, source.duration, operationLifetime);
     if (!operation || ids.has(operation.id)) {
       report({
         check: 'history-operation',
@@ -187,7 +189,8 @@ function validEffectSnapshotClosure(
 /** Rejects corrupt history, including invalid operations in the unapplied redo suffix. */
 function parseWorkspace(
   value: unknown,
-  report: Report
+  report: Report,
+  operationLifetime: ReviewOperationLifetime
 ): { workspace: VideoWorkspace; document: ReviewDocument } | null {
   if (
     !isRecord(value) ||
@@ -227,7 +230,7 @@ function parseWorkspace(
     ? parseReviewDocumentBaseline(value['baseline'], source.duration)
     : undefined;
   if (completeBaseline === null || (!complete && 'baseline' in value)) return null;
-  const admitted = parseWorkspaceHistory(value['history'], source, report);
+  const admitted = parseWorkspaceHistory(value['history'], source, report, operationLifetime);
   if (!admitted) return null;
   const parsed = parseWorkspaceDocument({
     ...admitted,
@@ -277,11 +280,18 @@ function parseWorkspace(
 }
 
 /** Admits complete history and its selected document without storage writes; rejected values retain only a bounded diagnostic. */
-export function inspectVideoWorkspace(value: unknown) {
+export function inspectVideoWorkspace(
+  value: unknown,
+  operationLifetime: ReviewOperationLifetime = 'retained'
+) {
   let failure: VideoWorkspaceDiagnostic = { check: 'workspace-envelope', reason: 'invalid' };
-  const admitted = parseWorkspace(value, (detail) => {
-    failure = detail;
-  });
+  const admitted = parseWorkspace(
+    value,
+    (detail) => {
+      failure = detail;
+    },
+    operationLifetime
+  );
   if (admitted) return { ...admitted, failure: null };
   const count = (value: unknown) =>
     typeof value === 'number' && Number.isSafeInteger(value) && value >= 0

@@ -4,7 +4,7 @@ import {
   createQuickEditAdvancedContent,
   createQuickEditAdvancedState,
 } from '../../../features/video/review/advanced/defaults';
-import { inspectVideoWorkspace } from './parser';
+import { inspectVideoWorkspace, parseVideoWorkspace } from './parser';
 import {
   replayReviewHistory,
   reviewAdvancedContentBaseline,
@@ -373,3 +373,34 @@ it.each([1, 2, 5])(
     ).toBeNull();
   }
 );
+
+it('keeps transient history admission equivalent for current, redo and refused graphs', () => {
+  const note = { id: 'note', text: 'Original', anchor: { kind: 'point', time: 1 } };
+  const operation = { id: 'add-note', at: 1, target: 'annotation', before: null, after: note };
+  const edit = {
+    id: 'edit-note',
+    at: 2,
+    target: 'annotation',
+    before: note,
+    after: { ...note, text: 'Updated' },
+  };
+  const valid = { ...workspace(), history: [operation, edit], cursor: 1 };
+  for (const input of [
+    valid,
+    { ...valid, cursor: 0 },
+    { ...valid, cursor: 2 },
+    { ...valid, history: [operation, { ...edit, before: { ...note, text: 'Mismatch' } }] },
+    { ...valid, history: [operation, { ...edit, id: operation.id }] },
+    { ...valid, history: [operation, { ...edit, after: { ...note, text: 42 } }] },
+  ]) {
+    expect(inspectVideoWorkspace(input, 'transient')).toEqual(inspectVideoWorkspace(input));
+  }
+  const result = inspectVideoWorkspace(valid, 'transient');
+  expect(result.workspace).not.toBeNull();
+  expect(Object.isFrozen(result.workspace?.history[0])).toBe(false);
+});
+
+it('keeps the compatibility parser usable as a direct array callback', () => {
+  const input = workspace();
+  expect([input].map(parseVideoWorkspace)).toEqual([inspectVideoWorkspace(input).workspace]);
+});

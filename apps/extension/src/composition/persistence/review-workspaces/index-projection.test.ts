@@ -216,3 +216,15 @@ it('clears admitted history markers after recovery in a later transaction', asyn
   await createWorkspaceIndexMutation(fixture.tx).put('video_workspaces', head, 'put');
   expect(fixture.put.mock.calls.map(([store]) => store)).toEqual(['video_workspaces']);
 });
+
+it('does not retain immutable operation copies during one-shot reference projection', () => {
+  const head = workspaceStorageHead(workspace, []);
+  const rows = workspaceStorageRows(workspace);
+  const clone = vi.spyOn(globalThis, 'structuredClone');
+  try {
+    expect(projectWorkspaceReferenceKeys(head, rows)).toEqual(['media:recording:one']);
+    expect(clone).not.toHaveBeenCalled();
+  } finally {
+    clone.mockRestore();
+  }
+});

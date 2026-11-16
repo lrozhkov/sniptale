@@ -447,3 +447,20 @@ it('detaches and freezes nested compound content without freezing the caller doc
   expect(parsed.before.audio.original.volume).not.toBe(0.2);
   expect(parseReviewOperation(parsed, 10)).toBe(parsed);
 });
+
+it('validates transient operations without retaining immutable copies', () => {
+  const raw = {
+    id: 'transient',
+    at: 1,
+    target: 'annotation',
+    before: null,
+    after: { ...annotation },
+  };
+  const transient = parseReviewOperation(raw, 10, 'transient');
+  expect(transient).toEqual(parseReviewOperation(raw, 10));
+  expect(Object.isFrozen(transient)).toBe(false);
+  expect(
+    parseReviewOperation({ ...raw, after: { ...annotation, text: 42 } }, 10, 'transient')
+  ).toBeNull();
+  expect(Object.isFrozen(raw.after)).toBe(false);
+});

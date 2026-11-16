@@ -326,6 +326,9 @@ export function parseCanvasComment(value: unknown, duration: number): CanvasComm
   };
 }
 
+/** One-shot projections validate values without retaining immutable operation copies. */
+export type ReviewOperationLifetime = 'retained' | 'transient';
+
 const admittedOperations = new WeakMap<
   object,
   { operation: ReviewOperation; duration: number; bytes?: number }
@@ -339,14 +342,18 @@ function freezeOperationValue(value: unknown): void {
 }
 
 /** Reuses only detached immutable outputs admitted for the same source duration. */
-export function parseReviewOperation(value: unknown, duration: number): ReviewOperation | null {
+export function parseReviewOperation(
+  value: unknown,
+  duration: number,
+  lifetime: ReviewOperationLifetime = 'retained'
+): ReviewOperation | null {
   if (isRecord(value)) {
     // Only this parser's outputs enter the memo; external frozen objects are not trusted.
     const admitted = admittedOperations.get(value);
     if (admitted?.duration === duration) return admitted.operation;
   }
   const parsed = parseReviewOperationValue(value, duration);
-  if (!parsed) return null;
+  if (!parsed || lifetime === 'transient') return parsed;
   const detached = structuredClone(parsed);
   freezeOperationValue(detached);
   admittedOperations.set(detached, { operation: detached, duration });
