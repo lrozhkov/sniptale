@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { ReviewTextDocumentPanel } from './text-panel';
 import type { ReviewTextFragment } from '../../features/video/review/text-types';
-import { act, type ComponentProps, type ReactNode } from 'react';
+import { act, Suspense, useState, type ComponentProps, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
@@ -14,7 +14,7 @@ import {
 } from '../../features/video/review/advanced/action-audio';
 import type { ReviewSourceSpeechBinding } from './speech-panel';
 import type { ReviewSelectedProperties } from './selected-properties';
-import { ReviewInspectorBinding, backupReview } from './inspector-binding';
+import { ReviewInspectorBinding, ReviewDeferredSelection, backupReview } from './inspector-binding';
 import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
 import { translate } from '../../platform/i18n';
 
@@ -103,6 +103,7 @@ vi.mock('./speech-panel', () => ({
 const selectedProbe = vi.hoisted(() => vi.fn());
 vi.mock('./selected-properties', () => ({
   reviewSelectionLabel: () => 'Voiceover',
+  reviewSelectionIcon: () => undefined,
   ReviewSelectedProperties: (props: ComponentProps<typeof ReviewSelectedProperties>) => {
     selectedProbe(props);
     return (
@@ -239,7 +240,7 @@ it('joins every editor buffer for either recognition source and guards related-t
     });
   try {
     await act(async () => root.render(<ReviewInspectorBinding {...props} />));
-    expect(host.querySelector('[role="status"]')?.textContent).toBe('Backup refused');
+    expect(host.querySelector('[role="status"]')?.textContent).not.toContain('Backup refused');
     await checkHistoryPlaybackIsolation(root, props, host);
     await act(async () => root.render(<ReviewInspectorBinding {...props} />));
     await click('Flush source buffers');
@@ -799,3 +800,48 @@ async function checkLatestHistoryCommands(
     audition.mockRestore();
   }
 }
+
+it('commits selection before suspended properties and admits only the latest property panel', async () => {
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const wait = new Promise<void>(() => {});
+  let blocked = false;
+  let value = '';
+  let edit: (next: string) => void = () => {};
+  function Properties({ id }: { id: string }) {
+    const [text, setText] = useState('');
+    edit = setText;
+    value = text;
+    if (blocked) throw wait;
+    return <input aria-label={id} value={text} onChange={() => {}} />;
+  }
+  const render = (id: string) =>
+    root.render(
+      <Suspense fallback={<span>Suspended</span>}>
+        <output>{id}</output>
+        <ReviewDeferredSelection selectionKey={id}>
+          <Properties key={id} id={id} />
+        </ReviewDeferredSelection>
+      </Suspense>
+    );
+  try {
+    await act(async () => render('first'));
+    expect(host.querySelector('input')?.getAttribute('aria-label')).toBe('first');
+    blocked = true;
+    await act(async () => render('second'));
+    expect(host.querySelector('output')?.textContent).toBe('second');
+    expect(host.querySelector('[aria-busy="true"]')).not.toBeNull();
+    expect(host.querySelector('input')).toBeNull();
+    expect(host.textContent).not.toContain('Suspended');
+    blocked = false;
+    await act(async () => render('third'));
+    expect(host.querySelector('output')?.textContent).toBe('third');
+    expect(host.querySelector('input')?.getAttribute('aria-label')).toBe('third');
+    await act(async () => edit('immediate edit'));
+    expect(value).toBe('immediate edit');
+    expect(host.querySelector('input')?.value).toBe('immediate edit');
+    expect(host.querySelector('[aria-busy="false"]')).not.toBeNull();
+  } finally {
+    await act(async () => root.unmount());
+  }
+});

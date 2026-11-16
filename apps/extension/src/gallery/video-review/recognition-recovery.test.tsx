@@ -243,6 +243,9 @@ it.each([
     session.setAutosaveEnabled(autosave);
     await act(async () => root.render(<SourcePanelProbe session={session} />));
     await act(async () =>
+      host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-recognition"]')!.click()
+    );
+    await act(async () =>
       button(
         translate(
           autosave
@@ -252,6 +255,11 @@ it.each([
       ).click()
     );
     await act(async () => button(translate('gallery.videoReview.speechConsentContinue')).click());
+    const section = async (id: string) =>
+      act(async () =>
+        host.querySelector<HTMLButtonElement>(`[role="tab"][aria-controls$="-${id}"]`)!.click()
+      );
+    await section('audio');
     const gain = () => button(translate('gallery.videoReview.volume') + ' decrease');
     expect(gain().disabled).toBe(false);
     const applyLabel = translate(
@@ -259,11 +267,15 @@ it.each([
     );
     if (retry) {
       commit.mockRejectedValueOnce(new Error('Apply failed'));
+      await section('recognition');
       await act(async () => button(applyLabel).click());
+      await section('audio');
       expect(gain().disabled).toBe(false);
     }
     const release = holdCommit();
+    await section('recognition');
     await act(async () => button(applyLabel).click());
+    await section('audio');
     expect(commit).toHaveBeenCalledTimes(retry ? 2 : 1);
     // A keyboard step is a real gain gesture after the buffer join, before acceptance acknowledgement.
     await act(async () => gain().click());

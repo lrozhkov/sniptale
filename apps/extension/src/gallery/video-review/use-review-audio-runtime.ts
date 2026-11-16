@@ -188,6 +188,11 @@ class ReviewAudioPlaybackSession {
   private actionBuffers = new Map<ActionSoundSampleId, ReviewAudioClipBuffer>();
   private planKey = '';
   private generation = 0;
+  private handles: {
+    lane: QuickEditAudioPlanEntry['lane'];
+    end: number;
+    handle: ReturnType<ReviewAudioEngine['scheduleClip']>;
+  }[] = [];
   private preparation: AbortController | null = null;
   private anchor: { outputTime: number; audioNow: number } | null = null;
   private rollingTimer: ReturnType<typeof setTimeout> | null = null;
@@ -206,7 +211,10 @@ class ReviewAudioPlaybackSession {
     private engines: { get(): ReviewAudioEngine | null; peek(): ReviewAudioEngine | null }
   ) {}
 
-  stop(stopEngine = true) {
+  stop(stopEngine = true, preserveMusic = false) {
+    if (preserveMusic)
+      for (const owned of this.handles) if (owned.lane !== 'music') owned.handle.stop();
+    this.handles = preserveMusic ? this.handles.filter((owned) => owned.lane === 'music') : [];
     this.generation += 1;
     this.requestedPlayback = false;
     this.requestedProcessingKey = '';
@@ -231,13 +239,18 @@ class ReviewAudioPlaybackSession {
   cancelAudition() {
     if (this.auditionActive) this.stop();
   }
-  async preparePlayback(): Promise<boolean> {
+  async preparePlayback(planKey: string): Promise<boolean> {
     this.stop();
     const current = {
       ...this.latest.current,
       outputTime: this.readOutputTime(this.latest.current) ?? this.latest.current.outputTime,
     };
     const plan = current.actionPlan;
+    const plainEntries = buildQuickEditAudioPlan(current).filter(
+      (entry) =>
+        !hasReviewAudioProcessing(entry.audioProcessing) &&
+        entry.timelineStart + entry.duration > current.outputTime
+    );
     let processedEntries: readonly QuickEditAudioPlanEntry[];
     try {
       processedEntries = this.processingEntries(current);
@@ -247,7 +260,10 @@ class ReviewAudioPlaybackSession {
     }
     if (
       current.silent ||
-      (!plan?.descriptors.length && !current.recordingActionSource && !processedEntries.length)
+      (!plan?.descriptors.length &&
+        !current.recordingActionSource &&
+        !processedEntries.length &&
+        !plainEntries.length)
     )
       return true;
     const controller = new AbortController();
@@ -269,6 +285,20 @@ class ReviewAudioPlaybackSession {
     try {
       await this.loadActions(current, controller.signal, valid);
       if (!valid()) return false;
+      if (this.planKey !== planKey) {
+        this.prepared.clear();
+        this.planKey = planKey;
+      }
+      if (plainEntries.length) {
+        const engine = this.engines.get();
+        if (!engine) throw new Error('Audio preview is unavailable.');
+        await engine.resume();
+        for (const entry of plainEntries) {
+          if (!valid()) return false;
+          await this.preparePlainClip(entry, engine, controller.signal);
+        }
+        if (!valid()) return false;
+      }
       if (processedEntries.length) {
         const engine = this.engines.get();
         if (!engine) throw new Error('Processed audio preview is unavailable.');
@@ -391,7 +421,9 @@ class ReviewAudioPlaybackSession {
       this.requestedProcessingKey === this.processingKey(this.latest.current)
     );
   }
-  schedule(planKey: string, requested = false) {
+  schedule(planKey: string, requested = false, preserveMusic = false) {
+    // Background music keeps its audio clock during drift correction, until a transport command.
+    preserveMusic = preserveMusic && this.planKey === planKey && this.anchor !== null;
     this.auditionActive = false;
     const current = {
       ...this.latest.current,
@@ -405,7 +437,7 @@ class ReviewAudioPlaybackSession {
       Math.abs(current.outputTime - this.stagedProcessingTime) < SEEK_RESCHEDULE_SECONDS &&
       this.stagedSourceFile === current.originalSource?.file;
     this.stagedProcessingKey = '';
-    if (!staged) this.stop(false);
+    if (!staged) this.stop(false, preserveMusic);
     const generation = ++this.generation;
     this.clearActionResources();
     const controller = staged ? this.preparation! : new AbortController();
@@ -424,7 +456,7 @@ class ReviewAudioPlaybackSession {
     this.requestedPlayback = requested;
     this.requestedProcessingKey = this.processingKey(current);
     this.anchor = { outputTime: current.outputTime, audioNow: engine.now() };
-    if (!staged) engine.stopAll();
+    if (!staged && !preserveMusic) engine.stopAll();
     try {
       this.configureOriginal(engine, current);
     } catch {
@@ -440,7 +472,7 @@ class ReviewAudioPlaybackSession {
             originalAudioGainAt(current.original, current.video.current?.currentTime ?? 0)
           )
     );
-    void this.run({ current, generation, signal: controller.signal, engine });
+    void this.run({ current, generation, signal: controller.signal, engine, preserveMusic });
   }
   private active(job: PlaybackJob) {
     return (
@@ -455,57 +487,93 @@ class ReviewAudioPlaybackSession {
   }
   private async run(job: PlaybackJob) {
     try {
+      // Ready music must replace stopped nodes in this turn, before unrelated IO or React work.
+      const plain = this.startPlain(job);
+      // Observe a cold decode failure even if resuming the audio context also fails.
+      void plain.catch((error: unknown) => this.fail(job, error));
       await job.engine.resume();
       if (!this.active(job)) return;
-      await this.startProcessed(job);
-      if (!this.active(job)) return;
-      await this.startActions(job);
-      if (!this.active(job)) return;
-      const plan = buildQuickEditAudioPlan({
-        voiceover: job.current.voiceover,
-        music: job.current.music,
-      });
-      for (const entry of plan) {
-        if (hasReviewAudioProcessing(entry.audioProcessing)) continue;
-        const buffer = await this.resolveBuffer(entry);
-        if (!this.active(job)) return;
-        if (!buffer) continue;
-        const rate = entry.playbackRate ?? 1;
-        const key = JSON.stringify([
-          quickEditAudioSourceKey(entry.source),
-          entry.sourceOffset,
-          entry.duration,
-          rate,
-        ]);
-        let prepared = rate === 1 ? buffer : this.prepared.get(key);
-        if (!prepared) {
-          prepared = await job.engine.prepareClip(buffer, entry, job.signal);
-          if (!this.active(job)) return;
-          this.prepared.set(key, prepared);
-        }
-        if (!this.active(job) || !this.anchor) return;
-        const now = job.engine.now();
-        const schedule = planQuickEditClipPlayback({
-          entry,
-          outputTime: this.anchor.outputTime + now - this.anchor.audioNow,
-          audioNow: now,
-        });
-        if (schedule)
-          job.engine.scheduleClip(
-            rate === 1
-              ? schedule
-              : {
-                  ...schedule,
-                  offset: (schedule.offset - entry.sourceOffset) / rate,
-                  duration: schedule.duration / rate,
-                  playbackRate: 1,
-                },
-            prepared
-          );
-      }
+      await Promise.all([plain, this.startProcessed(job), this.startActions(job)]);
     } catch (error) {
       this.fail(job, error);
     }
+  }
+  private async startPlain(job: PlaybackJob) {
+    if (!this.active(job)) return;
+    const plan = buildQuickEditAudioPlan({
+      voiceover: job.current.voiceover,
+      music: job.current.music,
+    });
+    for (const entry of plan) {
+      if (
+        (job.preserveMusic && entry.lane === 'music') ||
+        entry.timelineStart + entry.duration <= job.current.outputTime ||
+        hasReviewAudioProcessing(entry.audioProcessing)
+      )
+        continue;
+      const prepared =
+        this.prepared.get(this.plainKey(entry)) ??
+        (await this.preparePlainClip(entry, job.engine, job.signal));
+      if (!this.active(job)) return;
+      if (!prepared) continue;
+      const rate = entry.playbackRate ?? 1;
+      if (!this.active(job) || !this.anchor) return;
+      const now = job.engine.now();
+      const schedule = planQuickEditClipPlayback({
+        entry,
+        outputTime: this.anchor.outputTime + now - this.anchor.audioNow,
+        audioNow: now,
+      });
+      if (schedule)
+        this.scheduleClip(
+          job,
+          entry.lane,
+          rate === 1
+            ? schedule
+            : {
+                ...schedule,
+                offset: (schedule.offset - entry.sourceOffset) / rate,
+                duration: schedule.duration / rate,
+                playbackRate: 1,
+              },
+          prepared
+        );
+    }
+  }
+  private scheduleClip(
+    job: PlaybackJob,
+    lane: QuickEditAudioPlanEntry['lane'],
+    schedule: Parameters<ReviewAudioEngine['scheduleClip']>[0],
+    buffer: ReviewAudioClipBuffer
+  ) {
+    this.handles = this.handles.filter((owned) => owned.end > job.engine.now());
+    const handle = job.engine.scheduleClip(schedule, buffer);
+    this.handles.push({ lane, end: schedule.when + schedule.duration, handle });
+  }
+  private plainKey(entry: QuickEditAudioPlanEntry) {
+    return JSON.stringify([
+      quickEditAudioSourceKey(entry.source),
+      entry.sourceOffset,
+      entry.duration,
+      entry.playbackRate ?? 1,
+    ]);
+  }
+  private async preparePlainClip(
+    entry: QuickEditAudioPlanEntry,
+    engine: ReviewAudioEngine,
+    signal: AbortSignal
+  ) {
+    const key = this.plainKey(entry);
+    const cached = this.prepared.get(key);
+    if (cached) return cached;
+    const buffer = await this.resolveBuffer(entry);
+    signal.throwIfAborted();
+    if (!buffer) return null;
+    const prepared =
+      (entry.playbackRate ?? 1) === 1 ? buffer : await engine.prepareClip(buffer, entry, signal);
+    signal.throwIfAborted();
+    this.prepared.set(key, prepared);
+    return prepared;
   }
   private configureOriginal(engine: ReviewAudioEngine, current: ReviewAudioRuntimeProps) {
     const active = hasReviewAudioProcessing(current.original.audioProcessing);
@@ -696,9 +764,10 @@ class ReviewAudioPlaybackSession {
     if ((!source && !plan?.descriptors.length) || !this.active(job)) return;
     const admission = await this.loadActions(job.current, job.signal, () => this.active(job));
     if (!admission || !this.active(job)) return;
+    job.current.onActionAudioRecovered?.();
+    if (!admission.sampleIds.length) return;
     if (job.audition)
       this.anchor = { outputTime: job.current.outputTime, audioNow: job.engine.now() };
-    job.current.onActionAudioRecovered?.();
     const visited = new Map<string, number>();
     const pump = async () => {
       if (!this.active(job) || !this.anchor) return;
@@ -750,7 +819,7 @@ class ReviewAudioPlaybackSession {
             outputTime: this.anchor.outputTime + now - this.anchor.audioNow,
           });
           visited.set(entry.clipId, entry.timelineStart + entry.duration);
-          if (schedule) job.engine.scheduleClip(schedule, buffer);
+          if (schedule) this.scheduleClip(job, 'action', schedule, buffer);
         }
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
       }
@@ -770,6 +839,7 @@ type PlaybackJob = {
   engine: ReviewAudioEngine;
   audition?: boolean;
   until?: number;
+  preserveMusic?: boolean;
 };
 
 export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
@@ -820,9 +890,10 @@ export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
   useEffect(() => {
     session.current?.cancelAudition();
   }, [planKey, props.seekRevision, props.recordingActionSource]);
+  const sourceClockMapped = props.sourceToResult !== undefined;
   useEffect(() => {
-    if (session.current?.needsSeek()) session.current.schedule(planKey);
-  }, [props.outputTime, planKey]);
+    if (session.current?.needsSeek()) session.current.schedule(planKey, false, sourceClockMapped);
+  }, [props.outputTime, planKey, sourceClockMapped]);
   useEffect(() => {
     peek()?.setOriginalProcessing?.(
       hasReviewAudioProcessing(latest.current.original.audioProcessing)
@@ -847,8 +918,8 @@ export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
   const stopAudition = useCallback(() => session.current?.cancelAudition(), []);
   const preparePlayback = useCallback(() => {
     const current = session.current;
-    return current ? current.preparePlayback() : Promise.resolve(false);
-  }, []);
+    return current ? current.preparePlayback(planKey) : Promise.resolve(false);
+  }, [planKey]);
   const startPlayback = useCallback(() => session.current?.schedule(planKey, true), [planKey]);
   const stopPlayback = useCallback(() => session.current?.stop(), []);
   return { audition, stopAudition, preparePlayback, startPlayback, stopPlayback };

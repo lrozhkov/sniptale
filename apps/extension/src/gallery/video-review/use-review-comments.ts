@@ -24,10 +24,6 @@ export function useReviewCommentActions(args: {
     args.setCutting(false);
     (args.pause ?? (() => args.video.current?.pause()))();
     args.setSelected(annotation);
-    args.seek(
-      annotation.anchor.kind === 'point' ? annotation.anchor.time : annotation.anchor.start,
-      false
-    );
     args.setSelection(annotation.anchor);
   };
   const add = (marker?: ReviewTelemetryMarker) => {

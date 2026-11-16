@@ -389,6 +389,8 @@ export function ReviewFragmentAction(props: {
   selection: ReviewAnchor;
   snapToKeyframes?: boolean;
   showLabel?: boolean;
+  persistent?: boolean;
+  iconOnly?: boolean;
   index: ReviewMediaIndex | null;
   edits: readonly ReviewEdit[];
   busy: boolean;
@@ -408,7 +410,7 @@ export function ReviewFragmentAction(props: {
         : null,
     [selection, index, edits, props.snapToKeyframes]
   );
-  if (selection.kind !== 'range') return null;
+  if (selection.kind !== 'range' && !props.persistent) return null;
   const audioUnavailable =
     !!index?.audioCodec &&
     !index.processedAudioCodec &&
@@ -424,11 +426,17 @@ export function ReviewFragmentAction(props: {
           ? 'gallery.videoReview.exportSelection'
           : 'gallery.videoReview.downloadSelection'
       )}
-      toolbarLabel={props.showLabel ? undefined : translate('gallery.videoReview.toolbarFragment')}
+      toolbarLabel={
+        props.showLabel || props.iconOnly
+          ? undefined
+          : translate('gallery.videoReview.toolbarFragment')
+      }
       title={rangeLabel + hint}
       disabled={!fragment || props.busy || audioUnavailable}
       className={props.showLabel ? `${reviewTextButtonClassName} !w-full justify-start` : plain}
-      onClick={() => props.onDownload(selection)}
+      onClick={() => {
+        if (selection.kind === 'range') props.onDownload(selection);
+      }}
     >
       <Download size={16} />
       {props.showLabel ? <span>{translate('gallery.videoReview.exportSelection')}</span> : null}

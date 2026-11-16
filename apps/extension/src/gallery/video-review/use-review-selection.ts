@@ -1,10 +1,24 @@
 import { reviewInteractionFamily } from '../../features/video/review/interaction-timeline';
+import { resolveReviewTimelineSelection } from './timeline-batch-selection';
 import { reviewTrackEnabled } from '../../features/video/review/advanced/track-controls';
 import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
 import { originalAudioRangeViews } from '../../features/video/review/advanced/original-audio-mutes';
 import { createTrackProjection } from './track-projection';
-import { reviewVoiceoverRange } from '../../features/video/review/voiceover-edits';
+import {
+  projectReviewVoiceover,
+  reviewVoiceoverRange,
+} from '../../features/video/review/voiceover-edits';
+import {
+  buildReviewTimeMap,
+  createReviewDisplayMap,
+  type ReviewTimeSegment,
+} from '../../features/video/review/timeline';
+import { projectReviewFocus } from '../../features/video/review/focus-edits';
+import {
+  projectReviewCursorMotions,
+  projectReviewWebcam,
+} from '../../features/video/review/timeline-placement';
 import { retimeReviewVoiceover } from '../../features/video/review/voiceover-timing';
 import { useEffect, useRef, useState } from 'react';
 import type {
@@ -18,6 +32,206 @@ import type {
   QuickEditZoomRegion,
 } from '../../features/video/review/advanced/types';
 import { resolveQuickEditZoomLink } from '../../features/video/review/advanced/zoom';
+
+type SelectionInterval = { start: number; end: number; domain: 'source' | 'result' };
+type SelectionNavigation = {
+  document: ReviewDocument;
+  advanced: QuickEditAdvancedState;
+  duration: number;
+  markers: readonly ReviewTelemetryMarker[];
+  sourceTime: number;
+  resultTime: number;
+  segments?: readonly ReviewTimeSegment[];
+};
+type SelectionGeometry = Omit<SelectionNavigation, 'sourceTime' | 'resultTime'>;
+
+/** Resolve current lane membership and cursor samples before deriving selected-item bounds. */
+export function reviewTimelineSelectionInterval(
+  keys: readonly string[],
+  selection: ReviewSelection,
+  context: SelectionGeometry,
+  cursorFocusKeys: readonly { id: string; sourceTime: number }[]
+) {
+  const selections =
+    keys.length > 1
+      ? keys.map((key) => {
+          const item = resolveReviewTimelineSelection(key, context.advanced);
+          if (item?.kind !== 'cursor-focus') return item;
+          const point = cursorFocusKeys.find((point) => point.id === item.id);
+          return point ? { ...item, time: point.sourceTime } : null;
+        })
+      : [selection];
+  if (selections.some((item) => !item)) return null;
+  return reviewSelectionInterval(
+    selections.filter((item) => item !== null),
+    context
+  );
+}
+
+/** Bounds include gaps between selected items and retain exact positions inside inserted freezes. */
+export function reviewSelectionInterval(
+  selections: readonly ReviewSelection[],
+  context: SelectionGeometry
+) {
+  const display = createReviewDisplayMap(context.duration, context.document.edits);
+  const intervals = selections.map((selection) => selectionIntervals(selection, context));
+  if (!intervals.length || intervals.some((ranges) => !ranges.length)) return null;
+  let start = Infinity;
+  let end = -Infinity;
+  for (const range of intervals.flat()) {
+    if (!Number.isFinite(range.start) || !Number.isFinite(range.end) || range.end < range.start)
+      return null;
+    const convert = range.domain === 'source' ? display.sourceToDisplay : display.resultToDisplay;
+    start = Math.min(start, convert(range.start));
+    end = Math.max(end, convert(range.end, range.start === range.end ? 'start' : 'end'));
+  }
+  start = Math.max(0, start);
+  end = Math.min(display.duration, end);
+  if (end - start < 0.05 - 1e-9) return null;
+  const result = { start: display.displayToResult(start), end: display.displayToResult(end) };
+  return {
+    start: display.displayToSource(start),
+    end: display.displayToSource(end),
+    ...(result.end - result.start >= 0.05 - 1e-9 ? { result } : {}),
+  };
+}
+
+/** Selection preserves an active playhead; only an outside position needs an unsnapped seek. */
+export function reviewSelectionSeekTarget(
+  selection: ReviewSelection,
+  context: SelectionNavigation
+) {
+  const intervals = selectionIntervals(selection, context).filter(
+    (range) =>
+      Number.isFinite(range.start) && Number.isFinite(range.end) && range.end >= range.start
+  );
+  if (
+    intervals.some((range) => {
+      const time = range.domain === 'source' ? context.sourceTime : context.resultTime;
+      return range.end === range.start
+        ? Math.abs(time - range.start) <= 0.001
+        : time >= range.start && time < range.end;
+    })
+  )
+    return null;
+  const first = intervals.toSorted((a, b) => a.start - b.start)[0];
+  return first ? { domain: first.domain, time: first.start } : null;
+}
+
+function selectionIntervals(
+  selection: ReviewSelection,
+  context: SelectionGeometry
+): SelectionInterval[] {
+  const { document, advanced, duration, markers } = context;
+  const ranges = (
+    value: { start: number; end: number } | undefined,
+    domain: SelectionInterval['domain'] = 'source'
+  ) => (value ? [{ ...value, domain }] : []);
+  const point = (time: number | undefined, domain: SelectionInterval['domain'] = 'source') =>
+    time === undefined ? [] : ranges({ start: time, end: time }, domain);
+  const segments = context.segments ?? buildReviewTimeMap(duration, document.edits);
+  switch (selection.kind) {
+    case 'none':
+      return [];
+    case 'cursor-focus':
+      return point(selection.time);
+    case 'edit': {
+      const edit = document.edits.find((item) => item.id === selection.id);
+      if (edit?.kind !== 'freeze') return ranges(edit);
+      const hold = segments.find((part) => part.freezeId === edit.id);
+      return hold ? ranges({ start: hold.resultStart, end: hold.resultEnd }, 'result') : [];
+    }
+    case 'annotation': {
+      const anchor = document.annotations.find((item) => item.id === selection.id)?.anchor;
+      return anchor?.kind === 'point' ? point(anchor.time) : ranges(anchor);
+    }
+    case 'canvas-comment': {
+      const item = document.canvasComments.find((item) => item.id === selection.id);
+      return item ? ranges({ start: item.start ?? 0, end: item.end ?? duration }) : [];
+    }
+    case 'annotation-effect': {
+      const item = advanced.annotationEffects?.instances.find((item) => item.id === selection.id);
+      return ranges(item, item?.timeDomain ?? 'source');
+    }
+    case 'text': {
+      const item = advanced.text?.fragments.find((item) => item.id === selection.id);
+      return ranges(item, item?.timeDomain === 'source' ? 'source' : 'result');
+    }
+    case 'telemetry': {
+      const item = markers.find(
+        (item) => item.ref.kind === selection.ref.kind && item.ref.id === selection.ref.id
+      );
+      return ranges(item, item?.timeDomain ?? 'source');
+    }
+    case 'cursor-motion': {
+      const item = advanced.cursorMotions?.find((item) => item.id === selection.id);
+      return (item ? (projectReviewCursorMotions([item], segments) ?? []) : []).flatMap((item) =>
+        ranges(item, 'result')
+      );
+    }
+    case 'zoom': {
+      const item = advanced.zoom.regions.find((item) => item.id === selection.id);
+      if (!item) return [];
+      const projected = projectReviewFocus([{ ...item, dormant: false }], segments);
+      return projected.flatMap((item) => ranges(item, 'result'));
+    }
+    case 'zoom-link': {
+      const link = resolveQuickEditZoomLink(advanced.zoom.regions, selection.id);
+      if (!link) return [];
+      const source = projectReviewFocus([link.source], segments).at(-1);
+      const target = projectReviewFocus([link.target], segments)[0];
+      return source && target ? ranges({ start: source.end, end: target.start }, 'result') : [];
+    }
+    case 'original-audio':
+      return ranges(
+        originalAudioRangeViews(
+          advanced.audio,
+          resolveQuickEditEffectiveFeatures(advanced).voiceoverApplied
+        ).find((item) => item.id === selection.id)
+      );
+    case 'audio': {
+      const item = advanced.audio[selection.lane].find((item) => item.id === selection.id);
+      return (
+        item
+          ? projectReviewVoiceover(
+              [item],
+              segments,
+              selection.lane === 'music' ? 'fill' : 'continue'
+            )
+          : []
+      ).map((item) => ({
+        start: item.timelineStart,
+        end: item.timelineStart + item.duration,
+        domain: 'result',
+      }));
+    }
+    case 'webcam':
+      return ranges({ start: 0, end: duration });
+    case 'webcam-position':
+    case 'webcam-hidden': {
+      const camera = projectReviewWebcam(advanced.webcam, segments);
+      const domain = camera?.timeDomain ?? 'source';
+      if (selection.kind === 'webcam-hidden')
+        return ranges(
+          camera?.hiddenRanges.find((item) => item.id === selection.id),
+          domain
+        );
+      const index = camera?.positions.findIndex((item) => item.id === selection.id) ?? -1;
+      const item = camera?.positions[index];
+      return item
+        ? ranges(
+            {
+              start: item.time,
+              end:
+                camera?.positions[index + 1]?.time ??
+                (domain === 'result' ? (segments.at(-1)?.resultEnd ?? duration) : duration),
+            },
+            domain
+          )
+        : [];
+    }
+  }
+}
 
 /** Builds the history deletion represented by a text or edit selection. */
 export function selectedHistoryRemoval(

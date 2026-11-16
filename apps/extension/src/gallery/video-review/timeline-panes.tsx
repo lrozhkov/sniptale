@@ -158,28 +158,16 @@ function observeReviewPaneLayout(
     );
     const rulerHeight = ordered.find((row) => row.ruler)?.body.getBoundingClientRect().height ?? 0;
     const planeRect = plane.getBoundingClientRect();
-    fixed.style.height = `${rulerHeight}px`;
-    list.style.height = `${Math.max(0, planeRect.height - rulerHeight)}px`;
-    root.style.setProperty(
-      '--review-scrollbar-height',
-      `${Math.max(0, right.offsetHeight - right.clientHeight)}px`
-    );
     let index = 0;
     let natural = 120;
-    for (const row of ordered) {
+    const placements = ordered.map((row) => {
       const parent = row.ruler ? fixed : list;
       const position = row.ruler ? 0 : index++;
-      if (parent.children[position] !== row.header)
-        parent.insertBefore(row.header, parent.children[position] ?? null);
       // Source comments occupy leading clearance above the visible video strip.
       const visibleLane = row.body.querySelector<HTMLElement>(
         '[data-ui="gallery.videoReview.sourceLane"]'
       );
       const rect = (visibleLane ?? row.body).getBoundingClientRect();
-      row.header.style.position = 'absolute';
-      row.header.style.insetInline = '0';
-      row.header.style.top = `${row.ruler ? 0 : rect.top - planeRect.top - rulerHeight}px`;
-      row.header.style.height = `${rect.height}px`;
       const label = row.header.querySelector<HTMLElement>('[data-track-label]');
       const actions = row.header.querySelector<HTMLElement>('[data-track-controls]');
       const toggle = row.header.querySelector<HTMLElement>('[role="switch"]');
@@ -192,12 +180,26 @@ function observeReviewPaneLayout(
           (reorder ? reorder.offsetWidth + 4 : 0) +
           44
       );
-    }
+      return { row, parent, position, rect };
+    });
+    const scrollbarHeight = Math.max(0, right.offsetHeight - right.clientHeight);
     const scrollbar = Math.max(0, left.offsetWidth - left.clientWidth);
     const width = Math.min(
       root.clientWidth * 0.4 || 260,
       Math.max(labelWidth, Math.ceil(natural + scrollbar))
     );
+    // Read all row geometry before changing any row or pane layout.
+    fixed.style.height = `${rulerHeight}px`;
+    list.style.height = `${Math.max(0, planeRect.height - rulerHeight)}px`;
+    root.style.setProperty('--review-scrollbar-height', `${scrollbarHeight}px`);
+    for (const { row, parent, position, rect } of placements) {
+      if (parent.children[position] !== row.header)
+        parent.insertBefore(row.header, parent.children[position] ?? null);
+      row.header.style.position = 'absolute';
+      row.header.style.insetInline = '0';
+      row.header.style.top = `${row.ruler ? 0 : rect.top - planeRect.top - rulerHeight}px`;
+      row.header.style.height = `${rect.height}px`;
+    }
     labelWidth = width;
     root.style.setProperty('--review-label-width', `${width}px`);
     const top = Math.max(
@@ -221,7 +223,24 @@ function observeReviewPaneLayout(
       .forEach((node) => resize.observe(node));
     measure();
   };
-  const mutation = new MutationObserver(observe);
+  const mutation = new MutationObserver((records) => {
+    const geometryChanged = records.some((record) => {
+      if (
+        record.target === fixed ||
+        record.target === list ||
+        fixed.contains(record.target) ||
+        list.contains(record.target)
+      )
+        return true;
+      return [...record.addedNodes, ...record.removedNodes].some(
+        (node) =>
+          node instanceof Element &&
+          [...rows].some((row) => node === row.body || node.contains(row.body))
+      );
+    });
+    // Lane size changes are covered by ResizeObserver; playback text does not move headers.
+    if (geometryChanged) observe();
+  });
   for (const node of [fixed, list])
     mutation.observe(node, { childList: true, subtree: true, characterData: true });
   mutation.observe(plane, { childList: true, subtree: true });

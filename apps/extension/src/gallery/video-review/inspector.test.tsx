@@ -2,8 +2,11 @@
 import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
+import { Info } from 'lucide-react';
+import { ReviewButton } from './controls';
 import { ReviewInspector as Inspector } from './inspector';
 import { useReviewInspectorNavigation } from './inspector-navigation';
+import { ReviewInspectorSections, reviewInspectorActions } from './inspector-sections';
 import type { ReviewSelection } from '../../features/video/review/types';
 
 let currentNavigation: ReturnType<typeof useReviewInspectorNavigation>;
@@ -111,7 +114,9 @@ it('hover highlights without seeking; comment selection and edit are distinct ex
       )
     );
     const headerActions = host.querySelectorAll<HTMLButtonElement>('header button');
-    const height = headerActions[headerActions.length - 2]!;
+    const height = host.querySelector<HTMLButtonElement>(
+      '[aria-label="videoEditor.app.panelRestoreHeight"]'
+    )!;
     expect(height.getAttribute('aria-label')).toBe('videoEditor.app.panelRestoreHeight');
     expect(headerActions[headerActions.length - 1]!.getAttribute('aria-label')).toBe(
       'common.actions.close'
@@ -214,7 +219,6 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
         onDelete={vi.fn()}
         onReport={vi.fn()}
         settingsAvailable={advanced}
-        selectionHasSections={advanced && contextKey.startsWith('settings:zoom:')}
         contextKey={contextKey}
         {...(selectionLabel ? { selectionLabel } : {})}
         scene={<p>Scene controls</p>}
@@ -234,7 +238,9 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
       )
     ).toBeNull();
     await act(async () => render(false, 'edit:cut-1', 'Cut'));
-    expect(host.querySelector('[data-ui="gallery.videoReview.inspectorPresentation"]')).toBeNull();
+    expect(
+      host.querySelector('[data-ui="gallery.videoReview.inspectorPresentation"]')
+    ).not.toBeNull();
     expect(host.textContent).toContain('Selected controls');
     expect(host.textContent).not.toContain('gallery.videoReview.commentsEmpty');
     expect(host.querySelector('[aria-label="gallery.app.selectionBackup"]')).toBeNull();
@@ -253,17 +259,7 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
     expect(host.textContent).toContain('Scene controls');
     expect(host.querySelector('[aria-label="gallery.app.selectionBackup"]')).toBeNull();
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
-    const presentation = host.querySelector<HTMLButtonElement>(
-      '[data-ui="gallery.videoReview.inspectorPresentation"]'
-    )!;
-    const originalLabel = presentation.getAttribute('aria-label');
-    await act(async () => presentation.click());
-    expect(presentation.getAttribute('aria-label')).not.toBe(originalLabel);
-    await act(async () => presentation.click());
-    expect(presentation.getAttribute('aria-label')).toBe(originalLabel);
-    expect(presentation.nextElementSibling?.getAttribute('aria-label')).toBe(
-      'videoEditor.app.panelFullHeight'
-    );
+    expect(host.querySelector('[data-ui="gallery.videoReview.inspectorPresentation"]')).toBeNull();
     await act(async () => render(true, 'settings:zoom:z1', 'Zoom'));
     expect(
       host.querySelector('[data-ui="gallery.videoReview.inspectorPresentation"]')
@@ -440,8 +436,8 @@ it.each(['scene', 'selected', 'history', 'export'] as const)(
         'header [aria-label="common.actions.close"]'
       )!;
       expect(host.querySelector('header .lucide-arrow-left')).not.toBeNull();
-      act(() => close.click());
-      expect(leave).toHaveBeenCalledOnce();
+      expect(close).toBeNull();
+      expect(leave).not.toHaveBeenCalled();
     } finally {
       act(() => root.unmount());
       host.remove();
@@ -503,8 +499,7 @@ it.each([true, false])(
       const presentation = host.querySelector<HTMLButtonElement>(
         '[data-ui="gallery.videoReview.inspectorPresentation"]'
       );
-      expect(presentation).not.toBeNull();
-      act(() => presentation!.click());
+      expect(presentation).toBeNull();
       expect(navigation.presentation).toBe('sections');
       expect(beforeAction).toHaveBeenCalledTimes(1);
       act(() => root.render(<Harness />));
@@ -736,6 +731,156 @@ it('does not let a repeated track-root command hide the next selected item', () 
     expect(currentNavigation.shown).toBe('selected');
   } finally {
     act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('routes visible inspector commands into the header menu in both parameter presentations', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const onCommand = vi.fn();
+  try {
+    await act(async () =>
+      root.render(
+        <ReviewInspector
+          filename="clip.webm"
+          annotations={[]}
+          selectedId={null}
+          busy={false}
+          message={null}
+          selectionLabel="Selected item"
+          contextKey="edit:one"
+          onBack={vi.fn()}
+          onAdd={vi.fn()}
+          onSelect={vi.fn()}
+          onHover={vi.fn()}
+          onEdit={vi.fn()}
+          onDelete={vi.fn()}
+          onReport={vi.fn()}
+          trackWorkspace={
+            <ReviewInspectorSections
+              sections={[reviewInspectorActions(<button>Lane command</button>)]}
+            />
+          }
+        >
+          <ReviewInspectorSections
+            sections={[
+              {
+                id: 'one',
+                label: 'One',
+                icon: Info,
+                content: <input aria-label="first-parameter" />,
+              },
+              {
+                id: 'two',
+                label: 'Two',
+                icon: Info,
+                content: <input aria-label="second-parameter" />,
+              },
+              reviewInspectorActions(<button onClick={onCommand}>Selected command</button>),
+            ]}
+          />
+        </ReviewInspector>
+      )
+    );
+    const footer = host.querySelector('[data-ui="gallery.videoReview.inspectorActionMenu"]')!;
+    expect(footer.textContent).toBe('Selected command');
+    const presentation = host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.inspectorPresentation"]'
+    )!;
+    expect(host.querySelector('[aria-label="second-parameter"]')).toBeNull();
+    await act(async () => presentation.click());
+    expect(currentNavigation.presentation).toBe('all');
+    expect(host.querySelector('[aria-label="first-parameter"]')).not.toBeNull();
+    expect(host.querySelector('[aria-label="second-parameter"]')).not.toBeNull();
+    expect(host.querySelector('[role="tablist"]')).toBeNull();
+    expect(footer.textContent).toBe('Selected command');
+    await act(async () => presentation.click());
+    expect(host.querySelector('[role="tablist"]')).not.toBeNull();
+    expect(footer.closest('.review-inspector-scroll')).toBeNull();
+    expect(footer.closest('header')).not.toBeNull();
+    expect(host.querySelector('[data-ui="gallery.videoReview.inspectorActionFooter"]')).toBeNull();
+    const menu = host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.inspectorActionMenuTrigger"]'
+    )!;
+    await act(async () => menu.click());
+    expect(menu.getAttribute('aria-expanded')).toBe('true');
+    await act(async () => footer.querySelector('button')!.click());
+    expect(onCommand).toHaveBeenCalledOnce();
+    expect(menu.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(menu);
+    await act(async () => currentNavigation.setSection('track'));
+    expect(footer.textContent).toBe('Lane command');
+    expect(footer.querySelectorAll('[data-section="actions"]')).toHaveLength(1);
+    await act(async () => currentNavigation.setSection('selected'));
+    expect(footer.textContent).toBe('Selected command');
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('keeps portaled item commands disabled while editor admission is busy', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const command = vi.fn();
+  const render = (busy: boolean) =>
+    root.render(
+      <ReviewInspector
+        filename="clip"
+        annotations={[]}
+        selectedId={null}
+        busy={busy}
+        message={null}
+        selectionLabel="Item"
+        contextKey="edit:item"
+        settingsAvailable
+        onBack={vi.fn()}
+        onAdd={vi.fn()}
+        onSelect={vi.fn()}
+        onHover={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+        onReport={vi.fn()}
+      >
+        <fieldset disabled={busy}>
+          <ReviewInspectorSections
+            sections={[
+              reviewInspectorActions(
+                <ReviewButton label="Reset" onClick={command}>
+                  Reset
+                </ReviewButton>
+              ),
+            ]}
+          />
+        </fieldset>
+      </ReviewInspector>
+    );
+  try {
+    await act(async () => render(false));
+    const trigger = host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.inspectorActionMenuTrigger"]'
+    )!;
+    await act(async () => trigger.click());
+    await act(async () => render(true));
+    const action = host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.inspectorActionMenu"] button'
+    )!;
+    expect(trigger.disabled).toBe(true);
+    expect(action.matches(':disabled')).toBe(true);
+    await act(async () => action.click());
+    expect(command).not.toHaveBeenCalled();
+    await act(async () => render(false));
+    expect(trigger.disabled).toBe(false);
+    expect(action.matches(':disabled')).toBe(false);
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
     vi.unstubAllGlobals();
   }
 });

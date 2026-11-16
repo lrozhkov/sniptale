@@ -46,6 +46,9 @@ it('offers press feedback rather than a fabricated click ripple for an incomplet
         />
       )
     );
+    act(() =>
+      host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-animation"]')!.click()
+    );
     const control = host.querySelector<HTMLButtonElement>(
       `[aria-label="${translate('gallery.videoReview.gestureFeedback')}"]`
     )!;

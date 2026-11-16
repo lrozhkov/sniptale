@@ -144,7 +144,7 @@ export function isReviewVoiceoverCut(
 export function projectReviewVoiceover(
   clips: readonly QuickEditAudioClip[],
   map?: readonly ReviewTimeSegment[],
-  holdPolicy: 'continue' | 'source' = 'continue'
+  holdPolicy: 'continue' | 'source' | 'fill' = 'continue'
 ): QuickEditAudioClip[] {
   return clips.flatMap((clip) => {
     if (!clip.sourceAnchor || !map) {
@@ -165,34 +165,68 @@ export function projectReviewVoiceover(
   });
 }
 
-/** Projects normalized native anchors without choosing an editor's source clock. */
+/** Adjacent retimed spans can divide one intact take at an inserted-video boundary. */
+function crossesContinuousAudio(
+  anchors: readonly QuickEditVoiceoverAnchor[],
+  time: number
+): boolean {
+  if (anchors.some((span) => span.start < time && time < span.end)) return true;
+  return anchors.some(
+    (left) =>
+      left.start < time &&
+      Math.abs(left.end - time) < 1e-7 &&
+      anchors.some(
+        (right) =>
+          Math.abs(right.start - time) < 1e-7 &&
+          right.end > time &&
+          Math.abs(left.offset + left.duration - right.offset) < 1e-7
+      )
+  );
+}
+
+/** Music fills inserted video with subsequent asset samples; recorded takes keep their native length. */
 export function projectReviewVoiceoverAnchors(
   clip: QuickEditAudioClip,
   anchors: readonly QuickEditVoiceoverAnchor[],
   map: readonly ReviewTimeSegment[],
-  holdPolicy: 'continue' | 'source' = 'continue'
+  holdPolicy: 'continue' | 'source' | 'fill' = 'continue'
 ): QuickEditAudioClip[] {
   const { sourceAnchor: _anchor, ...recording } = clip;
+  const crossingHolds = map.filter(
+    (part) => part.kind === 'freeze' && crossesContinuousAudio(anchors, part.sourceStart)
+  );
+  const tempo = clip.tempo ?? 1;
+  const filledSamples =
+    holdPolicy === 'fill'
+      ? crossingHolds.reduce((sum, part) => sum + (part.resultEnd - part.resultStart) * tempo, 0)
+      : 0;
   const slices = anchors.flatMap((anchor, anchorIndex) =>
     map.flatMap((part) => {
-      if (part.kind === 'cut' || part.kind === 'freeze') return [];
+      if (part.kind === 'cut') return [];
+      const filling = part.kind === 'freeze';
+      if (
+        filling &&
+        (holdPolicy !== 'fill' ||
+          !crossingHolds.includes(part) ||
+          anchor.start > part.sourceStart ||
+          anchor.end <= part.sourceStart)
+      )
+        return [];
       const start = Math.max(anchor.start, part.sourceStart);
       const end = Math.min(anchor.end, part.sourceEnd);
-      if (end <= start) return [];
+      if (!filling && end <= start) return [];
       const assetPerSource = anchor.duration / (anchor.end - anchor.start);
       const assetOffset = anchor.offset + (start - anchor.start) * assetPerSource;
-      const duration = (end - start) / part.rate;
-      const placedStart = part.resultStart + (start - part.sourceStart) / part.rate;
+      const duration = filling ? part.resultEnd - part.resultStart : (end - start) / part.rate;
+      const placedStart = filling
+        ? part.resultStart
+        : part.resultStart + (start - part.sourceStart) / part.rate;
       const insertedDelay =
-        holdPolicy === 'continue'
-          ? map.reduce(
+        holdPolicy !== 'source'
+          ? crossingHolds.reduce(
               (delay, hold) =>
                 delay +
-                (hold.kind === 'freeze' &&
-                hold.resultEnd <= placedStart + 1e-7 &&
-                anchors.some((span) => span.start < hold.sourceStart && hold.sourceStart < span.end)
-                  ? hold.resultEnd - hold.resultStart
-                  : 0),
+                (hold.resultEnd <= placedStart + 1e-7 ? hold.resultEnd - hold.resultStart : 0),
               0
             )
           : 0;
@@ -200,11 +234,15 @@ export function projectReviewVoiceoverAnchors(
         {
           ...recording,
           id: `${clip.id}:slice:${anchorIndex}:${part.sourceStart}`,
-          timelineStart: placedStart - insertedDelay,
-          sourceOffset: clip.sourceOffset + assetOffset,
+          timelineStart: placedStart - (holdPolicy === 'continue' ? insertedDelay : 0),
+          sourceOffset:
+            clip.sourceOffset + assetOffset + (holdPolicy === 'fill' ? insertedDelay * tempo : 0),
           duration,
-          playbackRate: clip.tempo ?? 1,
-          fadePhase: { offset: assetOffset, duration: clip.duration },
+          playbackRate: tempo,
+          fadePhase: {
+            offset: assetOffset + (holdPolicy === 'fill' ? insertedDelay * tempo : 0),
+            duration: clip.duration + filledSamples,
+          },
         },
       ];
     })

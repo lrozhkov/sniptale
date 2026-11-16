@@ -84,6 +84,11 @@ const commit = async (node: HTMLInputElement) => {
   });
 };
 
+function openAnimation() {
+  const tab = host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-animation"]');
+  if (tab) act(() => tab.click());
+}
+
 function renderInspector(
   onChange: (patch: QuickEditZoomRegionPatch) => void,
   onReset = vi.fn(),
@@ -147,6 +152,7 @@ it('commits percent-mapped focus fields and dedupes a repeated commit', async ()
 it('edits transition type and duration in separate enter/exit sections', async () => {
   const change = vi.fn((_patch: QuickEditZoomRegionPatch) => undefined);
   const inspector = renderInspector(change);
+  openAnimation();
   const typeIn = host.querySelector<HTMLButtonElement>(
     'fieldset[aria-label$="zoomTransitionIn"] [aria-label$="zoomTransitionType"] button[title$="transitionLinear"]'
   )!;
@@ -253,6 +259,13 @@ it('edits spotlight strength, area, reveal, rounding and blur through shared con
     area: { x: 0.1, y: 0.2, width: 0.6, height: 0.7 },
   });
   const choose = async (label: string, option: string, phase?: string) => {
+    act(() =>
+      host
+        .querySelector<HTMLButtonElement>(
+          `[role="tab"][aria-controls$="-${phase ? 'animation' : 'framing'}"]`
+        )!
+        .click()
+    );
     const section = phase
       ? host.querySelector(`fieldset[aria-label="gallery.videoReview.${phase}"]`)!
       : host;
@@ -288,6 +301,7 @@ it('edits spotlight strength, area, reveal, rounding and blur through shared con
 it('bounds the transition slider and typed duration by the other phase', async () => {
   const change = vi.fn();
   renderInspector(change);
+  openAnimation();
   const phase = host.querySelector('fieldset')!;
   expect(phase.querySelector('input[type="range"]')?.getAttribute('max')).toBe('1.7');
   const duration = phase.querySelector<HTMLInputElement>('input')!;
@@ -296,7 +310,7 @@ it('bounds the transition slider and typed duration by the other phase', async (
   expect(change).toHaveBeenLastCalledWith({ enter: { type: 'ease-in-out', duration: 1.7 } });
 });
 
-it('distinguishes compact nested position from collapsible top-level sections', () => {
+it('keeps precise position nested while top-level parameter groups use tabs', () => {
   renderInspector(vi.fn());
   const nested = host.querySelector('details[data-level="group"]');
   expect(nested).not.toBeNull();
@@ -304,8 +318,10 @@ it('distinguishes compact nested position from collapsible top-level sections', 
     'gallery.videoReview.precisePosition'
   );
   const parents = host.querySelectorAll('details[data-level="section"]');
-  expect(parents.length).toBeGreaterThanOrEqual(2);
-  expect([...parents].every((node) => node.hasAttribute('open'))).toBe(true);
+  expect(parents).toHaveLength(0);
+  expect(host.querySelectorAll('[role="tab"]')).toHaveLength(2);
+  openAnimation();
+  expect(host.querySelector('[data-section="animation"]')).not.toBeNull();
 });
 
 it('offers five source seconds on the slider and retains valid longer typed phases', async () => {
@@ -316,6 +332,7 @@ it('offers five source seconds on the slider and retains valid longer typed phas
       <ReviewZoomInspector region={long} onChange={change} onReset={vi.fn()} onDelete={vi.fn()} />
     )
   );
+  openAnimation();
   const phase = host.querySelector('fieldset')!;
   expect(phase.querySelector('input[type="range"]')?.getAttribute('max')).toBe('5');
   const duration = phase.querySelector<HTMLInputElement>('input')!;
@@ -336,6 +353,7 @@ it('displays fitted legacy phases without emitting a persistence change on mount
       <ReviewZoomInspector region={legacy} onChange={change} onReset={vi.fn()} onDelete={vi.fn()} />
     )
   );
+  openAnimation();
   const phases = host.querySelectorAll('fieldset');
   expect(Number(phases[0]!.querySelector<HTMLInputElement>('input')!.value)).toBeCloseTo(1.33);
   expect(Number(phases[1]!.querySelector<HTMLInputElement>('input')!.value)).toBeCloseTo(0.67);
@@ -367,6 +385,7 @@ it('updates the opposite fractional budget live and keeps fitted values unchange
     render();
   });
   await act(async () => render());
+  openAnimation();
   const ranges = () => [...host.querySelectorAll<HTMLInputElement>('fieldset input[type="range"]')];
   await type(ranges()[0]!, '0.17');
   expect(current.enter.duration).toBe(0.3);
@@ -459,6 +478,7 @@ it('allows camera copies and explains why unresolved placements cannot be copied
 it('configures entrance and exit blur separately, starts disabled and retains the other phase', async () => {
   const change = vi.fn();
   renderInspector(change);
+  openAnimation();
   expect(host.querySelectorAll('[data-ui="gallery.videoReview.motionBlurSettings"]')).toHaveLength(
     2
   );
@@ -545,6 +565,7 @@ it('orders spotlight roundness before precise area and makes both animation phas
     strength.compareDocumentPosition(roundness) & Node.DOCUMENT_POSITION_FOLLOWING
   ).toBeTruthy();
   expect(roundness.compareDocumentPosition(area) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  openAnimation();
   const phases = [...host.querySelectorAll('summary h4')].filter((node) =>
     node.textContent?.includes('zoomTransition')
   );

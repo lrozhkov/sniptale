@@ -175,7 +175,7 @@ function useReviewPlaybackFollow(
     if (navigated) suspended.current = true;
     const node = viewport.current;
     // Play accepts the current viewport, including a paused zoom's deferred scroll event.
-    if (start && node) position.current.left = node.scrollLeft;
+    if (start && node && !props.playbackRange) position.current.left = node.scrollLeft;
     if (
       !node ||
       !props.playing ||

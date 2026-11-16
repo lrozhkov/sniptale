@@ -63,6 +63,9 @@ it('patches volume and fades from numeric fields', () => {
   setValue(field('audioClipVolume'), '150');
   act(() => field('audioClipVolume').dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(onPatch).toHaveBeenCalledWith({ volume: 1.5 });
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-animation"]')!.click()
+  );
   setValue(field('audioFadeIn'), '0.5');
   act(() => field('audioFadeIn').dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(onPatch).toHaveBeenCalledWith({ fadeIn: 0.5 });
@@ -171,8 +174,11 @@ it('keeps long fades available by typing while using a five-second slider', () =
     endMax: 120,
   });
   renderEditor(clip);
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-animation"]')!.click()
+  );
   const ranges = [...host.querySelectorAll<HTMLInputElement>('input[type="range"]')];
-  expect(ranges.slice(1).map((range) => range.max)).toEqual(['5', '5']);
+  expect(ranges.map((range) => range.max)).toEqual(['5', '5']);
   const fade = host.querySelector<HTMLInputElement>(
     '[aria-label="gallery.videoReview.audioFadeOut"]'
   )!;
@@ -237,6 +243,9 @@ it('bounds a short audio fade to its duration', () => {
     endMax: 2,
   });
   const { field } = renderEditor(clip);
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-animation"]')!.click()
+  );
   setValue(field('audioFadeIn'), '12');
   act(() => field('audioFadeIn').dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(onPatch).toHaveBeenLastCalledWith({ fadeIn: 2 });

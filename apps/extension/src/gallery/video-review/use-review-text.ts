@@ -244,8 +244,8 @@ export function useReviewText(args: {
     jump: (fragment: ReviewTextFragment, select = false) =>
       guard(() => {
         args.pause();
-        args.seek(sourceInterval(fragment).start, false);
         if (select) args.select({ kind: 'text', id: fragment.id });
+        else args.seek(sourceInterval(fragment).start, false);
       }),
   };
 }

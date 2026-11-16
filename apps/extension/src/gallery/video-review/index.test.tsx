@@ -308,7 +308,9 @@ it('routes rare commands into one More menu in Basic and Advanced without perman
         translate('videoEditor.app.newProjectAction'),
         translate('gallery.keyboard.title'),
         translate('gallery.app.selectionBackup'),
-        ...(mode === 'advanced' ? [translate('gallery.videoReview.returnBasicMode')] : []),
+        ...(mode === 'advanced'
+          ? [translate('gallery.videoReview.returnBasicMode'), translate('common.actions.close')]
+          : []),
       ]
     );
     await act(async () => trigger.click());
@@ -350,4 +352,25 @@ it('makes the live seek toolbar toggle available after metadata and keeps it out
   await act(async () => button().click());
   expect(button().getAttribute('aria-pressed')).toBe('true');
   expect(loaded.session.getSnapshot().snapshot).toEqual(before.snapshot);
+});
+
+it('keeps the advanced editor open when its exit checkpoint cannot be saved', async () => {
+  setup();
+  const onBack = vi.fn();
+  const flush = vi.spyOn(loaded.session, 'flush');
+  await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={onBack} />));
+  await act(async () => state().setMode('advanced'));
+  expect(
+    host.querySelector('header [aria-label="' + translate('common.actions.close') + '"]')
+  ).toBeNull();
+  const trigger = host.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.videoReview.moreActions"]'
+  )!;
+  await act(async () => trigger.click());
+  const close = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(
+    (node) => node.textContent === translate('common.actions.close')
+  )!;
+  await act(async () => close.click());
+  expect(flush).toHaveBeenCalledOnce();
+  expect(onBack).not.toHaveBeenCalled();
 });

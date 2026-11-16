@@ -252,6 +252,12 @@ it('offers source-load retry and surfaces playback failure without exiting', asy
     vi.mocked(HTMLMediaElement.prototype.play).mockRejectedValueOnce(new Error('Unsupported'));
     await click('play');
     expect(host.textContent).toContain('gallery.videoReview.playbackFailed');
+    expect(host.textContent!.split('gallery.videoReview.playbackFailed')).toHaveLength(2);
+    expect(
+      host
+        .querySelector('[data-ui="gallery.videoReview.feedback"]')
+        ?.closest('[data-ui="gallery.videoReview.previewFrame"]')
+    ).not.toBeNull();
     await act(async () => host.querySelector('video')!.dispatchEvent(new Event('error')));
     expect(back).not.toHaveBeenCalled();
     const event = new Event('cancel', { cancelable: true });
@@ -738,6 +744,7 @@ it('connects Scene presentation controls to the real session and suppresses them
     );
     expect(inspector()).toBeNull();
     for (const action of ['advancedEditing', 'scene']) await fixture.click(action);
+    await fixture.section('presentation');
     const fade = inspector()!.querySelector<HTMLButtonElement>(
       'button[aria-label="gallery.videoReview.presentationFadeIn"]'
     );

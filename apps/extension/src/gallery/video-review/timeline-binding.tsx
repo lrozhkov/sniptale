@@ -284,11 +284,6 @@ function ReviewTimelineToolsBinding(
         telemetryAvailable={props.telemetryAvailable}
         setTrackVisibility={props.setTrackVisibility}
         setMode={props.setMode}
-        onDownloadFragment={() => {
-          if (range.kind !== 'range') return;
-          props.onOpenExport?.();
-          void props.editing.exporter.downloadSelection(range);
-        }}
       />
     </fieldset>
   );
@@ -631,6 +626,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
             props.setSelection(range);
           }}
           onPlay={props.onPlay}
+          onPause={props.onPause}
           onClearSelection={props.onClearSelection}
           onComment={(note) =>
             (props.beforeAction ?? ((action) => action()))(() => props.onComment(note))

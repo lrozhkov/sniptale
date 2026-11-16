@@ -212,6 +212,9 @@ function mount(transition?: CompositionJoinSettings) {
   document.body.append(host);
   const root = createRoot(host);
   act(() => root.render(<ReviewSelectedProperties {...props} />));
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-transition"]')!.click()
+  );
   cleanup = () => {
     act(() => root.unmount());
     host.remove();

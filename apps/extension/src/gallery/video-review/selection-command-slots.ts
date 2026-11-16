@@ -8,3 +8,6 @@ export type ReviewSelectionCommandSlots = Partial<
 export const ReviewSelectionCommandSlotsContext = createContext<ReviewSelectionCommandSlots | null>(
   null
 );
+
+/** Menu placement supplies semantics without changing timeline toolbar buttons. */
+export const ReviewCommandMenuContext = createContext(false);

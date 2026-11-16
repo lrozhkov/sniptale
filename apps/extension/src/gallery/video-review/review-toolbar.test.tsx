@@ -56,7 +56,6 @@ it('annotation addition is advanced-only, admitted through the note owner and bl
           setMode={vi.fn()}
           setTrackVisibility={vi.fn()}
           telemetryAvailable={false}
-          onDownloadFragment={vi.fn()}
           editing={{
             mode: null,
             rate: 2,
@@ -187,7 +186,6 @@ it('keeps one labelled mode control outside the track controls in both modes', a
             composerBusy={false}
             selection={{ kind: 'point', time: 0 }}
             edits={[]}
-            onDownloadFragment={vi.fn()}
             editing={{
               mode: null,
               rate: 2,
@@ -322,7 +320,6 @@ it('offers five direct focus types, retains the choice, and preserves admission 
           telemetryAvailable
           selection={{ kind: 'point', time: 0 }}
           edits={[]}
-          onDownloadFragment={vi.fn()}
           focusTool={{ active, type, available: true, onToggle }}
           editing={{
             mode: null,

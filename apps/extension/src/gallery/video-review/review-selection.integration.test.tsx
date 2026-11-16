@@ -109,6 +109,80 @@ async function dragRange(
     );
 }
 
+it('preserves an inside playhead when opening properties and seeks to the start only from outside', async () => {
+  const scrollIntoView = Element.prototype.scrollIntoView;
+  Element.prototype.scrollIntoView = vi.fn();
+  const fixture = createEditorFixture(integration, {
+    history: [
+      {
+        id: 'speed-operation',
+        at: 1,
+        target: 'edit',
+        before: null,
+        after: {
+          id: 'selected-speed',
+          kind: 'speed',
+          start: 1,
+          end: 3,
+          requestedStart: 1,
+          requestedEnd: 3,
+          rate: 2,
+          audio: 'speed',
+        },
+      },
+    ],
+  });
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    const video = fixture.host.querySelector('video')!;
+    for (const [time, expected] of [
+      [2, 2],
+      [0.5, 1],
+      [3, 1],
+    ]) {
+      await act(async () => {
+        video.currentTime = time!;
+        video.dispatchEvent(new Event('timeupdate', { bubbles: true }));
+      });
+      await act(async () =>
+        fixture.host
+          .querySelector<HTMLButtonElement>(
+            '[data-review-header-track="source"] [data-review-track-select]'
+          )!
+          .click()
+      );
+      await act(async () =>
+        [...fixture.host.querySelectorAll<HTMLButtonElement>('.review-track-items-open')]
+          .at(-1)!
+          .click()
+      );
+      expect(video.currentTime).toBe(expected);
+      expect(
+        fixture.host.querySelector('aside input[aria-label="gallery.videoReview.rangeStart"]')
+      ).not.toBeNull();
+    }
+    await act(async () => {
+      video.currentTime = 2;
+      video.dispatchEvent(new Event('timeupdate', { bubbles: true }));
+    });
+    await act(async () =>
+      fixture.host
+        .querySelector<HTMLButtonElement>('[data-selection-slot="interval"] button')!
+        .click()
+    );
+    expect(video.currentTime).toBe(1);
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.playbackRangeOverlay"]')
+    ).not.toBeNull();
+  } finally {
+    await fixture.cleanup();
+    Element.prototype.scrollIntoView = scrollIntoView;
+  }
+});
+
 it('deletes the unified selection: cut stays when audio is selected, undo restores it', async () => {
   const fixture = createEditorFixture(integration, { inspectorWidth: 0 });
   const { host, root, click, back } = fixture;
@@ -522,9 +596,19 @@ it('creates edits from recorded actions, selects their properties and recalculat
     const properties = fixture.host.querySelector(
       '[data-ui="gallery.videoReview.actionProperties"]'
     )!;
-    expect(properties.textContent).toContain('gallery.videoReview.actionRemoved');
+    const commands = fixture.host.querySelector(
+      '[data-ui="gallery.videoReview.inspectorActionMenu"]'
+    )!;
+    await act(async () =>
+      fixture.host
+        .querySelector<HTMLButtonElement>(
+          '[data-ui="gallery.videoReview.inspectorActionMenuTrigger"]'
+        )!
+        .click()
+    );
+    expect(commands.textContent).toContain('gallery.videoReview.actionRemoved');
     for (const key of ['actionCut', 'actionSpeed', 'actionFocus', 'createCopy'])
-      expect(properties.querySelector(`[aria-label="gallery.videoReview.${key}"]`)).toBeNull();
+      expect(commands.querySelector(`[aria-label="gallery.videoReview.${key}"]`)).toBeNull();
     expect(properties.querySelector('[aria-label="common.actions.delete"]')).toBeNull();
     expect(
       properties.querySelector('[data-ui="gallery.videoReview.interactionProperties"]')

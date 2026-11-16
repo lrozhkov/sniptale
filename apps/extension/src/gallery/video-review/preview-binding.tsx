@@ -45,6 +45,7 @@ type PreviewState = Pick<
   | 'onMediaError'
   | 'recovering'
 > & {
+  preparingPlayback?: EditorState['preparingPlayback'];
   cursorMotion?: EditorState['cursorMotion'];
   history?: EditorState['history'];
   setCursorFocusPath?: EditorState['setCursorFocusPath'];
@@ -134,7 +135,7 @@ export function ReviewPreviewBinding({
   const { busy, audio } = state;
   return (
     <main
-      aria-busy={state.recovering}
+      aria-busy={state.recovering || state.preparingPlayback}
       className="flex min-h-0 min-w-0 flex-col overflow-hidden p-3"
     >
       {state.history?.failed ||
@@ -178,14 +179,6 @@ export function ReviewPreviewBinding({
           ) : null}
         </div>
       ) : null}
-      <ReviewFeedback
-        message={state.message}
-        originalFeedback={audio.originalFeedback}
-        onDismiss={() => {
-          state.setMessage(null);
-          audio.dismissOriginalFeedback();
-        }}
-      />
       <ReviewPreviewFrame
         onOpenPreviewSettings={onOpenPreviewSettings}
         time={state.timeline.sceneOutputTime}
@@ -209,18 +202,28 @@ export function ReviewPreviewBinding({
         }
       >
         {(fullscreen) => (
-          <ReviewPreviewStage
-            resource={resource}
-            state={state}
-            sceneActive={sceneActive}
-            annotationMagnetEnabled={annotationMagnetEnabled}
-            fullscreen={fullscreen}
-            previewOverlay={previewOverlay}
-            focusInteracting={zoom.previewing}
-            previewPreferences={previewPreferences}
-            onPreviewRaster={onPreviewRaster}
-            onPreviewRendererStatus={onPreviewRendererStatus}
-          />
+          <>
+            <ReviewPreviewStage
+              resource={resource}
+              state={state}
+              sceneActive={sceneActive}
+              annotationMagnetEnabled={annotationMagnetEnabled}
+              fullscreen={fullscreen}
+              previewOverlay={previewOverlay}
+              focusInteracting={zoom.previewing}
+              previewPreferences={previewPreferences}
+              onPreviewRaster={onPreviewRaster}
+              onPreviewRendererStatus={onPreviewRendererStatus}
+            />
+            <ReviewFeedback
+              message={state.message}
+              originalFeedback={audio.originalFeedback}
+              onDismiss={() => {
+                state.setMessage(null);
+                audio.dismissOriginalFeedback();
+              }}
+            />
+          </>
         )}
       </ReviewPreviewFrame>
     </main>
@@ -357,6 +360,7 @@ function ReviewPreviewStage({
               sourceFrameRate: state.exporter.index?.frameRate,
               waitingReason:
                 [
+                  state.preparingPlayback ? translate('gallery.videoReview.audioPreparing') : null,
                   state.history?.pending || state.history?.initialLoading
                     ? translate('gallery.videoReview.recordingHistoryLoading')
                     : null,

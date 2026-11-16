@@ -35,7 +35,7 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
   useEffect(() => {
     if (!props.recordingAvailable) showRecording(true);
   }, [props.recordingAvailable]);
-  const [presentation, setPresentation] = useState<'all' | 'sections'>('all');
+  const [presentation, setPresentation] = useState<'all' | 'sections'>('sections');
   const contextKey = props.contextKey ?? 'comments';
   const contextSection: Section = contextKey.startsWith('comments')
     ? 'comments'

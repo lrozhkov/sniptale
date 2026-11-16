@@ -6,6 +6,9 @@ import { ReviewButton, reviewIconButtonClassName } from './controls';
 import { resolveReviewTimelineSelection } from './timeline-batch-selection';
 import { ReviewInspectorToolbarNavigation } from './review-toolbar';
 import { ReviewSelectionActionsSurface } from './selection-actions';
+import { reviewTimelineSelectionInterval } from './use-review-selection';
+import { ReviewTimelineFragment } from './selection-fragment';
+import type { ReviewPlaybackRange } from './playback-range';
 import { setGalleryQuickEditUrl, clearGalleryQuickEditUrl } from '../platform/browser-driver';
 import { useReviewWorkspaceColor } from './workspace-color';
 import {
@@ -19,6 +22,7 @@ import {
   reviewInspectorContext,
   backupReview,
   flushReviewTextVoiceBuffers,
+  leaveReviewInspector,
 } from './inspector-binding';
 import { useReviewProjectCommands } from './project-controls';
 import { ReviewKeyboardHelp } from './keyboard-help';
@@ -39,7 +43,7 @@ import { ReviewLoadStatus, reviewErrorMessage } from './feedback';
 import { ReviewDialog } from './review-dialog';
 import { ReviewHistoryControls } from './timeline-chrome';
 import { reviewSelectionLabel } from './selected-properties';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { translate, useAppLocale, usePageLocaleMetadata } from '../../platform/i18n';
 import { useReviewWaveforms } from './audio-waveform';
 import { ReviewTimelineBinding } from './timeline-binding';
@@ -192,6 +196,26 @@ function ReviewEditor({
   const music = useReviewMusicImport(state);
   const { audio, canvasComments, editing, snapshot, composer, advanced, features, zoom, busy } =
     state;
+  const exitOwner = useRef({ active: true, resource, session: state.session });
+  exitOwner.current.resource = resource;
+  exitOwner.current.session = state.session;
+  useEffect(() => {
+    const owner = exitOwner.current;
+    owner.active = true;
+    return () => {
+      owner.active = false;
+    };
+  }, []);
+  const leaveEditor = () =>
+    leaveReviewInspector(
+      state,
+      canvasComments,
+      onBack,
+      () =>
+        exitOwner.current.active &&
+        exitOwner.current.resource === resource &&
+        exitOwner.current.session === state.session
+    );
   const joinPreview = useEditorPresentationPreview(resource, state, previewPreferences.preferences);
   const projectCommands = useReviewProjectCommands(
     state,
@@ -206,6 +230,15 @@ function ReviewEditor({
     features.mode === 'advanced' || !!editing.exporter.index?.audioCodec,
     editing.exporter.index === null || !!editing.exporter.index.audioCodec
   );
+  const applyInterval = (range: ReviewPlaybackRange) => {
+    state.pause();
+    if (range.result) state.setPlaybackRange(range);
+    else {
+      state.setPlaybackRange(null);
+      state.seek(range.start, false);
+    }
+    state.setSelection({ kind: 'range', start: range.start, end: range.end });
+  };
   const timelineRow = panels.timelineHeight === null ? 'auto' : `${panels.timelineHeight}px`;
   if (!editorReady) {
     return (
@@ -215,6 +248,32 @@ function ReviewEditor({
   return (
     <ReviewSelectionActionsSurface
       selection={state.activeSelection}
+      onSelectInterval={(keys) =>
+        state.beforeAction(() => {
+          const range = reviewTimelineSelectionInterval(
+            keys,
+            state.activeSelection,
+            {
+              document: state.snapshot.document,
+              advanced: state.advanced,
+              duration: state.source.duration,
+              markers: state.projected.markers,
+              segments: state.timeline.timeMap.getSegments(),
+            },
+            state.cursorFocusKeys
+          );
+          if (!range) return;
+          applyInterval(range);
+        })
+      }
+      fragmentAction={(keys) => (
+        <ReviewTimelineFragment
+          state={state}
+          keys={keys}
+          onSelectInterval={applyInterval}
+          onOpenExport={() => requestExport((current) => current + 1)}
+        />
+      )}
       onSelectKey={(key) => {
         if (!key) {
           state.setActiveSelection({ kind: 'none' });
@@ -417,6 +476,7 @@ function ReviewEditor({
                       features.mode === 'advanced' ? () => state.setMode('basic') : undefined
                     }
                     busy={busy || editing.exporter.phase !== 'idle'}
+                    onClose={panelsEnabled ? leaveEditor : undefined}
                     onNewProject={projectCommands.newProject}
                     onBackup={() => void state.run(() => backupReview(state, canvasComments))}
                   />
@@ -569,8 +629,6 @@ function useReviewEditorNavigation(
     },
     onMarker: (marker: Parameters<Parameters<typeof ReviewTimelineBinding>[0]['onMarker']>[0]) => {
       if (!state.canStart()) return;
-      if (marker.timeDomain === 'result') state.seekResult(marker.start);
-      else state.seek(marker.start, false);
       state.setActiveSelection({ kind: 'telemetry', ref: marker.ref });
       navigation.setSection('selected');
     },

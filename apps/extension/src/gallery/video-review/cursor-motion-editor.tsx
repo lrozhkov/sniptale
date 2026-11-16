@@ -58,12 +58,10 @@ export function useReviewCursorMotions(args: {
   const update = (id: string, patch: Partial<CursorMotion>) =>
     args.onChange(motions.map((m) => (m.id === id ? { ...m, ...patch } : m)));
   const choose = (id: string) => {
-    if (selected?.id === id) return;
     const m = motions.find((m) => m.id === id);
     if (!m) return;
     args.select({ kind: 'cursor-motion', id });
-    setPointId(m.points[0]?.id);
-    args.seek(m.start, false);
+    if (selected?.id !== id) setPointId(m.points[0]?.id);
   };
   const add = () => {
     if (motions.length >= 512 || !args.canStart()) return;

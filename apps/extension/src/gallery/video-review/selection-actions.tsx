@@ -12,7 +12,9 @@ import {
 import type { ReviewSelection } from '../../features/video/review/types';
 import { translate } from '../../platform/i18n';
 import './selection-actions.css';
-import { Copy, RotateCcw, Trash2 } from 'lucide-react';
+import { Copy, Download, RotateCcw, Trash2 } from 'lucide-react';
+import { Icon } from '@iconify/react';
+import containerIcon from '@iconify-icons/tabler/container';
 import { ReviewButton } from './controls';
 import {
   type ReviewSelectionCommand,
@@ -180,6 +182,7 @@ export function useReviewSelectionActions(
     if (event.button !== undefined && event.button !== 0) return;
     if (
       !(event.target instanceof Element) ||
+      event.target.closest('[data-playback-range-edge]') ||
       !event.target.closest('[data-ui="gallery.videoReview.timeline"]') ||
       event.target.closest('[data-ui="gallery.videoReview.toolbar"]')
     )
@@ -244,6 +247,9 @@ export function useReviewSelectionActions(
 const ReviewSelectionActionsHostContext = createContext<{
   setHost(host: HTMLFieldSetElement | null): void;
   setSlot(action: ReviewSelectionCommand, host: HTMLSpanElement | null): void;
+  selectInterval?: (() => void) | undefined;
+  fragment?: ReactNode;
+  disabled: boolean;
 } | null>(null);
 
 function ReviewSelectionActionSlot({
@@ -285,7 +291,7 @@ export function ReviewSelectionActionsToolbar() {
       aria-label={translate('gallery.videoReview.actionActions')}
       data-ui="gallery.videoReview.selectionActions"
       className="review-timeline-selection-actions"
-      disabled={target?.disabled ?? true}
+      disabled={host.disabled}
       onPointerDown={(event) => event.stopPropagation()}
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
@@ -295,6 +301,22 @@ export function ReviewSelectionActionsToolbar() {
         }
       }}
     >
+      <span className="review-selection-action-slot" data-selection-slot="interval">
+        <ReviewButton
+          label={translate('gallery.videoReview.selectionInterval')}
+          disabled={!host.selectInterval || (target?.disabled ?? true)}
+          onClick={host.selectInterval}
+        >
+          <Icon icon={containerIcon} width={16} height={16} aria-hidden="true" />
+        </ReviewButton>
+      </span>
+      <span className="review-selection-action-slot" data-selection-slot="fragment">
+        {host.fragment ?? (
+          <ReviewButton label={translate('gallery.videoReview.downloadSelection')} disabled>
+            <Download size={16} />
+          </ReviewButton>
+        )}
+      </span>
       {(['duplicate', 'reset', 'delete'] as const).map((action) => (
         <ReviewSelectionActionSlot key={action} action={action} setSlot={host.setSlot} />
       ))}
@@ -309,6 +331,8 @@ export function ReviewSelectionActionsSurface(props: {
   visible: boolean;
   disabled: boolean;
   onSelectKey?: ((key: string | null) => void) | undefined;
+  onSelectInterval?: ((keys: readonly string[]) => void) | undefined;
+  fragmentAction?: ((keys: readonly string[]) => ReactNode) | undefined;
   children: ReactNode;
 }) {
   const actions = useReviewSelectionActions(
@@ -317,9 +341,25 @@ export function ReviewSelectionActionsSurface(props: {
     props.disabled,
     props.onSelectKey
   );
+  const { onSelectInterval, fragmentAction, disabled } = props;
   const hosts = useMemo(
-    () => ({ setHost: actions.setHost, setSlot: actions.setSlot }),
-    [actions.setHost, actions.setSlot]
+    () => ({
+      setHost: actions.setHost,
+      setSlot: actions.setSlot,
+      fragment: fragmentAction?.(actions.multiSelection.keys),
+      disabled,
+      selectInterval: onSelectInterval
+        ? () => onSelectInterval(actions.multiSelection.keys)
+        : undefined,
+    }),
+    [
+      actions.setHost,
+      actions.setSlot,
+      actions.multiSelection.keys,
+      onSelectInterval,
+      fragmentAction,
+      disabled,
+    ]
   );
   const pointer = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   return (

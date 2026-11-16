@@ -101,7 +101,6 @@ export function ReviewTrackItemsInspector(props: {
   const open = (row: ReviewTrackItem) =>
     state.beforeAction(() => {
       state.video.current?.pause();
-      state.seek(row.start, false);
       state.setActiveSelection(row.selection);
       navigation.setSection(row.selection.kind === 'none' ? 'track' : 'selected');
       // Selection renders before the scroll target is inspected; no synthetic click mutates the item.

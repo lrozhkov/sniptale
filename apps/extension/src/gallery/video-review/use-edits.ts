@@ -184,7 +184,6 @@ export function useReviewEdits(props: {
           ? { kind: 'point', time: edit.start }
           : { kind: 'range', start: edit.start, end: edit.end }
       );
-      props.seek(edit.start);
     },
     toggle,
     remove: () => {

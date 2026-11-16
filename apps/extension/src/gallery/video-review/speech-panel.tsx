@@ -24,6 +24,9 @@ import { ReviewButton, reviewTextButtonClassName } from './controls';
 
 type Props = ReviewRecognitionAccess & {
   sound?: (applying: boolean) => ReactNode;
+  renderInspectorSections?:
+    | ((sections: readonly ReviewInspectorSection[]) => ReactNode)
+    | undefined;
   renderSections?: (recognition: ReviewInspectorSection, applying: boolean) => ReactNode;
   mainVideo?: HTMLVideoElement | undefined;
   resultTime?: number | undefined;
@@ -90,7 +93,17 @@ export function ReviewOriginalSpeechPanel(
       ) : null}
     </>
   );
-  if (!recognitionEnabled) return sound(false);
+  if (!recognitionEnabled)
+    return props.renderInspectorSections
+      ? props.renderInspectorSections([
+          {
+            id: 'audio',
+            label: translate('gallery.videoReview.volume'),
+            icon: AudioLines,
+            content: sound(false),
+          },
+        ])
+      : sound(false);
   return <ReviewSpeechPanel {...speech} target={{ kind: 'original' }} sound={sound} />;
 }
 
@@ -139,17 +152,22 @@ export function ReviewSpeechPanel(props: Props) {
       </div>
     ),
   };
+  const renderInspectorSections =
+    props.renderInspectorSections ??
+    ((sections: readonly ReviewInspectorSection[]) => (
+      <ReviewInspectorSections sections={sections} />
+    ));
   return (
     <section
-      className="min-w-0 space-y-3"
+      className={
+        props.renderInspectorSections ? 'flex min-h-0 min-w-0 flex-1 flex-col' : 'min-w-0 space-y-3'
+      }
       data-ui="gallery.videoReview.speechPanel"
       onKeyDown={(event) => event.stopPropagation()}
     >
-      {props.renderSections ? (
-        props.renderSections(section, recognition.applying)
-      ) : (
-        <ReviewInspectorSections
-          sections={[
+      {props.renderSections
+        ? props.renderSections(section, recognition.applying)
+        : renderInspectorSections([
             ...(props.sound
               ? [
                   {
@@ -161,9 +179,7 @@ export function ReviewSpeechPanel(props: Props) {
                 ]
               : []),
             section,
-          ]}
-        />
-      )}
+          ])}
     </section>
   );
 }
@@ -605,6 +621,7 @@ export function ReviewSourceSpeechBinding({
   editor,
   audio,
   flush,
+  renderInspectorSections,
 }: {
   resource: LoadedReview;
   editor: Pick<
@@ -624,9 +641,11 @@ export function ReviewSourceSpeechBinding({
   >;
   audio: Pick<ReturnType<typeof useReviewAudio>, 'setOriginal'>;
   flush(): Promise<void>;
+  renderInspectorSections?: Props['renderInspectorSections'];
 }) {
   return (
     <ReviewOriginalSpeechPanel
+      renderInspectorSections={renderInspectorSections}
       recognitionEnabled={editor.advanced.ui.mode === 'advanced'}
       mainVideo={editor.video.current ?? undefined}
       resultTime={editor.timeline.sceneOutputTime}

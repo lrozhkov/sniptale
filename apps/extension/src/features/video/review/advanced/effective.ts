@@ -188,7 +188,8 @@ export function resolveQuickEditEffectiveState(
       })),
     music: projectReviewVoiceover(
       features.musicApplied ? state.audio.music : [],
-      state.audio.voiceoverSegments
+      state.audio.voiceoverSegments,
+      'fill'
     )
       .filter((clip) => !clip.dormant)
       .filter((clip) => {

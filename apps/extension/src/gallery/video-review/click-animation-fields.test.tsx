@@ -24,10 +24,22 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 const click = { ...REVIEW_CLICK_DEFAULT, effect: 'ripple' as const };
-const field = (name: string, type = 'text') =>
-  host.querySelector<HTMLInputElement>(
-    `input[type="${type}"][aria-label="gallery.videoReview.${name}${type === 'range' ? ' range' : ''}"]`
-  )!;
+function openSection(id: string) {
+  const tab = host.querySelector<HTMLButtonElement>(`[role="tab"][aria-controls$="-${id}"]`);
+  if (tab) act(() => tab.click());
+}
+const field = (name: string, type = 'text') => {
+  const selector = `input[type="${type}"][aria-label="gallery.videoReview.${name}${type === 'range' ? ' range' : ''}"]`;
+  let found = host.querySelector<HTMLInputElement>(selector);
+  if (found) return found;
+  for (const tab of host.querySelectorAll<HTMLButtonElement>('[role="tab"]')) {
+    act(() => tab.click());
+    found = host.querySelector<HTMLInputElement>(selector);
+    if (found) return found;
+  }
+  return null!;
+};
+
 function input(node: HTMLInputElement, value: string) {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(node, value);
   node.dispatchEvent(new Event('input', { bubbles: true }));
@@ -36,7 +48,12 @@ function input(node: HTMLInputElement, value: string) {
 it('provides common slider ranges while accepting larger typed values', () => {
   const change = vi.fn();
   act(() => root.render(<ReviewClickFields values={[click]} onChange={change} />));
-  expect(host.querySelectorAll('input[type="range"]')).toHaveLength(8);
+  let ranges = 0;
+  for (const tab of host.querySelectorAll<HTMLButtonElement>('[role="tab"]')) {
+    act(() => tab.click());
+    ranges += host.querySelectorAll('input[type="range"]').length;
+  }
+  expect(ranges).toBe(8);
   const radius = field('clickRadius', 'range');
   expect(radius.min).toBe('2');
   expect(radius.max).toBe('80');
@@ -72,6 +89,7 @@ it('shows slider drafts locally and commits one changed field for mixed selectio
 it('exposes only effective appearance controls and preserves fractional position input', () => {
   const change = vi.fn();
   act(() => root.render(<ReviewClickFields values={[click]} onChange={change} />));
+  openSection('appearance');
   expect(field('clickOpacity')).toBeNull();
   expect(field('clickX', 'range').min).toBe('-10');
   expect(field('clickX', 'range').max).toBe('10');

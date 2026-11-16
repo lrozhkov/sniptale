@@ -112,11 +112,26 @@ function render(
       />
     )
   );
+  openSection('placement');
+}
+function openSection(id: string) {
+  const tab = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((node) =>
+    node.getAttribute('aria-controls')?.endsWith(`-${id}`)
+  );
+  if (tab) act(() => tab.click());
+}
+function reveal(selector: string): Element | null {
+  let found = host.querySelector(selector);
+  if (found) return found;
+  for (const tab of host.querySelectorAll<HTMLButtonElement>('[role="tab"]')) {
+    act(() => tab.click());
+    found = host.querySelector(selector);
+    if (found) return found;
+  }
+  return null;
 }
 function input(label: string) {
-  const node = [...host.querySelectorAll<HTMLInputElement>('input')].find(
-    (element) => element.getAttribute('aria-label') === label
-  );
+  const node = reveal(`input[aria-label="${label}"]`) as HTMLInputElement | null;
   if (!node) throw new Error(`Missing fixture field: ${label}`);
   return node;
 }
@@ -156,8 +171,8 @@ it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners', 'arr
     );
     for (const control of value.document.controls) {
       expect(
-        host.querySelector(
-          `[aria-label="${resolveEffectLocaleText(control.label, getCurrentLocale()) || control.id}"]`
+        reveal(
+          `[aria-label="${resolveEffectLocaleText(control.label, getCurrentLocale()) || control.id}"]:not([role="tab"])`
         )
       ).not.toBeNull();
       if (control.kind === 'number' && !control.options?.length)
@@ -171,8 +186,10 @@ it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners', 'arr
           `sdk:${resolveEffectControlGroup(control.group, value.document.controlGroups) ?? 'advanced'}`
       )
     );
-    for (const group of expected)
+    for (const group of expected) {
+      openSection(group);
       expect(host.querySelector(`[data-section="${group}"]`)).not.toBeNull();
+    }
     expect(value.editor.change).not.toHaveBeenCalled();
   }
 );
@@ -181,9 +198,9 @@ it('previews multiline text without history, commits once on Ctrl+Enter and canc
   const value = fixture('title');
   render(value);
   const control = value.document.controls.find((item) => item.id === 'title')!;
-  const node = host.querySelector<HTMLTextAreaElement>(
+  const node = reveal(
     `textarea[aria-label="${resolveEffectLocaleText(control.label, getCurrentLocale())}"]`
-  )!;
+  ) as HTMLTextAreaElement;
   type(node, 'Typed value');
   expect(value.editor.previewGesture).toHaveBeenLastCalledWith({
     controls: { ...value.instance.controls, title: 'Typed value' },
@@ -203,7 +220,9 @@ it('previews multiline text without history, commits once on Ctrl+Enter and canc
 it('applies an SDK visual preset without changing text, geometry or fixed anchors', async () => {
   const value = fixture('callout');
   render(value);
-  const trigger = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+  expect(host.querySelector('[role="tab"][aria-controls$="-presets"]')).toBeNull();
+  openSection('sdk:appearance');
+  const trigger = [...host.querySelectorAll<HTMLButtonElement>('button:not([role="tab"])')].find(
     (node) => node.getAttribute('aria-label') === translate('gallery.videoReview.annotationPresets')
   )!;
   await act(async () => {
@@ -337,6 +356,9 @@ it('retains the SDK type of numeric select options and their localized labels', 
   value.instance.controls[control.id] = 25;
   expect(validateAnimationTemplate(value.document).ok).toBe(true);
   render(value, JSON.stringify(value.document));
+  reveal(
+    `button:not([role="tab"])[aria-label="${resolveEffectLocaleText(control.label, getCurrentLocale())}"]`
+  );
   const trigger = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
     (node) =>
       node.getAttribute('aria-label') === resolveEffectLocaleText(control.label, getCurrentLocale())
@@ -436,13 +458,18 @@ it('derives the preset label from accepted controls across rerender and reopenin
   const preset = value.document.controlPresets![0]!;
   value.instance.controls = { ...value.instance.controls, ...preset.values };
   render(value);
-  const trigger = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+  openSection('sdk:appearance');
+  let trigger = [...host.querySelectorAll<HTMLButtonElement>('button:not([role="tab"])')].find(
     (node) => node.getAttribute('aria-label') === translate('gallery.videoReview.annotationPresets')
   )!;
   expect(trigger.textContent).toContain(resolveEffectLocaleText(preset.label, getCurrentLocale()));
   value.instance.controls['title'] = 'Changed text';
   value.instance.transform.x = 0.2;
   render(value);
+  openSection('sdk:appearance');
+  trigger = host.querySelector<HTMLButtonElement>(
+    'button:not([role="tab"])[aria-label="gallery.videoReview.annotationPresets"]'
+  )!;
   expect(trigger.textContent).toContain(resolveEffectLocaleText(preset.label, getCurrentLocale()));
   await act(async () => {
     trigger.click();
@@ -551,7 +578,8 @@ it('keeps a custom group from repeating the host placement icon', () => {
   const source = JSON.stringify(value.document);
   expect(validateAnimationTemplate(value.document).ok).toBe(true);
   render(value, source);
-  expect(host.querySelectorAll('summary svg.lucide-move')).toHaveLength(1);
+  expect(host.querySelectorAll('[role="tab"] svg.lucide-move')).toHaveLength(1);
+  openSection('sdk:geometry');
   expect(host.querySelector('[data-effect-control-group="tracing"] input')).not.toBeNull();
 });
 
@@ -572,4 +600,21 @@ it('uses measured visible bounds even when inspector metadata is a different par
   render(value);
   expect(Number(input(translate('gallery.videoReview.annotationWidth')).value)).toBeCloseTo(20, 6);
   expect(Number(input(translate('gallery.videoReview.annotationHeight')).value)).toBeCloseTo(10, 6);
+});
+
+it('keeps presets under Appearance when a template has no appearance control group', () => {
+  const value = fixture('callout');
+  for (const control of value.document.controls) {
+    if (resolveEffectControlGroup(control.group, value.document.controlGroups) === 'appearance')
+      control.group = 'typography';
+  }
+  expect(validateAnimationTemplate(value.document).ok).toBe(true);
+  render(value, JSON.stringify(value.document));
+  expect(host.querySelector('[role="tab"][aria-controls$="-presets"]')).toBeNull();
+  openSection('sdk:appearance');
+  expect(
+    host.querySelector(
+      '[data-section="sdk:appearance"] button[aria-label="gallery.videoReview.annotationPresets"]'
+    )
+  ).not.toBeNull();
 });

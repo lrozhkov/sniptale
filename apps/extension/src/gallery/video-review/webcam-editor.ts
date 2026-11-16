@@ -270,7 +270,6 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
     navigate: (id: string | null) => {
       const target = camera?.positions.find((item) => item.id === id);
       choose(target ? { kind: 'webcam-position', id: target.id } : { kind: 'webcam' });
-      if (latest.current.allowed()) args.seek(target?.time ?? 0);
     },
     canHide,
     canResizeHidden: (id: string, range: { start: number; end: number }) =>

@@ -143,7 +143,20 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
+function reveal(selector: string) {
+  if (host.querySelector(selector)) return;
+  for (const tab of host.querySelectorAll<HTMLButtonElement>('[role="tab"]')) {
+    act(() => tab.click());
+    if (host.querySelector(selector)) return;
+  }
+}
+function section(id: string) {
+  act(() =>
+    host.querySelector<HTMLButtonElement>(`[role="tab"][aria-controls$="-${id}"]`)!.click()
+  );
+}
 async function enter(name: string, value: string) {
+  reveal(`[aria-label="${name}"]`);
   const node = field(name);
   expect(node).not.toBeNull();
   await act(async () => {
@@ -153,6 +166,9 @@ async function enter(name: string, value: string) {
   act(() => node.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
 }
 async function choose(name: string, option: string) {
+  reveal(
+    name === label('webcamShadowDirection') ? `[title="${option}"]` : `[aria-label="${name}"]`
+  );
   if (name === label('webcamShadowDirection')) {
     const direct = host.querySelector<HTMLButtonElement>(`[title="${option}"]`)!;
     expect(direct).not.toBeNull();
@@ -198,6 +214,7 @@ it('edits camera placement, appearance and signed timing through inspector contr
   expect(field('videoEditor.sidebar.cameraRoundness')).toBeNull();
   await choose('videoEditor.sidebar.cameraShape', label('webcamCircle'));
   expect(field('videoEditor.sidebar.cameraRoundness')).toBeNull();
+  section('webcam-layout');
   expect(field(label('webcam_height'))).toBeNull();
   await enter(label('webcamDiameter'), '30');
   expect(editor.placement!.width).toBe(0.3);
@@ -206,6 +223,7 @@ it('edits camera placement, appearance and signed timing through inspector contr
   await choose('videoEditor.sidebar.cameraShape', 'videoEditor.sidebar.cameraShapeSoft');
   await enter('videoEditor.sidebar.cameraRoundness', '35');
   await choose('videoEditor.sidebar.cameraShape', 'videoEditor.sidebar.cameraShapeRounded');
+  section('webcam-appearance');
   act(() =>
     host
       .querySelector<HTMLButtonElement>(`[role="switch"][aria-label="${label('webcamMirror')}"]`)!
@@ -220,6 +238,7 @@ it('edits camera placement, appearance and signed timing through inspector contr
     offsetSeconds: -1.25,
     appearance: { shape: 'rounded', roundness: 35, zoom: 2, panX: 0.25, panY: -0.3 },
   });
+  section('webcam-appearance');
   act(() =>
     host
       .querySelector<HTMLButtonElement>(`[role="switch"][aria-label="${label('webcamMirror')}"]`)!

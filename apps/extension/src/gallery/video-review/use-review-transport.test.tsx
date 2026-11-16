@@ -193,3 +193,31 @@ it('stops the logical project clock when audio fails while native video is alrea
   expect(nativePause).toHaveBeenCalledOnce();
   expect(mounted.failure).toHaveBeenCalledOnce();
 });
+
+it('publishes pending audio preparation and clears it when Play is canceled', async () => {
+  const fixture = mount();
+  let release!: (ready: boolean) => void;
+  bridge.preparePlayback.mockImplementationOnce(
+    () =>
+      new Promise<boolean>((resolve) => {
+        release = resolve;
+      })
+  );
+  let pending!: Promise<void>;
+  await act(async () => {
+    pending = fixture.get().play();
+  });
+  try {
+    expect(fixture.get()).toHaveProperty('preparingPlayback', true);
+    await act(async () => fixture.get().pause());
+    expect(fixture.get()).toHaveProperty('preparingPlayback', false);
+    await act(async () => {
+      release(true);
+      await pending;
+    });
+    expect(bridge.play).not.toHaveBeenCalled();
+  } finally {
+    release(false);
+    await pending;
+  }
+});

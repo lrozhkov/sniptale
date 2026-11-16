@@ -9,12 +9,13 @@ import {
 } from './selection-actions';
 import { ReviewInspectorSections, reviewInspectorActions } from './inspector-sections';
 import { ReviewButton } from './controls';
-it('keeps three fixed toolbar slots and routes guarded inspector commands into them', async () => {
+it('keeps five fixed toolbar slots and routes guarded inspector commands into them', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
   const command = vi.fn();
+  const interval = vi.fn();
   let disabled = false;
   function Fixture() {
     const [selected, select] = useState(false);
@@ -24,6 +25,7 @@ it('keeps three fixed toolbar slots and routes guarded inspector commands into t
           selection={selected ? { kind: 'edit', id: 'one' } : { kind: 'none' }}
           visible
           disabled={disabled}
+          onSelectInterval={interval}
         >
           <div data-ui="gallery.videoReview.timeline">
             <div data-ui="gallery.videoReview.toolbar">
@@ -53,15 +55,20 @@ it('keeps three fixed toolbar slots and routes guarded inspector commands into t
     )!;
     const slots = [...panel.querySelectorAll('[data-selection-slot]')];
     expect(slots.map((slot) => slot.getAttribute('data-selection-slot'))).toEqual([
+      'interval',
+      'fragment',
       'duplicate',
       'reset',
       'delete',
     ]);
-    expect(panel.disabled).toBe(true);
+    expect(panel.disabled).toBe(false);
+    expect([...panel.querySelectorAll('button')].every((button) => button.disabled)).toBe(true);
     const item = host.querySelector<HTMLButtonElement>('[data-review-removal-key]')!;
     await act(async () => item.click());
     expect(host.querySelector('[data-ui="gallery.videoReview.selectionActions"]')).toBe(panel);
     expect([...panel.querySelectorAll('[data-selection-slot]')]).toEqual(slots);
+    await act(async () => slots[0]!.querySelector<HTMLButtonElement>('button')!.click());
+    expect(interval).toHaveBeenCalledWith([]);
     expect(panel.closest('[data-ui="gallery.videoReview.toolbar"]')).not.toBeNull();
     const remove = panel.querySelector<HTMLButtonElement>('button[aria-label="Remove"]')!;
     expect(remove.closest('[data-selection-slot]')?.getAttribute('data-selection-slot')).toBe(
@@ -82,7 +89,8 @@ it('keeps three fixed toolbar slots and routes guarded inspector commands into t
       )
     );
     expect(host.querySelector('[data-ui="gallery.videoReview.selectionActions"]')).toBe(panel);
-    expect(panel.disabled).toBe(true);
+    expect(panel.disabled).toBe(false);
+    expect([...panel.querySelectorAll('button')].every((button) => button.disabled)).toBe(true);
     expect(panel.querySelector('button[aria-label="Remove"]')).toBeNull();
     expect(
       host.querySelector('[data-section="actions"] button[aria-label="Remove"]')
@@ -144,6 +152,7 @@ it('anchors every supported selection identity and preserves ordered Ctrl and Sh
                 {key}
               </button>
             ))}
+            <div data-playback-range-edge="start" />
           </div>
         </div>
       </dialog>
@@ -175,6 +184,8 @@ it('anchors every supported selection identity and preserves ordered Ctrl and Sh
     selected = choices[0]!.selection;
     render();
     pointer(0);
+    act(() => actions.capture({ target: host.querySelector('[data-playback-range-edge]')! }));
+    expect(actions.target?.key).toBe('edit:a');
     pointer(1, { ctrlKey: true });
     expect(actions.multiSelection.keys).toEqual(['edit:a', 'edit:b']);
     expect(host.querySelectorAll('[data-review-multi-selected]')).toHaveLength(2);
@@ -196,6 +207,49 @@ it('anchors every supported selection identity and preserves ordered Ctrl and Sh
     act(() => root.unmount());
     host.remove();
     visible.mockRestore();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('keeps fragment active for an interval without a selected object, including outside properties', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const download = vi.fn();
+  let busy = false;
+  const render = () =>
+    act(async () =>
+      root.render(
+        <ReviewSelectionActionsSurface
+          selection={{ kind: 'none' }}
+          visible={false}
+          disabled={busy}
+          fragmentAction={() => (
+            <ReviewButton label="Fragment" onClick={download}>
+              Download
+            </ReviewButton>
+          )}
+        >
+          <ReviewSelectionActionsToolbar />
+        </ReviewSelectionActionsSurface>
+      )
+    );
+  try {
+    await render();
+    const button = host.querySelector<HTMLButtonElement>(
+      '[data-selection-slot="fragment"] button'
+    )!;
+    await act(async () => button.click());
+    expect(download).toHaveBeenCalledOnce();
+    expect(
+      host.querySelector<HTMLButtonElement>('[data-selection-slot="interval"] button')!.disabled
+    ).toBe(true);
+    busy = true;
+    await render();
+    await act(async () => button.click());
+    expect(download).toHaveBeenCalledOnce();
+  } finally {
+    await act(async () => root.unmount());
     vi.unstubAllGlobals();
   }
 });

@@ -107,6 +107,7 @@ export function useReviewAdvanced(session: Session, beforeEdit?: () => void) {
     }
   }, [contentState, controls, session]);
   const content = contentState.content;
+  const previousAdvanced = useRef<{ session: Session; value: QuickEditAdvancedState } | null>(null);
   const advanced = useMemo<QuickEditAdvancedState>(() => {
     const {
       sourceFilters: _baselineSourceFilters,
@@ -128,12 +129,32 @@ export function useReviewAdvanced(session: Session, beforeEdit?: () => void) {
       captions: _baselineCaptions,
       ...workspaceState
     } = persisted;
-    return {
+    const next: QuickEditAdvancedState = {
       ...workspaceState,
       ui: optimistic?.value.ui ?? persisted.ui,
       ...content,
     };
-  }, [persisted, optimistic, content]);
+    const previous =
+      previousAdvanced.current?.session === session ? previousAdvanced.current.value : undefined;
+    if (previous) {
+      next.ui = retainReviewFields(previous.ui, next.ui);
+      next.zoom = retainReviewFields(previous.zoom, next.zoom);
+      next.audio = retainReviewFields(previous.audio, {
+        ...next.audio,
+        original: retainReviewFields(previous.audio.original, next.audio.original),
+      });
+      if (previous.annotationEffects && next.annotationEffects)
+        next.annotationEffects = retainReviewFields(
+          previous.annotationEffects,
+          next.annotationEffects
+        );
+      if (previous.webcam && next.webcam)
+        next.webcam = retainReviewFields(previous.webcam, next.webcam);
+    }
+    const value = previous ? retainReviewFields(previous, next) : next;
+    previousAdvanced.current = { session, value };
+    return value;
+  }, [persisted, optimistic, content, session]);
   return {
     ...contentState.commands,
     advanced,
@@ -161,6 +182,24 @@ export function useReviewAdvanced(session: Session, beforeEdit?: () => void) {
     },
     reset,
   };
+}
+
+/** Persistence parsing clones JSON branches; equal branches must not restart unrelated consumers. */
+function retainReviewFields<T extends object>(previous: T, next: T): T {
+  const fields = new Map<string, unknown>(Object.entries(previous));
+  const entries = Object.entries(next);
+  let equal = fields.size === entries.length;
+  const result = { ...next };
+  for (const [key, value] of entries) {
+    const prior = fields.get(key);
+    if (
+      fields.has(key) &&
+      (Object.is(prior, value) || JSON.stringify(prior) === JSON.stringify(value))
+    )
+      Reflect.set(result, key, prior);
+    else equal = false;
+  }
+  return equal ? previous : result;
 }
 
 /** Coordinates lane visibility with authored application without dropping stored settings. */

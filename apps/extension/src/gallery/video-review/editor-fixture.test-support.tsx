@@ -267,14 +267,46 @@ export function createEditorFixture(
     const scope =
       key === 'zoomRegionLabel'
         ? host.querySelector('[data-ui="gallery.videoReview.focusTools"]')
-        : host;
-    const node = scope?.querySelector<HTMLButtonElement>(
-      `[aria-label="${key.includes('.') ? key : `gallery.videoReview.${key}`}"]`
-    );
+        : ['cutMode', 'speedMode'].includes(key)
+          ? host.querySelector('[data-ui="gallery.videoReview.editingTools"]')
+          : host;
+    const selector = `button[aria-label="${key.includes('.') ? key : `gallery.videoReview.${key}`}"]`;
+    const node = scope?.querySelector<HTMLButtonElement>(selector);
     if (!node) throw new Error(`Missing ${key}`);
     return node;
   };
+  const section = async (id: string) => {
+    const tab = host.querySelector<HTMLButtonElement>(`[role="tab"][id$="-${id}-tab"]`);
+    if (!tab) throw new Error(`Missing inspector section ${id}`);
+    await act(async () => tab.click());
+  };
   const click = async (key: string) => {
+    if (
+      key === 'common.actions.close' &&
+      !host.querySelector('header button[aria-label="common.actions.close"]')
+    ) {
+      await act(async () => button('moreActions').click());
+      const close = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(
+        (item) => item.textContent === 'common.actions.close'
+      );
+      if (!close) throw new Error('Missing Close menu action');
+      await act(async () => close.click());
+      return;
+    }
+    if (
+      key === 'exportVideo' &&
+      !host.querySelector('button[aria-label="gallery.videoReview.exportVideo"]')
+    )
+      await click('exportSection');
+    const commandLabel = key.includes('.') ? key : `gallery.videoReview.${key}`;
+    const command = host.querySelector<HTMLButtonElement>(
+      `[data-ui="gallery.videoReview.inspectorActionMenu"] button[aria-label="${commandLabel}"]`
+    );
+    const menuTrigger = host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.inspectorActionMenuTrigger"]'
+    );
+    if (command && menuTrigger?.getAttribute('aria-expanded') !== 'true')
+      await act(async () => menuTrigger?.click());
     if (
       key === 'addComment' &&
       !host.querySelector('[aria-label="gallery.videoReview.addComment"]')
@@ -293,7 +325,9 @@ export function createEditorFixture(
     }
     if (
       ['cutMode', 'speedMode'].includes(key) &&
-      !host.querySelector(`[aria-label="gallery.videoReview.${key}"]`)
+      !host.querySelector(
+        `[data-ui="gallery.videoReview.editingTools"] button[aria-label="gallery.videoReview.${key}"]`
+      )
     ) {
       await act(async () =>
         host
@@ -323,9 +357,7 @@ export function createEditorFixture(
           )!
           .click()
       );
-      const settings = host.querySelector<HTMLButtonElement>('[data-lane-tab="settings"]');
-      if (!settings) throw new Error('Missing source settings after track navigation');
-      await act(async () => settings.click());
+      await section('canvas');
       return;
     }
     if (key === 'telemetry') {
@@ -359,6 +391,7 @@ export function createEditorFixture(
     back,
     button,
     click,
+    section,
     key(event: KeyboardEvent) {
       const surface = host.querySelector<HTMLElement>(
         '[data-ui="gallery.videoReview.previewFrame"]'

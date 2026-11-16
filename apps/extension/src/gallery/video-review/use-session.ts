@@ -3,6 +3,7 @@ import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -155,6 +156,29 @@ export function useReviewSnapshot(session: Session) {
     session.getSnapshot,
     session.getSnapshot
   );
+  const previousEdits = useRef<{
+    session: Session;
+    key: string;
+    edits: typeof snapshot.document.edits;
+  } | null>(null);
+  const edits = useMemo(() => {
+    const key = JSON.stringify(snapshot.document.edits);
+    if (previousEdits.current?.session === session && previousEdits.current.key === key)
+      return previousEdits.current.edits;
+    previousEdits.current = { session, key, edits: snapshot.document.edits };
+    return snapshot.document.edits;
+  }, [session, snapshot.document.edits]);
+  // A content-only save must not rebuild every timeline map or restart recording-history readers.
+  const view = useMemo(
+    () =>
+      edits === snapshot.document.edits
+        ? snapshot
+        : {
+            ...snapshot,
+            document: { ...snapshot.document, edits },
+          },
+    [snapshot, edits]
+  );
   useEffect(() => {
     const protect = (event: BeforeUnloadEvent) => {
       if (!session.getSnapshot().dirty) return;
@@ -164,7 +188,7 @@ export function useReviewSnapshot(session: Session) {
     window.addEventListener('beforeunload', protect);
     return () => window.removeEventListener('beforeunload', protect);
   }, [session]);
-  return snapshot;
+  return view;
 }
 
 function useComposerUnloadProtection(latest: RefObject<{ dirty: boolean }>) {

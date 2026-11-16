@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+import type { ReviewInspectorSection } from './inspector-sections';
 import { isCameraShadowDirection } from '../../features/video/project/camera/shadow-direction';
 import { ReviewWebcamCropPreview } from './webcam-crop-preview';
 import {
@@ -53,8 +55,10 @@ function placementPreset(placement: QuickEditWebcamPlacement) {
 export function ReviewWebcamInspector({
   editor,
   range,
+  renderSections,
 }: {
   editor: Editor;
+  renderSections?: ((sections: readonly ReviewInspectorSection[]) => ReactNode) | undefined;
   range?: { start: number; end: number } | undefined;
 }) {
   const camera = editor.camera;
@@ -117,9 +121,17 @@ export function ReviewWebcamInspector({
       </ReviewButton>
     </>
   );
+  const render =
+    renderSections ??
+    ((sections: readonly ReviewInspectorSection[]) => (
+      <ReviewInspectorSections sections={sections} />
+    ));
   return (
-    <div className="space-y-3" data-ui="gallery.videoReview.webcamInspector">
-      {editor.candidate ? (
+    <div
+      className={renderSections ? 'flex min-h-0 min-w-0 flex-1 flex-col' : 'space-y-3'}
+      data-ui="gallery.videoReview.webcamInspector"
+    >
+      {editor.candidate && !renderSections ? (
         <div
           className="truncate text-xs text-[var(--sniptale-color-text-secondary)]"
           title={editor.candidate.filename}
@@ -127,35 +139,55 @@ export function ReviewWebcamInspector({
           {editor.candidate.filename}
         </div>
       ) : null}
-      {editor.hidden ? (
-        <>
-          <ReviewInterval start={editor.hidden.start} end={editor.hidden.end} />
-          {(['start', 'end'] as const).map((edge) => (
-            <ReviewNumberRow
-              key={edge}
-              label={translate(
-                edge === 'start' ? 'gallery.videoReview.rangeStart' : 'gallery.videoReview.rangeEnd'
-              )}
-              value={editor.hidden![edge]}
-              min={edge === 'start' ? 0 : editor.hidden!.start + 0.001}
-              max={edge === 'end' ? editor.duration : editor.hidden!.end - 0.001}
-              step={0.01}
-              precision={3}
-              unit="s"
-              onChange={(value) => editor.hide({ ...editor.hidden!, [edge]: value }, true)}
-            />
-          ))}
-          <ReviewInspectorSections sections={[actions]} />
-        </>
-      ) : (
-        <ReviewInspectorSections
-          leadingSectionColumn
-          sections={[
+      {editor.hidden
+        ? render([
+            {
+              id: 'webcam-timing',
+              label: translate('gallery.videoReview.webcamTiming'),
+              icon: Clock3,
+              content: (
+                <>
+                  <ReviewInterval start={editor.hidden.start} end={editor.hidden.end} />
+                  {(['start', 'end'] as const).map((edge) => (
+                    <ReviewNumberRow
+                      key={edge}
+                      label={translate(
+                        edge === 'start'
+                          ? 'gallery.videoReview.rangeStart'
+                          : 'gallery.videoReview.rangeEnd'
+                      )}
+                      value={editor.hidden![edge]}
+                      min={edge === 'start' ? 0 : editor.hidden!.start + 0.001}
+                      max={edge === 'end' ? editor.duration : editor.hidden!.end - 0.001}
+                      step={0.01}
+                      precision={3}
+                      unit="s"
+                      onChange={(value) => editor.hide({ ...editor.hidden!, [edge]: value }, true)}
+                    />
+                  ))}
+                </>
+              ),
+            },
+            actions,
+          ])
+        : render([
             {
               id: 'webcam-layout',
               label: translate('gallery.videoReview.webcamLayout'),
               icon: Move,
-              content: <WebcamLayout editor={editor} />,
+              content: (
+                <>
+                  {editor.candidate && renderSections ? (
+                    <p
+                      className="truncate text-xs text-[var(--sniptale-color-text-secondary)]"
+                      title={editor.candidate.filename}
+                    >
+                      {editor.candidate.filename}
+                    </p>
+                  ) : null}
+                  <WebcamLayout editor={editor} />
+                </>
+              ),
             },
             {
               id: 'webcam-appearance',
@@ -187,9 +219,7 @@ export function ReviewWebcamInspector({
               ),
             },
             actions,
-          ]}
-        />
-      )}
+          ])}
     </div>
   );
 }

@@ -812,3 +812,14 @@ it.each([
     expect(state.zoom.change).not.toHaveBeenCalled();
   }
 );
+
+it('routes audio preparation to the FPS waiting reason without disabling cancellation', async () => {
+  state = { ...state, preparingPlayback: true };
+  await render(true, DEFAULT_QUICK_PREVIEW_PREFERENCES);
+  expect(stage().preview?.waitingReason).toContain('gallery.videoReview.audioPreparing');
+  expect(frame().disabled).toBe(false);
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  state = { ...state, preparingPlayback: false };
+  await render(true, DEFAULT_QUICK_PREVIEW_PREFERENCES);
+  expect(stage().preview?.waitingReason).toBeUndefined();
+});

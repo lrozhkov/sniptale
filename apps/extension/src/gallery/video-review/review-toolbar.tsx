@@ -24,7 +24,7 @@ import {
   ReviewToolGroup,
 } from './controls';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
-import { ReviewTimelineTools, ReviewFragmentAction } from './edit-actions';
+import { ReviewTimelineTools } from './edit-actions';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
 import {
   StickyNote,
@@ -100,7 +100,6 @@ type ToolbarProps = {
   setMode(mode: 'basic' | 'advanced'): void;
   telemetryAvailable: boolean;
   setTrackVisibility(track: 'actions' | 'zoom' | 'audio', visible: boolean): void;
-  onDownloadFragment(): void;
 };
 
 /** Tools, comment entry, fragment export, and the advanced shell share one quiet toolbar. */
@@ -169,16 +168,6 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
             editor={props.originalAudioEditor}
             busy={busy}
             admit={admit}
-          />
-        ) : null}
-        {track === 'source' ? (
-          <ReviewFragmentAction
-            selection={props.selection}
-            snapToKeyframes={advanced.ui.mode !== 'advanced'}
-            index={props.editing.exporter.index}
-            edits={props.edits}
-            busy={busy}
-            onDownload={() => admit(props.onDownloadFragment)}
           />
         ) : null}
       </div>

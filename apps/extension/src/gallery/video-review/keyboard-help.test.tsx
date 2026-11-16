@@ -153,3 +153,17 @@ it('closes the menu on an outside pointer action without stealing outside focus'
   expect(document.querySelector('[role="menu"]')).toBeNull();
   expect(document.activeElement).not.toBe(trigger());
 });
+
+it('offers guarded exit in the existing utility menu and disables it while busy', () => {
+  const onClose = vi.fn();
+  act(() => root.render(<ReviewKeyboardHelp onClose={onClose} />));
+  open();
+  act(() => item('common.actions.close').click());
+  expect(onClose).toHaveBeenCalledOnce();
+  expect(document.querySelector('[role="menu"]')).toBeNull();
+  act(() => root.render(<ReviewKeyboardHelp onClose={onClose} busy />));
+  open();
+  expect(item('common.actions.close').disabled).toBe(true);
+  act(() => item('common.actions.close').click());
+  expect(onClose).toHaveBeenCalledOnce();
+});

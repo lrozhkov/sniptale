@@ -259,6 +259,35 @@ it('allows overlapping duplicates and enabled toggles without allocating another
   expect(save).not.toHaveBeenCalled();
 });
 
+it('buffers lane toggles without a blocking flush or invalidating unrelated tracks', async () => {
+  const { pause } = setup();
+  const audio = advanced.advanced.audio;
+  const zoom = advanced.advanced.zoom;
+  const instances = editor.lane!.instances;
+  const gate = Promise.withResolvers<void>();
+  const flush = vi.fn(() => gate.promise);
+  holdFlush = flush;
+  try {
+    act(() => editor.enabled(false));
+    expect(editor.pending).toBe(false);
+    expect(editor.lane?.enabled).toBe(false);
+    expect(editor.lane?.instances).toBe(instances);
+    expect(advanced.advanced.audio).toBe(audio);
+    expect(advanced.advanced.zoom).toBe(zoom);
+    expect(flush).not.toHaveBeenCalled();
+    expect(pause).toHaveBeenCalled();
+  } finally {
+    await settle(() => gate.resolve());
+    holdFlush = null;
+  }
+  await act(async () => advanced.flush());
+  expect(session.getSnapshot().document.advancedContent.annotationEffects?.enabled).toBe(false);
+  await act(async () => session.history('undo'));
+  expect(editor.lane?.enabled).toBe(true);
+  await act(async () => session.history('redo'));
+  expect(editor.lane?.enabled).toBe(false);
+});
+
 it('rejects invalid timing and SDK controls before they poison the content buffer', async () => {
   setup();
   for (const patch of [
@@ -333,8 +362,10 @@ it('retries an unadmitted choice and refuses all mutations while another editor 
     editor.add(choice);
     editor.remove('first');
     editor.change('first', { start: 0 });
+    editor.enabled(false);
   });
   expect(acquire).not.toHaveBeenCalled();
+  expect(editor.lane?.enabled).toBe(true);
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
   blocked = false;
   acquire.mockRejectedValueOnce(new Error('Unavailable'));
@@ -508,6 +539,9 @@ it('retries the retained live field before clearing a completed edit failure', a
 
 it('commits actual inspector scrub once, restores through Undo/Redo and cancels without history', async () => {
   const { save } = setup(true);
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-placement"]')!.click()
+  );
   const range = () =>
     host.querySelector<HTMLInputElement>(
       `input[aria-label="${translate('gallery.videoReview.annotationX')} range"]`
@@ -549,6 +583,9 @@ it('commits actual inspector scrub once, restores through Undo/Redo and cancels 
 
 it('derives preset presentation through canonical history, rejected edits and persisted reopen', async () => {
   const { save, render } = setup(true);
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-sdk:appearance"]')!.click()
+  );
   const document = readReviewAnnotationEffectDocument(source)!;
   const preset = document.controlPresets![1]!;
   const label = () =>
@@ -607,6 +644,9 @@ it('switches attachment in real perspective geometry as one history edit and res
   act(() => editor.setGeometry(geometry));
   const before = structuredClone(
     session.getSnapshot().document.advancedContent.annotationEffects!.instances[0]!
+  );
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-placement"]')!.click()
   );
   const trigger = host.querySelector<HTMLButtonElement>(
     `button[aria-label="${translate('gallery.videoReview.annotationAttachment')}"]`
@@ -692,6 +732,9 @@ it('retains picked alpha through actual Apply, canonical Undo/Redo and persisted
   const definition = readReviewAnnotationEffectDocument(source)!;
   const control = definition.controls.find((item) => item.id === 'accent')!;
   const label = resolveEffectLocaleText(control.label, getCurrentLocale());
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-sdk:appearance"]')!.click()
+  );
   const row = [
     ...host.querySelectorAll<HTMLElement>('[data-ui="shared.ui.compact-inspector.color-field"]'),
   ].find((node) => node.querySelector(`[title="${label}"]`))!;

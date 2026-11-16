@@ -11,7 +11,7 @@ import {
 } from '../../ui/effect-control-presentation/icons';
 import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Clock3, Copy, Move, LayoutTemplate, Trash2, Link2 } from 'lucide-react';
+import { Clock3, Copy, Move, Trash2, Link2 } from 'lucide-react';
 import { type AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
 import {
   applyEffectControlPreset,
@@ -166,6 +166,47 @@ function AnnotationParameters(
         }
       : transform;
 
+  const sdkSections = annotationSdkSections({
+    document,
+    instance,
+    values,
+    locale,
+    editor,
+    disabled,
+    preview,
+    commit,
+  });
+  if (document.controlPresets?.length) {
+    const preset = (
+      <AnnotationPreset
+        document={document}
+        instance={instance}
+        editor={editor}
+        locale={locale}
+        disabled={disabled}
+      />
+    );
+    const appearance = sdkSections.findIndex((section) => section.id === 'sdk:appearance');
+    if (appearance >= 0) {
+      const section = sdkSections[appearance]!;
+      sdkSections[appearance] = {
+        ...section,
+        content: (
+          <>
+            {preset}
+            {section.content}
+          </>
+        ),
+      };
+    } else {
+      sdkSections.push({
+        id: 'sdk:appearance',
+        label: translate('videoEditor.effectsLibrary.objectAppearance'),
+        icon: effectControlRootIcon('appearance'),
+        content: preset,
+      });
+    }
+  }
   const sections = [
     {
       id: 'timing',
@@ -292,34 +333,7 @@ function AnnotationParameters(
         </>
       ),
     },
-    ...(document.controlPresets?.length
-      ? [
-          {
-            id: 'presets',
-            label: translate('gallery.videoReview.annotationPresets'),
-            icon: LayoutTemplate,
-            content: (
-              <AnnotationPreset
-                document={document}
-                instance={instance}
-                editor={editor}
-                locale={locale}
-                disabled={disabled}
-              />
-            ),
-          },
-        ]
-      : []),
-    ...annotationSdkSections({
-      document,
-      instance,
-      values,
-      locale,
-      editor,
-      disabled,
-      preview,
-      commit,
-    }),
+    ...sdkSections,
     reviewInspectorActions(
       <>
         <ReviewButton

@@ -678,7 +678,7 @@ it('anchors real drift recovery to the current mapped media time instead of a st
     playing: true,
     outputTime: 3,
     sourceToResult: map.sourceToTimeline,
-    music: [clip({ timelineStart: 0, duration: 8 })],
+    voiceover: [clip({ timelineStart: 0, duration: 8 })],
     resolveAsset: async () => new Blob(),
   });
   await act(async () => root.render(<Harness />));
@@ -1079,4 +1079,124 @@ it('starts prepared audio before the native Play request and adopts it on the la
   expect(prepareProcessedClip).toHaveBeenCalledOnce();
   await act(async () => root.render(<f.Harness playing={false} outputTime={0.8} />));
   expect(dispose).toHaveBeenCalledOnce();
+});
+
+it.each([1, 2])(
+  'prepares ordinary music at %sx before Play and reuses its decoded tempo buffer',
+  async (rate) => {
+    const engine = new FakeEngine();
+    const decode = vi.spyOn(engine, 'decode');
+    const prepare = vi.spyOn(engine, 'prepareClip');
+    const f = renderRuntime({
+      createEngine: () => engine,
+      playing: false,
+      music: [clip({ timelineStart: 0, playbackRate: rate })],
+      resolveAsset: async () => new Blob(),
+    });
+    await act(async () => root.render(<f.Harness />));
+    await act(async () => expect(await f.controls.preparePlayback()).toBe(true));
+    expect(decode).toHaveBeenCalledOnce();
+    expect(prepare).toHaveBeenCalledTimes(rate === 1 ? 0 : 1);
+    expect(engine.scheduled).toHaveLength(0);
+    await act(async () => root.render(<f.Harness playing />));
+    expect(decode).toHaveBeenCalledOnce();
+    expect(prepare).toHaveBeenCalledTimes(rate === 1 ? 0 : 1);
+    expect(engine.scheduled).toHaveLength(1);
+  }
+);
+
+it('cancels a pending ordinary music preparation without scheduling stale audio', async () => {
+  const engine = new FakeEngine();
+  let release!: (blob: Blob) => void;
+  let requested!: () => void;
+  const started = new Promise<void>((resolve) => {
+    requested = resolve;
+  });
+  const asset = new Promise<Blob>((resolve) => {
+    release = resolve;
+  });
+  const failure = vi.fn();
+  const f = renderRuntime({
+    createEngine: () => engine,
+    playing: false,
+    music: [clip()],
+    resolveAsset: () => {
+      requested();
+      return asset;
+    },
+    onFailure: failure,
+  });
+  await act(async () => root.render(<f.Harness />));
+  await act(async () => {
+    const pending = f.controls.preparePlayback();
+    await started;
+    f.controls.stopPlayback();
+    release(new Blob());
+    expect(await pending).toBe(false);
+  });
+  expect(engine.scheduled).toHaveLength(0);
+  expect(failure).not.toHaveBeenCalled();
+});
+
+it('schedules ready music synchronously when resynchronizing after clock drift', async () => {
+  const engine = new FakeEngine();
+  const f = renderRuntime({
+    createEngine: () => engine,
+    outputTime: 3,
+    music: [clip()],
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<f.Harness />));
+  await act(async () => expect(await f.controls.preparePlayback()).toBe(true));
+  await act(async () => root.render(<f.Harness playing />));
+  expect(engine.scheduled).toHaveLength(1);
+  act(() => {
+    f.controls.startPlayback();
+    // Teardown and replacement must share one turn; a later effect may block microtasks.
+    expect(engine.scheduled).toHaveLength(2);
+  });
+});
+
+it('keeps background music continuous during native clock corrections but resets it on a real seek', async () => {
+  const engine = new FakeEngine();
+  const stops: ReturnType<typeof vi.fn>[] = [];
+  const schedule = engine.scheduleClip.bind(engine);
+  vi.spyOn(engine, 'scheduleClip').mockImplementation((placement, buffer) => {
+    schedule(placement, buffer);
+    const stop = vi.fn();
+    stops.push(stop);
+    return { stop };
+  });
+  const node = document.createElement('video');
+  node.currentTime = 3;
+  const f = renderRuntime({
+    video: { current: node },
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 3,
+    sourceToResult: (time) => time,
+    seekRevision: 0,
+    music: [clip()],
+    voiceover: [clip({ id: 'voice' })],
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<f.Harness />));
+  expect(engine.scheduled).toHaveLength(2);
+  const stopsBeforeDrift = engine.stops;
+  // The native video stalled while the Web Audio clock continued running.
+  engine.currentTime = 100.5;
+  node.currentTime = 3.1;
+  await act(async () => root.render(<f.Harness outputTime={3.1} />));
+  expect(engine.stops).toBe(stopsBeforeDrift);
+  expect(engine.scheduled).toHaveLength(3); // Only synchronized voiceover is replaced.
+  expect(stops[0]).toHaveBeenCalledOnce(); // Voiceover.
+  expect(stops[1]).not.toHaveBeenCalled(); // Music continues on its original clock.
+  node.currentTime = 5;
+  await act(async () => root.render(<f.Harness outputTime={5} seekRevision={1} />));
+  expect(engine.stops).toBeGreaterThan(stopsBeforeDrift);
+  expect(engine.scheduled).toHaveLength(5);
+  expect(engine.scheduled.at(-1)!.schedule).toMatchObject({ offset: 3, duration: 1 });
+  const beforePause = engine.stops;
+  await act(async () => root.render(<f.Harness outputTime={5} seekRevision={1} playing={false} />));
+  expect(engine.stops).toBeGreaterThan(beforePause);
 });

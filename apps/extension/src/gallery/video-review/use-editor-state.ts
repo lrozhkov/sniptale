@@ -23,7 +23,11 @@ import {
   reviewRecordingWindow,
 } from '../../features/video/review/telemetry';
 import { translate } from '../../platform/i18n';
-import type { ReviewAnchor, ReviewAnnotation } from '../../features/video/review/types';
+import type {
+  ReviewAnchor,
+  ReviewAnnotation,
+  ReviewSelection,
+} from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import type { ReviewActionAudioUnavailable } from '../../features/video/review/action-audio';
 import { useReviewBackgroundImport } from './use-review-background';
@@ -32,7 +36,11 @@ import { useReviewExport } from './use-export';
 import { useReviewAdvanced } from './use-advanced';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { useReviewTransport } from './use-review-transport';
-import { reviewSelectionSourceTime, useReviewSelection } from './use-review-selection';
+import {
+  reviewSelectionSeekTarget,
+  reviewSelectionSourceTime,
+  useReviewSelection,
+} from './use-review-selection';
 import { useReviewEditorWiring } from './use-review-wiring';
 import { useReviewEditingTools } from './use-review-editing';
 import { useReviewWebcamEditor } from './webcam-editor';
@@ -98,6 +106,19 @@ export function useReviewEditorState(resource: LoadedReview) {
     timelineSelection: selection,
     cuts,
   });
+  core.selectionNavigation.current = (selection) => {
+    const target = reviewSelectionSeekTarget(selection, {
+      document: core.snapshot.document,
+      advanced: core.advanced,
+      duration: core.source.duration,
+      markers: wiring.projected.markers,
+      sourceTime: core.playheadClock?.read() ?? core.time,
+      resultTime: core.playheadClock?.readResult?.() ?? core.timeline.sceneOutputTime,
+      segments: core.timeline.timeMap.getSegments(),
+    });
+    if (target?.domain === 'result') core.seekResult(target.time);
+    else if (target) core.seek(target.time, false);
+  };
   const actionsApplied = resolveQuickEditEffectiveState(advanced).actionsApplied;
   const clickCues = useMemo(
     () =>
@@ -433,6 +454,7 @@ function useReviewEditorBase(resource: LoadedReview) {
   const composer = useReviewComposer(session);
   const exporter = useReviewExport(resource);
   const stopForEdit = useRef<() => void>(() => {});
+  const selectionNavigation = useRef<(selection: ReviewSelection) => void>(() => {});
   const beforeEdit = useCallback(() => stopForEdit.current(), []);
   const advancedState = useReviewAdvanced(session, beforeEdit);
   const advanced = advancedState.advanced;
@@ -480,7 +502,11 @@ function useReviewEditorBase(resource: LoadedReview) {
     if (selection.kind !== 'none') beforeEdit();
     activeSelectionRef.current = selection;
     advancedState.endTyping();
-    void speechGuard.perform(() => selectActive(selection));
+    void speechGuard.perform(() => {
+      if (typeof next !== 'function' && selection.kind !== 'none')
+        selectionNavigation.current(selection);
+      selectActive(selection);
+    });
   };
   const run = (action: () => Promise<unknown>, success?: string) =>
     Promise.resolve(speechGuard.perform(() => transitions.perform(() => raw(action, success))));
@@ -497,6 +523,7 @@ function useReviewEditorBase(resource: LoadedReview) {
   return {
     session,
     stopForEdit,
+    selectionNavigation,
     source,
     snapshot,
     composer,
@@ -585,6 +612,7 @@ function useReviewEditorTimeline(
     onEnded,
     onMediaError,
     recovering,
+    preparingPlayback,
     seekRevision,
     navigationRevision,
     actionSoundPreview,
@@ -663,6 +691,7 @@ function useReviewEditorTimeline(
     onEnded,
     onMediaError,
     recovering,
+    preparingPlayback,
     seekRevision,
     navigationRevision,
     playing,
@@ -716,14 +745,13 @@ function assembleReviewEditorState(
       core.beforeAction(() => {
         core.setSelection({ kind: 'point', time });
         setActiveSelection({ kind: 'cursor-focus', id: id ?? '', time });
-        core.seek(time, false);
       }),
     moveCursorFocusKey: (key: (typeof wiring.cursorFocusKeys)[number], time: number) =>
       core.beforeAction(() => {
         const moved = moveCursorFocusTimelineKey(wiring.cursorFocusPath, key, time);
         advancedState.setCursorFocusPath(moved.path);
         if (core.activeSelection.kind === 'cursor-focus' && core.activeSelection.id === key.id)
-          setActiveSelection({ kind: 'cursor-focus', id: moved.id, time: moved.time });
+          setActiveSelection(() => ({ kind: 'cursor-focus', id: moved.id, time: moved.time }));
       }),
     addCursorFocusKey: (requestedTime: number) =>
       core.beforeAction(() => {

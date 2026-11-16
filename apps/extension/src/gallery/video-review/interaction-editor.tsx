@@ -55,8 +55,6 @@ type Input = Pick<
 export function createReviewInteractionEditor(input: Input) {
   const select = (marker: ReviewTelemetryMarker) => {
     input.setActiveSelection({ kind: 'telemetry', ref: marker.ref });
-    if (marker.timeDomain === 'result' && input.seekResult) input.seekResult(marker.start);
-    else input.seek(marker.start, false);
   };
   const update = (marker: ReviewTelemetryMarker, start: number, end: number, enabled = true) =>
     input.beforeAction(() => {

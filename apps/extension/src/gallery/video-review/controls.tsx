@@ -2,6 +2,7 @@ import { InspectorDisclosureView } from '../../ui/compact-inspector-controls/dis
 import { createPortal } from 'react-dom';
 import {
   ReviewSelectionCommandSlotsContext,
+  ReviewCommandMenuContext,
   type ReviewSelectionCommand,
 } from './selection-command-slots';
 import type { InspectorDisclosureProps } from '../../ui/compact-inspector-controls/shared';
@@ -248,6 +249,7 @@ export function ReviewButton({
 }) {
   const press = useCommandPress(props);
   const actionSlots = useContext(ReviewSelectionCommandSlotsContext);
+  const menuItem = useContext(ReviewCommandMenuContext);
   const tone = primary
     ? getControlPrimaryButtonClassName()
     : getControlSecondaryButtonClassName({ density: 'compact' });
@@ -256,6 +258,7 @@ export function ReviewButton({
       type="button"
       title={label}
       aria-label={label}
+      role={menuItem ? 'menuitem' : undefined}
       data-review-toolbar-button={toolbarLabel === undefined ? undefined : ''}
       data-toolbar-priority={toolbarLabel === undefined ? undefined : toolbarPriority}
       {...props}

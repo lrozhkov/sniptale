@@ -59,6 +59,7 @@ type TimelineProps = ReviewCursorTimelineInteractions & {
   busy?: boolean;
   playbackRange?: ReviewPlaybackRange | null | undefined;
   onPlaybackRange?: ((range: ReviewPlaybackRange | null) => void) | undefined;
+  onPause?: (() => void) | undefined;
   annotationTool?: boolean;
   annotationDrawing?: boolean;
   sourceRangeTool?: boolean;
@@ -269,6 +270,13 @@ function ReviewTimelineSurface(props: TimelineProps) {
             }}
             onPointerDown={plane.onPointerDown}
             onPointerMoveCapture={(event) => {
+              if (
+                event.target instanceof Element &&
+                event.target.closest('[data-playback-range-edge]')
+              ) {
+                hover.clear();
+                return;
+              }
               if (event.target instanceof Node && event.currentTarget.contains(event.target))
                 hover.move(event, plane.activeLane());
               else hover.clear();
@@ -300,6 +308,11 @@ function ReviewTimelineSurface(props: TimelineProps) {
               duration={props.duration}
               gutter={gutter}
               width={Math.max(1, width * zoom)}
+              edgeInteraction={
+                props.playbackRange && !plane.trackPreview && props.onPlaybackRange
+                  ? ruler.edgeInteraction
+                  : undefined
+              }
             />
             <ReviewTimelineResizeGuide
               key={props.sourceId}
@@ -515,7 +528,6 @@ export function ReviewTimeline(props: TimelineProps) {
           onSnap={() => {}}
           onEdit={(view) => {
             props.onEdit?.(originalEdit(view));
-            props.onSeekResult?.(part.segment.resultStart);
           }}
           onChangeEdit={async (_view, value) => {
             if (value.kind !== 'range') return;

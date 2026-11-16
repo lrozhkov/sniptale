@@ -302,9 +302,15 @@ it('requires the audio tool for drawing, ignores overlapping ranges and edits in
     )!;
     expect(block.textContent).toBe('150%');
     expect(block.className).not.toContain('sniptale-color-danger');
+    act(() =>
+      f.host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-timing"]')!.click()
+    );
     change(translate('gallery.videoReview.rangeStart'), '1');
     change(translate('gallery.videoReview.rangeEnd'), '6');
     expect(f.editor.selectedOriginal).toMatchObject({ start: 1, end: 6 });
+    act(() =>
+      f.host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-audio"]')!.click()
+    );
     act(() =>
       f.host
         .querySelector<HTMLButtonElement>(

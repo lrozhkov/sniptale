@@ -44,6 +44,7 @@ export function useReviewTransport(args: {
   const playbackAudio = useRef<ReturnType<typeof useReviewEditorAudioRuntime> | null>(null);
   const playIntent = useRef(0);
   const starting = useRef(false);
+  const [preparingPlayback, setPreparingPlayback] = useState(false);
   function failTransport(reason?: ReviewActionAudioUnavailable['reason']) {
     pause();
     args.onTransportFailure(reason);
@@ -87,6 +88,7 @@ export function useReviewTransport(args: {
   const pause = useCallback(() => {
     ++playIntent.current;
     starting.current = false;
+    setPreparingPlayback(false);
     playbackAudio.current?.stopPlayback();
     pausePlayback();
   }, [pausePlayback]);
@@ -217,15 +219,19 @@ export function useReviewTransport(args: {
       }
       const intent = ++playIntent.current;
       starting.current = true;
-      if (!active && !args.silent) {
-        if (!(await actionSoundPreview.preparePlayback())) {
-          if (intent === playIntent.current) starting.current = false;
-          return;
+      try {
+        if (!args.silent) {
+          setPreparingPlayback(true);
+          if (!(await actionSoundPreview.preparePlayback())) return;
+        }
+        if (intent !== playIntent.current) return;
+        play();
+      } finally {
+        if (intent === playIntent.current) {
+          starting.current = false;
+          setPreparingPlayback(false);
         }
       }
-      if (intent !== playIntent.current) return;
-      starting.current = false;
-      play();
     },
     timeline,
     playbackRange,
@@ -233,6 +239,7 @@ export function useReviewTransport(args: {
     onEnded,
     onMediaError,
     recovering,
+    preparingPlayback,
     seekRevision,
     navigationRevision,
   };

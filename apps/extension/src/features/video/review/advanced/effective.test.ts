@@ -13,6 +13,66 @@ import {
 import { createCanvasComment } from '../comments';
 import type { QuickEditAdvancedState } from './types';
 import { createQuickEditWebcam } from './webcam';
+import { buildReviewTimeMap } from '../timeline';
+import { anchorReviewVoiceover } from '../voiceover-edits';
+import { buildQuickEditAudioPlan, planQuickEditClipPlayback } from './audio-plan';
+
+it('plays music to its displayed right edge across inserted video without shortening the tail', () => {
+  const state = createQuickEditAdvancedState();
+  state.ui.mode = 'advanced';
+  state.ui.tracks.audio = true;
+  const clip = anchorReviewVoiceover(
+    {
+      id: 'music',
+      assetId: 'asset',
+      timelineStart: 3,
+      sourceOffset: 2,
+      duration: 4,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 1,
+    },
+    buildReviewTimeMap(12, [])
+  );
+  state.audio.music = [clip];
+  state.audio.voiceover = [{ ...clip, id: 'voice' }];
+  const before = structuredClone(state);
+  for (const length of [0.5, 2, 4]) {
+    state.audio.voiceoverSegments = buildReviewTimeMap(12, [
+      {
+        id: 'hold',
+        kind: 'freeze',
+        start: 4,
+        end: 4,
+        requestedStart: 4,
+        requestedEnd: 4,
+        duration: length,
+        frameTime: 3.98,
+        frameDuration: 0.04,
+      },
+    ]);
+    const effective = resolveQuickEditEffectiveState(state);
+    expect(effective.music).toMatchObject([
+      { timelineStart: 3, duration: 4 + length, sourceOffset: 2 },
+    ]);
+    expect(effective.voiceover).toMatchObject([{ timelineStart: 3, duration: 4, sourceOffset: 2 }]);
+    const plan = buildQuickEditAudioPlan({ music: effective.music, voiceover: [] });
+    const time = 7 + length - 0.25;
+    expect(
+      planQuickEditClipPlayback({ entry: plan[0]!, outputTime: time, audioNow: 100 })
+    ).toMatchObject({
+      when: 100,
+      offset: 6 + length - 0.25,
+      duration: 0.25,
+    });
+  }
+  state.audio.voiceoverSegments = buildReviewTimeMap(12, []);
+  expect(resolveQuickEditEffectiveState(state).music).toMatchObject([
+    { timelineStart: 3, duration: 4 },
+  ]);
+  expect(state.audio.music).toEqual(before.audio.music);
+});
 
 it('keeps authored annotations editable while application is disabled and forces only video rendering', () => {
   const state = createQuickEditAdvancedState();

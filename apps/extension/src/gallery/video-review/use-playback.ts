@@ -267,6 +267,15 @@ function useReviewSourcePlayback(props: ReviewPlaybackProps) {
       }
     },
     onTime: (value: number) => synchronize(value, playing),
+    pause: () => {
+      ++playIntent.current;
+      pendingResume.current = null;
+      const node = video.current;
+      node?.pause();
+      // The native pause event is queued; publish its final sample in the paused-state commit.
+      if (node) publishTime(node.currentTime);
+      setPlaying(false);
+    },
     seek: (value: number, snap = true) => {
       const clamped = Math.max(0, Math.min(props.duration, value));
       const boundaries = snap ? props.boundaries() : undefined;

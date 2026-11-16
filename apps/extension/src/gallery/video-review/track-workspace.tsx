@@ -1,4 +1,6 @@
-import { type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { ReviewInspectorSectionNavigation } from './inspector-section-navigation';
+import { ReviewInspectorActionTray, type ReviewInspectorSection } from './inspector-sections';
 import {
   Film,
   Volume2,
@@ -12,75 +14,16 @@ import {
   Music,
   Webcam,
   History,
-  Settings2,
+  List,
+  Crop,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { reviewTrackTitleKeys } from './track-items';
 import type { QuickEditTrack } from '../../features/video/review/advanced/types';
 import { translate } from '../../platform/i18n';
-import { ReviewButton, reviewTextButtonClassName } from './controls';
-
-/** A lane retains its tab and mounted collection while a selected element owns the inspector. */
-export function ReviewTrackWorkspace({
-  track,
-  id,
-  list,
-  settings,
-  tab: requestedTab,
-}: {
-  track: QuickEditTrack;
-  id: string;
-  list: ReactNode;
-  settings?: ReactNode;
-  tab: 'list' | 'settings';
-}) {
-  const tab = settings ? requestedTab : 'list';
-  return (
-    <div
-      className="flex min-h-0 flex-1 flex-col gap-2"
-      data-ui="gallery.videoReview.trackWorkspace"
-    >
-      <div
-        role="tabpanel"
-        id={`${id}-list`}
-        aria-labelledby={`${id}-list-tab`}
-        aria-label={translate('gallery.videoReview.trackList')}
-        hidden={tab !== 'list'}
-        style={{ display: tab !== 'list' ? 'none' : undefined }}
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto"
-        key={`list:${track}`}
-      >
-        {list}
-      </div>
-      {tab === 'settings' ? (
-        <div
-          role="tabpanel"
-          id={`${id}-settings`}
-          aria-labelledby={`${id}-settings-tab`}
-          aria-label={translate('gallery.videoReview.trackSettingsTab')}
-          className="min-h-0 flex-1 overflow-y-auto"
-          key={`settings:${track}`}
-        >
-          {settings}
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 /** Lane navigation occupies the inspector header; unavailable settings have no tab. */
-export function ReviewTrackWorkspaceTabs({
-  id,
-  track,
-  tab,
-  hasSettings,
-  onTabChange,
-}: {
-  id: string;
-  track: QuickEditTrack;
-  tab: 'list' | 'settings';
-  hasSettings: boolean;
-  onTabChange(tab: 'list' | 'settings'): void;
-}) {
+export function ReviewTrackWorkspaceHeading({ id, track }: { id: string; track: QuickEditTrack }) {
   const title = translate(reviewTrackTitleKeys[track]);
   const Icon = {
     source: Film,
@@ -97,64 +40,87 @@ export function ReviewTrackWorkspaceTabs({
     actions: History,
   }[track];
   return (
+    <h2 id={`${id}-title`} className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+      <Icon
+        size={16}
+        className="shrink-0 text-[var(--sniptale-color-text-secondary)]"
+        aria-hidden="true"
+      />
+      <span className="truncate">{title}</span>
+    </h2>
+  );
+}
+
+/** Lane lists stay mounted while the common section row selects individual settings. */
+export function ReviewTrackWorkspace({
+  id,
+  tab,
+  onTabChange,
+  list,
+  sections,
+}: {
+  id: string;
+  tab: 'list' | 'settings';
+  onTabChange(tab: 'list' | 'settings'): void;
+  list: ReactNode;
+  sections: readonly ReviewInspectorSection[];
+}) {
+  const [remembered, remember] = useState<string>();
+  const parameters = sections.filter((section) => section.id !== 'actions');
+  const actions = sections.find((section) => section.id === 'actions');
+  const current = parameters.find((section) => section.id === remembered) ?? parameters[0];
+  const selected = tab === 'settings' && current ? current.id : 'list';
+  const choices = [
+    { id: 'list', label: translate('gallery.videoReview.trackTab'), icon: List },
+    ...parameters.map((section) => ({
+      ...section,
+      icon:
+        section.id === 'canvas'
+          ? Crop
+          : section.id === 'source-filters'
+            ? SlidersHorizontal
+            : section.icon,
+    })),
+  ];
+  const choose = (value: string) => {
+    if (value !== 'list') remember(value);
+    onTabChange(value === 'list' ? 'list' : 'settings');
+  };
+  return (
     <div
-      role="tablist"
-      aria-label={translate('gallery.videoReview.trackSections')}
-      className="flex shrink-0 items-center gap-1"
-      onKeyDown={(event) => {
-        if (!hasSettings) return;
-        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-        event.preventDefault();
-        const next =
-          event.key === 'Home'
-            ? 'list'
-            : event.key === 'End'
-              ? 'settings'
-              : tab === 'list'
-                ? 'settings'
-                : 'list';
-        onTabChange(next);
-        event.currentTarget.querySelector<HTMLButtonElement>(`[data-lane-tab="${next}"]`)?.focus();
-      }}
+      className="flex min-h-0 min-w-0 flex-1 flex-col"
+      data-ui="gallery.videoReview.trackWorkspace"
     >
-      <ReviewButton
-        role="tab"
-        id={`${id}-list-tab`}
-        data-lane-tab="list"
-        aria-controls={`${id}-list`}
-        tabIndex={tab === 'list' ? 0 : -1}
-        aria-selected={tab === 'list'}
-        label={title}
-        className={[
-          reviewTextButtonClassName,
-          'aria-selected:!bg-[var(--sniptale-color-surface-hover)]',
-          'aria-selected:!text-[var(--sniptale-color-text-primary)]',
-        ].join(' ')}
-        onClick={() => onTabChange('list')}
+      <ReviewInspectorSectionNavigation
+        id={id}
+        value={selected}
+        items={choices}
+        onChange={choose}
+      />
+      <div
+        id={`${id}-list`}
+        role="tabpanel"
+        aria-label={translate('gallery.videoReview.trackTab')}
+        aria-labelledby={choices.length > 1 ? `${id}-list-tab` : undefined}
+        hidden={selected !== 'list'}
+        style={{ display: selected !== 'list' ? 'none' : undefined }}
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto"
       >
-        <Icon size={14} aria-hidden="true" />
-        {title}
-      </ReviewButton>
-      {hasSettings ? (
-        <ReviewButton
-          role="tab"
-          id={`${id}-settings-tab`}
-          data-lane-tab="settings"
-          aria-controls={`${id}-settings`}
-          tabIndex={tab === 'settings' ? 0 : -1}
-          aria-selected={tab === 'settings'}
-          label={translate('gallery.videoReview.trackSettingsTab')}
-          className={[
-            reviewTextButtonClassName,
-            'aria-selected:!bg-[var(--sniptale-color-surface-hover)]',
-            'aria-selected:!text-[var(--sniptale-color-text-primary)]',
-          ].join(' ')}
-          onClick={() => onTabChange('settings')}
+        {list}
+      </div>
+      {selected !== 'list' && current ? (
+        <div
+          key={current.id}
+          role="tabpanel"
+          id={`${id}-${current.id}`}
+          aria-labelledby={`${id}-${current.id}-tab`}
+          tabIndex={0}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-3"
         >
-          <Settings2 size={14} aria-hidden="true" />
-          {translate('gallery.videoReview.trackSettingsTab')}
-        </ReviewButton>
+          {current.content}
+        </div>
       ) : null}
+      {actions ? <ReviewInspectorActionTray>{actions.content}</ReviewInspectorActionTray> : null}
     </div>
   );
 }

@@ -372,7 +372,23 @@ export function useReviewAnnotationEffects(
     add,
     change,
     enabled: (enabled: boolean) => {
-      if (!draft.current) void mutate((lane) => lane && { ...lane, enabled });
+      if (draft.current || completion.current) return;
+      const owner = args;
+      // A lane flag uses the same buffered content path as Zoom, without global operation busy.
+      (owner.beforeAction ?? ((action) => action()))(() => {
+        if (
+          !mounted.current ||
+          latest.current.session !== owner.session ||
+          draft.current ||
+          completion.current ||
+          operation.current ||
+          !latest.current.allowed()
+        )
+          return;
+        owner.pause();
+        owner.setLane((lane) => lane && { ...lane, enabled });
+        setFailure(null);
+      });
     },
     remove: (id: string) => {
       if (draft.current) cancelGesture();

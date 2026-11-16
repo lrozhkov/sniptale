@@ -84,15 +84,15 @@ it('navigates source and authored rows, filters, pages and removes through the a
     expect(host.querySelectorAll('[data-track-item]')).toHaveLength(50);
     const renderedLabels = renderProbe.inactiveLabels;
     expect(renderedLabels).toBeGreaterThan(0);
-    const currentSeek = vi.fn();
-    props.state = { ...props.state, seek: currentSeek };
+    const currentSelect = vi.fn();
+    props.state = { ...props.state, setActiveSelection: currentSelect };
     render('zoom');
     expect(renderProbe.inactiveLabels).toBe(renderedLabels);
     await act(async () =>
       host.querySelector<HTMLButtonElement>('.review-track-items-open')!.click()
     );
-    expect(currentSeek).toHaveBeenCalledWith(0, false);
-    props.state = { ...props.state, seek };
+    expect(currentSelect).toHaveBeenCalledWith({ kind: 'zoom', id: 'focus0' });
+    props.state = { ...props.state, setActiveSelection: selected };
     render('zoom');
 
     await click('trackItemsMore');
@@ -101,7 +101,7 @@ it('navigates source and authored rows, filters, pages and removes through the a
       host.querySelector<HTMLButtonElement>('.review-track-items-open')!.click()
     );
     expect(selected).toHaveBeenCalledWith({ kind: 'zoom', id: 'focus0' });
-    expect(seek).toHaveBeenCalledWith(0, false);
+    expect(seek).not.toHaveBeenCalled();
     expect(section).toHaveBeenCalledWith('selected');
     toggle(1);
     toggle(2);

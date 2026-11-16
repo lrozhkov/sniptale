@@ -20,6 +20,7 @@ interface SourcePlayback {
   onEnded(): void;
   onMediaError(): void;
   play(): void;
+  pause?(): void;
   playheadClock?: ReviewPlaybackPresentationClock;
   onPresentedTime?(identity: string, time: number): void;
   cancelPendingPlay?(): void;
@@ -69,6 +70,7 @@ export function useReviewFreezePlayback<Playback extends SourcePlayback>(
     });
   }, [segments, duration]);
   const active = useRef<Hold | null>(null);
+  const resumeRevision = useRef(0);
   const played = useRef(new Set<string>());
   const previousSource = useRef<number | null>(null);
   const presentationFloor = useRef<number | null>(null);
@@ -94,8 +96,11 @@ export function useReviewFreezePlayback<Playback extends SourcePlayback>(
         part.sourceStart >= from &&
         part.sourceStart <= source
     );
-    return pending?.resultStart ?? null;
-  }, [elapsed, holds]);
+    if (pending) return pending.resultStart;
+    const floor = presentationFloor.current;
+    // Native seek timestamps can round below the boundary of the hold that just ended.
+    return floor !== null && source < floor ? sourceToReviewResult(floor, segments) : null;
+  }, [elapsed, holds, segments]);
   const playheadClock = useMemo(() => {
     const sourceClock = base.playheadClock;
     if (!sourceClock) return undefined;
@@ -125,6 +130,7 @@ export function useReviewFreezePlayback<Playback extends SourcePlayback>(
     };
   }, [base.playheadClock, readResultTime, segments]);
   const pause = useCallback(() => {
+    resumeRevision.current += 1;
     playingIntent.current = false;
     latest.current.cancelPendingPlay?.();
     const hold = active.current;
@@ -132,11 +138,15 @@ export function useReviewFreezePlayback<Playback extends SourcePlayback>(
       hold.elapsed = elapsed(hold);
       hold.started = null;
     }
-    latest.current.video.current?.pause();
-    latest.current.setPlaying(false);
+    if (!hold && latest.current.pause) latest.current.pause();
+    else {
+      latest.current.video.current?.pause();
+      latest.current.setPlaying(false);
+    }
     refresh((value) => value + 1);
   }, [elapsed]);
   const enter = useCallback((segment: Segment, offset = 0, playing = true) => {
+    resumeRevision.current += 1;
     const node = latest.current.video.current;
     if (!node) return;
     playingIntent.current = playing;
@@ -150,6 +160,7 @@ export function useReviewFreezePlayback<Playback extends SourcePlayback>(
   }, []);
   const seek = useCallback(
     (time: number, snap = true) => {
+      resumeRevision.current += 1;
       const range = rangeRef.current?.result;
       const result = sourceToReviewResult(time, segments);
       if (range && (result === null || result < range.start || result >= range.end)) {
@@ -221,6 +232,11 @@ export function useReviewFreezePlayback<Playback extends SourcePlayback>(
       if (!node) return;
       const now = performance.now();
       const selected = rangeRef.current?.result;
+      // A range restart owns its pending seek and Play. Reissuing it cancels native Play.
+      if (selected && !active.current && (node.paused || node.seeking)) {
+        frame = requestAnimationFrame(tick);
+        return;
+      }
       const result = readResultTime() ?? sourceToReviewResult(node.currentTime, segments);
       if (
         selected &&
@@ -244,7 +260,20 @@ export function useReviewFreezePlayback<Playback extends SourcePlayback>(
             previousSource.current = hold.segment.sourceStart;
             node.currentTime = hold.segment.sourceStart;
             if (node.currentTime >= duration) current.onEnded();
-            else void node.play().catch(() => current.onMediaError());
+            else {
+              const revision = ++resumeRevision.current;
+              const source = node.currentSrc;
+              void node.play().catch(() => {
+                if (
+                  revision === resumeRevision.current &&
+                  playingIntent.current &&
+                  !active.current &&
+                  latest.current.video.current === node &&
+                  node.currentSrc === source
+                )
+                  latest.current.onMediaError();
+              });
+            }
             refresh((value) => value + 1);
           }
         } else if (now - lastPublish >= REVIEW_PLAYBACK_UI_INTERVAL_MS) {
@@ -286,6 +315,7 @@ export function useReviewFreezePlayback<Playback extends SourcePlayback>(
   ]);
   useEffect(
     () => () => {
+      resumeRevision.current += 1;
       active.current = null;
     },
     []

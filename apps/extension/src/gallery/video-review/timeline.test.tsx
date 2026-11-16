@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReviewAnchor } from '../../features/video/review/types';
 import { ReviewTimelineHoverGuide } from './timeline-hover';
 import { ReviewTimeline } from './timeline';
-import { useReviewTimelineGeometry } from './timeline-geometry';
+import { useReviewTimelineNavigation, useReviewTimelineGeometry } from './timeline-geometry';
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -863,10 +863,12 @@ it('keeps source selection and comment identities while inserted time expands th
   };
   const note = { id: 'note', text: 'After hold', anchor: { kind: 'point' as const, time: 3.5 } };
   const onSeekResult = vi.fn();
+  const onEdit = vi.fn();
   const { host, props } = renderTimeline({
     edits: [freeze, cut],
     annotations: [note],
     onSeekResult,
+    onEdit,
     resultTime: 2,
     playbackRange: { start: 0.5, end: 3.5 },
     boundaries: [0, 1, 4],
@@ -879,7 +881,8 @@ it('keeps source selection and comment identities while inserted time expands th
   expect(block).not.toBeNull();
   expect(Number.parseFloat(block.style.width)).toBeCloseTo(100 / 3);
   act(() => block.querySelector<HTMLButtonElement>('button')!.click());
-  expect(onSeekResult).toHaveBeenCalledWith(1);
+  expect(onEdit).toHaveBeenCalledWith(freeze);
+  expect(onSeekResult).not.toHaveBeenCalled();
   act(() => host.querySelector<HTMLButtonElement>('[title="After hold"]')!.click());
   expect(props.onComment).toHaveBeenCalledWith(note);
   const plane = planeWithMetrics(host);
@@ -1003,4 +1006,86 @@ it('reports an unchanged visible source window once while the playhead traverses
     );
   }
   expect(onHistoryRange).toHaveBeenCalledOnce();
+});
+
+it('does not read scroll geometry when playback follow is disabled by a selected interval', () => {
+  const viewport = { current: document.createElement('div') };
+  const read = vi.fn(() => 0);
+  Object.defineProperty(viewport.current, 'scrollLeft', { get: read, set() {} });
+  function Harness() {
+    useReviewTimelineNavigation(
+      {
+        duration: 12,
+        time: 3.865,
+        playing: true,
+        playbackRange: { start: 3.865, end: 6.105 },
+        onSeek() {},
+      },
+      { viewport, gutter: 0, width: 800 }
+    );
+    return null;
+  }
+  act(() => environment.root!.render(<Harness />));
+  expect(read).not.toHaveBeenCalled();
+});
+
+it('resizes an interval inside freeze time, pauses before drafting and commits once in result time', () => {
+  const freeze = {
+    id: 'hold',
+    kind: 'freeze' as const,
+    start: 1,
+    end: 1,
+    requestedStart: 1,
+    requestedEnd: 1,
+    duration: 2,
+    frameTime: 0.98,
+    frameDuration: 0.04,
+  };
+  const onPause = vi.fn();
+  const onPlaybackRange = vi.fn();
+  const onHoverTime = vi.fn();
+  const { host, props } = renderTimeline({
+    edits: [freeze],
+    playing: true,
+    time: 1,
+    resultTime: 2,
+    playbackRange: { start: 1, end: 1, result: { start: 1, end: 3 } },
+    onPause,
+    onPlaybackRange,
+    onHoverTime,
+  });
+  const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
+  const gutter = parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
+  const geometry = vi.fn(() => new DOMRect(100, 0, 600 + gutter, 400));
+  Object.assign(plane, { getBoundingClientRect: geometry });
+  const handle = host.querySelector<HTMLElement>('[data-playback-range-edge="start"]')!;
+  Object.assign(handle, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  const pointer = (type: string, x: number) =>
+    act(() =>
+      handle.dispatchEvent(
+        new MouseEvent(type, {
+          bubbles: true,
+          clientX: x,
+          button: 0,
+          buttons: type === 'pointerup' ? 0 : 1,
+        })
+      )
+    );
+  pointer('pointerdown', 300);
+  expect(onPause).toHaveBeenCalledOnce();
+  pointer('pointermove', 350);
+  expect(onPlaybackRange).not.toHaveBeenCalled();
+  expect(props.onSeek).not.toHaveBeenCalled();
+  expect(onHoverTime.mock.calls.every(([time]) => time === null)).toBe(true);
+  pointer('pointerup', 350);
+  expect(onPlaybackRange).toHaveBeenCalledExactlyOnceWith({
+    start: 1,
+    end: 1,
+    result: { start: 1.5, end: 3 },
+  });
+  expect(geometry).toHaveBeenCalledOnce();
 });

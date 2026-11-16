@@ -40,9 +40,11 @@ export function ReviewFeedback({
       data-ui="gallery.videoReview.feedback"
       role="alert"
       aria-atomic="true"
-      className="mb-3 flex shrink-0 items-start gap-3 rounded-[var(--sniptale-radius-md)] border
-        border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-danger-soft)] p-3
-        text-sm text-[var(--sniptale-color-text-primary)]"
+      className="absolute inset-x-0 top-0 z-30 flex max-h-full
+        items-start gap-3 overflow-y-auto border-b
+        border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel-glass)] p-3
+        text-sm text-[var(--sniptale-color-text-primary)] shadow-[var(--sniptale-shadow-sm)]
+        backdrop-blur-[var(--sniptale-glass-blur)]"
       onKeyDown={(event) => {
         event.stopPropagation();
         if (event.key === 'Escape') {

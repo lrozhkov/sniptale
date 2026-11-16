@@ -23,7 +23,7 @@
 }
 .review-selection-specific-actions {
   position: absolute;
-  inset-inline-start: calc(50% + 58px);
+  inset-inline-start: calc(50% + 92px);
   inset-inline-end: 0;
   overflow-x: auto;
   scrollbar-width: none;
