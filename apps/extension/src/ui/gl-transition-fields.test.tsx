@@ -4,11 +4,16 @@ import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { createGlTransitionSelection } from '../features/video/project/transition/gl-catalog';
 import { GlTransitionFields } from './gl-transition-fields';
-vi.mock('../platform/i18n', async (original) => ({
-  ...(await original<typeof import('../platform/i18n')>()),
-  useAppLocale: () => 'en',
-  translate: (key: string) => key,
-}));
+const localeState = vi.hoisted(() => ({ locale: 'en' as 'en' | 'ru' }));
+vi.mock('../platform/i18n', async (original) => {
+  const { translateCatalogFixture } = await import('../platform/i18n/catalog-fixture.test-support');
+  return {
+    ...(await original<typeof import('../platform/i18n')>()),
+    useAppLocale: () => localeState.locale,
+    translate: (key: Parameters<typeof translateCatalogFixture>[0], locale = localeState.locale) =>
+      key.startsWith('videoEditor.glTransitions.') ? translateCatalogFixture(key, locale) : key,
+  };
+});
 vi.mock('./compact-inspector-controls', async (original) => ({
   ...(await original<typeof import('./compact-inspector-controls')>()),
   ColorField: (props: {
@@ -27,6 +32,7 @@ vi.mock('./compact-inspector-controls', async (original) => ({
 }));
 let host: HTMLDivElement, root: ReturnType<typeof createRoot>;
 beforeEach(() => {
+  localeState.locale = 'en';
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   host = document.createElement('div');
   document.body.append(host);
@@ -156,5 +162,27 @@ it.each([false, true])(
     act(() => button.click());
     expect(action).toHaveBeenCalledOnce();
     expect(change).not.toHaveBeenCalled();
+  }
+);
+
+it.each([
+  ['en', 'Pan downward', 'Off', 'Blur', 'Color separation', 'Perspective'],
+  ['ru', 'Панорама вниз', 'Выкл.', 'Размытие', 'Разделение цветов', 'Перспектива'],
+] as const)(
+  'renders and operates localized WhipTilt fields in %s',
+  (locale, label, enabled, blur, chroma, perspective) => {
+    localeState.locale = locale;
+    const view = render('WhipTilt');
+    const toggle = host.querySelector<HTMLButtonElement>('[role="switch"]')!;
+    expect(toggle.getAttribute('aria-label')).toBe(label);
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    expect(host.querySelector('[data-effect-control-id="down"]')?.textContent).toContain(enabled);
+    for (const text of [blur, chroma, perspective]) expect(host.textContent).toContain(text);
+    act(() => toggle.click());
+    expect(view.change).toHaveBeenCalledExactlyOnceWith({
+      ...view.selection,
+      values: { ...view.selection.values, down: 1 },
+    });
+    expect(JSON.stringify(view.selection)).toBe(view.before);
   }
 );

@@ -1,6 +1,10 @@
 import { useAudioPresets } from '../../composition/audio-preset-resources/use-audio-presets';
 import { AudioPresetControls } from '../../ui/audio/preset-controls';
-import { AudioTakeLevelFields, AudioTakeFadeFields } from '../../ui/audio/take-fields';
+import {
+  AudioTakeLevelFields,
+  AudioTakeFadeFields,
+  AudioTakeProcessingFields,
+} from '../../ui/audio/take-fields';
 import {
   reviewInspectorActions,
   ReviewInspectorSections,
@@ -15,7 +19,7 @@ import {
 } from '../../features/video/review/voiceover-edits';
 import { translate } from '../../platform/i18n';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
-import { Trash2, AudioLines, Waves, VolumeX } from 'lucide-react';
+import { Trash2, AudioLines, Waves, VolumeX, SlidersHorizontal } from 'lucide-react';
 import {
   ReviewInterval,
   ReviewButton,
@@ -40,25 +44,17 @@ export function ReviewAudioClipEditor(props: {
   const sections = [
     {
       id: 'audio',
-      label: translate('gallery.videoReview.volume'),
+      label: translate('videoEditor.sidebar.inspectorGroupAudio'),
       icon: AudioLines,
       content: (
         <>
           <ReviewInspectorColumns>
             <AudioTakeLevelFields
-              presetControls={
-                <AudioPresetControls
-                  key={ownerKey}
-                  {...presets}
-                  hasValue={!!props.clip.audioProcessing}
-                  disabled={props.busy}
-                  onApply={(audioProcessing) => props.onPatch({ audioProcessing })}
-                />
-              }
-              createDefaultProcessing={presets.createDefaultProcessing}
               clip={props.clip}
               disabled={props.busy}
               showTempo={props.lane === 'voiceover'}
+              tempoChoices
+              showProcessing={false}
               onPatch={props.onPatch}
             />
           </ReviewInspectorColumns>
@@ -66,8 +62,32 @@ export function ReviewAudioClipEditor(props: {
       ),
     },
     {
+      id: 'audio-effects',
+      label: translate('audioProcessing.title'),
+      icon: SlidersHorizontal,
+      content: (
+        <ReviewInspectorColumns>
+          <AudioTakeProcessingFields
+            clip={props.clip}
+            disabled={props.busy}
+            onPatch={props.onPatch}
+            createDefaultProcessing={presets.createDefaultProcessing}
+            presetControls={
+              <AudioPresetControls
+                key={ownerKey}
+                {...presets}
+                hasValue={!!props.clip.audioProcessing}
+                disabled={props.busy}
+                onApply={(audioProcessing) => props.onPatch({ audioProcessing })}
+              />
+            }
+          />
+        </ReviewInspectorColumns>
+      ),
+    },
+    {
       id: 'animation',
-      label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
+      label: translate('gallery.videoReview.audioFades'),
       icon: Waves,
       content: (
         <ReviewInspectorColumns>

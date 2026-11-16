@@ -161,7 +161,9 @@ it('preserves an inside playhead when opening properties and seeks to the start 
       );
       expect(video.currentTime).toBe(expected);
       expect(
-        fixture.host.querySelector('aside input[aria-label="gallery.videoReview.rangeStart"]')
+        fixture.host.querySelector(
+          'aside [role="group"][aria-label="gallery.videoReview.speedRate"]'
+        )
       ).not.toBeNull();
     }
     await act(async () => {
@@ -314,10 +316,12 @@ it('preserves a selected speed range when toolbar preferences and tools change',
     await fixture.click('advancedEditing');
     await fixture.selectRulerRange(1, 2);
     await fixture.click('speedMode');
-    const input = fixture.host.querySelector<HTMLInputElement>(
-      'aside input[aria-label="gallery.videoReview.rangeEnd"]'
+    const speedOptions = fixture.host.querySelector<HTMLElement>(
+      'aside [role="group"][aria-label="gallery.videoReview.speedRate"]'
     )!;
-    expect(input).not.toBeNull();
+    expect(speedOptions).not.toBeNull();
+    const selectedRate = speedOptions.querySelector('[aria-pressed="true"]')?.textContent;
+    expect(selectedRate).toBe('2×');
     const historyLength = fixture.snapshot.workspace.history.length;
     expect(
       fixture.host.querySelector(
@@ -335,18 +339,19 @@ it('preserves a selected speed range when toolbar preferences and tools change',
     await act(async () => magnet.click());
     await act(async () => liveSeek.click());
     expect(fixture.snapshot.workspace.history).toHaveLength(historyLength);
-    expect(input.isConnected).toBe(true);
+    expect(speedOptions.isConnected).toBe(true);
+    expect(speedOptions.querySelector('[aria-pressed="true"]')?.textContent).toBe(selectedRate);
     await fixture.addFocus(2, 3);
     expect(fixture.snapshot.workspace.history).toHaveLength(historyLength + 1);
     expect(fixture.snapshot.workspace.history[historyLength - 1]).toEqual(speed);
-    expect(input.isConnected).toBe(false);
+    expect(speedOptions.isConnected).toBe(false);
     expect(fixture.button('zoomRegionLabel').getAttribute('aria-pressed')).toBe('false');
   } finally {
     await fixture.cleanup();
   }
 });
 
-it('edits a selected speed range from its inspector through the same reversible history', async () => {
+it('resizes a selected speed range on the timeline through the same reversible history', async () => {
   const fixture = createEditorFixture(integration);
   integration.index.mockResolvedValue({
     duration: 4,
@@ -363,22 +368,50 @@ it('edits a selected speed range from its inspector through the same reversible 
     await fixture.click('advancedEditing');
     await fixture.selectRulerRange(1, 2);
     await fixture.click('speedMode');
-    const input = fixture.host.querySelector<HTMLInputElement>(
-      'aside input[aria-label="gallery.videoReview.rangeEnd"]'
+    const speedOptions = fixture.host.querySelector<HTMLElement>(
+      'aside [role="group"][aria-label="gallery.videoReview.speedRate"]'
     )!;
-    expect(input).not.toBeNull();
+    expect(speedOptions).not.toBeNull();
+    const selectedRate = speedOptions.querySelector('[aria-pressed="true"]')?.textContent;
+    expect(selectedRate).toBe('2×');
     const historyLength = fixture.snapshot.workspace.history.length;
-    await act(async () => input.dispatchEvent(new FocusEvent('focusin', { bubbles: true })));
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '2.5');
-      input.dispatchEvent(new Event('input', { bubbles: true }));
+    const block = fixture.host.querySelector<HTMLElement>(
+      '[data-ui="gallery.videoReview.editBlock"]'
+    )!;
+    const endHandle = block.querySelector<HTMLElement>('[data-edge="end"]')!;
+    const duration = Number(
+      fixture.host
+        .querySelector('[data-ui="gallery.videoReview.ruler"]')!
+        .getAttribute('aria-valuemax')
+    );
+    vi.spyOn(block.parentElement!, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(0, 0, 400, 48)
+    );
+    Object.assign(block, {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+      releasePointerCapture: vi.fn(),
     });
-    await act(async () => input.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+    for (const [type, time] of [
+      ['pointerdown', 2],
+      ['pointermove', 2.5],
+      ['pointerup', 2.5],
+    ] as const) {
+      const event = new MouseEvent(type, {
+        bubbles: true,
+        clientX: (time / duration) * 400,
+        button: 0,
+        altKey: true,
+      });
+      Object.defineProperty(event, 'pointerId', { value: 1 });
+      await act(async () => (type === 'pointerdown' ? endHandle : block).dispatchEvent(event));
+    }
     expect(fixture.snapshot.workspace.history).toHaveLength(historyLength + 1);
     const operation = fixture.snapshot.workspace.history.at(-1);
     expect(operation).toMatchObject({
       target: 'edit',
-      after: { kind: 'speed', start: 1, end: 2.5 },
+      before: { kind: 'speed', start: 1, end: 2, rate: 2 },
+      after: { kind: 'speed', start: 1, end: 2.5, rate: 2 },
     });
     expect(fixture.button('cutMode').getAttribute('aria-pressed')).toBe('false');
     const remove = fixture.host.querySelector<HTMLButtonElement>(
@@ -392,7 +425,7 @@ it('edits a selected speed range from its inspector through the same reversible 
       after: null,
     });
     expect(
-      fixture.host.querySelector('aside input[aria-label="gallery.videoReview.rangeEnd"]')
+      fixture.host.querySelector('aside [role="group"][aria-label="gallery.videoReview.speedRate"]')
     ).toBeNull();
     expect(fixture.host.querySelectorAll('[data-ui="gallery.videoReview.editBlock"]')).toHaveLength(
       0
@@ -401,6 +434,17 @@ it('edits a selected speed range from its inspector through the same reversible 
     expect(fixture.host.querySelectorAll('[data-ui="gallery.videoReview.editBlock"]')).toHaveLength(
       1
     );
+    expect(committedEditorFixtureProjection(fixture.snapshot).document.edits).toEqual([
+      expect.objectContaining({ kind: 'speed', start: 1, end: 2.5, rate: 2 }),
+    ]);
+    await fixture.click('undo');
+    expect(committedEditorFixtureProjection(fixture.snapshot).document.edits).toEqual([
+      expect.objectContaining({ kind: 'speed', start: 1, end: 2, rate: 2 }),
+    ]);
+    await fixture.click('redo');
+    expect(committedEditorFixtureProjection(fixture.snapshot).document.edits).toEqual([
+      expect.objectContaining({ kind: 'speed', start: 1, end: 2.5, rate: 2 }),
+    ]);
     await fixture.click('redo');
     expect(fixture.host.querySelectorAll('[data-ui="gallery.videoReview.editBlock"]')).toHaveLength(
       0
@@ -580,7 +624,7 @@ it('creates edits from recorded actions, selects their properties and recalculat
       after: { kind: 'speed', start: 2, end: 3 },
     });
     expect(
-      fixture.host.querySelector('aside input[aria-label="gallery.videoReview.rangeEnd"]')
+      fixture.host.querySelector('aside [role="group"][aria-label="gallery.videoReview.speedRate"]')
     ).not.toBeNull();
     await selectAction();
     expect(fixture.button('actionSpeed').disabled).toBe(true);
@@ -599,14 +643,10 @@ it('creates edits from recorded actions, selects their properties and recalculat
     const commands = fixture.host.querySelector(
       '[data-ui="gallery.videoReview.inspectorActionMenu"]'
     )!;
-    await act(async () =>
-      fixture.host
-        .querySelector<HTMLButtonElement>(
-          '[data-ui="gallery.videoReview.inspectorActionMenuTrigger"]'
-        )!
-        .click()
+    expect(properties.querySelector('[role="status"]')?.textContent).toContain(
+      'gallery.videoReview.actionRemoved'
     );
-    expect(commands.textContent).toContain('gallery.videoReview.actionRemoved');
+    expect(commands.textContent).not.toContain('gallery.videoReview.actionRemoved');
     for (const key of ['actionCut', 'actionSpeed', 'actionFocus', 'createCopy'])
       expect(commands.querySelector(`[aria-label="gallery.videoReview.${key}"]`)).toBeNull();
     expect(properties.querySelector('[aria-label="common.actions.delete"]')).toBeNull();

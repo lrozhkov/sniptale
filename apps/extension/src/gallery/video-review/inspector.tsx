@@ -7,6 +7,7 @@ import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   ReviewInspectorPresentation,
   ReviewInspectorActionTrayContext,
+  ReviewInspectorActionTray,
 } from './inspector-sections';
 import '../../ui/compact-inspector-controls/inspector-surface.css';
 import './inspector.css';
@@ -24,8 +25,16 @@ import {
   Plus,
   FileDown,
   X,
+  Info,
+  StickyNote,
+  Eye,
+  History,
+  Mic,
+  AudioLines,
+  Crop,
+  Type,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnnotation } from '../../features/video/review/types';
 import {
@@ -100,6 +109,18 @@ export function ReviewInspector(props: {
   const { presentation, shown, scroll } = props.navigation;
   const previewHost = useRef<HTMLDivElement>(null);
   const [actionTrayHost, setActionTrayHost] = useState<HTMLDivElement | null>(null);
+  const selectionScope = props.selectionPreferenceScope ?? props.selectionLabel ?? '';
+  const [sectionCount, setSectionCount] = useState({ scope: selectionScope, count: 0 });
+  const onSectionCountChange = useCallback(
+    (count: number) => {
+      setSectionCount((current) =>
+        current.scope === selectionScope && current.count === count
+          ? current
+          : { scope: selectionScope, count }
+      );
+    },
+    [selectionScope]
+  );
   const hintOwner = useRef<ReviewIntervalHintOwner>({
     title: { current: null },
     active: null,
@@ -139,6 +160,7 @@ export function ReviewInspector(props: {
               }
               hintOwner={hintOwner}
               section={recordingShown ? 'recording' : shown}
+              hasMultipleSections={sectionCount.scope === selectionScope && sectionCount.count > 1}
             />
             <ReviewInspectorStatus {...props} />
           </div>
@@ -215,6 +237,7 @@ export function ReviewInspector(props: {
                 value={presentation}
                 section={shown}
                 selectionScope={props.selectionPreferenceScope}
+                onSectionCountChange={shown === 'selected' ? onSectionCountChange : undefined}
               >
                 {shown === 'preview' ? (
                   <div
@@ -255,7 +278,9 @@ export function ReviewInspector(props: {
               {props.recording}
             </div>
           ) : (
-            <ReviewInspectorFooter {...props} showReports={shown === 'comments'} />
+            <ReviewInspectorActionTrayContext value={shown === 'comments' ? actionTrayHost : null}>
+              <ReviewInspectorFooter {...props} showReports={shown === 'comments'} />
+            </ReviewInspectorActionTrayContext>
           )}
         </aside>
       </InspectorLayout>
@@ -368,15 +393,15 @@ function ReviewProjectActions(
   );
 }
 
-/** Comment reports retain their own commands; export belongs to the inspector section. */
+/** Note reports use the same header command menu as the selected-object inspectors. */
 function ReviewInspectorFooter(
   props: Parameters<typeof ReviewInspector>[0] & { showReports: boolean }
 ) {
   if (!props.showReports) return null;
   return (
-    <div className="min-h-0 max-h-[max(10rem,40%)] shrink-0 scroll-pt-20 space-y-2 overflow-y-auto">
+    <ReviewInspectorActionTray>
       {props.showReports ? (
-        <div className="grid grid-cols-1 gap-1" data-ui="gallery.videoReview.reportActions">
+        <div className="review-inspector-actions" data-ui="gallery.videoReview.reportActions">
           <ReviewButton
             label={translate('gallery.videoReview.copyReport')}
             disabled={props.busy}
@@ -397,7 +422,7 @@ function ReviewInspectorFooter(
           </ReviewButton>
         </div>
       ) : null}
-    </div>
+    </ReviewInspectorActionTray>
   );
 }
 
@@ -472,9 +497,24 @@ function ReviewInspectorHeader(
     hintOwner: ReviewIntervalHintOwner;
     section: InspectorSection;
     actionMenu: ReactNode;
+    hasMultipleSections: boolean;
   }
 ) {
-  const SelectionIcon = props.section === 'selected' ? props.selectionIcon : undefined;
+  const SelectionIcon =
+    props.section === 'selected'
+      ? props.selectionIcon
+      : {
+          project: Info,
+          track: List,
+          scene: Crop,
+          comments: StickyNote,
+          export: FileDown,
+          history: History,
+          preview: Eye,
+          speech: AudioLines,
+          text: Type,
+          recording: Mic,
+        }[props.section];
   return (
     <header className="flex shrink-0 items-center gap-1">
       {!(
@@ -524,7 +564,7 @@ function ReviewInspectorHeader(
         </div>
       )}
 
-      {props.section === 'selected' ? (
+      {props.section === 'selected' && props.hasMultipleSections ? (
         <ContentToolbarButton
           type="button"
           tone="utility"

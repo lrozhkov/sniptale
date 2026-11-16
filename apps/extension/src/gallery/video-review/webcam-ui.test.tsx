@@ -288,7 +288,7 @@ it('edits an authored position and respects neighboring time bounds and transiti
   await enter(label('webcamPositionTime'), '9');
   expect(editor.selectedPosition).toMatchObject({ time: 7.999, transition: { duration: 2 } });
   expect(editor.camera!.positions[1]!.time).toBe(8);
-  await choose(label('webcamPosition'), '2 · 8.000 s');
+  await choose(label('webcamPosition'), '2 · 0:08.000');
   expect(editor.navigate).toHaveBeenLastCalledWith('second');
   await choose(label('webcamPosition'), label('webcamBasePosition'));
   expect(editor.navigate).toHaveBeenLastCalledWith(null);
@@ -300,7 +300,7 @@ it('edits an authored position and respects neighboring time bounds and transiti
   expect(editor.remove).toHaveBeenCalledOnce();
 });
 
-it('explains unavailable hide intervals and edits an existing hidden interval without exposing layout', async () => {
+it('explains unavailable hide intervals and keeps hidden bounds on the timeline without exposing layout', async () => {
   editor.canHide = vi.fn(() => false);
   render = () =>
     root.render(<ReviewWebcamInspector editor={editor} range={{ start: 3, end: 5 }} />);
@@ -312,10 +312,13 @@ it('explains unavailable hide intervals and edits an existing hidden interval wi
   editor.candidate = null;
   act(render);
   expect(field(label('webcamPlacement'))).toBeNull();
-  await enter(label('rangeStart'), '2');
-  expect(editor.hide).toHaveBeenLastCalledWith({ id: 'hidden', start: 2, end: 5 }, true);
-  await enter(label('rangeEnd'), '6');
-  expect(editor.hide).toHaveBeenLastCalledWith({ id: 'hidden', start: 3, end: 6 }, true);
+  expect(field(label('rangeStart'))).toBeNull();
+  expect(field(label('rangeEnd'))).toBeNull();
+  expect(host.querySelector('[role="tablist"]')).toBeNull();
+  expect(host.querySelector('[role="status"]')?.textContent).toBe(label('webcamHidden'));
+  click('removeEdit');
+  expect(editor.remove).toHaveBeenCalledOnce();
+  expect(editor.hide).not.toHaveBeenCalled();
   editor.camera = undefined;
   act(render);
   expect(host.textContent).toBe('');

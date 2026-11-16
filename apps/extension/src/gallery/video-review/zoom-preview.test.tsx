@@ -614,7 +614,9 @@ it.each([
     spatialEdit: { region: authored, revision: 'capture', onCommit },
   });
   await act(async () => Promise.resolve());
-  await act(async () => previewButton(tool).click());
+  if (tool === 'spatialToolPosition')
+    expect(host.querySelector('[aria-label="gallery.videoReview.spatialToolPosition"]')).toBeNull();
+  else await act(async () => previewButton(tool).click());
   await act(async () => previewButton(reset).click());
   expect(onCommit).toHaveBeenCalledExactlyOnceWith('capture', patch);
   expect(view.onChange).not.toHaveBeenCalled();

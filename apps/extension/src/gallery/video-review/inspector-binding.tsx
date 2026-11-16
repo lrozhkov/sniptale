@@ -281,13 +281,13 @@ export function ReviewInspectorBinding({
       sections={
         inspectorTrack === 'source'
           ? [
+              ...sections,
               {
                 id: 'information',
                 label: translate('gallery.videoReview.aboutProject'),
                 icon: Info,
                 content: projectInfo,
               },
-              ...sections,
             ]
           : sections
       }

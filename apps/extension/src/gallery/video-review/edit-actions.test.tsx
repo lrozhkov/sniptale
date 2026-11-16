@@ -189,11 +189,12 @@ it('sets speed creation defaults without a toolbar delete action', () => {
     const [rate, audio] = Array.from(
       host.querySelectorAll<HTMLButtonElement>('[aria-haspopup="listbox"]')
     );
-    for (const [index] of REVIEW_SPEED_RATES.entries()) {
+    const visibleRates = REVIEW_SPEED_RATES.filter((rate) => rate >= 0.5 && rate <= 8);
+    for (const [index] of visibleRates.entries()) {
       act(() => rate!.click());
       act(() => document.querySelectorAll<HTMLButtonElement>('[role="option"]')[index]!.click());
     }
-    expect(props.onRate.mock.calls.map(([rate]) => rate)).toEqual([...REVIEW_SPEED_RATES]);
+    expect(props.onRate.mock.calls.map(([rate]) => rate)).toEqual(visibleRates);
     act(() => audio!.click());
     act(() => document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click());
     expect(props.onAudio).toHaveBeenCalledWith('mute');
@@ -363,20 +364,37 @@ it('keeps labelled inspector speed and audio choices editable and respects the b
   const props = { layout: 'inspector' as const, rate: 2, audio: 'speed' as const, onRate, onAudio };
   try {
     await act(async () => root.render(<ReviewSpeedOptions {...props} busy={false} />));
-    const [rate, audio] = host.querySelectorAll<HTMLButtonElement>('[aria-haspopup="listbox"]');
-    expect(rate!.getAttribute('aria-label')).toBe(translate('gallery.videoReview.speedRate'));
-    expect(audio!.getAttribute('aria-label')).toBe(translate('gallery.videoReview.speedAudio'));
-    await act(async () => rate!.click());
-    await act(async () => document.querySelector<HTMLButtonElement>('[role="option"]')!.click());
-    expect(onRate).toHaveBeenCalledWith(REVIEW_SPEED_RATES[0]);
-    await act(async () => audio!.click());
-    await act(async () =>
-      document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click()
-    );
+    const rateGroup = host.querySelector(
+      `[role="group"][aria-label="${translate('gallery.videoReview.speedRate')}"]`
+    )!;
+    const audioGroup = host.querySelector(
+      `[role="group"][aria-label="${translate('gallery.videoReview.speedAudio')}"]`
+    )!;
+    const rateChoices = [...rateGroup.querySelectorAll<HTMLButtonElement>('button')];
+    expect(rateChoices.map((button) => button.textContent)).toEqual([
+      '0.5×',
+      '0.75×',
+      '1.25×',
+      '1.5×',
+      '2×',
+      '4×',
+      '8×',
+    ]);
+    await act(async () => rateChoices[0]!.click());
+    expect(onRate).toHaveBeenCalledWith(0.5);
+    await act(async () => audioGroup.querySelectorAll<HTMLButtonElement>('button')[1]!.click());
     expect(onAudio).toHaveBeenCalledWith('mute');
     await act(async () => root.render(<ReviewSpeedOptions {...props} busy />));
-    expect(rate!.disabled).toBe(true);
-    expect(audio!.disabled).toBe(true);
+    expect(
+      [...host.querySelectorAll<HTMLButtonElement>('button')].every((button) => button.disabled)
+    ).toBe(true);
+    await act(async () => root.render(<ReviewSpeedOptions {...props} rate={16} busy={false} />));
+    const custom = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === '16×'
+    )!;
+    expect(custom.getAttribute('aria-pressed')).toBe('true');
+    await act(async () => custom.click());
+    expect(onRate).toHaveBeenLastCalledWith(16);
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();

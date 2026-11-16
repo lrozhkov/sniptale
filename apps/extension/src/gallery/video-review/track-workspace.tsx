@@ -15,8 +15,6 @@ import {
   Webcam,
   History,
   List,
-  Crop,
-  SlidersHorizontal,
 } from 'lucide-react';
 import { reviewTrackTitleKeys } from './track-items';
 import type { QuickEditTrack } from '../../features/video/review/advanced/types';
@@ -72,15 +70,7 @@ export function ReviewTrackWorkspace({
   const selected = tab === 'settings' && current ? current.id : 'list';
   const choices = [
     { id: 'list', label: translate('gallery.videoReview.trackTab'), icon: List },
-    ...parameters.map((section) => ({
-      ...section,
-      icon:
-        section.id === 'canvas'
-          ? Crop
-          : section.id === 'source-filters'
-            ? SlidersHorizontal
-            : section.icon,
-    })),
+    ...parameters,
   ];
   const choose = (value: string) => {
     if (value !== 'list') remember(value);

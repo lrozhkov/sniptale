@@ -3,7 +3,11 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Info, SlidersHorizontal } from 'lucide-react';
 import { expect, it, vi } from 'vitest';
-import { ReviewInspectorSections, reviewInspectorActions } from './inspector-sections';
+import {
+  ReviewInspectorPresentation,
+  ReviewInspectorSections,
+  reviewInspectorActions,
+} from './inspector-sections';
 
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
@@ -49,6 +53,65 @@ it('navigates parameter sections and keeps commands in a separate unlabelled bot
   } finally {
     await act(async () => root.unmount());
     host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('reports only parameter sections so the header can suppress a redundant presentation switch', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const report = vi.fn();
+  const parameter = {
+    id: 'appearance',
+    label: 'Appearance',
+    icon: Info,
+    content: <input aria-label="color" />,
+  };
+  const commands = reviewInspectorActions(<button>Delete</button>);
+  const render = (sections: Parameters<typeof ReviewInspectorSections>[0]['sections']) =>
+    root.render(
+      <ReviewInspectorPresentation value="sections" onSectionCountChange={report}>
+        <ReviewInspectorSections sections={sections} />
+      </ReviewInspectorPresentation>
+    );
+  try {
+    await act(async () => render([parameter, commands]));
+    expect(report).toHaveBeenLastCalledWith(1);
+    await act(async () =>
+      render([parameter, { ...parameter, id: 'animation', label: 'Animation' }, commands])
+    );
+    expect(report).toHaveBeenLastCalledWith(2);
+    await act(async () => render([commands]));
+    expect(report).toHaveBeenLastCalledWith(0);
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('retains the parameter count when sibling sections contain only commands', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const report = vi.fn();
+  const one = { id: 'content', label: 'Text', icon: Info, content: <textarea /> };
+  const two = { ...one, id: 'appearance', label: 'Appearance' };
+  const actions = reviewInspectorActions(<button>Remove</button>);
+  const render = (parameters: boolean) =>
+    root.render(
+      <ReviewInspectorPresentation value="sections" onSectionCountChange={report}>
+        {parameters ? <ReviewInspectorSections sections={[one, two]} /> : null}
+        <ReviewInspectorSections sections={[actions]} />
+      </ReviewInspectorPresentation>
+    );
+  try {
+    await act(async () => render(true));
+    expect(report).toHaveBeenLastCalledWith(2);
+    await act(async () => render(false));
+    expect(report).toHaveBeenLastCalledWith(0);
+  } finally {
+    await act(async () => root.unmount());
     vi.unstubAllGlobals();
   }
 });

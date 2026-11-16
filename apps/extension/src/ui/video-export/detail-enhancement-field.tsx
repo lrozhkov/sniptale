@@ -30,6 +30,7 @@ export function DetailEnhancementField(props: {
   value: VideoExportDetailMode | undefined;
   onChange(value: VideoExportDetailMode): void;
   disabled?: boolean;
+  hintPresentation?: 'inline' | 'tooltip';
 }) {
   useAppLocale();
   const [capability, setCapability] = useState<Capability | null>(null);
@@ -47,8 +48,20 @@ export function DetailEnhancementField(props: {
       current = false;
     };
   }, []);
+  const capabilityHint = capabilityMessage(capability);
+  const hints = [
+    translate('videoEditor.exportDialog.detailEnhancementHint'),
+    ...(!capability?.clark && capabilityHint ? [capabilityHint] : []),
+    ...(props.value === 'clark-x2'
+      ? [translate('videoEditor.exportDialog.detailEnhancementTimeNote')]
+      : []),
+  ];
   return (
-    <div data-ui="video.exportDetailEnhancement" className="min-w-0">
+    <div
+      data-ui="video.exportDetailEnhancement"
+      className="min-w-0"
+      title={props.hintPresentation === 'tooltip' ? hints.join('\n') : undefined}
+    >
       <SelectField<VideoExportDetailMode>
         label={translate('videoEditor.exportDialog.detailEnhancementLabel')}
         value={props.value ?? 'off'}
@@ -67,13 +80,19 @@ export function DetailEnhancementField(props: {
           },
         ]}
       />
-      <div className="space-y-1 text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
-        <p>{translate('videoEditor.exportDialog.detailEnhancementHint')}</p>
-        {!capability?.clark ? <p role="status">{capabilityMessage(capability)}</p> : null}
-        {props.value === 'clark-x2' ? (
-          <p>{translate('videoEditor.exportDialog.detailEnhancementTimeNote')}</p>
-        ) : null}
-      </div>
+      {props.hintPresentation !== 'tooltip' ? (
+        <div className="space-y-1 text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
+          <p>{translate('videoEditor.exportDialog.detailEnhancementHint')}</p>
+          {!capability?.clark ? <p role="status">{capabilityMessage(capability)}</p> : null}
+          {props.value === 'clark-x2' ? (
+            <p>{translate('videoEditor.exportDialog.detailEnhancementTimeNote')}</p>
+          ) : null}
+        </div>
+      ) : props.value === 'clark-x2' && !capability?.clark ? (
+        <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+          {capabilityHint}
+        </p>
+      ) : null}
     </div>
   );
 }

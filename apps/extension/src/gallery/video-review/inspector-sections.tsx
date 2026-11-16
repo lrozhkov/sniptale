@@ -15,6 +15,8 @@ import {
   useMemo,
   useState,
   useId,
+  useLayoutEffect,
+  useRef,
   type ReactNode,
 } from 'react';
 import { EllipsisVertical, Layers2, Info, type LucideIcon } from 'lucide-react';
@@ -26,6 +28,7 @@ const PresentationContext = createContext<{
   value: 'all' | 'sections';
   remembered?: string | undefined;
   remember?: ((id: string) => void) | undefined;
+  registerSectionCount?: ((owner: object, count: number | null) => void) | undefined;
 }>({ value: 'sections' });
 
 /** Presentation stays outside the video document; disclosure choices survive editor sessions. */
@@ -43,6 +46,7 @@ export function ReviewInspectorPresentation(props: {
     | 'speech'
     | 'text';
   selectionScope?: string | undefined;
+  onSectionCountChange?: ((count: number) => void) | undefined;
   children: ReactNode;
 }) {
   const family =
@@ -50,14 +54,29 @@ export function ReviewInspectorPresentation(props: {
       ? (props.selectionScope ?? 'selection')
       : (props.section ?? 'selection');
   const [choices, setChoices] = useState<Readonly<Record<string, string>>>({});
+  const onSectionCountChange = props.onSectionCountChange;
+  const sectionCounts = useRef(new Map<object, number>());
+  const registerSectionCount = useCallback(
+    (owner: object, count: number | null) => {
+      if (count === null) sectionCounts.current.delete(owner);
+      else sectionCounts.current.set(owner, count);
+      onSectionCountChange?.(Math.max(0, ...sectionCounts.current.values()));
+    },
+    [onSectionCountChange]
+  );
   const remembered = choices[family];
   const remember = useCallback(
     (id: string) => setChoices((current) => ({ ...current, [family]: id })),
     [family]
   );
   const context = useMemo(
-    () => ({ value: props.value, remembered, remember }),
-    [props.value, remembered, remember]
+    () => ({
+      value: props.value,
+      remembered,
+      remember,
+      registerSectionCount,
+    }),
+    [props.value, remembered, remember, registerSectionCount]
   );
   return (
     <InspectorDisclosurePreferences scope={`gallery:${family}`}>
@@ -156,6 +175,13 @@ export function ReviewInspectorSections({
         )
       : null;
   const context = useContext(PresentationContext);
+  const registerSectionCount = context.registerSectionCount;
+  const sectionOwner = useRef({});
+  useLayoutEffect(() => {
+    const owner = sectionOwner.current;
+    registerSectionCount?.(owner, sections.length);
+    return () => registerSectionCount?.(owner, null);
+  }, [registerSectionCount, sections.length]);
   const [local, setLocal] = useState<string>();
   const id = useId();
   const remembered = context.remembered ?? local;

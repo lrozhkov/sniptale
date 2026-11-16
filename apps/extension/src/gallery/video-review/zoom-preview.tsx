@@ -673,18 +673,9 @@ function ZoomPreviewHeading(props: {
   region: QuickEditZoomRegion;
   controls: ReturnType<typeof usePreviewToolSelection>;
 }) {
-  const { region, controls } = props;
+  const { controls } = props;
   return (
     <div className="min-w-0 sniptale-parameter-stack">
-      <h5 className="px-2 text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
-        {translate(
-          region.border
-            ? 'gallery.videoReview.borderPreview'
-            : controls.overlay
-              ? 'gallery.videoReview.focusPreview'
-              : 'gallery.videoReview.zoomPreview'
-        )}
-      </h5>
       {!controls.overlay && controls.tool === 'position' && (
         <SegmentedRow<'area' | 'result'>
           columns={2}

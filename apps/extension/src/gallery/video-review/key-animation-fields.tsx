@@ -24,6 +24,7 @@ export function ReviewKeyFields(props: Parameters<typeof reviewKeySections>[0]) 
 
 export function reviewKeySections(props: {
   information?: ReactNode;
+  content?: ReactNode;
   extraSections?: Parameters<typeof ReviewInspectorSections>[0]['sections'];
   values: readonly ReviewKeyStyle[];
   onChange(patch: ReviewKeyPatch | null): void;
@@ -31,18 +32,23 @@ export function reviewKeySections(props: {
   const fields = (part: 'display' | 'appearance' | 'timing' | 'position') => (
     <KeyboardFeedbackFields values={props.values} part={part} onChange={props.onChange} />
   );
-  const sections = reviewInformationSections(props.information);
+  const sections: Parameters<typeof ReviewInspectorSections>[0]['sections'][number][] = [];
   sections.push({
     id: 'display',
     label: translate('gallery.videoReview.keyDisplay'),
     icon: Keyboard,
-    content: fields('display'),
+    content: (
+      <>
+        {props.content}
+        {fields('display')}
+      </>
+    ),
   });
   if (props.values.some((value) => value.enabled))
     sections.push(
       {
         id: 'appearance',
-        label: translate('gallery.videoReview.clickAppearance'),
+        label: translate('videoEditor.effectsLibrary.objectAppearance'),
         icon: Palette,
         content: fields('appearance'),
       },
@@ -54,12 +60,13 @@ export function reviewKeySections(props: {
       },
       {
         id: 'position',
-        label: translate('gallery.videoReview.clickPosition'),
+        label: translate('gallery.videoReview.spatialToolPosition'),
         icon: Move,
         content: fields('position'),
       }
     );
   if (props.extraSections) sections.push(...props.extraSections);
+  sections.push(...reviewInformationSections(props.information));
   sections.push(
     reviewInspectorActions(
       <ReviewButton

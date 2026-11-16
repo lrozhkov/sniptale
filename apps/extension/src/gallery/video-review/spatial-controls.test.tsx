@@ -147,8 +147,10 @@ it('makes all tools available without enabling authored effects or resetting the
       onReset={onReset}
     />
   );
-  act(() => button(view.host, 'spatialToolPosition').click());
-  expect(onTool).toHaveBeenCalledExactlyOnceWith('position');
+  expect(
+    view.host.querySelector('[aria-label="gallery.videoReview.spatialToolPosition"]')
+  ).toBeNull();
+  expect(onTool).not.toHaveBeenCalled();
   expect(view.host.querySelector('[aria-label="gallery.videoReview.spatialToolTilt"]')).toBeNull();
   expect(onReset).not.toHaveBeenCalled();
   expect(onAxis).not.toHaveBeenCalled();

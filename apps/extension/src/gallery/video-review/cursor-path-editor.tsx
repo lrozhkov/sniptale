@@ -23,7 +23,7 @@ import {
   compareCursorFocusKeys,
 } from '../../features/video/project/cursor-focus-path/authoring';
 import { evaluateReviewCursorFocus } from '../../features/video/review/advanced/cursor-focus-path';
-import { Clock3, MousePointer2, SlidersHorizontal } from 'lucide-react';
+import { MousePointer2, SlidersHorizontal } from 'lucide-react';
 import { SegmentedRow, SelectField, ToggleField } from '../../ui/compact-inspector-controls';
 import { DraftNumericRow as ReviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 import { ReviewInspectorSections, reviewInspectorActions } from './inspector-sections';
@@ -116,7 +116,6 @@ type CursorEditorState = ReturnType<typeof cursorEditorState>;
 
 export function ReviewCursorPathEditor(props: CursorPathEditorProps) {
   const state = cursorEditorState(props);
-  const { selected, segment, field, editable, change } = state;
   return (
     <fieldset
       disabled={props.disabled}
@@ -131,22 +130,6 @@ export function ReviewCursorPathEditor(props: CursorPathEditorProps) {
             icon: MousePointer2,
             content: <CursorPositionFields state={state} />,
           },
-          ...(selected
-            ? [
-                {
-                  id: 'timing',
-                  label: translate('gallery.videoReview.interval'),
-                  icon: Clock3,
-                  content: field(
-                    translate('videoEditor.sidebar.actionTimePrefix'),
-                    selected.time,
-                    (time) => change({ time }),
-                    !editable,
-                    { min: segment?.start, max: segment?.end }
-                  ),
-                },
-              ]
-            : []),
           reviewInspectorActions(<CursorKeyActions state={state} props={props} />),
         ]}
       />

@@ -7,7 +7,7 @@ import type { useReviewAudio } from './use-review-audio';
 import type { LoadedReview } from './use-session';
 import { getAIProviderFailureKey } from '../../features/ai/provider-failure-copy';
 import { useRef, useState, type ReactNode } from 'react';
-import { AudioLines, FileText, LoaderCircle } from 'lucide-react';
+import { AudioLines, FileText, LoaderCircle, SlidersHorizontal } from 'lucide-react';
 import { CheckboxField, SelectField, TextareaField } from '../../ui/compact-inspector-controls';
 import { ReviewInspectorSections, type ReviewInspectorSection } from './inspector-sections';
 import { PreviewNumericRow as ReviewPreviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
@@ -24,6 +24,7 @@ import { ReviewButton, reviewTextButtonClassName } from './controls';
 
 type Props = ReviewRecognitionAccess & {
   sound?: (applying: boolean) => ReactNode;
+  soundSections?: (applying: boolean) => readonly ReviewInspectorSection[];
   renderInspectorSections?:
     | ((sections: readonly ReviewInspectorSection[]) => ReactNode)
     | undefined;
@@ -57,54 +58,66 @@ export function ReviewOriginalSpeechPanel(
   } = props;
   const ownerKey = JSON.stringify(['gallery-original', props.original?.sourceAssetId]);
   const presets = useAudioPresets(ownerKey, masterAudio.audioProcessing);
-  const sound = (applying: boolean) => (
-    <>
-      <ReviewPreviewNumberRow
-        label={translate('gallery.videoReview.volume')}
-        unit="%"
-        min={0}
-        max={200}
-        step={1}
-        precision={0}
-        enterBehavior="blur"
-        disabled={masterDisabled || applying}
-        value={masterAudio.muted ? 0 : masterAudio.volume * 100}
-        onChange={(value) => {
-          if (!masterDisabled && !applying) onMasterVolumeChange(value / 100);
-        }}
-      />
-      {onProcessingChange ? (
-        <>
-          <AudioPresetControls
-            key={ownerKey}
-            {...presets}
-            hasValue={!!masterAudio.audioProcessing}
-            disabled={masterDisabled || applying}
-            onApply={(value) => onProcessingChange(value)}
-          />
-          <AudioProcessingFields
-            key={props.original?.sourceAssetId}
-            createDefaultProcessing={presets.createDefaultProcessing}
-            value={masterAudio.audioProcessing}
-            disabled={masterDisabled || applying}
-            onChange={onProcessingChange}
-          />
-        </>
-      ) : null}
-    </>
+  const volume = (applying: boolean) => (
+    <ReviewPreviewNumberRow
+      label={translate('gallery.videoReview.volume')}
+      unit="%"
+      min={0}
+      max={200}
+      step={1}
+      precision={0}
+      enterBehavior="blur"
+      disabled={masterDisabled || applying}
+      value={masterAudio.muted ? 0 : masterAudio.volume * 100}
+      onChange={(value) => {
+        if (!masterDisabled && !applying) onMasterVolumeChange(value / 100);
+      }}
+    />
   );
-  if (!recognitionEnabled)
-    return props.renderInspectorSections
-      ? props.renderInspectorSections([
+  const soundSections = (applying: boolean): readonly ReviewInspectorSection[] => [
+    {
+      id: 'audio',
+      label: translate('gallery.videoReview.volume'),
+      icon: AudioLines,
+      content: volume(applying),
+    },
+    ...(onProcessingChange
+      ? [
           {
-            id: 'audio',
-            label: translate('gallery.videoReview.volume'),
-            icon: AudioLines,
-            content: sound(false),
+            id: 'audio-effects',
+            label: translate('audioProcessing.title'),
+            icon: SlidersHorizontal,
+            content: (
+              <>
+                <AudioPresetControls
+                  key={ownerKey}
+                  {...presets}
+                  hasValue={!!masterAudio.audioProcessing}
+                  disabled={masterDisabled || applying}
+                  onApply={onProcessingChange}
+                />
+                <AudioProcessingFields
+                  key={props.original?.sourceAssetId}
+                  createDefaultProcessing={presets.createDefaultProcessing}
+                  value={masterAudio.audioProcessing}
+                  disabled={masterDisabled || applying}
+                  onChange={onProcessingChange}
+                />
+              </>
+            ),
           },
-        ])
-      : sound(false);
-  return <ReviewSpeechPanel {...speech} target={{ kind: 'original' }} sound={sound} />;
+        ]
+      : []),
+  ];
+  if (!recognitionEnabled)
+    return props.renderInspectorSections ? (
+      props.renderInspectorSections(soundSections(false))
+    ) : (
+      <ReviewInspectorSections sections={soundSections(false)} />
+    );
+  return (
+    <ReviewSpeechPanel {...speech} target={{ kind: 'original' }} soundSections={soundSections} />
+  );
 }
 
 /** Explicit source and selected voiceover commands share one canonical recognition workflow. */
@@ -168,16 +181,18 @@ export function ReviewSpeechPanel(props: Props) {
       {props.renderSections
         ? props.renderSections(section, recognition.applying)
         : renderInspectorSections([
-            ...(props.sound
-              ? [
-                  {
-                    id: 'audio',
-                    label: translate('gallery.videoReview.volume'),
-                    icon: AudioLines,
-                    content: props.sound(recognition.applying),
-                  },
-                ]
-              : []),
+            ...(props.soundSections
+              ? props.soundSections(recognition.applying)
+              : props.sound
+                ? [
+                    {
+                      id: 'audio',
+                      label: translate('gallery.videoReview.volume'),
+                      icon: AudioLines,
+                      content: props.sound(recognition.applying),
+                    },
+                  ]
+                : []),
             section,
           ])}
     </section>

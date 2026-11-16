@@ -190,6 +190,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/gl-transition-choices.ts`
 - `apps/extension/src/ui/gl-transition-fields.test.tsx`
 - `apps/extension/src/ui/gl-transition-fields.tsx`
+- `apps/extension/src/ui/gl-transition-labels.ts`
 - `apps/extension/src/ui/glass-select`
 - `apps/extension/src/ui/gradient-preset-grid`
 - `apps/extension/src/ui/highlighter-preset-editor`

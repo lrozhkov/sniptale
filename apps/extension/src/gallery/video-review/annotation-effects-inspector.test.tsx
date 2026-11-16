@@ -166,9 +166,6 @@ it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners', 'arr
   (name) => {
     const value = fixture(name);
     render(value);
-    expect(host.textContent).toContain(
-      resolveEffectLocaleText(value.document.label, getCurrentLocale())
-    );
     for (const control of value.document.controls) {
       expect(
         reveal(
@@ -412,8 +409,6 @@ it('offers bounded scrub tracks in displayed units without changing authored val
   expect([x.min, x.max, x.value]).toEqual(['-100', '500', '500']);
   const width = input(`${translate('gallery.videoReview.annotationWidth')} range`);
   expect([width.min, width.max, width.value]).toEqual(['0.01', '200', '40']);
-  const start = input(`${translate('gallery.videoReview.annotationStart')} range`);
-  expect([start.min, start.max, start.value]).toEqual(['0', '3.999', '0']);
   const handle = value.document.objectLayout!.handles![0]!;
   const control = value.document.controls.find((item) => item.id === handle.xControl)!;
   const anchor = input(`${resolveEffectLocaleText(control.label, getCurrentLocale())} range`);
@@ -617,4 +612,21 @@ it('keeps presets under Appearance when a template has no appearance control gro
       '[data-section="sdk:appearance"] button[aria-label="gallery.videoReview.annotationPresets"]'
     )
   ).not.toBeNull();
+});
+
+it('starts with SDK text and omits identity, timing, and proportional-scale hints', () => {
+  const value = fixture('callout');
+  render(value);
+  const tabs = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+  expect(tabs[0]?.getAttribute('aria-controls')).toContain('-sdk:content');
+  expect(tabs.some((tab) => tab.getAttribute('aria-controls')?.endsWith('-timing'))).toBe(false);
+  expect(host.textContent).not.toContain(translate('gallery.videoReview.annotationScaleHint'));
+  expect(host.textContent).not.toContain(translate('gallery.videoReview.annotationName'));
+  openSection('sdk:appearance');
+  const enabled = host.querySelector<HTMLButtonElement>(
+    `[aria-label="${translate('gallery.videoReview.annotationEnabled')}"]`
+  )!;
+  expect(enabled).not.toBeNull();
+  act(() => enabled.click());
+  expect(value.editor.change).toHaveBeenCalledWith(value.instance.id, { enabled: false });
 });

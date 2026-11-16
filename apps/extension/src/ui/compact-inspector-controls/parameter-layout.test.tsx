@@ -184,6 +184,49 @@ it('clears a controlled draft without accepting it and keeps input focus', () =>
   expect(commit).toHaveBeenCalledExactlyOnceWith('');
 });
 
+it('keeps a fitting name and value inline when either needs more than its former fixed share', () => {
+  const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(300);
+  const canvas = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    font: '',
+    measureText: (text: string) => ({ width: text.length * 8 }),
+  } as unknown as CanvasRenderingContext2D);
+  try {
+    act(() =>
+      root.render(
+        <InspectorParameterRow label="A longer setting name">
+          <input />
+        </InspectorParameterRow>
+      )
+    );
+    expect(host.querySelector<HTMLElement>('.sniptale-parameter-row')!.dataset['layout']).toBe(
+      'inline'
+    );
+    act(() =>
+      root.render(
+        <InspectorParameterRow label="Name" valueMinimum={180}>
+          <input />
+        </InspectorParameterRow>
+      )
+    );
+    expect(host.querySelector<HTMLElement>('.sniptale-parameter-row')!.dataset['layout']).toBe(
+      'inline'
+    );
+    act(() =>
+      root.render(
+        <InspectorParameterRow label="A longer setting name" valueMinimum={180}>
+          <input />
+        </InspectorParameterRow>
+      )
+    );
+    expect(host.querySelector<HTMLElement>('.sniptale-parameter-row')!.dataset['layout']).toBe(
+      'stacked'
+    );
+  } finally {
+    canvas.mockRestore();
+    width.mockRestore();
+  }
+});
+
 it('keeps text names and padding inert while the input retains native focus', () => {
   act(() =>
     root.render(

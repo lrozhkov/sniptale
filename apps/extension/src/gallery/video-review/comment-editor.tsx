@@ -1,4 +1,4 @@
-import { NumberInput } from '@sniptale/ui/number-input';
+import { NumericRow } from '../../ui/compact-inspector-controls/numeric';
 import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { CompactPaintSelector } from '../../ui/paint-selector';
 import {
@@ -7,13 +7,13 @@ import {
   TextareaField,
   ToggleField,
 } from '../../ui/compact-inspector-controls';
-import { Plus, Type, Paintbrush, Play, Trash2 } from 'lucide-react';
+import { Plus, Type, Palette, Play, Trash2 } from 'lucide-react';
 import {
   reviewInspectorActions,
   ReviewInspectorSections,
   ReviewInspectorColumns,
 } from './inspector-sections';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
 import { translate } from '../../platform/i18n';
 import type { CanvasComment, ReviewAnnotation } from '../../features/video/review/types';
@@ -22,6 +22,53 @@ import {
   clampCanvasCommentTimes,
 } from '../../features/video/review/comments';
 import { ReviewButton, reviewTimeLabel, reviewDeleteButtonClassName } from './controls';
+
+/** Notes retain blur acceptance while sharing numeric geometry, units, and stepping. */
+function CommentNumericRow(
+  props: Omit<ComponentProps<typeof NumericRow>, 'onPreviewValue' | 'onCommitValue'> & {
+    onChange(value: number): void;
+  }
+) {
+  const [draft, setDraft] = useState(props.value);
+  const pending = useRef<number | null>(null);
+  const cancelled = useRef(false);
+  useEffect(() => setDraft(props.value), [props.value]);
+  return (
+    <div
+      onFocusCapture={() => {
+        cancelled.current = false;
+      }}
+      onKeyDownCapture={(event) => {
+        if (event.key === 'Escape') {
+          cancelled.current = true;
+          pending.current = null;
+          setDraft(props.value);
+          const input = event.currentTarget.querySelector<HTMLInputElement>('input[type="text"]');
+          queueMicrotask(() => input?.blur());
+        } else cancelled.current = false;
+      }}
+      onBlur={() => {
+        const value = pending.current;
+        pending.current = null;
+        if (!cancelled.current && value !== null && value !== props.value) props.onChange(value);
+      }}
+    >
+      <NumericRow
+        {...props}
+        value={draft}
+        enterBehavior="blur"
+        onPreviewValue={(value) => {
+          pending.current = value;
+          setDraft(value);
+        }}
+        onCommitValue={(value) => {
+          pending.current = value;
+          setDraft(value);
+        }}
+      />
+    </div>
+  );
+}
 
 /** Text from the linked annotation is edited there; the overlay only references it. */
 const linkedTextPlaceholder = 'gallery.videoReview.overlayLinkedText';
@@ -39,8 +86,6 @@ function ReviewOverlayTimeFields(props: {
   busy: boolean;
   start: string;
   end: string;
-  onInputStart(value: string): void;
-  onInputEnd(value: string): void;
   onCommit(window: { start?: number | undefined; end?: number | undefined }): void;
 }) {
   return (
@@ -49,42 +94,28 @@ function ReviewOverlayTimeFields(props: {
         {translate('gallery.videoReview.overlayWindow')}
       </legend>
       <div className="sniptale-parameter-stack">
-        <InspectorParameterRow label={translate('gallery.videoReview.overlayStart')}>
-          <NumberInput
-            data-ui="gallery.videoReview.overlayStartInput"
-            aria-label={translate('gallery.videoReview.overlayStart')}
-            type="number"
-            step={0.1}
-            min={0}
-            max={props.duration}
-            disabled={props.busy}
-            value={props.start}
-            onChange={(event) => props.onInputStart(event.target.value)}
-            onBlur={() =>
-              props.onCommit({ start: resolveTimes(props.start), end: props.comment.end })
-            }
-            className="h-8 w-full min-w-0 rounded-md border border-transparent
-              bg-transparent px-2 py-1 text-right tabular-nums"
-          />
-        </InspectorParameterRow>
-        <InspectorParameterRow label={translate('gallery.videoReview.overlayEnd')}>
-          <NumberInput
-            data-ui="gallery.videoReview.overlayEndInput"
-            aria-label={translate('gallery.videoReview.overlayEnd')}
-            type="number"
-            step={0.1}
-            min={0}
-            max={props.duration}
-            disabled={props.busy}
-            value={props.end}
-            onChange={(event) => props.onInputEnd(event.target.value)}
-            onBlur={() =>
-              props.onCommit({ start: props.comment.start, end: resolveTimes(props.end) })
-            }
-            className="h-8 w-full min-w-0 rounded-md border border-transparent
-              bg-transparent px-2 py-1 text-right tabular-nums"
-          />
-        </InspectorParameterRow>
+        <CommentNumericRow
+          label={translate('gallery.videoReview.overlayStart')}
+          value={resolveTimes(props.start) ?? null}
+          unit="s"
+          min={0}
+          max={props.duration}
+          step={0.1}
+          precision={1}
+          disabled={props.busy}
+          onChange={(start) => props.onCommit({ start, end: props.comment.end })}
+        />
+        <CommentNumericRow
+          label={translate('gallery.videoReview.overlayEnd')}
+          value={resolveTimes(props.end) ?? null}
+          unit="s"
+          min={0}
+          max={props.duration}
+          step={0.1}
+          precision={1}
+          disabled={props.busy}
+          onChange={(end) => props.onCommit({ start: props.comment.start, end })}
+        />
       </div>
     </fieldset>
   );
@@ -249,7 +280,7 @@ function useCommentEditorDraft(props: CanvasCommentEditorProps) {
 
 export function ReviewCanvasCommentEditor(props: CanvasCommentEditorProps) {
   const linked = !!props.comment.annotationId;
-  const { text, start, end, setStart, setEnd, change, commit, pause, patchComment, patchTimes } =
+  const { text, start, end, change, commit, pause, patchComment, patchTimes } =
     useCommentEditorDraft(props);
   return (
     <div data-ui="gallery.videoReview.canvasCommentEditor" className="min-w-0 space-y-3">
@@ -291,7 +322,7 @@ export function ReviewCanvasCommentEditor(props: CanvasCommentEditorProps) {
           {
             id: 'appearance',
             label: translate('videoEditor.effectsLibrary.objectAppearance'),
-            icon: Paintbrush,
+            icon: Palette,
             content: (
               <ReviewInspectorColumns>
                 <ReviewOverlayPlacementFields
@@ -326,8 +357,6 @@ export function ReviewCanvasCommentEditor(props: CanvasCommentEditorProps) {
                   busy={props.busy}
                   start={start}
                   end={end}
-                  onInputStart={setStart}
-                  onInputEnd={setEnd}
                   onCommit={patchTimes}
                 />
                 <div className="sniptale-parameter-stack">
@@ -442,35 +471,18 @@ function ReviewCommentStyleFields(props: {
             },
           ] as const
         ).map((field) => (
-          <InspectorParameterRow key={field.key} label={translate(field.label)}>
-            <NumberInput
-              type="number"
-              aria-label={translate(field.label)}
-              min={field.min}
-              max={field.max}
-              step={1}
-              key={`${props.style[field.key] ?? field.fallback}`}
-              defaultValue={props.style[field.key] ?? field.fallback}
-              className="h-8 w-full min-w-0 rounded-md border border-transparent
-                bg-transparent px-2 py-1 text-right text-xs tabular-nums"
-              onBlur={(event) => {
-                const value = event.currentTarget.valueAsNumber;
-                const bounded = Number.isFinite(value)
-                  ? Math.max(field.min, Math.min(field.max, value))
-                  : (props.style[field.key] ?? field.fallback);
-                event.currentTarget.value = String(bounded);
-                patch({ [field.key]: bounded });
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape')
-                  event.currentTarget.value = String(props.style[field.key] ?? field.fallback);
-                if (event.key === 'Enter' || event.key === 'Escape') {
-                  event.preventDefault();
-                  event.currentTarget.blur();
-                }
-              }}
-            />
-          </InspectorParameterRow>
+          <CommentNumericRow
+            key={field.key}
+            label={translate(field.label)}
+            value={props.style[field.key] ?? field.fallback}
+            min={field.min}
+            max={field.max}
+            step={1}
+            precision={0}
+            unit="px"
+            disabled={props.busy}
+            onChange={(value) => patch({ [field.key]: value })}
+          />
         ))}
       </div>
     </fieldset>

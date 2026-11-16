@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, type ReactNode } from 'react';
+import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { reviewClickSections } from './click-animation-fields';
@@ -8,6 +8,12 @@ import { reviewActionAudioSection } from './action-audio-section';
 import { ReviewActionProperties } from './action-properties';
 import { planReviewActionEdits } from '../../features/video/review/action-edits';
 import { translate } from '../../platform/i18n';
+import { createReviewInteractionEditor } from './interaction-editor';
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import type { ReviewAuthoredPress } from '../../features/video/review/interaction-types';
+import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
+import { REVIEW_KEY_DEFAULT } from '../../features/video/project/action-feedback/key-animation';
+import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
 
 const marker = {
   ref: { kind: 'action' as const, id: 'click' },
@@ -114,18 +120,21 @@ it('shows recorded target metadata as text and tolerates a disappearing selectio
   }
 });
 
-vi.mock('./key-animation-fields', async (original) => ({
-  ...(await original<typeof import('./key-animation-fields')>()),
-  ReviewKeyFields: (props: {
-    information?: ReactNode;
-    onChange(patch: { enabled: boolean }): void;
-  }) => (
-    <>
-      {props.information}
-      <button onClick={() => props.onChange({ enabled: true })}>Enable key caption</button>
-    </>
-  ),
-}));
+vi.mock('./key-animation-fields', async (original) => {
+  const actual = await original<typeof import('./key-animation-fields')>();
+  return {
+    ...actual,
+    ReviewKeyFields: (props: Parameters<typeof actual.ReviewKeyFields>[0]) =>
+      props.content ? (
+        <actual.ReviewKeyFields {...props} />
+      ) : (
+        <>
+          {props.information}
+          <button onClick={() => props.onChange({ enabled: true })}>Enable key caption</button>
+        </>
+      ),
+  };
+});
 it('configures keyboard points without offering interval focus edits', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div'),
@@ -254,3 +263,124 @@ it.each([
       .slice(-2)
   ).toEqual(['action-audio', 'actions']);
 });
+
+function authoredInteractionFixture(family: ReviewAuthoredPress['family']) {
+  const advanced = createQuickEditAdvancedState();
+  const press: ReviewAuthoredPress = {
+    id: `authored-${family}`,
+    family,
+    start: 1,
+    end: 2,
+    label: family === 'keyboard' ? 'Ctrl+C' : 'Mouse click',
+    ...(family === 'keyboard' ? { keys: ['Control', 'KeyC'] } : {}),
+    button: 0,
+    x: 0.25,
+    y: 0.75,
+  };
+  advanced.interactionTimeline = { presses: [press], overrides: [] };
+  const editor = createReviewInteractionEditor({
+    advanced,
+    duration: 6,
+    time: 1,
+    setMode: vi.fn(),
+    setActiveSelection: vi.fn(),
+    seek: vi.fn(),
+    beforeAction: (action) => {
+      action();
+    },
+    canStart: () => true,
+    setInteractionTimeline: vi.fn((update) => {
+      advanced.interactionTimeline = update(
+        advanced.interactionTimeline ?? { presses: [], overrides: [] }
+      );
+    }),
+    setKeyAnimations: vi.fn((update) => {
+      advanced.keyAnimations = update(advanced.keyAnimations ?? []);
+    }),
+    setClickAnimations: vi.fn((update) => {
+      advanced.clickAnimations = update(advanced.clickAnimations ?? []);
+    }),
+  });
+  const marker: ReviewTelemetryMarker = {
+    ref: { kind: 'action', id: press.id },
+    eventType: family === 'keyboard' ? 'KEY' : 'CLICK',
+    start: press.start,
+    end: press.end,
+    target: press.label,
+    ...(family === 'mouse' ? { focusPoint: { x: press.x, y: press.y } } : {}),
+  };
+  return { editor, marker };
+}
+
+it.each(['keyboard', 'mouse'] as const)(
+  'shows authored %s fields only in its content category and retains duplicate/delete commands',
+  (family) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    const { marker, editor } = authoredInteractionFixture(family);
+    const copy = vi.spyOn(editor, 'copy');
+    const remove = vi.spyOn(editor, 'remove');
+    const category = family === 'keyboard' ? 'display' : 'animation';
+    const open = (id: string) =>
+      act(() => {
+        const tab = host.querySelector<HTMLButtonElement>(`[role="tab"][aria-controls$="-${id}"]`);
+        expect(tab).not.toBeNull();
+        tab!.click();
+      });
+    const commands = () => [
+      host.querySelector<HTMLButtonElement>(
+        `[aria-label="${translate('gallery.videoReview.createCopy')}"]`
+      ),
+      host.querySelector<HTMLButtonElement>(`[aria-label="${translate('common.actions.delete')}"]`),
+    ];
+    const fields = () =>
+      family === 'keyboard'
+        ? [
+            ...host.querySelectorAll(
+              `[aria-label="${translate('gallery.videoReview.chooseChordKey')}"]`
+            ),
+          ]
+        : [...host.querySelectorAll('input[aria-label="X"], input[aria-label="Y"]')];
+    try {
+      act(() =>
+        root.render(
+          <ReviewActionProperties
+            marker={marker}
+            plan={plan}
+            busy={false}
+            interactionEditor={editor}
+            onEdit={vi.fn()}
+            onFocus={vi.fn()}
+            keyAnimations={[{ ...REVIEW_KEY_DEFAULT, id: marker.ref.id, enabled: true }]}
+            animations={[{ ...REVIEW_CLICK_DEFAULT, id: marker.ref.id, effect: 'ripple' }]}
+          />
+        )
+      );
+      for (const id of [category, 'appearance', 'information', category]) {
+        open(id);
+        expect(fields()).toHaveLength(id === category ? 2 : 0);
+        if (family === 'mouse') {
+          const button = host.querySelector(
+            `[aria-label="${translate('gallery.videoReview.historyButton')}"]`
+          );
+          if (id === category) expect(button).not.toBeNull();
+          else expect(button).toBeNull();
+        }
+        for (const command of commands()) {
+          expect(command).not.toBeNull();
+          expect(command!.disabled).toBe(false);
+        }
+      }
+      act(() => commands()[0]!.click());
+      expect(copy).toHaveBeenCalledExactlyOnceWith(marker);
+      act(() => commands()[1]!.click());
+      expect(remove).toHaveBeenCalledExactlyOnceWith(marker);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+      vi.unstubAllGlobals();
+    }
+  }
+);

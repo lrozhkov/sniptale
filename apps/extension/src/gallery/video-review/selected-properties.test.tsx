@@ -212,9 +212,6 @@ function mount(transition?: CompositionJoinSettings) {
   document.body.append(host);
   const root = createRoot(host);
   act(() => root.render(<ReviewSelectedProperties {...props} />));
-  act(() =>
-    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-transition"]')!.click()
-  );
   cleanup = () => {
     act(() => root.unmount());
     host.remove();
@@ -830,30 +827,8 @@ it('restores a GL parameter after the existing cut command refuses a save', asyn
   ).toBe('0.4');
 });
 
-async function importPresetFile(
-  parent: ParentNode,
-  selection: ReturnType<typeof createGlTransitionSelection>,
-  name = 'Imported'
-) {
-  if (!selection) throw new Error('Missing preset selection');
-  const source = JSON.stringify({
-    format: 'sniptale-gl-preset',
-    version: 1,
-    name,
-    transition: selection,
-  });
-  const file = new File([source], 'imported.sniptale-gl-preset.json');
-  Object.defineProperty(file, 'arrayBuffer', {
-    value: async () => new TextEncoder().encode(source).buffer,
-  });
-  const input = parent.querySelector<HTMLInputElement>('input[type=file]');
-  if (!input) throw new Error('Missing preset file input');
-  Object.defineProperty(input, 'files', { value: [file], configurable: true });
-  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
-}
-
 it.each([true, false])(
-  'imports a GL preset into the selected cut through the existing save command (%s)',
+  'changes a GL selection through the cut control and recovers after refusal (%s)',
   async (accepted) => {
     const initial = {
       type: 'gl' as const,
@@ -864,16 +839,29 @@ it.each([true, false])(
     };
     const view = mount(initial);
     if (!accepted) view.change.mockResolvedValue(false);
-    const selection = createGlTransitionSelection('CrossZoom')!;
+    const select = view.host.querySelector<HTMLSelectElement>(
+      'select[aria-label="gallery.videoReview.zoomTransitionType"]'
+    )!;
+    expect(view.host.querySelector('[role="tab"]')).toBeNull();
+    expect(view.host.querySelector('[data-section="timing"]')).toBeNull();
+    expect(view.host.textContent).not.toContain('gallery.videoReview.intervalBounds');
     expect(
-      view.host.querySelector('[data-gl-preset-owner]')?.getAttribute('data-gl-preset-owner')
-    ).toBe(view.edit.id);
-    await importPresetFile(view.host, selection);
+      view.host.querySelector('input[aria-label="gallery.videoReview.rangeStart"]')
+    ).toBeNull();
+    expect(view.host.querySelector('input[aria-label="gallery.videoReview.rangeEnd"]')).toBeNull();
+    expect(view.host.querySelector('[data-ui="composition.gl-preset-actions"]')).toBeNull();
+    expect(view.host.querySelector('input[type="file"]')).toBeNull();
+    expect(view.host.textContent).not.toContain('gallery.videoReview.cutTransitionEffective');
+    expect(view.host.textContent).not.toContain('videoEditor.effectsLibrary.importGlPreset');
+    expect(view.host.textContent).not.toContain('videoEditor.effectsLibrary.downloadGlPreset');
+    const selection = createGlTransitionSelection('CrossZoom')!;
+    await act(async () => {
+      select.value = 'CrossZoom';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
     expect(view.change).toHaveBeenCalledExactlyOnceWith({ ...initial, selection });
     expect(view.edit.transition).toEqual(accepted ? { ...initial, selection } : initial);
-    expect(
-      view.host.querySelector('[data-ui="composition.gl-preset-actions"] [role=status]')
-    ).toBeNull();
+    expect(select.value).toBe(accepted ? 'CrossZoom' : 'Fade');
   }
 );
 

@@ -3,6 +3,7 @@ import {
   createGlTransitionSelection,
   type GlTransitionSelection,
 } from '../features/video/project/transition/gl-catalog';
+import { glTransitionLabel } from './gl-transition-labels';
 
 /** Checked catalogue data is supplied by composition; this projection has no storage authority. */
 export type GlTransitionChoiceCatalog = {
@@ -45,12 +46,21 @@ export function glTransitionChoices(
   current?: GlTransitionSelection
 ) {
   const options: { value: string; label: string; disabled?: boolean }[] = catalog
-    ? available(catalog).map((item) => ({ value: choiceId(item), label: item.name }))
-    : GL_TRANSITIONS.map((item) => ({ value: item.name, label: item.name }));
+    ? available(catalog).map((item) => ({
+        value: choiceId(item),
+        label:
+          item.builtin && item.status === 'ready' && item.id === `builtin:${item.selection.name}`
+            ? glTransitionLabel(item.selection)
+            : item.name,
+      }))
+    : GL_TRANSITIONS.map((item) => {
+        const selection = createGlTransitionSelection(item.name);
+        return { value: item.name, label: selection ? glTransitionLabel(selection) : item.name };
+      });
   if (current) {
     const value = glTransitionChoiceValue(catalog, current);
     if (!options.some((option) => option.value === value))
-      options.push({ value, label: current.name, disabled: true });
+      options.push({ value, label: glTransitionLabel(current), disabled: true });
   }
   return options;
 }

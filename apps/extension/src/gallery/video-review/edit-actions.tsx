@@ -7,7 +7,7 @@ import {
   VideoResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { reviewOutputCodecs } from '../../workflows/video-review/render-settings';
-import { SelectField } from '../../ui/compact-inspector-controls';
+import { SelectField, SegmentedRow } from '../../ui/compact-inspector-controls';
 import { reviewSelectFieldClassName } from './controls';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { useEffect, useMemo, type ReactNode } from 'react';
@@ -155,7 +155,9 @@ export function ReviewSpeedOptions(props: {
   onRate(value: ReviewSpeedRate): void;
   onAudio(value: 'speed' | 'mute'): void;
 }) {
-  const rateOptions = REVIEW_SPEED_RATES.map((rate) => ({
+  const rateOptions = REVIEW_SPEED_RATES.filter(
+    (rate) => (rate >= 0.5 && rate <= 8) || rate === props.rate
+  ).map((rate) => ({
     value: String(rate),
     label: `${rate < 0.25 ? `1/${1 / rate}` : rate}×`,
   }));
@@ -170,20 +172,21 @@ export function ReviewSpeedOptions(props: {
   if (props.layout === 'inspector')
     return (
       <>
-        <SelectField
-          className={reviewSelectFieldClassName}
+        <SegmentedRow
+          ariaLabel={translate('gallery.videoReview.speedRate')}
           label={translate('gallery.videoReview.speedRate')}
           value={String(props.rate)}
-          disabled={props.busy}
-          options={rateOptions}
+          layout="stacked"
+          columns={4}
+          options={rateOptions.map((option) => ({ ...option, disabled: props.busy }))}
           onChange={changeRate}
         />
-        <SelectField
-          className={reviewSelectFieldClassName}
+        <SegmentedRow
+          ariaLabel={translate('gallery.videoReview.speedAudio')}
           label={translate('gallery.videoReview.speedAudio')}
           value={props.audio}
-          disabled={props.busy}
-          options={audioOptions}
+          columns={2}
+          options={audioOptions.map((option) => ({ ...option, disabled: props.busy }))}
           onChange={props.onAudio}
         />
       </>
@@ -585,6 +588,7 @@ export function ReviewRenderOptions({
             }}
           />
           <DetailEnhancementField
+            hintPresentation="tooltip"
             value={settings.detailEnhancement}
             disabled={busy}
             onChange={(detailEnhancement) =>

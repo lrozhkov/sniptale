@@ -94,11 +94,24 @@ export function ReviewActionProperties(props: {
         </ReviewButton>
       ) : null}
       {props.interactionEditor ? (
-        <ReviewInteractionProperties editor={props.interactionEditor} marker={marker} />
+        <ReviewInteractionProperties
+          part="actions"
+          editor={props.interactionEditor}
+          marker={marker}
+        />
       ) : null}
       {isReviewClick(marker) &&
       (marker.focusPoint || (gestureFeedback && marker.gesture?.path?.length)) ? (
         <ReviewClickFields
+          content={
+            props.interactionEditor ? (
+              <ReviewInteractionProperties
+                part="fields"
+                editor={props.interactionEditor}
+                marker={marker}
+              />
+            ) : null
+          }
           gesture={gestureFeedback}
           extraSections={audioSections}
           information={<RecordedInformation marker={marker} />}
@@ -109,6 +122,15 @@ export function ReviewActionProperties(props: {
         />
       ) : isReviewKey(marker) ? (
         <ReviewKeyFields
+          content={
+            props.interactionEditor ? (
+              <ReviewInteractionProperties
+                part="fields"
+                editor={props.interactionEditor}
+                marker={marker}
+              />
+            ) : null
+          }
           extraSections={audioSections}
           information={<RecordedInformation marker={marker} />}
           values={[
@@ -119,6 +141,7 @@ export function ReviewActionProperties(props: {
       ) : (
         <ReviewInspectorSections
           sections={[
+            ...audioSections,
             {
               id: 'information',
               label: translate('gallery.videoReview.actionInformation'),
@@ -126,13 +149,17 @@ export function ReviewActionProperties(props: {
               content: (
                 <>
                   <RecordedInformation marker={marker} />
+                  {plan.removed ? (
+                    <p role="status" className="review-inspector-notice">
+                      {translate('gallery.videoReview.actionRemoved')}
+                    </p>
+                  ) : null}
                   {isReviewClick(marker) ? (
                     <p role="status">{translate('gallery.videoReview.clickNoPoint')}</p>
                   ) : null}
                 </>
               ),
             },
-            ...audioSections,
             ...(!isReviewClick(marker) && marker.end > marker.start && !plan.removed
               ? [
                   reviewInspectorActions(
@@ -142,15 +169,6 @@ export function ReviewActionProperties(props: {
                       onEdit={props.onEdit}
                       onFocus={props.onFocus}
                     />
-                  ),
-                ]
-              : []),
-            ...(plan.removed
-              ? [
-                  reviewInspectorActions(
-                    <p className="text-[var(--sniptale-color-text-muted)]">
-                      {translate('gallery.videoReview.actionRemoved')}
-                    </p>
                   ),
                 ]
               : []),

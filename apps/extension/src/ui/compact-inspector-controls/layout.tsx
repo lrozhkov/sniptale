@@ -132,7 +132,13 @@ export function InspectorParameterRow(props: {
             2 * (valueOptions.length - 1)
         : 0
     );
-    setStacked(labelWidth > (available - 8) * 0.45 || valueWidth > (available - 8) * 0.55);
+    const needsStack = labelWidth + valueWidth + 8 > available;
+    const nameColumn = Math.max(
+      labelWidth,
+      Math.min((available - 8) * 0.45, available - 8 - valueWidth)
+    );
+    element.style.setProperty('--sniptale-parameter-name-fit', `${Math.ceil(nameColumn)}px`);
+    setStacked(needsStack);
   }, [
     props.label,
     hasLabelAccessory,

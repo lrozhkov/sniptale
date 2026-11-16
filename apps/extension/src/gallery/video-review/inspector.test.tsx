@@ -238,9 +238,7 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
       )
     ).toBeNull();
     await act(async () => render(false, 'edit:cut-1', 'Cut'));
-    expect(
-      host.querySelector('[data-ui="gallery.videoReview.inspectorPresentation"]')
-    ).not.toBeNull();
+    expect(host.querySelector('[data-ui="gallery.videoReview.inspectorPresentation"]')).toBeNull();
     expect(host.textContent).toContain('Selected controls');
     expect(host.textContent).not.toContain('gallery.videoReview.commentsEmpty');
     expect(host.querySelector('[aria-label="gallery.app.selectionBackup"]')).toBeNull();
@@ -261,9 +259,7 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
     expect(host.querySelector('[data-ui="gallery.videoReview.inspectorPresentation"]')).toBeNull();
     await act(async () => render(true, 'settings:zoom:z1', 'Zoom'));
-    expect(
-      host.querySelector('[data-ui="gallery.videoReview.inspectorPresentation"]')
-    ).not.toBeNull();
+    expect(host.querySelector('[data-ui="gallery.videoReview.inspectorPresentation"]')).toBeNull();
     expect(host.textContent).toContain('Selected controls');
     expect(host.querySelector('[aria-label="gallery.app.selectionBackup"]')).toBeNull();
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();

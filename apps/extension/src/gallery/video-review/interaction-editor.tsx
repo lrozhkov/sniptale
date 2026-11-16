@@ -294,9 +294,11 @@ export function ReviewInteractionAdd({
 export function ReviewInteractionProperties({
   editor,
   marker,
+  part = 'all',
 }: {
   editor: ReviewInteractionEditor;
   marker: ReviewTelemetryMarker;
+  part?: 'all' | 'fields' | 'actions';
 }) {
   const p = editor.presses.find((p) => p.id === marker.ref.id);
   const row = (key: 'x' | 'y', label: string) =>
@@ -341,26 +343,13 @@ export function ReviewInteractionProperties({
     </>
   ) : null;
   return (
-    <div className="space-y-2" data-ui="gallery.videoReview.interactionProperties">
-      {fields}
-      <ReviewInterval start={marker.start} end={marker.end} />
-      <DraftNumericRow
-        label={translate('gallery.videoReview.pressStart')}
-        value={marker.start}
-        min={0}
-        max={Math.max(0, marker.end - 0.001)}
-        step={0.01}
-        onChange={(v) => editor.update(marker, v, marker.end)}
-      />
-      <DraftNumericRow
-        label={translate('gallery.videoReview.pressEnd')}
-        value={marker.end}
-        min={marker.start + 0.001}
-        max={editor.duration}
-        step={0.01}
-        onChange={(v) => editor.update(marker, marker.start, v)}
-      />
-      {p ? (
+    <div
+      className={part === 'actions' ? 'contents' : 'space-y-2'}
+      data-ui="gallery.videoReview.interactionProperties"
+    >
+      {part !== 'actions' ? fields : null}
+      {part !== 'fields' ? <ReviewInterval start={marker.start} end={marker.end} /> : null}
+      {p && part !== 'fields' ? (
         <ReviewInspectorSections
           sections={[
             reviewInspectorActions(

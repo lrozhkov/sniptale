@@ -575,9 +575,7 @@ it('configures recorded keys without pointer locations, separately from selected
     const sectionTab = (id: string) =>
       host.querySelector<HTMLButtonElement>(`[role="tab"][aria-controls$="-${id}"]`)!;
     expect(
-      sectionTab('click:animation')
-        .querySelector('svg')
-        ?.classList.contains('lucide-mouse-pointer-2')
+      sectionTab('click:animation').querySelector('svg')?.classList.contains('lucide-waves')
     ).toBe(true);
     expect(
       sectionTab('key:display').querySelector('svg')?.classList.contains('lucide-keyboard')

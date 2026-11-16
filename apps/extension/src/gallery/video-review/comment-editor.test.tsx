@@ -199,43 +199,52 @@ it('commits pending text when the editor unmounts', async () => {
 });
 
 it('keeps numeric drafts local after changing sections and accepts the complete style on blur', async () => {
-  const onPatch = vi.fn();
-  await act(async () =>
-    renderEditor(
-      <ReviewCanvasCommentEditor
-        comment={comment()}
-        annotations={[]}
-        duration={10}
-        busy={false}
-        onPatch={onPatch}
-        onSwitchAttachment={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    )
-  );
-  const area = host.querySelector('textarea')!;
-  await act(async () => {
-    area.focus();
-    typeValue(area, 'New text');
-  });
-  const input = reveal<HTMLInputElement>('input[min="10"]')!;
-  await act(async () => input.focus());
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
-  for (const value of ['', '1', '18']) {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  try {
+    const onPatch = vi.fn();
+    await act(async () =>
+      renderEditor(
+        <ReviewCanvasCommentEditor
+          comment={comment()}
+          annotations={[]}
+          duration={10}
+          busy={false}
+          onPatch={onPatch}
+          onSwitchAttachment={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      )
+    );
+    const area = host.querySelector('textarea')!;
     await act(async () => {
-      setter.call(input, value);
-      input.dispatchEvent(new Event('input', { bubbles: true }));
+      area.focus();
+      typeValue(area, 'New text');
     });
-    expect(input.value).toBe(value);
-    expect(onPatch).not.toHaveBeenCalled();
+    const input = reveal<HTMLInputElement>(
+      'input[aria-label="gallery.videoReview.overlayFontSize"]'
+    )!;
+    await act(async () => input.focus());
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    for (const value of ['', '1', '18']) {
+      await act(async () => {
+        setter.call(input, value);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      expect(input.value).toBe(value);
+      expect(onPatch).not.toHaveBeenCalled();
+    }
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(340);
+    });
+    expect(onPatch).toHaveBeenCalledExactlyOnceWith({ text: 'New text' });
+    await act(async () => input.blur());
+    expect(onPatch).toHaveBeenCalledWith({
+      text: 'New text',
+      style: { ...comment().style, fontSize: 18 },
+    });
+  } finally {
+    vi.useRealTimers();
   }
-  await act(async () => new Promise((resolve) => setTimeout(resolve, 340)));
-  expect(onPatch).toHaveBeenCalledExactlyOnceWith({ text: 'New text' });
-  await act(async () => input.blur());
-  expect(onPatch).toHaveBeenCalledWith({
-    text: 'New text',
-    style: { ...comment().style, fontSize: 18 },
-  });
 });
 
 it('keeps overlay commands in an unlabelled tray across parameter sections', async () => {
@@ -265,7 +274,9 @@ it('keeps overlay commands in an unlabelled tray across parameter sections', asy
     '[role="tab"][aria-controls$="-appearance"]'
   )!;
   await act(async () => style.click());
-  expect(host.querySelector('input[min="10"]')).not.toBeNull();
+  expect(
+    host.querySelector('input[aria-label="gallery.videoReview.overlayFontSize"]')
+  ).not.toBeNull();
   expect(host.querySelector('textarea')).toBeNull();
   expect(host.querySelector('[aria-label="gallery.videoReview.overlayDelete"]')).not.toBeNull();
   expect(
@@ -361,16 +372,18 @@ it('preserves stored numeric values when an empty draft loses focus', async () =
       />
     )
   );
-  const input = reveal<HTMLInputElement>('input[min="10"]')!;
+  const input = reveal<HTMLInputElement>(
+    'input[aria-label="gallery.videoReview.overlayFontSize"]'
+  )!;
   expect(input.value).toBe('18');
   await act(async () => {
     input.focus();
-    input.value = '';
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '');
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.blur();
   });
   expect(input.value).toBe('18');
-  expect(onPatch).toHaveBeenCalledWith({ text: 'Hello', style: stored.style });
+  expect(onPatch).not.toHaveBeenCalled();
 });
 
 it('clears the comment draft through its editor and commits after leaving the inspector', async () => {
@@ -415,18 +428,18 @@ it('restores the accepted numeric value on Escape before blur acceptance', async
       />
     )
   );
-  const input = reveal<HTMLInputElement>('input[min="10"]')!;
+  const input = reveal<HTMLInputElement>(
+    'input[aria-label="gallery.videoReview.overlayFontSize"]'
+  )!;
   await act(async () => {
     input.focus();
-    input.value = '25';
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '25');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   });
   expect(input.value).toBe('12');
   expect(document.activeElement).not.toBe(input);
-  expect(onPatch).toHaveBeenCalledWith({
-    text: 'Hello',
-    style: { ...comment().style, fontSize: 12 },
-  });
+  expect(onPatch).not.toHaveBeenCalled();
 });
 
 it.each([

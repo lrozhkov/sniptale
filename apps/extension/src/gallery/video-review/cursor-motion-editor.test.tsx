@@ -90,6 +90,9 @@ it('authors cursor intervals and points; edits, copies and toggles without accep
     const id = editor.selected!.id;
     expect(editor.overlay?.path.segments[0]?.start).toBe(0);
     act(() => setTime(1));
+    click('cursorMotionPoints');
+    expect(host.querySelectorAll('.review-cursor-point-row')).toHaveLength(2);
+    expect(host.querySelector('[aria-label="gallery.videoReview.cursorMotionStart"]')).toBeNull();
     click('cursorMotionAddPoint');
     expect(editor.selected?.points).toHaveLength(3);
     const key = editor.pointId!;
@@ -106,12 +109,27 @@ it('authors cursor intervals and points; edits, copies and toggles without accep
     act(() => editor.overlay!.onChange(moved));
     expect(editor.selected!.points.every((p) => p.x === 0.8)).toBe(true);
     act(() => editor.overlay!.onChange({ ...path, segments: [] }));
+    act(() =>
+      host
+        .querySelector<HTMLButtonElement>(
+          '[aria-label="videoEditor.effectsLibrary.objectAppearance"]'
+        )!
+        .click()
+    );
     click('cursorShapePointer');
+    click('cursorMotionPoints');
     expect(editor.selected!.shape).toBe('pointer');
     click('cursorMotionDeletePoint');
     expect(editor.selected!.points).toHaveLength(2);
-    click('cursorMotionStart');
-    click('cursorMotionEnd');
+    expect(host.querySelectorAll('.review-cursor-point-row')).toHaveLength(2);
+    act(() => host.querySelectorAll<HTMLButtonElement>('.review-cursor-point-row')[0]!.click());
+    expect(editor.time).toBe(0);
+    expect(
+      host.querySelector<HTMLButtonElement>(
+        '[aria-label="gallery.videoReview.cursorMotionDeletePoint"]'
+      )!.disabled
+    ).toBe(true);
+    act(() => host.querySelectorAll<HTMLButtonElement>('.review-cursor-point-row')[1]!.click());
     expect(editor.time).toBeLessThan(3);
     act(() => editor.choose(id));
     act(() => editor.choose('missing'));

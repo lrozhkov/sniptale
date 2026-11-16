@@ -132,7 +132,7 @@ it('shows lens controls with fractional magnification and no repeated pulses', (
   expect(change).toHaveBeenCalledWith({ magnification: 2.3 });
 });
 
-it('starts with recorded information and falls back when an effect removes the active section', () => {
+it('starts with animation, keeps information last and falls back when an effect removes the active section', () => {
   const change = vi.fn();
   const render = (effect: 'ripple' | 'off') =>
     act(() =>
@@ -152,6 +152,10 @@ it('starts with recorded information and falls back when an effect removes the a
       )
     );
   render('ripple');
+  expect(host.querySelector('[data-section="animation"]')).not.toBeNull();
+  const tabs = Array.from(host.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+  expect(tabs.at(-1)?.getAttribute('aria-controls')).toMatch(/-information$/);
+  act(() => tabs.at(-1)!.click());
   expect(host.querySelector('[data-section="information"] dl')?.textContent).toContain('01.00');
   const timing = Array.from(host.querySelectorAll('button')).find(
     (node) => node.getAttribute('aria-label') === 'gallery.videoReview.clickTiming'
@@ -160,7 +164,11 @@ it('starts with recorded information and falls back when an effect removes the a
   expect(host.querySelector('[data-section="timing"]')).not.toBeNull();
   render('off');
   expect(host.querySelector('[data-section="timing"]')).toBeNull();
-  expect(host.querySelector('[data-section="information"]')).not.toBeNull();
+  expect(host.querySelector('[data-section="animation"]')).not.toBeNull();
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-information"]')!.click()
+  );
+  expect(host.querySelector('[data-section="information"] dl')?.textContent).toContain('01.00');
   expect(change).not.toHaveBeenCalled();
 });
 

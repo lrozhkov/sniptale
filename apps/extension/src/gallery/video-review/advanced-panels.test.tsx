@@ -633,6 +633,10 @@ it('dispatches shared source filter controls through the Gallery content adapter
       />
     )
   );
+  expect(host.querySelector('[data-section="canvas"]')).not.toBeNull();
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-source-filters"]')!.click()
+  );
   const add = [...host.querySelectorAll('button')].find(
     (item) => item.textContent === translate('videoEditor.sidebar.sourceFiltersAddBloom')
   );

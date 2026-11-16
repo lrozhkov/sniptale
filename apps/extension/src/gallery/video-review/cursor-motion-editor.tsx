@@ -2,8 +2,17 @@ import { reviewTimelineHint } from './timeline-hints';
 import { reviewInsertionRange } from './range-placement';
 import { reviewCursorMotionShapeTitleKeys } from './track-items';
 import { useRef, useState, type PointerEvent } from 'react';
-import { MousePointer2, Trash2, Copy, Flag, CirclePlus, Eye, EyeOff } from 'lucide-react';
-import { translate } from '../../platform/i18n';
+import {
+  MousePointer2,
+  Trash2,
+  Copy,
+  CirclePlus,
+  Palette,
+  Waypoints,
+  Eye,
+  EyeOff,
+} from 'lucide-react';
+import { translate, formatNumber } from '../../platform/i18n';
 import {
   CURSOR_MOTION_SHAPES,
   cursorMotionSegment,
@@ -15,7 +24,6 @@ import type { ReviewSelection } from '../../features/video/review/types';
 import { appleCursorDataUrl } from '../../features/video/project/cursor-motion/paint';
 import {
   ReviewButton,
-  ReviewInterval,
   reviewTextButtonClassName,
   reviewIconButtonClassName,
   reviewDeleteButtonClassName,
@@ -503,115 +511,155 @@ export function ReviewCursorMotionInspector({
   if (!m) return null;
   const update = (patch: Partial<CursorMotion>) => editor.update(m.id, patch);
   const selected = m.points.find((p) => p.id === editor.pointId);
-  const index = m.points.findIndex((p) => p.id === editor.pointId);
   return (
     <fieldset
       disabled={busy}
       className="min-w-0 space-y-3"
       data-ui="gallery.videoReview.cursorMotionInspector"
     >
-      <ReviewInterval start={m.start} end={m.end} />
-      <div className="flex flex-wrap gap-1">
-        {CURSOR_MOTION_SHAPES.map((shape) => (
-          <button
-            key={shape}
-            type="button"
-            aria-label={translate(reviewCursorMotionShapeTitleKeys[shape])}
-            aria-pressed={m.shape === shape}
-            title={translate(reviewCursorMotionShapeTitleKeys[shape])}
-            onClick={() => update({ shape })}
-            className={[
-              'flex h-10 w-10 shrink-0 items-center justify-center rounded border !p-0',
-              m.shape === shape
-                ? 'border-[var(--sniptale-color-accent)]'
-                : 'border-[var(--sniptale-color-border-soft)]',
-            ].join(' ')}
-          >
-            <img
-              alt=""
-              className="h-8 w-8 shrink-0 object-contain"
-              width={32}
-              height={32}
-              src={appleCursorDataUrl(shape, m.color, m.outline, false)}
-            />
-          </button>
-        ))}
-      </div>
-      <DraftNumericRow
-        label={translate('gallery.videoReview.cursorMotionSize')}
-        value={m.size}
-        min={12}
-        max={160}
-        step={1}
-        unit="px"
-        onChange={(size) => update({ size })}
-      />
-      <ColorField
-        title={translate('gallery.videoReview.cursorMotionColor')}
-        label={translate('gallery.videoReview.cursorMotionColor')}
-        value={m.color}
-        onChange={(color) => update({ color })}
-      />
-      <ColorField
-        title={translate('gallery.videoReview.cursorMotionOutline')}
-        label={translate('gallery.videoReview.cursorMotionOutline')}
-        value={m.outline}
-        onChange={(outline) => update({ outline })}
-      />
-      <ToggleField
-        label={translate('gallery.videoReview.cursorMotionShadow')}
-        value={m.shadow}
-        onChange={(shadow) => update({ shadow })}
-      />
-      <SegmentedRow
-        ariaLabel={translate('gallery.videoReview.cursorMotionEasing')}
-        label={translate('gallery.videoReview.cursorMotionEasing')}
-        value={m.easing}
-        options={[
-          { value: 'linear', label: translate('gallery.videoReview.cursorMotionLinear') },
-          { value: 'smooth', label: translate('gallery.videoReview.cursorMotionSmooth') },
-        ]}
-        onChange={(easing) => update({ easing: easing as CursorMotion['easing'] })}
-      />
-      <div className="flex items-center gap-1">
-        <ReviewButton
-          label={translate('gallery.videoReview.cursorMotionStart')}
-          onClick={() => editor.pickPoint(m.points[0]!.id, m.start)}
-        >
-          <Flag size={14} />
-          <span>{translate('gallery.videoReview.cursorMotionStart')}</span>
-        </ReviewButton>
-        <ReviewButton
-          label={translate('gallery.videoReview.cursorMotionEnd')}
-          onClick={() => editor.pickPoint(m.points.at(-1)!.id, m.end - 0.000001)}
-        >
-          <Flag size={14} />
-          <span>{translate('gallery.videoReview.cursorMotionEnd')}</span>
-        </ReviewButton>
-      </div>
-      <ReviewButton
-        label={translate('gallery.videoReview.cursorMotionAddPoint')}
-        disabled={editor.time <= m.start || editor.time >= m.end}
-        onClick={editor.addPoint}
-        className={`${reviewTextButtonClassName} w-full justify-start`}
-      >
-        <CirclePlus size={15} />
-        <span>{translate('gallery.videoReview.cursorMotionAddPoint')}</span>
-      </ReviewButton>
-      {selected && index > 0 && index < m.points.length - 1 ? (
-        <ReviewButton
-          label={translate('gallery.videoReview.cursorMotionDeletePoint')}
-          onClick={() => update({ points: m.points.filter((p) => p.id !== selected.id) })}
-        >
-          <Trash2 size={14} />
-          <span>{translate('gallery.videoReview.cursorMotionDeletePoint')}</span>
-        </ReviewButton>
-      ) : null}
-      <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-        {translate('gallery.videoReview.cursorMotionHint')}
-      </p>
       <ReviewInspectorSections
         sections={[
+          {
+            id: 'appearance',
+            label: translate('videoEditor.effectsLibrary.objectAppearance'),
+            icon: Palette,
+            content: (
+              <div className="sniptale-parameter-stack">
+                <div className="flex flex-wrap gap-1">
+                  {CURSOR_MOTION_SHAPES.map((shape) => (
+                    <button
+                      key={shape}
+                      type="button"
+                      aria-label={translate(reviewCursorMotionShapeTitleKeys[shape])}
+                      aria-pressed={m.shape === shape}
+                      title={translate(reviewCursorMotionShapeTitleKeys[shape])}
+                      onClick={() => update({ shape })}
+                      className={[
+                        'flex h-10 w-10 shrink-0 items-center justify-center rounded border border-transparent !p-0',
+                        m.shape === shape
+                          ? 'bg-[var(--sniptale-color-surface-hover)]'
+                          : 'bg-transparent hover:bg-[var(--sniptale-color-surface-hover)]',
+                      ].join(' ')}
+                    >
+                      <img
+                        alt=""
+                        className="h-8 w-8 shrink-0 object-contain"
+                        width={32}
+                        height={32}
+                        src={appleCursorDataUrl(shape, m.color, m.outline, false)}
+                      />
+                    </button>
+                  ))}
+                </div>
+                <DraftNumericRow
+                  label={translate('gallery.videoReview.cursorMotionSize')}
+                  value={m.size}
+                  min={12}
+                  max={160}
+                  step={1}
+                  unit="px"
+                  onChange={(size) => update({ size })}
+                />
+                <ColorField
+                  title={translate('gallery.videoReview.cursorMotionColor')}
+                  label={translate('gallery.videoReview.cursorMotionColor')}
+                  value={m.color}
+                  onChange={(color) => update({ color })}
+                />
+                <ColorField
+                  title={translate('gallery.videoReview.cursorMotionOutline')}
+                  label={translate('gallery.videoReview.cursorMotionOutline')}
+                  value={m.outline}
+                  onChange={(outline) => update({ outline })}
+                />
+                <ToggleField
+                  label={translate('gallery.videoReview.cursorMotionShadow')}
+                  value={m.shadow}
+                  onChange={(shadow) => update({ shadow })}
+                />
+                <SegmentedRow
+                  ariaLabel={translate('gallery.videoReview.cursorMotionEasing')}
+                  label={translate('gallery.videoReview.cursorMotionEasing')}
+                  value={m.easing}
+                  options={[
+                    { value: 'linear', label: translate('gallery.videoReview.cursorMotionLinear') },
+                    { value: 'smooth', label: translate('gallery.videoReview.cursorMotionSmooth') },
+                  ]}
+                  onChange={(easing) => update({ easing: easing as CursorMotion['easing'] })}
+                />
+              </div>
+            ),
+          },
+          {
+            id: 'points',
+            label: translate('gallery.videoReview.cursorMotionPoints'),
+            icon: Waypoints,
+            content: (
+              <div className="sniptale-parameter-stack">
+                <div
+                  className="sniptale-parameter-stack"
+                  role="group"
+                  aria-label={translate('gallery.videoReview.cursorMotionPoints')}
+                >
+                  {m.points.map((point, index) => {
+                    const label = translate('gallery.videoReview.cursorMotionPoint').replace(
+                      '{number}',
+                      String(index + 1)
+                    );
+                    return (
+                      <ReviewButton
+                        key={point.id}
+                        label={label}
+                        aria-pressed={selected?.id === point.id}
+                        className="review-cursor-point-row"
+                        onClick={() =>
+                          editor.pickPoint(point.id, m.start + point.at * (m.end - m.start))
+                        }
+                      >
+                        <span>{label}</span>
+                        <span className="review-cursor-point-values">
+                          {translate('gallery.videoReview.intervalSeconds').replace(
+                            '{value}',
+                            formatNumber(m.start + point.at * (m.end - m.start), {
+                              maximumFractionDigits: 2,
+                            })
+                          )}
+                          {' · '}
+                          {translate('gallery.videoReview.cursorMotionPointX')}{' '}
+                          {formatNumber(point.x * 100, { maximumFractionDigits: 1 })}%{' · '}
+                          {translate('gallery.videoReview.cursorMotionPointY')}{' '}
+                          {formatNumber(point.y * 100, { maximumFractionDigits: 1 })}%
+                        </span>
+                      </ReviewButton>
+                    );
+                  })}
+                </div>
+                <ReviewButton
+                  label={translate('gallery.videoReview.cursorMotionAddPoint')}
+                  disabled={
+                    editor.time <= m.start || editor.time >= m.end || m.points.length >= 256
+                  }
+                  onClick={editor.addPoint}
+                  className={`${reviewTextButtonClassName} w-full justify-start`}
+                >
+                  <CirclePlus size={15} aria-hidden="true" />
+                  <span>{translate('gallery.videoReview.cursorMotionAddPoint')}</span>
+                </ReviewButton>
+                <ReviewButton
+                  label={translate('gallery.videoReview.cursorMotionDeletePoint')}
+                  disabled={!selected || selected.at === 0 || selected.at === 1}
+                  onClick={() =>
+                    selected &&
+                    update({ points: m.points.filter((point) => point.id !== selected.id) })
+                  }
+                  className={`${reviewTextButtonClassName} w-full justify-start`}
+                >
+                  <Trash2 size={15} aria-hidden="true" />
+                  <span>{translate('gallery.videoReview.cursorMotionDeletePoint')}</span>
+                </ReviewButton>
+              </div>
+            ),
+          },
           reviewInspectorActions(
             <>
               <ReviewButton

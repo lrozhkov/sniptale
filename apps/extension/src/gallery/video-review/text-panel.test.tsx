@@ -394,14 +394,15 @@ it('keeps a selected text detail distinct from an expandable numbered list row',
   const article = host.querySelector('[data-ui="gallery.videoReview.textPhrase"]')!;
   expect(article.querySelector(':scope > div:first-child button[aria-expanded]')).toBeNull();
   expect(article.querySelector('textarea')?.rows).toBe(6);
-  const timing = article.querySelector(
-    'input[aria-label="gallery.videoReview.textFragmentStart"]'
-  )!;
   expect(
-    timing
-      .closest('[data-ui="shared.ui.compact-inspector.numeric-value-field"]')
-      ?.querySelector('.sniptale-numeric-entry > span')?.textContent
-  ).toBeTruthy();
+    article.querySelector('input[aria-label="gallery.videoReview.textFragmentStart"]')
+  ).toBeNull();
+  expect(article.querySelector('[aria-label="gallery.videoReview.speechJump"]')).toBeNull();
+  const tabs = [...article.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+  expect(tabs.map((tab) => tab.getAttribute('aria-label'))).toEqual([
+    'videoEditor.effectsLibrary.objectText',
+    'videoEditor.effectsLibrary.objectAppearance',
+  ]);
 });
 
 it('passes the current source-clock fragment cap into the selected voice form without joining the session', () => {

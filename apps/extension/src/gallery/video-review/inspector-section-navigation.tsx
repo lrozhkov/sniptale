@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { ReviewButton } from './controls';
 import { translate } from '../../platform/i18n';
@@ -18,6 +18,47 @@ export function ReviewInspectorSectionNavigation({
   label?: string;
 }) {
   const navigation = useRef<HTMLDivElement>(null);
+  const [expandedLabels, setExpandedLabels] = useState(false);
+  const labelsKey = JSON.stringify(items.map((item) => item.label));
+  useLayoutEffect(() => {
+    const element = navigation.current;
+    if (!element) return;
+    const fit = () => {
+      const canvas = document.createElement('canvas').getContext('2d');
+      if (!canvas || !element.clientWidth) return;
+      const label = element.querySelector('.review-inspector-tab-label');
+      if (!label) return;
+      canvas.font = getComputedStyle(label).font;
+      const labels: unknown = JSON.parse(labelsKey);
+      if (
+        !Array.isArray(labels) ||
+        !labels.every((value): value is string => typeof value === 'string')
+      )
+        return;
+      const widths = labels.map((text) =>
+        Math.max(88, Math.ceil(canvas.measureText(text).width) + 36)
+      );
+      const slots = element.querySelectorAll<HTMLElement>('[data-inspector-tab-motion]');
+      slots.forEach((slot, index) =>
+        slot.style.setProperty('--review-tab-caption-width', `${widths[index]}px`)
+      );
+      setExpandedLabels(
+        widths.reduce((sum, width) => sum + width, 0) + (widths.length - 1) * 2 <=
+          element.clientWidth
+      );
+    };
+    fit();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fit);
+    observer?.observe(element);
+    let disposed = false;
+    void document.fonts?.ready.then(() => {
+      if (!disposed) fit();
+    });
+    return () => {
+      disposed = true;
+      observer?.disconnect();
+    };
+  }, [labelsKey]);
   const motion = useRef<{ before: Map<HTMLElement, number> | null; animations: Animation[] }>({
     before: null,
     animations: [],
@@ -78,6 +119,7 @@ export function ReviewInspectorSectionNavigation({
         role="tablist"
         aria-label={label}
         className="review-inspector-tabs"
+        data-expanded-labels={expandedLabels ? 'true' : undefined}
         data-multirow={items.length > 8 ? 'true' : undefined}
         onKeyDown={(event) => {
           if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;

@@ -11,6 +11,7 @@ import {
 } from '../../features/video/review/text-document';
 import type { ReviewTextFragment } from '../../features/video/review/text-types';
 import { useReviewText } from './use-review-text';
+import { translate } from '../../platform/i18n';
 
 let root: Root, host: HTMLDivElement;
 beforeEach(() => {
@@ -184,4 +185,45 @@ it('guards caption navigation and preserves ordinary timeline navigation', async
   expect(seek).not.toHaveBeenCalled();
   expect(pause).not.toHaveBeenCalled();
   expect(setText).not.toHaveBeenCalled();
+});
+
+it('uses Text then Appearance without interval or nested style disclosure', async () => {
+  const change = vi.fn(() => true);
+  const editor = {
+    endTyping: vi.fn(),
+    captions: createReviewCaptionSettings(),
+    playhead: () => 0,
+    split: vi.fn(),
+    merge: vi.fn(),
+    remove: vi.fn(),
+    change,
+  };
+  await act(async () =>
+    root.render(
+      <ReviewTextPhrase
+        fragment={phrase}
+        inspector
+        expanded
+        busy={false}
+        limit={10}
+        onJump={vi.fn()}
+        editor={editor}
+      />
+    )
+  );
+  const tabs = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+  expect(tabs.map((tab) => tab.getAttribute('aria-label') ?? tab.textContent)).toEqual([
+    translate('videoEditor.effectsLibrary.objectText'),
+    translate('videoEditor.effectsLibrary.objectAppearance'),
+  ]);
+  expect(host.querySelector('textarea')).not.toBeNull();
+  expect(
+    host.querySelector(`[aria-label="${translate('gallery.videoReview.speechJump')}"]`)
+  ).toBeNull();
+  act(() => tabs[1]!.click());
+  expect(host.querySelector('details')).toBeNull();
+  const switches = host.querySelectorAll<HTMLButtonElement>('[role="switch"]');
+  expect(switches).toHaveLength(2);
+  act(() => switches[1]!.click());
+  expect(change).toHaveBeenCalledWith(phrase.id, { style: createReviewCaptionSettings().style });
 });

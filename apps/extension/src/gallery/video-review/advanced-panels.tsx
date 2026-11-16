@@ -6,7 +6,8 @@ import { ReviewPresentationBinding } from './presentation-binding';
 import { WatermarkInspector } from '../../ui/watermark/inspector';
 import type { ComponentProps } from 'react';
 import {
-  Scan,
+  Crop,
+  SlidersHorizontal,
   Wallpaper,
   Stamp,
   AudioLines,
@@ -175,12 +176,25 @@ export function ReviewSceneProperties(props: {
         ) : null}
         {renderSections(
           [
+            {
+              id: 'canvas',
+              label: translate('gallery.videoReview.canvas'),
+              icon: Crop,
+              content: (
+                <ReviewCanvasSettings
+                  cropPreview={props.cropPreview}
+                  source={props.source}
+                  canvas={props.canvas}
+                  onChange={props.onCanvas}
+                />
+              ),
+            },
             ...(props.onSourceFilters
               ? [
                   {
                     id: 'source-filters',
                     label: translate('videoEditor.sidebar.sourceFiltersTitle'),
-                    icon: Scan,
+                    icon: SlidersHorizontal,
                     content: (
                       <SourceImageFilterFields
                         value={props.sourceFilters}
@@ -191,19 +205,6 @@ export function ReviewSceneProperties(props: {
                   },
                 ]
               : []),
-            {
-              id: 'canvas',
-              label: translate('gallery.videoReview.canvas'),
-              icon: Scan,
-              content: (
-                <ReviewCanvasSettings
-                  cropPreview={props.cropPreview}
-                  source={props.source}
-                  canvas={props.canvas}
-                  onChange={props.onCanvas}
-                />
-              ),
-            },
             {
               id: 'window-header',
               label: translate('gallery.videoReview.windowHeader'),

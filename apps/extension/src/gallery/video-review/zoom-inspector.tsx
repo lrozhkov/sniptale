@@ -44,14 +44,13 @@ import {
   type QuickEditZoomRegionPatch,
 } from '../../features/video/review/advanced/zoom';
 import { Trash2, Copy, RotateCcw, Scan, Waves } from 'lucide-react';
-import { SegmentedRow, SelectField, ToggleField } from '../../ui/compact-inspector-controls';
+import { SegmentedRow, ToggleField } from '../../ui/compact-inspector-controls';
 import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
 import {
   ReviewButton,
   ReviewInterval,
   ReviewDetails,
   reviewTimeLabel,
-  reviewSelectFieldClassName,
   reviewTextButtonClassName,
   reviewDeleteButtonClassName,
 } from './controls';
@@ -133,7 +132,6 @@ export function ReviewZoomInspector(props: {
 }) {
   const { region, onChange } = props;
   const [tool, onTool] = useState<SpatialTool>(region.effect === '3d' ? 'tilt' : 'position');
-  const [resetTarget, setResetTarget] = useState<HTMLDivElement | null>(null);
   const map = useContext(ReviewIntervalMap);
   const sourceRange = region.sourceAnchor ?? (map ? reviewFocusSourceRange(region, map) : null);
   const following = region.followCursor ?? props.cursorPath?.mode === 'follow';
@@ -147,7 +145,7 @@ export function ReviewZoomInspector(props: {
     ) ??
     false;
   return (
-    <ReviewSpatialToolContext.Provider value={{ tool, onTool, resetTarget }}>
+    <ReviewSpatialToolContext.Provider value={{ tool, onTool, resetTarget: null }}>
       <div data-ui="gallery.videoReview.zoomInspector" className="min-w-0 space-y-3">
         <ReviewInterval
           start={sourceRange?.start ?? region.start}
@@ -169,7 +167,7 @@ export function ReviewZoomInspector(props: {
           </p>
         ) : null}
         {props.cutSuppressed ? (
-          <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+          <p role="status" className="review-inspector-notice">
             {translate('gallery.videoReview.cutOverlapHint')}{' '}
             {region.sourceAnchor
               ? `${reviewTimeLabel(region.sourceAnchor.start)} – ${reviewTimeLabel(region.sourceAnchor.end)}`
@@ -235,12 +233,6 @@ export function ReviewZoomInspector(props: {
                           onReset={() => onChange({ cameraFollow: null })}
                         />
                       </ReviewDetails>
-                    ) : null}
-                    {props.preview &&
-                    !region.border &&
-                    !region.spotlight &&
-                    region.effect !== '3d' ? (
-                      <div ref={setResetTarget} />
                     ) : null}
                   </div>
                 </ReviewInspectorColumns>
@@ -310,20 +302,14 @@ function ReviewFocusParameters(props: FocusParameterProps) {
               {...props}
               tool={props.tool === 'position' ? 'tilt' : props.tool}
             />
-            <ReviewDetails
-              preferenceId="gallery.videoReview.spatialMotion"
-              label={translate('gallery.videoReview.spatialMotion')}
-              initiallyOpen
-            >
-              <SpatialMotionFields
-                perspective={region.perspective}
-                value={region.spatialMotion}
-                onChange={(spatialMotion) => onChange({ spatialMotion })}
-                onPreview={(spatialMotion) =>
-                  props.onPreview?.(spatialMotion ? { spatialMotion } : null)
-                }
-              />
-            </ReviewDetails>
+            <SpatialMotionFields
+              perspective={region.perspective}
+              value={region.spatialMotion}
+              onChange={(spatialMotion) => onChange({ spatialMotion })}
+              onPreview={(spatialMotion) =>
+                props.onPreview?.(spatialMotion ? { spatialMotion } : null)
+              }
+            />
           </>
         )}
       </>
@@ -362,8 +348,9 @@ function ReviewFocusParameters(props: FocusParameterProps) {
     return (
       <>
         {region.spotlight.effect === 'magnify' ? (
-          <SelectField
-            className={reviewSelectFieldClassName}
+          <SegmentedRow<'fixed' | 'follow'>
+            columns={2}
+            ariaLabel={translate('gallery.videoReview.focusLensPlacement')}
             label={translate('gallery.videoReview.focusLensPlacement')}
             value={props.followCursor ? 'follow' : 'fixed'}
             options={[

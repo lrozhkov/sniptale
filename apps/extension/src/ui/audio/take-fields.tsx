@@ -4,6 +4,7 @@ import { AudioProcessingFields } from './processing-fields';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
 import { getAudioFadeLimitSeconds } from '../../features/video/audio/fades';
 import { translate } from '../../platform/i18n';
+import { SegmentedRow } from '../compact-inspector-controls';
 import { DraftNumericRow } from '../compact-inspector-controls/numeric-preview';
 
 interface TakeFieldProps {
@@ -15,7 +16,9 @@ interface TakeFieldProps {
 }
 
 /** Authored take parameters share bounds and numeric draft behavior across editors. */
-export function AudioTakeLevelFields(props: TakeFieldProps & { showTempo?: boolean }) {
+export function AudioTakeLevelFields(
+  props: TakeFieldProps & { showTempo?: boolean; tempoChoices?: boolean; showProcessing?: boolean }
+) {
   return (
     <>
       {props.showTempo && (
@@ -31,6 +34,19 @@ export function AudioTakeLevelFields(props: TakeFieldProps & { showTempo?: boole
           onChange={(tempo) => props.onPatch({ tempo })}
         />
       )}
+      {props.showTempo && props.tempoChoices ? (
+        <SegmentedRow
+          ariaLabel={translate('gallery.videoReview.voiceoverTempo')}
+          columns={3}
+          value={String(props.clip.tempo ?? 1)}
+          options={[0.5, 0.75, 1, 1.5, 2, 4].map((tempo) => ({
+            value: String(tempo),
+            label: `${tempo}×`,
+            disabled: props.disabled,
+          }))}
+          onChange={(tempo) => props.onPatch({ tempo: Number(tempo) })}
+        />
+      ) : null}
       <DraftNumericRow
         label={translate('gallery.videoReview.audioClipVolume')}
         unit="%"
@@ -41,6 +57,15 @@ export function AudioTakeLevelFields(props: TakeFieldProps & { showTempo?: boole
         disabled={props.disabled}
         onChange={(value) => props.onPatch({ volume: value / 100 })}
       />
+      {props.showProcessing !== false ? <AudioTakeProcessingFields {...props} /> : null}
+    </>
+  );
+}
+
+/** Processing can occupy a dedicated inspector section while legacy consumers retain combined fields. */
+export function AudioTakeProcessingFields(props: TakeFieldProps) {
+  return (
+    <>
       {props.presetControls}
       <AudioProcessingFields
         key={props.clip.id}

@@ -646,6 +646,10 @@ it('shows gain and processing in Basic without starting recognition or model req
   expect(host.textContent).toContain(translate('gallery.videoReview.volume'));
   expect(host.textContent).not.toContain(translate('gallery.videoReview.recognitionTitle'));
   expect(host.querySelector('[data-ui="gallery.videoReview.speechRecognition"]')).toBeNull();
+  expect(host.querySelector('[data-ui="audio.processing-fields"]')).toBeNull();
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-audio-effects"]')!.click()
+  );
   expect(host.querySelector('[data-ui="audio.processing-fields"]')).not.toBeNull();
   await act(async () =>
     host

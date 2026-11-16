@@ -9,9 +9,8 @@ import {
   effectControlIcons,
   effectControlRootIcon,
 } from '../../ui/effect-control-presentation/icons';
-import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Clock3, Copy, Move, Trash2, Link2 } from 'lucide-react';
+import { Copy, Move, Trash2 } from 'lucide-react';
 import { type AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
 import {
   applyEffectControlPreset,
@@ -207,40 +206,31 @@ function AnnotationParameters(
       });
     }
   }
+  const enabled = (
+    <ToggleField
+      value={instance.enabled}
+      disabled={disabled}
+      label={translate('gallery.videoReview.annotationEnabled')}
+      onChange={(enabled) => editor.change(instance.id, { enabled })}
+    />
+  );
+  const appearance = sdkSections.find((section) => section.id === 'sdk:appearance');
+  if (appearance)
+    appearance.content = (
+      <>
+        {enabled}
+        {appearance.content}
+      </>
+    );
+  else
+    sdkSections.push({
+      id: 'sdk:appearance',
+      label: translate('videoEditor.effectsLibrary.objectAppearance'),
+      icon: effectControlRootIcon('appearance'),
+      content: enabled,
+    });
   const sections = [
-    {
-      id: 'timing',
-      label: translate('gallery.videoReview.annotationTiming'),
-      icon: Clock3,
-      content: (
-        <>
-          {number(
-            'start',
-            translate('gallery.videoReview.annotationStart'),
-            instance.start,
-            (start) => ({ start }),
-            0,
-            instance.end - 0.001,
-            's'
-          )}
-          {number(
-            'end',
-            translate('gallery.videoReview.annotationEnd'),
-            instance.end,
-            (end) => ({ end }),
-            instance.start + 0.001,
-            props.duration,
-            's'
-          )}
-          <ToggleField
-            value={instance.enabled}
-            disabled={disabled}
-            label={translate('gallery.videoReview.annotationEnabled')}
-            onChange={(enabled) => editor.change(instance.id, { enabled })}
-          />
-        </>
-      ),
-    },
+    ...sdkSections.filter((section) => section.id === 'sdk:content'),
     {
       id: 'placement',
       label: translate('gallery.videoReview.annotationPlacement'),
@@ -299,10 +289,6 @@ function AnnotationParameters(
             1600,
             '%'
           )}
-          <p className="flex items-center gap-1.5 text-xs text-[var(--sniptale-color-text-secondary)]">
-            <Link2 size={12} aria-hidden="true" />
-            {translate('gallery.videoReview.annotationScaleHint')}
-          </p>
           {number(
             'width',
             translate('gallery.videoReview.annotationWidth'),
@@ -333,7 +319,7 @@ function AnnotationParameters(
         </>
       ),
     },
-    ...sdkSections,
+    ...sdkSections.filter((section) => section.id !== 'sdk:content'),
     reviewInspectorActions(
       <>
         <ReviewButton
@@ -361,14 +347,6 @@ function AnnotationParameters(
   ];
   return (
     <div data-ui="gallery.videoReview.annotationInspector">
-      <InspectorParameterRow label={translate('gallery.videoReview.annotationName')}>
-        <span
-          className="block min-w-0 w-full truncate text-right text-[var(--sniptale-color-text-primary)]"
-          title={resolveEffectLocaleText(document.label, locale)}
-        >
-          {resolveEffectLocaleText(document.label, locale)}
-        </span>
-      </InspectorParameterRow>
       {editor.failure && (
         <div role="alert">
           {translate(

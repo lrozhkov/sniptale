@@ -302,15 +302,21 @@ it('requires the audio tool for drawing, ignores overlapping ranges and edits in
     )!;
     expect(block.textContent).toBe('150%');
     expect(block.className).not.toContain('sniptale-color-danger');
-    act(() =>
-      f.host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-timing"]')!.click()
-    );
-    change(translate('gallery.videoReview.rangeStart'), '1');
-    change(translate('gallery.videoReview.rangeEnd'), '6');
-    expect(f.editor.selectedOriginal).toMatchObject({ start: 1, end: 6 });
-    act(() =>
-      f.host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-audio"]')!.click()
-    );
+    expect(f.host.querySelector('[role="tab"][aria-controls$="-timing"]')).toBeNull();
+    expect(
+      f.host.querySelector(`input[aria-label="${translate('gallery.videoReview.rangeStart')}"]`)
+    ).toBeNull();
+    expect(
+      f.host.querySelector(`input[aria-label="${translate('gallery.videoReview.rangeEnd')}"]`)
+    ).toBeNull();
+    f.send('pointerdown', 200, block.querySelector('[data-audio-edge="start"]')!);
+    f.send('pointermove', 100);
+    f.send('pointerup', 100);
+    expect(f.editor.selectedOriginal).toMatchObject({ start: 1, end: 5, volume: 1.5 });
+    f.send('pointerdown', 500, block.querySelector('[data-audio-edge="end"]')!);
+    f.send('pointermove', 600);
+    f.send('pointerup', 600);
+    expect(f.editor.selectedOriginal).toMatchObject({ start: 1, end: 6, volume: 1.5 });
     act(() =>
       f.host
         .querySelector<HTMLButtonElement>(
