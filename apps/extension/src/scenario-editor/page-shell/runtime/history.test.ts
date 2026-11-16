@@ -321,3 +321,80 @@ it('does not repeatedly serialize retained snapshots when editing another snapsh
     stringify.mockRestore();
   }
 });
+
+it('restores the current cursor and both navigation branches without creating another action', () => {
+  const current = createGuideProject('Current', 'guide', 100);
+  const before = { ...current, name: 'Before' };
+  const after = { ...current, name: 'After' };
+  const last = { ...current, name: 'Last' };
+  const past = [before];
+  const future = [after, last];
+  const restore = { kind: 'reset' as const, project: current, past, future };
+  let state = reduceGuideHistory(
+    {
+      ...initial(),
+      group: 'old-group',
+      actionId: 'old-action',
+      closedCaptures: [{ project: initial().present!, actionId: 'old-action' }],
+    },
+    restore
+  );
+  expect(state.present).toBe(current);
+  expect(state.future).toEqual([after, last]);
+  expect(state.group).toBeNull();
+  expect(state.actionId).toBeUndefined();
+  expect(state.closedCaptures).toBeUndefined();
+  state = reduceGuideHistory(state, { kind: 'redo' });
+  expect(state.present?.name).toBe('After');
+  state = reduceGuideHistory(state, { kind: 'redo' });
+  expect(state.present?.name).toBe('Last');
+  for (const name of ['After', 'Current', 'Before']) {
+    state = reduceGuideHistory(state, { kind: 'undo' });
+    expect(state.present?.name).toBe(name);
+  }
+  expect(past).toEqual([before]);
+  expect(future).toEqual([after, last]);
+});
+
+it('admits only this project in both restored branches and clears them when the project closes', () => {
+  const project = createGuideProject('Current', 'guide', 100);
+  const before = { ...project, name: 'Before' };
+  const after = { ...project, name: 'After' };
+  const foreign = createGuideProject('Foreign', 'other', 100);
+  const state = reduceGuideHistory(initial(), {
+    kind: 'reset',
+    project,
+    past: [foreign, before],
+    future: [after, foreign],
+  });
+  expect(state.past).toEqual([before]);
+  expect(state.future).toEqual([after]);
+  expect(
+    reduceGuideHistory(state, { kind: 'reset', project: null, past: [before], future: [after] })
+  ).toEqual({ present: null, past: [], future: [], group: null });
+});
+
+it('bounds a restored timeline around the current cursor and branches on the next edit', () => {
+  const project = createGuideProject('Current', 'guide', 100);
+  const past = Array.from({ length: 60 }, (_, index) => ({ ...project, name: `Past ${index}` }));
+  const future = Array.from({ length: 60 }, (_, index) => ({
+    ...project,
+    name: `Future ${index}`,
+  }));
+  let state = reduceGuideHistory(initial(), { kind: 'reset', project, past, future });
+  expect(state.present).toBe(project);
+  expect(state.past).toHaveLength(25);
+  expect(state.future).toHaveLength(25);
+  expect(state.past.at(-1)?.name).toBe('Past 59');
+  expect(state.future[0]?.name).toBe('Future 0');
+  expect(past).toHaveLength(60);
+  expect(future).toHaveLength(60);
+  state = reduceGuideHistory(state, {
+    kind: 'edit',
+    project: { ...project, name: 'Branch' },
+    group: null,
+  });
+  expect(state.future).toEqual([]);
+  state = reduceGuideHistory(state, { kind: 'undo' });
+  expect(state.present).toBe(project);
+});

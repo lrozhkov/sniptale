@@ -69,7 +69,7 @@ function retainGuideHistory(
   return { ...state, past, future, ...(closedCaptures ? { closedCaptures } : {}) };
 }
 type HistoryAction =
-  | { kind: 'reset'; project: GuideProject | null; past?: GuideProject[] }
+  | { kind: 'reset'; project: GuideProject | null; past?: GuideProject[]; future?: GuideProject[] }
   | { kind: 'commit'; project: GuideProject; reversible?: true }
   | { kind: 'publish'; project: GuideProject; source: GuideProject; actionId?: string }
   | { kind: 'edit'; project: GuideProject; group: string | null; actionId?: string }
@@ -104,7 +104,9 @@ export function reduceGuideHistory(
       past: (action.past ?? [])
         .filter((project) => project.id === action.project?.id)
         .slice(-HISTORY_LIMIT),
-      future: [],
+      future: (action.future ?? [])
+        .filter((project) => project.id === action.project?.id)
+        .slice(0, HISTORY_LIMIT),
       group: null,
     });
   if (action.kind === 'seal') return { ...closeGuideCapture(state, true), group: null };
@@ -220,8 +222,8 @@ export function useGuideHistory({
     group: null,
   });
   const reset = useCallback(
-    (project: GuideProject | null, past: GuideProject[] = []) =>
-      dispatch({ kind: 'reset', project, past }),
+    (project: GuideProject | null, past: GuideProject[] = [], future: GuideProject[] = []) =>
+      dispatch({ kind: 'reset', project, past, future }),
     []
   );
   const edit = (project: GuideProject, group: string | null = null) => {

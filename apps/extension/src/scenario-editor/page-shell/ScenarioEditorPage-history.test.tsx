@@ -75,6 +75,7 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   useAppLocale: () => 'en',
 }));
 vi.mock('../../ui/page-bootstrap', () => ({ renderPageShell: io.mount }));
+import { useGuideHistory } from './runtime/history';
 import { GUIDE_AUTOSAVE_IDLE_MS } from './runtime/autosave';
 import { ScenarioEditorPage } from './ScenarioEditorPage';
 import type { GuideLibraryBrowser } from './library-browser';
@@ -361,4 +362,43 @@ it('protects actual page input across held pointer saves and completes without b
   expect(io.save.mock.calls.at(-1)![0].name).toBe('Completed');
   expect(io.release).toHaveBeenCalledOnce();
   expect(document.activeElement).toBe(field);
+});
+
+it('restores both history branches through the React owner without treating loading as an edit', async () => {
+  let history!: ReturnType<typeof useGuideHistory>;
+  const edited = vi.fn();
+  function Probe() {
+    history = useGuideHistory({ canEdit: () => true, onEdit: edited, onFailure: vi.fn() });
+    return (
+      <>
+        <output>{history.project?.name}</output>
+        <button aria-label="Restore undo" onClick={history.undo} disabled={!history.canUndo}>
+          Undo
+        </button>
+        <button aria-label="Restore redo" onClick={history.redo} disabled={!history.canRedo}>
+          Redo
+        </button>
+      </>
+    );
+  }
+  await act(async () => root.render(<Probe />));
+  const current = createGuideProject('Restored current', 'guide', 100);
+  const before = { ...current, name: 'Before current' };
+  const after = { ...current, name: 'After current' };
+  act(() => history.reset(current, [before], [after]));
+  expect(edited).not.toHaveBeenCalled();
+  expect(history.actionId).toBeUndefined();
+  expect(history.closedCaptures).toEqual([]);
+  const redo = container.querySelector('[aria-label="Restore redo"]');
+  const undo = container.querySelector('[aria-label="Restore undo"]');
+  if (!(redo instanceof HTMLButtonElement) || !(undo instanceof HTMLButtonElement))
+    throw new Error('History controls did not mount');
+  expect(redo.disabled).toBe(false);
+  expect(undo.disabled).toBe(false);
+  await act(async () => redo.click());
+  expect(container.querySelector('output')?.textContent).toBe('After current');
+  await act(async () => undo.click());
+  expect(container.querySelector('output')?.textContent).toBe('Restored current');
+  expect(edited).toHaveBeenCalledTimes(2);
+  expect(io.save).not.toHaveBeenCalled();
 });
