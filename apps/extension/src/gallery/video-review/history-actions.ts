@@ -3,7 +3,7 @@ import type { createVideoReviewSession } from '../../workflows/video-review/sess
 
 /** History transitions own staged flush and success reporting without owning document state. */
 export function createReviewHistoryActions(args: {
-  session: ReturnType<typeof createVideoReviewSession>;
+  session: Pick<ReturnType<typeof createVideoReviewSession>, 'flush' | 'flushAutosave' | 'history'>;
   flushStaged(): Promise<void>;
   reset(): Promise<void>;
   run(action: () => Promise<unknown>): Promise<unknown>;
@@ -14,7 +14,8 @@ export function createReviewHistoryActions(args: {
   };
   const move = async (direction: ReviewHistoryDirection | 'reset') => {
     if (direction === 'reset') return args.reset();
-    await flush(true);
+    await args.flushStaged();
+    await args.session.flushAutosave();
     await args.session.history(direction);
   };
   const run = async (direction: ReviewHistoryDirection | 'reset') => {

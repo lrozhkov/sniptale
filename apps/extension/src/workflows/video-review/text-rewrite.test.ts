@@ -257,7 +257,7 @@ describe('durable AI text workflow', () => {
       await change({ gain: 0.4 });
       const audio = structuredClone(session.getSnapshot().document.advancedContent.audio);
       await applyReviewTextRewritePreview(session, preview, signal(), 'replace');
-      expect(commit.mock.calls.length).toBe(count + (autosave ? 1 : 0) + 1);
+      expect(commit.mock.calls.length).toBe(count + 1);
       expect(session.getSnapshot().autosaveEnabled).toBe(autosave);
       const current = session.getSnapshot().document.advancedContent;
       expect(current.audio).toEqual(audio);

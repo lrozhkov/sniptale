@@ -77,10 +77,11 @@ it('returns directly to the saved baseline, retaining history, Redo and source a
     sourceAssetId: 'source',
     advanced: initial.workspace.advanced,
   });
+  await session.flush();
   await session.reload();
   await session.history('redo');
   expect(session.getSnapshot().document.annotations).toHaveLength(1);
-  expect(deps.moveVideoWorkspaceHistory).toHaveBeenCalledTimes(2);
+  expect(deps.moveVideoWorkspaceHistory).not.toHaveBeenCalled();
   await session.reset();
   expect(session.getSnapshot().document.advancedContent.audio.original).toEqual({
     muted: false,
@@ -105,41 +106,51 @@ it('buffers start with autosave off and persists the retained history when enabl
   expect(session.getSnapshot().snapshot.workspace.cursor).toBe(0);
 });
 
-it('allows recovery only from a completed history failure, leaving normal flush strict', async () => {
+it('retains local cursor, history and Redo after failed publication and retries without another action', async () => {
   const { session, deps, initial } = fixture();
-  deps.moveVideoWorkspaceHistory.mockRejectedValueOnce(new Error('Quota'));
-  await expect(session.history('start')).rejects.toThrow('Quota');
-  expect(session.getSnapshot().snapshot).toEqual(initial);
-  await expect(session.flush()).rejects.toThrow('storage');
-  await session.flush({ retryHistory: true });
-  await session.history('start');
-  expect(session.getSnapshot()).toMatchObject({
-    error: null,
-    snapshot: { workspace: { cursor: 0 } },
-  });
-  deps.saveVideoWorkspaceAdvanced.mockRejectedValueOnce(new Error('Content failure'));
-  await expect(session.saveAdvanced(initial.workspace.advanced)).rejects.toThrow();
-  await expect(session.flush({ retryHistory: true })).rejects.toThrow('storage');
+  try {
+    deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(new Error('Quota'));
+    await session.history('start');
+    expect(session.getSnapshot().snapshot.workspace.cursor).toBe(0);
+    await expect(session.flush()).rejects.toThrow('Quota');
+    expect(session.getSnapshot()).toMatchObject({ dirty: true, error: 'storage' });
+    expect(session.getSnapshot().snapshot.workspace.history).toEqual(initial.workspace.history);
+    await session.flush();
+    expect(session.getSnapshot()).toMatchObject({ dirty: false, error: null });
+    await session.reload();
+    await session.history('redo');
+    expect(session.getSnapshot().document.annotations).toHaveLength(1);
+  } finally {
+    await session.dispose();
+  }
 });
 
-it('does not ignore a history write that fails while flush is waiting', async () => {
+it('does not ignore a history publication failure while the durable barrier is waiting', async () => {
   const { session, deps } = fixture();
   let reject!: (error: Error) => void;
   let markStarted!: () => void;
   const started = new Promise<void>((resolve) => {
     markStarted = resolve;
   });
-  deps.moveVideoWorkspaceHistory.mockImplementationOnce(
+  deps.saveVideoWorkspaceSnapshot.mockImplementationOnce(
     () =>
       new Promise((_, fail) => {
         reject = fail;
         markStarted();
       })
   );
-  const operation = session.history('start').catch(() => undefined);
-  const flushed = session.flush({ retryHistory: true });
-  await started;
-  reject(new Error('Quota'));
-  await expect(flushed).rejects.toThrow('storage');
-  await operation;
+  try {
+    await session.history('start');
+    const flushed = session.flush({ retryHistory: true });
+    await started;
+    reject(new Error('Quota'));
+    await expect(flushed).rejects.toThrow('Quota');
+    expect(session.getSnapshot()).toMatchObject({
+      dirty: true,
+      error: 'storage',
+      snapshot: { workspace: { cursor: 0 } },
+    });
+  } finally {
+    await session.dispose();
+  }
 });

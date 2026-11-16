@@ -145,8 +145,11 @@ it('keeps conflict recovery accessible while a Basic comment is being edited', a
     );
     await fixture.click('addComment');
     await fixture.fill('Conflicting comment');
-    integration.commit.mockRejectedValueOnce({ code: 'conflict' });
+    fixture.publication.mockRejectedValueOnce({ code: 'conflict' });
     await fixture.click('save');
+    await act(async () => {
+      await expect(fixture.flush()).rejects.toMatchObject({ code: 'conflict' });
+    });
     const reload = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(
       (button) => button.textContent?.trim() === 'gallery.videoReview.reload'
     );

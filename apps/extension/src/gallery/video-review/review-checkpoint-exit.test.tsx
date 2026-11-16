@@ -300,6 +300,7 @@ it('does not dismiss a newer accepted native revision after an older exit RPC re
         },
       })
     );
+    await act(async () => sync.sessions[0]!.flush());
     expect(sync.sessions[0]!.getCheckpointExitReceipt()).toEqual(receipt(2));
     await act(async () => rpc.resolve({ kind: 'checkpoint-exit', outcome: 'requested' }));
     expect(f.back).not.toHaveBeenCalled();
@@ -349,7 +350,7 @@ it('preserves unsaved note text after native failure and requests exit only afte
   try {
     await f.click('addComment');
     await f.fill('Keep this note');
-    integration.draft.mockRejectedValueOnce(new Error('Native refused'));
+    integration.snapshot.mockRejectedValueOnce(new Error('Native refused'));
     await act(async () => close(f).click());
     expect(sync.exit).not.toHaveBeenCalled();
     expect(f.back).not.toHaveBeenCalled();
@@ -403,7 +404,7 @@ it(
       const committed = f.snapshot.workspace.history.length;
       await act(async () => close(f).click());
       expect(f.snapshot.workspace.history).toHaveLength(committed);
-      expect(f.snapshot.draft?.annotation.text).toBe('Recovery edit');
+      expect(f.persistedSnapshot.draft?.annotation.text).toBe('Recovery edit');
       expect(sync.exit).toHaveBeenCalledOnce();
       expect(f.back).toHaveBeenCalledOnce();
     } finally {
@@ -423,12 +424,12 @@ it(
       await f.click('save');
       await f.click('editComment');
       await f.fill('Retained recovery');
-      integration.draft.mockRejectedValueOnce(new Error('Native refused'));
+      integration.snapshot.mockRejectedValueOnce(new Error('Native refused'));
       await act(async () => close(f).click());
       expect(sync.exit).not.toHaveBeenCalled();
       expect(f.back).not.toHaveBeenCalled();
       await act(async () => sync.sessions[0]!.flushAutosave(['draft']));
-      expect(sync.sessions[0]!.getSnapshot().dirty).toBe(false);
+      expect(sync.sessions[0]!.getSnapshot().dirty).toBe(true);
       expect(sync.sessions[0]!.getCheckpointExitReceipt()).toBeNull();
       await act(async () => close(f).click());
       expect(sync.exit).toHaveBeenCalledOnce();
@@ -458,7 +459,7 @@ it('reacquires the existing-note action for later input after an obsolete exit a
     expect(f.back).not.toHaveBeenCalled();
     await f.fill('Later recovery edit');
     await act(async () => sync.sessions[0]!.flushAutosave(['draft']));
-    expect(sync.sessions[0]!.getSnapshot().dirty).toBe(false);
+    expect(sync.sessions[0]!.getSnapshot().dirty).toBe(true);
     expect(sync.sessions[0]!.getCheckpointExitReceipt()).toBeNull();
     await act(async () => close(f).click());
     expect(sync.exit).toHaveBeenCalledTimes(2);

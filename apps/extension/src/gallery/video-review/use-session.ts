@@ -269,6 +269,10 @@ export function useReviewComposer(session: Session) {
     getCurrent: () => latest.current,
     commitField,
     clearLocal,
+    acceptAnnotation: (accepted) => {
+      latest.current = { ...latest.current, before: accepted };
+      setField((field) => ({ ...field, before: accepted }));
+    },
   });
   return {
     annotation,
@@ -316,15 +320,16 @@ function createComposerCompletion(args: {
   getCurrent(): { annotation: ReviewAnnotation | null; before: ReviewAnnotation | null };
   commitField(action: () => Promise<void>): Promise<void>;
   clearLocal(): void;
+  acceptAnnotation(annotation: ReviewAnnotation): void;
 }) {
-  const save = () =>
+  const save = (options?: { durable: true }) =>
     args.commitField(async () => {
       await args.flush();
       const captured = args.getCurrent();
       if (!captured.annotation) return;
       if (JSON.stringify(captured.annotation) === JSON.stringify(captured.before))
         await args.session.saveDraft(null, null);
-      else
+      else {
         await args.session.commit(
           {
             id: crypto.randomUUID(),
@@ -335,21 +340,26 @@ function createComposerCompletion(args: {
           },
           true
         );
+        // A failed durable exit leaves this field attached to the accepted local note.
+        args.acceptAnnotation(captured.annotation);
+      }
+      if (options?.durable) await args.session.flush();
       args.clearLocal();
     });
-  const discard = () =>
+  const discard = (options?: { durable: true }) =>
     args.commitField(async () => {
       await args.flush();
       await args.session.saveDraft(null, null);
+      if (options?.durable) await args.session.flush();
       args.clearLocal();
     });
   return {
     save,
     discard,
-    finishNew: () => {
+    finishNew: (options?: { durable: true }) => {
       const current = args.getCurrent();
       if (!current.annotation || current.before) return Promise.resolve();
-      return current.annotation.text.trim() ? save() : discard();
+      return current.annotation.text.trim() ? save(options) : discard(options);
     },
   };
 }

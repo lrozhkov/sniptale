@@ -30,6 +30,7 @@ import {
   saveExplicitReviewBuffer,
 } from './session-durable-access';
 import { createAutosaveCoordinator, type AutosavePolicy } from '@sniptale/platform/data/autosave';
+import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 import {
   createReviewAnnotationResourceRetention,
   type ReviewPreparedAnnotationResource,
@@ -69,9 +70,54 @@ import type {
   ReviewHistoryDirection,
   ReviewOperation,
 } from '../../features/video/review/types';
-import { createReviewAdvancedContentOperation } from '../../features/video/review/document';
+import {
+  createReviewAdvancedContentOperation,
+  applyReviewOperation,
+  replayReviewHistory,
+  reviewDocumentBaseline,
+} from '../../features/video/review/document';
 
-/** Serializes one editor's durable operations; the only document authority is persisted history. */
+type BufferCapture = { version: number; snapshot: VideoWorkspaceSnapshot };
+type BufferAttempt = { capture: BufferCapture; basis: VideoWorkspaceSnapshot };
+
+function sameBufferPublication(saved: VideoWorkspaceSnapshot, captured: VideoWorkspaceSnapshot) {
+  const a = saved.workspace;
+  const b = captured.workspace;
+  if (
+    a.aggregateId !== b.aggregateId ||
+    a.sourceAssetId !== b.sourceAssetId ||
+    a.sourceMediaId !== b.sourceMediaId ||
+    a.createdAt !== b.createdAt ||
+    a.cursor !== b.cursor ||
+    !sameReviewWorkspaceValue(a.source, b.source) ||
+    !sameReviewWorkspaceValue(
+      a.history.map((value) => value.id),
+      b.history.map((value) => value.id)
+    ) ||
+    !sameReviewWorkspaceValue(a.advanced.ui, b.advanced.ui) ||
+    !sameReviewWorkspaceValue(a.advanced.recoveryV1, b.advanced.recoveryV1) ||
+    !sameReviewWorkspaceValue(a.typing, b.typing) ||
+    !sameReviewWorkspaceValue(a.effectSnapshots, b.effectSnapshots) ||
+    !sameReviewWorkspaceValue(
+      saved.draft?.annotation ?? null,
+      captured.draft?.annotation ?? null
+    ) ||
+    !sameReviewWorkspaceValue(saved.draft?.before ?? null, captured.draft?.before ?? null)
+  )
+    return false;
+  let left = replayReviewHistory([], 0, a.source, reviewDocumentBaseline(a));
+  let right = replayReviewHistory([], 0, b.source, reviewDocumentBaseline(b));
+  for (let index = 0; index <= a.history.length; index++) {
+    if (!sameReviewWorkspaceValue(left, right)) return false;
+    if (index < a.history.length) {
+      left = applyReviewOperation(left, a.history[index]!, a.source);
+      right = applyReviewOperation(right, b.history[index]!, b.source);
+    }
+  }
+  return true;
+}
+
+/** Owns local history admission and serializes its independent durable publication. */
 export function createVideoReviewSession(
   initial: VideoWorkspaceSnapshot,
   deps: ReviewSessionPersistence = reviewSessionPersistence
@@ -82,6 +128,9 @@ export function createVideoReviewSession(
 /** One owner for the editor buffer, durable receipts, ordered writes and resource lifetime. */
 class VideoReviewSession {
   private state: ReviewSessionState;
+  private bufferVersion = 0;
+  private pendingBuffer: BufferAttempt | undefined;
+  private readonly publication: ReturnType<typeof createAutosaveCoordinator<'buffer', number>>;
   private durable: VideoWorkspaceSnapshot;
   private checkpointExit:
     | {
@@ -128,6 +177,7 @@ class VideoReviewSession {
       snapshot: structuredClone(this.initial),
       document: projectReviewWorkspace(this.initial),
       autosaveEnabled: true,
+      saving: false,
       dirty: false,
       pending: 0,
       error: null as Failure | null,
@@ -147,6 +197,18 @@ class VideoReviewSession {
       },
       capture: (key) => this.captures.capture(key),
       commit: (captured) => this.commitAutosaveCapture(captured),
+      classifyFailure: (error) => (failureCode(error) === 'storage' ? 'retry' : 'stop'),
+    });
+    this.publication = createAutosaveCoordinator<'buffer', number>({
+      now: () => Date.now(),
+      schedule: (callback, delay) => {
+        const timer = setTimeout(callback, delay);
+        return () => clearTimeout(timer);
+      },
+      capture: () => this.bufferVersion,
+      commit: async () => {
+        await this.publishBuffer(false);
+      },
       classifyFailure: (error) => (failureCode(error) === 'storage' ? 'retry' : 'stop'),
     });
   }
@@ -278,7 +340,7 @@ class VideoReviewSession {
       (this.state.pending ||
         this.checkpointActions.size ||
         this.captures.hasPending() ||
-        (this.checkpointWrote && this.state.dirty))
+        (this.state.dirty && (this.state.autosaveEnabled || this.checkpointWrote)))
     )
       return;
     const admission = this.checkpointAdmission;
@@ -318,72 +380,126 @@ class VideoReviewSession {
       attempt = { change, baseRevision: this.state.snapshot.workspace.revision, attempted: false };
       this.typingAttempts.set(captured, attempt);
     }
-    const owned = attempt;
-    if (owned.attempted && this.state.autosaveEnabled) {
-      this.checkpointExit = undefined;
-      const read = await this.deps.readVideoWorkspace(this.initial.workspace.aggregateId);
-      const canonical = read ? this.stripCheckpointReceipt(read) : null;
+    if (attempt.attempted) return;
+    await this.execute(async () => this.state.snapshot, { kind: 'typing', change: attempt.change });
+    attempt.attempted = true;
+  }
+
+  private requestBufferPublication() {
+    if (this.state.autosaveEnabled && !this.disposed)
+      this.publication.request('buffer', EDITOR_AUTOSAVE_POLICY);
+  }
+
+  private acceptLocalSnapshot(snapshot: VideoWorkspaceSnapshot) {
+    this.bufferVersion++;
+    this.state = {
+      ...this.state,
+      snapshot,
+      document: projectReviewWorkspace(snapshot),
+      dirty: true,
+    };
+    this.requestBufferPublication();
+    return snapshot;
+  }
+
+  private retainedBufferReferences() {
+    const references = new Set(collectReviewAssetReferences(this.state.snapshot.workspace));
+    if (this.pendingBuffer)
+      for (const reference of collectReviewAssetReferences(
+        this.pendingBuffer.capture.snapshot.workspace
+      ))
+        references.add(reference);
+    return references;
+  }
+
+  private acknowledgeBuffer(attempt: BufferAttempt, returned: VideoWorkspaceSnapshot) {
+    if (
+      returned.workspace.aggregateId !== attempt.basis.workspace.aggregateId ||
+      returned.workspace.sourceAssetId !== attempt.basis.workspace.sourceAssetId ||
+      returned.workspace.createdAt !== attempt.basis.workspace.createdAt ||
+      !sameReviewWorkspaceValue(returned.workspace.source, attempt.basis.workspace.source) ||
+      returned.workspace.revision <= attempt.basis.workspace.revision
+    )
+      throw new VideoWorkspaceError('conflict');
+    const snapshot = this.consumeCheckpointAcknowledgement(returned);
+    this.noteAcknowledgedWrite(snapshot, attempt.basis.workspace.revision);
+    this.durable = snapshot;
+    if (this.pendingBuffer === attempt) this.pendingBuffer = undefined;
+    if (this.disposed) return;
+    const current = this.bufferVersion === attempt.capture.version;
+    this.state = {
+      ...this.state,
+      snapshot: current
+        ? snapshot
+        : {
+            ...this.state.snapshot,
+            workspace: {
+              ...this.state.snapshot.workspace,
+              revision: snapshot.workspace.revision,
+            },
+          },
+      document: current ? projectReviewWorkspace(snapshot) : this.state.document,
+      dirty: !current,
+      error: this.state.error === 'storage' ? null : this.state.error,
+    };
+  }
+
+  private async settleBufferAttempt(attempt: BufferAttempt, retry: boolean) {
+    let acknowledged: VideoWorkspaceSnapshot | undefined;
+    if (retry) {
+      const read = await this.deps.readVideoWorkspace(attempt.basis.workspace.aggregateId);
       if (
-        !canonical ||
-        canonical.workspace.sourceAssetId !== this.state.snapshot.workspace.sourceAssetId ||
-        !sameReviewWorkspaceValue(canonical.workspace.source, this.state.snapshot.workspace.source)
+        !read ||
+        read.workspace.sourceAssetId !== attempt.basis.workspace.sourceAssetId ||
+        read.workspace.createdAt !== attempt.basis.workspace.createdAt ||
+        !sameReviewWorkspaceValue(read.workspace.source, attempt.basis.workspace.source)
       )
-        throw new Error('Typing source changed.');
-      if (
-        canonical.workspace.typing?.actionId === typing.actionId &&
-        canonical.workspace.typing.writeId === typing.writeId &&
-        sameReviewWorkspaceValue(
-          projectReviewWorkspace(canonical).advancedContent,
-          owned.change.after
+        throw new VideoWorkspaceError('conflict');
+      if (read.workspace.revision !== attempt.basis.workspace.revision) {
+        if (
+          read.workspace.revision !== attempt.basis.workspace.revision + 1 ||
+          !sameBufferPublication(read, attempt.capture.snapshot)
         )
-      ) {
-        this.noteCheckpointCommitted(canonical);
-        await this.execute(async () => canonical);
-        return;
+          throw new VideoWorkspaceError('conflict');
+        acknowledged = read;
       }
-      if (
-        canonical.workspace.revision !== owned.baseRevision ||
-        !sameReviewWorkspaceValue(
-          projectReviewWorkspace(canonical).advancedContent,
-          owned.change.before
-        )
-      )
-        throw new Error('Typing acknowledgement is unknown.');
     }
-    owned.attempted = true;
-    await this.execute(
-      () =>
-        (this.deps.saveVideoWorkspaceTyping ?? reviewSessionPersistence.saveVideoWorkspaceTyping)({
-          ...reviewWriteIdentity(this.state.snapshot),
-          change: owned.change,
-        }),
-      { kind: 'typing', change: owned.change }
+    acknowledged ??= await this.deps.saveVideoWorkspaceSnapshot(
+      reviewSnapshotSaveRequest(attempt.basis, attempt.capture.snapshot)
     );
+    this.acknowledgeBuffer(attempt, acknowledged);
+  }
+
+  private async publishBuffer(explicit: boolean) {
+    if (!this.state.dirty && !this.pendingBuffer) return this.state.snapshot;
+    this.state = { ...this.state, saving: true };
+    this.emit();
+    try {
+      await this.acquireCheckpointAdmission();
+      this.checkpointWrote = true;
+      const previous = this.pendingBuffer;
+      if (previous) await this.settleBufferAttempt(previous, true);
+      if (this.state.dirty && (explicit || (this.state.autosaveEnabled && !this.disposed))) {
+        const capture = { version: this.bufferVersion, snapshot: this.state.snapshot };
+        const attempt = { capture, basis: this.durable };
+        this.pendingBuffer = attempt;
+        await this.settleBufferAttempt(attempt, false);
+      }
+      await this.annotationResources.reconcile(this.retainedBufferReferences(), !this.state.dirty);
+      return this.state.snapshot;
+    } catch (error) {
+      this.state = { ...this.state, error: failureCode(error), dirty: true };
+      if (this.state.error !== 'storage') this.coordinator.suspend(error);
+      throw error;
+    } finally {
+      this.state = { ...this.state, saving: false };
+      this.emit();
+      this.releaseCheckpointIfIdle();
+    }
   }
 
   private async persistBuffer() {
-    if (this.state.dirty) {
-      const expectedRevision = this.durable.workspace.revision;
-      this.checkpointWrote = true;
-      const snapshot = this.consumeCheckpointAcknowledgement(
-        await this.deps.saveVideoWorkspaceSnapshot(
-          reviewSnapshotSaveRequest(this.durable, this.state.snapshot)
-        )
-      );
-      this.noteAcknowledgedWrite(snapshot, expectedRevision);
-      this.durable = snapshot;
-      this.state = { ...this.state, snapshot, dirty: false };
-    }
-    try {
-      await this.annotationResources.reconcile(
-        collectReviewAssetReferences(this.state.snapshot.workspace),
-        true
-      );
-    } catch (error) {
-      this.state = { ...this.state, dirty: true };
-      throw error;
-    }
-    return this.state.snapshot;
+    return this.publishBuffer(true);
   }
 
   private async transition(
@@ -397,46 +513,20 @@ class VideoReviewSession {
       if (this.disposed) throw new Error('Review session is closed.');
       if (local?.kind === 'advanced')
         local = { ...local, advanced: this.prepareAdvancedUi(local.advanced) };
-      if (local && (!this.state.autosaveEnabled || (this.state.dirty && local.kind !== 'reset'))) {
-        const snapshot = applyLocalReviewChange(this.state.snapshot, local);
-        this.state = {
-          ...this.state,
-          snapshot,
-          document: projectReviewWorkspace(snapshot),
-          dirty: true,
-        };
-        if (!this.state.autosaveEnabled) {
-          await this.annotationResources.reconcile(
-            collectReviewAssetReferences(snapshot.workspace),
-            false
-          );
-          return snapshot;
-        }
-        const committed = await this.persistBuffer();
-        this.state = {
-          ...this.state,
-          snapshot: committed,
-          document: projectReviewWorkspace(committed),
-          error: null,
-        };
-        return committed;
+      if (local) {
+        if (this.state.error && this.state.error !== 'storage')
+          throw new VideoWorkspaceError(this.state.error);
+        const snapshot = this.acceptLocalSnapshot(
+          applyLocalReviewChange(this.state.snapshot, local)
+        );
+        await this.annotationResources.reconcile(this.retainedBufferReferences(), false);
+        return snapshot;
       }
-      const expectedRevision = this.state.snapshot.workspace.revision;
       this.checkpointWrote = true;
       const committed = await action();
       const returned = 'snapshot' in committed ? committed.snapshot : committed;
-      const snapshot = local
-        ? this.consumeCheckpointAcknowledgement(
-            returned,
-            committed.checkpointReceipt ?? returned.checkpointReceipt
-          )
-        : this.stripCheckpointReceipt(returned);
-      if (local) this.noteAcknowledgedWrite(snapshot, expectedRevision);
-      if (
-        !local &&
-        this.state.dirty &&
-        (snapshot === this.state.snapshot || !this.state.autosaveEnabled)
-      )
+      const snapshot = this.stripCheckpointReceipt(returned);
+      if (this.state.dirty && (snapshot === this.state.snapshot || !this.state.autosaveEnabled))
         return snapshot;
       this.durable = snapshot;
       this.failedSpeechSave = undefined;
@@ -478,18 +568,40 @@ class VideoReviewSession {
   ) {
     this.state = { ...this.state, pending: this.state.pending + 1 };
     this.emit();
-    return this.transition(action, local, speechSaveKey);
+    return local
+      ? this.transition(action, local, speechSaveKey)
+      : this.publication.runOrdered(() => this.transition(action, local, speechSaveKey));
+  }
+
+  private enqueueLocal(action: () => Promise<VideoWorkspaceSnapshot>) {
+    return this.enqueue(action, undefined, undefined, true);
   }
 
   private enqueue(
     action: () => Promise<ReviewCommittedMutation>,
     local?: LocalReviewChange,
-    speechSaveKey?: string
-  ) {
+    speechSaveKey?: string,
+    localAction = false
+  ): Promise<VideoWorkspaceSnapshot> {
     if (this.disposed) return Promise.reject(new Error('Review session is closed.'));
     this.state = { ...this.state, pending: this.state.pending + 1 };
     this.emit();
-    return this.coordinator.runOrdered(() => this.transition(action, local, speechSaveKey));
+    return this.coordinator.runOrdered(async () => {
+      if (!localAction)
+        return local
+          ? this.transition(action, local, speechSaveKey)
+          : this.publication.runOrdered(() => this.transition(action, local, speechSaveKey));
+      try {
+        await this.acquireCheckpointAdmission();
+        if (this.disposed) throw new Error('Review session is closed.');
+        const committed = await action();
+        return 'snapshot' in committed ? committed.snapshot : committed;
+      } finally {
+        this.state = { ...this.state, pending: this.state.pending - 1 };
+        this.emit();
+        this.releaseCheckpointIfIdle();
+      }
+    });
   }
 
   private createSpeechPublicationReceipt(): ReviewSpeechPublicationReceipt {
@@ -695,11 +807,8 @@ class VideoReviewSession {
     if (this.disposed) return;
     this.state = { ...this.state, autosaveEnabled: enabled };
     this.emit();
-    if (enabled && this.state.dirty)
-      void this.enqueue(async () => {
-        if (!this.state.autosaveEnabled) return this.state.snapshot;
-        return this.persistBuffer();
-      }).catch(() => undefined);
+    if (enabled) this.requestBufferPublication();
+    else this.publication.cancel('buffer');
   }
 
   private subscribe(listener: () => void) {
@@ -711,7 +820,7 @@ class VideoReviewSession {
 
   /** Callers drain accepted field captures before enqueueing a lane control transition. */
   private setTrackControl(track: QuickEditTrack | 'audio', control: { enabled: boolean }) {
-    return this.enqueue(async () => {
+    return this.enqueueLocal(async () => {
       let next = this.state.snapshot;
       const current = { ...next.workspace.advanced, ...this.state.document.advancedContent };
       if (track === 'source') return next;
@@ -733,13 +842,7 @@ class VideoReviewSession {
         },
       };
 
-      this.state = {
-        ...this.state,
-        snapshot: next,
-        document: projectReviewWorkspace(next),
-        dirty: true,
-      };
-      return this.state.autosaveEnabled ? this.persistBuffer() : next;
+      return this.acceptLocalSnapshot(next);
     });
   }
 
@@ -835,6 +938,7 @@ class VideoReviewSession {
         resources,
         new Set(captured.snapshot.assets.map((asset) => asset.assetId))
       );
+      this.bufferVersion++;
       this.state = {
         ...this.state,
         snapshot,
@@ -867,34 +971,36 @@ class VideoReviewSession {
     this.state = { ...this.state, pending: this.state.pending + 1 };
     this.emit();
     try {
-      return await this.coordinator.runOrdered(async () => {
-        await this.acquireCheckpointAdmission();
-        if (this.disposed) throw new Error('Review session is closed.');
-        const accepted =
-          owned.operation && owned.baseRevision !== undefined
-            ? await this.recoverPublication(owned.operation, owned.baseRevision, {
-                kind: 'speech',
-                targets: owned.changes!.map((change) => change.target),
-              })
-            : null;
-        if (!accepted && options?.discardUncommittedAttempt) {
-          delete owned.operation;
-          delete owned.baseRevision;
-          delete owned.intent;
-          delete owned.changes;
-        }
-        if (
-          !accepted &&
-          !options &&
-          this.failedSpeechSave === receipt.id &&
-          this.state.error === 'storage'
-        ) {
-          this.state = { ...this.state, error: null };
-          this.failedSpeechSave = undefined;
-          this.coordinator.resume();
-        }
-        return accepted !== null;
-      });
+      return await this.coordinator.runOrdered(() =>
+        this.publication.runOrdered(async () => {
+          await this.acquireCheckpointAdmission();
+          if (this.disposed) throw new Error('Review session is closed.');
+          const accepted =
+            owned.operation && owned.baseRevision !== undefined
+              ? await this.recoverPublication(owned.operation, owned.baseRevision, {
+                  kind: 'speech',
+                  targets: owned.changes!.map((change) => change.target),
+                })
+              : null;
+          if (!accepted && options?.discardUncommittedAttempt) {
+            delete owned.operation;
+            delete owned.baseRevision;
+            delete owned.intent;
+            delete owned.changes;
+          }
+          if (
+            !accepted &&
+            !options &&
+            this.failedSpeechSave === receipt.id &&
+            this.state.error === 'storage'
+          ) {
+            this.state = { ...this.state, error: null };
+            this.failedSpeechSave = undefined;
+            this.coordinator.resume();
+          }
+          return accepted !== null;
+        })
+      );
     } finally {
       this.state = { ...this.state, pending: this.state.pending - 1 };
       this.emit();
@@ -965,13 +1071,21 @@ class VideoReviewSession {
 
   /** Clears authored content atomically while preserving source identity and UI preferences. */
   private reset() {
-    return this.enqueue(
-      async () => {
-        const next = applyLocalReviewChange(this.state.snapshot, { kind: 'reset' });
-        return this.deps.saveVideoWorkspaceSnapshot(reviewSnapshotSaveRequest(this.durable, next));
-      },
-      { kind: 'reset' }
-    );
+    return this.enqueue(async () => {
+      if (!this.state.autosaveEnabled)
+        return this.acceptLocalSnapshot(
+          applyLocalReviewChange(this.state.snapshot, { kind: 'reset' })
+        );
+      if (this.pendingBuffer) await this.settleBufferAttempt(this.pendingBuffer, true);
+      const next = applyLocalReviewChange(this.state.snapshot, { kind: 'reset' });
+      const snapshot = this.consumeCheckpointAcknowledgement(
+        await this.deps.saveVideoWorkspaceSnapshot(reviewSnapshotSaveRequest(this.durable, next))
+      );
+      this.noteAcknowledgedWrite(snapshot, this.durable.workspace.revision);
+      this.bufferVersion++;
+      this.publication.cancel('buffer');
+      return snapshot;
+    });
   }
 
   private history(direction: ReviewHistoryDirection) {
@@ -1113,6 +1227,7 @@ class VideoReviewSession {
 
   private reload() {
     this.checkpointExit = undefined;
+    this.publication.cancel('buffer');
     for (const key of this.captures.keys()) this.coordinator.cancel(key);
     this.captures.invalidate();
     return this.enqueue(async () => {
@@ -1123,6 +1238,9 @@ class VideoReviewSession {
       this.captures.clear();
       this.checkpointActions.clear();
       this.state = { ...this.state, dirty: false };
+      this.bufferVersion++;
+      this.pendingBuffer = undefined;
+      this.publication.resume();
       this.failedDurableAttempt = undefined;
       this.failedTranscript = undefined;
       this.coordinator.resume();
@@ -1135,6 +1253,8 @@ class VideoReviewSession {
     const hadPending = this.state.pending > 0;
     await this.coordinator.flushCaptured();
     await this.coordinator.runOrdered(async () => undefined);
+    await this.publication.flushCaptured();
+    await this.publication.runOrdered(async () => undefined);
     // Only a completed history failure may be retried; pending/content failures stay strict.
     if (this.state.error && !(options?.retryHistory && this.failedHistory && !hadPending))
       throw new Error(`Review ${this.state.error}.`);
@@ -1144,6 +1264,7 @@ class VideoReviewSession {
   private dispose(): Promise<void> {
     if (this.disposal) return this.disposal;
     this.disposed = true;
+    this.publication.cancel('buffer');
     this.checkpointExit = undefined;
     this.checkpointActions.clear();
     this.failedDurableAttempt = undefined;
@@ -1151,9 +1272,10 @@ class VideoReviewSession {
     for (const key of this.captures.keys()) this.coordinator.cancel(key);
     this.captures.clear();
     this.disposal = this.coordinator
-      .runOrdered(() => this.annotationResources.dispose())
+      .runOrdered(() => this.publication.runOrdered(() => this.annotationResources.dispose()))
       .finally(async () => {
         this.coordinator.dispose();
+        this.publication.dispose();
         this.releaseCheckpointIfIdle(true);
         await this.checkpointCleanup;
       });

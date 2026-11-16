@@ -21,6 +21,7 @@ vi.mock('../infrastructure/indexed-db/mutation', () => ({
     operation(await harness.database()),
 }));
 import { commitVideoWorkspace, readVideoWorkspace, saveVideoWorkspaceSnapshot } from './store';
+import { parseReviewOperation } from '../../../features/video/review/validation';
 import { applyLocalReviewChange } from '../../../workflows/video-review/local-session';
 
 let rows: Map<string, Map<string, unknown>>;
@@ -145,5 +146,28 @@ it('keeps retained row identities and ordinals when an ordinary paused-buffer Sa
       expect(written.get(key)).toStrictEqual(row);
   expect(historyWrites.filter((row) => isRecord(row) && row['ordinal'] !== 0)).toHaveLength(1);
   expect([...written.values()].some((row) => isRecord(row) && row['ordinal'] === 51)).toBe(true);
+  expect(await readVideoWorkspace(updated.workspace.aggregateId)).toEqual(updated);
+});
+
+it('keeps unchanged history admitted after a whole-buffer ACK so the next edit does not detach it again', async () => {
+  const { saved } = await saveScaledWorkspace();
+  const local = applyLocalReviewChange(saved, { kind: 'history', direction: 'undo' });
+  const updated = await saveVideoWorkspaceSnapshot({
+    aggregateId: saved.workspace.aggregateId,
+    expectedRevision: saved.workspace.revision,
+    expectedSourceAssetId: saved.workspace.sourceAssetId,
+    expectedDraftRevision: null,
+    workspace: local.workspace,
+    draft: null,
+  });
+  const retained = updated.workspace.history.filter(
+    (operation) => operation.target === 'advancedContent'
+  );
+  expect(retained.length).toBeGreaterThan(0);
+  for (const operation of retained)
+    expect(parseReviewOperation(operation, updated.workspace.source.duration)).toBe(operation);
+  expect(inspectVideoWorkspace(updated.workspace).document).toEqual(
+    inspectVideoWorkspace(local.workspace).document
+  );
   expect(await readVideoWorkspace(updated.workspace.aggregateId)).toEqual(updated);
 });

@@ -287,7 +287,7 @@ it('rejects stale sources before admission and orders concurrent additions', asy
 });
 
 it('includes staged producers in a session barrier and builds history from the admitted document', async () => {
-  const { session, deps } = setup();
+  const { session } = setup();
   const before = session.getSnapshot().document.advancedContent;
   const first = { ...before, actionsEnabled: false };
   const second = { ...first, zoom: { ...first.zoom, enabled: true } };
@@ -307,7 +307,7 @@ it('includes staged producers in a session barrier and builds history from the a
     { delay: 250 }
   );
   await session.flush();
-  expect(deps.commitVideoWorkspace.mock.calls[1]?.[0].operation).toMatchObject({
+  expect(session.getSnapshot().snapshot.workspace.history[1]).toMatchObject({
     before: first,
     after: second,
   });
@@ -341,9 +341,9 @@ it.each(['new-stage', 'cancel-restage', 'ack-next-group'] as const)(
   async (mode) => {
     const { session, deps } = setup();
     const initial = session.getSnapshot().document.advancedContent;
-    const original = deps.commitVideoWorkspace.getMockImplementation()!;
+    const original = deps.saveVideoWorkspaceSnapshot.getMockImplementation()!;
     let release: () => void = () => undefined;
-    deps.commitVideoWorkspace.mockImplementationOnce(async (args) => {
+    deps.saveVideoWorkspaceSnapshot.mockImplementationOnce(async (args) => {
       await new Promise<void>((resolve) => {
         release = resolve;
       });
@@ -371,11 +371,11 @@ it.each(['new-stage', 'cancel-restage', 'ack-next-group'] as const)(
     release();
     await first;
     expect(session.getSnapshot().dirty).toBe(true);
-    expect(deps.commitVideoWorkspace).toHaveBeenCalledOnce();
+    expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledOnce();
     await session.flush();
     expect(session.getSnapshot().dirty).toBe(false);
-    expect(deps.commitVideoWorkspace).toHaveBeenCalledTimes(2);
-    expect(deps.saveVideoWorkspaceSnapshot).not.toHaveBeenCalled();
+    expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledTimes(2);
+    expect(deps.commitVideoWorkspace).not.toHaveBeenCalled();
   }
 );
 
@@ -427,7 +427,7 @@ it('applies paused autosave locally and only explicit Save acknowledges a durabl
 
 it('retains a failed staged buffer and stops other autosaves until source recovery', async () => {
   const { session, deps } = setup();
-  deps.commitVideoWorkspace.mockRejectedValueOnce({ code: 'changed-source' });
+  deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce({ code: 'changed-source' });
   const content = { ...session.getSnapshot().document.advancedContent, actionsEnabled: false };
   const acknowledge = vi.fn();
   const fail = vi.fn();
@@ -437,7 +437,9 @@ it('retains a failed staged buffer and stops other autosaves until source recove
     { delay: 250 }
   );
   await expect(session.flush()).rejects.toMatchObject({ code: 'changed-source' });
-  expect(acknowledge).not.toHaveBeenCalled();
+  expect(acknowledge).toHaveBeenCalledOnce();
+  expect(session.getSnapshot()).toMatchObject({ dirty: true, error: 'changed-source' });
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
   session.stageAutosave(
     'advanced',
     () => ({
@@ -455,7 +457,7 @@ it('retains a failed staged buffer and stops other autosaves until source recove
   await session.reload();
   expect(session.getSnapshot().error).toBeNull();
   await session.flush();
-  expect(deps.commitVideoWorkspace).toHaveBeenCalledTimes(1);
+  expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledTimes(1);
 });
 
 it('aborting an annotation queued behind another operation prevents local admission and lease transfer', async () => {
@@ -484,38 +486,37 @@ it('aborting an annotation queued behind another operation prevents local admiss
   await session.dispose();
 });
 
-it('publishes only the committed mutation projection and keeps injected adapter ownership', async () => {
+it('publishes the local history through the injected snapshot adapter and retains newer work after failure', async () => {
   const { session, deps } = setup();
-  let document: ReturnType<typeof projectReviewWorkspace> | undefined;
-  const projected = vi.fn(async (args: Parameters<typeof deps.commitVideoWorkspace>[0]) => {
-    const snapshot = await deps.commitVideoWorkspace(args);
-    document = projectReviewWorkspace(snapshot);
-    return { snapshot, document };
-  });
+  const projected = vi.fn();
   Object.assign(deps, { commitVideoWorkspaceWithProjection: projected });
   const content = { ...session.getSnapshot().document.advancedContent, actionsEnabled: false };
   session.stageAutosave(
     'content',
-    () => ({
-      change: { kind: 'content', content },
-      acknowledge: vi.fn(),
-      fail: vi.fn(),
-    }),
+    () => ({ change: { kind: 'content', content }, acknowledge: vi.fn(), fail: vi.fn() }),
     { delay: 250 }
   );
   await session.flush();
-  expect(projected).toHaveBeenCalledOnce();
-  expect(session.getSnapshot().document).toBe(document);
+  expect(projected).not.toHaveBeenCalled();
+  expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledOnce();
   expect(session.getSnapshot().document).toEqual(
     projectReviewWorkspace(await deps.readVideoWorkspace())
   );
-  projected.mockRejectedValueOnce({ code: 'storage' });
-  const operation = session.getSnapshot().snapshot.workspace.history[0]!;
-  await expect(session.commit({ ...operation, id: 'rejected-projection' })).rejects.toMatchObject({
-    code: 'storage',
+  await session.commit({
+    id: 'new-local-action',
+    at: 1,
+    target: 'sourceAudio',
+    before: { muted: false, volume: 1 },
+    after: { muted: true, volume: 1 },
   });
-  expect(deps.commitVideoWorkspace).toHaveBeenCalledOnce();
-  expect(session.getSnapshot().document).toBe(document);
+  const accepted = session.getSnapshot().document;
+  deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce({ code: 'storage' });
+  await expect(session.flush()).rejects.toMatchObject({ code: 'storage' });
+  expect(session.getSnapshot().document).toBe(accepted);
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(2);
+  expect(session.getSnapshot()).toMatchObject({ dirty: true, error: 'storage' });
+  expect(projected).not.toHaveBeenCalled();
+  await session.dispose();
 });
 
 it('retains a crop after save refusal and retries one durable content change', async () => {

@@ -59,6 +59,7 @@ function setup(
       ]
     : [];
   let cursor = 0;
+  let revision = history.length + 1;
   const events: string[] = [];
   let commitGate = Promise.resolve();
   const snapshot = (): VideoWorkspaceSnapshot => ({
@@ -67,7 +68,7 @@ function setup(
       sourceAssetId: 'main',
       formatVersion: 1,
       source,
-      revision: history.length + 1,
+      revision,
       cursor,
       advanced,
       history: [...history],
@@ -83,9 +84,13 @@ function setup(
     if (!operation) throw new Error('Invalid operation');
     history.splice(cursor, history.length - cursor, operation);
     cursor += 1;
+    revision++;
     return snapshot();
   });
-  const saveAdvanced = vi.fn(async () => snapshot());
+  const saveAdvanced = vi.fn(async () => {
+    revision++;
+    return snapshot();
+  });
   const session = createVideoReviewSession(snapshot(), {
     commitVideoWorkspace: commit,
     commitVideoWorkspaceWithProjection: async (args) =>
@@ -94,13 +99,17 @@ function setup(
       const workspace = parseVideoWorkspace(args.workspace);
       if (!workspace) throw new Error('Invalid workspace');
       Object.assign(advanced, workspace.advanced);
+      expect(args.expectedRevision).toBe(revision);
       history.splice(0, history.length, ...workspace.history);
+      cursor = workspace.cursor;
+      revision++;
       return snapshot();
     },
     saveVideoWorkspaceDraft: async () => snapshot(),
     readVideoWorkspace: async () => snapshot(),
     moveVideoWorkspaceHistory: async ({ direction }) => {
       cursor += direction === 'undo' ? -1 : 1;
+      revision++;
       return snapshot();
     },
     saveVideoWorkspaceAdvanced: saveAdvanced,
@@ -134,7 +143,9 @@ function setup(
     session,
     saveAdvanced,
     commit,
-    history,
+    get history() {
+      return session.getSnapshot().snapshot.workspace.history;
+    },
     events,
     render: (activeSession = session) => root!.render(<Harness activeSession={activeSession} />),
     advanced,

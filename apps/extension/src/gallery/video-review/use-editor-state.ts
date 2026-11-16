@@ -318,10 +318,14 @@ function useReviewEditorCore(resource: LoadedReview) {
     watermark,
     presentation,
     annotationEffects,
-    run: async (action: () => Promise<unknown>, success?: string) => {
+    run: async (
+      action: () => Promise<unknown>,
+      success?: string,
+      options?: { durableNote: true }
+    ) => {
       try {
         await annotationEffects.flush();
-        return await base.run(action, success);
+        return await base.run(action, success, options);
       } catch {
         base.setMessage(translate('gallery.videoReview.saveFailed'));
       }
@@ -398,8 +402,17 @@ function useReviewEditorBase(resource: LoadedReview) {
     advancedState.endTyping();
     void speechGuard.perform(() => selectActive(next));
   };
-  const run = (action: () => Promise<unknown>, success?: string) =>
-    Promise.resolve(speechGuard.perform(() => transitions.perform(() => raw(action, success))));
+  const run = (action: () => Promise<unknown>, success?: string, options?: { durableNote: true }) =>
+    Promise.resolve(
+      speechGuard.perform(() =>
+        options?.durableNote
+          ? raw(async () => {
+              await composer.finishNew({ durable: true });
+              await action();
+            }, success)
+          : transitions.perform(() => raw(action, success))
+      )
+    );
   const backgroundImport = useReviewBackgroundImport({
     advanced: advancedState,
     session,

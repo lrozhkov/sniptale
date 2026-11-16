@@ -467,7 +467,7 @@ it('rejects stale apply before preparing private bytes and cleans up the disposa
 
 it('places source-authored narration through Speed while keeping its natural playback duration', async () => {
   const { session } = fixture('source');
-  await session.commit({
+  await session.commitDurable({
     id: 'speed-op',
     at: 1,
     target: 'edit',
@@ -516,7 +516,7 @@ it('refuses a failed durable history Save before a new paid request instead of c
   const { session, commit } = fixture();
   commit.mockRejectedValueOnce(new Error('storage'));
   await expect(
-    session.commit({
+    session.commitDurable({
       id: 'note',
       at: 1,
       target: 'annotation',

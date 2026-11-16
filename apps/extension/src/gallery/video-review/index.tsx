@@ -65,7 +65,7 @@ function ReviewHistoryControlBinding({
         error: snapshot.error,
         errorMessage: snapshot.error ? reviewErrorMessage(snapshot.error) : null,
         dirty: snapshot.dirty,
-        saving: snapshot.pending > 0,
+        saving: snapshot.pending > 0 || snapshot.saving === true,
         busy,
         onChange: (enabled) => state.beforeAction(() => state.session.setAutosaveEnabled(enabled)),
         onReload: () =>

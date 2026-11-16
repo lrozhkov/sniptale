@@ -142,10 +142,18 @@ it('rejects duplicate import, attaches through history, and preserves the old ba
     release();
     await first;
   });
-  expect(mocks.commit).toHaveBeenCalledOnce();
+  expect(mocks.commit).not.toHaveBeenCalled();
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  const accepted = session.getSnapshot().document.advancedContent.background;
+  expect(accepted).toMatchObject({
+    enabled: true,
+    type: 'image',
+    assetId: 'project-asset:imported',
+  });
   expect(importer.pending).toBe(false);
   mocks.import.mockRejectedValueOnce(new Error('decode'));
   await act(async () => importer.importImage(file));
   expect(importer.failed).toBe(true);
-  expect(session.getSnapshot().document.advancedContent.background).toEqual({ enabled: false });
+  expect(session.getSnapshot().document.advancedContent.background).toEqual(accepted);
+  await session.dispose();
 });

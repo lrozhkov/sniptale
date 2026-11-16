@@ -102,13 +102,8 @@ import {
   committedEditorFixtureProjection,
 } from './editor-fixture.test-support';
 
-function advancedContentAt(snapshot: VideoWorkspaceSnapshot, index = -1) {
-  const operations = snapshot.workspace.history.filter(
-    (operation) => operation.target === 'advancedContent'
-  );
-  const operation = index < 0 ? operations.at(-1) : operations[index];
-  if (operation?.target !== 'advancedContent') throw new Error('Missing advanced content op');
-  return operation.after;
+function advancedContentAt(snapshot: VideoWorkspaceSnapshot) {
+  return committedEditorFixtureProjection(snapshot).document.advancedContent;
 }
 
 it('integrates selection, recoverable text, drawing, history and report actions in the modal', async () => {
@@ -220,7 +215,7 @@ it('keeps unsaved text in the editor when Back cannot persist recovery, then ret
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
     await click('addComment');
     await fill('Keep this text');
-    integration.draft.mockRejectedValueOnce(new Error('Quota'));
+    integration.snapshot.mockRejectedValueOnce(new Error('Quota'));
     await click('common.actions.close');
     expect(back).not.toHaveBeenCalled();
     expect(host.querySelector('textarea')?.value).toBe('Keep this text');
@@ -231,9 +226,11 @@ it('keeps unsaved text in the editor when Back cannot persist recovery, then ret
     expect(host.querySelector('textarea')?.value).toBe('Keep this text');
     await click('common.actions.close');
     expect(back).toHaveBeenCalledOnce();
-    expect(fixture.snapshot.draft).toBeNull();
+    expect(fixture.persistedSnapshot.draft).toBeNull();
     await act(async () =>
-      vi.waitFor(() => expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('annotation'))
+      vi.waitFor(() =>
+        expect(fixture.persistedSnapshot.workspace.history.at(-1)?.target).toBe('annotation')
+      )
     );
     expect(host.textContent).toContain('Keep this text');
   } finally {
@@ -509,6 +506,8 @@ it('creates a zoom region from the playhead, edits it in the inspector, and pers
       })
     );
     expect(advancedContentAt(fixture.snapshot).zoom.regions[0]!.transform.scale).toBe(2);
+    await fixture.flush();
+    expect(advancedContentAt(fixture.persistedSnapshot).zoom.regions[0]!.transform.scale).toBe(2);
   } finally {
     await fixture.cleanup();
   }
@@ -644,20 +643,20 @@ it('toggles the persisted advanced mode and restores it after reopening the edit
     expect(button('moreActions')).not.toBeNull();
     expect(button('trackSettings').getAttribute('aria-pressed')).toBe('false');
     expect(host.querySelector('[data-review-track="zoom"]')).not.toBeNull();
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 1100)));
-    expect(fixture.snapshot.workspace.advanced.ui).toEqual({
+    await fixture.flush();
+    expect(fixture.persistedSnapshot.workspace.advanced.ui).toEqual({
       mode: 'advanced',
       advancedTracksInitialized: true,
       tracks: { actions: true, zoom: true, audio: true },
       overlaysVisible: true,
     });
-    expect(integration.advanced).toHaveBeenCalled();
+    expect(integration.snapshot).toHaveBeenCalled();
     await click('advancedEditing');
     expect(button('advancedEditing').getAttribute('aria-pressed')).toBe('false');
     expect(document.querySelector('[aria-label="gallery.videoReview.zoomTrack"]')).toBeNull();
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 1100)));
-    expect(fixture.snapshot.workspace.advanced.ui.mode).toBe('basic');
-    expect(fixture.snapshot.workspace.advanced.ui.tracks.zoom).toBe(true);
+    await fixture.flush();
+    expect(fixture.persistedSnapshot.workspace.advanced.ui.mode).toBe('basic');
+    expect(fixture.persistedSnapshot.workspace.advanced.ui.tracks.zoom).toBe(true);
     // Reopening reads the same durable workspace: the saved mode and track return.
     await act(async () => root.unmount());
     const reopenedHost = document.createElement('div');
@@ -706,6 +705,8 @@ it('reveals the three audio lanes and persists the original audio gate', async (
     await act(async () => mute.click());
     await act(async () => vi.advanceTimersByTimeAsync(1000));
     expect(advancedContentAt(fixture.snapshot).audio.original.muted).toBe(true);
+    await fixture.flush();
+    expect(advancedContentAt(fixture.persistedSnapshot).audio.original.muted).toBe(true);
   } finally {
     try {
       await fixture.cleanup();

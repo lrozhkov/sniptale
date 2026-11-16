@@ -222,8 +222,8 @@ it('restores a deleted note with keyboard Undo after its focused action disappea
     });
     const remove = fixture.host.querySelector<HTMLButtonElement>('[data-note-delete]')!;
     expect(remove).not.toBeNull();
-    const commit = integration.commit.getMockImplementation()!;
-    integration.commit.mockImplementationOnce(async (...args) => {
+    const commit = fixture.liveSession.commit;
+    vi.spyOn(fixture.liveSession, 'commit').mockImplementationOnce(async (...args) => {
       await gate;
       return commit(...args);
     });
@@ -275,14 +275,14 @@ it('retains failed new-note text and blocks Back until retry succeeds', async ()
     );
     await fixture.click('addComment');
     await fixture.fill('Keep on failure');
-    integration.commit.mockRejectedValueOnce(new Error('Quota'));
+    integration.snapshot.mockRejectedValueOnce(new Error('Quota'));
     await fixture.click('common.actions.close');
     expect(fixture.back).not.toHaveBeenCalled();
     expect(fixture.host.querySelector('textarea')?.value).toBe('Keep on failure');
     expect(fixture.host.textContent).toContain('gallery.videoReview.saveFailed');
     await fixture.click('common.actions.close');
     expect(fixture.back).toHaveBeenCalledOnce();
-    expect(fixture.snapshot.workspace.history).toHaveLength(1);
+    expect(fixture.persistedSnapshot.workspace.history).toHaveLength(1);
   } finally {
     await fixture.cleanup();
   }
@@ -427,13 +427,14 @@ it.each(['success', 'cancel', 'failure'] as const)(
       const calls = vi.mocked(HTMLMediaElement.prototype.play).mock.calls.length;
       await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' })));
       expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(calls);
-      const revision = fixture.snapshot.workspace.revision;
+      await fixture.flush();
+      const revision = fixture.persistedSnapshot.workspace.revision;
       await act(async () =>
         window.dispatchEvent(
           new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', ctrlKey: true })
         )
       );
-      expect(fixture.snapshot.workspace.revision).toBe(revision);
+      expect(fixture.persistedSnapshot.workspace.revision).toBe(revision);
       if (outcome === 'cancel') await fixture.click('cancelExport');
       await act(async () => finish());
       expect(fixture.button('play').disabled).toBe(false);
@@ -517,8 +518,8 @@ it('retains the requested playhead while admission finishes the previous draft',
     await fixture.selectRulerRange(2, 2);
     await fixture.click('addComment');
     await fixture.fill('Previous draft');
-    const commit = integration.commit.getMockImplementation()!;
-    integration.commit.mockImplementationOnce(async (...args) => {
+    const commit = fixture.liveSession.commit;
+    vi.spyOn(fixture.liveSession, 'commit').mockImplementationOnce(async (...args) => {
       await gate;
       return commit(...args);
     });

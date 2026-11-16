@@ -127,6 +127,12 @@ function fixture(projection?: 'outer' | 'nested') {
   };
 }
 
+async function publishDraft(f: ReturnType<typeof fixture>) {
+  await f.session.saveDraft(null, null);
+  await f.session.flush();
+  return f.session.getSnapshot().snapshot;
+}
+
 it('separates a coherent initial-open receipt from canonical state and returns a fresh exact DTO', async () => {
   const f = fixture();
   expect(f.session.getCheckpointExitReceipt()).toEqual(receipt(1));
@@ -142,11 +148,14 @@ it('separates a coherent initial-open receipt from canonical state and returns a
 });
 
 it.each(['outer', 'nested'] as const)(
-  'consumes %s projection metadata without changing snapshot or document semantics',
+  'keeps local admission separate from the legacy %s projection adapter',
   async (projection) => {
     const f = fixture(projection);
     const saved = await f.session.commit(operation);
     expect(saved).not.toHaveProperty('checkpointReceipt');
+    expect(f.projected).not.toHaveBeenCalled();
+    expect(f.session.getCheckpointExitReceipt()).toBeNull();
+    await f.session.flush();
     expect(f.session.getCheckpointExitReceipt()).toEqual(receipt(2));
     expect(JSON.stringify(f.session.getSnapshot())).not.toContain('checkpointReceipt');
     expect(f.session.getSnapshot().snapshot).toEqual(await f.read());
@@ -157,10 +166,10 @@ it.each(['outer', 'nested'] as const)(
 
 it('consumes plain native ACK metadata and clears authority on a later legacy ACK omission', async () => {
   const f = fixture();
-  expect(await f.session.saveDraft(null, null)).not.toHaveProperty('checkpointReceipt');
+  expect(await publishDraft(f)).not.toHaveProperty('checkpointReceipt');
   expect(f.session.getCheckpointExitReceipt()).toEqual(receipt(2));
   f.omit();
-  await f.session.saveDraft(null, null);
+  await publishDraft(f);
   expect(f.session.getCheckpointExitReceipt()).toBeNull();
   expect(f.session.getSnapshot().snapshot).toEqual(await f.read());
   await f.session.dispose();
@@ -170,17 +179,18 @@ it('does not expose an old receipt while a newer native ACK is pending and retai
   const f = fixture();
   const entered = deferred<void>();
   const ack = deferred<VideoWorkspaceSnapshot>();
-  f.save.mockImplementationOnce(async () => {
+  f.saveSnapshot.mockImplementationOnce(async () => {
     entered.resolve();
     return ack.promise;
   });
-  const first = f.session.saveDraft(null, null);
+  const first = publishDraft(f);
   await entered.promise;
   const second = f.session.saveDraft(null, null);
+  await second;
   expect(f.session.getCheckpointExitReceipt()).toBeNull();
   ack.resolve(f.acknowledge());
   await first;
-  await second;
+  await f.session.flush();
   expect(f.session.getCheckpointExitReceipt()).toEqual(receipt(3));
   await f.session.dispose();
 });
@@ -201,7 +211,7 @@ it('keeps confirmed-absence recovery equality independent of a prior receipt-bea
   const f = fixture();
   f.commit.mockRejectedValueOnce(new Error('Native refused'));
   await expect(f.session.commitDurable(operation)).rejects.toThrow('Native refused');
-  await f.session.saveDraft(null, null);
+  await publishDraft(f);
   expect(f.session.getCheckpointExitReceipt()).toEqual(receipt(2));
   await expect(f.session.recoverDurableOperation(operation, 1, { kind: 'text' })).resolves.toBe(
     false
@@ -241,11 +251,11 @@ it('never restores receipt authority after disposal when an older native ACK arr
   const f = fixture();
   const entered = deferred<void>();
   const ack = deferred<VideoWorkspaceSnapshot>();
-  f.save.mockImplementationOnce(async () => {
+  f.saveSnapshot.mockImplementationOnce(async () => {
     entered.resolve();
     return ack.promise;
   });
-  const saving = f.session.saveDraft(null, null);
+  const saving = publishDraft(f);
   await entered.promise;
   const disposal = f.session.dispose();
   expect(f.session.getCheckpointExitReceipt()).toBeNull();
@@ -281,12 +291,14 @@ it(
 
 it('refuses a receipt from another aggregate even when a legacy adapter returns a matching foreign snapshot', async () => {
   const f = fixture();
-  f.save.mockResolvedValueOnce({
+  f.saveSnapshot.mockResolvedValueOnce({
     ...f.initial,
     workspace: { ...f.initial.workspace, aggregateId: 'recording:other', revision: 2 },
     checkpointReceipt: { ...receipt(2), rootId: 'recording:other' },
   });
-  await f.session.saveDraft(null, null);
+  await expect(publishDraft(f)).rejects.toMatchObject({ code: 'conflict' });
+  expect(f.session.getSnapshot().snapshot.workspace.aggregateId).toBe(id);
+  expect(f.session.getSnapshot().dirty).toBe(true);
   expect(f.session.getCheckpointExitReceipt()).toBeNull();
   expect(f.session.getSnapshot().snapshot).not.toHaveProperty('checkpointReceipt');
   await f.session.dispose();
@@ -298,12 +310,12 @@ it('ignores malformed or mismatched ACK receipts without changing the accepted l
     { ...receipt(2), rootId: 'other' },
   ]) {
     const f = fixture();
-    f.save.mockResolvedValueOnce({
+    f.saveSnapshot.mockResolvedValueOnce({
       ...f.initial,
       workspace: { ...f.initial.workspace, revision: 2 },
       checkpointReceipt: invalid,
     });
-    await f.session.saveDraft(null, null);
+    await publishDraft(f);
     expect(f.session.getCheckpointExitReceipt()).toBeNull();
     expect(f.session.getSnapshot()).toMatchObject({ error: null, dirty: false });
     expect(f.session.getSnapshot().snapshot).not.toHaveProperty('checkpointReceipt');

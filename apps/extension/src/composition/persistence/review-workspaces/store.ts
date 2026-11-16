@@ -542,11 +542,15 @@ async function putWorkspace(
   // Re-encode only after full before-state and redo admission; each accepted step keeps its identity.
   const encoded = {
     ...admitted,
-    history: admitted.history.map((operation) =>
-      operation.target === 'advancedContent'
-        ? (createReviewAdvancedContentOperation(operation) ?? operation)
-        : operation
-    ),
+    history: admitted.history.map((operation) => {
+      if (operation.target !== 'advancedContent') return operation;
+      const compact = createReviewAdvancedContentOperation(operation);
+      // Preserve immutable admission unless the encoded operation actually changes.
+      if (compact?.target !== 'sourceAudio') return operation;
+      const parsed = parseReviewOperation(compact, admitted.source.duration);
+      if (!parsed) throw new VideoWorkspaceError('invalid');
+      return parsed;
+    }),
   };
   return writePreparedWorkspace(tx, previous, encoded, storage, mode, physicalDelete, prepared);
 }

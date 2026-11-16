@@ -1,6 +1,11 @@
 import { moveReviewWorkspaceCursor } from '../../composition/persistence/review-workspaces/history-cursor';
-import { parseVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
+import {
+  parseVideoWorkspace,
+  parseVideoWorkspaceDraft,
+} from '../../composition/persistence/review-workspaces/parser';
 import { act } from 'react';
+import * as reviewSessions from '../../workflows/video-review/session';
+import { reviewSessionPersistence } from '../../workflows/video-review/session-durable-access';
 import { createRoot } from 'react-dom/client';
 import { replayReviewHistory, reviewDocumentBaseline } from '../../features/video/review/document';
 import { vi } from 'vitest';
@@ -14,6 +19,7 @@ import type { VideoWorkspaceSnapshot } from '../../composition/persistence/revie
 import type {
   saveVideoWorkspaceAdvanced,
   saveVideoWorkspaceDraft,
+  saveVideoWorkspaceSnapshot,
   commitVideoWorkspace,
   moveVideoWorkspaceHistory,
 } from '../../composition/persistence/review-workspaces/store';
@@ -40,7 +46,7 @@ interface EditorFixtureIntegration {
   history: ReturnType<typeof vi.fn>;
   read: ReturnType<typeof vi.fn>;
   advanced: ReturnType<typeof vi.fn>;
-  snapshot?: ReturnType<typeof vi.fn>;
+  snapshot?: ReturnType<typeof vi.fn<typeof saveVideoWorkspaceSnapshot>>;
   download: ReturnType<typeof vi.fn>;
   export: ReturnType<typeof vi.fn>;
 }
@@ -103,7 +109,7 @@ function stubReviewDom(inspectorWidth: number) {
   return { show, close, createUrl, revokeUrl, clipboard };
 }
 
-function stubReviewSession(integration: EditorFixtureIntegration, history: ReviewOperation[]) {
+function stubReviewPersistence(integration: EditorFixtureIntegration, history: ReviewOperation[]) {
   let snapshot: VideoWorkspaceSnapshot = {
     workspace: {
       aggregateId: 'recording:r',
@@ -175,17 +181,19 @@ function stubReviewSession(integration: EditorFixtureIntegration, history: Revie
       return structuredClone(snapshot);
     }
   );
-  integration.snapshot?.mockImplementation(
-    async (args: { workspace: unknown; draft: VideoWorkspaceSnapshot['draft'] }) => {
-      const workspace = parseVideoWorkspace(args.workspace);
-      if (!workspace) throw new Error('Invalid fixture workspace.');
-      snapshot = {
-        workspace: { ...workspace, revision: snapshot.workspace.revision + 1 },
-        draft: args.draft,
-      };
-      return structuredClone(snapshot);
-    }
-  );
+  const saveSnapshot = integration.snapshot ?? vi.fn<typeof saveVideoWorkspaceSnapshot>();
+  saveSnapshot.mockImplementation(async (args) => {
+    const workspace = parseVideoWorkspace(args.workspace);
+    if (!workspace) throw new Error('Invalid fixture workspace.');
+    const draft =
+      args.draft === null ? null : parseVideoWorkspaceDraft(args.draft, workspace.source.duration);
+    if (args.draft !== null && !draft) throw new Error('Invalid fixture draft.');
+    snapshot = {
+      workspace: { ...workspace, revision: snapshot.workspace.revision + 1 },
+      draft,
+    };
+    return structuredClone(snapshot);
+  });
   integration.commit.mockImplementation(
     async (args: Parameters<typeof commitVideoWorkspace>[0]) => {
       snapshot = {
@@ -238,6 +246,7 @@ function stubReviewSession(integration: EditorFixtureIntegration, history: Revie
     }
   );
   return {
+    saveSnapshot,
     get snapshot() {
       return structuredClone(snapshot);
     },
@@ -256,7 +265,16 @@ export function createEditorFixture(
   const { show, close, createUrl, revokeUrl, clipboard } = stubReviewDom(
     options?.inspectorWidth ?? 640
   );
-  const session = stubReviewSession(integration, [...(options?.history ?? [])]);
+  const persistence = stubReviewPersistence(integration, [...(options?.history ?? [])]);
+  let liveSession: ReturnType<typeof reviewSessions.createVideoReviewSession> | undefined;
+  const createSession = reviewSessions.createVideoReviewSession;
+  vi.spyOn(reviewSessions, 'createVideoReviewSession').mockImplementation((initial, deps) => {
+    liveSession = createSession(initial, {
+      ...(deps ?? reviewSessionPersistence),
+      saveVideoWorkspaceSnapshot: persistence.saveSnapshot,
+    });
+    return liveSession;
+  });
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
@@ -410,8 +428,24 @@ export function createEditorFixture(
     createUrl,
     revokeUrl,
     clipboard,
+    publication: persistence.saveSnapshot,
+    get persistedSnapshot() {
+      return persistence.snapshot;
+    },
+    get liveSession() {
+      if (!liveSession) throw new Error('The editor session has not opened.');
+      return liveSession;
+    },
     get snapshot() {
-      return session.snapshot;
+      if (!liveSession) throw new Error('The editor session has not opened.');
+      return structuredClone(liveSession.getSnapshot().snapshot);
+    },
+    async flush() {
+      const current = liveSession;
+      if (!current) throw new Error('The editor session has not opened.');
+      await act(async () => {
+        await current.flush();
+      });
     },
     async cleanup() {
       await act(async () => root.unmount());

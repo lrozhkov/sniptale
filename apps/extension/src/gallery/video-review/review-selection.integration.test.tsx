@@ -466,7 +466,7 @@ it('closes the preview only after saving the note and preserves it when saving f
     );
     await fixture.click('addComment');
     await fixture.fill('Keep this note');
-    integration.draft.mockRejectedValueOnce(new Error('Write failed'));
+    integration.snapshot.mockRejectedValueOnce(new Error('Write failed'));
     const close = fixture.host.querySelector<HTMLButtonElement>(
       'header [aria-label="common.actions.close"]'
     )!;
@@ -478,8 +478,8 @@ it('closes the preview only after saving the note and preserves it when saving f
     await act(async () => close.click());
     expect(fixture.back).toHaveBeenCalledOnce();
     expect(onClose).not.toHaveBeenCalled();
-    expect(fixture.snapshot.draft).toBeNull();
-    expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
+    expect(fixture.persistedSnapshot.draft).toBeNull();
+    expect(fixture.persistedSnapshot.workspace.history.at(-1)).toMatchObject({
       target: 'annotation',
       after: { text: 'Keep this note' },
     });

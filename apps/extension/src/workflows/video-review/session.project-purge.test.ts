@@ -75,19 +75,16 @@ it.each(['text', 'crop', 'workspace color', 'track controls', 'initial mode'] as
     const oldEditor = createVideoReviewSession(initial, {
       ...reviewSessionPersistence,
       saveVideoWorkspaceSnapshot: async (args) => {
-        if (kind === 'track controls') await waitForRelease();
+        await waitForRelease();
         return reviewSessionPersistence.saveVideoWorkspaceSnapshot(args);
       },
       saveVideoWorkspaceAdvanced: async (args) => {
-        if (kind === 'workspace color' || kind === 'initial mode') await waitForRelease();
         return reviewSessionPersistence.saveVideoWorkspaceAdvanced(args);
       },
       saveVideoWorkspaceDraft: async (args) => {
-        if (kind === 'text') await waitForRelease();
         return reviewSessionPersistence.saveVideoWorkspaceDraft(args);
       },
       commitVideoWorkspaceWithProjection: async (args) => {
-        if (kind === 'crop') await waitForRelease();
         return reviewSessionPersistence.commitVideoWorkspaceWithProjection(args);
       },
     });
@@ -125,7 +122,8 @@ it.each(['text', 'crop', 'workspace color', 'track controls', 'initial mode'] as
                       }
                     : { ...initial.workspace.advanced.ui, workspaceColors: { dark: '#123456ff' } },
               });
-    const delayedWrite = write();
+    await write();
+    const delayedWrite = oldEditor.flush();
     await started;
     try {
       let purgedWhileLive = false;

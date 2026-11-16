@@ -65,6 +65,8 @@ export type ReviewSessionState = {
   snapshot: VideoWorkspaceSnapshot;
   document: ReturnType<typeof replayReviewHistory>;
   autosaveEnabled: boolean;
+  /** Native publication is independent of local command admission. */
+  saving?: boolean;
   dirty: boolean;
   pending: number;
   error: Failure | null;

@@ -124,7 +124,7 @@ export function useCanvasComments(args: {
     if (!guard()) return;
     await args.run(async () => {
       try {
-        await args.session.flush();
+        await args.session.flushAutosave();
       } catch (error) {
         // A settled storage failure is retryable; conflicts still require recovery.
         if (args.session.getSnapshot().error !== 'storage') throw error;
@@ -138,13 +138,14 @@ export function useCanvasComments(args: {
         ...change,
         ...(text !== undefined && change.text === undefined ? { text } : {}),
       });
-      await args.session.commit({
-        id: crypto.randomUUID(),
-        at: Date.now(),
-        target: 'canvasComment',
-        before,
-        after,
-      });
+      if (JSON.stringify(before) !== JSON.stringify(after))
+        await args.session.commit({
+          id: crypto.randomUUID(),
+          at: Date.now(),
+          target: 'canvasComment',
+          before,
+          after,
+        });
       if (drafts.current.get(comment.id) === after.text) drafts.current.delete(comment.id);
     });
   };

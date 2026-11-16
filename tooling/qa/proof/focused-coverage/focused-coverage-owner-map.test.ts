@@ -754,3 +754,28 @@ it('selects native lifetime and delayed acknowledgement proof for Image source r
     ])
   );
 });
+
+it('selects local acceptance, publication recovery and native purge proof for the review session', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/workflows/video-review';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/session.ts`)).toEqual(
+    expect.arrayContaining([
+      `${root}/session-buffer-autosave.test.ts`,
+      `${root}/session.project-purge.test.ts`,
+      `${root}/session.autosave.test.ts`,
+      `${root}/session.checkpoint-publication.test.ts`,
+      `${root}/session.checkpoint-receipt.test.ts`,
+    ])
+  );
+});
+
+it('selects immutable native snapshot acknowledgement proof for the review writer', async () => {
+  const module = await importOwnerMap();
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      'apps/extension/src/composition/persistence/review-workspaces/store.ts'
+    )
+  ).toContain(
+    'apps/extension/src/composition/persistence/review-workspaces/store-history-retention.test.ts'
+  );
+});

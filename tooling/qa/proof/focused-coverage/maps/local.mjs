@@ -1192,6 +1192,7 @@ unchanged project admission.',
     reason: 'Real writer tests prevent deleted content from returning after purge and recreation.',
     testFiles: [
       'apps/extension/src/composition/persistence/review-workspaces/sync-capture.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store-history-retention.test.ts',
       'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
       'apps/extension/src/gallery/video-review/use-session.purge.test.tsx',
     ],
@@ -1208,8 +1209,18 @@ unchanged project admission.',
   {
     owner: 'review-session-concurrency',
     productionFile: 'apps/extension/src/workflows/video-review/session.ts',
-    reason: 'Real writer tests prevent deleted content from returning after purge and recreation.',
-    testFiles: ['apps/extension/src/workflows/video-review/session.project-purge.test.ts'],
+    reason:
+      'Local acceptance, publication recovery and native purge share the session writer lifetime.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
+      'apps/extension/src/workflows/video-review/session-buffer-autosave.test.ts',
+      'apps/extension/src/workflows/video-review/session.autosave.test.ts',
+      'apps/extension/src/workflows/video-review/session.checkpoint-publication.test.ts',
+      'apps/extension/src/workflows/video-review/session.checkpoint-receipt.test.ts',
+      'apps/extension/src/workflows/video-review/session.test.ts',
+      'apps/extension/src/workflows/video-review/session.reset.test.ts',
+      'apps/extension/src/workflows/video-review/session.history-start.test.ts',
+    ],
   },
   {
     owner: 'review-loading-concurrency',

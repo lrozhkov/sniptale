@@ -430,9 +430,12 @@ export function ReviewInspectorBinding({
           />
         }
         saveStatus={
-          state.advancedFailed
+          state.advancedFailed || snapshot.error
             ? 'failed'
-            : state.advancedPending || snapshot.pending > 0
+            : state.advancedPending ||
+                snapshot.pending > 0 ||
+                snapshot.saving ||
+                (snapshot.autosaveEnabled && snapshot.dirty)
               ? 'saving'
               : 'saved'
         }
@@ -941,13 +944,17 @@ function leaveReviewInspector(
   isCurrent: () => boolean
 ) {
   state.video.current?.pause();
-  void state.run(async () => {
-    await flushReviewTextVoiceBuffers(state, canvasComments);
-    await state.session.flush();
-    if (!isCurrent() || !state.composer.endCheckpointEditAfterFlush()) return;
-    const canLeave = await prepareReviewCheckpointExit(state.session, isCurrent);
-    if (canLeave()) done();
-  });
+  void state.run(
+    async () => {
+      await flushReviewTextVoiceBuffers(state, canvasComments);
+      await state.session.flush();
+      if (!isCurrent() || !state.composer.endCheckpointEditAfterFlush()) return;
+      const canLeave = await prepareReviewCheckpointExit(state.session, isCurrent);
+      if (canLeave()) done();
+    },
+    undefined,
+    { durableNote: true }
+  );
 }
 
 /** The continuation rechecks local ownership after advisory IPC, including a rejected request. */
