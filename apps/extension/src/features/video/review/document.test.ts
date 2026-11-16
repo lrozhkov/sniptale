@@ -13,6 +13,7 @@ import {
 import { createQuickEditAdvancedContent } from './advanced/defaults';
 import type { QuickEditAdvancedContent } from './advanced/types';
 import { createCanvasComment } from './comments';
+import { parseReviewOperation } from './validation';
 import type { ReviewAnnotation, ReviewOperation, ReviewSource } from './types';
 
 const source: ReviewSource = {
@@ -690,4 +691,69 @@ it('replays freeze duration, deletion and Undo without rewriting cursor keys or 
     expect(slices.at(-1)!.timelineStart + slices.at(-1)!.duration).toBe(7 + inserted);
   }
   expect(baseline).toEqual(before);
+});
+
+function immutableContentTransition() {
+  const before = createQuickEditAdvancedContent();
+  const after = { ...before, actionsEnabled: false };
+  const operation = parseReviewOperation(
+    { id: 'immutable-change', at: 1, target: 'advancedContent', before, after },
+    source.duration
+  );
+  const twin = parseReviewOperation(
+    { id: 'immutable-twin', at: 1, target: 'advancedContent', before, after },
+    source.duration
+  );
+  if (operation?.target !== 'advancedContent' || twin?.target !== 'advancedContent')
+    throw new Error('Invalid immutable proof');
+  const document = { ...replayReviewHistory([], 0, source), advancedContent: twin.before };
+  return { operation, document };
+}
+
+it('does not enumerate unchanged immutable content pairs again during replay', () => {
+  const { operation, document } = immutableContentTransition();
+  applyReviewOperation(document, operation, source);
+  const keys = vi.spyOn(Object, 'keys');
+  try {
+    expect(applyReviewOperation(document, operation, source).advancedContent).toBe(operation.after);
+    expect(keys).not.toHaveBeenCalled();
+  } finally {
+    keys.mockRestore();
+  }
+});
+
+it.each(['mutable', 'shallow-frozen', 'accessor'] as const)(
+  'rechecks %s content after a previous successful comparison',
+  (kind) => {
+    const { operation, document } = immutableContentTransition();
+    const content = structuredClone(operation.before);
+    let audio = content.audio;
+    const current =
+      kind === 'accessor'
+        ? Object.freeze(
+            Object.defineProperty({ ...content }, 'audio', { enumerable: true, get: () => audio })
+          )
+        : kind === 'shallow-frozen'
+          ? Object.freeze(content)
+          : content;
+    const input = { ...document, advancedContent: current };
+    applyReviewOperation(input, operation, source);
+    if (kind === 'accessor') audio = { ...audio, original: { ...audio.original, volume: 0.25 } };
+    else content.audio.original.volume = 0.25;
+    expect(() => applyReviewOperation(input, operation, source)).toThrowError(
+      'Review operation does not match the current document.'
+    );
+  }
+);
+
+it('preserves repeated immutable no-change and before-mismatch refusals', () => {
+  const { operation, document } = immutableContentTransition();
+  for (let repeat = 0; repeat < 2; repeat++) {
+    expect(() =>
+      applyReviewOperation(document, { ...operation, after: operation.before }, source)
+    ).toThrowError('Review operation has no change.');
+    expect(() =>
+      applyReviewOperation({ ...document, advancedContent: operation.after }, operation, source)
+    ).toThrowError('Review operation does not match the current document.');
+  }
 });

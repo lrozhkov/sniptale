@@ -119,13 +119,50 @@ function replaceAdvancedContent(
   return after;
 }
 
+const immutableContentValues = new WeakSet<object>();
+const immutableContentComparisons = new WeakMap<object, WeakMap<object, boolean>>();
+
+function isImmutableContentValue(value: object): boolean {
+  if (immutableContentValues.has(value)) return true;
+  if (!Object.isFrozen(value)) return false;
+  for (const key of Object.keys(value)) {
+    const field = Object.getOwnPropertyDescriptor(value, key);
+    // Frozen accessors can still return changing content.
+    if (!field || !('value' in field)) return false;
+    const child: unknown = field.value;
+    if (child !== null && typeof child === 'object' && !isImmutableContentValue(child))
+      return false;
+  }
+  immutableContentValues.add(value);
+  return true;
+}
+
 function equalAdvancedContentValue(left: unknown, right: unknown): boolean {
   if (left === right) return true;
+  if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object')
+    return sameAdvancedContentValue(left, right);
+  const immutable = isImmutableContentValue(left) && isImmutableContentValue(right);
+  const previous = immutable ? immutableContentComparisons.get(left)?.get(right) : undefined;
+  if (previous !== undefined) return previous;
+  const equal = sameAdvancedContentValue(left, right);
+  if (immutable) {
+    let comparisons = immutableContentComparisons.get(left);
+    if (!comparisons) {
+      comparisons = new WeakMap();
+      immutableContentComparisons.set(left, comparisons);
+    }
+    comparisons.set(right, equal);
+  }
+  return equal;
+}
+
+function sameAdvancedContentValue(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
   if (Array.isArray(left) && Array.isArray(right))
-    return sameHistoryArray(left, right, equalAdvancedContentValue);
+    return sameHistoryArray(left, right, sameAdvancedContentValue);
   if (!isRecord(left) || !isRecord(right) || Array.isArray(left) || Array.isArray(right))
     return false;
-  return sameHistoryRecord(left, right, equalAdvancedContentValue);
+  return sameHistoryRecord(left, right, sameAdvancedContentValue);
 }
 
 /** Encodes admitted source gain edits without unchanged content; compound edits retain a full snapshot. */
