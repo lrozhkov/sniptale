@@ -72,6 +72,9 @@ function setup(autosave = true) {
     acquireSyncCheckpointEdit: checkpointAcquire,
     readVideoWorkspace: vi.fn(async () => structuredClone(stored)),
     saveVideoWorkspaceSnapshot: commit,
+    commitVideoWorkspace: vi.fn(async () => {
+      throw new Error('Buffered edits must use snapshot publication.');
+    }),
     saveVideoWorkspaceDraft: vi.fn(),
     saveVideoWorkspaceAdvanced: vi.fn(),
     moveVideoWorkspaceHistory: vi.fn(),

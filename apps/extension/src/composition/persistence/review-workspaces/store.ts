@@ -16,6 +16,7 @@ import {
 import { enqueuePrivateSourceRetirement } from '../assets/private-source-retention';
 import {
   readWorkspaceStorage,
+  readWorkspaceEffectSnapshots,
   replaceWorkspaceStorage,
   writeWorkspaceStorage,
   type WorkspaceStorageRead,
@@ -291,15 +292,26 @@ async function mutate<T extends object>(
     return committed;
   };
   if (!admitsSources) return execute({ assets: new Map(), libraryAudioClaims: [] });
-  await initDB();
+  const db = await initDB();
   return runWithDurableAssetLifecycleLock(async (lifecyclePermit) => {
     let prepared = await readReviewReadySources(aggregateId);
     if (effectSnapshots?.length) {
-      const previous = await readVideoWorkspace(aggregateId);
-      if (!previous) throw new VideoWorkspaceError('invalid');
+      const tx = db.transaction(
+        [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE],
+        'readonly'
+      );
+      let registry: ReviewAnnotationEffectSnapshot[] | null;
+      try {
+        registry = await readWorkspaceEffectSnapshots(tx, aggregateId);
+        await tx.done;
+      } catch (error) {
+        await tx.done.catch(() => undefined);
+        throw error;
+      }
+      if (!registry) throw new VideoWorkspaceError('invalid');
       try {
         prepared = await verifyReviewAnnotationEffectSources(
-          previous.workspace,
+          { effectSnapshots: registry },
           effectSnapshots,
           prepared
         );

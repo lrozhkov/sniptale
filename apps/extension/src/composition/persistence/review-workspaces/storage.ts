@@ -7,6 +7,8 @@ import {
 import { withReviewWorkspaceUsage } from '../media-library/usage-index-keys';
 import type { VideoWorkspace } from './contracts';
 import { parseVideoWorkspace } from './parser';
+import { parseReviewAnnotationEffectSnapshots } from '../../../features/video/review/annotation-effects/validation';
+import type { ReviewAnnotationEffectSnapshot } from '../../../features/video/review/annotation-effects/types';
 import {
   materializeWorkspaceStorage,
   workspaceStorageHead,
@@ -53,6 +55,33 @@ export interface WorkspaceStorageRead {
   head: unknown;
   rows: unknown[];
   logical: unknown;
+}
+
+/** Reads source preflight metadata only; the write transaction still admits the full workspace. */
+export async function readWorkspaceEffectSnapshots(
+  tx: { objectStore(name: string): { get(key: string | [string, number]): Promise<unknown> } },
+  aggregateId: string
+): Promise<ReviewAnnotationEffectSnapshot[] | null> {
+  const head = await tx.objectStore(VIDEO_WORKSPACES_STORE).get(aggregateId);
+  if (!isRecord(head) || head['aggregateId'] !== aggregateId) return null;
+  let registry = head['effectSnapshots'];
+  if ('historyLength' in head) {
+    const version = head['formatVersion'];
+    const length = head['historyLength'];
+    if (
+      (version !== 2 && version !== 3 && version !== 4 && version !== 5) ||
+      typeof length !== 'number' ||
+      !Number.isSafeInteger(length) ||
+      length < 0 ||
+      'effectSnapshots' in head
+    )
+      return null;
+    const baseline = await tx.objectStore(VIDEO_WORKSPACE_HISTORY_STORE).get([aggregateId, 0]);
+    if (!isRecord(baseline) || baseline['aggregateId'] !== aggregateId || baseline['ordinal'] !== 0)
+      return null;
+    registry = baseline['effectSnapshots'];
+  }
+  return registry === undefined ? [] : parseReviewAnnotationEffectSnapshots(registry);
 }
 
 /** Materializes an already selected indexed head in the same native readonly transaction. */

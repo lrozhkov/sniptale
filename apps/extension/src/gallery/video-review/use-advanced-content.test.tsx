@@ -69,6 +69,9 @@ function setup() {
     saveVideoWorkspaceAdvanced: read,
     saveVideoWorkspaceDraft: read,
     saveVideoWorkspaceSnapshot: commit,
+    commitVideoWorkspace: vi.fn(async () => {
+      throw new Error('Buffered edits must use snapshot publication.');
+    }),
   });
   function Harness() {
     const snapshot = useReviewSnapshot(session);
