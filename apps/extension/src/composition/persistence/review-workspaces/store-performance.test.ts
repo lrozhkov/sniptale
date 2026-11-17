@@ -550,3 +550,9 @@ it('derives retained usage keys for every workspace writer without accepting imp
   ])
     expect(Object.keys(result ?? {}).sort()).toEqual(['draft', 'workspace']);
 });
+
+// Exercise rollover and refusal with a small budget; actual defaults have browser capacity proof.
+vi.mock('../../../features/editor-history/policy', async (load) => ({
+  ...(await load<typeof import('../../../features/editor-history/policy')>()),
+  EDITOR_HISTORY_LIMITS: Object.freeze({ maxActions: 50, maxBytes: 8 * 1024 * 1024 }),
+}));

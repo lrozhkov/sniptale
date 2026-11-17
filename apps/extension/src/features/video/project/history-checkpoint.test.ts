@@ -1,3 +1,4 @@
+import { createTextClip } from './factories/overlay-clip';
 import { expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from './factories/creation';
 import { createVideoProjectCursorTrack } from './defaults';
@@ -291,4 +292,29 @@ it('replays past from newest to oldest and future from nearest to farthest', () 
       first
     )
   ).toBeNull();
+});
+
+it('admits 1000 complete clip replacements within the existing byte budget', () => {
+  const initial = createEmptyVideoProject('Compound history');
+  initial.duration = 12;
+  const clip = {
+    ...createTextClip(initial.tracks[0]!.id, initial.width, initial.height, 0),
+    duration: 12,
+  };
+  let current = { ...initial, clips: [{ ...clip, id: 'clip-0', text: 'Text 0' }] };
+  const past: VideoProjectHistoryChange[] = [];
+  for (let index = 1; index <= 1000; index++) {
+    const next = { ...current, clips: [{ ...clip, id: `clip-${index}`, text: `Text ${index}` }] };
+    const change = createVideoProjectHistoryChange(current, next);
+    if (!change) throw new Error('Expected a supported clip replacement.');
+    past.push(change);
+    current = next;
+  }
+  const checkpoint = { version: 1, projectId: current.id, past, future: [] };
+  expect(new TextEncoder().encode(JSON.stringify(checkpoint)).byteLength).toBeLessThan(
+    EDITOR_HISTORY_LIMITS.maxBytes
+  );
+  expect(
+    admitCheckpoint(checkpoint, current, { ...EDITOR_HISTORY_LIMITS, maxActions: 1000 })?.past
+  ).toHaveLength(1000);
 });

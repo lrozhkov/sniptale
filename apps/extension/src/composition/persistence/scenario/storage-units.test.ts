@@ -306,7 +306,7 @@ it('refuses incomplete or mismatched editing branch graphs without changing thei
         future: [{ ...branch, items: [{ unitId: 'guide:missing', revision: 1 }] }],
       },
     },
-    { ...native.head, editingHistory: { version: 1, past: [], future: Array(51).fill(branch) } },
+    { ...native.head, editingHistory: { version: 1, past: [], future: Array(1001).fill(branch) } },
   ];
   const original = structuredClone(native);
   for (const head of heads)

@@ -1,7 +1,12 @@
 import { selectHistoryRetentionWindow } from '@sniptale/foundation/history/retention';
 
+const MAX_EDITOR_ACTIONS = 1000;
+
 /** Product Undo+Redo budget; adapters retain current content independently. */
-export const EDITOR_HISTORY_LIMITS = Object.freeze({ maxActions: 50, maxBytes: 8 * 1024 * 1024 });
+export const EDITOR_HISTORY_LIMITS = Object.freeze({
+  maxActions: MAX_EDITOR_ACTIONS,
+  maxBytes: 32 * 1024 * 1024,
+});
 
 /** Bounded metadata admission precedes file reads; raster bytes have separate asset limits. */
 export const IMAGE_HISTORY_MAX_JSON_BYTES = 512 * 1024 * 1024;
@@ -9,7 +14,7 @@ export const IMAGE_HISTORY_MAX_VALUES = 100_000;
 
 /** Image snapshots share unchanged raster and drawing payloads between logical actions. */
 export const IMAGE_EDITOR_HISTORY_LIMITS = Object.freeze({
-  maxActions: 100,
+  maxActions: MAX_EDITOR_ACTIONS,
   maxBytes: 32 * 1024 * 1024,
 });
 

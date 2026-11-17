@@ -1,4 +1,3 @@
-import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 import { createDefaultRichShapeObject } from '../../../features/editor/document/rich-shape';
 import { expect, it, vi } from 'vitest';
 import { crc32 } from 'node:zlib';
@@ -81,7 +80,7 @@ it('does not recount pooled object bytes across the retained past on each append
 
 // Keep small-budget retention cases independent of the Image Editor product default.
 const createEditorSnapshotHistory = (document: EditorDocument) =>
-  createImageHistory(document, EDITOR_HISTORY_LIMITS);
+  createImageHistory(document, { maxActions: 50, maxBytes: 8 * 1024 * 1024 });
 
 it('round-trips editor documents through snapshot history', () => {
   const first = createMockDocument();
@@ -640,17 +639,17 @@ it('pools every retained raster slot and restores full metadata through undo and
   expect(redoEditorSnapshot(history)).toEqual(second);
 });
 
-it('retains 100 transitions under the Image Editor default without changing other history policies', () => {
+it('retains 1000 transitions under the Image Editor product default', () => {
   const first = createMockDocument();
   const history = createImageHistory(first);
-  for (let index = 1; index <= 120; index++)
+  for (let index = 1; index <= 1020; index++)
     pushEditorSnapshotHistory({
       history,
       muted: false,
       exportDocument: () => ({ ...first, sourceName: `edit-${index}` }),
     });
-  expect(history.getSnapshots()).toHaveLength(101);
-  for (let index = 119; index >= 20; index--)
+  expect(history.getSnapshots()).toHaveLength(1001);
+  for (let index = 1019; index >= 20; index--)
     expect(undoEditorSnapshot(history)?.sourceName).toBe(`edit-${index}`);
   expect(undoEditorSnapshot(history)).toBeNull();
 });

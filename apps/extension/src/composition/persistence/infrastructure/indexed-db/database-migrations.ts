@@ -1130,6 +1130,33 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
     validationStores: [IMAGE_WORKSPACES_STORE, ASSET_REFS_STORE, ASSET_OWNERS_STORE],
     diagnostic: 'Image packed history stores are unavailable.',
   }),
+  contractOnlyMigration({
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 41, to: 42 },
+      { domainId: 'videoProjects', from: 15, to: 16 },
+      { domainId: 'scenarioProjects', from: 14, to: 15 },
+    ],
+    fromDatabaseVersion: 67,
+    toDatabaseVersion: 68,
+    stores: [
+      IMAGE_WORKSPACES_STORE,
+      VIDEO_WORKSPACES_STORE,
+      VIDEO_PROJECTS_STORE,
+      SCENARIO_PROJECTS_STORE,
+    ],
+    validationStores: [
+      IMAGE_WORKSPACES_STORE,
+      VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_HISTORY_STORE,
+      VIDEO_PROJECTS_STORE,
+      VIDEO_PROJECT_REVISIONS_STORE,
+      SCENARIO_PROJECTS_STORE,
+      SCENARIO_PROJECT_HISTORY_STORE,
+      SCENARIO_PROJECT_UNITS_STORE,
+      SCENARIO_PROJECT_REVISIONS_STORE,
+    ],
+    diagnostic: 'Editor history capacity stores are unavailable.',
+  }),
 ];
 
 function projectPrototypeAnimationPreferences(value: unknown) {

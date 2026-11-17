@@ -190,3 +190,9 @@ it('admits only a matching retained baseline after immutable operation reuse', (
   };
   expect(retainedWorkspaceReplacementStart(previous, empty)).toBe(previous.cursor);
 });
+
+// Exercise rollover and refusal with a small budget; actual defaults have browser capacity proof.
+vi.mock('../../../features/editor-history/policy', async (load) => ({
+  ...(await load<typeof import('../../../features/editor-history/policy')>()),
+  EDITOR_HISTORY_LIMITS: Object.freeze({ maxActions: 50, maxBytes: 8 * 1024 * 1024 }),
+}));

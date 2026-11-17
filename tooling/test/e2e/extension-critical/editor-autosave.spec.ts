@@ -226,7 +226,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
                 URL.revokeObjectURL(url);
               }
             },
-            { text, source, fragments: owner === 'gallery-nearcap' ? 270 : 112 }
+            { text, source, fragments: owner === 'gallery-nearcap' ? 1080 : 112 }
           );
           if (owner === 'gallery-nearcap') {
             if (
@@ -236,8 +236,8 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
               typeof fixture.historyBytes !== 'number'
             )
               throw new Error('Missing canonical near-cap bytes');
-            expect(fixture.historyBytes).toBeGreaterThan(0.9 * 8 * 1024 * 1024);
-            expect(fixture.historyBytes).toBeLessThan(0.98 * 8 * 1024 * 1024);
+            expect(fixture.historyBytes).toBeGreaterThan(0.9 * 32 * 1024 * 1024);
+            expect(fixture.historyBytes).toBeLessThan(0.98 * 32 * 1024 * 1024);
           }
           fixture = {
             fixture,

@@ -34,7 +34,7 @@ The document asset owner retains the original image, accepted color image, visib
 
 Physical database version 65 advances the videoProjects contract to version 14. The additive migration preserves every existing record, store and immutable file. Earlier writers refuse the newer database before mutation.
 
-The native workspace factory uses the existing asset journal and project writer. Preparation captures the canonical predecessor and retained revision before file IO. Preparation stores each distinct inverse value in one immutable JSON object. Retained changes reuse their admitted native references. One transaction publishes the current document, history references, ownership, source retention and revision. The history budget remains 50 transitions and 8 MiB, including unfinished gesture recovery.
+The native workspace factory uses the existing asset journal and project writer. Preparation captures the canonical predecessor and retained revision before file IO. Preparation stores each distinct inverse value in one immutable JSON object. Retained changes reuse their admitted native references. One transaction publishes the current document, history references, ownership, source retention and revision. The history budget permits 1000 transitions and 32 MiB, including unfinished gesture recovery.
 
 A retry retains its prepared attempt and journal identity. An exact acknowledgement does not create another revision. The live attempt retains its own sync receipt across acknowledgement failure. Deleted or recreated identities refuse delayed publication through the retained revision counter. Cold recovery validates unknown metadata, actual file hashes, both history directions and source closure before publication. Superseded journals settle before obsolete file reads and preserve published resources.
 
@@ -160,7 +160,7 @@ Gallery bundled action sounds require physical database version 23, mediaLibrary
 
 Earlier writers refuse the newer database before dropping the authored settings.
 
-Bounded editor history requires physical database version24, mediaLibrary contract21 and scenarioProjects contract7. The additive23→24 admission publishes contracts only, preserving every released head, row, draft and immutable object. Ordinary admitted mutations retain at most50 combined Undo/Redo transitions and8MiB canonical UTF8 operation metadata. Current content remains outside that budget. Gallery logical format2 retains a complete document baseline, including Cuts, Speed, notes, canvas comments and authored advanced content.
+Bounded editor history requires physical database version24, mediaLibrary contract21 and scenarioProjects contract7. The additive23→24 admission publishes contracts only, preserving every released head, row, draft and immutable object. Ordinary admitted mutations retain at most1000 combined Undo/Redo transitions and32MiB canonical UTF8 operation metadata. Current content remains outside that budget. Gallery logical format2 retains a complete document baseline, including Cuts, Speed, notes, canvas comments and authored advanced content.
 
 Physical format3 keeps that baseline at ordinal zero and a stable positive ordinal range in the head. Reads check the full retained graph and redo without mutation. The first admitted legacy mutation may replace its representation. Warm rollover removes only expired rows and updates baseline/head and the new tail, including ordinary paused-buffer Save.
 
@@ -168,7 +168,7 @@ Gallery field typing uses an explicit owner API with a page-issued action identi
 
 Missing or superseded write evidence is unknown and cannot authorize another append. UI-only acknowledgement, idle and maxWait do not close the field group. Portable review carries authored history and the complete baseline, omits this private write marker and rejects marker-bearing input before restore publication.
 
-Scenario saved versions retain at most20 previous roots and16MiB canonical UTF8 metadata, separately from current content and the50/8MiB page Undo policy. Existing valid50/64MiB roots remain read-admitted until an explicit mutation. The existing editor/autosave queue publishes final closed action captures in order before a later action. Repeated publication of one action retains its earliest previous saved root. Generate action IDs outside the pure reducer.
+Scenario saved versions retain at most20 previous roots and16MiB canonical UTF8 metadata, separately from current content and the1000/32MiB page Undo policy. Existing valid50/64MiB roots remain read-admitted until an explicit mutation. The existing editor/autosave queue publishes final closed action captures in order before a later action. Repeated publication of one action retains its earliest previous saved root. Generate action IDs outside the pure reducer.
 
 These IDs require an exact owner revision for metadata-only publication.
 
@@ -1233,7 +1233,7 @@ Portable history version 2 uses the same shared JSON file. Privacy projection st
 
 Physical database version 62 adds `image_workspace_identities` and advances the mediaLibrary contract to version 40. The additive 61→62 migration preserves existing documents, history, assets and presentations. Earlier writers refuse the newer database before mutation.
 
-Image history retains a cursor, actions and references to immutable snapshot and object versions. Unchanged raster bytes and drawing payloads share retained resources. Ordinary history retention permits 100 transitions and 32 MiB of pooled payload. Current content remains available when history retention removes transitions.
+Image history retains a cursor, actions and references to immutable snapshot and object versions. Unchanged raster bytes and drawing payloads share retained resources. Ordinary history retention permits 1000 transitions and 32 MiB of pooled payload. Current content remains available when history retention removes transitions.
 
 Native admission limits history JSON to 512 MiB and 100,000 values before file reads. These admission limits do not replace the smaller runtime retention budget. Canvas SVG sources remain in bounded object JSON. Raster resources retain their existing validators.
 
@@ -1265,7 +1265,7 @@ Physical database version 64 advances the scenarioProjects contract to version 1
 
 Optional `editingHistory` retains separate `past` and `future` branches. Their order determines the navigation cursor. Saved revisions retain their separate chronology and budget. An explicit empty checkpoint differs from an absent legacy checkpoint.
 
-Native unit format 3 shares unchanged Guide items and Tour slides across current content, saved revisions and both editing branches. The checkpoint permits 50 transitions and 8 MiB of pooled payload. Empty history retains current content independently of this budget. Admission checks project identities, complete unit references and UTF-8 byte sizes. Reads do not repair or prune physical evidence.
+Native unit format 3 shares unchanged Guide items and Tour slides across current content, saved revisions and both editing branches. The checkpoint permits 1000 transitions and 32 MiB of pooled payload. Empty history retains current content independently of this budget. Admission checks project identities, complete unit references and UTF-8 byte sizes. Reads do not repair or prune physical evidence.
 
 Resource admission, reachability and source promotion share one collector over current content, saved revisions and both editing branches. It reads references without serializing snapshot payloads.
 
@@ -1287,3 +1287,5 @@ Automatic saves preserve the active edit group. A transient group origin retains
 
 
 Explicit Library removal clears selected resource references from current content, saved revisions and both editing branches. It preserves branch order and historical timestamps. The operation retains existing image slots, captions and layout. It does not append an editing action. The native transaction publishes the sanitized graph and removes child ownership together. Revision exhaustion refuses the transaction and preserves its predecessor.
+
+Database version 68 publishes mediaLibrary contract 42, videoProjects contract 16 and scenarioProjects contract 15. This admission prevents older writers from truncating the larger history. The additive migration preserves existing rows and files.

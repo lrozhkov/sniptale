@@ -1,5 +1,32 @@
 export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   {
+    owner: 'editor-history-product-budget',
+    productionFile: 'apps/extension/src/features/editor-history/policy.ts',
+    allowCrossOwner: true,
+    reason:
+      'The common budget affects four native history writers and retained resources. ' +
+      'Runtime retention and native conflict, lifetime and retry suites cover these consumers.',
+    testFiles: [
+      'apps/extension/src/features/editor-history/policy.test.ts',
+      'apps/extension/src/editor/controller/history/index.test.ts',
+      'apps/extension/src/features/editor-history/image-checkpoint.test.ts',
+      'apps/extension/src/composition/persistence/image-workspaces/history-codec.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.history.integration.test.ts',
+      'apps/extension/src/features/video/project/history-checkpoint.test.ts',
+      'apps/extension/src/composition/persistence/projects/history-publication.test.ts',
+      'apps/extension/src/composition/persistence/scenario/editing-history.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-checkpoint-write.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.identity.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+      'apps/extension/src/composition/persistence/scenario/storage-units.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/history-retention.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store-history-retention.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store-performance.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store-annotation-retention.test.ts',
+    ],
+  },
+  {
     owner: 'native-project-replacement-consumers',
     productionFile: 'apps/extension/src/composition/persistence/projects/backup-restore.ts',
     allowCrossOwner: true,

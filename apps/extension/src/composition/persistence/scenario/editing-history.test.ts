@@ -291,3 +291,9 @@ it('keeps a contiguous nearest window when both branches exceed the pooled byte 
   expect(parseScenarioEditingHistory(retained, current)).toEqual(retained);
   expect(future).toHaveLength(2);
 });
+
+// Keep byte refusal and nearest-window cases small; browser tests prove the product capacity.
+vi.mock('../../../features/editor-history/policy', async (load) => ({
+  ...(await load<typeof import('../../../features/editor-history/policy')>()),
+  EDITOR_HISTORY_LIMITS: Object.freeze({ maxActions: 50, maxBytes: 8 * 1024 * 1024 }),
+}));

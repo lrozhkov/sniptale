@@ -858,3 +858,17 @@ it.each([
     );
   }
 );
+
+it('selects all four native publishers when the common editor history budget changes', async () => {
+  const module = await importOwnerMap();
+  expect(
+    module.resolveMappedCoverageOwnerTests('apps/extension/src/features/editor-history/policy.ts')
+  ).toEqual(
+    expect.arrayContaining([
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.history.integration.test.ts',
+      'apps/extension/src/composition/persistence/projects/history-publication.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.identity.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store.test.ts',
+    ])
+  );
+});

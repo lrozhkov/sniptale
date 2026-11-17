@@ -116,7 +116,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 41,
+    schemaVersion: 42,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
@@ -140,7 +140,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'videoProjects',
-    schemaVersion: 15,
+    schemaVersion: 16,
     stores: [
       { storeName: VIDEO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_PROJECT_REVISIONS_STORE, dataClass: 'durable-authority' },
@@ -151,7 +151,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'scenarioProjects',
-    schemaVersion: 14,
+    schemaVersion: 15,
     stores: [
       { storeName: SCENARIO_PROJECT_REVISIONS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_PROJECTS_STORE, dataClass: 'durable-authority' },

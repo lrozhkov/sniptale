@@ -870,3 +870,21 @@ it('admits packed Image history additively and fences older writers', async () =
   expect(await plan![0]!.estimateAdditionalBytes()).toBe(64 * 1024);
   expect(buildDatabaseMigrationPlan(67, 66)).toBeNull();
 });
+
+it('fences older writers before they can truncate 1000-action editor history', async () => {
+  const plan = buildDatabaseMigrationPlan(67, 68);
+  expect(plan).toHaveLength(1);
+  expect(plan![0]).toMatchObject({
+    fromDatabaseVersion: 67,
+    toDatabaseVersion: 68,
+    risk: 'additive',
+    backupCoverage: 'none',
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 41, to: 42 },
+      { domainId: 'videoProjects', from: 15, to: 16 },
+      { domainId: 'scenarioProjects', from: 14, to: 15 },
+    ],
+  });
+  expect(await plan![0]!.estimateAdditionalBytes()).toBe(64 * 1024);
+  expect(buildDatabaseMigrationPlan(68, 67)).toBeNull();
+});

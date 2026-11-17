@@ -145,7 +145,7 @@ it('refuses invalid checkpoint admission before changing any native store', asyn
     null,
     { ...checkpoint, version: 2 },
     { ...checkpoint, future: [{ ...first.project, id: 'foreign' }] },
-    { ...checkpoint, past: Array.from({ length: 51 }, () => first.project) },
+    { ...checkpoint, past: Array.from({ length: 1001 }, () => first.project) },
   ]) {
     Reflect.set(options, 'editingHistory', hostile);
     await expect(commitScenarioAggregateMutation(first.project, options)).rejects.toThrow(
