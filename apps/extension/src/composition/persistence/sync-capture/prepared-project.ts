@@ -284,7 +284,14 @@ export function parsePreparedVideoProjectReplicaRoot(
 ): PreparedVideoProjectReplicaRoot {
   if (!isRecord(value) || !isBoundedImageMetadata(value, false)) return invalid();
   assertKeys(value, ['assets', 'exports', 'entry', 'snapshotRefs', 'thumbnail', 'presentation']);
-  const entry = parseVideoProjectMetadataEntry(value['entry']);
+  const rawEntry = value['entry'];
+  if (
+    !isRecord(rawEntry) ||
+    Object.hasOwn(rawEntry, 'history') ||
+    Object.hasOwn(rawEntry, 'historyPublicationId')
+  )
+    return invalid();
+  const entry = parseVideoProjectMetadataEntry(rawEntry);
   if (!entry) return invalid();
   const assets = parseAssets(value['assets']);
   const exports = parseExports(value['exports'], entry.id);

@@ -319,6 +319,8 @@ function isPortableVideoProjectMetadata(value: unknown): value is PortableVideoP
   return (
     isRecord(value) &&
     isRecord(value['entry']) &&
+    !Object.hasOwn(value['entry'], 'history') &&
+    !Object.hasOwn(value['entry'], 'historyPublicationId') &&
     typeof value['entry']['id'] === 'string' &&
     isRecord(value['entry']['project']) &&
     Array.isArray(value['projectAssets']) &&

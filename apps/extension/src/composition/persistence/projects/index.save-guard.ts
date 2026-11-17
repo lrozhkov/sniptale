@@ -3,6 +3,7 @@ import type { VideoWorkspace } from '../review-workspaces/contracts';
 import type { VideoProject } from '../../../features/video/project/types';
 import type { VideoProjectEntry } from './contracts';
 import type { LibraryStorageClass } from '../library-lifecycle/contracts';
+import { createVideoProjectHistoryChange } from '../../../features/video/project/history-change';
 
 export interface SaveVideoProjectOptions {
   baseUpdatedAt?: number | null;
@@ -102,6 +103,12 @@ export function guardStaleVideoProjectSave(args: {
   if (hasBaseRevisionConflict(args)) {
     throw new StaleVideoProjectSaveError(args.project.id);
   }
+
+  if (
+    args.existing?.history &&
+    createVideoProjectHistoryChange(args.existing.project, args.project)
+  )
+    throw new Error('Changing a video project with history requires an owned history capture.');
 
   const preservePersistedAssets = shouldPreservePersistedProjectAssets(args);
   return {

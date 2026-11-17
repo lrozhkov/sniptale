@@ -70,6 +70,32 @@ it('hydrates exact self-contained animation bytes without staged effect bindings
   expect(JSON.stringify(data.root)).toBe(before);
   expect(io.read).not.toHaveBeenCalled();
 });
+
+it.each([
+  { history: { version: 1 as const, epoch: 'foreign', past: [], future: [], sources: [] } },
+  {
+    history: {
+      version: 1 as const,
+      epoch: 'foreign',
+      past: [{ assetId: 'unowned-native-file' }],
+      future: [],
+      sources: [],
+    },
+  },
+  {
+    history: { version: 1 as const, epoch: 'foreign', past: [], future: [], sources: [] },
+    historyPublicationId: 'foreign-publication',
+  },
+  { historyPublicationId: 'foreign-publication' },
+])('refuses private native history in a synced root before file IO: %j', async (fields) => {
+  const { root } = await setup();
+  const candidate = { ...root, entry: { ...root.entry, ...fields } };
+  const before = structuredClone(candidate);
+  expect(() => parsePreparedVideoProjectReplicaRoot(candidate)).toThrow('invalid');
+  await expect(hydratePreparedVideoProjectReplicaRoot(candidate)).rejects.toThrow('invalid');
+  expect(candidate).toEqual(before);
+  expect(io.read).not.toHaveBeenCalled();
+});
 it.each(['extra', 'duplicate', 'wrong-slot', 'size', 'mime', 'digest'] as const)(
   'refuses unsupported detached effect binding before physical reads: %s',
   async (change) => {

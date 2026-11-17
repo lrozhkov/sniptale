@@ -6,6 +6,7 @@ import {
   parseVideoProjectEntry,
   parseVideoProjectEntryResult,
   parseVideoProjectMetadataEntry,
+  parseVideoProjectCurrentEntryResult,
 } from './read-guards';
 import type { VideoProjectMetadataEntry } from './contracts';
 
@@ -75,4 +76,43 @@ it('shares legacy revision defaults and retains unsupported native diagnostics',
   });
   expect(parseVideoProjectEntryResult(undefined)).toEqual({ status: 'notFound' });
   expect(parseVideoProjectMetadataEntry(undefined)).toBeNull();
+});
+
+it('retains the native history head and its publication identity without mutating the row', () => {
+  const history = {
+    version: 1,
+    epoch: 'history-epoch',
+    past: [{ assetId: 'change-1' }],
+    future: [],
+    sources: [],
+  };
+  const row = {
+    ...parseVideoProjectEntry(createVideoProjectEntry())!,
+    history,
+    historyPublicationId: 'publication-1',
+  };
+  expect(parseVideoProjectEntry(row)).toEqual(row);
+  expect(parseVideoProjectMetadataEntry(row)).toEqual(row);
+  expect(parseVideoProjectEntry(row)?.history).not.toBe(history);
+});
+
+it.each([
+  { history: null },
+  { history: { version: 2 } },
+  { historyPublicationId: 'orphan-receipt' },
+  {
+    history: { version: 1, epoch: 'epoch', past: [], future: [], sources: [] },
+    historyPublicationId: '',
+  },
+])('refuses an invalid retained history envelope instead of silently stripping it: %j', (patch) => {
+  const row = { ...createVideoProjectEntry(), ...patch };
+  expect(parseVideoProjectEntry(row)).toBeNull();
+  expect(parseVideoProjectMetadataEntry(row)).toBeNull();
+  const current = parseVideoProjectCurrentEntryResult(row);
+  expect(current.status).toBe('ready');
+  if (current.status === 'ready') {
+    expect(current.entry.project).toEqual(row.project);
+    expect(current.entry).not.toHaveProperty('history');
+    expect(current.entry).not.toHaveProperty('historyPublicationId');
+  }
 });

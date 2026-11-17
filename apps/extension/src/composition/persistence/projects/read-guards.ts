@@ -19,6 +19,7 @@ import type {
   VideoProjectEntryReadResult,
 } from './contracts';
 import { parseLibraryLifecycle } from '../library-lifecycle/parser';
+import { parsePersistedVideoProjectHistory } from './history-contracts';
 
 function isOptionalString(value: unknown): value is string | undefined {
   return value === undefined || isString(value);
@@ -114,9 +115,15 @@ export function parseVideoProjectEntryResult(value: unknown): VideoProjectEntryR
   return parseProjectEntryResult(value, isVideoProject);
 }
 
+/** Current-only reads do not admit or load history. Full native reads and retention stay strict. */
+export function parseVideoProjectCurrentEntryResult(value: unknown): VideoProjectEntryReadResult {
+  return parseProjectEntryResult(value, isVideoProject, 'current');
+}
+
 function parseProjectEntryResult<Project extends VideoProjectMetadata>(
   value: unknown,
-  admitProject: (project: unknown) => project is Project
+  admitProject: (project: unknown) => project is Project,
+  scope: 'full' | 'current' = 'full'
 ):
   | { status: 'ready'; entry: Omit<VideoProjectEntry, 'project'> & { project: Project } }
   | Exclude<VideoProjectEntryReadResult, { status: 'ready' }> {
@@ -167,6 +174,20 @@ function parseProjectEntryResult<Project extends VideoProjectMetadata>(
   ) {
     return { diagnostics: ['invalid-video-project-entry'], status: 'invalid' };
   }
+  const history =
+    scope === 'current' || value['history'] === undefined
+      ? undefined
+      : parsePersistedVideoProjectHistory(value['history']);
+  const historyPublicationId = scope === 'current' ? undefined : value['historyPublicationId'];
+  if (
+    history === null ||
+    (historyPublicationId !== undefined &&
+      (!history ||
+        typeof historyPublicationId !== 'string' ||
+        historyPublicationId.length === 0 ||
+        historyPublicationId.length > 200))
+  )
+    return { diagnostics: ['invalid-video-project-entry'], status: 'invalid' };
   return {
     entry: {
       createdAt: value['createdAt'],
@@ -174,6 +195,8 @@ function parseProjectEntryResult<Project extends VideoProjectMetadata>(
       project: value['project'],
       updatedAt: value['updatedAt'],
       workspaceRevision: workspaceRevision ?? 0,
+      ...(history ? { history } : {}),
+      ...(typeof historyPublicationId === 'string' ? { historyPublicationId } : {}),
       ...(lifecycle === undefined ? {} : { lifecycle }),
     },
     status: 'ready',

@@ -22,6 +22,7 @@ import { assertNewProjectSources, promoteProjectSourceLifecycles } from './new-r
 import type { VideoProject } from '../../../features/video/project/types';
 import {
   ASSET_REFS_STORE,
+  ASSET_OWNERS_STORE,
   initDB,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
@@ -45,6 +46,7 @@ import {
   type StoredProjectAssetEntry,
   type VideoProjectEntry,
   type VideoProjectReadResult,
+  type VideoProjectWorkspaceReadResult,
 } from './contracts';
 import {
   assertAssetWriteAdmission,
@@ -54,6 +56,7 @@ import {
   cancelAssetPublication,
   discardPreparedAsset,
   parseAssetRef,
+  parseAssetOwner,
   publishReadyJournalWithRetry,
   readAssetFile,
   releaseAssetReadyProtection,
@@ -82,7 +85,7 @@ import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import {
   parseProjectAssetEntry,
   parseVideoProjectEntry,
-  parseVideoProjectEntryResult,
+  parseVideoProjectCurrentEntryResult,
 } from './read-guards';
 import { isHydratableVideoProject } from '../../../features/video/project/validation';
 import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../features/video/project/effect-instance';
@@ -91,6 +94,11 @@ import {
   promoteLibraryLifecycle,
   updateLibraryLifecycle,
 } from '../library-lifecycle/contracts';
+import { hydratePersistedVideoProjectHistory } from './history-codec';
+import {
+  VIDEO_PROJECT_HISTORY_OWNER_KIND,
+  videoProjectHistoryAssetBindings,
+} from './history-contracts';
 
 export { deleteVideoProject } from './index.delete.ts';
 export * from './index.exports.ts';
@@ -115,7 +123,10 @@ export async function saveVideoProject(
     const stores = createProjectMutationStores(db);
     const { assetOperationStore, mediaLibraryStore, projectStore, recordingStore, tx } = stores;
     try {
-      const existing = parseVideoProjectEntry(await projectStore.get(project.id));
+      const rawExisting: unknown = await projectStore.get(project.id);
+      const existing = parseVideoProjectEntry(rawExisting);
+      if (rawExisting !== undefined && !existing)
+        throw new Error('Stored video project is invalid.');
       if (expectedReviewWorkspace) await assertVideoWorkspaceUnchanged(tx, expectedReviewWorkspace);
       const guardedSave = guardStaleVideoProjectSave({
         existing: existing ?? undefined,
@@ -154,6 +165,7 @@ export async function saveVideoProject(
         createdAt: existing?.createdAt ?? candidate.createdAt,
         updatedAt: now,
         lifecycle: buildSavedProjectLifecycle(existing, now),
+        ...(existing?.history ? { history: existing.history } : {}),
         workspaceRevision: await allocateVideoProjectRevisionInTransaction(
           tx,
           candidate.id,
@@ -249,7 +261,7 @@ function withVideoProjectCreatedAt(project: VideoProject): VideoProject {
 
 export async function getVideoProject(id: string): Promise<VideoProjectReadResult> {
   const db = await initDB();
-  const result = parseVideoProjectEntryResult(await db.get(VIDEO_PROJECTS_STORE, id));
+  const result = parseVideoProjectCurrentEntryResult(await db.get(VIDEO_PROJECTS_STORE, id));
   if (result.status !== 'ready') return result;
   try {
     await verifyVideoProjectEffectSnapshotIntegrity(result.entry.project);
@@ -268,9 +280,69 @@ export async function getVideoProject(id: string): Promise<VideoProjectReadResul
   }
 }
 
+/** Read one native workspace snapshot. Callers hold the editing-resource lease during file IO. */
+export async function getVideoProjectWorkspace(
+  id: string
+): Promise<VideoProjectWorkspaceReadResult> {
+  const db = await initDB();
+  const tx = db.transaction(
+    [VIDEO_PROJECTS_STORE, ASSET_REFS_STORE, ASSET_OWNERS_STORE],
+    'readonly'
+  );
+  const raw: unknown = await tx.objectStore(VIDEO_PROJECTS_STORE).get(id);
+  const current = parseVideoProjectCurrentEntryResult(raw);
+  const full = parseVideoProjectEntry(raw);
+  const refs: unknown[] = [];
+  let available = full !== null;
+  for (const binding of videoProjectHistoryAssetBindings(full?.history)) {
+    const owner = parseAssetOwner(
+      await tx
+        .objectStore(ASSET_OWNERS_STORE)
+        .get([VIDEO_PROJECT_HISTORY_OWNER_KIND, id, binding.role])
+    );
+    const ref: unknown = await tx.objectStore(ASSET_REFS_STORE).get(binding.assetId);
+    if (
+      !owner ||
+      owner.assetId !== binding.assetId ||
+      owner.ownerId !== id ||
+      owner.ownerKind !== VIDEO_PROJECT_HISTORY_OWNER_KIND ||
+      owner.role !== binding.role
+    )
+      available = false;
+    refs.push(ref);
+  }
+  await tx.done;
+  if (current.status !== 'ready') return current;
+  if (current.entry.id !== id)
+    return { status: 'invalid', diagnostics: ['invalid-video-project-entry'] };
+  try {
+    await verifyVideoProjectEffectSnapshotIntegrity(current.entry.project);
+  } catch {
+    return { status: 'invalid', diagnostics: ['invalid-video-project-entry'], opaqueId: id };
+  }
+  const result = {
+    status: 'ready' as const,
+    project: current.entry.project,
+    workspaceRevision: current.entry.workspaceRevision ?? 0,
+    ...(current.entry.lifecycle ? { lifecycle: current.entry.lifecycle } : {}),
+  };
+  if (!available || !full) return { ...result, history: { status: 'unavailable' } };
+  if (!full.history) return { ...result, history: { status: 'absent' } };
+  try {
+    const value = await hydratePersistedVideoProjectHistory({
+      history: full.history,
+      refs,
+      current: result.project,
+    });
+    return { ...result, history: { status: 'ready', value } };
+  } catch {
+    return { ...result, history: { status: 'unavailable' } };
+  }
+}
+
 export async function listVideoProjects(): Promise<VideoProjectListItem[]> {
   const db = await initDB();
-  const entries = (await db.getAll(VIDEO_PROJECTS_STORE)).map(parseVideoProjectEntryResult);
+  const entries = (await db.getAll(VIDEO_PROJECTS_STORE)).map(parseVideoProjectCurrentEntryResult);
   // Listing metadata must not read/hash every project's effect assets. Exact reads still verify them.
   return entries
     .flatMap((result, index) =>
@@ -293,7 +365,7 @@ export async function listVideoProjects(): Promise<VideoProjectListItem[]> {
 
 export async function listVideoProjectReadResults(): Promise<VideoProjectReadResult[]> {
   const db = await initDB();
-  const all = (await db.getAll(VIDEO_PROJECTS_STORE)).map(parseVideoProjectEntryResult);
+  const all = (await db.getAll(VIDEO_PROJECTS_STORE)).map(parseVideoProjectCurrentEntryResult);
   const verified: VideoProjectReadResult[] = [];
   for (const result of all) {
     if (result.status !== 'ready') {

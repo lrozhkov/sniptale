@@ -5,6 +5,9 @@ import {
 } from '../../../features/video/project/history-capture';
 import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 
+/** Native ownership identity for immutable Montage inverse-change JSON. */
+export const VIDEO_PROJECT_HISTORY_OWNER_KIND = 'video-project-history';
+
 /** Native head references immutable inverse-change JSON; no project payload repeats in this head. */
 export interface PersistedVideoProjectHistory {
   version: 1;

@@ -100,6 +100,69 @@ async function importProjectsDbModule() {
   return import('./index');
 }
 
+describe('retained native project history admission', () => {
+  beforeEach(() => resetProjectsDbMocks(projectsDbMocks));
+
+  it('preserves history during unchanged-content promotion and clears the old publication receipt', async () => {
+    const { saveVideoProject } = await importProjectsDbModule();
+    const history = { version: 1, epoch: 'epoch', past: [], future: [], sources: [] };
+    const existing = {
+      ...createVideoProjectEntry(),
+      history,
+      historyPublicationId: 'old-publication',
+    };
+    projectsDbMocks.txGetMock.mockResolvedValue(existing);
+    const { name, ...content } = existing.project;
+    const saved = await saveVideoProject({ name, ...content, updatedAt: 200 });
+    expect(saved).toMatchObject({ history });
+    expect(saved).not.toHaveProperty('historyPublicationId');
+  });
+
+  it('refuses a content edit without an owned history capture and preserves the stored root', async () => {
+    const { saveVideoProject } = await importProjectsDbModule();
+    const existing = {
+      ...createVideoProjectEntry(),
+      history: { version: 1, epoch: 'epoch', past: [], future: [], sources: [] },
+    };
+    projectsDbMocks.txGetMock.mockResolvedValue(existing);
+    await expect(saveVideoProject({ ...existing.project, name: 'Changed' })).rejects.toThrow(
+      'history'
+    );
+    expect(projectsDbMocks.txPutMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses an invalid existing root instead of replacing it as a missing project', async () => {
+    const { saveVideoProject } = await importProjectsDbModule();
+    projectsDbMocks.txGetMock.mockResolvedValue({
+      ...createVideoProjectEntry(),
+      history: { version: 99 },
+    });
+    await expect(saveVideoProject(createVideoProject())).rejects.toThrow('invalid');
+    expect(projectsDbMocks.txPutMock).not.toHaveBeenCalled();
+  });
+
+  it('preserves history through CAS refusal and retry from the observed predecessor', async () => {
+    const { saveVideoProject } = await importProjectsDbModule();
+    const history = { version: 1, epoch: 'epoch', past: [], future: [], sources: [] };
+    const existing = { ...createVideoProjectEntry(), workspaceRevision: 8, history };
+    const before = structuredClone(existing);
+    projectsDbMocks.txGetMock.mockResolvedValue(existing);
+    await expect(
+      saveVideoProject(existing.project, {
+        expectedWorkspaceRevision: 7,
+        expectedProject: existing.project,
+      })
+    ).rejects.toMatchObject({ name: 'StaleVideoProjectSaveError' });
+    expect(projectsDbMocks.txPutMock).not.toHaveBeenCalled();
+    const saved = await saveVideoProject(existing.project, {
+      expectedWorkspaceRevision: 8,
+      expectedProject: existing.project,
+    });
+    expect(saved.history).toEqual(history);
+    expect(existing).toEqual(before);
+  });
+});
+
 async function verifyProjectSaveRefreshesUpdatedAt() {
   const { saveVideoProject } = await importProjectsDbModule();
   const project = createVideoProject();
