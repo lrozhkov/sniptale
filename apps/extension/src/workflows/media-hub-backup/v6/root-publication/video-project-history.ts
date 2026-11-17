@@ -152,11 +152,12 @@ export async function readPortableVideoProjectHistory(args: {
   return { history, refs, restored };
 }
 
-function remappedCapture(
+/** Rebuild compact inverses through the same typed maps as the current portable project. */
+export function remapPortableVideoProjectHistoryCapture(
   current: VideoProject,
   restored: RestoredVideoProjectHistory,
   assetIds: ReadonlyMap<string, string>,
-  session: ArchiveRestoreSession
+  session: Pick<ArchiveRestoreSession, 'rootIdMap' | 'childIdMap'>
 ): VideoProjectHistoryCapture {
   const remap = (project: VideoProject) =>
     transformPortableVideoProjectReferences(
@@ -214,7 +215,12 @@ export const prepareVideoProjectHistoryStaged: NonNullable<
   });
   if (!original) throw new Error('Video project history is missing.');
   const assetIds = restoredHistoryProjectAssetIds(metadata, args.staged, args.session);
-  const capture = remappedCapture(current.project, original.restored, assetIds, args.session);
+  const capture = remapPortableVideoProjectHistoryCapture(
+    current.project,
+    original.restored,
+    assetIds,
+    args.session
+  );
   const prepared = await preparePersistedVideoProjectHistory(capture);
   try {
     const pointers = portableVideoProjectHistoryPointers(metadata.history);

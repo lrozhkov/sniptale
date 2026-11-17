@@ -18,6 +18,15 @@ import type { PreparedVideoProjectRevision } from '../projects/revision-publicat
 import { parseVideoWorkspace, parseVideoWorkspaceDraft } from '../review-workspaces/parser';
 import { isBoundedImageMetadata } from './image-snapshot';
 import { MAX_CAPTURE_ROWS } from './contracts';
+import {
+  parsePersistedVideoProjectHistory,
+  videoProjectHistoryAssetBindings,
+  videoProjectHistoryChangeRefs,
+  type PersistedVideoProjectHistory,
+} from '../projects/history-contracts';
+import { hydratePersistedVideoProjectHistory } from '../projects/history-codec';
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
+import { isSha256Digest } from '@sniptale/platform/security/digest';
 
 export interface PreparedProjectReplicaExport {
   entry: StoredProjectExportEntry;
@@ -33,6 +42,7 @@ export interface PreparedVideoProjectReplicaRoot {
   assets: PreparedVideoProjectRevision['assets'];
   exports?: PreparedProjectReplicaExport[];
   entry: VideoProjectMetadataEntry;
+  history?: { head: PersistedVideoProjectHistory; refs: AssetRef[] };
   snapshotRefs?: { snapshotId: string; assetId: string; ref: AssetRef }[];
   thumbnail?: { entry: Omit<MediaThumbnailEntry, 'blob'>; ref: AssetRef };
   presentation?: {
@@ -264,6 +274,7 @@ function parseExports(
 function boundRefs(root: PreparedVideoProjectReplicaRoot): AssetRef[] {
   const refs = [
     ...root.assets.map((asset) => asset.ref),
+    ...(root.history?.refs ?? []),
     ...(root.exports ?? []).flatMap((item) => (item.thumbnail ? [item.thumbnail.ref] : [])),
     ...(root.snapshotRefs ?? []).map((binding) => binding.ref),
     ...(root.thumbnail ? [root.thumbnail.ref] : []),
@@ -278,12 +289,49 @@ function boundRefs(root: PreparedVideoProjectReplicaRoot): AssetRef[] {
   return [...unique.values()];
 }
 
+function parseHistory(value: unknown): PreparedVideoProjectReplicaRoot['history'] {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return invalid();
+  assertKeys(value, ['head', 'refs']);
+  const head = parsePersistedVideoProjectHistory(value['head']);
+  if (!head || !Array.isArray(value['refs'])) return invalid();
+  const ids = new Set(videoProjectHistoryAssetBindings(head).map((binding) => binding.assetId));
+  if (value['refs'].length !== ids.size) return invalid();
+  const refs = new Map<string, AssetRef>();
+  for (const raw of value['refs']) {
+    const ref = requiredRef(raw);
+    if (
+      !ids.has(ref.assetId) ||
+      refs.has(ref.assetId) ||
+      ref.mimeType !== 'application/json' ||
+      !ref.sha256 ||
+      !isSha256Digest(`sha256:${ref.sha256}`)
+    )
+      return invalid();
+    refs.set(ref.assetId, ref);
+  }
+  let bytes = 0;
+  for (const change of videoProjectHistoryChangeRefs(head)) {
+    bytes += (refs.get(change.assetId) ?? invalid()).size;
+    if (bytes > EDITOR_HISTORY_LIMITS.maxBytes) return invalid();
+  }
+  return { head, refs: [...refs.values()] };
+}
+
 /** Admit a bounded JSON staged root, exact effect slots, native child rows and sidecar associations. */
 export function parsePreparedVideoProjectReplicaRoot(
   value: unknown
 ): PreparedVideoProjectReplicaRoot {
   if (!isRecord(value) || !isBoundedImageMetadata(value, false)) return invalid();
-  assertKeys(value, ['assets', 'exports', 'entry', 'snapshotRefs', 'thumbnail', 'presentation']);
+  assertKeys(value, [
+    'assets',
+    'exports',
+    'entry',
+    'snapshotRefs',
+    'thumbnail',
+    'presentation',
+    'history',
+  ]);
   const rawEntry = value['entry'];
   if (
     !isRecord(rawEntry) ||
@@ -294,6 +342,7 @@ export function parsePreparedVideoProjectReplicaRoot(
   const entry = parseVideoProjectMetadataEntry(rawEntry);
   if (!entry) return invalid();
   const assets = parseAssets(value['assets']);
+  const history = parseHistory(value['history']);
   const exports = parseExports(value['exports'], entry.id);
   const snapshotRefs = parseSnapshots(value['snapshotRefs'], entry);
   const thumbnail = parseThumbnail(value['thumbnail'], entry.id);
@@ -301,6 +350,7 @@ export function parsePreparedVideoProjectReplicaRoot(
   const root = {
     entry,
     assets,
+    ...(history ? { history } : {}),
     ...(exports === undefined ? {} : { exports }),
     ...(snapshotRefs === undefined ? {} : { snapshotRefs }),
     ...(thumbnail ? { thumbnail } : {}),
@@ -366,6 +416,14 @@ export async function hydratePreparedVideoProjectReplicaRoot(
   });
   if (!entry) return invalid();
   await verifyVideoProjectEffectSnapshotIntegrity(entry.project);
+  if (root.history) {
+    await hydratePersistedVideoProjectHistory({
+      current: entry.project,
+      history: root.history.head,
+      refs: root.history.refs,
+    });
+    entry.history = root.history.head;
+  }
   const thumbnail = root.thumbnail
     ? parseMediaThumbnailEntry({
         ...root.thumbnail.entry,
@@ -403,6 +461,7 @@ export async function hydratePreparedVideoProjectReplicaRoot(
   return {
     entry,
     assets: root.assets,
+    ...(root.history ? { historyRefs: root.history.refs } : {}),
     ...(exports === undefined ? {} : { exports }),
     ...(thumbnail ? { thumbnail } : {}),
     ...(presentation ? { presentation } : {}),

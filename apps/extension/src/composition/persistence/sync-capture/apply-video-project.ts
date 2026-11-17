@@ -82,7 +82,11 @@ import {
   parseProjectExportEntry,
 } from '../projects/read-guards';
 import type { VideoProjectEntry } from '../projects/contracts';
-import { promoteProjectSourceLifecycles } from '../projects/new-reference-admission';
+import {
+  assertNewProjectSources,
+  promoteProjectSourceLifecycles,
+} from '../projects/new-reference-admission';
+import { createScenarioProjectStore } from '../scenario/storage';
 import { allocateVideoProjectRevisionInTransaction } from '../projects/revisions';
 import {
   assertPreparedProjectAssetSources,
@@ -223,8 +227,15 @@ class PreparedProjectClosure {
   }
 
   assertComplete(): void {
-    for (const id of collectCapturedProjectRecordingIds(this.project))
+    for (const id of collectCapturedProjectRecordingIds(
+      this.project,
+      this.input.root.entry.history
+    ))
       this.neededMedia.add(`recording:${id}`);
+    for (const source of this.input.root.entry.history?.sources ?? []) {
+      if (source.kind === 'project-asset') this.neededAssets.add(source.id);
+      if (source.kind === 'library-asset') this.neededMedia.add(source.id);
+    }
     for (const asset of this.project.assets) this.admitSource(asset);
     for (const item of this.input.root.exports ?? []) {
       if (item.videoReview)
@@ -292,15 +303,20 @@ class PreparedProjectClosure {
     );
     const roots = this.input.rootDependencies ?? [];
     const declaredChildren = roots.flatMap((item) => item.children);
-    const provenance =
-      this.project.source.kind === 'scenario' ? this.project.source.scenarioProjectId : undefined;
+    const provenance = new Set(
+      this.project.source.kind === 'scenario' ? [this.project.source.scenarioProjectId] : []
+    );
+    for (const source of this.input.root.entry.history?.sources ?? []) {
+      if (source.kind === 'scenario-asset') scenarioChildren.add(source.id);
+      if (source.kind === 'scenario-project') provenance.add(source.id);
+    }
     if (
       new Set(roots.map((item) => item.rootId)).size !== roots.length ||
       declaredChildren.length !== scenarioChildren.size ||
       new Set(declaredChildren.map((child) => child.entry.id)).size !== declaredChildren.length ||
       declaredChildren.some((child) => !scenarioChildren.has(child.entry.id)) ||
-      roots.some((item) => !item.children.length && item.rootId !== provenance) ||
-      (provenance && !roots.some((item) => item.rootId === provenance))
+      roots.some((item) => !item.children.length && !provenance.has(item.rootId)) ||
+      [...provenance].some((id) => !roots.some((item) => item.rootId === id))
     )
       throw new VideoProjectApplyConflictError('unsupported-project');
     const count = this.input.dependencies.length;
@@ -582,6 +598,19 @@ async function publishApplication(
       stores,
     });
   await publishPreparedVideoProjectRevisionInTransaction({ root, stores, workspaceRevision });
+  if (root.entry.history)
+    await assertNewProjectSources(
+      root.entry.project,
+      undefined,
+      {
+        mediaLibraryStore: stores.media,
+        projectAssetStore: stores.assets,
+        recordingStore: tx.objectStore(STORE_NAME),
+        scenarioAssetStore: tx.objectStore(SCENARIO_ASSETS_STORE),
+        scenarioProjectStore: createScenarioProjectStore(tx),
+      },
+      { next: root.entry.history }
+    );
   await publishPreparedVideoProjectSidecarsInTransaction({ root, stores, workspaceRevision });
   for (const item of root.exports ?? []) {
     const raw: unknown = await tx.objectStore(PROJECT_EXPORTS_STORE).get(item.entry.id);
@@ -642,7 +671,8 @@ async function publishApplication(
       scenarioAssetStore: tx.objectStore(SCENARIO_ASSETS_STORE),
       recordingStore: tx.objectStore(STORE_NAME),
     },
-    Date.now()
+    Date.now(),
+    root.entry.history
   );
   const detached = new Set(collectProjectEntryOwnedAssetIds(context.current));
   await releaseUnpublishedProjectAssets(tx, detached, operation);

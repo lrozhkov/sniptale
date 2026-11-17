@@ -14,6 +14,7 @@ import {
   loadScenarioReplicaExport,
 } from '../../composition/persistence/sync-capture/apply-scenario';
 import { collectPreparedScenarioReplicaRefs } from '../../composition/persistence/sync-capture/prepared-scenario';
+import { collectPreparedProjectReplicaRefs } from '../../composition/persistence/sync-capture/prepared-project';
 import type { CaptureRootKind } from '../../composition/persistence/sync-capture/contracts';
 import {
   applyCatalogDeletionNative,
@@ -877,9 +878,15 @@ async function stageReplicaAttempts(
         physical.objects,
         args.signal
       );
-      if (payload.kind === 'scenario-project') {
+      if (
+        payload.kind === 'scenario-project' ||
+        (payload.kind === 'video-project' && payload.input.root.history)
+      ) {
         const retained = new Set(
-          collectPreparedScenarioReplicaRefs(payload.input.root).map((ref) => ref.assetId)
+          (payload.kind === 'scenario-project'
+            ? collectPreparedScenarioReplicaRefs(payload.input.root)
+            : collectPreparedProjectReplicaRefs(payload.input.root)
+          ).map((ref) => ref.assetId)
         );
         for (const item of [...staged]) {
           if (retained.has(item.ref.assetId)) continue;

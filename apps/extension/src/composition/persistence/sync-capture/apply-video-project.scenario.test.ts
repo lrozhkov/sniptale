@@ -12,6 +12,9 @@ import {
 import type { AssetRef } from '../assets';
 import { captureRootKey, type SyncCaptureRootState } from './contracts';
 import { applyPreparedVideoProjectRevision } from './apply-video-project';
+import { createSha256Digest } from '@sniptale/platform/security/digest';
+import { createVideoProjectHistoryChange } from '../../../features/video/project/history-change';
+import { collectVideoProjectHistorySources } from '../../../features/video/project/history-capture';
 import {
   createVideoProjectReplicaFixture,
   spaceId,
@@ -167,6 +170,59 @@ it('publishes Scenario-derived Montage without replacing its borrowed root', asy
     generation: 1,
   });
 });
+
+it.each(['valid', 'deleted-parent', 'changed-child'])(
+  'admits historical-only Scenario dependencies with their exact native witness: %s',
+  async (mode) => {
+    const fixture = await scenarioSetup();
+    const historical = fixture.input.root.entry.project;
+    const current = { ...historical, source: { kind: 'manual' as const }, assets: [], clips: [] };
+    fixture.input.root.entry.project = current;
+    const value = JSON.stringify(createVideoProjectHistoryChange(historical, current));
+    const file = new File([value], 'history.json', { type: 'application/json' });
+    const ref: AssetRef = {
+      assetId: 'scenario-history',
+      createdAt: 1,
+      size: file.size,
+      mimeType: file.type,
+      location: { kind: 'opfs', objectKey: 'objects/scenario-history' },
+      sha256: (await createSha256Digest(value)).slice('sha256:'.length),
+    };
+    fixture.input.root.history = {
+      head: {
+        version: 1,
+        epoch: 'historical-scenario',
+        past: [{ assetId: ref.assetId }],
+        future: [],
+        sources: collectVideoProjectHistorySources(historical),
+      },
+      refs: [ref],
+    };
+    if (mode === 'deleted-parent') fixture.table('scenario_projects').delete(fixture.scenario.id);
+    if (mode === 'changed-child')
+      fixture
+        .table('scenario_assets')
+        .set(fixture.child.id, { ...fixture.child, assetId: 'replacement-bytes' });
+    const before = structuredClone(fixture.rows);
+    const assets = await import('../assets');
+    const read = vi.spyOn(assets, 'readAssetFile').mockResolvedValue(file);
+    try {
+      if (mode === 'valid') {
+        await expect(applyPreparedVideoProjectRevision(fixture.input)).resolves.toMatchObject({
+          status: 'applied',
+        });
+        expect(fixture.table('video_projects').get(projectId)).toHaveProperty('history');
+        expect(fixture.table('scenario_projects')).toEqual(before.get('scenario_projects'));
+        expect(fixture.table('scenario_assets')).toEqual(before.get('scenario_assets'));
+      } else {
+        await expect(applyPreparedVideoProjectRevision(fixture.input)).rejects.toThrow();
+        expect(fixture.rows).toEqual(before);
+      }
+    } finally {
+      read.mockRestore();
+    }
+  }
+);
 
 it.each(['child-bytes', 'owner', 'parallel-head', 'delete-recreate'] as const)(
   'refuses delayed Scenario-dependent publication after %s changes',

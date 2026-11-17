@@ -28,6 +28,7 @@ import { collectReviewAssetReferences } from '../../composition/persistence/revi
 import { prepareVideoReviewRestore } from '../../composition/persistence/review-workspaces/backup-restore';
 import {
   type PreparedProjectReplicaExport,
+  type PreparedVideoProjectReplicaRoot,
   parsePreparedVideoProjectReplicaRoot,
 } from '../../composition/persistence/sync-capture/prepared-project';
 import type { ApplyPreparedVideoProjectRevisionInput } from '../../composition/persistence/sync-capture/apply-video-project';
@@ -59,6 +60,14 @@ import {
   parsePortableScenarioProjectMetadata,
   preparePortableVideoProjectAsset,
 } from '../media-hub-backup/v6/root-codecs/projects';
+import { portableVideoProjectHistoryPointers } from '../media-hub-backup/v6/root-codecs/video-project-history';
+import { createSha256Digest } from '@sniptale/platform/security/digest';
+import {
+  readPortableVideoProjectCurrent,
+  readPortableVideoProjectHistory,
+  remapPortableVideoProjectHistoryCapture,
+} from '../media-hub-backup/v6/root-publication/video-project-history';
+import { preparePersistedVideoProjectHistory } from '../../composition/persistence/projects/history-codec';
 
 const metadataOnlyReader: ArchiveReader = {
   entries: () => [],
@@ -193,7 +202,14 @@ export async function parsePortableSyncRoot(value: unknown, reviewSourceMediaId?
   if (envelope.descriptor.rootKind !== 'video-project')
     throw new Error('Unsupported portable sync root.');
   const metadata = parsePortableVideoProjectMetadata(envelope.metadata);
-  exactKeys(metadata, ['entry', 'projectAssets', 'projectExports', 'thumbnail', 'presentation']);
+  exactKeys(metadata, [
+    'entry',
+    'projectAssets',
+    'projectExports',
+    'thumbnail',
+    'presentation',
+    'history',
+  ]);
   if (
     metadata.projectAssets.length > MAX_CAPTURE_ROWS ||
     metadata.projectExports.length > MAX_CAPTURE_ROWS
@@ -289,6 +305,8 @@ function editingProjectAssets(
       asset.source.kind === 'project-asset' ? [asset.source.projectAssetId] : []
     )
   );
+  for (const source of parsed.metadata.history?.sources ?? [])
+    if (source.kind === 'project-asset') needed.add(source.id);
   for (const item of parsed.metadata.projectExports) {
     if (retainedExportIds.has(item.entry.id)) continue;
     if (item.videoReview)
@@ -368,6 +386,11 @@ export function portableSyncEditingObjectIds(
     ];
   return [
     ...new Set([
+      ...(parsed.metadata.history
+        ? portableVideoProjectHistoryPointers(parsed.metadata.history).map(
+            (entry) => entry.objectId
+          )
+        : []),
       ...editingProjectAssets(parsed, retained).map((asset) => asset.objectId),
       ...parsed.metadata.projectExports.flatMap((item) =>
         !omitPresentation && !retained.has(item.entry.id) && item.thumbnail
@@ -553,6 +576,10 @@ export function portableSyncDependencyIds(
     }
     return [...needed].sort();
   }
+  for (const source of parsed.metadata.history?.sources ?? []) {
+    if (source.kind === 'recording') needed.add(`recording:${source.id}`);
+    if (source.kind === 'library-asset') needed.add(source.id);
+  }
   for (const id of collectCapturedProjectRecordingIds(parsed.entry.project))
     needed.add(`recording:${id}`);
   for (const asset of parsed.entry.project.assets) {
@@ -583,7 +610,8 @@ async function prepareVideoRoot(
   sender: readonly PortableCausalDependency[],
   refFor: VerifiedObjectResolver,
   deferredExports?: ReadonlyMap<string, DeferredProjectExport>,
-  omitPresentation = false
+  omitPresentation = false,
+  stageNativeMetadata?: (blob: Blob) => Promise<AssetRef>
 ): Promise<ApplyPreparedVideoProjectRevisionInput['root']> {
   const needed = new Set(portableSyncDependencyIds(parsed));
   // Later staging must not replace a predecessor child that another native root can retain.
@@ -682,6 +710,48 @@ async function prepareVideoRoot(
     { ...Object.fromEntries(mediaRootIds), ...scenarioMaps.rootIdMap },
     scenarioMaps.childIdMap
   );
+  let history: PreparedVideoProjectReplicaRoot['history'];
+  if (parsed.metadata.history) {
+    if (!stageNativeMetadata) throw new Error('Project history staging is unavailable.');
+    const objectIds = new Set([
+      ...portableVideoProjectHistoryPointers(parsed.metadata.history).map((item) => item.objectId),
+      ...(parsed.metadata.entry.project.effectSnapshots ?? []).flatMap((snapshot) =>
+        snapshot.assets.map((asset) => asset.objectId)
+      ),
+    ]);
+    const staged = [...objectIds].map((objectId) => ({ objectId, ref: refFor(objectId) }));
+    const current = await readPortableVideoProjectCurrent(parsed.metadata, staged);
+    const admitted = await readPortableVideoProjectHistory({
+      metadata: parsed.metadata,
+      staged,
+      current: current.project,
+    });
+    if (!admitted) throw new Error('Project history is unavailable.');
+    const capture = remapPortableVideoProjectHistoryCapture(
+      current.project,
+      admitted.restored,
+      assetIds,
+      {
+        rootIdMap: { ...Object.fromEntries(mediaRootIds), ...scenarioMaps.rootIdMap },
+        childIdMap: scenarioMaps.childIdMap,
+      }
+    );
+    const byValue = new Map<string, AssetRef>();
+    for (const entry of [
+      ...capture.past,
+      ...capture.future,
+      ...(capture.recovery ? [capture.recovery] : []),
+    ]) {
+      if (byValue.has(entry.value)) continue;
+      const ref = await stageNativeMetadata(new Blob([entry.value], { type: 'application/json' }));
+      byValue.set(entry.value, {
+        ...ref,
+        sha256: (await createSha256Digest(entry.value)).slice('sha256:'.length),
+      });
+    }
+    const prepared = await preparePersistedVideoProjectHistory(capture, byValue);
+    history = { head: prepared.history, refs: prepared.refs };
+  }
   const snapshotRefs = (parsed.metadata.entry.project.effectSnapshots ?? []).flatMap((snapshot) =>
     snapshot.assets.map((asset) => ({
       snapshotId: snapshot.id,
@@ -742,6 +812,7 @@ async function prepareVideoRoot(
   return parsePreparedVideoProjectReplicaRoot({
     entry: { ...parsed.entry, project },
     assets,
+    ...(history ? { history } : {}),
     ...(exports === undefined ? {} : { exports }),
     ...(snapshotRefs.length ? { snapshotRefs } : {}),
     ...(thumbnail
@@ -942,7 +1013,8 @@ export async function preparePortableReplica(args: {
         sender,
         refFor,
         args.deferredExports,
-        args.omitPresentation
+        args.omitPresentation,
+        args.stageNativeMetadata
       );
       payload = {
         kind: 'video-project',
