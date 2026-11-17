@@ -347,6 +347,19 @@ it('upgrades each retained source contract only after all required stores valida
   }
 });
 
+it('advances native Montage history admission without rewriting stores', async () => {
+  const plan = buildDatabaseMigrationPlan(64, 65);
+  expect(plan).toHaveLength(1);
+  expect(plan![0]).toMatchObject({
+    fromDatabaseVersion: 64,
+    toDatabaseVersion: 65,
+    risk: 'additive',
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'videoProjects', from: 13, to: 14 }],
+  });
+  expect(await plan![0]!.estimateAdditionalBytes()).toBe(64 * 1024);
+});
+
 it('admits compact source gain without workspace migration and refuses incompatible contracts', () => {
   expect(betaV17Fixture.records).toEqual(betaV16Fixture.records);
   expect(betaV17Fixture.opfsObjects).toEqual(betaV16Fixture.opfsObjects);

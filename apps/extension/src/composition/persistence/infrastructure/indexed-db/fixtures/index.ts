@@ -1,4 +1,5 @@
 import { betaV64Fixture } from './beta-v64';
+import { betaV65Fixture } from './beta-v65';
 import { betaV63Fixture } from './beta-v63';
 import { betaV61Fixture } from './beta-v61';
 import { betaV62Fixture } from './beta-v62';
@@ -142,4 +143,5 @@ export const SUPPORTED_BETA_DATABASE_FIXTURES: readonly BetaDatabaseFixtureContr
   betaV62Fixture,
   betaV63Fixture,
   betaV64Fixture,
+  betaV65Fixture,
 ];

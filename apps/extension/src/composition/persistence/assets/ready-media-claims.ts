@@ -5,6 +5,10 @@ import { parseCapturedMediaRows } from '../sync-capture/media-snapshot';
 import { parsePreparedVideoReviewReplicaRoot } from '../sync-capture/prepared-review-parser';
 import type { MediaDependencyTarget } from '../media-library/dependencies';
 import type { AssetReadyJournal } from './contracts';
+import {
+  VIDEO_PROJECT_WORKSPACE_PUBLICATION_DOMAIN,
+  collectVideoProjectWorkspaceSources,
+} from '../projects/history-contracts';
 
 type MediaSource = MediaDependencyTarget['source'];
 interface ReadyMediaTarget {
@@ -106,6 +110,8 @@ function unknownPublicationKeys(domain: string): string[] {
       return ['unknown:web-snapshot'];
     case 'image-workspace':
       return [UNKNOWN_READY_MEDIA];
+    case VIDEO_PROJECT_WORKSPACE_PUBLICATION_DOMAIN:
+      return [UNKNOWN_READY_MEDIA, 'unknown:project-export-owner'];
     default:
       return [];
   }
@@ -119,6 +125,8 @@ export function collectReadyJournalMediaKeys(
   if (journal.domain === 'sync-replica') return replicaMediaKeys(payload);
   if (!isRecord(payload)) return unknownPublicationKeys(journal.domain);
   switch (journal.domain) {
+    case VIDEO_PROJECT_WORKSPACE_PUBLICATION_DOMAIN:
+      return workspacePublicationKeys(payload);
     case 'image-workspace':
       return [identityKey('media', recordIdentity(payload, 'aggregateId'))];
     case 'project-assets':
@@ -131,6 +139,26 @@ export function collectReadyJournalMediaKeys(
     default:
       return [];
   }
+}
+
+function workspacePublicationKeys(payload: Record<string, unknown>): string[] {
+  const project = payload['project'];
+  if (!isRecord(project)) return [UNKNOWN_READY_MEDIA, 'unknown:project-export-owner'];
+  const entry = parseVideoProjectMetadataEntry({
+    id: project['id'],
+    project,
+    history: payload['history'],
+    createdAt: project['createdAt'],
+    updatedAt: project['updatedAt'],
+  });
+  if (!entry?.history) return [UNKNOWN_READY_MEDIA, 'unknown:project-export-owner'];
+  const keys = new Set([reference('project-export-owner', entry.id)]);
+  for (const source of collectVideoProjectWorkspaceSources(entry)) {
+    keys.add(reference(source.kind === 'library-asset' ? 'media' : source.kind, source.id));
+    if (source.kind === 'project-asset' || source.kind === 'scenario-asset')
+      keys.add(reference('media', `${source.kind}:${source.id}`));
+  }
+  return [...keys];
 }
 
 /** The predicate and durable locators share one policy for pending source and sidecar publication. */

@@ -30,6 +30,16 @@ Physical database version 54 advances mediaLibrary from 34 to 35 and scenarioPro
 
 The document asset owner retains the original image, accepted color image, visibility mask and key image through its existing resource closure. Managed backgrounds keep these fields on the serialized background object. The change adds no Frame binary property, store, journal or archive layout. Portable readers refuse unsupported document versions before restore staging or publication.
 
+## Montage history publication
+
+Physical database version 65 advances the videoProjects contract to version 14. The additive migration preserves every existing record, store and immutable file. Earlier writers refuse the newer database before mutation.
+
+The native workspace factory uses the existing asset journal and project writer. Preparation captures the canonical predecessor and retained revision before file IO. Preparation stores each distinct inverse value in one immutable JSON object. Retained changes reuse their admitted native references. One transaction publishes the current document, history references, ownership, source retention and revision. The history budget remains 50 transitions and 8 MiB, including unfinished gesture recovery.
+
+A retry retains its prepared attempt and journal identity. An exact acknowledgement does not create another revision. The live attempt retains its own sync receipt across acknowledgement failure. Deleted or recreated identities refuse delayed publication through the retained revision counter. Cold recovery validates unknown metadata, actual file hashes, both history directions and source closure before publication. Superseded journals settle before obsolete file reads and preserve published resources.
+
+This protocol does not activate an editor producer or startup recovery. Archive and sync history codecs must preserve the complete graph before producer activation. Raw native history fields remain invalid at portable receiving boundaries.
+
 ## Recording recovery
 
 The recordings domain owns `recording_recovery_sessions` and `recording_recovery_blocks` in the canonical database. Both stores contain authoritative user data. Database version 33 adds these stores and changes the recordings contract from 2 to 3. The migration preserves all earlier rows and immutable media.

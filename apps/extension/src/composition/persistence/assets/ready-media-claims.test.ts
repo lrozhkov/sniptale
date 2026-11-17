@@ -1,9 +1,58 @@
 import { expect, it } from 'vitest';
+import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import { VIDEO_PROJECT_WORKSPACE_PUBLICATION_DOMAIN } from '../projects/history-contracts';
 import {
   collectReadyJournalMediaKeys,
   mediaHasPendingPublication,
   readyMediaTargetKeys,
 } from './ready-media-claims';
+
+it('retains the destination, current and historical sources of a prepared Montage workspace', () => {
+  const project = createEmptyVideoProject('Current');
+  project.baseRecordingId = 'current-recording';
+  const journal = {
+    domain: VIDEO_PROJECT_WORKSPACE_PUBLICATION_DOMAIN,
+    payload: {
+      project,
+      history: {
+        version: 1,
+        epoch: 'epoch',
+        past: [],
+        future: [],
+        sources: [
+          { kind: 'recording', id: 'removed-recording' },
+          { kind: 'project-asset', id: 'removed-private' },
+          { kind: 'library-asset', id: 'removed-library' },
+        ],
+      },
+    },
+  };
+  const keys = collectReadyJournalMediaKeys(journal);
+  expect(keys).toEqual(
+    expect.arrayContaining([
+      `project-export-owner:${project.id}`,
+      'recording:current-recording',
+      'recording:removed-recording',
+      'project-asset:removed-private',
+      'media:project-asset:removed-private',
+      'media:removed-library',
+    ])
+  );
+  expect(
+    readyMediaTargetKeys({ id: project.id, projectAssetIds: [] }).some((key) => keys.includes(key))
+  ).toBe(true);
+  expect(mediaHasPendingPublication(journal, { id: 'removed-library' })).toBe(true);
+  expect(mediaHasPendingPublication(journal, { id: 'unrelated' })).toBe(false);
+});
+
+it.each([null, {}, { project: createEmptyVideoProject('Current'), history: { version: 99 } }])(
+  'retains malformed Montage workspace publication conservatively: %j',
+  (payload) => {
+    expect(
+      collectReadyJournalMediaKeys({ domain: VIDEO_PROJECT_WORKSPACE_PUBLICATION_DOMAIN, payload })
+    ).toEqual(expect.arrayContaining(['unknown:media', 'unknown:project-export-owner']));
+  }
+);
 
 it('selects exports by parent owner and private assets without selecting other parents', () => {
   const keys = readyMediaTargetKeys({ id: 'parent', projectAssetIds: ['private'] });

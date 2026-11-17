@@ -1104,6 +1104,14 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
     ],
     diagnostic: 'Scenario editing history stores are unavailable.',
   }),
+  contractOnlyMigration({
+    domainVersions: [{ domainId: 'videoProjects', from: 13, to: 14 }],
+    fromDatabaseVersion: 64,
+    toDatabaseVersion: 65,
+    stores: [VIDEO_PROJECTS_STORE],
+    validationStores: [VIDEO_PROJECTS_STORE, VIDEO_PROJECT_REVISIONS_STORE],
+    diagnostic: 'Video project history stores are unavailable.',
+  }),
 ];
 
 function projectPrototypeAnimationPreferences(value: unknown) {

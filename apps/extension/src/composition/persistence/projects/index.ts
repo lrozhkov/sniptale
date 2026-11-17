@@ -1,6 +1,12 @@
 import { captureCheckpointReceiptInTransaction } from '../sync-capture/checkpoints';
 import type { SyncCheckpointReceipt } from '../sync-capture/contracts';
-import { allocateVideoProjectRevisionInTransaction } from './revisions';
+import {
+  allocateVideoProjectRevisionInTransaction,
+  readRetainedVideoProjectRevisionInTransaction,
+} from './revisions';
+import { createVideoProjectHistoryChange } from '../../../features/video/project/history-change';
+import { replaceEditorDocumentAssetOwnership } from '../document-assets/ownership';
+import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { captureVideoProjectInTransaction } from '../sync-capture/capture';
 import { publishLibraryProjectBindingInTransaction } from './known-library-source';
 import { assertVideoWorkspaceUnchanged } from '../review-workspaces/store';
@@ -27,6 +33,7 @@ import {
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   VIDEO_PROJECTS_STORE,
+  VIDEO_PROJECT_REVISIONS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { deleteMediaAssetWithProjectCascade } from '../media-library/delete-cascade';
@@ -64,6 +71,7 @@ import {
   type AssetReadyJournal,
   listReadyJournals,
   type AssetRef,
+  SupersededAssetPublicationError,
 } from '../assets';
 import {
   PROJECT_ASSET_PUBLICATION_DOMAIN,
@@ -79,7 +87,11 @@ import {
   type VideoProjectListItem,
 } from '../../../features/media-hub/video-project-list-items';
 import { publishMediaHubLibraryChanged } from '../../../features/media-hub/events';
-import { guardStaleVideoProjectSave, type SaveVideoProjectOptions } from './index.save-guard.ts';
+import {
+  guardStaleVideoProjectSave,
+  StaleVideoProjectSaveError,
+  type SaveVideoProjectOptions,
+} from './index.save-guard.ts';
 import { parseDbEntries } from '../infrastructure/indexed-db/read-primitives';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import {
@@ -98,6 +110,7 @@ import { hydratePersistedVideoProjectHistory } from './history-codec';
 import {
   VIDEO_PROJECT_HISTORY_OWNER_KIND,
   videoProjectHistoryAssetBindings,
+  type PreparedVideoProjectWorkspaceWrite,
 } from './history-contracts';
 
 export { deleteVideoProject } from './index.delete.ts';
@@ -113,26 +126,145 @@ export async function saveVideoProject(
   project: VideoProject,
   options: SaveVideoProjectOptions = {}
 ): Promise<VideoProjectSaveResult> {
-  const expectedReviewWorkspace = options.expectedReviewWorkspace
-    ? structuredClone(options.expectedReviewWorkspace)
-    : undefined;
-  const libraryBindings = structuredClone(options.libraryBindings ?? []);
+  const ownedOptions = {
+    ...options,
+    ...(options.expectedReviewWorkspace
+      ? { expectedReviewWorkspace: structuredClone(options.expectedReviewWorkspace) }
+      : {}),
+    libraryBindings: structuredClone(options.libraryBindings ?? []),
+  };
   const candidate = await prepareVideoProjectSave(project);
+  return persistVideoProjectSave(candidate, ownedOptions);
+}
+
+/** Commit an owner-prepared graph. Journal recovery must admit its bytes before this boundary. */
+export async function commitPreparedVideoProjectWorkspace(
+  input: PreparedVideoProjectWorkspaceWrite,
+  journal: Pick<AssetReadyJournal, 'journalId' | 'assetRefs'>,
+  lifecyclePermit?: DurableAssetLifecyclePermit
+): Promise<VideoProjectSaveResult> {
+  if (!isHydratableVideoProject(input.project)) throw new Error('Invalid video project payload');
+  await verifyVideoProjectEffectSnapshotIntegrity(input.project);
+  return persistVideoProjectSave(
+    input.project,
+    {
+      expectedWorkspaceRevision: input.expectedWorkspaceRevision,
+      expectedProject: input.expectedProject,
+    },
+    { input, journal, ...(lifecyclePermit ? { lifecyclePermit } : {}) }
+  );
+}
+
+function workspacePublicationStatus(
+  existing: VideoProjectEntry | null,
+  retained: number,
+  input: PreparedVideoProjectWorkspaceWrite,
+  journalId: string
+): 'acknowledged' | 'superseded' | 'ready' {
+  if (
+    existing?.historyPublicationId === journalId &&
+    existing.workspaceRevision === input.expectedRetainedRevision + 1 &&
+    retained === existing.workspaceRevision &&
+    JSON.stringify(existing.history) === JSON.stringify(input.history) &&
+    !createVideoProjectHistoryChange(existing.project, input.project)
+  )
+    return 'acknowledged';
+  if (
+    retained !== input.expectedRetainedRevision ||
+    (existing?.history && existing.history.epoch !== input.history.epoch)
+  )
+    return 'superseded';
+  return 'ready';
+}
+
+/** Recovery can settle or retire a prepared attempt before reading its obsolete file payloads. */
+export async function readVideoProjectWorkspacePublicationStatus(
+  input: PreparedVideoProjectWorkspaceWrite,
+  journalId: string
+): Promise<'acknowledged' | 'superseded' | 'ready'> {
+  const db = await initDB();
+  const tx = db.transaction([VIDEO_PROJECTS_STORE, VIDEO_PROJECT_REVISIONS_STORE], 'readonly');
+  const raw: unknown = await tx.objectStore(VIDEO_PROJECTS_STORE).get(input.project.id);
+  const existing = parseVideoProjectEntry(raw);
+  if (raw !== undefined && !existing) throw new Error('Stored video project is invalid.');
+  const retained = await readRetainedVideoProjectRevisionInTransaction(
+    tx,
+    input.project.id,
+    existing?.workspaceRevision ?? 0
+  );
+  await tx.done;
+  const status = workspacePublicationStatus(existing, retained, input, journalId);
+  if (status !== 'ready') return status;
+  try {
+    guardStaleVideoProjectSave({
+      existing: existing ?? undefined,
+      project: input.project,
+      replacesHistory: true,
+      options: {
+        expectedWorkspaceRevision: input.expectedWorkspaceRevision,
+        expectedProject: input.expectedProject,
+      },
+    });
+    return 'ready';
+  } catch (error) {
+    if (error instanceof StaleVideoProjectSaveError) return 'superseded';
+    throw error;
+  }
+}
+
+async function persistVideoProjectSave(
+  candidate: VideoProject,
+  options: SaveVideoProjectOptions,
+  prepared?: {
+    input: PreparedVideoProjectWorkspaceWrite;
+    journal: Pick<AssetReadyJournal, 'journalId' | 'assetRefs'>;
+    lifecyclePermit?: DurableAssetLifecyclePermit;
+  }
+): Promise<VideoProjectSaveResult> {
+  const expectedReviewWorkspace = options.expectedReviewWorkspace;
+  const libraryBindings = options.libraryBindings ?? [];
   const physicalDelete = buildPhysicalDeleteOperation([]);
   const saved = await runWithIndexedDbMutation(async (db) => {
     const stores = createProjectMutationStores(db);
     const { assetOperationStore, mediaLibraryStore, projectStore, recordingStore, tx } = stores;
     try {
-      const rawExisting: unknown = await projectStore.get(project.id);
+      const rawExisting: unknown = await projectStore.get(candidate.id);
       const existing = parseVideoProjectEntry(rawExisting);
       if (rawExisting !== undefined && !existing)
         throw new Error('Stored video project is invalid.');
+      if (prepared) {
+        const retained = await readRetainedVideoProjectRevisionInTransaction(
+          tx,
+          candidate.id,
+          existing?.workspaceRevision ?? 0
+        );
+        const status = workspacePublicationStatus(
+          existing,
+          retained,
+          prepared.input,
+          prepared.journal.journalId
+        );
+        if (status === 'acknowledged' && existing) {
+          await tx.done;
+          return existing;
+        }
+        if (status === 'superseded') throw new SupersededAssetPublicationError();
+        await assertPreparedHistoryReferences(stores, existing, prepared.input, prepared.journal);
+      }
       if (expectedReviewWorkspace) await assertVideoWorkspaceUnchanged(tx, expectedReviewWorkspace);
-      const guardedSave = guardStaleVideoProjectSave({
-        existing: existing ?? undefined,
-        options,
-        project: candidate,
-      });
+      let guardedSave: ReturnType<typeof guardStaleVideoProjectSave>;
+      try {
+        guardedSave = guardStaleVideoProjectSave({
+          existing: existing ?? undefined,
+          options,
+          project: candidate,
+          ...(prepared ? { replacesHistory: true } : {}),
+        });
+      } catch (error) {
+        if (prepared && error instanceof StaleVideoProjectSaveError)
+          throw new SupersededAssetPublicationError();
+        throw error;
+      }
       for (const binding of libraryBindings) {
         if (
           existing ||
@@ -147,17 +279,16 @@ export async function saveVideoProject(
           throw new Error('Invalid review destination source binding.');
         await publishLibraryProjectBindingInTransaction(tx, binding);
       }
-      await assertNewProjectSources(
-        guardedSave.project,
-        existing?.project,
-        stores,
-        existing?.history ? { next: existing.history, previous: existing.history } : undefined
-      );
+      const nextHistory = prepared?.input.history ?? existing?.history;
+      await assertNewProjectSources(guardedSave.project, existing?.project, stores, {
+        ...(nextHistory ? { next: nextHistory } : {}),
+        ...(existing?.history ? { previous: existing.history } : {}),
+      });
       const existingProjectAssetIds = collectProjectEntryOwnedAssetIds(existing);
       const nextProjectAssetIds = new Set(
         collectProjectEntryOwnedAssetIds({
           project: guardedSave.project,
-          ...(existing?.history ? { history: existing.history } : {}),
+          ...(nextHistory ? { history: nextHistory } : {}),
         })
       );
       const removedProjectAssetIds = guardedSave.preservePersistedAssets
@@ -175,13 +306,28 @@ export async function saveVideoProject(
         createdAt: existing?.createdAt ?? candidate.createdAt,
         updatedAt: now,
         lifecycle: buildSavedProjectLifecycle(existing, now),
-        ...(existing?.history ? { history: existing.history } : {}),
+        ...(prepared
+          ? { history: prepared.input.history, historyPublicationId: prepared.journal.journalId }
+          : existing?.history
+            ? { history: existing.history }
+            : {}),
         workspaceRevision: await allocateVideoProjectRevisionInTransaction(
           tx,
           candidate.id,
           existing?.workspaceRevision ?? 0
         ),
       };
+
+      if (prepared)
+        await replaceEditorDocumentAssetOwnership({
+          nextDocument: { assets: videoProjectHistoryAssetBindings(entry.history) },
+          nextRefs: prepared.input.refs,
+          ownerId: entry.id,
+          ownerKind: VIDEO_PROJECT_HISTORY_OWNER_KIND,
+          previousDocument: { assets: videoProjectHistoryAssetBindings(existing?.history) },
+          physicalDelete,
+          stores: { owners: stores.assetOwnerStore, refs: stores.assetRefStore },
+        });
 
       await persistProjectReferences({
         entry,
@@ -221,8 +367,55 @@ export async function saveVideoProject(
     }
   });
   if (physicalDelete.assetIds.length > 0 || physicalDelete.privateSources?.length)
-    await completePhysicalDeleteOperation(physicalDelete).catch(() => undefined);
+    await completePhysicalDeleteOperation(physicalDelete, prepared?.lifecyclePermit).catch(
+      () => undefined
+    );
   return saved;
+}
+
+async function assertPreparedHistoryReferences(
+  stores: ReturnType<typeof createProjectMutationStores>,
+  existing: VideoProjectEntry | null,
+  input: PreparedVideoProjectWorkspaceWrite,
+  journal: Pick<AssetReadyJournal, 'assetRefs'>
+): Promise<void> {
+  const bindings = videoProjectHistoryAssetBindings(input.history);
+  const refs = new Map(input.refs.map((ref) => [ref.assetId, ref]));
+  const staged = new Map(journal.assetRefs.map((ref) => [ref.assetId, ref]));
+  const previous = new Set(
+    videoProjectHistoryAssetBindings(existing?.history).map((binding) => binding.assetId)
+  );
+  if (
+    refs.size !== input.refs.length ||
+    refs.size !== bindings.length ||
+    staged.size !== journal.assetRefs.length ||
+    [...staged].some(([id, ref]) => JSON.stringify(refs.get(id)) !== JSON.stringify(ref))
+  )
+    throw new Error('Prepared video history references are inconsistent.');
+  for (const binding of bindings) {
+    const ref = parseAssetRef(refs.get(binding.assetId));
+    if (!ref || ref.mimeType !== 'application/json' || !ref.sha256)
+      throw new Error('Prepared video history reference is invalid.');
+    const stored: unknown = await stores.assetRefStore.get(binding.assetId);
+    if (staged.has(binding.assetId)) {
+      if (stored !== undefined) throw new Error('Prepared video history identity already exists.');
+    } else {
+      const owner = parseAssetOwner(
+        await stores.assetOwnerStore.get([
+          VIDEO_PROJECT_HISTORY_OWNER_KIND,
+          input.project.id,
+          binding.role,
+        ])
+      );
+      if (
+        !previous.has(binding.assetId) ||
+        !owner ||
+        owner.assetId !== binding.assetId ||
+        JSON.stringify(parseAssetRef(stored)) !== JSON.stringify(ref)
+      )
+        throw new Error('Reused video history reference changed.');
+    }
+  }
 }
 
 async function persistProjectReferences(args: {

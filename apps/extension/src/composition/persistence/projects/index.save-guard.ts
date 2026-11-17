@@ -17,7 +17,7 @@ export interface SaveVideoProjectOptions {
   storageClass?: LibraryStorageClass;
 }
 
-class StaleVideoProjectSaveError extends Error {
+export class StaleVideoProjectSaveError extends Error {
   constructor(projectId: string) {
     super(`Video project ${projectId} was changed before this save completed`);
     this.name = 'StaleVideoProjectSaveError';
@@ -99,6 +99,7 @@ export function guardStaleVideoProjectSave(args: {
   existing: VideoProjectEntry | undefined;
   options: SaveVideoProjectOptions;
   project: VideoProject;
+  replacesHistory?: boolean;
 }): { preservePersistedAssets: boolean; project: VideoProject } {
   if (hasBaseRevisionConflict(args)) {
     throw new StaleVideoProjectSaveError(args.project.id);
@@ -106,6 +107,7 @@ export function guardStaleVideoProjectSave(args: {
 
   if (
     args.existing?.history &&
+    !args.replacesHistory &&
     createVideoProjectHistoryChange(args.existing.project, args.project)
   )
     throw new Error('Changing a video project with history requires an owned history capture.');

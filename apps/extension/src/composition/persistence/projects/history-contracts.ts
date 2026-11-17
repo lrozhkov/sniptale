@@ -6,9 +6,22 @@ import {
 } from '../../../features/video/project/history-capture';
 import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 import type { VideoProjectMetadata } from '../../../features/video/project/validation';
+import type { VideoProject } from '../../../features/video/project/types';
+import type { AssetRef } from '../assets/contracts';
 
 /** Native ownership identity for immutable Montage inverse-change JSON. */
 export const VIDEO_PROJECT_HISTORY_OWNER_KIND = 'video-project-history';
+export const VIDEO_PROJECT_WORKSPACE_PUBLICATION_DOMAIN = 'video-project-workspace';
+
+/** An owned attempt binds immutable resources to the predecessor observed before file IO. */
+export interface PreparedVideoProjectWorkspaceWrite {
+  project: VideoProject;
+  history: PersistedVideoProjectHistory;
+  refs: readonly AssetRef[];
+  expectedProject: VideoProject | null;
+  expectedWorkspaceRevision: number | null;
+  expectedRetainedRevision: number;
+}
 
 /** Retained inverses or an unfinished gesture prevent independent current-head rewrites. */
 export function hasVideoProjectHistoryChanges(

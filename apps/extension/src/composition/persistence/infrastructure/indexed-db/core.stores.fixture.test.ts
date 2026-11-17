@@ -26,6 +26,26 @@ function canonicalize(value: unknown): string {
   return JSON.stringify(value);
 }
 
+it('admits Montage history without changing released data or other domain contracts', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 64
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 65
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, videoProjects: 14 });
+  expect(DATABASE_MIGRATIONS.find((step) => step.toDatabaseVersion === 65)).toMatchObject({
+    fromDatabaseVersion: 64,
+    risk: 'additive',
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'videoProjects', from: 13, to: 14 }],
+  });
+});
+
 it('admits known-source receipts without rewriting any released rows or object bytes', () => {
   const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
     (fixture) => fixture.databaseVersion === 25
@@ -437,7 +457,7 @@ it('adds empty capture and native revision stores without rewriting version 39 r
   expect(
     PERSISTENCE_DOMAIN_REGISTRY.find((domain) => domain.domainId === 'videoProjects')
   ).toMatchObject({
-    schemaVersion: 13,
+    schemaVersion: 14,
     stores: expect.arrayContaining([
       { storeName: 'video_project_revisions', dataClass: 'durable-authority' },
     ]),
