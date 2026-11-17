@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createGlTransitionSelection } from '../../features/video/project/transition/gl-catalog';
 import {
   resolvePresentationDescription,
   canCoalescePresentationInteraction,
@@ -826,33 +827,45 @@ it('requires explicit retry after context loss and ignores loss after disposal',
   expect(result.status.phase).toBe('inactive');
 });
 
-it('keeps the composed owner for dissolve projects even at Current quality outside the seam', async () => {
-  props.preferences = { ...DEFAULT_QUICK_PREVIEW_PREFERENCES };
-  props.cut = {
-    file: new File(['source'], 'source.webm'),
-    duration: 10,
-    time: 0,
-    edits: [
-      {
-        id: 'cut',
-        kind: 'cut',
-        start: 2,
-        end: 4,
-        requestedStart: 2,
-        requestedEnd: 4,
-        transition: { type: 'dissolve', before: 0.5, after: 0.5 },
-      },
-    ],
-  };
-  await render();
-  expect(result.active).toBe(true);
-  expect(io.factory).toHaveBeenCalledOnce();
-  props = { ...props, playing: true, cut: { ...props.cut, time: 5 } };
-  await render();
-  expect(result.active).toBe(true);
-  expect(io.factory).toHaveBeenCalledOnce();
-  expect(io.dispose).not.toHaveBeenCalled();
-});
+it.each(['dissolve', 'fade-black', 'gl'] as const)(
+  'keeps the composed owner for %s projects at Current quality outside the seam',
+  async (type) => {
+    props.preferences = { ...DEFAULT_QUICK_PREVIEW_PREFERENCES };
+    props.cut = {
+      file: new File(['source'], 'source.webm'),
+      duration: 10,
+      time: 0,
+      edits: [
+        {
+          id: 'cut',
+          kind: 'cut',
+          start: 2,
+          end: 4,
+          requestedStart: 2,
+          requestedEnd: 4,
+          transition:
+            type === 'gl'
+              ? {
+                  type,
+                  before: 0.5,
+                  after: 0.5,
+                  selection: createGlTransitionSelection('BowTie')!,
+                  easing: 'LINEAR',
+                }
+              : { type, before: 0.5, after: 0.5 },
+        },
+      ],
+    };
+    await render();
+    expect(result.active).toBe(true);
+    expect(io.factory).toHaveBeenCalledOnce();
+    props = { ...props, playing: true, cut: { ...props.cut, time: 5 } };
+    await render();
+    expect(result.active).toBe(true);
+    expect(io.factory).toHaveBeenCalledOnce();
+    expect(io.dispose).not.toHaveBeenCalled();
+  }
+);
 
 it('waits for attached background publication and resumes the same paused frame automatically', async () => {
   await render();

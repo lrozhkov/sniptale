@@ -85,7 +85,7 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
     !!input.scene.captions?.settings?.enabled ||
     !!input.cut?.edits.some((edit) => edit.kind === 'freeze') ||
     input.scene.webcam?.timeDomain === 'result' ||
-    !!input.cut?.edits.some((edit) => edit.kind === 'cut' && edit.transition?.type === 'dissolve');
+    !!input.cut?.edits.some((edit) => edit.kind === 'cut' && !!edit.transition);
   const active = manual && input.visible !== false && pageVisible;
   const retained =
     (manual || input.preferences.pausedQuality === 'detailed') &&

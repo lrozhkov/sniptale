@@ -787,6 +787,10 @@ it('shows a retryable history failure while keeping the existing video transport
   expect(button).toBeDefined();
   await act(async () => button!.click());
   expect(retry).toHaveBeenCalledOnce();
+  const notices = host.querySelector('[data-ui="gallery.videoReview.previewNotices"]');
+  expect(notices?.classList.contains('absolute')).toBe(true);
+  expect(notices?.classList.contains('inset-x-0')).toBe(true);
+  expect(notices?.contains(host.querySelector('[role="alert"]'))).toBe(true);
   expect(frame().disabled).toBe(false);
   state.history = { ...state.history, failed: false, pending: true, initialLoading: true };
   await render(true, DEFAULT_QUICK_PREVIEW_PREFERENCES);
@@ -809,26 +813,21 @@ it('keeps background history refresh out of the stage layout', async () => {
   expect(frame().disabled).toBe(false);
 });
 
-it(
-  'reports incomplete retained history after loading without blocking video or inventing ' +
-    'a retry failure',
-  async () => {
-    state.history = {
-      telemetry: null,
-      failed: false,
-      pending: false,
-      initialLoading: false,
-      incomplete: true,
-      retry: vi.fn(),
-    };
-    await render();
-    expect(host.querySelector('[role="status"]')?.textContent).toContain(
-      'gallery.videoReview.recordingHistoryIncomplete'
-    );
-    expect(host.querySelector('[role="alert"]')).toBeNull();
-    expect(frame().disabled).toBe(false);
-  }
-);
+it('keeps incomplete retained history silent without blocking video', async () => {
+  state.history = {
+    telemetry: null,
+    failed: false,
+    pending: false,
+    initialLoading: false,
+    incomplete: true,
+    retry: vi.fn(),
+  };
+  await render();
+  expect(host.textContent).not.toContain('gallery.videoReview.recordingHistoryIncomplete');
+  expect(host.querySelector('[role="status"]')).toBeNull();
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  expect(frame().disabled).toBe(false);
+});
 
 it.each([
   { local: true, inherited: false, suspended: true },

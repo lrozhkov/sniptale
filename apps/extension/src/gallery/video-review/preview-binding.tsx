@@ -189,36 +189,6 @@ function ReviewPreviewContent(props: SurfaceProps) {
       aria-busy={status.recovering || status.preparingPlayback}
       className="flex min-h-0 min-w-0 flex-col overflow-hidden p-3"
     >
-      {status.history?.failed ||
-      (status.history?.incomplete && !status.history.pending && !status.history.initialLoading) ? (
-        <div
-          role={status.history.failed ? 'alert' : 'status'}
-          className="flex items-center gap-2 text-xs"
-        >
-          <span>
-            {translate(
-              status.history.failed
-                ? 'gallery.videoReview.recordingHistoryFailed'
-                : 'gallery.videoReview.recordingHistoryIncomplete'
-            )}
-          </span>
-          {status.history.failed ? (
-            <ReviewButton
-              label={translate('gallery.videoReview.retry')}
-              onClick={status.history.retry}
-            />
-          ) : null}
-        </div>
-      ) : null}
-      {status.webcam.failed ? (
-        <div role="alert" className="flex items-center gap-2 text-xs">
-          <span>{translate('gallery.videoReview.webcamFailed')}</span>
-          <ReviewButton
-            label={translate('gallery.videoReview.retry')}
-            onClick={status.webcam.retry}
-          />
-        </div>
-      ) : null}
       <ReviewPreviewFrame
         onOpenPreviewSettings={props.onOpenPreviewSettings}
         time={props.sample.resultTime}
@@ -250,6 +220,39 @@ function ReviewPreviewContent(props: SurfaceProps) {
               fullscreen={fullscreen}
               focusInteracting={zoom.previewing}
             />
+            {status.history?.failed || status.webcam.failed ? (
+              <div
+                data-ui="gallery.videoReview.previewNotices"
+                className="absolute inset-x-0 top-0 z-40 flex max-h-full flex-col gap-2 overflow-y-auto
+                  border-b border-[var(--sniptale-color-border-soft)]
+                  bg-[var(--sniptale-color-surface-panel-glass)] p-3 text-sm
+                  text-[var(--sniptale-color-text-primary)] shadow-[var(--sniptale-shadow-sm)]
+                  backdrop-blur-[var(--sniptale-glass-blur)]"
+              >
+                {status.history?.failed ? (
+                  <div role="alert" className="flex items-center gap-3">
+                    <span className="min-w-0 flex-1">
+                      {translate('gallery.videoReview.recordingHistoryFailed')}
+                    </span>
+                    <ReviewButton
+                      label={translate('gallery.videoReview.retry')}
+                      onClick={status.history.retry}
+                    />
+                  </div>
+                ) : null}
+                {status.webcam.failed ? (
+                  <div role="alert" className="flex items-center gap-3">
+                    <span className="min-w-0 flex-1">
+                      {translate('gallery.videoReview.webcamFailed')}
+                    </span>
+                    <ReviewButton
+                      label={translate('gallery.videoReview.retry')}
+                      onClick={status.webcam.retry}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <ReviewFeedback
               message={status.message}
               originalFeedback={status.originalFeedback}

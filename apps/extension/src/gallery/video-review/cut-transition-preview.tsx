@@ -203,10 +203,18 @@ export function useReviewCutTransitionProvider(
   admit?: (bytes: readonly [number, number]) => { release(): void }
 ) {
   const { plans, blend } = useReviewCutTransitionProjection(binding);
-  const next = blend?.plan ?? plans.find((plan) => plan.seam + plan.after > (binding?.time ?? 0));
+  const [requested, setRequested] = useState<{
+    plans: readonly ReviewCutTransitionPlan[];
+    bindingTime: number | undefined;
+    next: ReviewCutTransitionPlan | undefined;
+  }>();
+  const next =
+    managed && requested?.plans === plans && requested.bindingTime === binding?.time
+      ? requested.next
+      : (blend?.plan ?? plans.find((plan) => plan.seam + plan.after > (binding?.time ?? 0)));
   const { current, retry } = useTransitionEndpoints(binding?.file, next, managed, admit);
-  const latest = useRef({ plans, current, managed });
-  latest.current = { plans, current, managed };
+  const latest = useRef({ plans, current, managed, next, bindingTime: binding?.time });
+  latest.current = { plans, current, managed, next, bindingTime: binding?.time };
   return {
     plans,
     blend,
@@ -215,6 +223,12 @@ export function useReviewCutTransitionProvider(
     read(time: number) {
       const value = latest.current;
       const sampled = reviewCutTransitionAt(time, value.plans);
+      const next = sampled?.plan ?? value.plans.find((plan) => plan.seam + plan.after > time);
+      // Only a change of endpoint pair reaches React; frame time remains transport-owned.
+      if (value.managed && next !== value.next) {
+        value.next = next;
+        setRequested({ plans: value.plans, bindingTime: value.bindingTime, next });
+      }
       if (!sampled) return null;
       const key = JSON.stringify([sampled.plan.left, sampled.plan.right]);
       const admitted =

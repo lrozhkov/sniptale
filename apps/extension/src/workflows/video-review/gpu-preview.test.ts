@@ -1,3 +1,5 @@
+import * as sceneBuilder from './gpu-preview-scene';
+import { gpuPreviewTextureBytes } from '../../features/video/composition/canvas/gpu-preview-plan';
 import { createSourceImageFilter } from '../../features/image-filters/contract';
 import { createGlTransitionSelection } from '../../features/video/project/transition/gl-catalog';
 import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
@@ -2329,3 +2331,72 @@ it('uses the original source filter axes before a Gallery quarter-turn', async (
   expect(found?.imageFilters?.logical).toEqual({ width: 640, height: 360 });
   f.owner.dispose();
 });
+
+it.each([
+  ['dissolve', false],
+  ['gl', false],
+  ['dissolve', true],
+] as const)(
+  'isolates %s endpoint caches and preserves internal conflict refusal (%s)',
+  async (type, invalidWithinEndpoint) => {
+    const f = fixture();
+    const input = await dissolveInput(f);
+    const first = { width: 8, height: 8, close: vi.fn() } as unknown as ImageBitmap;
+    const second = { width: 8, height: 8, close: vi.fn() } as unknown as ImageBitmap;
+    let side = 0;
+    const build = vi.spyOn(sceneBuilder, 'buildReviewGpuScene').mockImplementation(async () => {
+      const endpointIndex = side++;
+      const source = endpointIndex === 0 ? first : second;
+      const layer: GpuPreviewLayer = {
+        source,
+        rect: { x: 0, y: 0, width: 8, height: 8 },
+        inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+        cache: { key: 'effect-content:annotation', revision: source },
+        alphaMask: {
+          source,
+          rect: { x: 0, y: 0, width: 1, height: 1 },
+          cache: { key: 'local-mask', revision: source },
+        },
+        operationClip: { source, cache: { key: 'local-coverage', revision: source } },
+      };
+      return {
+        kind: 'group',
+        output: dimensions.backing,
+        logical: dimensions.canonical,
+        layers:
+          invalidWithinEndpoint && endpointIndex === 0
+            ? [layer, { ...layer, source: second }]
+            : [layer],
+      };
+    });
+    io.render.mockImplementationOnce(async (request) => {
+      expect(gpuPreviewTextureBytes(request.layers)).toBeGreaterThan(0);
+      return f.bitmap;
+    });
+    try {
+      const { color: _color, ...timing } = input.transition.blend.plan;
+      const blend =
+        type === 'gl'
+          ? {
+              ...input.transition.blend,
+              plan: {
+                ...timing,
+                type,
+                selection: createGlTransitionSelection('BowTie')!,
+                easing: 'LINEAR' as const,
+              },
+            }
+          : input.transition.blend;
+      const pending = f.owner.render({ ...input, transition: { ...input.transition, blend } });
+      if (invalidWithinEndpoint)
+        await expect(pending).rejects.toThrow('cache key has conflicting sources');
+      else await expect(pending).resolves.toBe(true);
+      expect(build).toHaveBeenCalledTimes(2);
+      expect(first.close).not.toHaveBeenCalled();
+      expect(second.close).not.toHaveBeenCalled();
+    } finally {
+      build.mockRestore();
+      f.owner.dispose();
+    }
+  }
+);

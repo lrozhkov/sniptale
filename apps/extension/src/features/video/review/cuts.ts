@@ -138,8 +138,12 @@ export function planReviewCutTransitions(
         sum +
         (segment.kind === 'cut'
           ? 0
-          : Math.max(0, Math.min(end, segment.sourceEnd) - Math.max(start, segment.sourceStart)) /
-            segment.rate),
+          : segment.kind === 'freeze'
+            ? segment.sourceStart >= start && segment.sourceStart <= end
+              ? segment.resultEnd - segment.resultStart
+              : 0
+            : Math.max(0, Math.min(end, segment.sourceEnd) - Math.max(start, segment.sourceStart)) /
+              segment.rate),
       0
     );
   const plans: ReviewCutTransitionPlan[] = [];
@@ -149,7 +153,9 @@ export function planReviewCutTransitions(
     const right = { start: cut.end, end: cuts[index + 1]?.start ?? duration };
     // Adjacent cuts have no independently visible seam; preserve intent only in the document.
     if (left.start >= left.end || right.start >= right.end) continue;
-    const seam = segments.find((segment) => segment.sourceStart === cut.start)!.resultStart;
+    const seam = segments.find(
+      (segment) => segment.kind === 'cut' && segment.sourceStart === cut.start
+    )!.resultStart;
     plans.push({
       ...cut.transition,
       id: cut.id,

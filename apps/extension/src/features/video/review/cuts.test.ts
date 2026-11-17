@@ -268,3 +268,32 @@ it('retains GL identity and evaluates easing on the speed-adjusted result clock'
   expect(reviewCutTransitionAt(1.25, plans)?.incoming).toBe(0.9375);
   expect(reviewCutTransitionAt(1.5, plans)).toBeNull();
 });
+
+it.each([1, 4, 6, 9])('keeps finite cut transition portions with a freeze at %s', (at) => {
+  const freeze = {
+    id: 'hold',
+    kind: 'freeze' as const,
+    start: at,
+    end: at,
+    requestedStart: at,
+    requestedEnd: at,
+    duration: 2,
+    frameTime: at - 0.02,
+    frameDuration: 0.04,
+  };
+  const cut = {
+    id: 'cut',
+    kind: 'cut' as const,
+    start: 4,
+    end: 6,
+    requestedStart: 4,
+    requestedEnd: 6,
+    transition: { type: 'dissolve' as const, before: 0.5, after: 0.5 },
+  };
+  const [plan] = planReviewCutTransitions(12, [freeze, cut]);
+  expect(plan!.before).toBe(0.5);
+  expect(plan!.after).toBe(0.5);
+  expect(plan!.seam).toBe(at <= 4 ? 6 : 4);
+  expect(reviewCutTransitionAt(plan!.seam - 0.25, [plan!])).not.toBeNull();
+  expect(reviewCutTransitionAt(plan!.seam + 0.25, [plan!])).not.toBeNull();
+});

@@ -162,6 +162,10 @@ export function ReviewEditBlock(
           target instanceof Element
             ? target.closest('[data-edge]')?.getAttribute('data-edge')
             : null;
+        if (edit.kind === 'freeze' && edge !== 'end') {
+          (props.beforeAction ?? ((action) => action()))(() => props.onEdit?.(edit));
+          return;
+        }
         setDragEdge(edge === 'start' || edge === 'end' ? edge : 'move');
         drag.current = {
           admission: deferReviewGesture(props.beforeAction, () => props.onEdit?.(edit), 'click'),
@@ -235,9 +239,9 @@ export function ReviewEditBlock(
         aria-label={caption}
         disabled={props.rangeEnabled === false}
         aria-pressed={selected}
-        className={`absolute inset-0 flex cursor-grab items-center justify-center gap-1
-            overflow-hidden active:cursor-grabbing disabled:cursor-default
-            ${edit.kind === 'freeze' ? 'px-0' : 'px-3'}`}
+        className={`absolute inset-0 flex items-center justify-center gap-1
+            overflow-hidden disabled:cursor-default
+            ${edit.kind === 'freeze' ? 'cursor-default px-0' : 'cursor-grab active:cursor-grabbing px-3'}`}
         onClick={(event) => {
           if (event.detail === 0)
             (props.beforeAction ?? ((action) => action()))(() => props.onEdit?.(edit));

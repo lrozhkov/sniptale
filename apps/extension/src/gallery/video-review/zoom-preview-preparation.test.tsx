@@ -461,3 +461,67 @@ it('admits simple selection lifetimes after paint, keeps only latest props, and 
   await act(async () => vi.runOnlyPendingTimersAsync());
   expect(crop).toHaveBeenCalledTimes(beforeCancel);
 });
+
+it('keeps a manual zoom draft interactive beside an automatic 3D camera', async () => {
+  vi.useFakeTimers();
+  const ticks = new Map<number, FrameRequestCallback>();
+  let id = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    ticks.set(++id, callback);
+    return id;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (key: number) => ticks.delete(key));
+  const automatic = region({
+    id: 'automatic-3d',
+    start: 6,
+    end: 8,
+    effect: '3d',
+    cursorComposition: { mode: 'orbit', amount: 0.5, smoothness: 0.6 },
+    cursorFocus: {
+      path: {
+        version: 1,
+        mode: 'follow',
+        smoothing: 0.5,
+        sensitivity: 0.5,
+        gapPolicy: 'hold',
+        segments: [],
+      },
+    },
+  });
+  const loadFrame = vi.fn(async () => frame);
+  let current: ReturnType<typeof usePreparedZoomCamera>;
+  function Probe(props: ZoomPreviewProps) {
+    current = usePreparedZoomCamera(props);
+    return null;
+  }
+  const show = (selected: QuickEditZoomRegion) =>
+    act(() =>
+      root.render(
+        <Probe
+          region={selected}
+          focus={{ regions: [selected, automatic], time: 3 }}
+          cursorFollowing={false}
+          previewing
+          background={background}
+          source={{ width: 640, height: 360 }}
+          sourceTime={3}
+          loadFrame={loadFrame}
+          onChange={vi.fn()}
+        />
+      )
+    );
+  const selected = region();
+  show(selected);
+  act(() => {
+    const callbacks = [...ticks.values()];
+    ticks.clear();
+    callbacks.forEach((callback) => callback(0));
+  });
+  await act(async () => vi.runOnlyPendingTimersAsync());
+  expect(current!.pending).toBe(false);
+  const edited = { ...selected, transform: { ...selected.transform, centerX: 0.7 } };
+  show(edited);
+  expect(current!.pending).toBe(false);
+  expect(current!.value?.snapshot.region).toBe(edited);
+  expect(current!.value?.camera.centerX).toBeCloseTo(0.7);
+});

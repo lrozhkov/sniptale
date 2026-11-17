@@ -615,33 +615,36 @@ it.each([false, true])(
   }
 );
 
-it('repacks transient overlapping overlay ranges and restores rows on Escape', async () => {
-  const overlay = (id: string, start: number, end: number) => ({
-    ...zoom(id, start, end),
-    sourceAnchor: { start, end },
-    spotlight: createQuickEditSpotlight(),
-  });
-  const commit = vi.fn();
-  const projection = createTrackProjection(10, []);
-  const track = renderTrack([overlay('a', 0, 2), overlay('b', 3, 5)], commit, null, {
-    projection,
-  });
-  const [first, second] = track.blocks;
-  first!.setPointerCapture = vi.fn();
-  first!.hasPointerCapture = vi.fn(() => false);
-  expect(first!.style.top).toBe(second!.style.top);
-  await track.event(first!, 'pointerdown', 0);
-  await track.event(first!, 'pointermove', 300, true);
-  expect(first!.style.top).not.toBe(second!.style.top);
-  expect(track.lane.style.height).toBe('72px');
-  expect(commit).not.toHaveBeenCalled();
-  await act(async () =>
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-  );
-  expect(first!.style.top).toBe(second!.style.top);
-  await track.event(first!, 'pointerup', 300, true);
-  expect(commit).not.toHaveBeenCalled();
-});
+it.each([false, true])(
+  'repacks transient anchored ranges and restores rows on Escape (projection=%s)',
+  async (projected) => {
+    const overlay = (id: string, start: number, end: number) => ({
+      ...zoom(id, start, end),
+      sourceAnchor: { start, end },
+      spotlight: createQuickEditSpotlight(),
+    });
+    const commit = vi.fn();
+    const projection = projected ? createTrackProjection(10, []) : undefined;
+    const track = renderTrack([overlay('a', 0, 2), overlay('b', 3, 5)], commit, null, {
+      ...(projection ? { projection } : {}),
+    });
+    const [first, second] = track.blocks;
+    first!.setPointerCapture = vi.fn();
+    first!.hasPointerCapture = vi.fn(() => false);
+    expect(first!.style.top).toBe(second!.style.top);
+    await track.event(first!, 'pointerdown', 0);
+    await track.event(first!, 'pointermove', 300, true);
+    expect(first!.style.top).not.toBe(second!.style.top);
+    expect(track.lane.style.height).toBe('72px');
+    expect(commit).not.toHaveBeenCalled();
+    await act(async () =>
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    );
+    expect(first!.style.top).toBe(second!.style.top);
+    await track.event(first!, 'pointerup', 300, true);
+    expect(commit).not.toHaveBeenCalled();
+  }
+);
 
 it('offers the immediate Spotlight neighbor instead of a stored link across it', async () => {
   const overlay = (id: string, start: number, end: number) => ({
@@ -819,3 +822,43 @@ it('retains focus row geometry while selection changes and invalidates authored 
   renderTrack([...regions, zoom('third', 1.5, 4)], commit, null, { selectedId: 'second' });
   expect(pack).toHaveBeenCalledOnce();
 });
+
+it('packs automatic 3D and zoom using the same intervals as their visible blocks', () => {
+  const track = renderTrack(
+    [
+      { ...zoom('manual', 0, 2), sourceAnchor: { start: 0, end: 2 } },
+      {
+        ...zoom('automatic', 4, 6),
+        effect: '3d',
+        sourceAnchor: { start: 1, end: 3 },
+        spatialClock: { offset: 0, rate: 1, duration: 2 },
+        cursorComposition: { mode: 'orbit', amount: 0.5, smoothness: 0.6 },
+      },
+    ],
+    vi.fn(),
+    null
+  );
+  const [manual, automatic] = track.blocks;
+  expect(manual!.style.left).toBe('0%');
+  expect(automatic!.style.left).toBe('10%');
+  expect(manual!.style.top).not.toBe(automatic!.style.top);
+});
+
+it.each([false, true])(
+  'reserves rows for visible dormant Spotlight blocks (projection=%s)',
+  (projected) => {
+    const projection = projected ? createTrackProjection(10, []) : undefined;
+    const spotlight = {
+      ...zoom('hidden-by-cut', 1, 4),
+      spotlight: createQuickEditSpotlight(),
+      dormant: true,
+      sourceAnchor: { start: 1, end: 4 },
+    };
+    const track = renderTrack([spotlight, zoom('visible-camera', 2, 3)], vi.fn(), null, {
+      ...(projection ? { projection } : {}),
+    });
+    expect(track.blocks).toHaveLength(2);
+    expect(track.blocks[0]!.style.top).not.toBe(track.blocks[1]!.style.top);
+    expect(track.lane.style.height).toBe('72px');
+  }
+);

@@ -83,7 +83,9 @@ it('inserts and removes one shared interval without changing authored events or 
   const remove: ReviewOperation = { ...policy, id: 'remove', at: 2, before: freeze, after: null };
   const after = applyReviewOperation(baseline, insert, source);
   const map = buildReviewTimeMap(12, after.edits);
-  expect(projectReviewVoiceover(after.advancedContent.audio.voiceover, map)).toMatchObject([
+  expect(
+    projectReviewVoiceover(after.advancedContent.audio.voiceover, map, 'source')
+  ).toMatchObject([
     { timelineStart: 3, duration: 1, sourceOffset: 1 },
     { timelineStart: 6, duration: 3, sourceOffset: 2 },
   ]);
@@ -124,4 +126,43 @@ it('inserts and removes one shared interval without changing authored events or 
     expect(projectReviewAnnotationEffect(annotation, segments).duration).toBe(4 + inserted);
   }
   expect(baseline).toEqual(original);
+});
+
+it.each([
+  [4, 6],
+  [2, 4],
+])('preserves inserted time when a cut touches its source anchor (%s–%s)', (start, end) => {
+  const freeze = {
+    id: 'hold',
+    kind: 'freeze' as const,
+    start: 4,
+    end: 4,
+    requestedStart: 4,
+    requestedEnd: 4,
+    duration: 2,
+    frameTime: 3.98,
+    frameDuration: 0.04,
+  };
+  const cut = {
+    id: 'cut',
+    kind: 'cut' as const,
+    start,
+    end,
+    requestedStart: start,
+    requestedEnd: end,
+  };
+  const map = buildReviewTimeMap(12, [freeze, cut]);
+  const hold = map.find((part) => part.freezeId === freeze.id);
+  expect(hold).toBeDefined();
+  expect(hold!.resultEnd - hold!.resultStart).toBe(2);
+  expect(map.at(-1)!.resultEnd).toBe(12);
+  const annotation = {
+    start: hold!.resultStart,
+    end: hold!.resultEnd,
+    timeDomain: 'result' as const,
+  };
+  const projected = projectReviewAnnotationEffect(annotation, map);
+  expect(projected.duration).toBe(2);
+  expect(sampleReviewAnnotationEffect(projected, 3.98, hold!.resultStart + 1)).not.toBeNull();
+  expect(createReviewDisplayMap(12, [freeze, cut]).duration).toBe(14);
 });

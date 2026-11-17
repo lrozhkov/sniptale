@@ -104,7 +104,7 @@ export function buildReviewTimeMap(
     ...new Set([0, duration, ...edits.flatMap((edit) => [edit.start, edit.end])]),
   ].sort((a, b) => a - b);
   const holds = (at: number) => {
-    if (edits.some((edit) => edit.kind === 'cut' && edit.start <= at && at < edit.end)) return;
+    if (edits.some((edit) => edit.kind === 'cut' && edit.start < at && at < edit.end)) return;
     for (const edit of edits
       .filter((edit) => edit.kind === 'freeze' && edit.start === at)
       .sort((a, b) => a.id.localeCompare(b.id))) {

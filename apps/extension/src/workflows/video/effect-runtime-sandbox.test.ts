@@ -745,3 +745,62 @@ it('keeps a pure foreground reuse token through the actual completed standby han
     rendered.mockRestore();
   }
 });
+
+it('retries a speculative preload timeout on first demand without retrying a demanded timeout', async () => {
+  vi.useFakeTimers();
+  const manager = new EffectRuntimeSandboxSessionManager(document, {
+    loadTimeoutMs: 100,
+    requestTimeoutMs: 100,
+    compositionBackend: 'gpu-scene',
+  });
+  try {
+    manager.preload();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(document.querySelector('iframe')).toBeNull();
+    manager.preload();
+    expect(document.querySelector('iframe')).toBeNull();
+    const pending = manager.prepareGpuFrame(createRequest());
+    expect(document.querySelector('iframe')).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(pending).resolves.toMatchObject({ kind: 'error', code: 'circuitOpen' });
+    await expect(manager.prepareGpuFrame(createRequest())).resolves.toMatchObject({
+      kind: 'error',
+      code: 'circuitOpen',
+    });
+    expect(document.querySelector('iframe')).toBeNull();
+    manager.dispose();
+    manager.preload();
+    expect(document.querySelector('iframe')).toBeNull();
+  } finally {
+    manager.dispose();
+    vi.useRealTimers();
+  }
+});
+
+it('authenticates the replacement after a speculative preload timeout before posting a frame', async () => {
+  vi.useFakeTimers();
+  installSynchronousMessageChannel();
+  const manager = new EffectRuntimeSandboxSessionManager(document, {
+    loadTimeoutMs: 100,
+    requestTimeoutMs: 100,
+    compositionBackend: 'gpu-scene',
+  });
+  const ports: MessagePort[] = [];
+  try {
+    manager.preload();
+    await vi.advanceTimersByTimeAsync(100);
+    const pending = manager.renderFrame(createRequest());
+    const iframe = document.querySelector('iframe');
+    expect(iframe).not.toBeNull();
+    const requests: EffectRuntimeRenderMessage[] = [];
+    installCacheRetryResponder(iframe!, requests, ports);
+    expect(requests).toEqual([]);
+    iframe!.dispatchEvent(new Event('load'));
+    await expect(pending).resolves.toMatchObject({ kind: 'frame' });
+    expect(requests).toHaveLength(1);
+  } finally {
+    manager.dispose();
+    for (const port of ports) port.close();
+    vi.useRealTimers();
+  }
+});

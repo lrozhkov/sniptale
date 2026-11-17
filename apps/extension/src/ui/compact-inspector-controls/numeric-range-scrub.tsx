@@ -41,24 +41,30 @@ interface NumericRangeScrubProps {
   visible: boolean;
 }
 
+type NumericRangeFocus = 'none' | 'pointer' | 'keyboard';
+
 export function NumericRangeScrub(props: NumericRangeScrubProps) {
   return props.disabled ? null : <EnabledNumericRangeScrub {...props} />;
 }
 
 function EnabledNumericRangeScrub(props: NumericRangeScrubProps) {
-  const [focused, setFocused] = useState(false);
+  const [focus, setFocus] = useState<NumericRangeFocus>('none');
   const state = getNumericRangeScrubState(props);
-  const visible = props.visible || props.active || focused;
+  const visible = props.visible || props.active || focus === 'keyboard';
 
   return (
-    <NumericRangeScrubShell visible={visible} rangeRatio={props.outOfScale ? 0 : state.rangeRatio}>
+    <NumericRangeScrubShell
+      visible={visible}
+      focused={focus !== 'none'}
+      rangeRatio={props.outOfScale ? 0 : state.rangeRatio}
+    >
       <NumericRangeTrack />
       <NumericRangeInput
         label={props.label}
         valueText={props.value === null ? undefined : String(props.value)}
         descriptionId={props.descriptionId}
         outOfScale={props.outOfScale}
-        onFocusChange={setFocused}
+        onFocusChange={setFocus}
         onActiveChange={props.onActiveChange}
         onCommitValue={props.onCommitValue}
         onPreviewValue={props.onPreviewValue}
@@ -96,15 +102,17 @@ function NumericRangeScrubShell({
   children,
   rangeRatio,
   visible,
+  focused,
 }: {
   children: ReactNode;
   rangeRatio: number;
   visible: boolean;
+  focused: boolean;
 }) {
   return (
     <div
       data-ui="shared.ui.compact-inspector.numeric-range-scrub"
-      aria-hidden={visible ? undefined : true}
+      aria-hidden={visible || focused ? undefined : true}
       className={cx(
         'pointer-events-none absolute transition-opacity',
         visible ? 'opacity-100' : 'opacity-0'
@@ -134,7 +142,7 @@ function NumericRangeInput(props: {
   valueText: string | undefined;
   descriptionId?: string | undefined;
   outOfScale?: boolean | undefined;
-  onFocusChange: (focused: boolean) => void;
+  onFocusChange: (focus: NumericRangeFocus) => void;
   label: string;
   onActiveChange: (active: boolean) => void;
   onCommitValue: (value: number) => void;
@@ -160,7 +168,7 @@ function NumericRangeInput(props: {
     props.onCommitValue(value);
   };
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    props.onFocusChange(true);
+    props.onFocusChange('keyboard');
     const value = rangeKeyboardValue(event, props.rangeMin, props.rangeMax, props.rangeStep);
     if (value === null) return;
     event.preventDefault();
@@ -180,12 +188,16 @@ function NumericRangeInput(props: {
       step="any"
       disabled={props.rangeMax <= props.rangeMin}
       value={props.rangeValue}
-      onFocus={() => props.onFocusChange(!pointerFocus.current)}
+      onFocus={() => props.onFocusChange(pointerFocus.current ? 'pointer' : 'keyboard')}
       onKeyDown={handleKeyDown}
       onChange={(event) => preview(event.currentTarget.valueAsNumber)}
       onPointerDown={(event) => {
         pointerFocus.current = true;
-        props.onFocusChange(false);
+        props.onFocusChange(
+          event.currentTarget.ownerDocument.activeElement === event.currentTarget
+            ? 'pointer'
+            : 'none'
+        );
         handlePointerActiveChange(event, props.onActiveChange, true);
       }}
       onPointerUp={(event) => {
@@ -199,7 +211,7 @@ function NumericRangeInput(props: {
       onKeyUp={handleRangeCommit}
       onBlur={() => {
         pointerFocus.current = false;
-        props.onFocusChange(false);
+        props.onFocusChange('none');
         handleRangeCommit();
         props.onActiveChange(false);
       }}

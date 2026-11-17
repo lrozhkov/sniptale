@@ -130,7 +130,9 @@ function needsPreviewCameraPlan(scene: ZoomCameraScene) {
     !scene.region.border &&
     !scene.region.spotlight &&
     (scene.focus?.regions ?? [scene.region]).some(
-      (region) => region.cursorFocus?.path.mode === 'follow'
+      (region) =>
+        (region.id === scene.region.id || region.id.startsWith(`${scene.region.id}:slice:`)) &&
+        region.cursorFocus?.path.mode === 'follow'
     )
   );
 }

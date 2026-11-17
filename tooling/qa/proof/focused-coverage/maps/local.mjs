@@ -294,7 +294,7 @@ export const LOCAL_OWNER_MAPPINGS = [
     owner: 'review-edit-snap-consumers',
     reason: 'Edit snapping is exercised by source-axis magnets and timeline gestures.',
     testFiles: [
-      'apps/extension/src/gallery/video-review/timeline-magnets.test.ts',
+      'apps/extension/src/gallery/video-review/timeline-magnets.test.tsx',
       'apps/extension/src/gallery/video-review/timeline-drag.test.tsx',
       'apps/extension/src/gallery/video-review/timeline-selection.test.tsx',
     ],

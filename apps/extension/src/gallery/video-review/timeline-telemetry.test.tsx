@@ -545,13 +545,15 @@ it('refreshes memoized telemetry labels, selection, capability and coverage geom
 });
 
 it.each([
-  ['CLICK', 'move', 3, 4],
-  ['KEY', 'start', 2.5, 3],
-  ['CLICK', 'end', 2, 3.5],
+  ['CLICK', 'move', 3, 4, 3],
+  ['KEY', 'start', 2.5, 3, 3],
+  ['CLICK', 'end', 2, 3.5, 3],
+  ['CLICK', 'move', 3, 3, 2],
+  ['KEY', 'move', 3, 3, 2],
 ] as const)(
   'drags %s %s with a preview and one final timing commit',
-  async (eventType, edge, start, end) => {
-    const m = { ...marker('action', 'authored', 2, 3), eventType };
+  async (eventType, edge, start, end, initialEnd) => {
+    const m = { ...marker('action', 'authored', 2, initialEnd), eventType };
     const onMarker = vi.fn();
     const editor = createReviewInteractionEditor({
       advanced: createQuickEditAdvancedState(),
@@ -602,10 +604,12 @@ it.each([
         Object.defineProperty(e, 'pointerId', { value: 1 });
         node.dispatchEvent(e);
       });
+    const initialWidth = button.style.width;
     await event('pointerdown', 200, target);
     const nextX = edge === 'move' ? 300 : 250;
     await event('pointermove', nextX);
     expect(button.dataset['reviewDragging']).toBe('true');
+    if (edge === 'move') expect(button.style.width).toBe(initialWidth);
     expect(update).not.toHaveBeenCalled();
     await event('pointerup', nextX);
     expect(update).toHaveBeenCalledExactlyOnceWith(m, start, end);

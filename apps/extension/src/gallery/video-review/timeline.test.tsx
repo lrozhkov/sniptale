@@ -1241,3 +1241,53 @@ it('keeps event commands committed when a seek-only parent render is abandoned',
   expect(latest).toHaveBeenCalledWith(markers[0]);
   expect(abandoned).not.toHaveBeenCalled();
 });
+
+it('selects a freeze body without moving it or changing its duration on drag', async () => {
+  const freeze = {
+    id: 'hold',
+    kind: 'freeze' as const,
+    start: 1,
+    end: 1,
+    requestedStart: 1,
+    requestedEnd: 1,
+    duration: 2,
+    frameTime: 0.98,
+    frameDuration: 0.04,
+  };
+  const onFreezeDurationChange = vi.fn();
+  const onChangeEdit = vi.fn();
+  const onEdit = vi.fn();
+  const { host } = renderTimeline({
+    edits: [freeze],
+    onFreezeDurationChange,
+    onChangeEdit,
+    onEdit,
+  });
+  const block = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.freezeBlock"]')!;
+  vi.spyOn(block.parentElement!, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(0, 0, 600, 48)
+  );
+  const capture = vi.fn();
+  Object.assign(block, {
+    setPointerCapture: capture,
+    hasPointerCapture: () => false,
+    releasePointerCapture: vi.fn(),
+  });
+  const before = block.style.cssText;
+  for (const [type, x] of [
+    ['pointerdown', 200],
+    ['pointermove', 300],
+    ['pointerup', 300],
+  ] as const) {
+    const event = new MouseEvent(type, { bubbles: true, clientX: x, button: 0 });
+    Object.defineProperty(event, 'pointerId', { value: 1 });
+    await act(async () =>
+      (type === 'pointerdown' ? block.querySelector('button')! : block).dispatchEvent(event)
+    );
+  }
+  expect(capture).not.toHaveBeenCalled();
+  expect(block.style.cssText).toBe(before);
+  expect(onEdit).toHaveBeenCalledExactlyOnceWith(freeze);
+  expect(onFreezeDurationChange).not.toHaveBeenCalled();
+  expect(onChangeEdit).not.toHaveBeenCalled();
+});

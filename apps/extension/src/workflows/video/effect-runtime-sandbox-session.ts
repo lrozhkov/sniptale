@@ -33,6 +33,7 @@ export class EffectRuntimeSandboxSessionManager {
   private readonly waitingRequests: { start(): void; refuse(): void }[] = [];
   private disposed = false;
   private startupUnavailable = false;
+  private speculativeTimeout = false;
   private frameReuseContext = {};
   private session: EffectRuntimeSandboxSession | null = null;
 
@@ -116,6 +117,11 @@ export class EffectRuntimeSandboxSessionManager {
     };
     if (this.disposed || signal?.aborted)
       return Promise.resolve(fail(this.disposed ? 'crashed' : 'stale'));
+    // An unused preload timeout must not permanently refuse the first actual frame.
+    if (this.speculativeTimeout) {
+      this.speculativeTimeout = false;
+      this.startupUnavailable = false;
+    }
     return new Promise((resolve, reject) => {
       const refuse = (code: 'crashed' | 'stale' | 'queueDepthExceeded') => {
         signal?.removeEventListener('abort', abort);
@@ -212,9 +218,13 @@ export class EffectRuntimeSandboxSessionManager {
       this.configuration.loadTimeoutMs
     );
     this.session = created;
-    void created.load.catch(() => {
+    void created.load.catch((error: unknown) => {
       // Retirement/cancellation of a previous session is not a startup refusal.
       if (this.session !== created || this.disposed) return;
+      this.speculativeTimeout =
+        this.requestCount === 0 &&
+        error instanceof Error &&
+        error.message === 'EFFECT_RUNTIME_SANDBOX_LOAD_TIMEOUT';
       this.startupUnavailable = true;
       this.clearSession(created);
     });

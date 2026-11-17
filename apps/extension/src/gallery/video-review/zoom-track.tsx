@@ -198,7 +198,7 @@ function zoomTrimMinimum(
 /** Camera stays on row zero; overlapping overlays pack from their current source ranges. */
 export function ReviewZoomTrack(incoming: ZoomTrackProps) {
   const display = incoming.projection?.display;
-  const regions = useMemo(
+  const regions = useMemo<readonly QuickEditZoomRegion[]>(
     () =>
       display
         ? incoming.regions.map((item) => {
@@ -274,11 +274,20 @@ export function ReviewZoomTrack(incoming: ZoomTrackProps) {
   const shownRange = (region: QuickEditZoomRegion) =>
     preview?.id === region.id ? preview : region;
   const { shownRegions, activeRegions, activeIds, rows, rowCount } = useMemo(() => {
-    const shownRegions = regions.map((region) =>
-      preview?.id === region.id ? { ...region, ...preview } : region
-    );
+    const shownRegions = regions.map((region): QuickEditZoomRegion => {
+      if (preview?.id !== region.id) return region;
+      const { sourceAnchor: _anchor, ...previous } = region;
+      return { ...previous, ...preview };
+    });
     const activeRegions = resolveQuickEditActiveFocusRegions(shownRegions);
-    const rows = packQuickEditFocusRows(shownRegions);
+    // Packing uses the same visible intervals as the blocks, independent of their effect clock.
+    const rows = packQuickEditFocusRows(
+      shownRegions.map(({ sourceAnchor, dormant, linkTo, ...region }) => ({
+        ...region,
+        ...sourceAnchor,
+        ...(!dormant && linkTo ? { linkTo } : {}),
+      }))
+    );
     return {
       shownRegions,
       activeRegions,
