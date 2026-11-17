@@ -3,7 +3,7 @@ import {
   fitCompositionJoinPortions,
   type CompositionJoinSettings,
 } from '../project/scene/composition-join';
-import { buildReviewTimeMap } from './timeline';
+import { buildReviewTimeMap, type ReviewTimeSegment } from './timeline';
 import { isReviewSpeedRate } from './speed';
 import type { ReviewAnchor, ReviewEdit } from './types';
 
@@ -117,12 +117,14 @@ export function reviewPlaybackTime(time: number, edits: readonly ReviewEdit[]): 
   return next;
 }
 
-/** Effective result-time window plus the only source intervals allowed to supply its frames. */
+/** Effective result-time window plus admitted source intervals.
+ * A freeze side admits its authored physical frame, including a frame inside removed source time.
+ */
 export type ReviewCutTransitionPlan = CompositionJoinSettings & {
   id: string;
   seam: number;
-  left: { start: number; end: number };
-  right: { start: number; end: number };
+  left: { start: number; end: number; frameTime?: number };
+  right: { start: number; end: number; frameTime?: number };
 };
 
 /** Fits authored portions to retained islands without changing any timeline coordinate. */
@@ -151,37 +153,58 @@ export function planReviewCutTransitions(
     if (!cut.transition) continue;
     const left = { start: cuts[index - 1]?.end ?? 0, end: cut.start };
     const right = { start: cut.end, end: cuts[index + 1]?.start ?? duration };
-    // Adjacent cuts have no independently visible seam; preserve intent only in the document.
-    if (left.start >= left.end || right.start >= right.end) continue;
-    const seam = segments.find(
+    const cutIndex = segments.findIndex(
       (segment) => segment.kind === 'cut' && segment.sourceStart === cut.start
-    )!.resultStart;
+    );
+    const leftFreeze = transitionFreezeEndpoint(segments[cutIndex - 1]);
+    const cutEndIndex = segments.findIndex(
+      (segment) => segment.kind === 'cut' && segment.sourceEnd === cut.end
+    );
+    const rightFreeze = transitionFreezeEndpoint(segments[cutEndIndex + 1]);
+    // A held frame can be the entire visible island between adjacent source cuts.
+    if ((!leftFreeze && left.start >= left.end) || (!rightFreeze && right.start >= right.end))
+      continue;
+    const seam = segments[cutIndex]!.resultStart;
     plans.push({
       ...cut.transition,
       id: cut.id,
       seam,
-      left,
-      right,
-      before: Math.min(cut.transition.before, retainedDuration(left.start, left.end)),
-      after: Math.min(cut.transition.after, retainedDuration(right.start, right.end)),
+      left: leftFreeze?.range ?? left,
+      right: rightFreeze?.range ?? right,
+      before: Math.min(
+        cut.transition.before,
+        leftFreeze?.duration ?? retainedDuration(left.start, left.end)
+      ),
+      after: Math.min(
+        cut.transition.after,
+        rightFreeze?.duration ?? retainedDuration(right.start, right.end)
+      ),
     });
   }
   for (let index = 1; index < plans.length; index++) {
     const previous = plans[index - 1]!;
     const current = plans[index]!;
-    if (previous.right.start !== current.left.start || previous.right.end !== current.left.end)
-      continue;
+    const previousCutIndex = cuts.findIndex((cut) => cut.id === previous.id);
+    if (cuts[previousCutIndex + 1]?.id !== current.id) continue;
     const available = current.seam - previous.seam;
-    const outgoing = cuts.find((cut) => cut.id === previous.id)!.transition!.after;
-    const incoming = cuts.find((cut) => cut.id === current.id)!.transition!.before;
-    const requested = outgoing + incoming;
-    if (requested > available) {
+    if (previous.after + current.before > available) {
+      const outgoing = cuts[previousCutIndex]!.transition!.after;
+      const incoming = cuts[previousCutIndex + 1]!.transition!.before;
       const fitted = fitCompositionJoinPortions(outgoing, incoming, available);
-      previous.after = fitted.outgoing;
-      current.before = fitted.incoming;
+      previous.after = Math.min(previous.after, fitted.outgoing);
+      current.before = Math.min(current.before, fitted.incoming);
     }
   }
   return plans;
+}
+
+function transitionFreezeEndpoint(segment: ReviewTimeSegment | undefined) {
+  if (segment?.kind !== 'freeze') return null;
+  const frameTime = segment.frameTime!;
+  return {
+    range: { start: frameTime, end: frameTime + segment.frameDuration!, frameTime },
+    duration: segment.resultEnd - segment.resultStart,
+  };
 }
 
 /** Shared blend evaluation; outside a transition the native frame remains unchanged. */

@@ -116,7 +116,7 @@ export function createReviewTransitionFrames(sink: FrameSink, signal: AbortSigna
         const left = await readRetainedTransitionSample(
           sink,
           plan.left,
-          beforeEndpoint(plan.left.end),
+          plan.left.frameTime ?? beforeEndpoint(plan.left.end),
           'last',
           current
         );
@@ -125,7 +125,7 @@ export function createReviewTransitionFrames(sink: FrameSink, signal: AbortSigna
         const right = await readRetainedTransitionSample(
           sink,
           plan.right,
-          undefined,
+          plan.right.frameTime,
           'first',
           current
         );
