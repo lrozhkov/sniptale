@@ -115,3 +115,26 @@ it('ignores an advisory response from an unmounted export field', async () => {
   expect(change).not.toHaveBeenCalled();
   expect(backend.create).not.toHaveBeenCalled();
 });
+
+it('keeps optional export guidance in a hint while exposing an unsupported accepted choice', async () => {
+  backend.probe.mockResolvedValue({ clark: false, reason: 'webgpu-unavailable' });
+  const change = vi.fn();
+  await act(async () =>
+    root.render(<DetailEnhancementField value="off" onChange={change} hintPresentation="tooltip" />)
+  );
+  await vi.waitFor(() => expect(backend.probe).toHaveBeenCalledOnce());
+  const field = host.querySelector<HTMLElement>('[data-ui="video.exportDetailEnhancement"]')!;
+  expect(field.title).toContain('detailEnhancementHint');
+  expect(field.title).toContain('detailEnhancementWebGpuUnavailable');
+  expect(host.querySelector('p')).toBeNull();
+  await act(async () =>
+    root.render(
+      <DetailEnhancementField value="clark-x2" onChange={change} hintPresentation="tooltip" />
+    )
+  );
+  expect(host.querySelector('[role="status"]')?.textContent).toContain(
+    'detailEnhancementWebGpuUnavailable'
+  );
+  expect(trigger().textContent).toContain('detailEnhancementClark');
+  expect(change).not.toHaveBeenCalled();
+});

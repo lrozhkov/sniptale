@@ -208,6 +208,7 @@ function cameraBinding() {
       retry: vi.fn(),
       selectVisible: vi.fn(),
       time: 1.2,
+      sourceTime: 1.2,
     },
   };
   return {
@@ -256,6 +257,7 @@ it('waits for camera load, admits selected crop and releases both camera reserva
   expect(props.webcam!.onResourceReady).toHaveBeenCalledOnce();
   expect(camera.captureFrame.mock.lastCall![0]).toEqual({
     sourceTime: props.pausedSourceTime,
+    resultTime: props.pausedResultTime,
     settings: camera.settings,
     placement: camera.settings.placement,
     crop: props.webcam!.editor.crop,
@@ -459,6 +461,7 @@ it.each(['shift', 'overlay'] as const)(
     expect(result.status.phase).toBe('ready');
     expect(camera.captureFrame.mock.lastCall![0]).toEqual({
       sourceTime: props.pausedSourceTime,
+      resultTime: props.pausedResultTime,
       settings: camera.settings,
       placement: undefined,
       crop: props.webcam!.editor.crop,

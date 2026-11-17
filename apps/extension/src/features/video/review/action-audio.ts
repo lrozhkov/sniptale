@@ -172,8 +172,19 @@ export function buildReviewActionAudioPlan(args: {
   const settings = new Map(
     args.settings.map((setting) => [reviewActionAudioRefKey(setting.ref), setting])
   );
-  const runs = keptRuns(args.segments);
+  const sourceRuns = keptRuns(args.segments);
+  const resultRuns = keptRuns([
+    {
+      kind: 'keep',
+      sourceStart: 0,
+      sourceEnd: duration,
+      resultStart: 0,
+      resultEnd: duration,
+      rate: 1,
+    },
+  ]);
   for (const marker of args.markers) {
+    const runs = marker.timeDomain === 'result' ? resultRuns : sourceRuns;
     const target = reviewActionAudioTarget(marker);
     if (!target) continue;
     const setting = settings.get(reviewActionAudioRefKey(target.ref));

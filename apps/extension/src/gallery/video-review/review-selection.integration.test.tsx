@@ -7,6 +7,7 @@ import {
   committedEditorFixtureProjection,
 } from './editor-fixture.test-support';
 import type { commitVideoWorkspaceWithProjection } from '../../composition/persistence/review-workspaces/store';
+import { parseVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -24,7 +25,55 @@ const integration = vi.hoisted(() => ({
   snapshot: vi.fn(),
   download: vi.fn(),
   export: vi.fn(),
+  editorRender: vi.fn(),
+  inspectorRender: vi.fn(),
+  laneRender: vi.fn(),
+  useSilentMediaFixture: false,
 }));
+vi.mock('./use-review-audio-runtime', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./use-review-audio-runtime')>();
+  return {
+    ...actual,
+    useReviewEditorAudioRuntime: (
+      props: Parameters<typeof actual.useReviewEditorAudioRuntime>[0]
+    ) => {
+      const runtime = actual.useReviewEditorAudioRuntime(
+        integration.useSilentMediaFixture ? { ...props, silent: true } : props
+      );
+      return integration.useSilentMediaFixture ? { ...runtime, startPlayback: () => {} } : runtime;
+    },
+  };
+});
+vi.mock('./use-editor-state', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./use-editor-state')>();
+  return {
+    ...actual,
+    useReviewEditorState: (...args: Parameters<typeof actual.useReviewEditorState>) => {
+      integration.editorRender();
+      return actual.useReviewEditorState(...args);
+    },
+  };
+});
+vi.mock('./inspector-binding', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./inspector-binding')>();
+  return {
+    ...actual,
+    ReviewInspectorBinding: (props: Parameters<typeof actual.ReviewInspectorBinding>[0]) => {
+      integration.inspectorRender();
+      return actual.ReviewInspectorBinding(props);
+    },
+  };
+});
+vi.mock('./track-row', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./track-row')>();
+  return {
+    ...actual,
+    ReviewTrackRow: (props: Parameters<typeof actual.ReviewTrackRow>[0]) => {
+      if (props.track) integration.laneRender(props.track);
+      return actual.ReviewTrackRow(props);
+    },
+  };
+});
 vi.mock('../../workflows/video-review/export-lifecycle', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../workflows/video-review/export-lifecycle')>()),
   exportReviewedVideo: integration.export,
@@ -108,6 +157,170 @@ async function dragRange(
       ).dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, button: 0 }))
     );
 }
+
+it('advances the real Gallery playhead without rendering the editor, inspector or lanes per tick', async () => {
+  const fixture = createEditorFixture(integration);
+  integration.index.mockResolvedValue({
+    duration: 4,
+    boundaries: [0, 4],
+    videoCodec: 'vp8',
+    audioCodec: null,
+    container: 'webm',
+    rotation: 0,
+  });
+  integration.useSilentMediaFixture = true;
+  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+  let now = 0;
+  vi.spyOn(performance, 'now').mockImplementation(() => now);
+  let frameId = 0;
+  const frames = new Map<number, FrameRequestCallback>();
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.set(++frameId, callback);
+    return frameId;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id));
+  const tick = async (video: HTMLVideoElement, time: number) => {
+    await act(async () => {
+      now = time * 1000;
+      video.currentTime = time;
+      video.dispatchEvent(new Event('timeupdate'));
+      const callbacks = [...frames.values()];
+      frames.clear();
+      for (const callback of callbacks) callback(now);
+    });
+  };
+  const counters = [integration.editorRender, integration.inspectorRender, integration.laneRender];
+  const playhead = () =>
+    fixture.host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.rulerPlayhead"]')!;
+  for (const counter of counters) counter.mockClear();
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    const video = fixture.host.querySelector<HTMLVideoElement>(
+      '[data-ui="gallery.videoReview.stage"] video'
+    )!;
+    Object.defineProperties(video, {
+      duration: { value: 4 },
+      readyState: { value: 4 },
+    });
+    await act(async () => {
+      video.dispatchEvent(new Event('loadedmetadata'));
+      video.dispatchEvent(new Event('canplay'));
+    });
+    expect(fixture.button('play').disabled).toBe(false);
+    await fixture.click('play');
+    expect(video.play).toHaveBeenCalled();
+    await tick(video, 0.25);
+    expect(video.paused).toBe(false);
+    for (const counter of counters) {
+      expect(counter).toHaveBeenCalled();
+      counter.mockClear();
+    }
+    let previous = playhead().style.transform;
+    for (const time of [0.5, 0.75, 1, 1.25, 1.5]) {
+      await tick(video, time);
+      const current = playhead().style.transform;
+      expect(current).not.toBe(previous);
+      previous = current;
+    }
+    expect(integration.editorRender).not.toHaveBeenCalled();
+    expect(integration.inspectorRender).not.toHaveBeenCalled();
+    expect(integration.laneRender).not.toHaveBeenCalled();
+  } finally {
+    await fixture.cleanup();
+    integration.useSilentMediaFixture = false;
+  }
+});
+
+it('preserves an inside playhead when opening properties and seeks to the start only from outside', async () => {
+  const scrollIntoView = Element.prototype.scrollIntoView;
+  Element.prototype.scrollIntoView = vi.fn();
+  const fixture = createEditorFixture(integration, {
+    history: [
+      {
+        id: 'speed-operation',
+        at: 1,
+        target: 'edit',
+        before: null,
+        after: {
+          id: 'selected-speed',
+          kind: 'speed',
+          start: 1,
+          end: 3,
+          requestedStart: 1,
+          requestedEnd: 3,
+          rate: 2,
+          audio: 'speed',
+        },
+      },
+    ],
+  });
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    const video = fixture.host.querySelector('video')!;
+    const seek = async (time: number) => {
+      const ruler = fixture.host.querySelector<HTMLElement>(
+        '[data-ui="gallery.videoReview.ruler"]'
+      )!;
+      vi.spyOn(ruler, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 28));
+      Object.assign(ruler, {
+        setPointerCapture: vi.fn(),
+        hasPointerCapture: () => true,
+        releasePointerCapture: vi.fn(),
+      });
+      const clientX = (time / Number(ruler.getAttribute('aria-valuemax'))) * 400;
+      for (const type of ['pointerdown', 'pointerup']) {
+        await act(async () =>
+          ruler.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0, clientX }))
+        );
+      }
+      expect(video.currentTime).toBe(time);
+    };
+    for (const [time, expected] of [
+      [2, 2],
+      [0.5, 1],
+      [3, 1],
+    ]) {
+      await seek(time!);
+      await act(async () =>
+        fixture.host
+          .querySelector<HTMLButtonElement>(
+            '[data-review-header-track="source"] [data-review-track-select]'
+          )!
+          .click()
+      );
+      await act(async () =>
+        [...fixture.host.querySelectorAll<HTMLButtonElement>('.review-track-items-open')]
+          .at(-1)!
+          .click()
+      );
+      expect(video.currentTime).toBe(expected);
+      expect(
+        fixture.host.querySelector(
+          'aside [role="group"][aria-label="gallery.videoReview.speedRate"]'
+        )
+      ).not.toBeNull();
+    }
+    await seek(2);
+    await act(async () =>
+      fixture.host
+        .querySelector<HTMLButtonElement>('[data-selection-slot="interval"] button')!
+        .click()
+    );
+    expect(video.currentTime).toBe(1);
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.playbackRangeOverlay"]')
+    ).not.toBeNull();
+  } finally {
+    await fixture.cleanup();
+    Element.prototype.scrollIntoView = scrollIntoView;
+  }
+});
 
 it('deletes the unified selection: cut stays when audio is selected, undo restores it', async () => {
   const fixture = createEditorFixture(integration, { inspectorWidth: 0 });
@@ -238,12 +451,14 @@ it('preserves a selected speed range when toolbar preferences and tools change',
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
     await fixture.click('advancedEditing');
+    await fixture.selectRulerRange(1, 2);
     await fixture.click('speedMode');
-    await dragRange(fixture.host);
-    const input = fixture.host.querySelector<HTMLInputElement>(
-      'aside input[aria-label="gallery.videoReview.rangeEnd"]'
+    const speedOptions = fixture.host.querySelector<HTMLElement>(
+      'aside [role="group"][aria-label="gallery.videoReview.speedRate"]'
     )!;
-    expect(input).not.toBeNull();
+    expect(speedOptions).not.toBeNull();
+    const selectedRate = speedOptions.querySelector('[aria-pressed="true"]')?.textContent;
+    expect(selectedRate).toBe('2×');
     const historyLength = fixture.snapshot.workspace.history.length;
     expect(
       fixture.host.querySelector(
@@ -251,51 +466,29 @@ it('preserves a selected speed range when toolbar preferences and tools change',
       )
     ).toBeNull();
     expect(fixture.button('speedMode').getAttribute('aria-pressed')).toBe('false');
-    await fixture.click('speedMode');
-    const toolbarRate = fixture.host.querySelector<HTMLButtonElement>(
-      '[data-ui="gallery.videoReview.editingTools"] [aria-label="gallery.videoReview.speedRate"]'
+    const speed = fixture.snapshot.workspace.history.at(-1);
+    const magnet = fixture.host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.annotationMagnetToggle"]'
     )!;
-    await act(async () => toolbarRate.click());
-    const four = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(
-      (option) => option.textContent === '4×'
+    const liveSeek = fixture.host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.liveSeekToggle"]'
     )!;
-    await act(async () => four.click());
+    await act(async () => magnet.click());
+    await act(async () => liveSeek.click());
     expect(fixture.snapshot.workspace.history).toHaveLength(historyLength);
-    expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
-      target: 'edit',
-      after: { kind: 'speed', rate: 2 },
-    });
-    await fixture.click('cutMode');
-    expect(fixture.snapshot.workspace.history).toHaveLength(historyLength);
-    expect(input.isConnected).toBe(true);
-    expect(fixture.button('cutMode').getAttribute('aria-pressed')).toBe('true');
-    await act(async () =>
-      fixture.host
-        .querySelector<HTMLButtonElement>(
-          '[data-review-header-track="zoom"] [data-review-track-select]'
-        )!
-        .click()
-    );
-    await fixture.click('zoomRegionLabel');
-    expect(fixture.snapshot.workspace.history).toHaveLength(historyLength);
-    expect(input.isConnected).toBe(false);
-    expect(fixture.button('zoomRegionLabel').getAttribute('aria-pressed')).toBe('true');
-    await act(async () =>
-      fixture.host
-        .querySelector<HTMLButtonElement>(
-          '[data-review-header-track="source"] [data-review-track-select]'
-        )!
-        .click()
-    );
-    await fixture.click('cutMode');
-    expect(input.isConnected).toBe(false);
-    expect(fixture.snapshot.workspace.history).toHaveLength(historyLength);
+    expect(speedOptions.isConnected).toBe(true);
+    expect(speedOptions.querySelector('[aria-pressed="true"]')?.textContent).toBe(selectedRate);
+    await fixture.addFocus(2, 3);
+    expect(fixture.snapshot.workspace.history).toHaveLength(historyLength + 1);
+    expect(fixture.snapshot.workspace.history[historyLength - 1]).toEqual(speed);
+    expect(speedOptions.isConnected).toBe(false);
+    expect(fixture.button('zoomRegionLabel').getAttribute('aria-pressed')).toBe('false');
   } finally {
     await fixture.cleanup();
   }
 });
 
-it('edits a selected speed range from its inspector through the same reversible history', async () => {
+it('resizes a selected speed range on the timeline through the same reversible history', async () => {
   const fixture = createEditorFixture(integration);
   integration.index.mockResolvedValue({
     duration: 4,
@@ -310,27 +503,54 @@ it('edits a selected speed range from its inspector through the same reversible 
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
     await fixture.click('advancedEditing');
+    await fixture.selectRulerRange(1, 2);
     await fixture.click('speedMode');
-    await dragRange(fixture.host);
-    const input = fixture.host.querySelector<HTMLInputElement>(
-      'aside input[aria-label="gallery.videoReview.rangeEnd"]'
+    const speedOptions = fixture.host.querySelector<HTMLElement>(
+      'aside [role="group"][aria-label="gallery.videoReview.speedRate"]'
     )!;
-    expect(input).not.toBeNull();
+    expect(speedOptions).not.toBeNull();
+    const selectedRate = speedOptions.querySelector('[aria-pressed="true"]')?.textContent;
+    expect(selectedRate).toBe('2×');
     const historyLength = fixture.snapshot.workspace.history.length;
-    await fixture.click('cutMode');
-    await act(async () => input.dispatchEvent(new FocusEvent('focusin', { bubbles: true })));
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '2.5');
-      input.dispatchEvent(new Event('input', { bubbles: true }));
+    const block = fixture.host.querySelector<HTMLElement>(
+      '[data-ui="gallery.videoReview.editBlock"]'
+    )!;
+    const endHandle = block.querySelector<HTMLElement>('[data-edge="end"]')!;
+    const duration = Number(
+      fixture.host
+        .querySelector('[data-ui="gallery.videoReview.ruler"]')!
+        .getAttribute('aria-valuemax')
+    );
+    vi.spyOn(block.parentElement!, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(0, 0, 400, 48)
+    );
+    Object.assign(block, {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+      releasePointerCapture: vi.fn(),
     });
-    await act(async () => input.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+    for (const [type, time] of [
+      ['pointerdown', 2],
+      ['pointermove', 2.5],
+      ['pointerup', 2.5],
+    ] as const) {
+      const event = new MouseEvent(type, {
+        bubbles: true,
+        clientX: (time / duration) * 400,
+        button: 0,
+        altKey: true,
+      });
+      Object.defineProperty(event, 'pointerId', { value: 1 });
+      await act(async () => (type === 'pointerdown' ? endHandle : block).dispatchEvent(event));
+    }
     expect(fixture.snapshot.workspace.history).toHaveLength(historyLength + 1);
     const operation = fixture.snapshot.workspace.history.at(-1);
     expect(operation).toMatchObject({
       target: 'edit',
-      after: { kind: 'speed', start: 1, end: 2.5 },
+      before: { kind: 'speed', start: 1, end: 2, rate: 2 },
+      after: { kind: 'speed', start: 1, end: 2.5, rate: 2 },
     });
-    expect(fixture.button('cutMode').getAttribute('aria-pressed')).toBe('true');
+    expect(fixture.button('cutMode').getAttribute('aria-pressed')).toBe('false');
     const remove = fixture.host.querySelector<HTMLButtonElement>(
       'aside button[aria-label="gallery.videoReview.deleteSelected"]'
     )!;
@@ -342,7 +562,7 @@ it('edits a selected speed range from its inspector through the same reversible 
       after: null,
     });
     expect(
-      fixture.host.querySelector('aside input[aria-label="gallery.videoReview.rangeEnd"]')
+      fixture.host.querySelector('aside [role="group"][aria-label="gallery.videoReview.speedRate"]')
     ).toBeNull();
     expect(fixture.host.querySelectorAll('[data-ui="gallery.videoReview.editBlock"]')).toHaveLength(
       0
@@ -351,6 +571,17 @@ it('edits a selected speed range from its inspector through the same reversible 
     expect(fixture.host.querySelectorAll('[data-ui="gallery.videoReview.editBlock"]')).toHaveLength(
       1
     );
+    expect(committedEditorFixtureProjection(fixture.snapshot).document.edits).toEqual([
+      expect.objectContaining({ kind: 'speed', start: 1, end: 2.5, rate: 2 }),
+    ]);
+    await fixture.click('undo');
+    expect(committedEditorFixtureProjection(fixture.snapshot).document.edits).toEqual([
+      expect.objectContaining({ kind: 'speed', start: 1, end: 2, rate: 2 }),
+    ]);
+    await fixture.click('redo');
+    expect(committedEditorFixtureProjection(fixture.snapshot).document.edits).toEqual([
+      expect.objectContaining({ kind: 'speed', start: 1, end: 2.5, rate: 2 }),
+    ]);
     await fixture.click('redo');
     expect(fixture.host.querySelectorAll('[data-ui="gallery.videoReview.editBlock"]')).toHaveLength(
       0
@@ -374,8 +605,8 @@ it('deletes a selected cut from the inspector and restores it through history', 
     await act(async () =>
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
+    await fixture.selectRulerRange(1, 2);
     await fixture.click('cutMode');
-    await dragRange(fixture.host);
     expect(fixture.host.querySelectorAll('[data-ui="gallery.videoReview.editBlock"]')).toHaveLength(
       1
     );
@@ -466,13 +697,24 @@ it('closes the preview only after saving the note and preserves it when saving f
     );
     await fixture.click('addComment');
     await fixture.fill('Keep this note');
-    integration.snapshot.mockRejectedValueOnce(new Error('Write failed'));
+    const publish = fixture.publication.getMockImplementation()!;
+    let refusedNote = false;
+    fixture.publication.mockImplementation(async (request) => {
+      const last = parseVideoWorkspace(request.workspace)?.history.at(-1);
+      if (!refusedNote && last?.target === 'annotation' && last.after?.text === 'Keep this note') {
+        refusedNote = true;
+        throw new Error('Write failed');
+      }
+      return publish(request);
+    });
     const close = fixture.host.querySelector<HTMLButtonElement>(
       'header [aria-label="common.actions.close"]'
     )!;
     expect(close).not.toBeNull();
     expect(fixture.host.querySelector('header [aria-label="gallery.videoReview.back"]')).toBeNull();
     await act(async () => close.click());
+    expect(refusedNote).toBe(true);
+    expect(fixture.back).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
     expect(fixture.host.querySelector('textarea')?.value).toBe('Keep this note');
     await act(async () => close.click());
@@ -530,7 +772,7 @@ it('creates edits from recorded actions, selects their properties and recalculat
       after: { kind: 'speed', start: 2, end: 3 },
     });
     expect(
-      fixture.host.querySelector('aside input[aria-label="gallery.videoReview.rangeEnd"]')
+      fixture.host.querySelector('aside [role="group"][aria-label="gallery.videoReview.speedRate"]')
     ).not.toBeNull();
     await selectAction();
     expect(fixture.button('actionSpeed').disabled).toBe(true);
@@ -546,9 +788,15 @@ it('creates edits from recorded actions, selects their properties and recalculat
     const properties = fixture.host.querySelector(
       '[data-ui="gallery.videoReview.actionProperties"]'
     )!;
-    expect(properties.textContent).toContain('gallery.videoReview.actionRemoved');
+    const commands = fixture.host.querySelector(
+      '[data-ui="gallery.videoReview.inspectorActionMenu"]'
+    )!;
+    expect(properties.querySelector('[role="status"]')?.textContent).toContain(
+      'gallery.videoReview.actionRemoved'
+    );
+    expect(commands.textContent).not.toContain('gallery.videoReview.actionRemoved');
     for (const key of ['actionCut', 'actionSpeed', 'actionFocus', 'createCopy'])
-      expect(properties.querySelector(`[aria-label="gallery.videoReview.${key}"]`)).toBeNull();
+      expect(commands.querySelector(`[aria-label="gallery.videoReview.${key}"]`)).toBeNull();
     expect(properties.querySelector('[aria-label="common.actions.delete"]')).toBeNull();
     expect(
       properties.querySelector('[data-ui="gallery.videoReview.interactionProperties"]')
@@ -570,17 +818,21 @@ it('adds a note from the primary toolbar group and focuses the notes composer', 
     expect(
       fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')
     ).not.toBeNull();
-    const group = fixture.host.querySelector('[data-ui="gallery.videoReview.primaryTools"]')!;
-    const buttons = group.querySelectorAll<HTMLButtonElement>('button');
-    expect(buttons[0]?.getAttribute('aria-label')).toBe('gallery.videoReview.pointerTool');
-    expect(buttons[1]?.getAttribute('aria-label')).toBe('gallery.videoReview.addComment');
-    expect(fixture.button('undo')).toBeDefined();
-    await act(async () => buttons[1]!.click());
+    expect(
+      fixture.host.querySelector(
+        '[data-ui="gallery.videoReview.timelineToolbar"] [aria-label="gallery.videoReview.pointerTool"]'
+      )
+    ).toBeNull();
+    expect(
+      fixture.host.querySelector(
+        '[data-ui="gallery.videoReview.primaryTools"] [aria-label="gallery.videoReview.addComment"]'
+      )
+    ).toBeNull();
+    await fixture.click('addComment');
     const field = fixture.host.querySelector('textarea');
     expect(field).not.toBeNull();
     expect(document.activeElement).toBe(field);
     expect(fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')).toBeNull();
-    expect(buttons[1]!.disabled).toBe(false);
     expect(
       fixture.host.querySelectorAll('[data-ui="gallery.videoReview.commentComposer"]')
     ).toHaveLength(1);
@@ -649,7 +901,7 @@ it('copies, mutes and deletes a multi-selection through the existing command his
     expect(afterMute.target).toBe('advancedContent');
     if (afterMute.target === 'advancedContent')
       expect(
-        afterMute.after.audio.music.filter((clip) => clip.volume === 0).map((clip) => clip.id)
+        afterMute.after.audio.music.filter((clip) => clip.muted).map((clip) => clip.id)
       ).toEqual(['a', 'b']);
     // Removing the final member clears the current object selection as well as the group.
     for (const item of [b!, a!])
@@ -710,6 +962,10 @@ it.each(['keyboard', 'mouse'] as const)(
           .click()
       );
       await fixture.click(family === 'keyboard' ? 'addKeyPress' : 'addMousePress');
+      if (family === 'keyboard')
+        await act(async () =>
+          document.querySelector<HTMLButtonElement>('[role="option"]')!.click()
+        );
       expect(plates()).toHaveLength(1);
       expect(
         inspector().querySelector('[data-ui="gallery.videoReview.interactionProperties"]')

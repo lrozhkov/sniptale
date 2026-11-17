@@ -9,9 +9,15 @@ import {
   effectControlIcons,
   effectControlRootIcon,
 } from '../../ui/effect-control-presentation/icons';
-import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Clock3, Copy, Move, LayoutTemplate, Trash2, Link2 } from 'lucide-react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type KeyboardEvent,
+} from 'react';
+import { Copy, Move, Trash2 } from 'lucide-react';
 import { type AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
 import {
   applyEffectControlPreset,
@@ -70,6 +76,10 @@ type Props = {
 /** SDK parameters and object commands share the existing admitted annotation transaction. */
 export function ReviewAnnotationInspector(props: Props) {
   const locale = useAppLocale();
+  const geometry = useSyncExternalStore(
+    props.editor.geometry.subscribe,
+    props.editor.geometry.read
+  );
   const document = useMemo(
     () =>
       props.source ? readReviewAnnotationEffectDocument(props.source, props.sourceDigest) : null,
@@ -88,16 +98,27 @@ export function ReviewAnnotationInspector(props: Props) {
   if (!document)
     return <div role="alert">{translate('gallery.videoReview.annotationSourceMissing')}</div>;
   return (
-    <AnnotationParameters {...props} document={document} instance={instance} locale={locale} />
+    <AnnotationParameters
+      {...props}
+      geometry={geometry}
+      document={document}
+      instance={instance}
+      locale={locale}
+    />
   );
 }
 
 function AnnotationParameters(
-  props: Props & { document: AnimationTemplate; instance: ReviewAnnotationEffect; locale: string }
+  props: Props & {
+    geometry: ReturnType<Editor['geometry']['read']>;
+    document: AnimationTemplate;
+    instance: ReviewAnnotationEffect;
+    locale: string;
+  }
 ) {
   const { editor, document, instance, locale } = props;
   const disabled = props.busy || editor.pending;
-  const geometry = editor.geometry;
+  const geometry = props.geometry;
   const values = geometry
     ? resolveReviewAnnotationEffectControls(document, instance, geometry[instance.attachment])
     : {
@@ -166,40 +187,73 @@ function AnnotationParameters(
         }
       : transform;
 
+  const sdkSections = annotationSdkSections({
+    document,
+    instance,
+    values,
+    locale,
+    editor,
+    geometry,
+    disabled,
+    preview,
+    commit,
+  });
+  if (document.controlPresets?.length) {
+    const preset = (
+      <AnnotationPreset
+        document={document}
+        instance={instance}
+        editor={editor}
+        locale={locale}
+        disabled={disabled}
+      />
+    );
+    const appearance = sdkSections.findIndex((section) => section.id === 'sdk:appearance');
+    if (appearance >= 0) {
+      const section = sdkSections[appearance]!;
+      sdkSections[appearance] = {
+        ...section,
+        content: (
+          <>
+            {preset}
+            {section.content}
+          </>
+        ),
+      };
+    } else {
+      sdkSections.push({
+        id: 'sdk:appearance',
+        label: translate('videoEditor.effectsLibrary.objectAppearance'),
+        icon: effectControlRootIcon('appearance'),
+        content: preset,
+      });
+    }
+  }
+  const enabled = (
+    <ToggleField
+      value={instance.enabled}
+      disabled={disabled}
+      label={translate('gallery.videoReview.annotationEnabled')}
+      onChange={(enabled) => editor.change(instance.id, { enabled })}
+    />
+  );
+  const appearance = sdkSections.find((section) => section.id === 'sdk:appearance');
+  if (appearance)
+    appearance.content = (
+      <>
+        {enabled}
+        {appearance.content}
+      </>
+    );
+  else
+    sdkSections.push({
+      id: 'sdk:appearance',
+      label: translate('videoEditor.effectsLibrary.objectAppearance'),
+      icon: effectControlRootIcon('appearance'),
+      content: enabled,
+    });
   const sections = [
-    {
-      id: 'timing',
-      label: translate('gallery.videoReview.annotationTiming'),
-      icon: Clock3,
-      content: (
-        <>
-          {number(
-            'start',
-            translate('gallery.videoReview.annotationStart'),
-            instance.start,
-            (start) => ({ start }),
-            0,
-            instance.end - 0.001,
-            's'
-          )}
-          {number(
-            'end',
-            translate('gallery.videoReview.annotationEnd'),
-            instance.end,
-            (end) => ({ end }),
-            instance.start + 0.001,
-            props.duration,
-            's'
-          )}
-          <ToggleField
-            value={instance.enabled}
-            disabled={disabled}
-            label={translate('gallery.videoReview.annotationEnabled')}
-            onChange={(enabled) => editor.change(instance.id, { enabled })}
-          />
-        </>
-      ),
-    },
+    ...sdkSections.filter((section) => section.id === 'sdk:content'),
     {
       id: 'placement',
       label: translate('gallery.videoReview.annotationPlacement'),
@@ -258,10 +312,6 @@ function AnnotationParameters(
             1600,
             '%'
           )}
-          <p className="flex items-center gap-1.5 text-xs text-[var(--sniptale-color-text-secondary)]">
-            <Link2 size={12} aria-hidden="true" />
-            {translate('gallery.videoReview.annotationScaleHint')}
-          </p>
           {number(
             'width',
             translate('gallery.videoReview.annotationWidth'),
@@ -292,37 +342,11 @@ function AnnotationParameters(
         </>
       ),
     },
-    ...(document.controlPresets?.length
-      ? [
-          {
-            id: 'presets',
-            label: translate('gallery.videoReview.annotationPresets'),
-            icon: LayoutTemplate,
-            content: (
-              <AnnotationPreset
-                document={document}
-                instance={instance}
-                editor={editor}
-                locale={locale}
-                disabled={disabled}
-              />
-            ),
-          },
-        ]
-      : []),
-    ...annotationSdkSections({
-      document,
-      instance,
-      values,
-      locale,
-      editor,
-      disabled,
-      preview,
-      commit,
-    }),
+    ...sdkSections.filter((section) => section.id !== 'sdk:content'),
     reviewInspectorActions(
       <>
         <ReviewButton
+          selectionAction="duplicate"
           label={translate('gallery.videoReview.annotationDuplicate')}
           className={reviewTextButtonClassName}
           disabled={disabled}
@@ -332,6 +356,7 @@ function AnnotationParameters(
           <span>{translate('gallery.videoReview.annotationDuplicate')}</span>
         </ReviewButton>
         <ReviewButton
+          selectionAction="delete"
           label={translate('gallery.videoReview.deleteSelected')}
           className={reviewDeleteButtonClassName}
           disabled={disabled}
@@ -345,14 +370,6 @@ function AnnotationParameters(
   ];
   return (
     <div data-ui="gallery.videoReview.annotationInspector">
-      <InspectorParameterRow label={translate('gallery.videoReview.annotationName')}>
-        <span
-          className="block min-w-0 w-full truncate text-right text-[var(--sniptale-color-text-primary)]"
-          title={resolveEffectLocaleText(document.label, locale)}
-        >
-          {resolveEffectLocaleText(document.label, locale)}
-        </span>
-      </InspectorParameterRow>
       {editor.failure && (
         <div role="alert">
           {translate(
@@ -381,6 +398,7 @@ function annotationSdkSections(props: {
   values: Record<string, string | number>;
   locale: string;
   editor: Editor;
+  geometry: ReturnType<Editor['geometry']['read']>;
   disabled: boolean;
   preview(patch: Patch): void;
   commit(): void;
@@ -444,6 +462,7 @@ function annotationSdkSections(props: {
                 value={values[control.id] ?? resolveEffectControlDefault(control, locale)}
                 locale={locale}
                 editor={editor}
+                geometry={props.geometry}
                 disabled={disabled}
                 preview={preview}
                 commit={commit}
@@ -502,6 +521,7 @@ type AnnotationControlProps = {
   value: string | number;
   locale: string;
   editor: Editor;
+  geometry: ReturnType<Editor['geometry']['read']>;
   disabled: boolean;
   preview(patch: Patch): void;
   commit(): void;
@@ -513,15 +533,15 @@ function AnnotationControl(props: AnnotationControlProps) {
   const bound = props.document.objectLayout?.handles?.some(
     (handle) => handle.xControl === control.id || handle.yControl === control.id
   );
-  const disabled = props.disabled || (!!bound && !editor.geometry);
+  const disabled = props.disabled || (!!bound && !props.geometry);
   const patch = (value: string | number): Patch | null => {
     if (bound) {
       const anchors =
-        typeof value === 'number' && editor.geometry
+        typeof value === 'number' && props.geometry
           ? changeReviewAnnotationBoundControl(
               instance,
               props.document,
-              editor.geometry,
+              props.geometry,
               control.id,
               value
             )

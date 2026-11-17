@@ -67,10 +67,31 @@ export function ReviewCaptionSceneControls(props: {
 export function ReviewFragmentCaptionControls(props: {
   fragment: ReviewTextFragment;
   settings: ReviewCaptionSettings;
+  /** Inline fields belong to the parent inspector Appearance category. */
+  presentation?: 'disclosure' | 'inline';
   disabled: boolean;
   onChange(patch: { showInVideo?: boolean; style?: ReviewCaptionStyle | null }): void;
 }) {
   const { fragment } = props;
+  const style = (
+    <>
+      <ToggleField
+        value={!fragment.style}
+        disabled={props.disabled}
+        label={translate('gallery.videoReview.captionInherit')}
+        onChange={() =>
+          props.onChange({ style: fragment.style ? null : { ...props.settings.style } })
+        }
+      />
+      {fragment.style && (
+        <ReviewCaptionStyleControls
+          style={fragment.style}
+          disabled={props.disabled}
+          onChange={(style) => props.onChange({ style })}
+        />
+      )}
+    </>
+  );
   return (
     <>
       <ToggleField
@@ -79,30 +100,17 @@ export function ReviewFragmentCaptionControls(props: {
         disabled={props.disabled}
         onChange={(showInVideo) => props.onChange({ showInVideo })}
       />
-      {fragment.showInVideo && (
-        <ReviewDetails
-          preferenceId="group:text-style"
-          label={translate('gallery.videoReview.captionStyle')}
-        >
-          <ToggleField
-            value={!fragment.style}
-            disabled={props.disabled}
-            label={translate('gallery.videoReview.captionInherit')}
-            onChange={() =>
-              props.onChange({
-                style: fragment.style ? null : { ...props.settings.style },
-              })
-            }
-          />
-          {fragment.style && (
-            <ReviewCaptionStyleControls
-              style={fragment.style}
-              disabled={props.disabled}
-              onChange={(style) => props.onChange({ style })}
-            />
-          )}
-        </ReviewDetails>
-      )}
+      {fragment.showInVideo &&
+        (props.presentation === 'inline' ? (
+          style
+        ) : (
+          <ReviewDetails
+            preferenceId="group:text-style"
+            label={translate('gallery.videoReview.captionStyle')}
+          >
+            {style}
+          </ReviewDetails>
+        ))}
     </>
   );
 }

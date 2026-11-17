@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { translate } from '../../platform/i18n';
 import en from '../../platform/i18n/catalogs/en.json';
 import ru from '../../platform/i18n/catalogs/ru.json';
 import { prepareTranslations } from '../../platform/i18n/locale/state';
@@ -488,29 +489,7 @@ it('configures and removes a join independently of the opposite edge and media',
   expect(last.intro).toEqual(props.settings.intro);
 });
 
-async function importPresetFile(
-  parent: ParentNode,
-  selection: ReturnType<typeof createGlTransitionSelection>,
-  name = 'Imported'
-) {
-  if (!selection) throw new Error('Missing preset selection');
-  const source = JSON.stringify({
-    format: 'sniptale-gl-preset',
-    version: 1,
-    name,
-    transition: selection,
-  });
-  const file = new File([source], 'imported.sniptale-gl-preset.json');
-  Object.defineProperty(file, 'arrayBuffer', {
-    value: async () => new TextEncoder().encode(source).buffer,
-  });
-  const input = parent.querySelector<HTMLInputElement>('input[type=file]');
-  if (!input) throw new Error('Missing preset file input');
-  Object.defineProperty(input, 'files', { value: [file], configurable: true });
-  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
-}
-
-it('imports a GL preset only into the selected presentation side and retains timing/easing', async () => {
+it('changes the selected presentation GL transition without preset file actions', async () => {
   retained();
   const initial = {
     type: 'gl' as const,
@@ -520,13 +499,27 @@ it('imports a GL preset only into the selected presentation side and retains tim
     after: 0.7,
   };
   props.settings.introTransition = initial;
+  props.settings.outroTransition = { type: 'dissolve', before: 0.1, after: 0.2 };
   const before = structuredClone(props.settings);
   await render();
-  expect(host.querySelector('[data-gl-preset-owner]')?.getAttribute('data-gl-preset-owner')).toBe(
-    'presentation:intro'
+  expect(host.querySelector('[data-ui="composition.gl-preset-actions"]')).toBeNull();
+  expect(host.querySelector('[data-gl-preset-owner]')).toBeNull();
+  expect(host.querySelector('input[type="file"]')).toBeNull();
+  expect(button('Import preset')).toBeUndefined();
+  expect(button('Download preset')).toBeUndefined();
+  const trigger = section().querySelector<HTMLButtonElement>(
+    'button[aria-label="Transition to video"]'
+  )!;
+  await act(async () => {
+    trigger.click();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  });
+  const option = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+    (node) => node.textContent === translate('videoEditor.glTransitions.names.CrossZoom')
   );
+  expect(option).toBeDefined();
+  await act(async () => option!.click());
   const selection = createGlTransitionSelection('CrossZoom')!;
-  await importPresetFile(host, selection);
   expect(props.onChange).toHaveBeenCalledExactlyOnceWith({
     ...before,
     introTransition: { ...initial, selection },

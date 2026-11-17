@@ -1,5 +1,4 @@
 import { useGlTransitionCatalog } from '../../composition/gl-transition-presets/catalog';
-import { GlTransitionPresetActions } from '../../composition/gl-transition-presets/actions';
 import type { TranslationDictionary } from '../../platform/i18n/types';
 import { PresentationMediaFields } from '../../ui/presentation-media-fields';
 import { PresentationFadeFields } from '../../ui/presentation-fade-fields';
@@ -300,17 +299,6 @@ function JoinFields(props: ReviewPresentationInspectorProps & { slot: SlotName }
       glCatalog={glCatalog}
       label={label(props.slot === 'intro' ? 'presentationJoinIntro' : 'presentationJoinOutro')}
       value={transition}
-      glPresetActions={
-        transition?.type === 'gl' ? (
-          <GlTransitionPresetActions
-            ownerKey={`presentation:${props.slot}`}
-            ownerRevision={props.settings}
-            selection={transition.selection}
-            disabled={props.pending}
-            onApply={(selection) => accept({ ...transition, selection }, false)}
-          />
-        ) : undefined
-      }
       timing={timing}
       colorClassName={reviewSelectFieldClassName}
       Details={ReviewDetails}

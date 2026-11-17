@@ -461,6 +461,13 @@ it('adapts background motion choices while retaining speed and intensity', async
 function mockChoiceWidth() {
   let width = 2000;
   const callbacks = new Set<() => void>();
+  const frames = new Map<number, FrameRequestCallback>();
+  let nextFrame = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.set(++nextFrame, callback);
+    return nextFrame;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id));
   vi.spyOn(window.HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => width);
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
     font: '',
@@ -481,5 +488,10 @@ function mockChoiceWidth() {
   return (next: number) => {
     width = next;
     act(() => callbacks.forEach((callback) => callback()));
+    act(() => {
+      const pending = [...frames.values()];
+      frames.clear();
+      pending.forEach((callback) => callback(0));
+    });
   };
 }

@@ -41,6 +41,11 @@ export interface ReviewTextVoiceAccess {
   sourceAudioAvailable?: () => boolean;
   context?: {
     video: RefObject<HTMLVideoElement | null>;
+    transport?: {
+      seek(resultTime: number): void;
+      play(): void | Promise<void>;
+      pause(): void;
+    };
     registerPending(owner: ReviewSpeechFlushRegistration): () => void;
     beforeAction(action: () => void): void;
     setSilent(value: boolean): void;

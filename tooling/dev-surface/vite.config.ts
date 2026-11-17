@@ -10,7 +10,10 @@ import { lottieSchema } from '../../apps/extension/build/lottie-schema.ts';
 import { i18nCatalogs } from '../../apps/extension/build/i18n-catalogs.ts';
 import { tourPlayerScript } from '../../apps/extension/build/tour-player-script.ts';
 import { videoEffectResources } from '../../apps/extension/build/video-effect-resources.ts';
-import { createZodRuntimeFallbackPlugin } from '../../apps/extension/build/injected-build-support.ts';
+import {
+  createBlobOnlyInlineWorkerPlugin,
+  createZodRuntimeFallbackPlugin,
+} from '../../apps/extension/build/injected-build-support.ts';
 import { layoutPolicy } from '../../apps/extension/build/layout.ts';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -37,7 +40,7 @@ function isolatedSandbox(): Plugin {
         publicDir: false,
         base: '/',
         resolve: { alias: aliases },
-        plugins: [createZodRuntimeFallbackPlugin()],
+        plugins: [createZodRuntimeFallbackPlugin(), createBlobOnlyInlineWorkerPlugin()],
         build: {
           outDir: output,
           emptyOutDir: true,
@@ -125,6 +128,35 @@ function isolatedSandbox(): Plugin {
   };
 }
 
+/** Editor hooks and preparation are one runtime; reload a settled source batch together. */
+function settledSourceReload(): Plugin {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return {
+    name: 'sniptale:dev-surface-settled-reload',
+    apply: 'serve',
+    enforce: 'pre',
+    handleHotUpdate(context) {
+      if (
+        !['apps/extension/src', 'packages', 'tooling/test/harness'].some((directory) =>
+          context.file.startsWith(`${resolve(root, directory)}/`)
+        )
+      )
+        return;
+      if (/\.(?:css|scss)$/u.test(context.file)) return;
+      if (timer) clearTimeout(timer);
+      context.server.moduleGraph.invalidateAll();
+      timer = setTimeout(() => {
+        timer = undefined;
+        context.server.ws.send({ type: 'full-reload' });
+      }, 900);
+      return [];
+    },
+    closeBundle() {
+      if (timer) clearTimeout(timer);
+    },
+  };
+}
+
 export default defineConfig({
   root,
   cacheDir: resolve(root, '.tmp/dev-surface/vite-cache'),
@@ -139,6 +171,7 @@ export default defineConfig({
     ],
   },
   plugins: [
+    settledSourceReload(),
     {
       name: 'sniptale:dev-surface-entry',
       apply: 'serve',

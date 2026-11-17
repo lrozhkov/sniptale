@@ -1,5 +1,8 @@
 import { reviewTrackEnabled } from './advanced/track-controls';
-import type { VideoProjectSourceInteractionDocument } from '../project/source-interaction-documents';
+import {
+  hasResultSourceInteractionContent,
+  type VideoProjectSourceInteractionDocument,
+} from '../project/source-interaction-documents';
 import {
   planReviewProjectPresentation,
   type ReviewProjectBookendResource,
@@ -320,7 +323,14 @@ export function planReviewProjectConversion(args: {
                   },
                 }
               : {}),
-            cursorMotions: structuredClone(authored.cursorMotions ?? []),
+            cursorMotions: structuredClone(
+              (document.edits.some((edit) => edit.kind === 'freeze')
+                ? projectReviewCursorMotions(
+                    authored.cursorMotions,
+                    buildReviewTimeMap(args.source.duration, document.edits)
+                  )
+                : authored.cursorMotions) ?? []
+            ),
             cursorEnabled:
               args.ui.mode === 'advanced' &&
               authored.cursorMotionEnabled !== false &&
@@ -333,6 +343,16 @@ export function planReviewProjectConversion(args: {
           },
         ]
       : [];
+  const hasResultInteractions = sourceInteractionDocuments.some(hasResultSourceInteractionContent);
+  if (hasResultInteractions)
+    timeline.videoClips = timeline.videoClips.map((clip) => ({
+      ...clip,
+      sourceInteractionTiming: {
+        time: clip.startTime - (clip.playbackWindow?.offset ?? 0),
+        sourceTime: clip.sourceStart,
+        rate: clip.playbackRate ?? 1,
+      },
+    }));
   const original = document.advancedContent.audio.original;
   const sourceMutes = (original.mutes ?? []).flatMap((mute) =>
     mute.kind === 'range'
@@ -356,42 +376,47 @@ export function planReviewProjectConversion(args: {
     externalAudio.sourceVoiceoverDocuments.some(
       (document) => document.take.audioProcessing !== undefined
     );
-  const contentVersion = sourceInteractionDocuments.length
-    ? 54
-    : hasAudioProcessing
-      ? 53
-      : camera.clips.some((clip) => clip.cameraShadowDirection !== undefined)
-        ? 47
-        : camera.clips.some(
-              (clip) =>
-                clip.cameraScreenBehavior !== undefined ||
-                clip.cameraPositions?.some(
-                  (position) => position.cameraScreenBehavior !== undefined
+  const contentVersion =
+    hasResultInteractions || camera.clips.some((clip) => clip.cameraTiming?.timeDomain === 'result')
+      ? 56
+      : sourceInteractionDocuments.length
+        ? 54
+        : hasAudioProcessing
+          ? 53
+          : camera.clips.some((clip) => clip.cameraShadowDirection !== undefined)
+            ? 47
+            : camera.clips.some(
+                  (clip) =>
+                    clip.cameraScreenBehavior !== undefined ||
+                    clip.cameraPositions?.some(
+                      (position) => position.cameraScreenBehavior !== undefined
+                    )
                 )
-            )
-          ? 46
-          : externalAudio.clips.some((clip) => clip.transcript !== undefined)
-            ? 44
-            : compositionJoins.length
-              ? 40
-              : annotations.clips.length
-                ? 38
-                : cursor?.sourceObservations
-                  ? 33
-                  : camera.clips.length
-                    ? 32
-                    : externalAudio.sourceVoiceoverDocuments.length ||
-                        externalAudio.originalSpeech !== undefined
-                      ? 31
-                      : externalAudio.clips.length
-                        ? 30
-                        : documents.textDocuments.some((entry) => entry.durationMode !== undefined)
-                          ? 29
-                          : original.ranges?.length || sourceMutes.length
-                            ? 28
-                            : timeline.videoClips.some((clip) => (clip.playbackRate ?? 1) < 0.1)
-                              ? 27
-                              : 26;
+              ? 46
+              : externalAudio.clips.some((clip) => clip.transcript !== undefined)
+                ? 44
+                : compositionJoins.length
+                  ? 40
+                  : annotations.clips.length
+                    ? 38
+                    : cursor?.sourceObservations
+                      ? 33
+                      : camera.clips.length
+                        ? 32
+                        : externalAudio.sourceVoiceoverDocuments.length ||
+                            externalAudio.originalSpeech !== undefined
+                          ? 31
+                          : externalAudio.clips.length
+                            ? 30
+                            : documents.textDocuments.some(
+                                  (entry) => entry.durationMode !== undefined
+                                )
+                              ? 29
+                              : original.ranges?.length || sourceMutes.length
+                                ? 28
+                                : timeline.videoClips.some((clip) => (clip.playbackRate ?? 1) < 0.1)
+                                  ? 27
+                                  : 26;
   const sceneVersion = minimumConvertedSceneSchemaVersion(scene);
   const compositionVersion = sceneVersion > contentVersion ? sceneVersion : contentVersion;
   const minimumVersion =
@@ -659,3 +684,4 @@ function pendingContent(): ReviewProjectConversionIssue[] {
     unmapped ? [{ kind: 'unmapped-content' as const, field }] : []
   );
 }
+import { projectReviewCursorMotions } from './timeline-placement';

@@ -1,5 +1,10 @@
 import type { CameraShadowDirection } from './shadow-direction';
-import { getMediaClipSourceTime } from '../timeline/rate';
+import {
+  getMediaClipSourceTime,
+  getCameraLayoutTime,
+  getCameraLayoutRate,
+  getCameraLayoutTimelineTime,
+} from '../timeline/rate';
 import { isCameraHiddenAt } from './visibility';
 import {
   DEFAULT_CAMERA_APPEARANCE,
@@ -29,10 +34,25 @@ export type CameraPositionEdit =
   | { kind: 'update'; id: string; sourceTime?: number; transition?: CameraPosition['transition'] };
 
 export function cameraSourceTime(clip: VideoProjectVideoClip, time: number): number {
+  if (clip.cameraTiming?.timeDomain === 'result') return getCameraLayoutTime(clip, time);
   return (
     clip.sourceStart +
     Math.max(0, Math.min(clip.duration, time - clip.startTime)) * (clip.playbackRate ?? 1)
   );
+}
+
+/** Authored camera intervals advance in result seconds or in the legacy source clock. */
+export function cameraTimingRate(clip: VideoProjectVideoClip): number {
+  return clip.cameraTiming?.timeDomain === 'result'
+    ? getCameraLayoutRate(clip)
+    : (clip.playbackRate ?? 1);
+}
+
+/** Convert a camera destination or visibility boundary back to its timeline position. */
+export function cameraTimelineTime(clip: VideoProjectVideoClip, time: number): number {
+  return clip.cameraTiming?.timeDomain === 'result'
+    ? getCameraLayoutTimelineTime(clip, time)
+    : clip.startTime + (time - clip.sourceStart) / cameraTimingRate(clip);
 }
 
 export function activeCameraPosition(
@@ -235,7 +255,7 @@ export function canAddCameraPosition(project: VideoProject, clipId: string, time
     time < clip.startTime + clip.duration &&
     (clip.cameraPositions?.length ?? 0) < 512 &&
     !clip.cameraPositions?.some(
-      (item) => Math.abs(item.sourceTime - sourceTime) < (clip.playbackRate ?? 1) / project.fps
+      (item) => Math.abs(item.sourceTime - sourceTime) < cameraTimingRate(clip) / project.fps
     )
   );
 }

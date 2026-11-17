@@ -15,6 +15,7 @@ import { createRecordingCursorTrajectoryReader } from '../../composition/persist
 import {
   prepareCameraCursorTrajectoryProject,
   prepareCursorTrajectoryProject,
+  prepareCursorTrajectoryRangeProject,
 } from '../../features/video/project/cursor-trajectory/project-window';
 import type { RecordingCursorTrajectoryStoreDependencies } from '../../composition/persistence/recordings/cursor-trajectory/contracts';
 import {
@@ -40,15 +41,22 @@ export function createRecordingCursorTrajectoryRenderer(
   const cameraPlans = new Map<string, PreparedProjectCamera>();
   const cameraPending = new Map<string, Promise<PreparedProjectCamera>>();
   return {
-    async prepare(project: VideoProject, time: number): Promise<VideoProject> {
+    async prepare(
+      project: VideoProject,
+      time: number,
+      range?: { start: number; end: number },
+      signal?: AbortSignal
+    ): Promise<VideoProject> {
       const current = ++revision;
       const activeReader = reader;
-      const prepared = await prepareCursorTrajectoryProject(
-        project,
-        time,
-        (identity, descriptor, timeUs) => activeReader.read(identity, descriptor, timeUs),
-        completed
-      );
+      const read: Parameters<typeof prepareCursorTrajectoryProject>[2] = (
+        identity,
+        descriptor,
+        timeUs
+      ) => activeReader.read(identity, descriptor, timeUs);
+      const prepared = range
+        ? await prepareCursorTrajectoryRangeProject(project, range, read, signal, completed)
+        : await prepareCursorTrajectoryProject(project, time, read, completed);
       if (current === revision) completed = prepared;
       return prepared;
     },

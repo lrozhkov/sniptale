@@ -76,8 +76,17 @@ interface ReviewAudioHandle {
 interface OwnedAudioHandle extends ReviewAudioHandle {
   release(): void;
 }
+/** One owned context: graph time schedules audio; output time estimates its current presentation. */
+export interface ReviewAudioClockSample {
+  readonly identity: object;
+  readonly graphTime: number;
+  /** Absent means unsupported; null means the supported output estimate is not ready. */
+  readonly outputTime?: number | null;
+}
 export interface ReviewAudioEngine {
   now(): number;
+  /** Borrow one running context without creating a graph or changing scheduling time. */
+  readActiveClock?(): ReviewAudioClockSample | null;
   resume(): Promise<void>;
   decode(data: ArrayBuffer): Promise<ReviewAudioClipBuffer>;
   /** Prepares the selected clip span at its applied tempo, preserving native pitch. */
@@ -251,6 +260,34 @@ export function createReviewAudioEngine(
   } catch {
     return null;
   }
+  const clockIdentity = {};
+  const readActiveClock = (): ReviewAudioClockSample | null => {
+    if (disposed || context.state !== 'running') return null;
+    const graphTime = context.currentTime;
+    if (typeof context.getOutputTimestamp !== 'function')
+      return { identity: clockIdentity, graphTime };
+    let outputTime: number | null = null;
+    try {
+      const { contextTime, performanceTime } = context.getOutputTimestamp();
+      const now = performance.now();
+      if (
+        typeof contextTime === 'number' &&
+        Number.isFinite(contextTime) &&
+        contextTime > 0 &&
+        typeof performanceTime === 'number' &&
+        Number.isFinite(performanceTime) &&
+        performanceTime > 0 &&
+        performanceTime <= now
+      ) {
+        const estimate = contextTime + (now - performanceTime) / 1000;
+        if (Number.isFinite(estimate) && estimate >= 0 && estimate <= graphTime)
+          outputTime = estimate;
+      }
+    } catch {
+      // Output estimation is optional; the graph remains available for scheduling.
+    }
+    return { identity: clockIdentity, graphTime, outputTime };
+  };
   let originalGain: GainNode | null = null;
   let originalSource: MediaElementAudioSourceNode | null = null;
   let originalDryGate: GainNode | null = null;
@@ -273,6 +310,7 @@ export function createReviewAudioEngine(
   };
   return {
     now: () => context.currentTime,
+    readActiveClock,
     resume: () => context.resume(),
     decode: async (data) =>
       new BrowserReviewAudioBuffer(await decodeReviewAudioClipBuffer(data, decoding.signal)),

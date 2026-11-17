@@ -220,6 +220,7 @@ it(
     const rpc = deferred<unknown>();
     sync.exit.mockReturnValueOnce(rpc.promise);
     try {
+      await f.click('comments');
       await act(async () => close(f).click());
       expect(sync.exit).toHaveBeenCalledExactlyOnceWith(receipt(1));
       expect(f.back).not.toHaveBeenCalled();
@@ -485,6 +486,7 @@ it.each([false, true])(
     const rpc = deferred<unknown>();
     sync.exit.mockReturnValueOnce(rpc.promise);
     try {
+      await f.click('comments');
       await clickNew(f);
       expect(integration.create).toHaveBeenCalledOnce();
       const args = integration.create.mock.calls[0]![0];

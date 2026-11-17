@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { createReviewInteractionEditor } from './interaction-editor';
+import { createReviewCommandFixture } from './editor-fixture.test-support';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 
@@ -7,6 +8,10 @@ type Input = Parameters<typeof createReviewInteractionEditor>[0];
 function fixture() {
   const advanced = createQuickEditAdvancedState();
   const input: Input = {
+    commands: createReviewCommandFixture(
+      () => ({ duration: input.duration, time: input.time, resultTime: input.time, advanced }),
+      { beforeAction: (action) => input.beforeAction(action) }
+    ),
     advanced,
     duration: 10,
     time: 9.9,

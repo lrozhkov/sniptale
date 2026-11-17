@@ -1,6 +1,7 @@
 import {
   resolveCameraClip,
   cameraSourceTime,
+  cameraTimelineTime,
   effectiveCameraTransitionDuration,
 } from '../../project/camera/animation';
 import { DEFAULT_CAMERA_APPEARANCE } from '../../project/camera/appearance';
@@ -19,14 +20,14 @@ const times = (a: Range, b: Range): Range =>
   range([a[0] * b[0], a[0] * b[1], a[1] * b[0], a[1] * b[1]]);
 const scale = (a: Range, factor: number): Range => times(a, [factor, factor]);
 
-/** Exact source-clock seams partition camera position and visibility proof intervals. */
+/** Camera media and layout boundaries partition geometry proof intervals. */
 export function cameraSourceGeometryBreaks(
   clip: VideoProjectVideoClip,
   project?: VideoProject
 ): number[] {
   const toProject = (time: number) =>
     clip.startTime + (time - clip.sourceStart) / (clip.playbackRate ?? 1);
-  return [
+  const media = [
     ...(clip.cameraTiming
       ? [
           clip.cameraTiming.offsetSeconds,
@@ -35,14 +36,17 @@ export function cameraSourceGeometryBreaks(
               Infinity),
         ]
       : []),
+  ].map(toProject);
+  const layout = [
     ...(clip.cameraPositions ?? []).flatMap((position) => [
       position.sourceTime,
       position.sourceTime + effectiveCameraTransitionDuration(clip, position),
     ]),
     ...(clip.cameraHiddenRanges ?? []).flatMap((interval) => [interval.start, interval.end]),
-  ]
-    .map(toProject)
-    .filter((time) => time >= clip.startTime && time <= clip.startTime + clip.duration);
+  ].map((time) => cameraTimelineTime(clip, time));
+  return [...media, ...layout].filter(
+    (time) => time >= clip.startTime && time <= clip.startTime + clip.duration
+  );
 }
 
 function trigBounds(angle: Range, cosine: boolean): Range {

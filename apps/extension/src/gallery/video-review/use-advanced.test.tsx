@@ -15,17 +15,20 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
-import type { ReviewOperation } from '../../features/video/review/types';
+import type { ReviewEdit, ReviewOperation } from '../../features/video/review/types';
 import { parseVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
 import { parseReviewOperation } from '../../features/video/review/validation';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import { useReviewAdvanced } from './use-advanced';
 import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
 import { createQuickEditWatermark } from '../../features/video/project/scene/watermark';
+import { createReviewCaptionSettings } from '../../features/video/review/text-document';
+import { useReviewSnapshot } from './use-session';
 
 let root: Root;
 let host: HTMLDivElement;
 let advanced: ReturnType<typeof useReviewAdvanced>;
+let view: ReturnType<typeof useReviewSnapshot>;
 
 function setup(initial = createQuickEditAdvancedState()) {
   let workspaceAdvanced = initial;
@@ -84,6 +87,7 @@ function setup(initial = createQuickEditAdvancedState()) {
   };
   const session = createVideoReviewSession(build(), deps);
   function Harness() {
+    view = useReviewSnapshot(session);
     advanced = useReviewAdvanced(session);
     return null;
   }
@@ -142,6 +146,144 @@ afterEach(async () => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
+
+it.each([
+  'zoom',
+  'cursorMotion',
+  'annotationEffects',
+  'text',
+  'originalAudio',
+  'voiceover',
+  'music',
+  'webcam',
+  'keyboard',
+  'mouse',
+] as const)('keeps unrelated lane data stable after the %s toggle is saved', async (track) => {
+  const initial = createQuickEditAdvancedState();
+  initial.ui.mode = 'advanced';
+  initial.zoom.enabled = true;
+  initial.cursorMotionEnabled = true;
+  initial.annotationEffects = { enabled: true, instances: [] };
+  initial.captions = { ...createReviewCaptionSettings(), enabled: true };
+  const clip = {
+    id: 'voice',
+    assetId: 'project-asset:voice',
+    timelineStart: 0,
+    sourceOffset: 0,
+    duration: 2,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+  };
+  initial.audio.voiceover = [clip];
+  initial.audio.music = [{ ...clip, id: 'music', assetId: 'project-asset:music' }];
+  initial.webcam = createQuickEditWebcam(
+    'project-asset:camera',
+    { width: 640, height: 480 },
+    { width: 1920, height: 1080 }
+  );
+  setup(initial);
+  const before = advanced.advanced;
+  const edits = view.document.edits;
+  await act(async () => {
+    switch (track) {
+      case 'zoom':
+        advanced.setZoom((value) => ({ ...value, enabled: false }));
+        break;
+      case 'cursorMotion':
+        advanced.setCursorMotionEnabled(false);
+        break;
+      case 'annotationEffects':
+        advanced.setAnnotationEffects((value) => value && { ...value, enabled: false });
+        break;
+      case 'text':
+        advanced.setCaptions({ ...advanced.advanced.captions!, enabled: false });
+        break;
+      case 'originalAudio':
+        advanced.setAudio((value) => ({ ...value, original: { ...value.original, muted: true } }));
+        break;
+      case 'voiceover':
+      case 'music':
+        advanced.setAudio((value) => ({
+          ...value,
+          [track]: value[track].map((clip) => ({ ...clip, muted: true })),
+        }));
+        break;
+      case 'webcam':
+        advanced.setWebcam((value) => value && { ...value, enabled: false });
+        break;
+      case 'keyboard':
+      case 'mouse':
+        await advanced.setTrackVisibility(track, false);
+        break;
+    }
+    await advanced.flush();
+  });
+  const after = advanced.advanced;
+  expect(view.document.edits, 'a lane flag must not rebuild timeline projections').toBe(edits);
+  const affected =
+    track === 'text'
+      ? 'captions'
+      : track === 'cursorMotion'
+        ? 'cursorMotionEnabled'
+        : track === 'keyboard' || track === 'mouse'
+          ? 'ui'
+          : ['originalAudio', 'voiceover', 'music'].includes(track)
+            ? 'audio'
+            : track;
+  for (const [key, value] of Object.entries(before)) {
+    if (key !== affected && typeof value === 'object' && value !== null)
+      expect(Reflect.get(after, key), `${track} must retain ${key}`).toBe(value);
+  }
+  if (track !== 'voiceover') expect(after.audio.voiceover).toBe(before.audio.voiceover);
+  if (track !== 'music') expect(after.audio.music).toBe(before.audio.music);
+  if (track !== 'originalAudio') expect(after.audio.original).toBe(before.audio.original);
+  if (track === 'zoom') expect(after.zoom.regions).toBe(before.zoom.regions);
+  if (track === 'annotationEffects')
+    expect(after.annotationEffects?.instances).toBe(before.annotationEffects?.instances);
+  if (track === 'webcam') expect(after.webcam?.positions).toBe(before.webcam?.positions);
+  expect(advanced.pending).toBe(false);
+});
+
+it.each(['cut', 'speed', 'freeze'] as const)(
+  'publishes changed %s edits to timeline consumers and restores them through Undo/Redo',
+  async (kind) => {
+    const { session } = setup();
+    session.setAutosaveEnabled(false);
+    const before = view.document.edits;
+    const range = { id: kind, start: 1, end: 2, requestedStart: 1, requestedEnd: 2 };
+    const edit: ReviewEdit =
+      kind === 'cut'
+        ? { ...range, kind }
+        : kind === 'speed'
+          ? { ...range, kind, rate: 2, audio: 'speed' }
+          : {
+              ...range,
+              kind,
+              end: 1,
+              requestedEnd: 1,
+              duration: 2,
+              frameTime: 1,
+              frameDuration: 1 / 30,
+            };
+    await act(async () => {
+      await session.commit({
+        id: `${kind}:operation`,
+        at: 1,
+        target: 'edit',
+        before: null,
+        after: edit,
+      });
+    });
+    expect(view.document.edits).not.toBe(before);
+    expect(view.document.edits).toEqual([edit]);
+    await act(async () => session.history('undo'));
+    expect(view.document.edits).toEqual([]);
+    await act(async () => session.history('redo'));
+    expect(view.document.edits).toEqual([edit]);
+  }
+);
 
 it('rebuilds writes from reloaded persisted content after a conflict recovery', async () => {
   const { session, deps, saveFromOtherTab } = setup();

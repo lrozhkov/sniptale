@@ -324,7 +324,9 @@ it('hides after a pointer commit and leave, while keyboard editing can retain vi
       createPointerEvent('pointerout', { bubbles: true, relatedTarget: document.body })
     )
   );
-  expect(shell.getAttribute('aria-hidden')).toBe('true');
+  expect(shell.className).toContain('opacity-0');
+  expect(document.activeElement).toBe(range);
+  expect(shell.getAttribute('aria-hidden')).toBeNull();
   act(() =>
     range.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
   );

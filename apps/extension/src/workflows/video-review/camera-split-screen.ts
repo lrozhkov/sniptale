@@ -13,18 +13,22 @@ import {
 export function reviewSplitScreenAt(
   webcam: QuickEditWebcam | undefined,
   sourceTime: number,
-  hasCamera: boolean
+  hasCamera: boolean,
+  resultTime = sourceTime
 ): CameraScreenPanel | null {
-  return webcam && hasCamera ? quickEditWebcamScreenPlacementAt(webcam, sourceTime) : null;
+  return webcam && hasCamera
+    ? quickEditWebcamScreenPlacementAt(webcam, sourceTime, resultTime)
+    : null;
 }
 
 export function reviewSplitRasterAt(
   webcam: QuickEditWebcam | undefined,
   sourceTime: number,
   hasCamera: boolean,
-  backing: { width: number; height: number }
+  backing: { width: number; height: number },
+  resultTime = sourceTime
 ) {
-  const screen = reviewSplitScreenAt(webcam, sourceTime, hasCamera);
+  const screen = reviewSplitScreenAt(webcam, sourceTime, hasCamera, resultTime);
   return screen && (screen.width < 1 || screen.height < 1 || screen.clip) ? backing : null;
 }
 

@@ -222,9 +222,7 @@ function parseEdit(value: unknown, duration: number): ReviewEdit | null {
       value['frameTime'] >= duration ||
       !finite(value['frameDuration']) ||
       value['frameDuration'] <= 0 ||
-      value['frameDuration'] > 172800 ||
-      (range.start !== 0 && value['frameTime'] > range.start) ||
-      value['frameTime'] + value['frameDuration'] < range.start - 1e-6
+      value['frameDuration'] > 172800
     )
       return null;
     return {
@@ -408,6 +406,11 @@ function parseReviewOperationValue(value: unknown, duration: number): ReviewOper
     if (value['preserveTextAnchors'] !== undefined && value['preserveTextAnchors'] !== true)
       return null;
     if (
+      (value['preserveResultText'] !== undefined && value['preserveResultText'] !== true) ||
+      (value['preserveResultText'] === true && value['preserveTextAnchors'] !== true)
+    )
+      return null;
+    if (
       (value['normalizeVoiceoverTempo'] !== undefined &&
         value['normalizeVoiceoverTempo'] !== true) ||
       (value['normalizeVoiceoverTempo'] === true && value['preserveVoiceoverAnchors'] !== true)
@@ -424,6 +427,7 @@ function parseReviewOperationValue(value: unknown, duration: number): ReviewOper
         ? { preserveVoiceoverAnchors: true as const }
         : {}),
       ...(value['preserveTextAnchors'] === true ? { preserveTextAnchors: true as const } : {}),
+      ...(value['preserveResultText'] === true ? { preserveResultText: true as const } : {}),
       ...(value['normalizeVoiceoverTempo'] === true
         ? { normalizeVoiceoverTempo: true as const }
         : {}),

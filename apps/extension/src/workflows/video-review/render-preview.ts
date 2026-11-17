@@ -826,7 +826,12 @@ async function drawPreparedCanvasFrame(
         await paintReviewCutDissolve(context, transition, blend.incoming, drawEndpoint, canvas);
     } else geometry = await draw(context, canvas, frame, sample);
     signal.throwIfAborted();
-    const splitScreen = reviewSplitScreenAt(scene.webcam, frame.sourceTime, !!frame.camera);
+    const splitScreen = reviewSplitScreenAt(
+      scene.webcam,
+      frame.sourceTime,
+      !!frame.camera,
+      frame.resultTime
+    );
     paintReviewCameraSplitScreen(context, canvas, dimensions.backing, splitScreen, resources);
     if (frame.camera && scene.webcam)
       drawReviewWebcam(
@@ -877,7 +882,8 @@ function admitRender(
     prepared.scene.webcam,
     frame?.sourceTime ?? 0,
     !!frame?.camera,
-    prepared.dimensions.backing
+    prepared.dimensions.backing,
+    frame?.resultTime ?? 0
   );
   const input = allocation.describe();
   const previousCache = assets.painter.retainedCacheSize;

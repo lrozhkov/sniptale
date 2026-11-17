@@ -28,11 +28,18 @@ interface WorkerOptions {
   timeoutMs?: number;
   workerFactory(): EffectRuntimeWorkerLike;
 }
+type WorkerStartupFailure = 'crashed' | 'malformed';
+
 interface EffectRuntimeWorkerLease {
   onReset?(): void;
   worker: EffectRuntimeWorkerLike | null;
+  started: boolean;
+  unavailable: boolean;
+  startupFailure?: WorkerStartupFailure;
 }
 interface EffectRuntimeWorkerSession {
+  readonly unavailable: boolean;
+  takeUnavailableCode(): WorkerStartupFailure | 'circuitOpen';
   /** Start trusted worker modules without posting a user frame or consuming queue admission. */
   preload(): void;
   execute(request: EffectRuntimeWorkerMessage): Promise<EffectRuntimeFrameResult>;
@@ -42,6 +49,12 @@ interface EffectRuntimeWorkerSession {
   ): Promise<EffectRuntimeSceneResult>;
 }
 
+function takeUnavailableCode(lease: EffectRuntimeWorkerLease) {
+  const code = lease.startupFailure ?? 'circuitOpen';
+  delete lease.startupFailure;
+  return code;
+}
+
 /** One worker owns retained Lottie players and executes one request at a time. */
 export function createEffectRuntimeWorkerSession(
   options: WorkerOptions
@@ -49,26 +62,32 @@ export function createEffectRuntimeWorkerSession(
   const lease: EffectRuntimeWorkerLease = {
     ...(options.onReset ? { onReset: options.onReset } : {}),
     worker: null,
+    started: false,
+    unavailable: false,
   };
   const preload = () => {
-    if (lease.worker) return;
+    if (lease.worker || lease.unavailable) return;
     let worker: EffectRuntimeWorkerLike;
     try {
       worker = options.workerFactory();
     } catch {
+      lease.unavailable = true;
+      lease.startupFailure = 'crashed';
       return;
     }
     lease.worker = worker;
-    const retire = () => {
+    const retire = (code: WorkerStartupFailure) => {
       if (lease.worker !== worker) return;
       worker.onerror = null;
       worker.onmessageerror = null;
       worker.terminate();
       lease.worker = null;
+      lease.unavailable = true;
+      lease.startupFailure = code;
       lease.onReset?.();
     };
-    worker.onerror = retire;
-    worker.onmessageerror = retire;
+    worker.onerror = () => retire('crashed');
+    worker.onmessageerror = () => retire('malformed');
   };
   let queue = Promise.resolve();
   function execute(request: EffectRuntimeWorkerMessage): Promise<EffectRuntimeFrameResult>;
@@ -91,14 +110,26 @@ export function createEffectRuntimeWorkerSession(
       );
     return operation.then(({ result }) => result);
   }
-  return { execute, preload };
+  return {
+    execute,
+    preload,
+    takeUnavailableCode: () => takeUnavailableCode(lease),
+    get unavailable() {
+      return lease.unavailable;
+    },
+  };
 }
 
 export async function executeEffectRuntimeWorker(
   request: EffectRuntimeWorkerMessage,
   options: WorkerOptions
 ): Promise<EffectRuntimeFrameResult> {
-  return startWorkerOperation(request, options, { worker: null }, true).result;
+  return startWorkerOperation(
+    request,
+    options,
+    { worker: null, started: false, unavailable: false },
+    true
+  ).result;
 }
 
 /** One authority owns publication, transfer, identity, deadline and worker retirement. */
@@ -188,6 +219,8 @@ function startWorkerOperation(
       closeEffectRuntimeWorkerResponse(event.data);
       return;
     }
+    // A reply proves worker startup, independently of per-frame payload admission.
+    lease.started = true;
     if (performance.now() >= deadline) {
       closeEffectRuntimeWorkerResponse(event.data);
       fail('timeout');
@@ -227,13 +260,23 @@ function startWorkerOperation(
     send(request);
   };
   try {
+    if (lease.unavailable) {
+      fail(takeUnavailableCode(lease));
+      return { result, drained };
+    }
+    if (!lease.worker) lease.started = false;
     worker = lease.worker ?? options.workerFactory();
     lease.worker = worker;
-    worker.onerror = () => fail('crashed');
-    worker.onmessageerror = () => fail('malformed');
+    const failWorker = (code: 'crashed' | 'malformed') => {
+      if (!terminateAfterResult && !lease.started) lease.unavailable = true;
+      fail(code);
+    };
+    worker.onerror = () => failWorker('crashed');
+    worker.onmessageerror = () => failWorker('malformed');
     worker.onmessage = onMessage;
     start();
   } catch {
+    if (!worker && !terminateAfterResult) lease.unavailable = true;
     fail('crashed');
     if (!worker) lease.onReset?.();
   }

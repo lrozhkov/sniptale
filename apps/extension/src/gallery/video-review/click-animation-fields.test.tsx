@@ -24,10 +24,22 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 const click = { ...REVIEW_CLICK_DEFAULT, effect: 'ripple' as const };
-const field = (name: string, type = 'text') =>
-  host.querySelector<HTMLInputElement>(
-    `input[type="${type}"][aria-label="gallery.videoReview.${name}${type === 'range' ? ' range' : ''}"]`
-  )!;
+function openSection(id: string) {
+  const tab = host.querySelector<HTMLButtonElement>(`[role="tab"][aria-controls$="-${id}"]`);
+  if (tab) act(() => tab.click());
+}
+const field = (name: string, type = 'text') => {
+  const selector = `input[type="${type}"][aria-label="gallery.videoReview.${name}${type === 'range' ? ' range' : ''}"]`;
+  let found = host.querySelector<HTMLInputElement>(selector);
+  if (found) return found;
+  for (const tab of host.querySelectorAll<HTMLButtonElement>('[role="tab"]')) {
+    act(() => tab.click());
+    found = host.querySelector<HTMLInputElement>(selector);
+    if (found) return found;
+  }
+  return null!;
+};
+
 function input(node: HTMLInputElement, value: string) {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(node, value);
   node.dispatchEvent(new Event('input', { bubbles: true }));
@@ -36,7 +48,12 @@ function input(node: HTMLInputElement, value: string) {
 it('provides common slider ranges while accepting larger typed values', () => {
   const change = vi.fn();
   act(() => root.render(<ReviewClickFields values={[click]} onChange={change} />));
-  expect(host.querySelectorAll('input[type="range"]')).toHaveLength(8);
+  let ranges = 0;
+  for (const tab of host.querySelectorAll<HTMLButtonElement>('[role="tab"]')) {
+    act(() => tab.click());
+    ranges += host.querySelectorAll('input[type="range"]').length;
+  }
+  expect(ranges).toBe(8);
   const radius = field('clickRadius', 'range');
   expect(radius.min).toBe('2');
   expect(radius.max).toBe('80');
@@ -72,6 +89,7 @@ it('shows slider drafts locally and commits one changed field for mixed selectio
 it('exposes only effective appearance controls and preserves fractional position input', () => {
   const change = vi.fn();
   act(() => root.render(<ReviewClickFields values={[click]} onChange={change} />));
+  openSection('appearance');
   expect(field('clickOpacity')).toBeNull();
   expect(field('clickX', 'range').min).toBe('-10');
   expect(field('clickX', 'range').max).toBe('10');
@@ -114,7 +132,7 @@ it('shows lens controls with fractional magnification and no repeated pulses', (
   expect(change).toHaveBeenCalledWith({ magnification: 2.3 });
 });
 
-it('starts with recorded information and falls back when an effect removes the active section', () => {
+it('starts with animation, keeps information last and falls back when an effect removes the active section', () => {
   const change = vi.fn();
   const render = (effect: 'ripple' | 'off') =>
     act(() =>
@@ -134,6 +152,10 @@ it('starts with recorded information and falls back when an effect removes the a
       )
     );
   render('ripple');
+  expect(host.querySelector('[data-section="animation"]')).not.toBeNull();
+  const tabs = Array.from(host.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+  expect(tabs.at(-1)?.getAttribute('aria-controls')).toMatch(/-information$/);
+  act(() => tabs.at(-1)!.click());
   expect(host.querySelector('[data-section="information"] dl')?.textContent).toContain('01.00');
   const timing = Array.from(host.querySelectorAll('button')).find(
     (node) => node.getAttribute('aria-label') === 'gallery.videoReview.clickTiming'
@@ -142,7 +164,11 @@ it('starts with recorded information and falls back when an effect removes the a
   expect(host.querySelector('[data-section="timing"]')).not.toBeNull();
   render('off');
   expect(host.querySelector('[data-section="timing"]')).toBeNull();
-  expect(host.querySelector('[data-section="information"]')).not.toBeNull();
+  expect(host.querySelector('[data-section="animation"]')).not.toBeNull();
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-information"]')!.click()
+  );
+  expect(host.querySelector('[data-section="information"] dl')?.textContent).toContain('01.00');
   expect(change).not.toHaveBeenCalled();
 });
 

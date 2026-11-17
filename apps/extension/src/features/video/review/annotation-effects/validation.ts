@@ -99,6 +99,7 @@ function parseInstance(raw: unknown): ReviewAnnotationEffect | null {
     !identity(raw['id']) ||
     !identity(raw['snapshotId']) ||
     typeof raw['enabled'] !== 'boolean' ||
+    (raw['timeDomain'] !== undefined && raw['timeDomain'] !== 'result') ||
     !finite(raw['start'], 0, MAX_TIME) ||
     !finite(raw['end'], 0, MAX_TIME) ||
     raw['end'] <= raw['start'] ||
@@ -115,6 +116,7 @@ function parseInstance(raw: unknown): ReviewAnnotationEffect | null {
     id: raw['id'],
     snapshotId: raw['snapshotId'],
     enabled: raw['enabled'],
+    ...(raw['timeDomain'] === 'result' ? { timeDomain: 'result' as const } : {}),
     start: raw['start'],
     end: raw['end'],
     attachment: raw['attachment'],

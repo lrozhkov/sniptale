@@ -1,3 +1,5 @@
+import { createQuickEditWebcam } from './advanced/webcam';
+import type { ReviewProjectCameraResource } from './project-camera';
 import { createCameraFollowSettings } from '../project/camera/cursor-policy';
 import { patchReviewKeys } from '../project/action-feedback/key-animation';
 import { patchReviewClicks } from './advanced/click-animation';
@@ -220,4 +222,75 @@ export function actionFixture() {
   });
   input.document.advancedContent.cameraFollowDefaults = createCameraFollowSettings('fast');
   return { input, events, signals };
+}
+
+export function cameraFixture() {
+  const input = fixture();
+  const camera: ReviewProjectCameraResource = {
+    reviewAssetId: 'project-asset:camera-owned',
+    asset: {
+      id: 'camera-asset',
+      type: 'VIDEO',
+      name: 'Camera.webm',
+      source: { kind: 'project-asset', projectAssetId: 'camera-owned' },
+      metadata: {
+        width: 320,
+        height: 240,
+        duration: 6,
+        size: 50,
+        mimeType: 'video/webm',
+        hasAudio: true,
+        audioPeaks: null,
+      },
+      createdAt: input.seed.createdAt,
+    },
+    track: {
+      id: 'camera-track',
+      name: 'Camera',
+      kind: 'PRIMARY',
+      role: 'CAMERA',
+      order: -1,
+      visible: true,
+      locked: false,
+    },
+  };
+  const webcam = createQuickEditWebcam(camera.reviewAssetId, camera.asset.metadata, input.source);
+  webcam.appearance = { shape: 'circle', roundness: 35, zoom: 1.5, panX: -0.2, panY: 0.3 };
+  webcam.mirrored = true;
+  webcam.shadow = { intensity: 45, color: '#123456' };
+  webcam.positions = [
+    {
+      id: 'move',
+      time: 1,
+      placement: { x: 0.1, y: 0.1, width: 0.3, height: 0.4 },
+      crop: { zoom: 2, panX: 0.5, panY: -0.5 },
+      transition: { type: 'ease-in-out', duration: 4 },
+    },
+    {
+      id: 'removed-key',
+      time: 3.5,
+      placement: { x: 0.5, y: 0.2, width: 0.3, height: 0.4 },
+      transition: { type: 'shrink', duration: 3 },
+    },
+    {
+      id: 'last',
+      time: 5,
+      placement: { x: 0.2, y: 0.5, width: 0.3, height: 0.4 },
+      crop: { zoom: 3, panX: -0.5, panY: 0.5 },
+      transition: { type: 'none', duration: 2 },
+    },
+  ];
+  webcam.hiddenRanges = [{ id: 'hidden', start: 4.2, end: 4.5 }];
+  input.document.advancedContent.webcam = webcam;
+  input.document.edits.push({
+    id: 'speed',
+    kind: 'speed',
+    start: 4,
+    end: 6,
+    requestedStart: 4,
+    requestedEnd: 6,
+    rate: 2,
+    audio: 'speed',
+  });
+  return { ...input, camera };
 }

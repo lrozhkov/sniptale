@@ -452,6 +452,7 @@ function webcamLayers(
   scene: PreviewScene,
   dimensions: PreviewSceneDimensions,
   sourceTime: number,
+  resultTime: number,
   camera: ReviewGpuCamera | undefined,
   primitives: ReviewGpuPrimitives
 ): GpuPreviewLayer[] {
@@ -459,7 +460,7 @@ function webcamLayers(
   if (!camera || !original) return [];
   const frame = camera.drawable.videoFrame?.();
   if (!frame) throw new Error('Camera GPU pixels are unavailable.');
-  const screen = reviewSplitScreenAt(original, sourceTime, true);
+  const screen = reviewSplitScreenAt(original, sourceTime, true, resultTime);
   const webcam = reviewSplitCameraStyle(original, screen);
   const output = dimensions.canonical;
   const placement = quickEditWebcamBounds(camera.placement, output, webcam.appearance.shape);
@@ -527,7 +528,7 @@ export function reviewGpuFinishLayers(args: {
   const { scene, dimensions, primitives } = args;
   const output = dimensions.canonical;
   const full = { x: 0, y: 0, ...output };
-  const screen = reviewSplitScreenAt(scene.webcam, args.sourceTime, !!args.camera);
+  const screen = reviewSplitScreenAt(scene.webcam, args.sourceTime, !!args.camera, args.resultTime);
   const split = screen && (screen.width < 1 || screen.height < 1 || screen.clip);
   const layers: GpuPreviewLayer[] = [];
   if (split) {
@@ -565,7 +566,9 @@ export function reviewGpuFinishLayers(args: {
       });
     } else layers.push(pane);
   } else layers.push({ source: args.main, rect: full, inverse: identity });
-  layers.push(...webcamLayers(scene, dimensions, args.sourceTime, args.camera, primitives));
+  layers.push(
+    ...webcamLayers(scene, dimensions, args.sourceTime, args.resultTime, args.camera, primitives)
+  );
   if (scene.keys.length || (args.watermark && scene.watermark?.mode !== 'none')) {
     const overlay = primitives.raster('preview-gpu-keys-watermark', output, (context) => {
       drawReviewKeys(context, scene.keys, args.resultTime, output);

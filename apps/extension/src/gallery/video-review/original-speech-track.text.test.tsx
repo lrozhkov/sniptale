@@ -1,13 +1,51 @@
 // @vitest-environment jsdom
-import { translate, formatNumber } from '../../platform/i18n';
+import {
+  createQuickEditAdvancedState,
+  createQuickEditAdvancedContent,
+} from '../../features/video/review/advanced/defaults';
+import { createReviewCommandFixture } from './editor-fixture.test-support';
+import {
+  translate,
+  formatNumber,
+  getCurrentLocale,
+  setLocalePreference,
+} from '../../platform/i18n';
 import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
-import { act, useRef, useState } from 'react';
+import { act, Suspense, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewTextTrack } from './original-speech-track';
 import { useReviewText } from './use-review-text';
 import type { ReviewEdit } from '../../features/video/review/types';
-import type { ReviewTextDocument } from '../../features/video/review/text-document';
+import {
+  createReviewCaptionSettings,
+  type ReviewTextDocument,
+} from '../../features/video/review/text-document';
+
+const presentation = vi.hoisted(() => ({ row: vi.fn() }));
+vi.mock('./track-row', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./track-row')>();
+  const { createElement } = await import('react');
+  return {
+    ...actual,
+    ReviewTrackRow: (props: React.ComponentProps<typeof actual.ReviewTrackRow>) => {
+      presentation.row();
+      return createElement(actual.ReviewTrackRow, props);
+    },
+  };
+});
+const defaultEdits: readonly ReviewEdit[] = [
+  {
+    id: 'speed',
+    kind: 'speed',
+    start: 0,
+    end: 10,
+    requestedStart: 0,
+    requestedEnd: 10,
+    rate: 2,
+    audio: 'speed',
+  },
+];
 
 let root: Root;
 let host: HTMLDivElement;
@@ -22,6 +60,11 @@ function Fixture({
   fragmentCount = 1,
   initial,
   edits,
+  sourceTime = 0,
+  onSelect = select,
+  selectedId = 'text',
+  suspend = false,
+  captionsEnabled = false,
 }: {
   domain?: 'source' | 'result';
   busy?: boolean;
@@ -29,6 +72,11 @@ function Fixture({
   fragmentCount?: number;
   initial?: ReviewTextDocument;
   edits?: readonly ReviewEdit[];
+  sourceTime?: number;
+  onSelect?: (id: string) => void;
+  selectedId?: string;
+  suspend?: boolean;
+  captionsEnabled?: boolean;
 }) {
   const document = useRef<ReviewTextDocument>(
     initial ?? {
@@ -49,22 +97,24 @@ function Fixture({
   );
   const [, refresh] = useState(0);
   current = document.current;
+  const effectiveEdits = edits ?? defaultEdits;
   editor = useReviewText({
-    document: document.current,
-    sourceDuration: 10,
-    sourceTime: 0,
-    edits: edits ?? [
-      {
-        id: 'speed',
-        kind: 'speed',
-        start: 0,
-        end: 10,
-        requestedStart: 0,
-        requestedEnd: 10,
-        rate: 2,
-        audio: 'speed',
+    commands: createReviewCommandFixture(() => ({
+      duration: 10,
+      time: 0,
+      document: {
+        annotations: [],
+        canvasComments: [],
+        edits: [...effectiveEdits],
+        advancedContent: createQuickEditAdvancedContent(),
       },
-    ],
+      advanced: { ...createQuickEditAdvancedState(), text: document.current },
+    })),
+    document: document.current,
+    captions: { ...createReviewCaptionSettings(), enabled: captionsEnabled },
+    sourceDuration: 10,
+    sourceTime,
+    edits: effectiveEdits,
     setText: (update) => {
       document.current = update(document.current)!;
       refresh((version) => version + 1);
@@ -85,14 +135,19 @@ function Fixture({
         editor={editor}
         busy={busy}
         compact={compact}
-        selectedId="text"
-        onSelect={select}
+        selectedId={selectedId}
+        onSelect={onSelect}
         onToggleCaptions={toggleCaptions}
       />
+      {suspend && <Pending />}
     </ReviewTimelineResizeGuide>
   );
 }
+function Pending(): never {
+  throw new Promise(() => {});
+}
 beforeEach(() => {
+  presentation.row.mockClear();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   host = document.createElement('div');
   document.body.append(host);
@@ -166,12 +221,13 @@ it.each(['source', 'result'] as const)(
     expect(current.fragments[0]?.start).toBe(1);
     await pointer(block, 'pointerup', 300);
     expect(current.fragments[0]).toMatchObject({
-      start: domain === 'source' ? 2 : 1.5,
-      end: domain === 'source' ? 3 : 2.5,
+      start: domain === 'source' ? 1 : 1.5,
+      end: domain === 'source' ? 1.5 : 2.5,
+      timeDomain: 'result',
       revision: 0,
       timingRevision: 1,
     });
-    expect(select).toHaveBeenCalledWith('text');
+    expect(select).not.toHaveBeenCalled();
     const accepted = structuredClone(current);
     await pointer(block, 'pointerdown', 300);
     await pointer(block, 'pointermove', 400);
@@ -286,7 +342,11 @@ it.each(['source', 'result'] as const)(
     expect(readout()).toContain(duration(0.01));
     await pointer(block, 'pointerup', 2000);
     expect(readout()).toBeUndefined();
-    expect(current.fragments[0]).toMatchObject({ start: 1.99, end: 2 });
+    expect(current.fragments[0]).toMatchObject({
+      start: domain === 'source' ? 0.99 : 1.99,
+      end: domain === 'source' ? 1 : 2,
+      timeDomain: 'result',
+    });
   }
 );
 
@@ -302,14 +362,16 @@ it.each(['source', 'result'] as const)(
     const near = domain === 'source' ? 295 : 595;
     await pointer(block.querySelector('[data-text-edge="end"]')!, 'pointerdown', initial);
     await pointer(block, 'pointermove', near);
-    expect(host.querySelector<HTMLElement>('[data-resizing]')?.style.left).toBe(`${near + 5}px`);
+    expect(
+      Number.parseFloat(host.querySelector<HTMLElement>('[data-resizing]')!.style.left)
+    ).toBeCloseTo(near + 5, 3);
     await pointer(block, 'pointermove', near, true);
     expect(
       Number.parseFloat(host.querySelector<HTMLElement>('[data-resizing]')!.style.left)
     ).toBeCloseTo(near, 3);
     await pointer(block, 'pointermove', near);
     await pointer(block, 'pointerup', near);
-    expect(current.fragments[0]?.end).toBe(3);
+    expect(current.fragments[0]?.end).toBe(domain === 'source' ? 1.5 : 3);
   }
 );
 
@@ -415,4 +477,78 @@ it('anchors result-text resize to its edge when a handle is grabbed off-center a
   await pointer(block, 'pointerup', 494, true);
   expect(current.fragments[0]!.end).toBeCloseTo(4.5, 7);
   expect(editor.sourceInterval(current.fragments[0]!).end).toBeCloseTo(5, 7);
+});
+
+it('skips the unchanged text lane hierarchy while retaining the latest committed selection command', () => {
+  const first = vi.fn();
+  const latest = vi.fn();
+  act(() => root.render(<Fixture onSelect={first} />));
+  const renders = presentation.row.mock.calls.length;
+  act(() => root.render(<Fixture sourceTime={3} onSelect={latest} />));
+  expect(presentation.row).toHaveBeenCalledTimes(renders);
+  act(() =>
+    host
+      .querySelector('[data-text-id]')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  );
+  expect(latest).toHaveBeenCalledWith('text');
+  expect(first).not.toHaveBeenCalled();
+  act(() => root.render(<Fixture selectedId="other" />));
+  expect(presentation.row.mock.calls.length).toBeGreaterThan(renders);
+  const block = host.querySelector<HTMLElement>('[data-text-id]')!;
+  expect(block.getAttribute('aria-pressed')).toBe('false');
+  act(() => root.render(<Fixture selectedId="other" busy />));
+  expect(block.getAttribute('aria-disabled')).toBe('true');
+  act(() => root.render(<Fixture selectedId="other" busy compact />));
+  expect(block.style.height).toBe('24px');
+  act(() => root.render(<Fixture selectedId="other" busy compact captionsEnabled />));
+  expect(host.querySelector('[data-track-controls] button')?.getAttribute('aria-pressed')).toBe(
+    'true'
+  );
+});
+
+it('does not publish selection receivers from an abandoned suspended render', () => {
+  const committed = vi.fn();
+  const abandoned = vi.fn();
+  act(() =>
+    root.render(
+      <Suspense fallback={null}>
+        <Fixture onSelect={committed} />
+      </Suspense>
+    )
+  );
+  const block = host.querySelector('[data-text-id]')!;
+  act(() =>
+    root.render(
+      <Suspense fallback={null}>
+        <Fixture onSelect={abandoned} suspend />
+      </Suspense>
+    )
+  );
+  act(() => block.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(committed).toHaveBeenCalledWith('text');
+  expect(abandoned).not.toHaveBeenCalled();
+});
+
+it('updates authored text, projected geometry and locale through the presentation boundary', async () => {
+  act(() => root.render(<Fixture />));
+  const block = prepare();
+  expect(block.style.left).toBe('20%');
+  act(() => {
+    editor.change('text', { text: 'Updated' });
+  });
+  expect(block.textContent).toBe('Updated');
+  act(() => root.render(<Fixture edits={[]} />));
+  expect(block.style.left).toBe('10%');
+  const locale = getCurrentLocale();
+  const renders = presentation.row.mock.calls.length;
+  try {
+    await act(async () => setLocalePreference(locale === 'en' ? 'ru' : 'en'));
+    expect(host.querySelector('[data-track-label]')?.textContent).toBe(
+      translate('gallery.videoReview.textTrack')
+    );
+    expect(presentation.row.mock.calls.length).toBeGreaterThan(renders);
+  } finally {
+    await act(async () => setLocalePreference(locale));
+  }
 });

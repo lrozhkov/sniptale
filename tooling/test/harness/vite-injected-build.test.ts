@@ -6,7 +6,7 @@ import { colornames } from 'color-name-list';
 import { build as buildEsbuild } from 'esbuild';
 import { build as buildVite } from 'vite';
 
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 
 import {
   compactColorCatalog,
@@ -18,11 +18,144 @@ import { createNamedCatalog } from '../../../apps/extension/src/ui/color-selecto
 import {
   CONTENT_RUNTIME_EXECUTION_FOOTER,
   CONTENT_RUNTIME_GLOBAL_NAME,
+  contentRuntimeDefines,
   getTraceWsUrlForMode,
   isTraceMessagesEnabledForMode,
   shouldEmitBuildSourcemaps,
 } from '../../../apps/extension/build/injected-build';
 import { CHROME_BUILD_TARGET, getChromeBuildTarget } from '../../../apps/extension/build/manifest';
+
+const catalogBundles = new Map<string, Promise<string>>();
+function injectedCatalogBundle(mode: string): Promise<string> {
+  const previous = catalogBundles.get(mode);
+  if (previous) return previous;
+  const built = buildEsbuild({
+    entryPoints: ['apps/extension/src/platform/i18n/catalog-transport.ts'],
+    bundle: true,
+    write: false,
+    platform: 'browser',
+    format: 'iife',
+    globalName: 'injectedCatalogProof',
+    target: CHROME_BUILD_TARGET,
+    minify: mode === 'release',
+    logLevel: 'silent',
+    define: contentRuntimeDefines(mode, 'catalog-proof'),
+  }).then((result) => result.outputFiles[0]!.text);
+  catalogBundles.set(mode, built);
+  return built;
+}
+
+async function injectedCatalogClient(mode: string) {
+  const replies = new Set<(value: unknown) => void>();
+  const disconnects = new Set<() => void>();
+  const deadlines = new Map<number, { callback(): void; delay: number }>();
+  let sequence = 0;
+  const port = {
+    postMessage: vi.fn(),
+    disconnect: vi.fn(),
+    onMessage: {
+      addListener: (listener: (value: unknown) => void) => replies.add(listener),
+      removeListener: (listener: (value: unknown) => void) => replies.delete(listener),
+    },
+    onDisconnect: {
+      addListener: (listener: () => void) => disconnects.add(listener),
+      removeListener: (listener: () => void) => disconnects.delete(listener),
+    },
+  };
+  const connect = vi.fn(() => port);
+  const fetch = vi.fn(() => {
+    throw new Error('Content catalogs must use the checked Port');
+  });
+  const context = {
+    URL,
+    TextEncoder,
+    TextDecoder,
+    fetch,
+    location: { protocol: 'https:', host: 'host.test' },
+    chrome: {
+      runtime: { getURL: (value: string) => `chrome-extension://fixture/${value}`, connect },
+    },
+    setTimeout(callback: () => void, delay: number) {
+      const id = ++sequence;
+      deadlines.set(id, { callback, delay });
+      return id;
+    },
+    clearTimeout(id: number) {
+      deadlines.delete(id);
+    },
+  };
+  const api: unknown = runInNewContext(
+    `${await injectedCatalogBundle(mode)}; injectedCatalogProof;`,
+    context
+  );
+  const load = api && typeof api === 'object' ? Reflect.get(api, 'loadCatalogMessages') : undefined;
+  if (typeof load !== 'function') throw new Error('Missing real injected catalog loader');
+  return {
+    port,
+    connect,
+    fetch,
+    replies,
+    disconnects,
+    deadlines,
+    load(profile: 'content' | 'content-shim'): Promise<unknown> {
+      const pending = Promise.resolve().then(() => Reflect.apply(load, undefined, ['en', profile]));
+      void pending.catch(() => {});
+      return pending;
+    },
+  };
+}
+
+it.each(['production', 'test-e2e', 'release'])(
+  'loads real content and shim catalogs through the injected %s IIFE',
+  async (mode) => {
+    const shimDefines = contentRuntimeDefines(mode);
+    expect(shimDefines['import.meta.env.DEV']).toBe('false');
+    expect(shimDefines['process.env.NODE_ENV']).toBe(
+      JSON.stringify(mode === 'release' ? 'production' : 'development')
+    );
+    expect(shimDefines).not.toHaveProperty('__SNIPTALE_CONTENT_RUNTIME_BUILD_ID__');
+    expect(contentRuntimeDefines(mode, 'catalog-proof').__SNIPTALE_CONTENT_RUNTIME_BUILD_ID__).toBe(
+      '"catalog-proof"'
+    );
+    for (const profile of ['content', 'content-shim'] as const) {
+      const client = await injectedCatalogClient(mode);
+      const pending = client.load(profile);
+      await Promise.resolve();
+      for (const reply of client.replies)
+        reply({ locale: 'en', profile, messages: { 'content.ready': 'Ready' } });
+      await expect(pending).resolves.toEqual({ 'content.ready': 'Ready' });
+      expect(client.connect).toHaveBeenCalledExactlyOnceWith({ name: 'sniptale:i18n-catalog:v1' });
+      expect(client.port.postMessage).toHaveBeenCalledExactlyOnceWith({ locale: 'en', profile });
+      expect(client.fetch).not.toHaveBeenCalled();
+      expect(client.port.disconnect).toHaveBeenCalledOnce();
+      expect(client.replies.size).toBe(0);
+      expect(client.disconnects.size).toBe(0);
+      expect(client.deadlines.size).toBe(0);
+    }
+  }
+);
+
+it.each(['reply', 'timeout'] as const)(
+  'retains packaged catalog %s refusal and the ten-second request budget',
+  async (failure) => {
+    const client = await injectedCatalogClient('test-e2e');
+    const pending = client.load('content');
+    await Promise.resolve();
+    expect([...client.deadlines.values()].map((deadline) => deadline.delay)).toEqual([10_000]);
+    const rejected = expect(pending).rejects.toThrow(
+      failure === 'reply'
+        ? 'Invalid translation catalog reply'
+        : 'Translation catalog request timed out'
+    );
+    if (failure === 'reply')
+      for (const reply of client.replies) reply({ error: 'catalog-unavailable' });
+    else for (const deadline of [...client.deadlines.values()]) deadline.callback();
+    await rejected;
+    expect(client.port.disconnect).toHaveBeenCalledOnce();
+    expect(client.replies.size).toBe(0);
+    expect(client.deadlines.size).toBe(0);
+  }
+);
 
 it('derives every extension build target from the manifest Chrome baseline', () => {
   expect(getChromeBuildTarget({ minimum_chrome_version: '148' })).toBe('chrome148');

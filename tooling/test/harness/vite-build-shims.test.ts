@@ -1,9 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import { build } from 'esbuild';
+import { build as buildVite } from 'vite';
 import {
+  createBlobOnlyInlineWorkerPlugin,
   createReleaseSafeDependencyAliasPlugin,
   createZodRuntimeFallbackPlugin,
   transformZodCompiler,
@@ -24,6 +27,85 @@ const RELEASE_BUILD_SHIMS = [
   'tooling/build/shims/set-immediate-function-only.cjs',
   'tooling/build/shims/zod-jitless.ts',
 ];
+
+let workerLauncher: Promise<string> | undefined;
+const workerBuildWarnings: string[] = [];
+function buildWorkerLauncher(): Promise<string> {
+  return (workerLauncher ??= (async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'sniptale-blob-worker-'));
+    const workerPath = 'apps/extension/src/effect-runtime-sandbox/worker/index.ts';
+    mkdirSync(path.dirname(path.join(root, workerPath)), { recursive: true });
+    writeFileSync(path.join(root, workerPath), 'self.onmessage = () => self.postMessage("ready");');
+    writeFileSync(
+      path.join(root, 'entry.ts'),
+      `import WorkerFactory from './${workerPath}?worker&inline'; globalThis.WorkerFactory = WorkerFactory;`
+    );
+    try {
+      const result = await buildVite({
+        configFile: false,
+        root,
+        logLevel: 'silent',
+        plugins: [createBlobOnlyInlineWorkerPlugin()],
+        worker: { format: 'iife' },
+        build: {
+          sourcemap: true,
+          rollupOptions: {
+            onwarn(warning) {
+              workerBuildWarnings.push(`${warning.code}:${warning.message}`);
+            },
+          },
+          write: false,
+          minify: false,
+          lib: { entry: path.join(root, 'entry.ts'), formats: ['iife'], name: 'WorkerProof' },
+        },
+      });
+      const output = Array.isArray(result) ? result[0] : result;
+      if (!output || !('output' in output))
+        throw new Error('Worker proof build output is unavailable.');
+      const chunk = output.output.find((file) => file.type === 'chunk');
+      if (!chunk || chunk.type !== 'chunk') throw new Error('Worker proof bundle is unavailable.');
+      return chunk.code;
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  })());
+}
+
+it('declares generated worker-wrapper mappings when the build emits sourcemaps', async () => {
+  await buildWorkerLauncher();
+  expect(
+    workerBuildWarnings.filter(
+      (warning) =>
+        warning.includes('SOURCEMAP_BROKEN') && warning.includes('blob-only-effect-worker')
+    )
+  ).toEqual([]);
+});
+
+it.each([false, true])(
+  'keeps the bundled worker on blob URLs and releases the URL when constructor failure is %s',
+  async (failure) => {
+    const original = new DOMException('Worker resources are unavailable.', 'InvalidStateError');
+    const urls: string[] = [];
+    const revokeObjectURL = vi.fn();
+    const scope = {
+      Blob,
+      URL: { createObjectURL: vi.fn(() => 'blob:worker-proof'), revokeObjectURL },
+      Worker: class {
+        addEventListener = vi.fn();
+        constructor(url: string) {
+          urls.push(url);
+          if (failure) throw original;
+        }
+      },
+    };
+    const context = vm.createContext({ ...scope, self: scope });
+    vm.runInContext(await buildWorkerLauncher(), context);
+    if (failure) expect(() => vm.runInContext('new WorkerFactory()', context)).toThrow(original);
+    else expect(() => vm.runInContext('new WorkerFactory()', context)).not.toThrow();
+    expect(urls).toEqual(['blob:worker-proof']);
+    expect(revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:worker-proof');
+  }
+);
 
 function collectGitVisibleFiles() {
   return execFileSync(

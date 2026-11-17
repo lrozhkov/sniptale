@@ -179,7 +179,7 @@ function validEffectSnapshotClosure(
       return (
         document !== undefined &&
         document !== null &&
-        instance.end <= duration &&
+        (instance.timeDomain === 'result' || instance.end <= duration) &&
         reviewAnnotationEffectMatchesDocument(instance, document)
       );
     })

@@ -189,6 +189,8 @@ function parseUiState(value: unknown): QuickEditUiState | null {
   if (initialized !== undefined && typeof initialized !== 'boolean') return null;
   const modeSelectionPending = value['modeSelectionPending'];
   if (modeSelectionPending !== undefined && typeof modeSelectionPending !== 'boolean') return null;
+  for (const key of ['liveSeekEnabled', 'annotationMagnetEnabled'])
+    if (value[key] !== undefined && typeof value[key] !== 'boolean') return null;
   const workspaceColors = parseWorkspaceColors(value['workspaceColors']);
   if (!workspaceColors) return null;
   const tracks = parseTrackVisibility(value['tracks']);
@@ -198,6 +200,12 @@ function parseUiState(value: unknown): QuickEditUiState | null {
     ...(value['workspaceColors'] === undefined ? {} : { workspaceColors }),
     ...(value['lockedTracks'] === undefined ? {} : { lockedTracks }),
     mode: value['mode'],
+    ...(typeof value['liveSeekEnabled'] === 'boolean'
+      ? { liveSeekEnabled: value['liveSeekEnabled'] }
+      : {}),
+    ...(typeof value['annotationMagnetEnabled'] === 'boolean'
+      ? { annotationMagnetEnabled: value['annotationMagnetEnabled'] }
+      : {}),
     ...(modeSelectionPending === undefined ? {} : { modeSelectionPending }),
     ...(initialized === undefined ? {} : { advancedTracksInitialized: initialized }),
     tracks,
@@ -272,6 +280,7 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   const exit = parseZoomTransition(value['exit']);
   if (!transform || !enter || !exit) return null;
   if (value['linkTo'] !== undefined && !identity(value['linkTo'])) return null;
+  if (value['timeDomain'] !== undefined && value['timeDomain'] !== 'result') return null;
   const sourceAnchor = value['sourceAnchor'];
   if (
     sourceAnchor !== undefined &&
@@ -289,6 +298,7 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
     return null;
   if (value['overlapPolicy'] !== undefined && value['overlapPolicy'] !== 'suppress') return null;
   return {
+    ...(value['timeDomain'] === 'result' ? { timeDomain: 'result' as const } : {}),
     ...(cameraFollow ? { cameraFollow } : {}),
     ...(typeof value['followCursor'] === 'boolean' ? { followCursor: value['followCursor'] } : {}),
     ...(cursorComposition ? { cursorComposition } : {}),

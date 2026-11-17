@@ -41,6 +41,20 @@ import { hasAnnotationFields } from './annotations';
 import { parseVideoProjectVoiceTextSnapshot } from '../text/voice-take';
 
 /** Refuses unsupported retained fields that the shared parser would normalize away. */
+function isRetainedPresentationClock(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    Object.keys(value).every((key) => key === 'time' || key === 'sourceTime' || key === 'rate') &&
+    isBoundedNumber(
+      value['time'],
+      -MAX_VIDEO_PROJECT_DURATION_SECONDS,
+      MAX_VIDEO_PROJECT_DURATION_SECONDS
+    ) &&
+    isBoundedNumber(value['sourceTime'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
+    isPlaybackRate(value['rate'])
+  );
+}
+
 function isRetainedAudioTranscript(value: unknown): boolean {
   const parsed = parseReviewSpeechTranscript(value);
   if (!parsed || !isRecord(value)) return false;
@@ -394,12 +408,29 @@ export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
   )
     return false;
 
+  if (
+    value['sourceInteractionTiming'] !== undefined &&
+    (value['type'] !== VideoProjectClipType.VIDEO ||
+      !isRetainedPresentationClock(value['sourceInteractionTiming']))
+  )
+    return false;
+
   const timing = value['cameraTiming'];
   if (
     timing !== undefined &&
     (value['type'] !== VideoProjectClipType.VIDEO ||
       !isRecord(timing) ||
-      Object.keys(timing).some((key) => key !== 'offsetSeconds' && key !== 'transitions') ||
+      Object.keys(timing).some(
+        (key) =>
+          key !== 'offsetSeconds' &&
+          key !== 'transitions' &&
+          key !== 'timeDomain' &&
+          key !== 'layoutClock'
+      ) ||
+      (timing['timeDomain'] !== undefined && timing['timeDomain'] !== 'result') ||
+      (timing['timeDomain'] === 'result'
+        ? !isRetainedPresentationClock(timing['layoutClock'])
+        : timing['layoutClock'] !== undefined) ||
       !isBoundedNumber(timing['offsetSeconds'], -86400, 86400) ||
       timing['transitions'] !== 'bounded')
   )

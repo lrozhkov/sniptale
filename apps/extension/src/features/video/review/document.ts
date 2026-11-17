@@ -1,3 +1,4 @@
+import { retimeReviewResultRange, retimeReviewResultPoint } from './timeline-placement';
 import { retimeReviewTextDocument } from './text-timing';
 import { sameHistoryArray, sameHistoryRecord } from '@sniptale/foundation/history/equal';
 import { loadQuickEditAdvancedContentState } from './advanced/validation';
@@ -272,6 +273,100 @@ export function applyReviewOperation(
         },
       }
     : document.advancedContent;
+  if (advancedContent.annotationEffects) {
+    const previous = buildReviewTimeMap(source.duration, document.edits);
+    const next = buildReviewTimeMap(source.duration, edits);
+    advancedContent = {
+      ...advancedContent,
+      annotationEffects: {
+        ...advancedContent.annotationEffects,
+        instances: advancedContent.annotationEffects.instances.flatMap((item) => {
+          if (item.timeDomain !== 'result') return [item];
+          const range = retimeReviewResultRange(item, previous, next);
+          return range.end > range.start ? [{ ...item, ...range }] : [];
+        }),
+      },
+    };
+  }
+  if (advancedContent.cursorMotions?.some((motion) => motion.timeDomain === 'result')) {
+    const previous = buildReviewTimeMap(source.duration, document.edits);
+    const next = buildReviewTimeMap(source.duration, edits);
+    advancedContent = {
+      ...advancedContent,
+      cursorMotions: advancedContent.cursorMotions.flatMap((motion) => {
+        if (motion.timeDomain !== 'result') return [motion];
+        const range = retimeReviewResultRange(motion, previous, next);
+        return range.end > range.start ? [{ ...motion, ...range }] : [];
+      }),
+    };
+  }
+  if (advancedContent.webcam?.timeDomain === 'result') {
+    const camera = advancedContent.webcam;
+    const previous = buildReviewTimeMap(source.duration, document.edits);
+    const next = buildReviewTimeMap(source.duration, edits);
+    advancedContent = {
+      ...advancedContent,
+      webcam: {
+        ...camera,
+        hiddenRanges: camera.hiddenRanges.flatMap((item) => {
+          const range = retimeReviewResultRange(item, previous, next);
+          return range.end > range.start ? [{ ...item, ...range }] : [];
+        }),
+        positions: camera.positions
+          .flatMap((item) => {
+            const time = retimeReviewResultPoint(item.time, previous, next);
+            if (time === null) return [];
+            const range = retimeReviewResultRange(
+              { start: item.time, end: item.time + Math.max(1e-7, item.transition.duration) },
+              previous,
+              next
+            );
+            return [
+              {
+                ...item,
+                time,
+                transition: {
+                  ...item.transition,
+                  duration: item.transition.duration
+                    ? Math.min(60, Math.max(0, range.end - range.start))
+                    : 0,
+                },
+              },
+            ];
+          })
+          .sort((a, b) => a.time - b.time)
+          .filter(
+            (item, index, items) => index === items.length - 1 || item.time < items[index + 1]!.time
+          ),
+      },
+    };
+  }
+  if (advancedContent.interactionTimeline) {
+    const previous = buildReviewTimeMap(source.duration, document.edits);
+    const next = buildReviewTimeMap(source.duration, edits);
+    const limit = next.at(-1)?.resultEnd ?? 0;
+    const retime = <T extends { start: number; end: number; timeDomain?: 'result' }>(items: T[]) =>
+      items.flatMap((item) => {
+        if (item.timeDomain !== 'result') return [item];
+        const time = retimeReviewResultPoint(item.start, previous, next);
+        return time !== null && time < limit
+          ? [
+              {
+                ...item,
+                start: time,
+                end: Math.min(limit, time + item.end - item.start),
+              },
+            ]
+          : [];
+      });
+    advancedContent = {
+      ...advancedContent,
+      interactionTimeline: {
+        presses: retime(advancedContent.interactionTimeline.presses),
+        overrides: retime(advancedContent.interactionTimeline.overrides),
+      },
+    };
+  }
   if (operation.preserveTextAnchors && advancedContent.text) {
     advancedContent = {
       ...advancedContent,
@@ -280,12 +375,43 @@ export function applyReviewOperation(
         buildReviewTimeMap(source.duration, document.edits),
         buildReviewTimeMap(source.duration, edits),
         operation.before,
-        operation.after
+        operation.after,
+        operation.preserveResultText === true
       ),
     };
     const admitted = loadQuickEditAdvancedContentState(advancedContent);
     if (!admitted) throw new ReviewHistoryError('text-invalid');
     advancedContent = admitted;
+  }
+  {
+    const previous = buildReviewTimeMap(source.duration, document.edits);
+    const next = buildReviewTimeMap(source.duration, edits);
+    const retime = (clips: QuickEditAdvancedContent['audio']['music']) =>
+      clips.flatMap((clip) => {
+        if (clip.timeDomain !== 'result') return [clip];
+        const range = retimeReviewResultRange(
+          { start: clip.timelineStart, end: clip.timelineStart + clip.duration },
+          previous,
+          next
+        );
+        const limit = next.at(-1)?.resultEnd ?? 0;
+        if (range.start >= limit || range.end <= range.start) return [];
+        return [
+          {
+            ...clip,
+            timelineStart: range.start,
+            duration: Math.min(clip.duration, limit - range.start),
+          },
+        ];
+      });
+    advancedContent = {
+      ...advancedContent,
+      audio: {
+        ...advancedContent.audio,
+        music: retime(advancedContent.audio.music),
+        voiceover: retime(advancedContent.audio.voiceover),
+      },
+    };
   }
   if (operation.preserveVoiceoverAnchors) {
     const previous = buildReviewTimeMap(source.duration, document.edits);

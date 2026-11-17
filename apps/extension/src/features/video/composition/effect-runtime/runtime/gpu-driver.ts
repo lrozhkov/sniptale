@@ -3,6 +3,7 @@ import type { EffectRuntimeSandboxExecutor } from '../../../../../contracts/effe
 import { collectEffectRuntimeResultBitmaps } from '../../../../../contracts/effect-runtime/retry-inputs';
 import { buildEffectRuntimeGpuPlan } from '../render/gpu-plan';
 import { createEffectRuntimeRenderMessage } from './request';
+import { EffectRuntimeFrameError } from './frame-error';
 import {
   closeEffectRuntimeGpuSceneResources,
   createEffectRuntimeGpuFrameLifetime,
@@ -47,7 +48,7 @@ export async function prepareEffectRuntimeGpuFramePlans(args: {
       let accepted = false;
       try {
         args.signal?.throwIfAborted();
-        if (result.kind === 'error') throw new Error('EFFECT_RUNTIME_GPU_PREPARATION_FAILED');
+        if (result.kind === 'error') throw new EffectRuntimeFrameError(result.code);
         const source =
           result.kind === 'gpu-plan' ? buildEffectRuntimeGpuPlan(result) : result.bitmap;
         const reservation = scope.reserve(collectEffectRuntimeResultBitmaps(result));
@@ -88,7 +89,13 @@ export async function prepareEffectRuntimeGpuFramePlans(args: {
           const frame = await prepareFrame(plan, sequenceId);
           frames.set(frame.effectInstanceId, frame);
         } catch (error) {
-          if (!failed) {
+          if (
+            !failed ||
+            (failure instanceof EffectRuntimeFrameError &&
+              failure.code === 'circuitOpen' &&
+              error instanceof EffectRuntimeFrameError &&
+              error.code !== 'circuitOpen')
+          ) {
             failed = true;
             failure = error;
           }

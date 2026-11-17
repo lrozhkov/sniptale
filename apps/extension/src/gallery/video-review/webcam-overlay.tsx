@@ -24,6 +24,7 @@ export type ReviewWebcamStageBinding = {
     | 'selectVisible'
     | 'selection'
     | 'time'
+    | 'sourceTime'
   >;
   disabled: boolean;
   onResourceReady?(): void;
@@ -100,7 +101,12 @@ export function ReviewWebcamOverlay(props: {
     setDraft(value);
     (props.onPreviewPlacement ?? props.manual?.onPreviewPlacement)?.(value);
   };
-  const frame = quickEditWebcamFrameAt(settings, editor.time, shownResource.duration);
+  const frame = quickEditWebcamFrameAt(
+    settings,
+    editor.sourceTime,
+    shownResource.duration,
+    editor.time
+  );
   const screen = quickEditWebcamScreenPlacementAt(settings, editor.time);
   const split = screen.width < 1 || screen.height < 1 || !!screen.clip || !!screen.cameraOverlay;
   return (

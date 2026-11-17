@@ -104,6 +104,7 @@ function interpolateCameraPanel(from: CameraPanel, to: CameraPanel, weight: numb
 }
 
 import type { VideoProjectTransform } from '../types/layout';
+import { getCameraLayoutTime } from '../timeline/rate';
 
 type SceneSize = { width: number; height: number };
 
@@ -113,10 +114,17 @@ interface CameraSplitPresentationInput {
   sourceStart: number;
   duration: number;
   playbackRate?: number;
+  playbackWindow?: NonNullable<Parameters<typeof getCameraLayoutTime>[0]['playbackWindow']>;
   transform: VideoProjectTransform;
   cameraSplit?: CameraSplitSide | undefined;
   cameraScreenBehavior?: CameraScreenBehavior | undefined;
-  cameraTiming?: { transitions: 'bounded' };
+  cameraTiming?: {
+    transitions: 'bounded';
+    timeDomain?: 'result';
+    layoutClock?: NonNullable<
+      NonNullable<Parameters<typeof getCameraLayoutTime>[0]['cameraTiming']>['layoutClock']
+    >;
+  };
   cameraPositions?: readonly {
     sourceTime: number;
     cameraSplit?: CameraSplitSide | null;
@@ -133,8 +141,10 @@ export function resolveCameraSplitPresentation(
   time: number
 ): { screen: CameraScreenPanel; camera: VideoProjectTransform } | null {
   const sourceTime =
-    clip.sourceStart +
-    Math.max(0, Math.min(clip.duration, time - clip.startTime)) * (clip.playbackRate ?? 1);
+    clip.cameraTiming?.timeDomain === 'result'
+      ? getCameraLayoutTime(clip, time)
+      : clip.sourceStart +
+        Math.max(0, Math.min(clip.duration, time - clip.startTime)) * (clip.playbackRate ?? 1);
   const positions = clip.cameraPositions ?? [];
   const index = positions.findLastIndex((position) => position.sourceTime <= sourceTime);
   const current = positions[index];

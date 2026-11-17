@@ -106,9 +106,9 @@ function advancedContentAt(snapshot: VideoWorkspaceSnapshot) {
   return committedEditorFixtureProjection(snapshot).document.advancedContent;
 }
 
-it('integrates selection, recoverable text, drawing, history and report actions in the modal', async () => {
+it('integrates recoverable notes, drawing and history in the modal', async () => {
   const fixture = createEditorFixture(integration);
-  const { host, root, back, click, fill, show, close, createUrl, revokeUrl, clipboard } = fixture;
+  const { host, root, back, click, fill, show, close, createUrl, revokeUrl } = fixture;
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
     expect(show).toHaveBeenCalled();
@@ -120,8 +120,7 @@ it('integrates selection, recoverable text, drawing, history and report actions 
     await click('addComment');
     await fill('First note');
     expect(
-      host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.addComment"]')
-        ?.disabled
+      host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.save"]')?.disabled
     ).toBe(false);
     expect(host.querySelector('input[type="number"]')).toBeNull();
     const stage = host.querySelector<HTMLDivElement>('[data-ui="gallery.videoReview.stage"]')!;
@@ -171,6 +170,35 @@ it('integrates selection, recoverable text, drawing, history and report actions 
     await fill('Discarded point note');
     await click('discard');
     expect(host.querySelector('textarea')).toBeNull();
+    await click('common.actions.close');
+    expect(back).toHaveBeenCalledOnce();
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    expect(close).toHaveBeenCalled();
+    expect(revokeUrl).toHaveBeenCalledWith('blob:review');
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('reports accepted notes, recovers report failure and restores a deleted note', async () => {
+  const fixture = createEditorFixture(integration, {
+    history: [
+      {
+        id: 'note-operation',
+        at: 1,
+        target: 'annotation',
+        before: null,
+        after: { id: 'note', text: 'Edited note', anchor: { kind: 'point', time: 0.1 } },
+      },
+    ],
+  });
+  const { host, root, back, click, clipboard } = fixture;
+  try {
+    await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
+    await click('comments');
+    expect(host.textContent).toContain('Edited note');
     await click('copyReport');
     expect(clipboard).toHaveBeenCalledWith(expect.stringContaining('Edited note'));
     await click('downloadReport');
@@ -187,6 +215,18 @@ it('integrates selection, recoverable text, drawing, history and report actions 
     expect(host.textContent).not.toContain('Edited note');
     await click('undo');
     expect(host.textContent).toContain('Edited note');
+    await click('common.actions.close');
+    expect(back).toHaveBeenCalledOnce();
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('opens recorded action properties and exits through the modal menu', async () => {
+  const fixture = createEditorFixture(integration);
+  const { host, root, back, click } = fixture;
+  try {
+    await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
     await click('telemetry');
     const capturedAction = Array.from(
       host.querySelectorAll<HTMLButtonElement>('.review-history-row button')
@@ -199,12 +239,7 @@ it('integrates selection, recoverable text, drawing, history and report actions 
     await click('common.actions.close');
     expect(back).toHaveBeenCalledOnce();
   } finally {
-    await act(async () => root.unmount());
-    host.remove();
-    expect(close).toHaveBeenCalled();
-    expect(revokeUrl).toHaveBeenCalledWith('blob:review');
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+    await fixture.cleanup();
   }
 });
 
@@ -250,6 +285,12 @@ it('offers source-load retry and surfaces playback failure without exiting', asy
     vi.mocked(HTMLMediaElement.prototype.play).mockRejectedValueOnce(new Error('Unsupported'));
     await click('play');
     expect(host.textContent).toContain('gallery.videoReview.playbackFailed');
+    expect(host.textContent!.split('gallery.videoReview.playbackFailed')).toHaveLength(2);
+    expect(
+      host
+        .querySelector('[data-ui="gallery.videoReview.feedback"]')
+        ?.closest('[data-ui="gallery.videoReview.previewFrame"]')
+    ).not.toBeNull();
     await act(async () => host.querySelector('video')!.dispatchEvent(new Event('error')));
     expect(back).not.toHaveBeenCalled();
     const event = new Event('cancel', { cancelable: true });
@@ -358,10 +399,6 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
     container: 'webm',
     rotation: 0,
   });
-  const key = async (key: string) =>
-    act(async () => {
-      fixture.key(new KeyboardEvent('keydown', { key }));
-    });
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
     const video = host.querySelector('video')!;
@@ -375,28 +412,6 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
     });
     await dragTimePlane(host, 140);
     expect(video.currentTime).toBe(1.4);
-    await click('cutMode');
-    const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
-    vi.mocked(plane.releasePointerCapture).mockClear();
-    for (const [kind, x] of [
-      ['pointerdown', 200],
-      ['pointermove', 300],
-    ] as const)
-      await act(async () =>
-        (kind === 'pointerdown'
-          ? host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!
-          : plane
-        ).dispatchEvent(new MouseEvent(kind, { bubbles: true, clientX: x }))
-      );
-    await key('Escape');
-    expect(video.currentTime).toBe(1.4);
-    expect(plane.getAttribute('aria-valuenow')).toBe('1.4');
-    expect(plane.releasePointerCapture).toHaveBeenCalled();
-    for (const kind of ['pointermove', 'pointerup'])
-      await act(async () =>
-        plane.dispatchEvent(new MouseEvent(kind, { bubbles: true, clientX: 350 }))
-      );
-    expect(fixture.snapshot.workspace.history).toHaveLength(0);
     await click('addComment');
     await fixture.fill('Restored selection');
     await click('save');
@@ -404,16 +419,8 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
       anchor: { kind: 'point', time: 1.4 },
     });
     await click('undo');
-    expect(fixture.button('cutMode').getAttribute('aria-pressed')).toBe('false');
+    await fixture.selectRulerRange(0, 1);
     await click('cutMode');
-    await dragTimePlane(host, 0);
-    await key('ArrowLeft');
-    expect(video.currentTime).toBe(0);
-    await key('ArrowRight');
-    expect(video.currentTime).toBe(1);
-    await key('ArrowLeft');
-    expect(video.currentTime).toBe(0);
-    await dragTimePlane(host, 0, 100);
     expect(fixture.snapshot.workspace.history.at(-1)?.after).toMatchObject({
       kind: 'cut',
       start: 0,
@@ -438,12 +445,10 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
     await click('deleteSelected');
     expect(fixture.snapshot.workspace.history.at(-1)?.after).toBeNull();
     await click('undo');
-    await click('cutMode');
     await dragTimePlane(host, 150);
     await click('addComment');
     await fixture.fill('Exact annotation');
     await click('save');
-    await click('cutMode');
     await act(async () =>
       host.querySelector<HTMLButtonElement>('[title="Exact annotation"]')!.click()
     );
@@ -646,6 +651,8 @@ it('toggles the persisted advanced mode and restores it after reopening the edit
     await fixture.flush();
     expect(fixture.persistedSnapshot.workspace.advanced.ui).toEqual({
       mode: 'advanced',
+      annotationMagnetEnabled: true,
+      liveSeekEnabled: true,
       advancedTracksInitialized: true,
       tracks: { actions: true, zoom: true, audio: true },
       overlaysVisible: true,
@@ -774,6 +781,7 @@ it('connects Scene presentation controls to the real session and suppresses them
     );
     expect(inspector()).toBeNull();
     for (const action of ['advancedEditing', 'scene']) await fixture.click(action);
+    await fixture.section('presentation');
     const fade = inspector()!.querySelector<HTMLButtonElement>(
       'button[aria-label="gallery.videoReview.presentationFadeIn"]'
     );

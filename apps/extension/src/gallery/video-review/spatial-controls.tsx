@@ -64,38 +64,37 @@ export function ReviewSpatialToolbar(props: {
   );
   return (
     <div className="review-spatial-toolbar" data-ui="gallery.videoReview.spatialTools">
-      <div
-        className="review-spatial-tools"
-        role="group"
-        aria-label={translate('gallery.videoReview.spatialTools')}
-      >
-        {(props.effect === '3d'
-          ? (['tilt', 'rotation', 'focus'] as const)
-          : (['position'] as const)
-        ).map((tool) => {
-          const Icon = toolIcons[tool];
-          return (
-            <ProductActionButton
-              type="button"
-              key={tool}
-              compact
-              tone="toggle"
-              active={props.tool === tool}
-              className={`review-spatial-tool ${props.tool === tool ? 'review-spatial-tool-active' : ''}`}
-              aria-label={translate(toolLabels[tool])}
-              aria-pressed={props.tool === tool}
-              title={translate(toolLabels[tool])}
-              disabled={props.disabled}
-              onClick={() => props.onTool(tool)}
-            >
-              <Icon size={15} aria-hidden />
-              <span aria-hidden="true" className="review-spatial-tool-label">
-                {translate(toolLabels[tool])}
-              </span>
-            </ProductActionButton>
-          );
-        })}
-      </div>
+      {props.effect === '3d' ? (
+        <div
+          className="review-spatial-tools"
+          role="group"
+          aria-label={translate('gallery.videoReview.spatialTools')}
+        >
+          {(['tilt', 'rotation', 'focus'] as const).map((tool) => {
+            const Icon = toolIcons[tool];
+            return (
+              <ProductActionButton
+                type="button"
+                key={tool}
+                compact
+                tone="toggle"
+                active={props.tool === tool}
+                className={`review-spatial-tool ${props.tool === tool ? 'review-spatial-tool-active' : ''}`}
+                aria-label={translate(toolLabels[tool])}
+                aria-pressed={props.tool === tool}
+                title={translate(toolLabels[tool])}
+                disabled={props.disabled}
+                onClick={() => props.onTool(tool)}
+              >
+                <Icon size={15} aria-hidden />
+                <span aria-hidden="true" className="review-spatial-tool-label">
+                  {translate(toolLabels[tool])}
+                </span>
+              </ProductActionButton>
+            );
+          })}
+        </div>
+      ) : null}
       <div className="review-spatial-context">
         {props.tool === 'tilt' ? (
           <SegmentedRow<SpatialAxis>

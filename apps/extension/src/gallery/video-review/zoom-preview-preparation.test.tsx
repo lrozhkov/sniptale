@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import * as scenePlans from '../../features/video/review/advanced/scene';
 import { ReviewZoomPreview } from './zoom-preview';
+import { usePreparedZoomCamera, type ZoomPreviewProps } from './zoom-preview-camera';
 import type { ZoomPreviewFrame } from './use-zoom-preview-source';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
@@ -141,7 +142,7 @@ it('admits only the latest follow-camera plan after the inspector has a paint op
   ).toBe('ready');
 });
 
-it('retains the completed follow preview during edits and drops it for another selection', async () => {
+it('retains the completed follow preview disabled until another selection is admitted', async () => {
   vi.useFakeTimers();
   const ticks = new Map<number, FrameRequestCallback>();
   let id = 0;
@@ -175,7 +176,7 @@ it('retains the completed follow preview during edits and drops it for another s
           source={{ width: 640, height: 360 }}
           sourceTime={3}
           loadFrame={loadFrame}
-          onChange={change}
+          onChange={(patch) => change(selected.id, patch)}
         />
       )
     );
@@ -200,10 +201,22 @@ it('retains the completed follow preview during edits and drops it for another s
   expect(host.querySelector('canvas')).toBe(canvas);
   expect(loadFrame).toHaveBeenCalledOnce();
   show({ ...first, id: 'other-selection' });
-  expect(host.querySelector('canvas')).toBeNull();
-  await admit();
-  expect(host.querySelector('canvas')).not.toBeNull();
+  expect(host.querySelector('canvas')).toBe(canvas);
+  expect(canvas?.getAttribute('tabindex')).toBe('-1');
+  act(() =>
+    canvas?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }))
+  );
   expect(change).not.toHaveBeenCalled();
+  await admit();
+  expect(host.querySelector('canvas')).not.toBe(canvas);
+  expect(host.querySelector('canvas')).not.toBeNull();
+  act(() =>
+    host
+      .querySelector('canvas')
+      ?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }))
+  );
+  expect(change).toHaveBeenCalledOnce();
+  expect(change.mock.calls[0]?.[0]).toBe('other-selection');
 });
 
 it('cancels follow planning before admission when its preview unmounts', async () => {
@@ -359,4 +372,156 @@ it('retains the completed follow plan throughout numeric drafts and prepares onl
   expect(plan.mock.calls.slice(initialPlans).every((call) => call[1] === latest)).toBe(true);
   expect(plan.mock.calls.length).toBeGreaterThan(initialPlans);
   expect(change).not.toHaveBeenCalled();
+});
+
+it('admits simple selection lifetimes after paint, keeps only latest props, and isolates source changes', async () => {
+  vi.useFakeTimers();
+  const ticks = new Map<number, FrameRequestCallback>();
+  let id = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    ticks.set(++id, callback);
+    return id;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (key: number) => ticks.delete(key));
+  const crop = vi.spyOn(scenePlans, 'quickEditCropCamera');
+  const loadFrame = vi.fn(async () => frame);
+  let current: ReturnType<typeof usePreparedZoomCamera>;
+  function Probe(props: ZoomPreviewProps) {
+    current = usePreparedZoomCamera(props);
+    return null;
+  }
+  const show = (selected: QuickEditZoomRegion, loader = loadFrame, width = 640) =>
+    act(() =>
+      root.render(
+        <Probe
+          region={selected}
+          background={background}
+          source={{ width, height: 360 }}
+          sourceTime={3}
+          loadFrame={loader}
+          onChange={vi.fn()}
+        />
+      )
+    );
+  const paint = () =>
+    act(() => {
+      const callbacks = [...ticks.values()];
+      ticks.clear();
+      callbacks.forEach((callback) => callback(0));
+    });
+  const admit = async () => {
+    paint();
+    await act(async () => vi.runOnlyPendingTimersAsync());
+  };
+  const first = region();
+  show(first);
+  expect(current!.value).toBeNull();
+  expect(crop).not.toHaveBeenCalled();
+  paint();
+  expect(crop).not.toHaveBeenCalled();
+  await act(async () => vi.runOnlyPendingTimersAsync());
+  expect(current!.value?.snapshot.region).toBe(first);
+  const admitted = current!.value;
+  const calls = crop.mock.calls.length;
+  show(region({ id: 'superseded' }));
+  const latest = region({ id: 'latest', transform: { ...first.transform, scale: 1.4 } });
+  show(latest);
+  expect(current!.value?.snapshot).toBe(admitted?.snapshot);
+  expect(current!.pending).toBe(true);
+  expect(crop).toHaveBeenCalledTimes(calls);
+  await admit();
+  expect(current!.value?.snapshot.region).toBe(latest);
+  const edited = { ...latest, transform: { ...latest.transform, scale: 1.6 } };
+  show(edited);
+  expect(current!.pending).toBe(false);
+  expect(current!.value?.snapshot.region).toBe(edited);
+  const failedSelection = { ...edited, id: 'failed-selection' };
+  crop.mockImplementationOnce(() => {
+    throw new Error('Current preview unavailable');
+  });
+  show(failedSelection);
+  await admit();
+  expect(current!.failed).toBe(true);
+  expect(current!.pending).toBe(true);
+  expect(current!.value?.snapshot.region.id).toBe('latest');
+  act(() => current!.retry());
+  await admit();
+  expect(current!.failed).toBe(false);
+  expect(current!.value?.snapshot.region).toBe(failedSelection);
+  show(edited, loadFrame, 800);
+  expect(current!.value).toBeNull();
+  await admit();
+  expect(current!.value?.snapshot.source.width).toBe(800);
+  const replacement = vi.fn(async () => frame);
+  show(edited, replacement, 800);
+  expect(current!.value).toBeNull();
+  const beforeCancel = crop.mock.calls.length;
+  paint();
+  act(() => root.render(null));
+  await act(async () => vi.runOnlyPendingTimersAsync());
+  expect(crop).toHaveBeenCalledTimes(beforeCancel);
+});
+
+it('keeps a manual zoom draft interactive beside an automatic 3D camera', async () => {
+  vi.useFakeTimers();
+  const ticks = new Map<number, FrameRequestCallback>();
+  let id = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    ticks.set(++id, callback);
+    return id;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (key: number) => ticks.delete(key));
+  const automatic = region({
+    id: 'automatic-3d',
+    start: 6,
+    end: 8,
+    effect: '3d',
+    cursorComposition: { mode: 'orbit', amount: 0.5, smoothness: 0.6 },
+    cursorFocus: {
+      path: {
+        version: 1,
+        mode: 'follow',
+        smoothing: 0.5,
+        sensitivity: 0.5,
+        gapPolicy: 'hold',
+        segments: [],
+      },
+    },
+  });
+  const loadFrame = vi.fn(async () => frame);
+  let current: ReturnType<typeof usePreparedZoomCamera>;
+  function Probe(props: ZoomPreviewProps) {
+    current = usePreparedZoomCamera(props);
+    return null;
+  }
+  const show = (selected: QuickEditZoomRegion) =>
+    act(() =>
+      root.render(
+        <Probe
+          region={selected}
+          focus={{ regions: [selected, automatic], time: 3 }}
+          cursorFollowing={false}
+          previewing
+          background={background}
+          source={{ width: 640, height: 360 }}
+          sourceTime={3}
+          loadFrame={loadFrame}
+          onChange={vi.fn()}
+        />
+      )
+    );
+  const selected = region();
+  show(selected);
+  act(() => {
+    const callbacks = [...ticks.values()];
+    ticks.clear();
+    callbacks.forEach((callback) => callback(0));
+  });
+  await act(async () => vi.runOnlyPendingTimersAsync());
+  expect(current!.pending).toBe(false);
+  const edited = { ...selected, transform: { ...selected.transform, centerX: 0.7 } };
+  show(edited);
+  expect(current!.pending).toBe(false);
+  expect(current!.value?.snapshot.region).toBe(edited);
+  expect(current!.value?.camera.centerX).toBeCloseTo(0.7);
 });

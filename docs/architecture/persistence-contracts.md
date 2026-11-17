@@ -688,7 +688,7 @@ Both editors share controlled fields and transition settings. Each editor retain
 
 Montage schema 32 admits optional `cameraTiming` on VIDEO clips. A camera placement retains this field after a move to another compatible video track. Earlier schemas refuse this field. Readers retain legacy camera behavior when the field is absent.
 
-`offsetSeconds` ranges from -86400 through 86400. The clip source clock owns positions, hidden intervals, and edits. Media decoders subtract `offsetSeconds` from that clock. They skip timestamps outside `[0, mediaDuration)`. Missing coverage does not repeat an endpoint frame.
+`offsetSeconds` ranges from -86400 through 86400. Camera pixels use the clip media clock. Media decoders subtract `offsetSeconds` from that clock. They skip timestamps outside `[0, mediaDuration)`. Missing coverage does not repeat an endpoint frame. An absent `timeDomain` retains source-clock positions, hidden intervals, and edits.
 
 The `bounded` transition policy caps effective position transitions at the next position. Interpolation starts at the previous authored destination and crop. Stored transition durations remain unchanged. Legacy cameras retain continuous interruption.
 
@@ -698,6 +698,19 @@ Preview, export, thumbnails, and crop previews use the media clock. Source text 
 
 The existing project mutation owner promotes edits that contain `cameraTiming` to schema 32. Existing history, resource admission, retention, and guarded publication owners retain authority. This field adds no writer, store, or physical database migration.
 
+Montage schema 56 admits `cameraTiming.timeDomain: 'result'` with a required `layoutClock`. Earlier schemas refuse this result clock. Readers refuse future schemas. Legacy cameras retain their source clocks.
+
+Layout time ranges from -86400 through 86400 seconds. Source time ranges from zero through 86400 seconds. Playback rate ranges from 0.0625 through 16. Only result cameras admit `layoutClock`.
+
+The `layoutClock` retains the original layout time, media source time, and playback rate. Conversion records this origin for each camera placement. Timeline placement, source trims, playback offsets, and rate changes map to the retained origin. Camera positions, transition durations, and hidden intervals retain their stored values. This mapping preserves animation through moves, duplication, intro insertion, trimming, splitting, and rate changes. Camera pixels retain their separate media clock.
+
+The existing project mutation owner retains schema 56 after edits. The clock adds no writer, store, resource claim, or physical database migration.
+
+Montage schema 56 also admits `sourceInteractionTiming` on video placements. Its time, source time, and rate use the same bounds as `layoutClock`. Unknown origin fields refuse admission. Earlier schemas refuse retained result-domain interaction documents, including documents with no current placement.
+
+Gallery conversion records this origin when cursor motions, presses, or overrides use result time. Each live bound placement requires the origin. Movement, duplication, intro insertion, trim, split, and rate changes preserve authored phase. Result-time cursor motion and input feedback continue through held video frames. Captured source facts retain their source clocks.
+
+The retained document determines the clock of its derived cursor segments and action occurrences. Native editing maps timeline coordinates through that declared clock. Clip duplication copies the bound document and gives cursor segments and keys independent identities. Aggregate admission failure refuses the complete copy. No new writer, store, or resource authority exists.
 
 ## Montage cursor source observations
 

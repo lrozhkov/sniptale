@@ -12,6 +12,65 @@ export const LOCAL_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'project-source-interaction-editing',
+    productionFile: 'apps/extension/src/features/video/project/source-interaction-authoring.ts',
+    reason:
+      'Conversion and Native effect commands cover retained input timing, point edits, reset and deletion.',
+    testFiles: [
+      'apps/extension/src/features/video/review/project-conversion.actions.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.source-interaction.test.ts',
+    ],
+  },
+  {
+    owner: 'gallery-focus-insertion',
+    productionFile: 'apps/extension/src/gallery/video-review/focus-placement.ts',
+    reason:
+      'Timeline binding and zoom editor tests exercise immediate focus insertion and selection admission.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/timeline-binding.test.tsx',
+      'apps/extension/src/gallery/video-review/zoom-editor.test.tsx',
+      'apps/extension/src/gallery/video-review/zoom-editor.revision.test.tsx',
+    ],
+  },
+  {
+    owner: 'gallery-original-audio-inspector',
+    productionFile: 'apps/extension/src/gallery/video-review/original-audio-inspector.tsx',
+    reason: 'Mounted original audio controls cover gain, deletion and inspector commands.',
+    testFiles: ['apps/extension/src/gallery/video-review/original-audio-track.test.tsx'],
+  },
+  {
+    owner: 'gallery-comment-markers',
+    productionFile: 'apps/extension/src/gallery/video-review/timeline-comment-markers.tsx',
+    reason:
+      'Timeline interaction tests retain comment identities, navigation and inserted display time.',
+    testFiles: ['apps/extension/src/gallery/video-review/timeline.test.tsx'],
+  },
+  {
+    owner: 'gallery-voiceover-save',
+    productionFile: 'apps/extension/src/gallery/video-review/voiceover-save.ts',
+    reason:
+      'Voiceover recording tests exercise retained take attachment, publication failure and retry.',
+    testFiles: ['apps/extension/src/gallery/video-review/voiceover-recording.test.tsx'],
+  },
+  {
+    owner: 'gallery-timeline-command-slots',
+    productionFile: 'apps/extension/src/gallery/video-review/selection-command-slots.ts',
+    reason:
+      'Mounted selection actions prove slot routing, disabled guards and inspector command fallback.',
+    testFiles: ['apps/extension/src/gallery/video-review/selection-actions.test.tsx'],
+  },
+  {
+    owner: 'gallery-live-seek-toolbar',
+    productionFile: 'apps/extension/src/gallery/video-review/live-seek-icon.tsx',
+    reason:
+      'Gallery entrypoint and toolbar tests retain the Live Seek command and its preview lifetime.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/index.test.tsx',
+      'apps/extension/src/gallery/video-review/use-live-seek.test.tsx',
+      'apps/extension/src/gallery/video-review/review-toolbar.test.tsx',
+    ],
+  },
+  {
     owner: 'review-inserted-time-contract',
     productionFile: 'apps/extension/src/features/video/review/time-segment.ts',
     reason:
@@ -71,6 +130,7 @@ export const LOCAL_OWNER_MAPPINGS = [
     reason:
       'Mounted editing, source admission and workspace CAS tests check history commands and refused writes.',
     testFiles: [
+      'apps/extension/src/gallery/video-review/use-review-editing.test.tsx',
       'apps/extension/src/gallery/video-review/index.test.tsx',
       'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
       'apps/extension/src/gallery/video-review/use-edits.test.tsx',
@@ -90,17 +150,22 @@ export const LOCAL_OWNER_MAPPINGS = [
     ],
   },
   {
-    owner: 'review-inserted-playback-clock',
-    productionFile: 'apps/extension/src/gallery/video-review/use-freeze-playback.ts',
+    owner: 'review-transport-controller',
+    productionFile: 'apps/extension/src/gallery/video-review/transport.ts',
     reason:
-      'Controlled playback tests check held source, project time, pause, resume, loops and insertion removal.',
-    testFiles: ['apps/extension/src/gallery/video-review/use-playback.test.tsx'],
+      'Controlled transport and adapter tests check atomic time, freeze, loops, recovery and accepted map changes.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/transport.test.ts',
+      'apps/extension/src/gallery/video-review/use-playback.test.tsx',
+      'apps/extension/src/gallery/video-review/use-review-transport.test.tsx',
+      'apps/extension/src/gallery/video-review/use-review-audio-runtime.test.tsx',
+    ],
   },
   {
     owner: 'review-presented-clock',
     productionFile: 'apps/extension/src/gallery/video-review/playback-presentation-clock.ts',
     reason:
-      'Transport validation and mounted readouts cover presented time, pause, seek and stale commits.',
+      'Mounted readouts use transport position; preview receipts do not change the logical clock.',
     testFiles: [
       'apps/extension/src/gallery/video-review/use-playback.test.tsx',
       'apps/extension/src/gallery/video-review/timeline-chrome.test.tsx',
@@ -241,7 +306,7 @@ export const LOCAL_OWNER_MAPPINGS = [
     owner: 'review-edit-snap-consumers',
     reason: 'Edit snapping is exercised by source-axis magnets and timeline gestures.',
     testFiles: [
-      'apps/extension/src/gallery/video-review/timeline-magnets.test.ts',
+      'apps/extension/src/gallery/video-review/timeline-magnets.test.tsx',
       'apps/extension/src/gallery/video-review/timeline-drag.test.tsx',
       'apps/extension/src/gallery/video-review/timeline-selection.test.tsx',
     ],

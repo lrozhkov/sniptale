@@ -1,3 +1,4 @@
+import { reviewTimelineHint } from './timeline-hints';
 import { useReviewTimelineSnap } from './timeline-magnets';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
@@ -44,11 +45,7 @@ export function ReviewSourceLane(props: SelectionProps) {
   const stacked = props.edits?.some((edit) => hasReviewEditOverlap(edit, props.edits));
   const height = stacked ? 'h-[60px]' : props.sourceCompact ? 'h-8' : 'h-12';
   return (
-    <ReviewTrackRow
-      track="source"
-      label={translate('gallery.videoReview.sourceVideo')}
-      icon={<Film size={14} aria-hidden="true" />}
-    >
+    <ReviewTrackRow track="source" label={translate('gallery.videoReview.sourceVideo')} icon={Film}>
       <div
         data-ui="gallery.videoReview.sourceLane"
         className={`relative ${height} rounded bg-[var(--sniptale-color-surface-hover)]
@@ -140,6 +137,12 @@ export function ReviewEditBlock(
       data-review-snap-end={edit.end}
       data-cut-suppressed={covered.length ? 'true' : 'false'}
       title={caption}
+      data-review-hint={reviewTimelineHint(
+        value ? `${name} ${value}` : name,
+        range.start,
+        range.end,
+        covered.length ? translate('gallery.videoReview.cutOverlapHint') : undefined
+      )}
       className={[
         'absolute rounded border text-xs',
         position,
@@ -165,7 +168,7 @@ export function ReviewEditBlock(
         }
         setDragEdge(edge === 'start' || edge === 'end' ? edge : 'move');
         drag.current = {
-          admission: deferReviewGesture(props.beforeAction, () => props.onEdit?.(edit)),
+          admission: deferReviewGesture(props.beforeAction, () => props.onEdit?.(edit), 'click'),
           x: event.clientX,
           width: event.currentTarget.parentElement!.getBoundingClientRect().width,
           edge: edge === 'start' || edge === 'end' ? edge : 'move',
@@ -208,6 +211,12 @@ export function ReviewEditBlock(
         if (event.currentTarget.hasPointerCapture(event.pointerId))
           event.currentTarget.releasePointerCapture(event.pointerId);
         if (!current) return;
+        if (!current.moved) {
+          setPreview(null);
+          if (current.edge === 'move') current.admission.select();
+          else current.admission.cancel();
+          return;
+        }
         current.admission.commit(async () => {
           committing.current = true;
           try {
@@ -230,9 +239,9 @@ export function ReviewEditBlock(
         aria-label={caption}
         disabled={props.rangeEnabled === false}
         aria-pressed={selected}
-        className={`absolute inset-0 flex cursor-grab items-center justify-center gap-1
-            overflow-hidden active:cursor-grabbing disabled:cursor-default
-            ${edit.kind === 'freeze' ? 'px-0' : 'px-3'}`}
+        className={`absolute inset-0 flex items-center justify-center gap-1
+            overflow-hidden disabled:cursor-default
+            ${edit.kind === 'freeze' ? 'cursor-default px-0' : 'cursor-grab active:cursor-grabbing px-3'}`}
         onClick={(event) => {
           if (event.detail === 0)
             (props.beforeAction ?? ((action) => action()))(() => props.onEdit?.(edit));

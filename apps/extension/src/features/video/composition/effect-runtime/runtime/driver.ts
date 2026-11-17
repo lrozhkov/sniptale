@@ -4,6 +4,7 @@ import type {
   EffectRuntimeSandboxExecutor,
 } from '../../../../../contracts/effect-runtime/types';
 import { createEffectRuntimeRenderMessage } from './request';
+import { EffectRuntimeFrameError } from './frame-error';
 import {
   closeEffectRuntimeBitmap,
   createEffectRuntimeCompositionResourceLedger,
@@ -24,18 +25,6 @@ export interface EffectRuntimeInputMaterializer {
     plan: EffectRuntimeFramePlan,
     frames?: EffectRuntimeRenderedFrameMap
   ): Promise<{ from: ImageBitmap; to: ImageBitmap }>;
-}
-
-type EffectRuntimeFrameError = Extract<EffectRuntimeFrameResult, { kind: 'error' }>;
-
-class EffectRuntimeFrameBatchError extends Error {
-  readonly failures: readonly EffectRuntimeFrameError[];
-
-  constructor(failures: readonly EffectRuntimeFrameError[]) {
-    super(`Effect runtime frame batch failed: ${failures.map(({ code }) => code).join(',')}`);
-    this.name = 'EffectRuntimeFrameBatchError';
-    this.failures = failures;
-  }
 }
 
 export async function renderEffectRuntimeFramePlans(args: {
@@ -60,7 +49,7 @@ export async function renderEffectRuntimeFramePlans(args: {
       resourceScope,
       args.signal
     );
-    if (failure) throw new EffectRuntimeFrameBatchError([failure]);
+    if (failure) throw new EffectRuntimeFrameError(failure);
     args.signal?.throwIfAborted();
     return frames;
   } catch (error) {
@@ -104,11 +93,11 @@ async function renderDirectFramePlans(
   frames: MutableEffectRuntimeRenderedFrames,
   resourceScope: EffectRuntimeFrameResourceScope,
   signal?: AbortSignal
-): Promise<EffectRuntimeFrameError | null> {
+): Promise<EffectRuntimeFrameError['code'] | null> {
   for (const plan of plans) {
     signal?.throwIfAborted();
     const result = await executePlan(plan, {});
-    if (result.kind === 'error') return result;
+    if (result.kind === 'error') return result.code;
     retainOutputBitmap(result.bitmap, resourceScope);
     frames.set(plan.effectInstanceId, toRenderedFrame(plan, result.bitmap));
   }

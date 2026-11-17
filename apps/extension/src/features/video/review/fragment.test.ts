@@ -121,6 +121,7 @@ it('includes insertions at fragment start and the original EOF without importing
     'first',
   ]);
   expect(buildReviewTimeMap(10, fragment.edits).at(-1)!.resultEnd).toBe(8);
+  expect(fragment.result).toEqual({ start: 2, end: 10 });
   const tail = createReviewFragment({
     ...input,
     edits,
@@ -131,5 +132,94 @@ it('includes insertions at fragment start and the original EOF without importing
     'eof',
   ]);
   expect(buildReviewTimeMap(10, tail.edits).at(-1)!.resultEnd).toBe(6);
+  expect(tail.result).toEqual({ start: 10, end: 16 });
   expect(edits).toEqual(before);
+});
+
+it.each([
+  [{ start: 2, end: 4.5 }, { start: 2, end: 3 }, 1.5],
+  [{ start: 4.5, end: 5 }, { start: 3, end: 3 }, 0.5],
+  [{ start: 4.5, end: 8 }, { start: 3, end: 7 }, 1.5],
+  [{ start: 4, end: 6 }, { start: 3, end: 3 }, 2],
+  [{ start: 6, end: 7 }, { start: 5, end: 6 }, 0],
+] as const)(
+  'exports result range %j including the exact retained hold portion',
+  (result, source, holdDuration) => {
+    const edits: ReviewEdit[] = [
+      {
+        id: 'hold',
+        kind: 'freeze',
+        start: 3,
+        end: 3,
+        requestedStart: 3,
+        requestedEnd: 3,
+        duration: 3,
+        frameTime: 2.96,
+        frameDuration: 0.04,
+      },
+      { id: 'cut', kind: 'cut', start: 3, end: 5, requestedStart: 3, requestedEnd: 5 },
+    ];
+    const selection = { kind: 'range' as const, ...source, result };
+    const fragment = createReviewFragment({ ...input, edits, snapToKeyframes: false, selection });
+    expect(fragment).toMatchObject({ ...result, result });
+    const map = buildReviewTimeMap(input.duration, fragment!.edits);
+    expect(map.at(-1)!.resultEnd).toBeCloseTo(result.end - result.start, 9);
+    const holds = map.filter((segment) => segment.kind === 'freeze');
+    if (holdDuration) {
+      expect(holds).toHaveLength(1);
+      expect(holds[0]).toMatchObject({ frameTime: 2.96, frameDuration: 0.04 });
+      expect(holds[0]!.resultEnd - holds[0]!.resultStart).toBeCloseTo(holdDuration, 9);
+    } else {
+      expect(holds).toEqual([]);
+    }
+    expect(edits[0]).toMatchObject({ duration: 3 });
+  }
+);
+
+it.each([
+  { start: 3, end: 3 },
+  { start: -0.1, end: 3 },
+  { start: 0, end: 11 },
+  { start: 0, end: NaN },
+])(
+  'rejects an invalid exact result range %j instead of exporting the source fallback',
+  (result) => {
+    expect(
+      createReviewFragment({
+        ...input,
+        snapToKeyframes: false,
+        selection: { ...input.selection, result },
+      })
+    ).toBeNull();
+  }
+);
+
+it('keeps the maximum hold duration at a fractional insertion point', () => {
+  const at = 424.3666666666667;
+  const hold: ReviewEdit = {
+    id: 'hold',
+    kind: 'freeze',
+    start: at,
+    end: at,
+    requestedStart: at,
+    requestedEnd: at,
+    duration: 600,
+    frameTime: at,
+    frameDuration: 1 / 30,
+  };
+  const selection = {
+    kind: 'range' as const,
+    start: at,
+    end: at,
+    result: { start: at, end: at + hold.duration },
+  };
+  const fragment = createReviewFragment({
+    ...input,
+    duration: 450,
+    edits: [hold],
+    snapToKeyframes: false,
+    selection,
+  });
+
+  expect(fragment?.edits).toContainEqual(hold);
 });

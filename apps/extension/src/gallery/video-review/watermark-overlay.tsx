@@ -4,6 +4,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type RefObject,
   type ButtonHTMLAttributes,
   type KeyboardEvent,
@@ -37,6 +38,7 @@ type OverlayProps = {
   settings: Settings | undefined;
   output: { width: number; height: number };
   editable: boolean;
+  editingAvailability?: ReviewWatermarkEditingAvailability | undefined;
   /** Canonical measured cache bounds from the sole manual renderer; null is pending. */
   manual?: { bounds: Bounds | null } | undefined;
   /** Reprepare unchanged resources after an explicit user retry. */
@@ -47,9 +49,23 @@ type OverlayProps = {
   onError(message: string | null): void;
 };
 
+/** Optional mounted UI eligibility; resource preparation and frame plans do not subscribe. */
+export interface ReviewWatermarkEditingAvailability {
+  read(): boolean;
+  subscribe(listener: () => void): () => void;
+}
+
+const editingAvailable = () => true;
+const noEditingSubscription = () => () => {};
+
 /** Final-canvas preview; persistent edits remain with the caller. */
 export function ReviewWatermarkOverlay(props: OverlayProps) {
   useAppLocale();
+  const available = useSyncExternalStore(
+    props.editingAvailability?.subscribe ?? noEditingSubscription,
+    props.editingAvailability?.read ?? editingAvailable
+  );
+  const editable = props.editable && available;
   const host = useRef<HTMLDivElement>(null);
   const handle = useRef<HTMLButtonElement | null>(null);
   const bindHandle = useCallback((node: HTMLButtonElement | null) => {
@@ -72,7 +88,14 @@ export function ReviewWatermarkOverlay(props: OverlayProps) {
       ? resolveQuickEditWatermarkBounds(settings, props.output, measuredBounds)
       : null;
   useWatermarkPaint(canvas, resource, bounds, props.output, settings?.layout);
-  const events = useWatermarkGesture(props, host, settings, bounds, resourceKey, setDraft);
+  const events = useWatermarkGesture(
+    { ...props, editable },
+    host,
+    settings,
+    bounds,
+    resourceKey,
+    setDraft
+  );
   return (
     <div
       ref={host}
@@ -89,7 +112,7 @@ export function ReviewWatermarkOverlay(props: OverlayProps) {
           className="pointer-events-none absolute inset-0 h-full w-full"
         />
       ) : null}
-      {props.editable && settings?.layout === 'single' && settings.mode !== 'none' && bounds && (
+      {editable && settings?.layout === 'single' && settings.mode !== 'none' && bounds && (
         <button
           ref={bindHandle}
           type="button"

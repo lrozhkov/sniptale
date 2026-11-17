@@ -7,6 +7,7 @@ import { createQuickEditAdvancedState } from '../../features/video/review/advanc
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 import { importedAudioClip } from '../../workflows/video-review/audio-import';
 import type { QuickEditAdvancedContent } from '../../features/video/review/advanced/types';
+import { createReviewCommandPort } from './command-context';
 
 const io = vi.hoisted(() => ({
   read: vi.fn(),
@@ -46,12 +47,16 @@ vi.mock('../../workflows/video-review/audio-import', async (original) => ({
 let root: Root;
 let host: HTMLDivElement;
 let api: ReturnType<typeof useReviewMusicImport>;
-let state: Parameters<typeof useReviewMusicImport>[0];
+let state: Parameters<typeof useReviewMusicImport>[0] & {
+  time: number;
+  source: { duration: number };
+  playbackRange: { start: number; end: number } | null;
+};
 let content: QuickEditAdvancedContent;
 let persisted: QuickEditAdvancedContent;
 let commit: ReturnType<typeof vi.fn>;
 let selected: ReturnType<typeof vi.fn>;
-let pause: ReturnType<typeof vi.fn>;
+let pause: ReturnType<typeof vi.fn<() => void>>;
 let audioNodes: Array<{
   pause: ReturnType<typeof vi.fn>;
   play: ReturnType<typeof vi.fn>;
@@ -89,9 +94,52 @@ beforeEach(() => {
     time: 2,
     source: { duration: 10 },
     playbackRange: null,
+    selection: { kind: 'point', time: 2 },
+    activeSelection: { kind: 'none' },
+    timeline: { outputTime: null },
     flushAdvanced: vi.fn(async () => undefined),
     audio: { setSelectedId: selected },
-  } as unknown as Parameters<typeof useReviewMusicImport>[0];
+  } as unknown as typeof state;
+  const resource = new Blob(['video']);
+  Object.assign(state, {
+    commands: createReviewCommandPort({
+      read: () => ({
+        scope: {
+          session: state.session,
+          sourceAssetId: 'source',
+          resource,
+          sourceUrl: 'blob:source',
+          sourceDuration: state.source.duration,
+        },
+        document: state.session.getSnapshot().document,
+        advanced: { ...content, ui: createQuickEditAdvancedState().ui },
+        selection: { kind: 'none' },
+        timelineSelection: { kind: 'point', time: state.time },
+        playbackRange: state.playbackRange,
+      }),
+      readPosition: () => ({
+        epoch: 0,
+        mapRevision: 0,
+        resultTime: createReviewTimeMap(
+          state.source.duration,
+          state.session.getSnapshot().document.edits
+        ).sourceToTimeline(state.time),
+        source: {
+          kind: 'video',
+          sourceTime: state.time,
+          mediaTime: state.time,
+          segmentId: 'video',
+        },
+        media: { sourceId: 'blob:source', time: state.time },
+      }),
+      beforeAction: (action) => action(),
+      pauseAt: () => {
+        pause();
+        return true;
+      },
+    }),
+    pause,
+  });
   const file = new File(['audio'], 'song.wav', { type: 'audio/wav' });
   io.read.mockResolvedValue({ file, filename: file.name, entry: { id: 'asset' } });
   io.inspect.mockResolvedValue(8);
@@ -159,10 +207,31 @@ it('captures insertion intent and commits one bounded normal music clip durably'
     duration: 3,
     assetId: 'project-asset:asset',
   });
-  expect(selected).toHaveBeenCalledWith(content.audio.music[1]!.id, 'music');
+  expect(selected).toHaveBeenCalledWith(
+    content.audio.music[1]!.id,
+    'music',
+    expect.objectContaining({ position: expect.objectContaining({ resultTime: 2 }) })
+  );
   expect(state.flushAdvanced).toHaveBeenCalledTimes(1);
   expect(api.drawer).toBeNull();
   expect(pause).toHaveBeenCalled();
+});
+
+it('refuses a local temporal edit while the music drawer retains its original intent', async () => {
+  await open();
+  const snapshot = state.session.getSnapshot();
+  state.session.getSnapshot = () => ({
+    ...snapshot,
+    document: {
+      ...snapshot.document,
+      edits: [{ id: 'cut', kind: 'cut', start: 0, end: 1, requestedStart: 0, requestedEnd: 1 }],
+    },
+  });
+  await act(async () => {
+    await expect(api.drawer!.onSelect('song')).rejects.toThrow('musicChanged');
+  });
+  expect(commit).not.toHaveBeenCalled();
+  expect(api.drawer).not.toBeNull();
 });
 
 it.each(['music', 'voiceover'] as const)(
@@ -309,8 +378,14 @@ it('captures voiceover lane and source clock independently of music result place
       state.session.getSnapshot().document.edits
     ).getSegments()
   );
-  expect(content.audio.voiceover[0]!.sourceAnchor?.[0]?.start).toBe(4);
-  expect(selected).toHaveBeenCalledWith(content.audio.voiceover[0]!.id, 'voiceover');
+  expect(content.audio.voiceover[0]).toMatchObject({ timelineStart: 1, timeDomain: 'result' });
+  expect(selected).toHaveBeenCalledWith(
+    content.audio.voiceover[0]!.id,
+    'voiceover',
+    expect.objectContaining({
+      position: expect.objectContaining({ source: expect.objectContaining({ sourceTime: 4 }) }),
+    })
+  );
   expect(io.publish).toHaveBeenCalledOnce();
 });
 
@@ -344,7 +419,7 @@ it('bounds an imported voiceover to the captured source selection', async () => 
   await act(async () => api.drawer!.onSelect('voice'));
   expect(content.audio.voiceover).toHaveLength(1);
   expect(content.audio.voiceover[0]).toMatchObject({ timelineStart: 3, duration: 2 });
-  expect(content.audio.voiceover[0]!.sourceAnchor?.[0]?.start).toBe(3);
+  expect(content.audio.voiceover[0]!.timeDomain).toBe('result');
   expect(commit).toHaveBeenCalledOnce();
   expect(io.publish).toHaveBeenCalledOnce();
 });

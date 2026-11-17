@@ -1,15 +1,22 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Maximize, Minimize, Pause, Play, Settings, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductRange } from '@sniptale/ui/product-form-controls';
 import { useLibraryFullscreen } from '../../composition/library-preview/viewport';
 import { translate } from '../../platform/i18n';
 import { reviewTimeLabel } from './controls';
+import {
+  REVIEW_PLAYBACK_UI_INTERVAL_MS,
+  type ReviewPlaybackPresentationClock,
+} from './playback-presentation-clock';
+import type { ReviewTransportPosition } from './transport';
 
 /** Native fullscreen retains the mounted scene and its one transport/resource owner. */
 type PreviewFrameProps = {
   children(fullscreen: boolean): ReactNode;
   time: number;
+  clock?: ReviewPlaybackPresentationClock | undefined;
+  readPosition?: (() => ReviewTransportPosition) | undefined;
   duration: number;
   playing: boolean;
   disabled: boolean;
@@ -123,42 +130,95 @@ export function ReviewPreviewFrame(props: PreviewFrameProps) {
         </div>
       ) : null}
       {fullscreen.fullscreen ? (
-        <div
-          data-ui="gallery.videoReview.fullscreenTransport"
-          className="flex min-h-10 shrink-0 items-center gap-2 border-t
-            border-[var(--sniptale-color-border-soft)] px-3 py-2"
-        >
-          <ContentToolbarButton
-            disabled={props.disabled}
-            onClick={props.onPlay}
-            aria-label={translate(
-              props.playing ? 'gallery.videoReview.pause' : 'gallery.videoReview.play'
-            )}
-          >
-            {props.playing ? <Pause size={16} aria-hidden /> : <Play size={16} aria-hidden />}
-          </ContentToolbarButton>
-          <ProductRange
-            className="min-w-12 flex-1"
-            min={0}
-            max={props.duration}
-            step={0.01}
-            value={Math.min(props.duration, Math.max(0, props.time))}
-            disabled={props.disabled || props.duration <= 0}
-            aria-label={translate('videoEditor.stage.fullscreenSeek')}
-            onChange={(event) => props.onSeek(Number(event.currentTarget.value))}
-          />
-          <span className="whitespace-nowrap text-xs tabular-nums text-[var(--sniptale-color-text-secondary)]">
-            {reviewTimeLabel(props.time)} / {reviewTimeLabel(props.duration)}
-          </span>
-          <ContentToolbarButton
-            tone="close"
-            onClick={fullscreen.exitFullscreen}
-            aria-label={translate('videoEditor.stage.exitFullscreen')}
-          >
-            <X size={16} aria-hidden />
-          </ContentToolbarButton>
-        </div>
+        <ReviewFullscreenTransport
+          time={props.time}
+          clock={props.clock}
+          readPosition={props.readPosition}
+          duration={props.duration}
+          playing={props.playing}
+          disabled={props.disabled}
+          onPlay={props.onPlay}
+          onSeek={props.onSeek}
+          onExit={fullscreen.exitFullscreen}
+        />
       ) : null}
+    </div>
+  );
+}
+
+/** Only the mounted fullscreen rail samples numeric transport time into React. */
+function ReviewFullscreenTransport(
+  props: Pick<
+    PreviewFrameProps,
+    'time' | 'duration' | 'playing' | 'disabled' | 'clock' | 'readPosition' | 'onPlay' | 'onSeek'
+  > & { onExit(): void }
+) {
+  const latest = useRef(props);
+  useLayoutEffect(() => {
+    latest.current = props;
+  });
+  const read = (previous: number) =>
+    latest.current.readPosition
+      ? (latest.current.readPosition().resultTime ?? previous)
+      : latest.current.time;
+  const [time, setTime] = useState(() => read(props.time));
+  useLayoutEffect(() => {
+    let pending: ReturnType<typeof setTimeout> | undefined;
+    const publish = () => setTime((previous) => read(previous));
+    const observe = () => {
+      if (!props.clock?.isPlaying()) {
+        clearTimeout(pending);
+        pending = undefined;
+        publish();
+      } else if (pending === undefined) {
+        pending = setTimeout(() => {
+          pending = undefined;
+          publish();
+        }, REVIEW_PLAYBACK_UI_INTERVAL_MS);
+      }
+    };
+    const unsubscribe = props.clock?.subscribe(observe);
+    publish();
+    return () => {
+      clearTimeout(pending);
+      unsubscribe?.();
+    };
+  }, [props.clock, props.readPosition, props.time, props.playing]);
+  return (
+    <div
+      data-ui="gallery.videoReview.fullscreenTransport"
+      className="flex min-h-10 shrink-0 items-center gap-2 border-t
+            border-[var(--sniptale-color-border-soft)] px-3 py-2"
+    >
+      <ContentToolbarButton
+        disabled={props.disabled}
+        onClick={props.onPlay}
+        aria-label={translate(
+          props.playing ? 'gallery.videoReview.pause' : 'gallery.videoReview.play'
+        )}
+      >
+        {props.playing ? <Pause size={16} aria-hidden /> : <Play size={16} aria-hidden />}
+      </ContentToolbarButton>
+      <ProductRange
+        className="min-w-12 flex-1"
+        min={0}
+        max={props.duration}
+        step={0.01}
+        value={Math.min(props.duration, Math.max(0, time))}
+        disabled={props.disabled || props.duration <= 0}
+        aria-label={translate('videoEditor.stage.fullscreenSeek')}
+        onChange={(event) => props.onSeek(Number(event.currentTarget.value))}
+      />
+      <span className="whitespace-nowrap text-xs tabular-nums text-[var(--sniptale-color-text-secondary)]">
+        {reviewTimeLabel(time)} / {reviewTimeLabel(props.duration)}
+      </span>
+      <ContentToolbarButton
+        tone="close"
+        onClick={props.onExit}
+        aria-label={translate('videoEditor.stage.exitFullscreen')}
+      >
+        <X size={16} aria-hidden />
+      </ContentToolbarButton>
     </div>
   );
 }

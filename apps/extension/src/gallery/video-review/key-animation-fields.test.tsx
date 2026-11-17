@@ -82,6 +82,11 @@ it('provides local slider drafts, larger typed values, and per-property batch pa
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(node, value);
     node.dispatchEvent(new Event('input', { bubbles: true }));
   };
+  const section = (id: string) =>
+    act(() =>
+      host.querySelector<HTMLButtonElement>(`[role="tab"][aria-controls$="-${id}"]`)!.click()
+    );
+  section('appearance');
   expect(input('key_fontSize').placeholder).toBe('—');
   expect(host.textContent).toContain('gallery.videoReview.clickMixed');
   const range = input('key_fontSize range');
@@ -98,6 +103,13 @@ it('provides local slider drafts, larger typed values, and per-property batch pa
     ['key_after', '3000', { after: 3 }],
     ['key_offset', '-100', { offset: -0.1 }],
   ] as const) {
+    section(
+      name === 'key_margin'
+        ? 'position'
+        : ['key_before', 'key_after', 'key_offset'].includes(name)
+          ? 'timing'
+          : 'appearance'
+    );
     const node = input(name);
     act(() => {
       node.focus();
@@ -107,6 +119,7 @@ it('provides local slider drafts, larger typed values, and per-property batch pa
     expect(change).toHaveBeenLastCalledWith(patch);
     expect(host.contains(document.activeElement)).toBe(false);
   }
+  section('appearance');
   for (const name of ['keyColor', 'keyBackground']) act(() => edit(input(name), '#aabbcc80'));
   expect(change).toHaveBeenLastCalledWith({ style: { background: '#aabbcc80', opacity: 1 } });
   for (const [name, value] of [
@@ -114,8 +127,9 @@ it('provides local slider drafts, larger typed values, and per-property batch pa
     ['keyEntrance', 'slide'],
     ['keyDisplay', 'off'],
   ]) {
+    section(name === 'keyPosition' ? 'position' : 'display');
     const node = host.querySelector<HTMLSelectElement>(
-      `[aria-label="gallery.videoReview.${name}"]`
+      `select[aria-label="gallery.videoReview.${name}"]`
     )!;
     act(() => {
       Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(node, value);

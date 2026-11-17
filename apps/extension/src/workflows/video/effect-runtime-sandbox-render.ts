@@ -30,6 +30,7 @@ export interface EffectRuntimeSandboxRenderAuthority {
   ensureSession(): EffectRuntimeSandboxSession;
   isCurrentSession(session: EffectRuntimeSandboxSession): boolean;
   isDisposed(): boolean;
+  isStartupUnavailable(): boolean;
   requestTimeoutMs: number;
 }
 
@@ -217,6 +218,10 @@ export async function renderEffectRuntimeSandboxFrame(
   kind: EffectRuntimeRenderMessage['kind'] = 'renderFrame'
 ): Promise<EffectRuntimeSceneResult> {
   if (authority.isDisposed()) return failUntransferredRequest(command);
+  if (authority.isStartupUnavailable()) {
+    closeEffectRuntimeBitmaps(command.inputFrames);
+    return createEffectRuntimeFailure(command, 'circuitOpen');
+  }
   try {
     const current = authority.ensureSession();
     await current.load;
@@ -230,6 +235,9 @@ export async function renderEffectRuntimeSandboxFrame(
   } catch {
     authority.clearSession();
     closeEffectRuntimeBitmaps(command.inputFrames);
-    return createEffectRuntimeFailure(command, 'crashed');
+    return createEffectRuntimeFailure(
+      command,
+      authority.isStartupUnavailable() ? 'circuitOpen' : 'crashed'
+    );
   }
 }

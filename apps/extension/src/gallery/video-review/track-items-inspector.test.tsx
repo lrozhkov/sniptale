@@ -1,11 +1,49 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, type ComponentProps } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { ReviewTrackItemsInspector } from './track-items-inspector';
+import { ReviewTrackItemsInspector as TrackItemsSurface } from './track-items-inspector';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import type { QuickEditTrack } from '../../features/video/review/advanced/types';
+type FixtureState = ReturnType<typeof import('./use-editor-state').useReviewEditorState>;
+function ReviewTrackItemsInspector(
+  props: Omit<
+    ComponentProps<typeof TrackItemsSurface>,
+    'document' | 'advanced' | 'selection' | 'snapshots' | 'busy' | 'commands'
+  > & { state: FixtureState }
+) {
+  const { state } = props;
+  return (
+    <TrackItemsSurface
+      {...props}
+      document={state.snapshot.document}
+      advanced={state.advanced}
+      selection={state.activeSelection}
+      snapshots={state.snapshot.snapshot.workspace.effectSnapshots}
+      busy={
+        state.busy ||
+        state.editing.exporter.phase !== 'idle' ||
+        state.annotationEffects.pending ||
+        !!state.annotationEffects.gestureId
+      }
+      commands={{
+        session: state.session,
+        open: (selection, done) =>
+          state.beforeAction(() => {
+            state.video.current?.pause();
+            state.setActiveSelection(selection);
+            done();
+          }),
+        canStart: state.canStart,
+        run: state.run,
+        flushAnnotations: state.annotationEffects.flush,
+        flushAdvanced: state.flushAdvanced,
+      }}
+    />
+  );
+}
+
 const renderProbe = vi.hoisted(() => ({ inactiveLabels: 0 }));
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
@@ -84,15 +122,15 @@ it('navigates source and authored rows, filters, pages and removes through the a
     expect(host.querySelectorAll('[data-track-item]')).toHaveLength(50);
     const renderedLabels = renderProbe.inactiveLabels;
     expect(renderedLabels).toBeGreaterThan(0);
-    const currentSeek = vi.fn();
-    props.state = { ...props.state, seek: currentSeek };
+    const currentSelect = vi.fn();
+    props.state = { ...props.state, setActiveSelection: currentSelect };
     render('zoom');
     expect(renderProbe.inactiveLabels).toBe(renderedLabels);
     await act(async () =>
       host.querySelector<HTMLButtonElement>('.review-track-items-open')!.click()
     );
-    expect(currentSeek).toHaveBeenCalledWith(0, false);
-    props.state = { ...props.state, seek };
+    expect(currentSelect).toHaveBeenCalledWith({ kind: 'zoom', id: 'focus0' });
+    props.state = { ...props.state, setActiveSelection: selected };
     render('zoom');
 
     await click('trackItemsMore');
@@ -101,7 +139,7 @@ it('navigates source and authored rows, filters, pages and removes through the a
       host.querySelector<HTMLButtonElement>('.review-track-items-open')!.click()
     );
     expect(selected).toHaveBeenCalledWith({ kind: 'zoom', id: 'focus0' });
-    expect(seek).toHaveBeenCalledWith(0, false);
+    expect(seek).not.toHaveBeenCalled();
     expect(section).toHaveBeenCalledWith('selected');
     toggle(1);
     toggle(2);

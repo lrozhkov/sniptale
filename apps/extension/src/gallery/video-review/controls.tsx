@@ -1,4 +1,10 @@
 import { InspectorDisclosureView } from '../../ui/compact-inspector-controls/disclosure';
+import { createPortal } from 'react-dom';
+import {
+  ReviewSelectionCommandSlotsContext,
+  ReviewCommandMenuContext,
+  type ReviewSelectionCommand,
+} from './selection-command-slots';
 import type { InspectorDisclosureProps } from '../../ui/compact-inspector-controls/shared';
 import { ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
 import { useInspectorDisclosure } from '../../composition/inspector-disclosures/state';
@@ -223,6 +229,7 @@ export const reviewSelectFieldClassName = 'w-full min-w-0';
 
 /** Same control language as the gallery inspector, with a stable accessible label. */
 export function ReviewButton({
+  selectionAction,
   label,
   primary = false,
   chrome = false,
@@ -233,6 +240,7 @@ export function ReviewButton({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   label: string;
+  selectionAction?: ReviewSelectionCommand;
   primary?: boolean;
   chrome?: boolean;
   toolbarLabel?: string | undefined;
@@ -240,14 +248,17 @@ export function ReviewButton({
   toolbarPriority?: number;
 }) {
   const press = useCommandPress(props);
+  const actionSlots = useContext(ReviewSelectionCommandSlotsContext);
+  const menuItem = useContext(ReviewCommandMenuContext);
   const tone = primary
     ? getControlPrimaryButtonClassName()
     : getControlSecondaryButtonClassName({ density: 'compact' });
-  return (
+  const button = (
     <button
       type="button"
       title={label}
       aria-label={label}
+      role={menuItem ? 'menuitem' : undefined}
       data-review-toolbar-button={toolbarLabel === undefined ? undefined : ''}
       data-toolbar-priority={toolbarLabel === undefined ? undefined : toolbarPriority}
       {...props}
@@ -256,6 +267,7 @@ export function ReviewButton({
       data-pressing={press.pressed ? 'true' : undefined}
       data-command-chrome={chrome ? 'true' : undefined}
       data-command-primary={primary ? 'true' : undefined}
+      data-selection-action={selectionAction}
       className={`review-command ${tone}
       !h-8 !min-h-8 !rounded-[var(--sniptale-radius-sm)]
       !px-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)] ${className}`}
@@ -270,6 +282,8 @@ export function ReviewButton({
       </span>
     </button>
   );
+  const host = selectionAction && actionSlots?.[selectionAction];
+  return host ? createPortal(button, host) : button;
 }
 
 /** Source timecode shared by timeline, selection labels and the comment feed. */

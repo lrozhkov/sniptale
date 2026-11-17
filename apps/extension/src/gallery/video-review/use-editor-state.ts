@@ -1,3 +1,17 @@
+import { reviewPlaybackFailureMessage } from './feedback';
+import type { ReviewTransportFailure } from './transport';
+import { reviewInsertionTarget, reviewResultInsertionContext } from './range-placement';
+import {
+  createReviewCommandPort,
+  reviewCommandSourceTime,
+  reviewCommandCanPublishSelection,
+  type ReviewCommandContext,
+  type ReviewCommandPort,
+} from './command-context';
+import { createTrackProjection } from './track-projection';
+import { projectReviewCursorMotions } from '../../features/video/review/timeline-placement';
+import { evaluateCursorFocusSegment } from '../../features/video/project/cursor-focus-path/evaluator';
+import { resolveReviewCursorFocusPath } from '../../features/video/review/advanced/cursor-focus-path';
 import { createReviewInteractionEditor } from './interaction-editor';
 import { useReviewCursorMotions } from './cursor-motion-editor';
 import { useReviewRecordingHistory } from './use-recording-history';
@@ -12,27 +26,35 @@ import { createReviewSpeechEditGuard } from './speech-edit-guard';
 import { scheduleReviewKeys } from '../../features/video/review/key-animation';
 import { scheduleReviewClicks } from '../../features/video/review/click-animation';
 import { useReviewNoteTransitions } from './note-transitions';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, type SetStateAction } from 'react';
 import {
   attachReviewRecordingWindow,
   projectReviewTelemetry,
   reviewRecordingWindow,
 } from '../../features/video/review/telemetry';
 import { translate } from '../../platform/i18n';
-import type { ReviewAnchor, ReviewAnnotation } from '../../features/video/review/types';
+import type {
+  ReviewAnchor,
+  ReviewAnnotation,
+  ReviewSelection,
+} from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
-import type { ReviewActionAudioUnavailable } from '../../features/video/review/action-audio';
 import { useReviewBackgroundImport } from './use-review-background';
 import { useReviewComposer, useReviewSnapshot, type LoadedReview } from './use-session';
 import { useReviewExport } from './use-export';
 import { useReviewAdvanced } from './use-advanced';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { useReviewTransport } from './use-review-transport';
-import { reviewSelectionSourceTime, useReviewSelection } from './use-review-selection';
+import {
+  reviewSelectionSeekTarget,
+  reviewSelectionSourceTime,
+  useReviewSelection,
+} from './use-review-selection';
 import { useReviewEditorWiring } from './use-review-wiring';
 import { useReviewEditingTools } from './use-review-editing';
 import { useReviewWebcamEditor } from './webcam-editor';
 import { computeQuickEditSceneSize } from '../../features/video/review/advanced/scene';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 
 export function useReviewEditorState(resource: LoadedReview) {
   const core = useReviewEditorCore(resource);
@@ -62,6 +84,7 @@ export function useReviewEditorState(resource: LoadedReview) {
     cuts,
   } = core;
   const wiring = useReviewEditorWiring({
+    commands: core.commands,
     session,
     document: snapshot.document,
     advanced,
@@ -73,6 +96,7 @@ export function useReviewEditorState(resource: LoadedReview) {
     setActiveSelection,
     clearAnnotation: setSelected,
     time,
+    resultTime: timeline.sceneOutputTime,
     timelineDuration: timeline.resultDuration,
     busy,
     canStart,
@@ -94,6 +118,21 @@ export function useReviewEditorState(resource: LoadedReview) {
     timelineSelection: selection,
     cuts,
   });
+  core.selectionNavigation.current = (selection, context) => {
+    const currentDocument = core.session.getSnapshot().document;
+    const currentAdvanced = core.advancedState.readCurrent();
+    const target = reviewSelectionSeekTarget(selection, {
+      document: currentDocument,
+      advanced: currentAdvanced,
+      duration: context.scope.sourceDuration,
+      markers: wiring.projected.markers,
+      sourceTime: reviewCommandSourceTime(context) ?? NaN,
+      resultTime: context.position.resultTime ?? NaN,
+      segments: buildReviewTimeMap(context.scope.sourceDuration, currentDocument.edits),
+    });
+    if (target?.domain === 'result') core.seekResult(target.time);
+    else if (target) core.seek(target.time, false);
+  };
   const actionsApplied = resolveQuickEditEffectiveState(advanced).actionsApplied;
   const clickCues = useMemo(
     () =>
@@ -132,29 +171,79 @@ export function useReviewEditorState(resource: LoadedReview) {
     ]
   );
   const state = assembleReviewEditorState(core, wiring);
-  const cursorMotion = useReviewCursorMotions({
-    advanced: state.advanced,
+  const cursorProjection = useMemo(
+    () => createTrackProjection(source.duration, state.snapshot.document.edits),
+    [source.duration, state.snapshot.document.edits]
+  );
+  const cursorMotions = useMemo(
+    () =>
+      projectReviewCursorMotions(
+        state.advanced.cursorMotions,
+        state.timeline.timeMap.getSegments()
+      ),
+    [state.advanced.cursorMotions, state.timeline.timeMap]
+  );
+  const cursorInsertion = reviewResultInsertionContext({
     time: state.time,
-    duration: source.duration,
+    resultTime: state.timeline.sceneOutputTime,
+    range:
+      state.playbackRange ??
+      (state.activeSelection.kind === 'none' && state.selection.kind === 'range'
+        ? state.selection
+        : null),
+    projection: cursorProjection,
+  });
+  const cursorMotion = useReviewCursorMotions({
+    commands: core.commands,
+    advanced: { ...state.advanced, ...(cursorMotions ? { cursorMotions } : {}) },
+    time: cursorInsertion.time,
+    insertionRange: cursorInsertion.range,
+    insertionPoint: (sourceTime) => state.insertionPoint(sourceTime),
+    pause: state.pause,
+    duration: cursorProjection.resultDuration,
     selection: state.activeSelection,
     onChange: state.setCursorMotions,
     onEnabledChange: state.setCursorMotionEnabled,
     select: state.setActiveSelection,
-    seek: state.seek,
+    seek: state.seekResult,
     canStart: state.canStart,
     setMessage: state.setMessage,
   });
   const interactionEditor = createReviewInteractionEditor({
     ...state,
-    duration: source.duration,
+    commands: core.commands,
+    time: cursorInsertion.time,
+    insertionRange: cursorInsertion.range,
+    duration: cursorProjection.resultDuration,
+    sourceDuration: source.duration,
+    toResult: (time) =>
+      state.timeline.timeMap.sourceToTimeline(time) ?? state.timeline.sceneOutputTime,
+    insertionPoint: (time) =>
+      state.insertionPoint(state.timeline.timeMap.timelineToSource(time) ?? state.time),
   });
-  return { ...state, interactionEditor, cursorMotion, clickCues, keyCues };
+  return {
+    ...state,
+    interactionEditor,
+    cursorMotion,
+    clickCues,
+    keyCues,
+  };
 }
 
 /** Combines session state with the timeline transport and editing controls. */
 function useReviewEditorCore(resource: LoadedReview) {
   const base = useReviewEditorBase(resource);
   const timeline = useReviewEditorTimeline(resource, base);
+  const commands = base.commands;
+  const insertionProjection = useMemo(
+    () => createTrackProjection(resource.source.duration, base.snapshot.document.edits),
+    [resource.source.duration, base.snapshot.document.edits]
+  );
+  base.stopForEdit.current = () => {
+    const status = timeline.transport.getStatusSnapshot();
+    if (status.mode !== 'paused' && status.mode !== 'ended' && status.mode !== 'failed')
+      timeline.pause();
+  };
   const styles = [...(base.advanced.keyAnimations ?? []), ...(base.advanced.clickAnimations ?? [])];
   const reach =
     Math.max(
@@ -163,6 +252,7 @@ function useReviewEditorCore(resource: LoadedReview) {
     ) * Math.max(1, ...timeline.timeline.timeMap.getSegments().map((segment) => segment.rate));
   const previewHistory = useReviewRecordingHistory(resource, timeline.time, base.activeSelection, {
     reach,
+    clock: timeline.playheadClock,
     interactionTimeline: base.advanced.interactionTimeline,
   });
   const [visibleHistory, setVisibleHistory] = useState<{
@@ -226,7 +316,11 @@ function useReviewEditorCore(resource: LoadedReview) {
     timelineHistory.telemetry,
   ]);
   const presentationPending = useRef(false);
+  const webcamResultClock =
+    base.advanced.webcam?.timeDomain === 'result' ||
+    timeline.timeline.timeMap.getSegments().some((segment) => segment.kind === 'freeze');
   const webcam = useReviewWebcamEditor({
+    commands,
     session: base.session,
     advanced: base.advancedState,
     scene: computeQuickEditSceneSize({
@@ -235,12 +329,34 @@ function useReviewEditorCore(resource: LoadedReview) {
       canvas: base.features.canvas,
       windowHeader: base.features.windowHeader,
     }),
-    sourceDuration: resource.source.duration,
-    time: timeline.time,
+    sourceDuration: webcamResultClock ? timeline.timeline.resultDuration : resource.source.duration,
+    time: webcamResultClock ? timeline.timeline.sceneOutputTime : timeline.time,
+    sourceTime: timeline.time,
+    segments: timeline.timeline.timeMap.getSegments(),
+    insertionRange: webcamResultClock
+      ? reviewResultInsertionContext({
+          time: timeline.time,
+          resultTime: timeline.timeline.sceneOutputTime,
+          range:
+            timeline.playbackRange ??
+            (base.activeSelection.kind === 'none' && base.selection.kind === 'range'
+              ? base.selection
+              : null),
+          projection: insertionProjection,
+        }).range
+      : reviewInsertionTarget(
+          timeline.time,
+          timeline.playbackRange ??
+            (base.activeSelection.kind === 'none' && base.selection.kind === 'range'
+              ? base.selection
+              : null)
+        ),
     selection: base.activeSelection,
     select: base.setActiveSelection,
     pause: timeline.pause,
-    seek: (time) => timeline.seek(time, false),
+    seek: webcamResultClock ? timeline.seekResult : (time) => timeline.seek(time, false),
+    seekSource: (time) => timeline.seek(time, false),
+    seekResult: timeline.seekResult,
     allowed: () =>
       !base.busy &&
       !presentationPending.current &&
@@ -284,6 +400,7 @@ function useReviewEditorCore(resource: LoadedReview) {
   );
   presentationPending.current = presentation.pending;
   const annotationEffects = useReviewAnnotationEffects({
+    commands,
     session: base.session,
     lane: base.advanced.annotationEffects,
     setLane: base.advancedState.setAnnotationEffects,
@@ -302,9 +419,18 @@ function useReviewEditorCore(resource: LoadedReview) {
       !base.composer.getCurrent().annotation &&
       base.advanced.ui.mode === 'advanced',
   });
+  const beforeAction = (action: () => void) => {
+    if (!annotationEffects.hasPending()) return base.beforeAction(action);
+    void annotationEffects
+      .flush()
+      .then(() => base.beforeAction(action))
+      .catch(() => base.setMessage(translate('gallery.videoReview.saveFailed')));
+  };
+  base.commandAdmission.current = beforeAction;
   return {
     ...base,
     ...timeline,
+    commands,
     history,
     historyTelemetry,
     setHistoryRange,
@@ -330,20 +456,7 @@ function useReviewEditorCore(resource: LoadedReview) {
         base.setMessage(translate('gallery.videoReview.saveFailed'));
       }
     },
-    beforeAction: (action: () => void) => {
-      if (!annotationEffects.hasPending()) return base.beforeAction(action);
-      void annotationEffects
-        .flush()
-        .then(() => base.beforeAction(action))
-        .catch(() => base.setMessage(translate('gallery.videoReview.saveFailed')));
-    },
-    setActiveSelection: (next: Parameters<typeof base.setActiveSelection>[0]) => {
-      if (!annotationEffects.hasPending()) return base.setActiveSelection(next);
-      void annotationEffects
-        .flush()
-        .then(() => base.setActiveSelection(next))
-        .catch(() => base.setMessage(translate('gallery.videoReview.saveFailed')));
-    },
+    beforeAction,
     busy:
       base.busy ||
       webcam.pending ||
@@ -359,19 +472,39 @@ function useReviewEditorBase(resource: LoadedReview) {
   const snapshot = useReviewSnapshot(session);
   const composer = useReviewComposer(session);
   const exporter = useReviewExport(resource);
-  const advancedState = useReviewAdvanced(session);
+  const stopForEdit = useRef<() => void>(() => {});
+  const commandPort = useRef<ReviewCommandPort | null>(null);
+  const commandRuntime = useRef<{
+    readPosition(): ReviewCommandContext['position'];
+    pauseAt(position: ReviewCommandContext['position']): boolean;
+    readRange(): ReviewCommandContext['playbackRange'];
+    readUIIntent(): { position: ReviewCommandContext['position']; playing: boolean };
+  } | null>(null);
+  const selectionNavigation = useRef<
+    (selection: ReviewSelection, context: ReviewCommandContext) => void
+  >(() => {});
+  const beforeEdit = useCallback(() => stopForEdit.current(), []);
+  const advancedState = useReviewAdvanced(session, beforeEdit);
   const advanced = advancedState.advanced;
   const features = useMemo(
     () => resolveQuickEditEffectiveState(advanced, { facts: resource.telemetry, source }),
     [advanced, resource.telemetry, source]
   );
-  const [selection, setSelection] = useState<ReviewAnchor>(
+  const [selection, publishSelection] = useState<ReviewAnchor>(
     composer.annotation?.anchor ?? { kind: 'point', time: 0 }
   );
+  const selectionRef = useRef(selection);
+  const setSelection = useCallback((next: SetStateAction<ReviewAnchor>) => {
+    const value = typeof next === 'function' ? next(selectionRef.current) : next;
+    selectionRef.current = value;
+    publishSelection(value);
+  }, []);
   const [selected, setSelected] = useState<ReviewAnnotation | null>(null);
   const [hovered, setHovered] = useState<ReviewAnnotation | null>(null);
   const [voiceoverSilent, setVoiceoverSilent] = useState(false);
   const { selection: activeSelection, setSelection: selectActive } = useReviewSelection();
+  const activeSelectionRef = useRef(activeSelection);
+  activeSelectionRef.current = activeSelection;
   const {
     actionBusy,
     isBusy,
@@ -398,9 +531,77 @@ function useReviewEditorBase(resource: LoadedReview) {
   const beforeAction: typeof transitions.beforeAction = (action) => {
     void speechGuard.perform(() => transitions.beforeAction(action));
   };
-  const setActiveSelection: typeof selectActive = (next) => {
-    advancedState.endTyping();
-    void speechGuard.perform(() => selectActive(next));
+  const commandAdmission = useRef(beforeAction);
+  commandAdmission.current = beforeAction;
+  const commandRead = useRef<() => Omit<ReviewCommandContext, 'position'> | null>(() => null);
+  commandRead.current = () => {
+    if (!commandRuntime.current) return null;
+    const accepted = session.getSnapshot();
+    return {
+      scope: {
+        session,
+        sourceAssetId: accepted.snapshot.workspace.sourceAssetId,
+        resource: resource.file,
+        sourceUrl: resource.url,
+        sourceDuration: resource.source.duration,
+      },
+      document: { ...accepted.document, advancedContent: advancedState.readCurrentContent() },
+      advanced: advancedState.readCurrent(),
+      selection: activeSelectionRef.current,
+      timelineSelection: selectionRef.current,
+      playbackRange: commandRuntime.current.readRange(),
+    };
+  };
+  const commands = useMemo(
+    () =>
+      createReviewCommandPort({
+        read: () => {
+          const current = commandRead.current();
+          return current?.scope.session === session && current.scope.resource === resource.file
+            ? current
+            : null;
+        },
+        readPosition: () => {
+          if (!commandRuntime.current) throw new Error('Review transport is unavailable.');
+          return commandRuntime.current.readPosition();
+        },
+        pauseAt: (position) => commandRuntime.current?.pauseAt(position) ?? false,
+        beforeAction: (action) => commandAdmission.current(action),
+      }),
+    [session, resource.file]
+  );
+  commandPort.current = commands;
+  const setActiveSelection = (
+    next: SetStateAction<ReviewSelection>,
+    context?: ReviewCommandContext
+  ) => {
+    const selection = typeof next === 'function' ? next(activeSelectionRef.current) : next;
+    const apply = (captured?: ReviewCommandContext) => {
+      advancedState.endTyping();
+      if (typeof next !== 'function' && selection.kind !== 'none' && captured)
+        selectionNavigation.current(selection, captured);
+      activeSelectionRef.current = selection;
+      selectActive(selection);
+    };
+    if (selection.kind === 'none') {
+      commandAdmission.current(() => apply());
+      return;
+    }
+    const commands = commandPort.current;
+    if (!commands) return;
+    if (context) {
+      const intent = commandRuntime.current?.readUIIntent();
+      if (
+        !commands.isCurrent(context, 'source') ||
+        !intent ||
+        !reviewCommandCanPublishSelection(context, intent.position, intent.playing)
+      )
+        return false;
+      apply(context);
+      return true;
+    }
+    const captured = commands.capture();
+    if (captured) commands.admit(captured, apply);
   };
   const run = (action: () => Promise<unknown>, success?: string, options?: { durableNote: true }) =>
     Promise.resolve(
@@ -425,6 +626,14 @@ function useReviewEditorBase(resource: LoadedReview) {
   const busy = actionBusy || backgroundImport.pending || transitions.pending;
   return {
     session,
+    stopForEdit,
+    commandPort,
+    commandRuntime,
+    commandAdmission,
+    commands,
+    readSelection: () => selectionRef.current,
+    readActiveSelection: () => activeSelectionRef.current,
+    selectionNavigation,
     source,
     snapshot,
     composer,
@@ -482,17 +691,8 @@ function useReviewEditorTimeline(
     busy,
     canStart,
   } = base;
-  const onTransportFailure = (reason?: ReviewActionAudioUnavailable['reason']) => {
-    if (reason) video.current?.pause();
-    setMessage(
-      translate(
-        reason === 'voice-limit'
-          ? 'gallery.videoReview.actionAudioLimit'
-          : reason
-            ? 'gallery.videoReview.actionAudioResource'
-            : 'gallery.videoReview.playbackFailed'
-      )
-    );
+  const onTransportFailure = (failure: ReviewTransportFailure) => {
+    setMessage(reviewPlaybackFailureMessage(failure));
   };
   const {
     video,
@@ -501,10 +701,12 @@ function useReviewEditorTimeline(
     time,
     onTime,
     playing,
-    setPlaying,
+    onMediaPlayback,
+    onMediaReady,
+    transport,
+    readPosition,
+    pauseAt,
     playheadClock,
-    setPresentationActive,
-    onPresentedTime,
     seek,
     play,
     timeline,
@@ -513,6 +715,7 @@ function useReviewEditorTimeline(
     onEnded,
     onMediaError,
     recovering,
+    preparingPlayback,
     seekRevision,
     navigationRevision,
     actionSoundPreview,
@@ -527,14 +730,21 @@ function useReviewEditorTimeline(
     interactionEnabled: advanced.ui.tracks,
     actionsApplied: features.actionsApplied,
     onSeek: (next) => {
-      if (selection.kind === 'point') setSelection({ kind: 'point', time: next });
+      setSelection((current) =>
+        current.kind === 'point' || next < current.start || next >= current.end
+          ? { kind: 'point', time: next }
+          : current
+      );
     },
     boundaries: () =>
       cuts.cutting && advanced.ui.mode !== 'advanced' ? exporter.index?.boundaries : undefined,
     onTransportFailure,
     onTransportRecovered: () =>
       setMessage((message) =>
-        message === translate('gallery.videoReview.playbackFailed') ? null : message
+        message === translate('gallery.videoReview.playbackFailed') ||
+        message === translate('gallery.videoReview.audioPlaybackFailed')
+          ? null
+          : message
       ),
     onActionAudioRecovered: () =>
       setMessage((message) =>
@@ -546,7 +756,17 @@ function useReviewEditorTimeline(
     onInvalidRange: () => setMessage(translate('gallery.videoReview.emptyPlaybackRange')),
     silent: voiceoverSilent,
   });
+  base.commandRuntime.current = {
+    readPosition,
+    pauseAt,
+    readRange: () => transport.getStatusSnapshot().range,
+    readUIIntent: () => {
+      const status = transport.getStatusSnapshot();
+      return { position: status.position, playing: status.playing };
+    },
+  };
   const { zoom, cuts } = useReviewEditingTools({
+    commands: base.commands,
     advancedState,
     zoom: advanced.zoom,
     timelineDuration: timeline.resultDuration,
@@ -555,7 +775,17 @@ function useReviewEditorTimeline(
     sourceDuration: source.duration,
     sourceTime: time,
     file: resource.file,
-    timelineSelection: selection,
+    timelineSelection: (() => {
+      const currentTime = time;
+      const target = reviewInsertionTarget(
+        currentTime,
+        playbackRange ??
+          (activeSelection.kind === 'none' && selection.kind === 'range' ? selection : null)
+      );
+      return target
+        ? { kind: 'range' as const, ...target }
+        : { kind: 'point' as const, time: currentTime };
+    })(),
     exporter,
     edits: snapshot.document.edits,
     pause,
@@ -580,13 +810,16 @@ function useReviewEditorTimeline(
     onEnded,
     onMediaError,
     recovering,
+    preparingPlayback,
     seekRevision,
     navigationRevision,
     playing,
-    setPlaying,
+    onMediaPlayback,
+    onMediaReady,
+    transport,
+    readPosition,
+    pauseAt,
     playheadClock,
-    setPresentationActive,
-    onPresentedTime,
     seek,
     play,
     timeline,
@@ -622,39 +855,56 @@ function assembleReviewEditorState(
     telemetry,
     ...reviewAdvancedControls(advancedState, setActiveSelection, core.beforeAction),
     projected,
+    insertionPoint: (at: number) => {
+      const path = wiring.cursorFocusPath;
+      const segment = path.segments.find((part) => at >= part.start && at <= part.end);
+      return segment ? evaluateCursorFocusSegment(segment, at, path.smoothing) : null;
+    },
     cursorFocusPath: wiring.cursorFocusPath,
     cursorFocusKeys: wiring.cursorFocusKeys,
-    selectCursorFocusKey: (id: string | undefined, time: number) =>
-      core.beforeAction(() => {
-        core.setSelection({ kind: 'point', time });
-        setActiveSelection({ kind: 'cursor-focus', id: id ?? '', time });
-        core.seek(time, false);
-      }),
+    selectCursorFocusKey: (id: string | undefined, time: number) => {
+      const context = core.commands.capture();
+      if (context)
+        core.commands.admit(context, () => {
+          if (setActiveSelection({ kind: 'cursor-focus', id: id ?? '', time }, context) !== false)
+            core.setSelection({ kind: 'point', time });
+        });
+    },
     moveCursorFocusKey: (key: (typeof wiring.cursorFocusKeys)[number], time: number) =>
       core.beforeAction(() => {
         const moved = moveCursorFocusTimelineKey(wiring.cursorFocusPath, key, time);
         advancedState.setCursorFocusPath(moved.path);
-        core.setSelection({ kind: 'point', time: moved.time });
-        setActiveSelection({ kind: 'cursor-focus', id: moved.id, time: moved.time });
-        core.seek(moved.time, false);
+        if (core.activeSelection.kind === 'cursor-focus' && core.activeSelection.id === key.id)
+          setActiveSelection(() => ({ kind: 'cursor-focus', id: moved.id, time: moved.time }));
       }),
-    addCursorFocusKey: (time: number) =>
-      core.beforeAction(() => {
-        const id = crypto.randomUUID();
-        advancedState.setCursorFocusPath(
-          addReviewCursorFocusKey(wiring.cursorFocusPath, time, core.source.duration, id)
-        );
-        core.setSelection({ kind: 'point', time });
-        setActiveSelection({ kind: 'cursor-focus', id, time });
-        core.seek(time, false);
-      }),
-    selectComment: (annotation: ReviewAnnotation) => {
-      core.beforeAction(() => {
-        comments.select(annotation);
-        setActiveSelection({ kind: 'annotation', id: annotation.id });
-      });
+    addCursorFocusKey: (requestedTime: number) => {
+      const context = core.commands.capture();
+      if (context)
+        core.commands.admit(context, () => {
+          const time =
+            reviewInsertionTarget(requestedTime, context.playbackRange)?.start ?? requestedTime;
+          const id = crypto.randomUUID();
+          const path = resolveReviewCursorFocusPath(
+            core.historyTelemetry,
+            core.source,
+            context.advanced.cursorFocusPath
+          );
+          advancedState.setCursorFocusPath(
+            addReviewCursorFocusKey(path, time, context.scope.sourceDuration, id)
+          );
+          if (setActiveSelection({ kind: 'cursor-focus', id, time }, context) !== false)
+            core.setSelection({ kind: 'point', time });
+        });
     },
-    add: (marker?: ReviewTelemetryMarker) => core.beforeAction(() => comments.add(marker)),
+    selectComment: (annotation: ReviewAnnotation) => {
+      const context = core.commands.capture();
+      if (context)
+        core.commands.admit(context, () => {
+          comments.select(annotation, context);
+          setActiveSelection({ kind: 'annotation', id: annotation.id }, context);
+        });
+    },
+    add: (marker?: ReviewTelemetryMarker) => comments.add(marker),
     displayRegion: reviewRegion(
       time,
       composer.annotation,
@@ -682,6 +932,7 @@ function reviewAdvancedControls(
     setTrackVisibility: advancedState.setTrackVisibility,
     setOverlaysVisible: advancedState.setOverlaysVisible,
     setWorkspaceColor: advancedState.setWorkspaceColor,
+    setTimelinePreferences: advancedState.setTimelinePreferences,
     setInteractionTimeline: advancedState.setInteractionTimeline,
     setKeyAnimations: advancedState.setKeyAnimations,
     setActionAudio: advancedState.setActionAudio,

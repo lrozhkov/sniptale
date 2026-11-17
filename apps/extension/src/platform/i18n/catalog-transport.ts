@@ -152,6 +152,8 @@ export function createCatalogTransport(options: CatalogTransportOptions) {
 /** Read packaged data directly in extension contexts and through the broker in content. */
 export function loadCatalogMessages(locale: AppLocale, profile: CatalogProfile): Promise<unknown> {
   return createCatalogTransport({
+    // Vite can compile source modules while a catalog request waits in its server queue.
+    ...(import.meta.env.DEV ? { timeoutMs: 120_000 } : {}),
     getURL: (path) => browserRuntime.getURL(path),
     connect: (info) => browserRuntime.connect(info),
     fetch: (input, init) => fetch(input, init),

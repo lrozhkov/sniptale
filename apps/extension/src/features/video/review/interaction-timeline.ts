@@ -38,6 +38,7 @@ export function parseReviewInteractionTimeline(
   for (const p of raw['presses']) {
     if (
       !isRecord(p) ||
+      (p['timeDomain'] !== undefined && p['timeDomain'] !== 'result') ||
       !validId(p['id']) ||
       ids.has(p['id']) ||
       (p['family'] !== 'keyboard' && p['family'] !== 'mouse') ||
@@ -70,6 +71,7 @@ export function parseReviewInteractionTimeline(
       return null;
     ids.add(p['id']);
     presses.push({
+      ...(p['timeDomain'] === 'result' ? { timeDomain: 'result' as const } : {}),
       id: p['id'],
       family: p['family'],
       start: p['start'],
@@ -87,6 +89,7 @@ export function parseReviewInteractionTimeline(
   for (const p of raw['overrides']) {
     if (
       !isRecord(p) ||
+      (p['timeDomain'] !== undefined && p['timeDomain'] !== 'result') ||
       !isRecord(p['ref']) ||
       !validId(p['ref']['id']) ||
       !validTime(p['start']) ||
@@ -116,6 +119,7 @@ export function parseReviewInteractionTimeline(
     )
       return null;
     overrides.push({
+      ...(p['timeDomain'] === 'result' ? { timeDomain: 'result' as const } : {}),
       ...(isRecord(range) && validTime(range['start']) && validTime(range['end'])
         ? { sourceRange: { start: range['start'], end: range['end'] } }
         : {}),
@@ -154,6 +158,7 @@ export function resolveReviewInteractions(
   );
   const authored: ReviewTelemetryMarker[] = [...(timeline?.presses ?? []), ...retained].map(
     (p) => ({
+      ...(p.timeDomain ? { timeDomain: p.timeDomain } : {}),
       ref: { kind: 'action', id: p.id },
       eventType: p.family === 'keyboard' ? 'KEY' : 'CLICK',
       target: p.label,
@@ -197,6 +202,7 @@ export function resolveReviewInteractions(
       return [
         {
           ...marker,
+          ...(change.timeDomain ? { timeDomain: change.timeDomain } : {}),
           start: change.start,
           end: change.end,
           ...(marker.keyboardAttack

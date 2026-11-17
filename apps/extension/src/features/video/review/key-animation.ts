@@ -24,7 +24,14 @@ export function scheduleReviewKeys(
   return markers.flatMap((marker) => {
     const style = isReviewKey(marker) ? styles.get(marker.ref.id) : undefined;
     if (!style?.enabled || !marker.target) return [];
-    const window = reviewCueWindow(segments, marker.start, style.offset, style.before, style.after);
+    const window = reviewCueWindow(
+      segments,
+      marker.start,
+      style.offset,
+      style.before,
+      style.after,
+      marker.timeDomain
+    );
     if (!window) return [];
     const { start, end } = window;
     return end > start ? [{ label: marker.target, settings: style, start, end }] : [];

@@ -1,4 +1,4 @@
-import { ReviewInspectorSections } from './inspector-sections';
+import { ReviewInspectorSections, reviewInspectorActions } from './inspector-sections';
 import {
   HistoryFilters,
   queryHistory,
@@ -21,7 +21,7 @@ import {
 } from '../../features/video/project/action-feedback/key-animation';
 import { reviewKeySections } from './key-animation-fields';
 import { memo, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, RotateCcw } from 'lucide-react';
 import { translate, formatNumber, useAppLocale } from '../../platform/i18n';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import type { RecordingTelemetryCapabilities } from '../../features/video/project/types';
@@ -311,20 +311,24 @@ function HistoryAnimationFields(props: {
     : [];
   const mixed = clickSections.length > 0 && keySections.length > 0;
   const sections = [
-    ...clickSections.map((section) => ({
-      ...section,
-      id: `click:${section.id}`,
-      label: mixed
-        ? `${translate('gallery.videoReview.historyClicks')} · ${section.label}`
-        : section.label,
-    })),
-    ...keySections.map((section) => ({
-      ...section,
-      id: `key:${section.id}`,
-      label: mixed
-        ? `${translate('gallery.videoReview.historyKeys')} · ${section.label}`
-        : section.label,
-    })),
+    ...clickSections
+      .filter((section) => section.id !== 'actions')
+      .map((section) => ({
+        ...section,
+        id: `click:${section.id}`,
+        label: mixed
+          ? `${translate('gallery.videoReview.historyClicks')} · ${section.label}`
+          : section.label,
+      })),
+    ...keySections
+      .filter((section) => section.id !== 'actions')
+      .map((section) => ({
+        ...section,
+        id: `key:${section.id}`,
+        label: mixed
+          ? `${translate('gallery.videoReview.historyKeys')} · ${section.label}`
+          : section.label,
+      })),
     ...(props.onAudioChange && props.audioTargets.length
       ? [
           reviewActionAudioSection(
@@ -340,6 +344,24 @@ function HistoryAnimationFields(props: {
         ]
       : []),
   ];
+  if (clickIds.length || props.keyIds.length)
+    sections.push(
+      reviewInspectorActions(
+        <ReviewButton
+          selectionAction="reset"
+          label={translate('gallery.videoReview.selectionReset')}
+          disabled={props.busy}
+          className={`${reviewTextButtonClassName} !w-full justify-start`}
+          onClick={() => {
+            if (clickIds.length) props.onChange(clickIds, null);
+            if (props.keyIds.length) props.onKeyChange?.(props.keyIds, null);
+          }}
+        >
+          <RotateCcw size={15} aria-hidden="true" />
+          <span>{translate('gallery.videoReview.selectionReset')}</span>
+        </ReviewButton>
+      )
+    );
   const disclosureIcons = new Set<(typeof sections)[number]['icon']>();
   const displayedSections = sections.map((section) => {
     if (!mixed) return section;
@@ -358,12 +380,7 @@ function HistoryAnimationFields(props: {
             : 'gallery.videoReview.historyAudioFields'
       }
     >
-      <ReviewInspectorSections
-        sections={[
-          ...displayedSections.filter((section) => !section.id.endsWith(':actions')),
-          ...displayedSections.filter((section) => section.id.endsWith(':actions')),
-        ]}
-      />
+      <ReviewInspectorSections sections={displayedSections} />
     </div>
   );
 }

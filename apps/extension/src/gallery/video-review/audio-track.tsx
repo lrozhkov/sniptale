@@ -1,3 +1,4 @@
+import { reviewTimelineHint } from './timeline-hints';
 import { useReviewTimelineSnap, type ReviewTimelineSnap } from './timeline-magnets';
 import { ReviewTrackVisibilityButton } from './track-row';
 import { reviewTrackMetrics, ReviewTrackRow, ReviewTrackCuts } from './track-row';
@@ -16,6 +17,8 @@ import {
   reviewVoiceoverOffset,
 } from '../../features/video/review/voiceover-edits';
 import {
+  memo,
+  useLayoutEffect,
   useCallback,
   useMemo,
   useEffect,
@@ -27,7 +30,7 @@ import {
   type ReactNode,
 } from 'react';
 import { Volume2, VolumeX, AudioLines, Music } from 'lucide-react';
-import { translate } from '../../platform/i18n';
+import { translate, useAppLocale } from '../../platform/i18n';
 import type {
   QuickEditAudioClip,
   QuickEditAudioState,
@@ -99,7 +102,8 @@ type ReviewAudioTimelineProps = {
   ): void;
 };
 
-type ReviewAudioClipLaneProps = ReviewAudioTimelineProps & {
+type ReviewAudioClipLaneProps = Omit<ReviewAudioTimelineProps, 'snapTimes'> & {
+  getSnapTimes(): readonly number[];
   lane: ReviewAudioLane;
   label: string;
   clips: readonly QuickEditAudioClip[];
@@ -143,7 +147,7 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
         const clip = retimeReviewVoiceover(stored, props.voiceoverSegments);
         const shown = preview?.clip.id === clip.id ? preview.clip : clip;
         const pieces =
-          props.lane === 'music' && props.projection
+          props.lane === 'music' && props.projection && shown.timeDomain !== 'result'
             ? props.projection.slices(shown.timelineStart, shown.timelineStart + shown.duration)
             : [undefined];
         return { clip, shown, pieces };
@@ -193,7 +197,13 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
     setPreview(null);
     if (current?.node.hasPointerCapture(current.pointerId))
       current.node.releasePointerCapture(current.pointerId);
-    if (!current || !shown || !current.moved) return;
+    if (!current) return;
+    if (!current.moved) {
+      if (current.edge === 'move') current.admission.select();
+      else current.admission.cancel();
+      return;
+    }
+    if (!shown) return;
     const assetId = props.clips.find((clip) => clip.id === current.original.id)?.assetId ?? '';
     const assetDuration =
       props.assets?.get(assetId)?.duration ?? props.waveforms?.get(assetId)?.duration;
@@ -206,11 +216,15 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
       else props.onMoveClip(current.lane, current.original.id, range.start);
     });
   };
-  const rows = reviewAudioClipRows(
-    props.clips.map((stored) => ({
-      id: stored.id,
-      ...reviewVoiceoverRange(retimeReviewVoiceover(stored, props.voiceoverSegments)),
-    }))
+  const rows = useMemo(
+    () =>
+      reviewAudioClipRows(
+        props.clips.map((stored) => ({
+          id: stored.id,
+          ...reviewVoiceoverRange(retimeReviewVoiceover(stored, props.voiceoverSegments)),
+        }))
+      ),
+    [props.clips, props.voiceoverSegments]
   );
   const rowCount = Math.max(1, ...[...rows.values()].map((row) => row + 1));
   return (
@@ -218,13 +232,7 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
       track={props.lane}
       muted={props.clips.length > 0 && props.clips.every((clip) => clip.muted)}
       label={props.label}
-      icon={
-        props.lane === 'music' ? (
-          <Music size={14} aria-hidden />
-        ) : (
-          <AudioLines size={14} aria-hidden />
-        )
-      }
+      icon={props.lane === 'music' ? Music : AudioLines}
       controls={props.trailing}
     >
       <div
@@ -248,11 +256,19 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
               label={props.label}
               assets={props.assets}
               waveforms={props.waveforms}
-              projection={props.projection}
+              projection={
+                clip.timeDomain === 'result'
+                  ? (props.cutsProjection ?? props.projection)
+                  : props.projection
+              }
               sourceProjection={props.cutsProjection}
               voiceoverSegments={props.voiceoverSegments}
-              snapTimes={props.snapTimes}
-              duration={props.duration}
+              getSnapTimes={props.getSnapTimes}
+              duration={
+                clip.timeDomain === 'result'
+                  ? (props.cutsProjection?.resultDuration ?? props.duration)
+                  : props.duration
+              }
               drag={drag}
               lane={props.lane}
               clips={props.clips}
@@ -293,7 +309,7 @@ type ReviewAudioClipBlockProps = {
   label: string;
   duration: number;
   projection?: ReviewTrackProjection | undefined;
-  snapTimes?: readonly number[] | undefined;
+  getSnapTimes(): readonly number[];
   waveforms?: ReadonlyMap<string, ReviewWaveform> | undefined;
   assets?: ReadonlyMap<string, ReviewAudioAsset> | undefined;
   drag: MutableRefObject<AudioDragState | null>;
@@ -326,6 +342,14 @@ function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
       data-review-removal-key={`audio:${clip.id}`}
       tabIndex={0}
       aria-label={accessibleLabel}
+      data-review-hint={reviewTimelineHint(
+        props.label,
+        shownRange.start,
+        shownRange.end,
+        [filename, props.cutSuppressed ? translate('gallery.videoReview.voiceoverCut') : '']
+          .filter(Boolean)
+          .join('\n')
+      )}
       data-cut-suppressed={props.cutSuppressed ? 'true' : 'false'}
       title={
         props.cutSuppressed
@@ -413,7 +437,11 @@ function reviewAudioClipGesture(
     onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => {
       if (event.button !== 0 || props.busy) return;
       event.stopPropagation();
-      const admission = deferReviewGesture(props.beforeAction, () => props.onSelect(clip.id));
+      const admission = deferReviewGesture(
+        props.beforeAction,
+        () => props.onSelect(clip.id),
+        'click'
+      );
       const edge =
         event.target instanceof Element
           ? event.target.closest('[data-audio-edge]')?.getAttribute('data-audio-edge')
@@ -443,12 +471,26 @@ function reviewAudioClipGesture(
       const current = props.drag.current;
       if (!current || current.width <= 0) return;
       current.moved ||= Math.abs(event.clientX - current.x) > 3;
+      const display = props.sourceProjection?.display ?? props.projection?.display;
+      const reference =
+        current.original.timelineStart + (current.edge === 'end' ? current.original.duration : 0);
       const delta =
-        props.projection?.delta(
-          current.sourceAtPointer,
-          event.clientX - current.x,
-          current.width
-        ) ?? ((event.clientX - current.x) / current.width) * props.duration;
+        current.original.timeDomain === 'result' && display
+          ? display.displayToResult(
+              Math.max(
+                0,
+                Math.min(
+                  display.duration,
+                  display.resultToDisplay(reference, current.edge === 'end' ? 'end' : 'start') +
+                    ((event.clientX - current.x) * display.duration) / current.width
+                )
+              )
+            ) - reference
+          : (props.projection?.delta(
+              current.sourceAtPointer,
+              event.clientX - current.x,
+              current.width
+            ) ?? ((event.clientX - current.x) / current.width) * props.duration);
       const stored = props.clips.find((item) => item.id === current.original.id);
       if (!stored) return;
       const original = retimeReviewVoiceover(stored, props.voiceoverSegments);
@@ -456,7 +498,7 @@ function reviewAudioClipGesture(
       const base = { ...original, timelineStart: range.start, duration: range.end - range.start };
       const threshold = event.altKey ? -1 : (SNAP_THRESHOLD_PX * props.duration) / current.width;
       const candidates = [
-        ...(props.snapTimes ?? []),
+        ...props.getSnapTimes(),
         ...props.clips
           .filter((clip) => clip.id !== base.id && !clip.dormant)
           .flatMap((clip) => {
@@ -581,7 +623,73 @@ export function ReviewAudioTrack(props: ReviewAudioTrackProps) {
   );
 }
 
+type ReviewClipLanesPresentationProps = Omit<ReviewClipLanesProps, 'audio' | 'snapTimes'> &
+  Pick<QuickEditAudioState, 'voiceover' | 'music'> & {
+    voiceoverSegments?: QuickEditAudioState['voiceoverSegments'] | undefined;
+    getSnapTimes(): readonly number[];
+  };
+
+/** Only committed audio commands and activation-time magnets cross the presentation boundary. */
 function ReviewClipLanes(props: ReviewClipLanesProps) {
+  const receivers = {
+    beforeAction: props.beforeAction,
+    onSelect: props.onSelect,
+    onMoveClip: props.onMoveClip,
+    onTrimClip: props.onTrimClip,
+    onImportFile: props.onImportFile,
+    onMuteLane: props.onMuteLane,
+    snapTimes: props.snapTimes,
+  };
+  const committed = useRef(receivers);
+  useLayoutEffect(() => {
+    committed.current = receivers;
+  });
+  const commands = useMemo(
+    () => ({
+      beforeAction: ((action) => {
+        const before = committed.current.beforeAction;
+        if (before) before(action);
+        else action();
+      }) satisfies ReviewBeforeAction,
+      onSelect: (id: string | null) => committed.current.onSelect(id),
+      onMoveClip: (...args: Parameters<ReviewAudioTimelineProps['onMoveClip']>) =>
+        committed.current.onMoveClip(...args),
+      onTrimClip: (...args: Parameters<ReviewAudioTimelineProps['onTrimClip']>) =>
+        committed.current.onTrimClip(...args),
+      onImportFile: (...args: Parameters<ReviewClipLanesProps['onImportFile']>) =>
+        committed.current.onImportFile(...args),
+      onMuteLane: (lane: ReviewAudioLane) => committed.current.onMuteLane?.(lane),
+      getSnapTimes: () => committed.current.snapTimes ?? [],
+    }),
+    []
+  );
+  return (
+    <ReviewClipLanesPresentation
+      compact={props.compact}
+      lane={props.lane}
+      voiceover={props.audio.voiceover}
+      music={props.audio.music}
+      voiceoverSegments={props.audio.voiceoverSegments}
+      assets={props.assets}
+      waveforms={props.waveforms}
+      projection={props.projection}
+      duration={props.duration}
+      selectedId={props.selectedId}
+      busy={props.busy}
+      {...commands}
+      onMuteLane={props.onMuteLane ? commands.onMuteLane : undefined}
+    />
+  );
+}
+
+const ReviewClipLanesPresentation = memo(function ReviewClipLanesPresentation(
+  props: ReviewClipLanesPresentationProps
+) {
+  useAppLocale();
+  const anchoredProjection = useMemo(
+    () => (props.projection ? { ...props.projection, ...props.projection.focus } : undefined),
+    [props.projection]
+  );
   return (
     <>
       {LANES.map((lane) =>
@@ -591,29 +699,24 @@ function ReviewClipLanes(props: ReviewClipLanesProps) {
             key={lane.key}
             lane={lane.key}
             label={translate(lane.label)}
-            clips={props.audio[lane.key]}
-            voiceoverSegments={props.audio.voiceoverSegments}
+            clips={props[lane.key]}
+            voiceoverSegments={props.voiceoverSegments}
             assets={props.assets}
             waveforms={props.waveforms}
             projection={
-              props.audio[lane.key].some((clip) => clip.sourceAnchor) &&
-              props.audio.voiceoverSegments
-                ? props.projection
-                  ? { ...props.projection, ...props.projection.focus }
-                  : undefined
+              props[lane.key].some((clip) => clip.sourceAnchor) && props.voiceoverSegments
+                ? anchoredProjection
                 : props.projection
             }
             cutsProjection={props.projection}
-            snapTimes={
-              props.audio[lane.key].some((clip) => clip.sourceAnchor) &&
-              props.audio.voiceoverSegments
-                ? props.snapTimes?.map((time) => props.projection?.source(time) ?? time)
-                : props.snapTimes
+            getSnapTimes={() =>
+              props[lane.key].some((clip) => clip.sourceAnchor) && props.voiceoverSegments
+                ? props.getSnapTimes().map((time) => props.projection?.source(time) ?? time)
+                : props.getSnapTimes()
             }
             duration={
-              props.audio[lane.key].some((clip) => clip.sourceAnchor) &&
-              props.audio.voiceoverSegments
-                ? props.audio.voiceoverSegments.at(-1)!.sourceEnd
+              props[lane.key].some((clip) => clip.sourceAnchor) && props.voiceoverSegments
+                ? props.voiceoverSegments.at(-1)!.sourceEnd
                 : props.duration
             }
             beforeAction={props.beforeAction}
@@ -631,25 +734,22 @@ function ReviewClipLanes(props: ReviewClipLanesProps) {
                   <ReviewTrackVisibilityButton
                     track={lane.key}
                     label={translate('gallery.videoReview.audioEnabled')}
-                    aria-pressed={
-                      props.audio[lane.key].length > 0 &&
-                      props.audio[lane.key].some((clip) => !clip.muted)
+                    enabled={
+                      props[lane.key].length > 0 && props[lane.key].some((clip) => !clip.muted)
                     }
-                    disabled={props.busy || !props.audio[lane.key].length}
+                    disabled={props.busy || !props[lane.key].length}
                     className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-                    onClick={() =>
+                    onToggle={() =>
                       (props.beforeAction ?? ((action) => action()))(() =>
                         props.onMuteLane?.(lane.key)
                       )
                     }
-                  >
-                    {props.audio[lane.key].length > 0 &&
-                    props.audio[lane.key].every((clip) => clip.muted) ? (
-                      <VolumeX size={14} />
-                    ) : (
-                      <Volume2 size={14} />
-                    )}
-                  </ReviewTrackVisibilityButton>
+                    icon={
+                      props[lane.key].length > 0 && props[lane.key].every((clip) => clip.muted)
+                        ? VolumeX
+                        : Volume2
+                    }
+                  />
                 ) : null}
               </>
             }
@@ -658,7 +758,7 @@ function ReviewClipLanes(props: ReviewClipLanesProps) {
       )}
     </>
   );
-}
+});
 
 /** Magnetic alignment uses the lane coordinate scale. */
 function ReviewAudioLaneStatus(props: { guide: number | null; duration: number }) {

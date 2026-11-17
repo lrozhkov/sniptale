@@ -261,7 +261,7 @@ it('keeps toolbar menus above the Design Review comment popover', () => {
     toolbarMenuSurfaceStylesheet.match(/\.sniptale-popover-menu\s*\{[^}]*z-index:\s*(\d+);/su)?.[1]
   );
   const openToolbarRootLayer = Number(
-    toolbarMenuSurfaceStylesheet.match(
+    contentRuntimeEffectsStylesheet.match(
       /\.sniptale-app:has\(\.sniptale-toolbar\[data-menu-open='true'\]\)\s*\{[^}]*z-index:\s*(\d+);/su
     )?.[1]
   );
@@ -272,31 +272,31 @@ it('keeps toolbar menus above the Design Review comment popover', () => {
 });
 
 it('keeps open main-toolbar menus above the page without disabling toolbar controls', () => {
-  expect(toolbarMenuSurfaceStylesheet).toMatch(
+  expect(contentRuntimeEffectsStylesheet).toMatch(
     /\.sniptale-toolbar-menu-interaction-guard\s*\{[^}]*position:\s*fixed;[^}]*pointer-events:\s*auto;/su
   );
-  expect(toolbarMenuSurfaceStylesheet).toMatch(
+  expect(contentRuntimeEffectsStylesheet).toMatch(
     /\.sniptale-toolbar\[data-menu-open='true'\]\s*\{[^}]*pointer-events:\s*auto\s*!important;/su
   );
-  expect(toolbarMenuSurfaceStylesheet).toMatch(
+  expect(contentRuntimeEffectsStylesheet).toMatch(
     /\.sniptale-toolbar\[data-menu-open='true'\][^{]*\.sniptale-popover-menu\s*\{[^}]*pointer-events:\s*auto\s*!important;/su
   );
-  expect(toolbarMenuSurfaceStylesheet).toMatch(
+  expect(contentRuntimeEffectsStylesheet).toMatch(
     /\.sniptale-toolbar-positioner:has\(> \.sniptale-toolbar\[data-menu-open='true'\]\)\s*\{[^}]*z-index:\s*2147483646;[^}]*pointer-events:\s*auto;/su
   );
-  expect(toolbarMenuSurfaceStylesheet).toContain('.sniptale-main-toolbar-popover');
-  expect(toolbarMenuSurfaceStylesheet).toContain(':not(#sniptale-resize-handles-portal)');
-  expect(toolbarMenuSurfaceStylesheet).toContain(':not(#sniptale-frame-size-panel-portal)');
-  expect(toolbarMenuSurfaceStylesheet).toContain(':has(> .sniptale-main-toolbar-popover)');
-  expect(toolbarMenuSurfaceStylesheet).toContain(':not(.sniptale-modal)');
-  expect(toolbarMenuSurfaceStylesheet).toMatch(/:not\(\s*\.sniptale-modal-backdrop\s*\)/su);
-  expect(toolbarMenuSurfaceStylesheet).toMatch(
+  expect(contentRuntimeEffectsStylesheet).toContain('.sniptale-main-toolbar-popover');
+  expect(contentRuntimeEffectsStylesheet).toContain(':not(#sniptale-resize-handles-portal)');
+  expect(contentRuntimeEffectsStylesheet).toContain(':not(#sniptale-frame-size-panel-portal)');
+  expect(contentRuntimeEffectsStylesheet).toContain(':has(> .sniptale-main-toolbar-popover)');
+  expect(contentRuntimeEffectsStylesheet).toContain(':not(.sniptale-modal)');
+  expect(contentRuntimeEffectsStylesheet).toMatch(/:not\(\s*\.sniptale-modal-backdrop\s*\)/su);
+  expect(contentRuntimeEffectsStylesheet).toMatch(
     /:is\(\.sniptale-modal-backdrop, \.sniptale-modal\)\s*\{[^}]*z-index:\s*2147483647\s*!important;/su
   );
 });
 
 it('keeps auto-blur modal interaction exclusive over frame overlay controls', () => {
-  expect(toolbarMenuSurfaceStylesheet).toMatch(
+  expect(contentRuntimeEffectsStylesheet).toMatch(
     /#sniptale-content-app-root:has\(\.sniptale-auto-blur-modal\)[^{]*#sniptale-content-overlay-root[^{]*\{[^}]*z-index:\s*2147483645\s*!important;[^}]*pointer-events:\s*none\s*!important;/su
   );
 });

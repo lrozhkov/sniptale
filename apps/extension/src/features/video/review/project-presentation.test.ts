@@ -164,6 +164,32 @@ it('converts active image/video bookends and retained variants into independent 
   expect(input).toEqual(before);
 });
 
+it('retains a newer Native schema when a video bookend needs a frame-aligned playback window', () => {
+  const input = bookendFixture();
+  input.seed.version = 56;
+  input.document.edits = [
+    {
+      id: 'subframe-cut',
+      kind: 'cut',
+      start: 3,
+      end: 4.017,
+      requestedStart: 3,
+      requestedEnd: 4.017,
+    },
+  ];
+  const settings = input.document.advancedContent.presentation!;
+  settings.intro = {
+    ...settings.intro,
+    mode: 'video',
+    video: { ...settings.intro.video!, trim: { start: 1, end: 1.15 } },
+  };
+  const result = planReviewProjectConversion(input);
+  if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+  expect(result.project.clips.some((clip) => clip.playbackWindow !== undefined)).toBe(true);
+  expect(result.project.version).toBe(56);
+  expect(isExportReadyVideoProject(result.project)).toBe(true);
+});
+
 it.each(['basic', 'none'] as const)(
   'retains all bookend bytes and settings in %s without creating hidden timeline content',
   (mode) => {

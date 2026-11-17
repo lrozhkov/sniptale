@@ -1,4 +1,6 @@
 import type { CompositionJoinSettings } from '../../features/video/project/scene/composition-join';
+import { reviewEditInsertionRange } from './range-placement';
+import { reviewCommandInsertion, type ReviewCommandContext } from './command-context';
 import { useRef, useState } from 'react';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import {
@@ -19,33 +21,51 @@ export function useReviewEdits(props: {
   pause(): void;
   seek(value: number): void;
   setSelection(value: ReviewAnchor): void;
-  commit(before: ReviewEdit | null, after: ReviewEdit | null): Promise<boolean>;
+  commit(
+    before: ReviewEdit | null,
+    after: ReviewEdit | null,
+    context?: ReviewCommandContext
+  ): Promise<boolean>;
   selectedEditId?: string | null;
   selectedObject?: boolean;
-  onSelectedEditIdChange?(id: string | null): void;
+  onSelectedEditIdChange?(id: string | null, context?: ReviewCommandContext): void;
 }) {
   const pending = useRef(false);
   const [mode, setMode] = useState<'cut' | 'speed' | null>(null);
   const [localSelectedEditId, setLocalSelectedEditId] = useState<string | null>(null);
   const selectedEditId =
     props.selectedEditId === undefined ? localSelectedEditId : props.selectedEditId;
-  const setSelectedEditId = (id: string | null) => {
+  const setSelectedEditId = (id: string | null, context?: ReviewCommandContext) => {
     if (props.selectedEditId === undefined) setLocalSelectedEditId(id);
-    props.onSelectedEditIdChange?.(id);
+    props.onSelectedEditIdChange?.(id, context);
   };
   const [rate, setRate] = useState<Speed['rate']>(2);
   const [audio, setAudio] = useState<Speed['audio']>('speed');
   const selected = props.edits.find((edit) => edit.id === selectedEditId) ?? null;
-  const toggle = async (kind: 'cut' | 'speed' = 'cut') => {
-    props.pause();
-    if (!selected && !props.selectedObject && props.selection?.kind === 'range')
-      return commitRange(props.selection, null, kind);
-    setMode(mode === kind ? null : kind);
+  const toggle = async (kind: 'cut' | 'speed' = 'cut', context?: ReviewCommandContext) => {
+    if (!context) props.pause();
+    const insertion = context ? reviewCommandInsertion(context, 'source') : null;
+    if (context && !insertion) return false;
+    const selection = insertion?.range
+      ? { kind: 'range' as const, ...insertion.range }
+      : insertion
+        ? { kind: 'point' as const, time: insertion.time }
+        : props.selection;
+    const range = reviewEditInsertionRange(
+      kind,
+      selection?.kind === 'point' ? selection.time : (selection?.start ?? 0),
+      insertion?.duration ?? props.duration,
+      context?.document.edits ?? props.edits,
+      selection?.kind === 'range' ? selection : null
+    );
+    if (range) return commitRange(range, null, kind, context);
+    props.onInvalid?.();
   };
   const candidate = (
     kind: 'cut' | 'speed',
     selection: ReviewAnchor,
-    before: ReviewEdit | null = null
+    before: ReviewEdit | null = null,
+    context?: ReviewCommandContext
   ) => {
     const movedRange =
       before &&
@@ -56,8 +76,8 @@ export function useReviewEdits(props: {
             current: before,
             requestedStart: selection.start,
             boundaries: props.boundaries ?? [],
-            duration: props.duration,
-            edits: props.edits,
+            duration: context?.scope.sourceDuration ?? props.duration,
+            edits: context?.document.edits ?? props.edits,
           })
         : null;
     const range = {
@@ -65,8 +85,8 @@ export function useReviewEdits(props: {
       selection: movedRange ? { kind: 'range' as const, ...movedRange } : selection,
       boundaries: props.boundaries ?? [],
       snapToKeyframes: props.snapToKeyframes !== false,
-      duration: props.duration,
-      edits: props.edits.filter((edit) => edit.id !== before?.id),
+      duration: context?.scope.sourceDuration ?? props.duration,
+      edits: (context?.document.edits ?? props.edits).filter((edit) => edit.id !== before?.id),
     };
     return kind === 'speed'
       ? createReviewSpeed({
@@ -79,11 +99,12 @@ export function useReviewEdits(props: {
   const commitRange = async (
     selection: ReviewAnchor,
     before: ReviewEdit | null = null,
-    requestedKind?: 'cut' | 'speed'
+    requestedKind?: 'cut' | 'speed',
+    context?: ReviewCommandContext
   ) => {
     const kind = before?.kind ?? requestedKind ?? mode;
     if (!kind || kind === 'freeze' || pending.current) return false;
-    const planned = candidate(kind, selection, before);
+    const planned = candidate(kind, selection, before, context);
     const after = planned && {
       ...planned,
       id: before?.id ?? crypto.randomUUID(),
@@ -94,14 +115,16 @@ export function useReviewEdits(props: {
       return false;
     }
     if (before && after.start === before.start && after.end === before.end) return true;
-    props.pause();
+    if (!context) props.pause();
     pending.current = true;
     try {
-      if (await props.commit(before, after)) {
+      if (await props.commit(before, after, context)) {
         if (!before) setMode(null);
-        setSelectedEditId(after.id);
-        props.setSelection({ kind: 'point', time: after.start });
-        if (!before) props.seek(after.start);
+        if (!before) {
+          setSelectedEditId(after.id, context);
+          props.setSelection({ kind: 'point', time: after.start });
+          props.seek(after.start);
+        }
         return true;
       }
       return false;
@@ -131,6 +154,25 @@ export function useReviewEdits(props: {
         ? props.commit(selected, { ...selected, audio: value })
         : undefined,
     selected,
+    moveFreeze: (edit: ReviewEdit, time: number) => {
+      if (
+        edit.kind !== 'freeze' ||
+        !Number.isFinite(time) ||
+        time < 0 ||
+        time > props.duration ||
+        props.edits.some((item) => item.kind === 'cut' && item.start <= time && time < item.end)
+      )
+        return;
+      props.pause();
+      if (Math.abs(edit.start - time) < 1e-7) return;
+      return props.commit(edit, {
+        ...edit,
+        start: time,
+        end: time,
+        requestedStart: time,
+        requestedEnd: time,
+      });
+    },
     changeFreezeDuration,
     changeSelectedFreezeDuration: (duration: number) =>
       selected ? changeFreezeDuration(selected, duration) : undefined,
@@ -147,15 +189,14 @@ export function useReviewEdits(props: {
     setCutting: (value: boolean) => {
       setMode(value ? 'cut' : null);
     },
-    select: (edit: ReviewEdit) => {
-      props.pause();
-      setSelectedEditId(edit.id);
+    select: (edit: ReviewEdit, context?: ReviewCommandContext) => {
+      if (!context) props.pause();
+      setSelectedEditId(edit.id, context);
       props.setSelection(
         edit.kind === 'freeze'
           ? { kind: 'point', time: edit.start }
           : { kind: 'range', start: edit.start, end: edit.end }
       );
-      props.seek(edit.start);
     },
     toggle,
     remove: () => {

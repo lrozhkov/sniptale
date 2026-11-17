@@ -235,3 +235,40 @@ it('still refuses negative, nonfinite and unsafe audio clock intervals after pri
     expect(() => handle.start(when, 24000)).toThrow('invalid');
   handle.dispose();
 });
+
+it.each([19200, 24000])(
+  'admits a refreshed start at frame %s beyond the initial primed PCM',
+  async (startFrame) => {
+    const f = fixture(),
+      handle = await createAudioProcessingWorklet(f.options),
+      node = Node.instances[0]!;
+    const primed = handle.prime(0);
+    node.emit({ kind: 'primed', generation: 3, startFrame: 0, bufferedFrames: 19200 });
+    await primed;
+    expect(() => handle.start(1.1, 48000, startFrame)).not.toThrow();
+    expect(node.port.postMessage).toHaveBeenLastCalledWith(
+      { kind: 'play', generation: 3, whenFrame: 52801, startFrame, endFrame: 48000 },
+      []
+    );
+    expect(f.options.onError).not.toHaveBeenCalled();
+    handle.dispose();
+  }
+);
+
+it.each([
+  { startFrame: 11999, endFrame: 48000 },
+  { startFrame: 12000, endFrame: 48001 },
+  { startFrame: 24000, endFrame: 24000 },
+])('refuses an invalid refreshed playback interval %j', async ({ startFrame, endFrame }) => {
+  const f = fixture(),
+    handle = await createAudioProcessingWorklet(f.options),
+    node = Node.instances[0]!;
+  const primed = handle.prime(12000);
+  node.emit({ kind: 'primed', generation: 3, startFrame: 12000, bufferedFrames: 19200 });
+  await primed;
+  expect(() => handle.start(1.1, endFrame, startFrame)).toThrow('invalid');
+  expect(
+    node.port.postMessage.mock.calls.filter(([message]) => message.kind === 'play')
+  ).toHaveLength(0);
+  handle.dispose();
+});

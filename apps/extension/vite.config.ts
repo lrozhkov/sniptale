@@ -3,7 +3,10 @@ import { compactColorCatalog } from './build/color-catalog.ts';
 import { glTransitions } from './build/gl-transitions.ts';
 import { lottieSchema } from './build/lottie-schema.ts';
 import { normalizeMediabunny } from '../../tooling/ci/mediabunny/normalize.mjs';
-import { createZodRuntimeFallbackPlugin } from './build/injected-build-support.ts';
+import {
+  createBlobOnlyInlineWorkerPlugin,
+  createZodRuntimeFallbackPlugin,
+} from './build/injected-build-support.ts';
 import { i18nCatalogs } from './build/i18n-catalogs.ts';
 import { tourPlayerScript } from './build/tour-player-script.ts';
 import { videoEffectResources } from './build/video-effect-resources.ts';
@@ -154,6 +157,7 @@ export default defineConfig(({ mode }) => ({
     compactColorCatalog(),
     i18nCatalogs(BUILD_LAYOUT.repositoryRoot),
     createZodRuntimeFallbackPlugin(),
+    createBlobOnlyInlineWorkerPlugin(),
     tourPlayerScript(),
     videoEffectResources(join(APP_ROOT, 'public/video-effects')),
     lottieSchema(),

@@ -180,9 +180,6 @@ function LensShapeFields(props: {
             onPreview={(size) => props.onPreview?.(size === null ? null : sizePatch(size))}
             onChange={(size) => props.onChange(sizePatch(size))}
           />
-          <p className="m-0 text-[12px] leading-4 text-[var(--sniptale-color-text-secondary)]">
-            {translate('gallery.videoReview.focusLensDiameterHint')}
-          </p>
         </div>
       ) : null}
     </>

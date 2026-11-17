@@ -41,6 +41,45 @@ export function createZodRuntimeFallbackPlugin(): Plugin {
   };
 }
 
+/** Keep the fixed effect sandbox worker inside its blob-only CSP. */
+export function createBlobOnlyInlineWorkerPlugin(): Plugin {
+  return {
+    name: 'sniptale:blob-only-effect-worker',
+    apply: 'build',
+    enforce: 'post',
+    transform(source, id) {
+      if (
+        !id
+          .replaceAll('\\', '/')
+          .endsWith('/apps/extension/src/effect-runtime-sandbox/worker/index.ts?worker&inline')
+      )
+        return null;
+      const firstLineEnd = source.indexOf('\n');
+      const declaration = source.slice(0, firstLineEnd).trimEnd();
+      const wrapper = source.slice(firstLineEnd);
+      if (
+        !declaration.startsWith('const jsContent = ') ||
+        !declaration.endsWith(';') ||
+        !wrapper.includes('export default function WorkerWrapper(options)') ||
+        wrapper.includes('type: "module"')
+      )
+        throw new Error('Fixed effect worker wrapper changed; review its blob-only build adapter.');
+      // Worker construction captures the local script before the URL is revoked. There is
+      // no data-URL retry: preserve the original failure under the existing sandbox CSP.
+      return {
+        code: `${declaration}
+        const blob = new Blob([jsContent], { type: 'text/javascript;charset=utf-8' });
+        export default function WorkerWrapper(options) {
+          const url = URL.createObjectURL(blob);
+          try { return new Worker(url, { name: options?.name }); }
+          finally { URL.revokeObjectURL(url); }
+        }`,
+        map: { mappings: '' },
+      };
+    },
+  };
+}
+
 export function createReleaseSafeDependencyAliasPlugin(repositoryRoot: string): EsbuildPlugin {
   const aliases = new Map([
     ['jszip', join(repositoryRoot, 'node_modules/jszip/lib/index.js')],

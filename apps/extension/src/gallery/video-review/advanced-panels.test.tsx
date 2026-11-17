@@ -179,6 +179,9 @@ it('edits the background paint and the selected zoom region through the panel ca
   act(() => root.render(<Harness />));
   expect(host.querySelector('[data-ui="gallery.videoReview.backgroundInspector"]')).toBeNull();
   await act(async () => button('toggleMode').click());
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-background"]')!.click()
+  );
   expect(host.querySelector('[data-ui="gallery.videoReview.backgroundInspector"]')).not.toBeNull();
   expect(host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')).toBeNull();
 
@@ -191,6 +194,9 @@ it('edits the background paint and the selected zoom region through the panel ca
   await act(async () => button('addZoom').click());
   expect(host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')).not.toBeNull();
   expect(host.querySelector('[data-ui="gallery.videoReview.backgroundInspector"]')).not.toBeNull();
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-framing"]')!.click()
+  );
   const focusX = host.querySelector<HTMLInputElement>(
     '[aria-label="gallery.videoReview.zoomFocusX"]'
   )!;
@@ -626,6 +632,10 @@ it('dispatches shared source filter controls through the Gallery content adapter
         onSourceFilters={onSourceFilters}
       />
     )
+  );
+  expect(host.querySelector('[data-section="canvas"]')).not.toBeNull();
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-source-filters"]')!.click()
   );
   const add = [...host.querySelectorAll('button')].find(
     (item) => item.textContent === translate('videoEditor.sidebar.sourceFiltersAddBloom')

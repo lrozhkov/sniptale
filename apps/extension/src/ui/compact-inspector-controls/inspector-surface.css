@@ -317,7 +317,7 @@
 }
 .sniptale-compact-workspace .sniptale-parameter-row {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, var(--sniptale-parameter-name-fit, 0.9fr)) minmax(0, 1.1fr);
   align-items: center;
   min-width: 0;
   min-height: var(--sniptale-parameter-row-height);
@@ -331,6 +331,11 @@
   grid-template-columns: minmax(0, 1fr);
   padding-bottom: 0;
   gap: 4px;
+}
+/* Numeric values keep a compact trailing column so long names can use the remaining space. */
+.sniptale-compact-workspace
+  [data-ui='shared.ui.compact-inspector.numeric-row'].sniptale-parameter-row {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 100px);
 }
 .sniptale-compact-workspace
   .sniptale-parameter-row[data-layout='stacked']

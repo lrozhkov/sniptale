@@ -57,6 +57,9 @@ export interface QuickEditTrackVisibility {
 export interface QuickEditUiState {
   /** Project workspace appearance, independent of authored scene and history. */
   workspaceColors?: Partial<Record<'light' | 'dark', string>>;
+  /** Project-scoped timeline interaction preferences; missing legacy fields mean enabled. */
+  liveSeekEnabled?: boolean;
+  annotationMagnetEnabled?: boolean;
   mode: 'basic' | 'advanced';
   modeSelectionPending?: boolean;
   /** First entry reveals editing lanes; later mode switches preserve their settings. */
@@ -103,6 +106,7 @@ export interface QuickEditCameraTransform {
  * matching the shared ReviewTimeMap coordinate domain.
  */
 export interface QuickEditZoomRegion {
+  timeDomain?: 'result';
   /** Independent spatial effect; it never occupies or moves the zoom camera. */
   effect?: '3d';
   /** Derived source clock for a cut/rate slice; storage admission drops this field. */
@@ -211,6 +215,7 @@ export type QuickEditBackgroundSettings = {
 /** One voiceover or music clip; timeline coordinates are seconds like the video domain. */
 
 export interface QuickEditAudioClip {
+  timeDomain?: 'result';
   audioProcessing?: import('@sniptale/runtime-contracts/audio-effects').AudioProcessing;
   /** Immutable text association; deleting or editing text does not delete this audio. */
   textSnapshot?: import('../text-types').ReviewVoiceTextSnapshot;

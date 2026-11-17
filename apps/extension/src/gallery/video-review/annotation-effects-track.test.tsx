@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
 import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
-import { act } from 'react';
+import { act, Suspense, startTransition } from 'react';
+import { ReviewPlaybackPresentationClockContext } from './playback-presentation-clock';
+import { createReviewPlaybackPresentationClock } from './playback-presentation-clock.test-support';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
 import { ReviewAnnotationEffectsTrack } from './annotation-effects-track';
+import * as i18n from '../../platform/i18n';
 
 let host: HTMLDivElement;
 let root: Root;
@@ -148,7 +151,7 @@ it.each(['body', 'start', 'end'])(
     expect(begin).toHaveBeenCalledWith('first');
     expect(preview).toHaveBeenCalled();
     expect(commit).toHaveBeenCalledOnce();
-    expect(select).toHaveBeenCalledWith('first');
+    expect(select).not.toHaveBeenCalled();
   }
 );
 
@@ -330,4 +333,102 @@ it('Escape cancels admission retained after pointer-up without later beginning o
   expect(cancel).toHaveBeenCalledTimes(1);
   expect(begin).not.toHaveBeenCalled();
   expect(commit).not.toHaveBeenCalled();
+});
+
+it('keeps annotation presentation asleep for unrelated seek time and fresh command receivers', () => {
+  const instances = [item('first')];
+  const snapshots: Parameters<typeof ReviewAnnotationEffectsTrack>[0]['snapshots'] = [];
+  const first = vi.fn();
+  const latest = vi.fn();
+  const place = vi.fn();
+  const calls = vi.spyOn(i18n, 'translate');
+  render({ instances, snapshots, drawing: true, time: 1, onSelect: first, onPlace: place });
+  const initial = calls.mock.calls.filter(
+    ([key]) => key === 'gallery.videoReview.annotationEffects'
+  ).length;
+  const lane = render({
+    instances,
+    snapshots,
+    drawing: true,
+    time: 7,
+    snapTimes: [8],
+    onSelect: latest,
+    onPlace: place,
+  });
+  expect
+    .soft(calls.mock.calls.filter(([key]) => key === 'gallery.videoReview.annotationEffects'))
+    .toHaveLength(initial);
+  act(() => lane.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(place).toHaveBeenLastCalledWith({ start: 7 }, lane);
+  act(() =>
+    lane
+      .querySelector('[data-annotation-effect-id]')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  );
+  expect(latest).toHaveBeenCalledWith('first');
+  expect(first).not.toHaveBeenCalled();
+});
+
+it('uses the live gesture clock and rejects receivers from an abandoned annotation render', async () => {
+  const clock = createReviewPlaybackPresentationClock(() => false);
+  clock.publish(1);
+  const committed = vi.fn();
+  const abandoned = vi.fn();
+  const latestPlace = vi.fn();
+  const attempted = vi.fn();
+  const instances = [item('first')];
+  const snapshots: Parameters<typeof ReviewAnnotationEffectsTrack>[0]['snapshots'] = [];
+  const pending = new Promise<void>(() => {});
+  function Wait({ suspend }: { suspend: boolean }) {
+    if (suspend) {
+      attempted();
+      throw pending;
+    }
+    return null;
+  }
+  const view = (place: typeof committed, suspend: boolean, busy = false) => (
+    <ReviewPlaybackPresentationClockContext value={clock}>
+      <Suspense fallback={<span data-pending-annotation />}>
+        <ReviewAnnotationEffectsTrack
+          instances={instances}
+          snapshots={snapshots}
+          duration={10}
+          time={0}
+          enabled
+          busy={busy}
+          drawing
+          selectedId="first"
+          snapTimes={[]}
+          onEnabled={enabled}
+          onSelect={select}
+          onBegin={begin}
+          onPreview={preview}
+          onCommit={commit}
+          onCancel={cancel}
+          onPlace={place}
+        />
+        <Wait suspend={suspend} />
+      </Suspense>
+    </ReviewPlaybackPresentationClockContext>
+  );
+  await act(async () => root.render(view(committed, false)));
+  const lane = host.querySelector('[data-ui="gallery.videoReview.annotationEffectsLane"]')!;
+  clock.publish(7);
+  act(() => lane.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(committed).toHaveBeenLastCalledWith({ start: 7 }, lane);
+  await act(async () => {
+    startTransition(() => root.render(view(abandoned, true)));
+  });
+  expect(attempted).toHaveBeenCalled();
+  expect(host.querySelector('[data-pending-annotation]')).toBeNull();
+  clock.publish(8);
+  act(() => lane.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(committed).toHaveBeenLastCalledWith({ start: 8 }, lane);
+  expect(abandoned).not.toHaveBeenCalled();
+  await act(async () => root.render(view(latestPlace, false)));
+  act(() => lane.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(latestPlace).toHaveBeenCalledExactlyOnceWith({ start: 8 }, lane);
+  await act(async () => root.render(view(latestPlace, false, true)));
+  act(() => lane.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(latestPlace).toHaveBeenCalledOnce();
 });

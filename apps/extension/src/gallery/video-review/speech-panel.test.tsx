@@ -278,6 +278,9 @@ async function mount(
       )
     );
   await render(originalSelection);
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-recognition"]')!.click()
+  );
   return { session, proposal, onSelectText, render };
 }
 function button(label: string) {
@@ -327,8 +330,16 @@ it('offers advanced editing after accepted source recognition as an explicit act
 it('disables selected clip sound controls only while Apply is in flight', async () => {
   await mount();
   await recognize();
-  const sound = () =>
-    host.querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.audioInspector"]')!;
+  const sound = () => {
+    act(() =>
+      host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-audio"]')!.click()
+    );
+    return host.querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.audioInspector"]')!;
+  };
+  const recognition = () =>
+    act(() =>
+      host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-recognition"]')!.click()
+    );
   expect(sound().disabled).toBe(false);
   let release!: () => void;
   mocks.apply.mockImplementationOnce(
@@ -337,6 +348,7 @@ it('disables selected clip sound controls only while Apply is in flight', async 
         release = resolve;
       })
   );
+  recognition();
   await click(translate('gallery.videoReview.recognitionApply'));
   expect(sound().disabled).toBe(true);
   await act(async () => release());
@@ -344,7 +356,7 @@ it('disables selected clip sound controls only while Apply is in flight', async 
 });
 it('keeps ordinary audio controls and one compact model form without requesting speech on mount', async () => {
   await mount();
-  expect(host.querySelector('[data-ui="gallery.videoReview.audioInspector"]')).not.toBeNull();
+  expect(host.querySelector('[role="tab"][aria-controls$="-audio"]')).not.toBeNull();
   expect(button(translate('gallery.videoReview.recognitionStart'))).toBeDefined();
   expect(host.querySelector('input[type="range"]')).toBeNull();
   expect(host.querySelectorAll('[role="dialog"]')).toHaveLength(0);
@@ -634,6 +646,10 @@ it('shows gain and processing in Basic without starting recognition or model req
   expect(host.textContent).toContain(translate('gallery.videoReview.volume'));
   expect(host.textContent).not.toContain(translate('gallery.videoReview.recognitionTitle'));
   expect(host.querySelector('[data-ui="gallery.videoReview.speechRecognition"]')).toBeNull();
+  expect(host.querySelector('[data-ui="audio.processing-fields"]')).toBeNull();
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-audio-effects"]')!.click()
+  );
   expect(host.querySelector('[data-ui="audio.processing-fields"]')).not.toBeNull();
   await act(async () =>
     host

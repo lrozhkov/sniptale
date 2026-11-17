@@ -175,9 +175,12 @@ export async function createReviewWebcamRenderer(
       await track.getDecoderConfig()
     );
     async function* sourceFrames(
-      sourceTimes: readonly number[]
+      sourceTimes: readonly number[],
+      resultTimes?: readonly number[]
     ): AsyncGenerator<ReviewWebcamSourceFrame | null> {
-      const frames = sourceTimes.map((time) => quickEditWebcamFrameAt(webcam, time, duration));
+      const frames = sourceTimes.map((time, index) =>
+        quickEditWebcamFrameAt(webcam, time, duration, resultTimes?.[index])
+      );
       const lastTick = (Math.ceil(duration * resolution) - 1) / resolution;
       const timestamps = frames.flatMap((frame) =>
         frame

@@ -109,6 +109,8 @@ export type ReviewOperation = { id: string; at: number } & (
       preserveVoiceoverAnchors?: true;
       /** Text follows native voiceover timing only for operations that record this policy. */
       preserveTextAnchors?: true;
+      /** Result-time text keeps offsets inside inserted holds; absent on legacy history. */
+      preserveResultText?: true;
       /** New Speed commands restore native sample timing before applying their absolute rate. */
       normalizeVoiceoverTempo?: true;
     }

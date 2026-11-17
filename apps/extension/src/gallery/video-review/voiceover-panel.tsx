@@ -35,6 +35,7 @@ export function ReviewVoiceoverLayer(props: {
       requestCloseRef={voiceover.requestClose}
       opener={voiceover.opener}
       playhead={voiceover.takeStart ?? 0}
+      maximumDuration={voiceover.takeDuration}
       onClose={voiceover.close}
       onSyncStart={voiceover.syncStart}
       onSyncStop={voiceover.syncStop}
@@ -53,6 +54,7 @@ export function ReviewVoiceoverRecording(props: {
   requestCloseRef?: import('react').RefObject<(() => void) | null>;
   opener?: import('react').RefObject<HTMLElement | null>;
   playhead: number;
+  maximumDuration?: number | undefined;
   onClose(): void;
   onSyncStart(playVideo: boolean): Promise<void>;
   onSyncStop(): void;
@@ -74,7 +76,7 @@ export function ReviewVoiceoverRecording(props: {
     onSave: props.onSave,
     timeline: {
       startTime: props.playhead,
-      duration: Infinity,
+      duration: props.maximumDuration ?? Infinity,
       beforeStart: () => props.onSyncStart(playVideo),
       onStop: props.onSyncStop,
       onPause: props.onSyncPause,

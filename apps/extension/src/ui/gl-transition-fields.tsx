@@ -1,5 +1,4 @@
 import { useMemo, type ReactNode } from 'react';
-import { resolveEffectLocaleText } from '@sniptale/runtime-contracts/effect-controls';
 import {
   glTransitionControls,
   glTransitionParameters,
@@ -9,6 +8,7 @@ import {
 } from '../features/video/project/transition/gl-catalog';
 import { translate, useAppLocale } from '../platform/i18n';
 import { ColorField, SelectField } from './compact-inspector-controls';
+import { glTransitionParameterLabel } from './gl-transition-labels';
 import { PreviewNumericRow } from './compact-inspector-controls/numeric-preview';
 import {
   EffectControlChoices,
@@ -67,15 +67,31 @@ export function GlTransitionFields(props: {
         ]}
       />
       {controls.map((control) => {
-        const label = resolveEffectLocaleText(control.label, locale) || control.id;
-        const description =
-          descriptor.params[control.id.split('.')[0] ?? control.id]?.description ?? label;
+        const label = glTransitionParameterLabel(control.id, locale);
+        const localizedControl = {
+          ...control,
+          label: { [locale]: label },
+          ...(control.options
+            ? {
+                options: control.options.map((option) => ({
+                  ...option,
+                  label: {
+                    [locale]: translate(
+                      option.value === 1
+                        ? 'videoEditor.glTransitions.enabled'
+                        : 'videoEditor.glTransitions.disabled'
+                    ),
+                  },
+                })),
+              }
+            : {}),
+        };
         const value = props.selection.values[control.id] ?? control.defaultValue;
         let field;
         if (control.options?.length)
           field = (
             <EffectControlChoices
-              control={control}
+              control={localizedControl}
               locale={locale}
               disabled={props.disabled ?? false}
               value={value}
@@ -90,7 +106,7 @@ export function GlTransitionFields(props: {
           field = (
             <PreviewNumericRow
               label={label}
-              title={description}
+              title={label}
               disabled={props.disabled ?? false}
               value={current}
               min={control.min ?? (integer ? -2147483648 : -3.4028234663852886e38)}
@@ -111,7 +127,7 @@ export function GlTransitionFields(props: {
           field = (
             <ColorField
               label={label}
-              title={description}
+              title={label}
               disabled={props.disabled ?? false}
               value={typeof value === 'string' ? value : control.defaultValue}
               allowAlpha={alpha}

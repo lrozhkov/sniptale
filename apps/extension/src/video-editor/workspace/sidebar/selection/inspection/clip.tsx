@@ -292,6 +292,7 @@ function createCameraPlacementGroup(
           key={clip.id}
           clip={clip}
           currentTime={props.currentTime ?? clip.startTime}
+          timelineDuration={props.project.duration}
           sourceDuration={
             props.project.assets.find((asset) => asset.id === clip.assetId)?.metadata.duration ??
             clip.sourceStart + clip.sourceDuration

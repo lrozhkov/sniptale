@@ -1,5 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, LocateFixed, Merge, Scissors, Trash2 } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  LocateFixed,
+  Merge,
+  Palette,
+  Scissors,
+  Trash2,
+  Type,
+} from 'lucide-react';
 import { TextareaField } from '../../ui/compact-inspector-controls';
 import type { ReviewSpeechPhrase } from '../../features/video/review/speech-transcript';
 import {
@@ -17,6 +26,7 @@ import type { useReviewText } from './use-review-text';
 import { formatSpeechTime } from './speech-audition';
 import { translate } from '../../platform/i18n';
 import { ReviewFragmentCaptionControls } from './caption-controls';
+import { ReviewInspectorSections } from './inspector-sections';
 /** List navigation remains independent of the expanded phrase editor. */
 function PhraseSummary({
   phrase,
@@ -137,11 +147,20 @@ function PhraseSummary({
 export function ReviewTextPhrase(props: {
   fragment: ReviewTextFragment;
   documentView?: boolean;
+  /** Selected inspector uses categories; document and speech cards retain their default layout. */
+  inspector?: boolean;
   visible?: boolean;
   next?: ReviewTextFragment | undefined;
   editor: Pick<
     ReturnType<typeof useReviewText>,
-    'change' | 'split' | 'merge' | 'remove' | 'playhead' | 'captions' | 'endTyping'
+    | 'change'
+    | 'split'
+    | 'splitAtPlayhead'
+    | 'merge'
+    | 'remove'
+    | 'playhead'
+    | 'captions'
+    | 'endTyping'
   >;
   expanded: boolean;
   selected?: boolean;
@@ -203,6 +222,73 @@ export function ReviewTextPhrase(props: {
     };
   }, [props.expanded, props.documentView, fragment.id, fragment.text]);
   if (props.visible === false && !props.expanded) return null;
+  const text = (
+    <>
+      <TextareaField
+        ref={textarea}
+        rows={6}
+        maxLength={16000}
+        label={translate('gallery.videoReview.speechText')}
+        value={fragment.text}
+        disabled={props.busy}
+        onChange={(text) => props.editor.change(fragment.id, { text })}
+        onBlur={() => props.editor.endTyping()}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') props.editor.endTyping();
+        }}
+        onSelect={() => setCaret(textarea.current?.selectionStart ?? 0)}
+      />
+      <div className="flex items-center gap-1">
+        <ReviewButton
+          label={translate('gallery.videoReview.textFragmentSplit')}
+          className={`${reviewTextButtonClassName} !w-8 !px-0`}
+          disabled={props.busy || !canSplit}
+          title={
+            canSplit
+              ? translate('gallery.videoReview.textFragmentSplit')
+              : translate('gallery.videoReview.textFragmentSplitHint')
+          }
+          onClick={() =>
+            boundary
+              ? props.editor.split(fragment.id, caret)
+              : props.editor.splitAtPlayhead(fragment.id, caret)
+          }
+        >
+          <Scissors size={14} />
+        </ReviewButton>
+        {props.next && (
+          <ReviewButton
+            label={translate('gallery.videoReview.textFragmentMerge')}
+            className={`${reviewTextButtonClassName} !w-8 !px-0`}
+            disabled={props.busy}
+            onClick={() => {
+              if (props.next) props.editor.merge(fragment.id, props.next.id);
+            }}
+          >
+            <Merge size={14} />
+          </ReviewButton>
+        )}
+        {props.actions}
+        <ReviewButton
+          label={translate('gallery.videoReview.textFragmentDelete')}
+          className={`${reviewDeleteButtonClassName} ml-auto !w-8 !px-0`}
+          disabled={props.busy}
+          onClick={() => props.editor.remove([fragment.id])}
+        >
+          <Trash2 size={14} />
+        </ReviewButton>
+      </div>
+    </>
+  );
+  const appearance = (
+    <ReviewFragmentCaptionControls
+      presentation={props.inspector ? 'inline' : 'disclosure'}
+      fragment={fragment}
+      settings={props.editor.captions}
+      disabled={props.busy}
+      onChange={(patch) => props.editor.change(fragment.id, patch)}
+    />
+  );
   return (
     <article
       className={[
@@ -212,7 +298,7 @@ export function ReviewTextPhrase(props: {
       data-ui="gallery.videoReview.textPhrase"
       data-text-id={fragment.id}
     >
-      {!props.documentView && (
+      {!props.documentView && !props.inspector && (
         <PhraseSummary
           phrase={fragment}
           selected={props.selected ?? false}
@@ -228,91 +314,58 @@ export function ReviewTextPhrase(props: {
       )}
       {props.expanded && (
         <>
-          <TextareaField
-            ref={textarea}
-            rows={6}
-            maxLength={16000}
-            label={translate('gallery.videoReview.speechText')}
-            value={fragment.text}
-            disabled={props.busy}
-            onChange={(text) => props.editor.change(fragment.id, { text })}
-            onBlur={() => props.editor.endTyping()}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') props.editor.endTyping();
-            }}
-            onSelect={() => setCaret(textarea.current?.selectionStart ?? 0)}
-          />
-          <div className="flex items-center gap-1">
-            <ReviewButton
-              label={translate('gallery.videoReview.textFragmentSplit')}
-              className={`${reviewTextButtonClassName} !w-8 !px-0`}
-              disabled={props.busy || !canSplit}
-              title={
-                canSplit
-                  ? translate('gallery.videoReview.textFragmentSplit')
-                  : translate('gallery.videoReview.textFragmentSplitHint')
-              }
-              onClick={() =>
-                props.editor.split(fragment.id, caret, boundary ? undefined : playhead)
-              }
+          {props.inspector ? (
+            <ReviewInspectorSections
+              sections={[
+                {
+                  id: 'content',
+                  label: translate('videoEditor.effectsLibrary.objectText'),
+                  icon: Type,
+                  content: text,
+                },
+                {
+                  id: 'appearance',
+                  label: translate('videoEditor.effectsLibrary.objectAppearance'),
+                  icon: Palette,
+                  content: appearance,
+                },
+              ]}
+            />
+          ) : (
+            <>
+              {text}
+              {appearance}
+            </>
+          )}
+          {!props.inspector && (
+            <ReviewDetails
+              preferenceId="group:text-timing"
+              label={translate('gallery.videoReview.intervalBounds')}
             >
-              <Scissors size={14} />
-            </ReviewButton>
-            {props.next && (
-              <ReviewButton
-                label={translate('gallery.videoReview.textFragmentMerge')}
-                className={`${reviewTextButtonClassName} !w-8 !px-0`}
+              <ReviewNumberRow
+                label={translate('gallery.videoReview.textFragmentStart')}
+                unit="s"
+                value={fragment.start}
+                min={0}
+                max={fragment.end - 0.01}
+                step={0.01}
+                precision={2}
                 disabled={props.busy}
-                onClick={() => {
-                  if (props.next) props.editor.merge(fragment.id, props.next.id);
-                }}
-              >
-                <Merge size={14} />
-              </ReviewButton>
-            )}
-            {props.actions}
-            <ReviewButton
-              label={translate('gallery.videoReview.textFragmentDelete')}
-              className={`${reviewDeleteButtonClassName} ml-auto !w-8 !px-0`}
-              disabled={props.busy}
-              onClick={() => props.editor.remove([fragment.id])}
-            >
-              <Trash2 size={14} />
-            </ReviewButton>
-          </div>
-          <ReviewFragmentCaptionControls
-            fragment={fragment}
-            settings={props.editor.captions}
-            disabled={props.busy}
-            onChange={(patch) => props.editor.change(fragment.id, patch)}
-          />
-          <ReviewDetails
-            preferenceId="group:text-timing"
-            label={translate('gallery.videoReview.intervalBounds')}
-          >
-            <ReviewNumberRow
-              label={translate('gallery.videoReview.textFragmentStart')}
-              unit="s"
-              value={fragment.start}
-              min={0}
-              max={fragment.end - 0.01}
-              step={0.01}
-              precision={2}
-              disabled={props.busy}
-              onChange={(start) => props.editor.change(fragment.id, { start })}
-            />
-            <ReviewNumberRow
-              label={translate('gallery.videoReview.textFragmentEnd')}
-              unit="s"
-              value={fragment.end}
-              min={fragment.start + 0.01}
-              max={props.limit}
-              step={0.01}
-              precision={2}
-              disabled={props.busy}
-              onChange={(end) => props.editor.change(fragment.id, { end })}
-            />
-          </ReviewDetails>
+                onChange={(start) => props.editor.change(fragment.id, { start })}
+              />
+              <ReviewNumberRow
+                label={translate('gallery.videoReview.textFragmentEnd')}
+                unit="s"
+                value={fragment.end}
+                min={fragment.start + 0.01}
+                max={props.limit}
+                step={0.01}
+                precision={2}
+                disabled={props.busy}
+                onChange={(end) => props.editor.change(fragment.id, { end })}
+              />
+            </ReviewDetails>
+          )}
         </>
       )}
     </article>

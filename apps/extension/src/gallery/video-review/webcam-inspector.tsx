@@ -1,10 +1,13 @@
+import type { ReactNode } from 'react';
+import type { ReviewInspectorSection } from './inspector-sections';
 import { isCameraShadowDirection } from '../../features/video/project/camera/shadow-direction';
 import { ReviewWebcamCropPreview } from './webcam-crop-preview';
 import {
-  Camera,
+  Palette,
   Clock3,
   Move,
   Plus,
+  EyeOff,
   Trash2,
   Layers2,
   Compass,
@@ -12,6 +15,7 @@ import {
   ArrowRightToLine,
 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
+import { formatPreciseTime } from '../../composition/library-preview/time-format';
 import {
   ColorField,
   SelectField,
@@ -52,8 +56,10 @@ function placementPreset(placement: QuickEditWebcamPlacement) {
 export function ReviewWebcamInspector({
   editor,
   range,
+  renderSections,
 }: {
   editor: Editor;
+  renderSections?: ((sections: readonly ReviewInspectorSection[]) => ReactNode) | undefined;
   range?: { start: number; end: number } | undefined;
 }) {
   const camera = editor.camera;
@@ -90,12 +96,13 @@ export function ReviewWebcamInspector({
               if (range) editor.hide(range);
             }}
           >
-            <Plus size={15} aria-hidden="true" />
+            <EyeOff size={15} aria-hidden="true" />
             <span>{translate('gallery.videoReview.webcamHideRange')}</span>
           </ReviewButton>
         </>
       ) : null}
       <ReviewButton
+        selectionAction="delete"
         label={translate(
           editor.selection.kind === 'webcam'
             ? 'gallery.videoReview.webcamDisable'
@@ -115,9 +122,17 @@ export function ReviewWebcamInspector({
       </ReviewButton>
     </>
   );
+  const render =
+    renderSections ??
+    ((sections: readonly ReviewInspectorSection[]) => (
+      <ReviewInspectorSections sections={sections} />
+    ));
   return (
-    <div className="space-y-3" data-ui="gallery.videoReview.webcamInspector">
-      {editor.candidate ? (
+    <div
+      className={renderSections ? 'flex min-h-0 min-w-0 flex-1 flex-col' : 'space-y-3'}
+      data-ui="gallery.videoReview.webcamInspector"
+    >
+      {editor.candidate && !renderSections ? (
         <div
           className="truncate text-xs text-[var(--sniptale-color-text-secondary)]"
           title={editor.candidate.filename}
@@ -125,40 +140,46 @@ export function ReviewWebcamInspector({
           {editor.candidate.filename}
         </div>
       ) : null}
-      {editor.hidden ? (
-        <>
-          <ReviewInterval start={editor.hidden.start} end={editor.hidden.end} />
-          {(['start', 'end'] as const).map((edge) => (
-            <ReviewNumberRow
-              key={edge}
-              label={translate(
-                edge === 'start' ? 'gallery.videoReview.rangeStart' : 'gallery.videoReview.rangeEnd'
-              )}
-              value={editor.hidden![edge]}
-              min={edge === 'start' ? 0 : editor.hidden!.start + 0.001}
-              max={edge === 'end' ? editor.duration : editor.hidden!.end - 0.001}
-              step={0.01}
-              precision={3}
-              unit="s"
-              onChange={(value) => editor.hide({ ...editor.hidden!, [edge]: value }, true)}
-            />
-          ))}
-          <ReviewInspectorSections sections={[actions]} />
-        </>
-      ) : (
-        <ReviewInspectorSections
-          leadingSectionColumn
-          sections={[
+      {editor.hidden
+        ? render([
+            {
+              id: 'webcam-timing',
+              label: translate('gallery.videoReview.webcamTiming'),
+              icon: Clock3,
+              content: (
+                <>
+                  <ReviewInterval start={editor.hidden.start} end={editor.hidden.end} />
+                  <p className="review-inspector-notice" role="status">
+                    {translate('gallery.videoReview.webcamHidden')}
+                  </p>
+                </>
+              ),
+            },
+            actions,
+          ])
+        : render([
             {
               id: 'webcam-layout',
-              label: translate('gallery.videoReview.webcamLayout'),
+              label: translate('gallery.videoReview.spatialToolPosition'),
               icon: Move,
-              content: <WebcamLayout editor={editor} />,
+              content: (
+                <>
+                  {editor.candidate && renderSections ? (
+                    <p
+                      className="truncate text-xs text-[var(--sniptale-color-text-secondary)]"
+                      title={editor.candidate.filename}
+                    >
+                      {editor.candidate.filename}
+                    </p>
+                  ) : null}
+                  <WebcamLayout editor={editor} />
+                </>
+              ),
             },
             {
               id: 'webcam-appearance',
-              label: translate('gallery.videoReview.webcamAppearance'),
-              icon: Camera,
+              label: translate('videoEditor.effectsLibrary.objectAppearance'),
+              icon: Palette,
               content: <WebcamAppearance editor={editor} />,
             },
             {
@@ -185,9 +206,7 @@ export function ReviewWebcamInspector({
               ),
             },
             actions,
-          ]}
-        />
-      )}
+          ])}
     </div>
   );
 }
@@ -214,7 +233,7 @@ function WebcamLayout({ editor }: { editor: Editor }) {
           { value: 'base', label: translate('gallery.videoReview.webcamBasePosition') },
           ...camera.positions.map((item, i) => ({
             value: item.id,
-            label: `${i + 1} · ${item.time.toFixed(3)} s`,
+            label: `${i + 1} · ${formatPreciseTime(item.time)}`,
           })),
         ]}
         onChange={(id) => editor.navigate(id === 'base' ? null : id)}

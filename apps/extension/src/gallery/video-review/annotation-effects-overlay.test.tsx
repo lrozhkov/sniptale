@@ -63,7 +63,7 @@ function fixture(name = 'callout', attachment: ReviewAnnotationEffect['attachmen
     editor: {
       lane,
       previewLane: lane,
-      geometry,
+      geometry: { read: () => geometry, subscribe: () => () => undefined },
       gestureId: null,
       setGeometry: vi.fn(),
       pending: false,

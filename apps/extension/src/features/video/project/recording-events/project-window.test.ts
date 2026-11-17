@@ -317,3 +317,44 @@ it('reads only the retained source interval for a moved event and invalidates it
     [93000000, 108000000],
   ]);
 });
+
+it('queries a retained source range through the result clock after a converted clip moves', async () => {
+  const seed = fixture();
+  const clip = seed.clips.find((clip) => clip.type === 'VIDEO')!;
+  const project = applyVideoProjectMutationPatch(seed, {
+    clips: seed.clips.map((item) =>
+      item.id === clip.id
+        ? { ...clip, sourceInteractionTiming: { time: 100, sourceTime: 0, rate: 1 } }
+        : item
+    ),
+    sourceInteractionDocuments: [
+      {
+        id: 'authored',
+        binding: { assetId: clip.assetId, sourceInstanceId: clip.sourceInstanceId! },
+        cursorMotions: [],
+        cursorEnabled: false,
+        keyboardEnabled: true,
+        mouseEnabled: true,
+        timeline: {
+          presses: [],
+          overrides: [
+            {
+              ref: { kind: 'action', id: 'moved' },
+              start: 200,
+              end: 201,
+              timeDomain: 'result',
+              enabled: true,
+              sourceRange: { start: 2000, end: 2001 },
+            },
+          ],
+        },
+      },
+    ],
+  });
+  const read = readEmpty();
+  await prepareRecordingEventsProject(project, { start: 100, end: 101 }, read);
+  expect(read.mock.calls.map(([range]) => [range.fromTimeUs, range.toTimeUs])).toEqual([
+    [93000000, 108000000],
+    [2000000000, 2001000000],
+  ]);
+});

@@ -4,83 +4,12 @@ import { hasCameraMediaAt, resolveCameraVisualClip } from '../project/camera/ani
 import { getMediaClipSourceTime, getVideoClipSourceTime } from '../project/timeline/rate';
 import { isExportReadyVideoProject, parseHydratableVideoProject } from '../project/validation/root';
 import type { VideoProject, VideoProjectVideoClip } from '../project/types/model';
-import { createQuickEditWebcam, quickEditWebcamFrameAt } from './advanced/webcam';
+import { quickEditWebcamFrameAt } from './advanced/webcam';
 import { quickEditWebcamScreenPlacementAt } from './advanced/webcam';
 import { resolveCameraSplitPresentation } from '../project/camera/split';
+import { cameraPositionSeekTime, editCameraPosition } from '../project/camera/editing';
 import { planReviewProjectConversion } from './project-conversion';
-import { fixture } from './project-conversion.test-support';
-import type { ReviewProjectCameraResource } from './project-camera';
-
-function cameraFixture() {
-  const input = fixture();
-  const camera: ReviewProjectCameraResource = {
-    reviewAssetId: 'project-asset:camera-owned',
-    asset: {
-      id: 'camera-asset',
-      type: 'VIDEO',
-      name: 'Camera.webm',
-      source: { kind: 'project-asset', projectAssetId: 'camera-owned' },
-      metadata: {
-        width: 320,
-        height: 240,
-        duration: 6,
-        size: 50,
-        mimeType: 'video/webm',
-        hasAudio: true,
-        audioPeaks: null,
-      },
-      createdAt: input.seed.createdAt,
-    },
-    track: {
-      id: 'camera-track',
-      name: 'Camera',
-      kind: 'PRIMARY',
-      role: 'CAMERA',
-      order: -1,
-      visible: true,
-      locked: false,
-    },
-  };
-  const webcam = createQuickEditWebcam(camera.reviewAssetId, camera.asset.metadata, input.source);
-  webcam.appearance = { shape: 'circle', roundness: 35, zoom: 1.5, panX: -0.2, panY: 0.3 };
-  webcam.mirrored = true;
-  webcam.shadow = { intensity: 45, color: '#123456' };
-  webcam.positions = [
-    {
-      id: 'move',
-      time: 1,
-      placement: { x: 0.1, y: 0.1, width: 0.3, height: 0.4 },
-      crop: { zoom: 2, panX: 0.5, panY: -0.5 },
-      transition: { type: 'ease-in-out', duration: 4 },
-    },
-    {
-      id: 'removed-key',
-      time: 3.5,
-      placement: { x: 0.5, y: 0.2, width: 0.3, height: 0.4 },
-      transition: { type: 'shrink', duration: 3 },
-    },
-    {
-      id: 'last',
-      time: 5,
-      placement: { x: 0.2, y: 0.5, width: 0.3, height: 0.4 },
-      crop: { zoom: 3, panX: -0.5, panY: 0.5 },
-      transition: { type: 'none', duration: 2 },
-    },
-  ];
-  webcam.hiddenRanges = [{ id: 'hidden', start: 4.2, end: 4.5 }];
-  input.document.advancedContent.webcam = webcam;
-  input.document.edits.push({
-    id: 'speed',
-    kind: 'speed',
-    start: 4,
-    end: 6,
-    requestedStart: 4,
-    requestedEnd: 6,
-    rate: 2,
-    audio: 'speed',
-  });
-  return { ...input, camera };
-}
+import { cameraFixture } from './project-conversion.test-support';
 
 function prepared(input: ReturnType<typeof cameraFixture>) {
   const plan = planReviewProjectConversion(input);
@@ -95,6 +24,86 @@ function cameras(project: VideoProject): VideoProjectVideoClip[] {
       project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
   );
 }
+
+it('requires Native 56 and bounded layout origins before admitting retained camera clocks', () => {
+  const input = cameraFixture();
+  input.document.edits = [
+    {
+      id: 'hold',
+      kind: 'freeze',
+      start: 2,
+      end: 2,
+      requestedStart: 2,
+      requestedEnd: 2,
+      duration: 2,
+      frameTime: 1.98,
+      frameDuration: 0.04,
+    },
+  ];
+  const project = prepared(input).project;
+  const camera = cameras(project).find((clip) => clip.startTime === 4)!;
+  expect(project.version).toBe(56);
+  expect(parseHydratableVideoProject({ ...project, version: 55 })).toBeNull();
+  expect(parseHydratableVideoProject({ ...project, version: 57 })).toBeNull();
+  for (const patch of [
+    { time: Number.NaN },
+    { time: -86401 },
+    { sourceTime: -1 },
+    { sourceTime: 86401 },
+    { rate: 0 },
+    { rate: Number.POSITIVE_INFINITY },
+    { unexpected: true },
+  ]) {
+    const invalid = structuredClone(project);
+    const candidate = cameras(invalid).find((clip) => clip.id === camera.id)!;
+    Object.assign(candidate.cameraTiming!.layoutClock!, patch);
+    expect(parseHydratableVideoProject(invalid)).toBeNull();
+  }
+  const missing = structuredClone(project);
+  Reflect.deleteProperty(cameras(missing)[0]!.cameraTiming!, 'layoutClock');
+  expect(parseHydratableVideoProject(missing)).toBeNull();
+  const orphan = structuredClone(project);
+  Reflect.deleteProperty(cameras(orphan)[0]!.cameraTiming!, 'timeDomain');
+  expect(parseHydratableVideoProject(orphan)).toBeNull();
+  expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(project)))).not.toBeNull();
+});
+
+it('retains the camera clock schema when Gallery also converts a spatial focus effect', async () => {
+  const { createQuickEditZoomRegion } = await import('./advanced/zoom');
+  const input = cameraFixture();
+  input.document.edits = [
+    {
+      id: 'hold',
+      kind: 'freeze',
+      start: 2,
+      end: 2,
+      requestedStart: 2,
+      requestedEnd: 2,
+      duration: 2,
+      frameTime: 1.98,
+      frameDuration: 0.04,
+    },
+  ];
+  input.ui.tracks.zoom = true;
+  input.document.advancedContent.zoom = {
+    enabled: true,
+    regions: [
+      {
+        ...createQuickEditZoomRegion({
+          id: 'spatial',
+          at: 0,
+          duration: 1,
+          endMax: input.source.duration,
+        }),
+        effect: '3d',
+        perspective: { enabled: true, rotateX: -12, rotateY: 24, rotateZ: 5, strength: 0.7 },
+      },
+    ],
+  };
+  const result = prepared(input).project;
+  expect(result.version).toBe(56);
+  expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(result)))).not.toBeNull();
+});
 
 it('preserves split panes and docked returns at sampled frames through Gallery migration and reload', () => {
   const input = cameraFixture();
@@ -420,4 +429,133 @@ it('holds webcam media with the original video during inserted time and keeps th
     );
   expect(cameras(plan.project).find((clip) => clip.startTime === 4)?.sourceStart).toBe(2);
   expect(isExportReadyVideoProject(plan.project)).toBe(true);
+});
+
+it('keeps split and docked camera panes on result time after an inserted video section', () => {
+  const input = cameraFixture();
+  const webcam = input.document.advancedContent.webcam!;
+  webcam.split = 'right';
+  webcam.hiddenRanges = [];
+  webcam.positions = [
+    {
+      id: 'split',
+      time: 3,
+      placement: webcam.placement,
+      split: 'top',
+      transition: { type: 'ease-in-out', duration: 1 },
+    },
+    {
+      id: 'dock',
+      time: 5,
+      placement: webcam.placement,
+      split: null,
+      transition: { type: 'none', duration: 0 },
+    },
+  ];
+  input.document.edits = [
+    {
+      id: 'hold',
+      kind: 'freeze',
+      start: 2,
+      end: 2,
+      requestedStart: 2,
+      requestedEnd: 2,
+      duration: 2,
+      frameTime: 1.98,
+      frameDuration: 0.04,
+    },
+  ];
+  const expected = {
+    ...webcam,
+    positions: webcam.positions.map((position) => ({ ...position, time: position.time + 2 })),
+  };
+  const converted = prepared(input).project;
+  const reopened = parseHydratableVideoProject(JSON.parse(JSON.stringify(converted)))!;
+  expect(reopened).not.toBeNull();
+  for (const project of [converted, reopened]) {
+    for (const time of [2.5, 4.5, 5, 5.5, 6.5, 7, 7.5]) {
+      const clip = cameras(project).find(
+        (item) => item.startTime <= time && time < item.startTime + item.duration
+      )!;
+      expect(clip).toBeDefined();
+      const split = resolveCameraSplitPresentation(project, clip, time);
+      expect(split?.screen).toEqual(quickEditWebcamScreenPlacementAt(expected, time));
+      const frame = quickEditWebcamFrameAt(expected, time, 20)!;
+      for (const key of ['x', 'y', 'width', 'height'] as const)
+        expect(
+          split!.camera[key] / (key === 'x' || key === 'width' ? project.width : project.height)
+        ).toBeCloseTo(frame.placement[key], 6);
+    }
+  }
+});
+
+it('selects, retimes, adds and hides converted camera destinations on their result clock', () => {
+  const input = cameraFixture();
+  const webcam = input.document.advancedContent.webcam!;
+  webcam.hiddenRanges = [];
+  webcam.positions = [
+    {
+      id: 'after-hold',
+      time: 3,
+      placement: webcam.placement,
+      transition: { type: 'none', duration: 0 },
+    },
+    {
+      id: 'rate',
+      time: 5,
+      placement: webcam.placement,
+      transition: { type: 'ease-in-out', duration: 0.25 },
+    },
+  ];
+  input.document.edits = [
+    {
+      id: 'hold',
+      kind: 'freeze',
+      start: 2,
+      end: 2,
+      requestedStart: 2,
+      requestedEnd: 2,
+      duration: 2,
+      frameTime: 1.98,
+      frameDuration: 0.04,
+    },
+    {
+      id: 'rate',
+      kind: 'speed',
+      start: 4,
+      end: 6,
+      requestedStart: 4,
+      requestedEnd: 6,
+      rate: 2,
+      audio: 'speed',
+    },
+  ];
+  const project = prepared(input).project;
+  const ordinary = cameras(project).find((clip) => clip.startTime === 4)!;
+  const fast = cameras(project).find((clip) => clip.startTime === 6)!;
+  expect(cameraPositionSeekTime(project, ordinary.id, 4, 'after-hold')).toBe(5);
+  expect(cameraPositionSeekTime(project, fast.id, 6, 'rate')).toBeCloseTo(6.625);
+  const changed = editCameraPosition(project, fast.id, 6.5, {
+    kind: 'update',
+    id: 'rate',
+    sourceTime: 6.25,
+    transition: { kind: 'smooth', duration: 0.2 },
+  });
+  expect(
+    cameras(changed)
+      .find((clip) => clip.id === fast.id)
+      ?.cameraPositions?.find((item) => item.id === 'rate')
+  ).toMatchObject({ sourceTime: 6.25 });
+  expect(cameraPositionSeekTime(changed, fast.id, 6.5, 'rate')).toBeCloseTo(6.45);
+  const added = editCameraPosition(changed, fast.id, 6.3, { kind: 'add' });
+  expect(
+    cameras(added)
+      .find((clip) => clip.id === fast.id)
+      ?.cameraPositions?.find((item) => Math.abs(item.sourceTime - 6.3) < 1e-7)?.transition.duration
+  ).toBe(0.5);
+  const hidden = editCameraPosition(added, fast.id, 6.5, { kind: 'hide', start: 6.5, end: 6.9 });
+  expect(cameras(hidden).find((clip) => clip.id === fast.id)?.cameraHiddenRanges).toMatchObject([
+    { start: 6.5, end: 6.9 },
+  ]);
+  expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(hidden)))).not.toBeNull();
 });

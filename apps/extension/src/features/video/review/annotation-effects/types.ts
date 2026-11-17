@@ -14,6 +14,7 @@ export interface ReviewAnnotationEffect {
   enabled: boolean;
   start: number;
   end: number;
+  timeDomain?: 'result';
   attachment: 'content' | 'viewport';
   transform: ReviewAnnotationEffectTransform;
   controls: Record<string, string | number>;

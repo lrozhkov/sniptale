@@ -21,6 +21,7 @@ import {
   ReviewFragmentAction,
   ReviewSpeedOptions,
   ReviewRenderOptions,
+  ReviewInspectorActions,
 } from './edit-actions';
 import { translate } from '../../platform/i18n';
 
@@ -189,11 +190,12 @@ it('sets speed creation defaults without a toolbar delete action', () => {
     const [rate, audio] = Array.from(
       host.querySelectorAll<HTMLButtonElement>('[aria-haspopup="listbox"]')
     );
-    for (const [index] of REVIEW_SPEED_RATES.entries()) {
+    const visibleRates = REVIEW_SPEED_RATES.filter((rate) => rate >= 0.5 && rate <= 8);
+    for (const [index] of visibleRates.entries()) {
       act(() => rate!.click());
       act(() => document.querySelectorAll<HTMLButtonElement>('[role="option"]')[index]!.click());
     }
-    expect(props.onRate.mock.calls.map(([rate]) => rate)).toEqual([...REVIEW_SPEED_RATES]);
+    expect(props.onRate.mock.calls.map(([rate]) => rate)).toEqual(visibleRates);
     act(() => audio!.click());
     act(() => document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click());
     expect(props.onAudio).toHaveBeenCalledWith('mute');
@@ -363,20 +365,37 @@ it('keeps labelled inspector speed and audio choices editable and respects the b
   const props = { layout: 'inspector' as const, rate: 2, audio: 'speed' as const, onRate, onAudio };
   try {
     await act(async () => root.render(<ReviewSpeedOptions {...props} busy={false} />));
-    const [rate, audio] = host.querySelectorAll<HTMLButtonElement>('[aria-haspopup="listbox"]');
-    expect(rate!.getAttribute('aria-label')).toBe(translate('gallery.videoReview.speedRate'));
-    expect(audio!.getAttribute('aria-label')).toBe(translate('gallery.videoReview.speedAudio'));
-    await act(async () => rate!.click());
-    await act(async () => document.querySelector<HTMLButtonElement>('[role="option"]')!.click());
-    expect(onRate).toHaveBeenCalledWith(REVIEW_SPEED_RATES[0]);
-    await act(async () => audio!.click());
-    await act(async () =>
-      document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click()
-    );
+    const rateGroup = host.querySelector(
+      `[role="group"][aria-label="${translate('gallery.videoReview.speedRate')}"]`
+    )!;
+    const audioGroup = host.querySelector(
+      `[role="group"][aria-label="${translate('gallery.videoReview.speedAudio')}"]`
+    )!;
+    const rateChoices = [...rateGroup.querySelectorAll<HTMLButtonElement>('button')];
+    expect(rateChoices.map((button) => button.textContent)).toEqual([
+      '0.5×',
+      '0.75×',
+      '1.25×',
+      '1.5×',
+      '2×',
+      '4×',
+      '8×',
+    ]);
+    await act(async () => rateChoices[0]!.click());
+    expect(onRate).toHaveBeenCalledWith(0.5);
+    await act(async () => audioGroup.querySelectorAll<HTMLButtonElement>('button')[1]!.click());
     expect(onAudio).toHaveBeenCalledWith('mute');
     await act(async () => root.render(<ReviewSpeedOptions {...props} busy />));
-    expect(rate!.disabled).toBe(true);
-    expect(audio!.disabled).toBe(true);
+    expect(
+      [...host.querySelectorAll<HTMLButtonElement>('button')].every((button) => button.disabled)
+    ).toBe(true);
+    await act(async () => root.render(<ReviewSpeedOptions {...props} rate={16} busy={false} />));
+    const custom = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === '16×'
+    )!;
+    expect(custom.getAttribute('aria-pressed')).toBe('true');
+    await act(async () => custom.click());
+    expect(onRate).toHaveBeenLastCalledWith(16);
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();
@@ -476,6 +495,76 @@ it('applies export frame rate and quality options without adding section divider
     await act(async () => root.render(<ReviewRenderOptions exporter={exporter} busy />));
     expect(rate!.disabled).toBe(true);
     expect(enhancement.disabled).toBe(true);
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('plans and downloads the retained fragment inside the mounted export controls', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const selection = { kind: 'range' as const, start: 2, end: 4 };
+  const plan = vi.fn(() => ({
+    kind: 'ready' as const,
+    video: 'copy' as const,
+    audio: 'copy' as const,
+    reasons: [],
+  }));
+  const downloadSelection = vi.fn();
+  const exporter = {
+    index: {
+      duration: 6,
+      boundaries: [0, 2, 4, 6],
+      videoCodec: 'vp8',
+      audioCodec: null,
+      container: 'webm',
+      rotation: 0,
+    },
+    phase: 'idle',
+    progress: 0,
+    timeEstimate: null,
+    failed: false,
+    failureDetail: null,
+    blocked: null,
+    cameraConflicts: [],
+    result: null,
+    completion: null,
+    checkingCodecs: false,
+    plan,
+    dismissCompletion: vi.fn(),
+    downloadSelection,
+    cancel: vi.fn(),
+    download: vi.fn(),
+  } as unknown as Parameters<typeof ReviewInspectorActions>[0]['exporter'];
+  const render = () =>
+    root.render(
+      <ReviewInspectorActions
+        exporter={exporter}
+        advanced={false}
+        hasEdits
+        busy={false}
+        composerBusy={false}
+        toolKey="retained-range"
+        fragment={{ selection, edits: [] }}
+        onExport={vi.fn()}
+        onOpenResult={vi.fn()}
+      />
+    );
+  try {
+    await act(async () => render());
+    expect(plan).toHaveBeenCalledWith(selection);
+    const fragment = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) =>
+        button.getAttribute('aria-label') === translate('gallery.videoReview.exportSelection')
+    )!;
+    expect(fragment.disabled).toBe(false);
+    await act(async () => fragment.click());
+    expect(downloadSelection).toHaveBeenCalledWith(selection);
+    exporter.phase = 'exporting';
+    await act(async () => render());
+    expect(fragment.disabled).toBe(true);
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();

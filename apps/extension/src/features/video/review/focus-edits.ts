@@ -1,3 +1,4 @@
+import { projectReviewVisualRange, retimeReviewResultRange } from './timeline-placement';
 import { resolveQuickEditActiveFocusRegions } from './advanced/focus-layout';
 import { projectSourceFocusPhases } from '../project/motion/source-phase-projection';
 import { fitQuickEditZoomTransitions } from './advanced/zoom';
@@ -47,6 +48,10 @@ export function reconcileReviewFocus(args: {
   const next = buildReviewTimeMap(args.duration, args.after);
   if (args.preserveUnderCuts) {
     return args.regions.map((region) => {
+      if (region.timeDomain === 'result') {
+        const range = retimeReviewResultRange(region, previous, next);
+        return range.end > range.start ? { ...region, ...range } : { ...region, dormant: true };
+      }
       if (region.dormant) return region;
       const anchor = region.sourceAnchor ?? reviewFocusSourceRange(region, previous);
       if (!anchor) return { ...region, dormant: true };
@@ -125,8 +130,19 @@ export function projectReviewFocus(
   );
   const inserted = map.some((part) => part.kind === 'freeze');
   const visible = active.map((region) => {
-    const anchor = region.sourceAnchor;
+    const anchor = region.timeDomain === 'result' ? undefined : region.sourceAnchor;
     if (!anchor) return [region];
+    if (inserted) {
+      const range = projectReviewVisualRange(anchor, map);
+      if (!range) return [];
+      const {
+        sourceAnchor: _sourceAnchor,
+        phaseClock: _phaseClock,
+        spatialClock: _spatialClock,
+        ...continuous
+      } = region;
+      return [{ ...continuous, ...range, timeDomain: 'result' as const }];
+    }
     const spans = projectSourceFocusPhases(
       { sourceStart: anchor.start, sourceEnd: anchor.end, enter: region.enter, exit: region.exit },
       sourceSpans,

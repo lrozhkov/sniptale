@@ -1,4 +1,4 @@
-import { reviewCutTransitionAt } from '../../features/video/review/cuts';
+import { planReviewCutTransitions, reviewCutTransitionAt } from '../../features/video/review/cuts';
 import { expect, it, vi } from 'vitest';
 import {
   createReviewTransitionFrames,
@@ -378,4 +378,53 @@ it('restores the dissolve compositor context and leaves source lifetime with the
   });
   expect(() => paintReviewCutDissolve(target, scratch, 0.5, draw, canvas)).toThrow('paint failed');
   expect(target.restore).toHaveBeenCalledTimes(2);
+});
+
+it('decodes both adjoining freeze frames and keeps each decorated side on the result clock', async () => {
+  const [heldPlan] = planReviewCutTransitions(10, [
+    {
+      id: 'cut',
+      kind: 'cut',
+      start: 4,
+      end: 6,
+      requestedStart: 4,
+      requestedEnd: 6,
+      transition: { type: 'dissolve', before: 0.5, after: 0.5 },
+    },
+    ...[4, 6].map((at) => ({
+      id: `hold-${at}`,
+      kind: 'freeze' as const,
+      start: at,
+      end: at,
+      requestedStart: at,
+      requestedEnd: at,
+      duration: 1,
+      frameTime: at - 0.04,
+      frameDuration: 0.04,
+    })),
+  ]);
+  const left = frame(3.96),
+    right = frame(5.96);
+  const sink = {
+    getSample: vi.fn(async (time: number) => (time === 3.96 ? left : right)),
+    async *samples() {
+      yield frame(6.04);
+    },
+  };
+  const owner = createReviewTransitionFrames(sink, new AbortController().signal);
+  try {
+    const endpoints = await owner.load(heldPlan!);
+    expect(endpoints).toEqual({ left, right });
+    expect(sink.getSample.mock.calls).toEqual([[3.96], [5.96]]);
+    for (const time of [heldPlan!.seam - 0.25, heldPlan!.seam + 0.25]) {
+      const blend = reviewCutTransitionAt(time, [heldPlan!])!;
+      const sides = reviewCutTransitionSides(blend, endpoints!, frame(6.04), time);
+      expect(sides.map((side) => side.sample)).toEqual([left, right]);
+      expect(sides[blend.beforeSeam ? 0 : 1].resultTime).toBe(time);
+    }
+  } finally {
+    owner.dispose();
+  }
+  expect(left.close).toHaveBeenCalledOnce();
+  expect(right.close).toHaveBeenCalledOnce();
 });

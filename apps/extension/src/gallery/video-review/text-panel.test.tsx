@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createReviewCommandFixture } from './editor-fixture.test-support';
 import type { ReviewSelection } from '../../features/video/review/types';
 
 import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
@@ -101,6 +102,12 @@ function Fixture({
   const inspectedId = selectedId ?? (selection.kind === 'text' ? selection.id : undefined);
   current = document.current;
   const editor = useReviewText({
+    commands: createReviewCommandFixture(() => ({
+      duration: 600,
+      time: 0,
+      selection,
+      advanced: { ...createQuickEditAdvancedState(), text: document.current },
+    })),
     document: document.current,
     sourceDuration: 600,
     edits: [],
@@ -394,14 +401,15 @@ it('keeps a selected text detail distinct from an expandable numbered list row',
   const article = host.querySelector('[data-ui="gallery.videoReview.textPhrase"]')!;
   expect(article.querySelector(':scope > div:first-child button[aria-expanded]')).toBeNull();
   expect(article.querySelector('textarea')?.rows).toBe(6);
-  const timing = article.querySelector(
-    'input[aria-label="gallery.videoReview.textFragmentStart"]'
-  )!;
   expect(
-    timing
-      .closest('[data-ui="shared.ui.compact-inspector.numeric-value-field"]')
-      ?.querySelector('.sniptale-numeric-entry > span')?.textContent
-  ).toBeTruthy();
+    article.querySelector('input[aria-label="gallery.videoReview.textFragmentStart"]')
+  ).toBeNull();
+  expect(article.querySelector('[aria-label="gallery.videoReview.speechJump"]')).toBeNull();
+  const tabs = [...article.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+  expect(tabs.map((tab) => tab.getAttribute('aria-label'))).toEqual([
+    'videoEditor.effectsLibrary.objectText',
+    'videoEditor.effectsLibrary.objectAppearance',
+  ]);
 });
 
 it('passes the current source-clock fragment cap into the selected voice form without joining the session', () => {

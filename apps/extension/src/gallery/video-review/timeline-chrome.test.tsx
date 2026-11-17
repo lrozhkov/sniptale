@@ -25,7 +25,6 @@ it('groups compact history and autosave with equal short separators', () => {
     cursor: 0,
     length: 0,
     onHistory: vi.fn(),
-    onAddNote: vi.fn(),
     autosave: {
       enabled: true,
       error: null,
@@ -47,13 +46,10 @@ it('groups compact history and autosave with equal short separators', () => {
       'gallery.videoReview.toolbar.separator'
     );
     const separators = host.querySelectorAll('[data-ui="gallery.videoReview.toolbar.separator"]');
-    expect(separators).toHaveLength(3);
+    expect(separators).toHaveLength(2);
     expect(autosave.nextElementSibling?.getAttribute('data-compact-only')).toBe('true');
-    const note = host.querySelector('[aria-label="gallery.videoReview.addComment"]')!;
-    expect(note.nextElementSibling?.getAttribute('data-ui')).toBe(
-      'gallery.videoReview.toolbar.separator'
-    );
-    expect(note.nextElementSibling?.nextElementSibling?.getAttribute('aria-label')).toBe(
+    expect(host.querySelector('[aria-label="gallery.videoReview.addComment"]')).toBeNull();
+    expect(host.querySelector('button')?.getAttribute('aria-label')).toBe(
       'gallery.videoReview.undo'
     );
     for (const separator of separators) {
@@ -232,8 +228,9 @@ it('keeps ruler and lane markers aligned across source-time bounds without captu
 });
 
 it('moves the playhead on published frames without a React render and preserves paused navigation', async () => {
-  const { createReviewPlaybackPresentationClock, ReviewPlaybackPresentationClockContext } =
-    await import('./playback-presentation-clock');
+  const { ReviewPlaybackPresentationClockContext } = await import('./playback-presentation-clock');
+  const { createReviewPlaybackPresentationClock } =
+    await import('./playback-presentation-clock.test-support');
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   let playing = true,
     renders = 0;
@@ -276,8 +273,9 @@ it('moves the playhead on published frames without a React render and preserves 
 });
 
 it('updates the clock from presented frames without a root render and rejects stale React time', async () => {
-  const { createReviewPlaybackPresentationClock, ReviewPlaybackPresentationClockContext } =
-    await import('./playback-presentation-clock');
+  const { ReviewPlaybackPresentationClockContext } = await import('./playback-presentation-clock');
+  const { createReviewPlaybackPresentationClock } =
+    await import('./playback-presentation-clock.test-support');
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal(
     'ResizeObserver',

@@ -62,6 +62,7 @@ export async function openEffectVideoEditorHarness(
 ): Promise<void> {
   await applyHarnessBootstrap(page, {
     apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+    storage: { 'sniptale-locale-preference': 'ru' },
     ...(project ? { videoProjects: [project] } : {}),
   });
   const projectQuery = project ? `?project=${encodeURIComponent(project.id)}` : '';
@@ -70,7 +71,10 @@ export async function openEffectVideoEditorHarness(
   });
   if (!project) {
     await page
-      .getByRole('button', { name: translate('videoEditor.app.newProjectAction'), exact: true })
+      .getByRole('button', {
+        name: translate('videoEditor.app.newProjectAction', 'ru'),
+        exact: true,
+      })
       .click();
   }
 }
@@ -119,7 +123,10 @@ export async function importAndApplyEffect(
   const documentLabel = page.locator(`[data-effect-document="${args.documentId}"]`);
   await documentLabel.hover();
   const applyKey = 'videoEditor.effectsLibrary.applyToScene';
-  const addButton = documentLabel.getByRole('button', { name: translate(applyKey), exact: true });
+  const addButton = documentLabel.getByRole('button', {
+    name: translate(applyKey, 'ru'),
+    exact: true,
+  });
   await expect(addButton).toBeEnabled();
   await addButton.click();
   await page.locator('[data-ui="video-editor.materials.close"]').click();

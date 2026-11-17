@@ -13,6 +13,11 @@ import { resolvePresentationSettings } from './presentation';
 import { resolveOriginalSourceAudio } from './original-audio-mutes';
 import { projectReviewVoiceover } from '../voiceover-edits';
 import { projectReviewFocus } from '../focus-edits';
+import {
+  projectReviewCursorMotions,
+  projectReviewCursorPath,
+  projectReviewWebcam,
+} from '../timeline-placement';
 import { reviewVisibleEditBoundaries } from '../timeline';
 import type { ReviewDocument } from '../types';
 import type {
@@ -149,13 +154,17 @@ export function resolveQuickEditEffectiveState(
     ...(state.sourceFilters ? { sourceFilters: state.sourceFilters } : {}),
     cursorMotions:
       advanced && state.cursorMotionEnabled !== false && state.ui.tracks.cursorMotion !== false
-        ? state.cursorMotions
+        ? usesResultCursorClock(state)
+          ? projectReviewCursorMotions(state.cursorMotions, state.audio.voiceoverSegments)
+          : state.cursorMotions
         : undefined,
     zoomRegions: resolveCursorRegions(state, features, cursorFacts),
     background: advanced ? state.background : { enabled: false },
     canvas: advanced ? state.canvas : undefined,
     windowHeader: advanced ? state.windowHeader : undefined,
-    webcam: features.webcamApplied ? state.webcam : undefined,
+    webcam: features.webcamApplied
+      ? projectReviewWebcam(state.webcam, state.audio.voiceoverSegments)
+      : undefined,
     watermark: features.watermarkApplied ? state.watermark : undefined,
     captions: features.captionsApplied ? state.captions : undefined,
     text: features.captionsApplied ? state.text : undefined,
@@ -179,7 +188,8 @@ export function resolveQuickEditEffectiveState(
       })),
     music: projectReviewVoiceover(
       features.musicApplied ? state.audio.music : [],
-      state.audio.voiceoverSegments
+      state.audio.voiceoverSegments,
+      'fill'
     )
       .filter((clip) => !clip.dormant)
       .filter((clip) => {
@@ -188,6 +198,18 @@ export function resolveQuickEditEffectiveState(
       })
       .map((clip) => ({ ...clip, volume: clip.volume * (state.audio.laneVolumes?.music ?? 1) })),
   };
+}
+
+/** Legacy source clocks remain unchanged until inserted time or authored result motion needs projection. */
+function usesResultCursorClock(state: QuickEditAdvancedState) {
+  return (
+    !!state.audio.voiceoverSegments?.some((segment) => segment.kind === 'freeze') ||
+    !!(
+      state.cursorMotionEnabled !== false &&
+      state.ui.tracks.cursorMotion !== false &&
+      state.cursorMotions?.some((motion) => motion.timeDomain === 'result')
+    )
+  );
 }
 
 function resolveCursorRegions(
@@ -240,6 +262,7 @@ function resolveCursorRegions(
   const cached = cursorRegions.get(owner) ?? [];
   const previous = cached.find((entry) => entry.key === key && entry.facts === cursorFacts?.facts);
   const pathKey = JSON.stringify({
+    timeMap: usesResultCursorClock(state) ? state.audio.voiceoverSegments : undefined,
     needsCursor,
     source: cursorFacts?.source,
     segments: state.cursorFocusPath?.segments,
@@ -278,9 +301,13 @@ function createCursorPaths(
       : state.cursorFocusPath
     : undefined;
   const cursorPath = withCursorMotionPath(
-    basePath,
+    usesResultCursorClock(state)
+      ? projectReviewCursorPath(basePath, state.audio.voiceoverSegments)
+      : basePath,
     state.cursorMotionEnabled !== false && state.ui.tracks.cursorMotion !== false
-      ? state.cursorMotions
+      ? usesResultCursorClock(state)
+        ? projectReviewCursorMotions(state.cursorMotions, state.audio.voiceoverSegments)
+        : state.cursorMotions
       : undefined
   );
   const observed =
@@ -291,9 +318,11 @@ function createCursorPaths(
     key,
     cursorPath,
     observed: withCursorMotionPath(
-      observed,
+      usesResultCursorClock(state)
+        ? projectReviewCursorPath(observed, state.audio.voiceoverSegments)
+        : observed,
       state.cursorMotionEnabled !== false && state.ui.tracks.cursorMotion !== false
-        ? state.cursorMotions
+        ? projectReviewCursorMotions(state.cursorMotions, state.audio.voiceoverSegments)
         : undefined
     ),
   };
@@ -355,7 +384,22 @@ function createCursorRegionProjection(
                   }
                 : {}),
               ...(observed ? { observed } : {}),
-              ...(state.audio.voiceoverSegments ? { timeMap: state.audio.voiceoverSegments } : {}),
+              ...(state.audio.voiceoverSegments
+                ? {
+                    timeMap: usesResultCursorClock(state)
+                      ? [
+                          {
+                            kind: 'keep' as const,
+                            rate: 1,
+                            sourceStart: 0,
+                            resultStart: 0,
+                            sourceEnd: state.audio.voiceoverSegments.at(-1)?.resultEnd ?? 0,
+                            resultEnd: state.audio.voiceoverSegments.at(-1)?.resultEnd ?? 0,
+                          },
+                        ]
+                      : state.audio.voiceoverSegments,
+                  }
+                : {}),
             },
           }
         : region;

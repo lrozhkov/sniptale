@@ -4,8 +4,7 @@ import type {
   VideoProjectVideoClip,
 } from '../types/index';
 import { VideoProjectActionPreset } from '../types/index';
-import { getSourceTimedClipProjectOffset } from './basics';
-import { normalizeClipPlaybackRate } from './basics';
+import { getSourceTimedClipProjectOffset, normalizeClipPlaybackRate } from './rate';
 
 const SOURCE_POINT_EPSILON = 0.000_001;
 

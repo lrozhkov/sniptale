@@ -11,6 +11,7 @@ import { parseVideoWorkspace } from '../../composition/persistence/review-worksp
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import { useReviewAdvanced } from './use-advanced';
 import { useReviewSnapshot } from './use-session';
+import { createReviewCommandFixture } from './editor-fixture.test-support';
 import { useReviewAnnotationEffects } from './annotation-effects-editor';
 import { ReviewAnnotationInspector } from './annotation-effects-inspector';
 import { translate } from '../../platform/i18n';
@@ -52,7 +53,7 @@ let advanced: ReturnType<typeof useReviewAdvanced>;
 let session: ReturnType<typeof createVideoReviewSession>;
 let blocked = false;
 let holdFlush: (() => Promise<void>) | null = null;
-function setup(inspect = false) {
+function setup(inspect = false, withCommands = false) {
   const renders = vi.fn();
   const initial = createQuickEditAdvancedState();
   initial.ui.mode = 'advanced';
@@ -100,8 +101,18 @@ function setup(inspect = false) {
   session.setAutosaveEnabled(false);
   const select = vi.fn<(selection: ReviewSelection) => void>();
   const pause = vi.fn();
+  const commands = withCommands
+    ? createReviewCommandFixture(() => ({
+        duration: 4,
+        time: 0,
+        session,
+        document: session.getSnapshot().document,
+        advanced: advanced.advanced,
+      }))
+    : undefined;
   const acquire = vi.fn<typeof applyReviewAnnotationCatalogDocument>(async (args) => {
     args.signal.throwIfAborted();
+    args.assertCurrentTarget?.();
     const id = args.instanceId ?? crypto.randomUUID();
     await args.session.applyAnnotationEffect({
       expectedSourceAssetId: 'source',
@@ -128,6 +139,7 @@ function setup(inspect = false) {
         allowed: () => !blocked && current.snapshot.workspace.advanced.ui.mode === 'advanced',
         pause,
         select,
+        ...(commands ? { commands } : {}),
       },
       acquire
     );
@@ -163,7 +175,16 @@ function setup(inspect = false) {
     locale: 'en',
     plane: { width: 640, height: 360 },
   };
-  return { save, select, pause, acquire, choice, renders, render: () => root.render(<Harness />) };
+  return {
+    save,
+    select,
+    pause,
+    acquire,
+    choice,
+    renders,
+    commands,
+    render: () => root.render(<Harness />),
+  };
 }
 const settle = async (action: () => void) => {
   await act(async () => {
@@ -259,6 +280,35 @@ it('allows overlapping duplicates and enabled toggles without allocating another
   expect(save).not.toHaveBeenCalled();
 });
 
+it('buffers lane toggles without a blocking flush or invalidating unrelated tracks', async () => {
+  const { pause } = setup();
+  const audio = advanced.advanced.audio;
+  const zoom = advanced.advanced.zoom;
+  const instances = editor.lane!.instances;
+  const gate = Promise.withResolvers<void>();
+  const flush = vi.fn(() => gate.promise);
+  holdFlush = flush;
+  try {
+    act(() => editor.enabled(false));
+    expect(editor.pending).toBe(false);
+    expect(editor.lane?.enabled).toBe(false);
+    expect(editor.lane?.instances).toBe(instances);
+    expect(advanced.advanced.audio).toBe(audio);
+    expect(advanced.advanced.zoom).toBe(zoom);
+    expect(flush).not.toHaveBeenCalled();
+    expect(pause).toHaveBeenCalled();
+  } finally {
+    await settle(() => gate.resolve());
+    holdFlush = null;
+  }
+  await act(async () => advanced.flush());
+  expect(session.getSnapshot().document.advancedContent.annotationEffects?.enabled).toBe(false);
+  await act(async () => session.history('undo'));
+  expect(editor.lane?.enabled).toBe(true);
+  await act(async () => session.history('redo'));
+  expect(editor.lane?.enabled).toBe(false);
+});
+
 it('rejects invalid timing and SDK controls before they poison the content buffer', async () => {
   setup();
   for (const patch of [
@@ -333,8 +383,10 @@ it('retries an unadmitted choice and refuses all mutations while another editor 
     editor.add(choice);
     editor.remove('first');
     editor.change('first', { start: 0 });
+    editor.enabled(false);
   });
   expect(acquire).not.toHaveBeenCalled();
+  expect(editor.lane?.enabled).toBe(true);
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
   blocked = false;
   acquire.mockRejectedValueOnce(new Error('Unavailable'));
@@ -508,6 +560,9 @@ it('retries the retained live field before clearing a completed edit failure', a
 
 it('commits actual inspector scrub once, restores through Undo/Redo and cancels without history', async () => {
   const { save } = setup(true);
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-placement"]')!.click()
+  );
   const range = () =>
     host.querySelector<HTMLInputElement>(
       `input[aria-label="${translate('gallery.videoReview.annotationX')} range"]`
@@ -549,6 +604,9 @@ it('commits actual inspector scrub once, restores through Undo/Redo and cancels 
 
 it('derives preset presentation through canonical history, rejected edits and persisted reopen', async () => {
   const { save, render } = setup(true);
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-sdk:appearance"]')!.click()
+  );
   const document = readReviewAnnotationEffectDocument(source)!;
   const preset = document.controlPresets![1]!;
   const label = () =>
@@ -585,9 +643,10 @@ it('derives preset presentation through canonical history, rejected edits and pe
   await previous.dispose();
 });
 
-it('switches attachment in real perspective geometry as one history edit and restores exact state', async () => {
-  const { save, render } = setup(true);
-  const { createReviewAnnotationGeometry } = await import('./annotation-effects-geometry');
+it('switches attachment with current perspective geometry, no root update and one restorable edit', async () => {
+  const { save, render, renders } = setup(true);
+  const { createReviewAnnotationGeometry, convertReviewAnnotationAttachment } =
+    await import('./annotation-effects-geometry');
   const { quickEditSpatialTargetCamera } =
     await import('../../features/video/review/advanced/spatial');
   const { DEFAULT_CAMERA_PERSPECTIVE: DEFAULT_QUICK_EDIT_PERSPECTIVE } =
@@ -604,9 +663,24 @@ it('switches attachment in real perspective geometry as one history edit and res
     camera: quickEditSpatialTargetCamera(region),
     background: { enabled: false },
   })!;
+  const count = renders.mock.calls.length;
+  act(() =>
+    editor.setGeometry(
+      createReviewAnnotationGeometry({
+        source: { width: 640, height: 360 },
+        output: { width: 1280, height: 720 },
+        camera: { scale: 1, centerX: 0.2, centerY: 0.3 },
+        background: { enabled: false },
+      })
+    )
+  );
   act(() => editor.setGeometry(geometry));
+  expect(renders).toHaveBeenCalledTimes(count);
   const before = structuredClone(
     session.getSnapshot().document.advancedContent.annotationEffects!.instances[0]!
+  );
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-placement"]')!.click()
   );
   const trigger = host.querySelector<HTMLButtonElement>(
     `button[aria-label="${translate('gallery.videoReview.annotationAttachment')}"]`
@@ -623,6 +697,9 @@ it('switches attachment in real perspective geometry as one history edit and res
   await settle(() => option.click());
   const after = session.getSnapshot().document.advancedContent.annotationEffects!.instances[0]!;
   expect(after.attachment).toBe('viewport');
+  expect(after.transform).toEqual(
+    convertReviewAnnotationAttachment(before, 'viewport', geometry)!.transform
+  );
   expect(after).toMatchObject({
     id: before.id,
     snapshotId: before.snapshotId,
@@ -692,6 +769,9 @@ it('retains picked alpha through actual Apply, canonical Undo/Redo and persisted
   const definition = readReviewAnnotationEffectDocument(source)!;
   const control = definition.controls.find((item) => item.id === 'accent')!;
   const label = resolveEffectLocaleText(control.label, getCurrentLocale());
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-sdk:appearance"]')!.click()
+  );
   const row = [
     ...host.querySelectorAll<HTMLElement>('[data-ui="shared.ui.compact-inspector.color-field"]'),
   ].find((node) => node.querySelector(`[title="${label}"]`))!;
@@ -754,9 +834,29 @@ it('does not schedule another editor render when the stage reports equal geometr
   const count = renders.mock.calls.length;
   for (let i = 0; i < 80; i++) act(() => editor.setGeometry(structuredClone(geometry)));
   expect(renders).toHaveBeenCalledTimes(count);
-  expect(editor.geometry).toEqual(geometry);
+  expect(editor.geometry.read()).toEqual(geometry);
   expect(save).not.toHaveBeenCalled();
 });
+
+it.each([false, true])(
+  'keeps changing presented camera geometry outside the root owner with inspector=%s',
+  async (inspect) => {
+    const { renders, save } = setup(inspect);
+    const { createReviewAnnotationGeometry } = await import('./annotation-effects-geometry');
+    const count = renders.mock.calls.length;
+    for (const centerX of [0.3, 0.4, 0.6, 0.7]) {
+      const geometry = createReviewAnnotationGeometry({
+        source: { width: 640, height: 360 },
+        output: { width: 640, height: 360 },
+        background: { enabled: false },
+        camera: { scale: 2, centerX, centerY: 0.3 },
+      });
+      act(() => editor.setGeometry(geometry));
+    }
+    expect(renders).toHaveBeenCalledTimes(count);
+    expect(save).not.toHaveBeenCalled();
+  }
+);
 
 it('publishes changed geometry and readmits the same geometry after a session reset', async () => {
   const { render } = setup();
@@ -774,21 +874,125 @@ it('publishes changed geometry and readmits the same geometry after a session re
     editor.setGeometry(first);
     editor.setGeometry(changed);
   });
-  expect(editor.geometry).toEqual(changed);
+  expect(editor.geometry.read()).toEqual(changed);
   act(() => {
     editor.setGeometry(first);
     editor.setGeometry(changed);
     editor.setGeometry(null);
   });
-  expect(editor.geometry).toBeNull();
+  expect(editor.geometry.read()).toBeNull();
   act(() => editor.setGeometry(changed));
-  expect(editor.geometry).toEqual(changed);
+  expect(editor.geometry.read()).toEqual(changed);
   const previous = session;
+  const previousGeometry = editor.geometry;
+  const previousReport = editor.setGeometry;
   session = createVideoReviewSession(previous.getSnapshot().snapshot);
   session.setAutosaveEnabled(false);
   act(render);
-  expect(editor.geometry).toBeNull();
+  expect(editor.geometry).not.toBe(previousGeometry);
+  expect(editor.geometry.read()).toBeNull();
+  act(() => previousReport(changed));
+  expect(editor.geometry.read()).toBeNull();
   act(() => editor.setGeometry(changed));
-  expect(editor.geometry).toEqual(changed);
+  expect(editor.geometry.read()).toEqual(changed);
   await previous.dispose();
 });
+
+it('keeps cached geometry snapshots equal and detaches local subscribers without root work', async () => {
+  const { renders, render } = setup();
+  const { createReviewAnnotationGeometry } = await import('./annotation-effects-geometry');
+  const next = createReviewAnnotationGeometry({
+    source: { width: 640, height: 360 },
+    output: { width: 640, height: 360 },
+    background: { enabled: false },
+    camera: { scale: 2, centerX: 0.3, centerY: 0.4 },
+  });
+  const port = editor.geometry;
+  const listener = vi.fn();
+  const unsubscribe = port.subscribe(listener);
+  const count = renders.mock.calls.length;
+  act(() => editor.setGeometry(next));
+  const accepted = port.read();
+  act(() => editor.setGeometry(structuredClone(next)));
+  expect(port.read()).toBe(accepted);
+  expect(listener).toHaveBeenCalledOnce();
+  expect(renders).toHaveBeenCalledTimes(count);
+  unsubscribe();
+  act(() => editor.setGeometry(null));
+  expect(port.read()).toBeNull();
+  expect(listener).toHaveBeenCalledOnce();
+  act(render);
+  expect(editor.geometry).toBe(port);
+});
+
+it.each([true, false])(
+  'guards captured temporal attachment after acquisition await (changesMap=%s)',
+  async (changesMap) => {
+    const { acquire, choice, commands, select } = setup(false, true);
+    const cut = {
+      id: 'pending-cut',
+      kind: 'cut' as const,
+      start: 3,
+      end: 4,
+      requestedStart: 3,
+      requestedEnd: 4,
+    };
+    await act(async () =>
+      session.commit({ id: 'add-cut', at: 1, target: 'edit', before: null, after: cut })
+    );
+    const context = commands!.capture()!;
+    expect(context).not.toBeNull();
+    const implementation = acquire.getMockImplementation()!;
+    let reportReached!: () => void;
+    let resume!: () => void;
+    const reached = new Promise<void>((resolve) => {
+      reportReached = resolve;
+    });
+    const held = new Promise<void>((resolve) => {
+      resume = resolve;
+    });
+    acquire.mockImplementationOnce(async (...args) => {
+      reportReached();
+      await held;
+      return implementation(...args);
+    });
+    const apply = vi.spyOn(session, 'applyAnnotationEffect');
+    let pending!: Promise<string | null>;
+    let id: string | null = null;
+    try {
+      await act(async () => {
+        pending = editor.add({ ...choice, timeDomain: 'result' }, context);
+        await reached;
+        await session.commit({
+          id: 'change-cut',
+          at: 2,
+          target: 'edit',
+          before: cut,
+          after: { ...cut, requestedStart: 2.5, ...(changesMap ? { start: 2.5 } : {}) },
+        });
+        expect(commands!.isCurrent(context, 'temporal')).toBe(!changesMap);
+        resume();
+        id = await pending;
+      });
+      expect(acquire.mock.calls[0]![0].assertCurrentTarget).toBeTypeOf('function');
+      if (changesMap) {
+        expect(id).toBeNull();
+        expect(apply).not.toHaveBeenCalled();
+        expect(select).not.toHaveBeenCalled();
+        expect(editor.lane?.instances.map((item) => item.id)).toEqual(['first']);
+        expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(2);
+      } else {
+        expect(id).not.toBeNull();
+        expect(apply).toHaveBeenCalledOnce();
+        expect(select).toHaveBeenCalledWith({ kind: 'annotation-effect', id }, context);
+        expect(editor.lane?.instances.map((item) => item.id)).toEqual(['first', id]);
+        expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(3);
+      }
+      expect(editor.pending).toBe(false);
+    } finally {
+      resume();
+      await pending;
+      apply.mockRestore();
+    }
+  }
+);

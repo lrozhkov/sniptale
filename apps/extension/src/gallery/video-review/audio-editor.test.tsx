@@ -2,6 +2,8 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { AudioTakeLevelFields } from '../../ui/audio/take-fields';
+import { ReviewOriginalAudioInspector } from './original-audio-inspector';
 import { ReviewAudioClipEditor, ReviewAudioInspectorSection } from './audio-editor';
 import { createQuickEditAudioClip } from '../../features/video/review/advanced/audio';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
@@ -63,6 +65,9 @@ it('patches volume and fades from numeric fields', () => {
   setValue(field('audioClipVolume'), '150');
   act(() => field('audioClipVolume').dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(onPatch).toHaveBeenCalledWith({ volume: 1.5 });
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-animation"]')!.click()
+  );
   setValue(field('audioFadeIn'), '0.5');
   act(() => field('audioFadeIn').dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(onPatch).toHaveBeenCalledWith({ fadeIn: 0.5 });
@@ -171,8 +176,11 @@ it('keeps long fades available by typing while using a five-second slider', () =
     endMax: 120,
   });
   renderEditor(clip);
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-animation"]')!.click()
+  );
   const ranges = [...host.querySelectorAll<HTMLInputElement>('input[type="range"]')];
-  expect(ranges.slice(1).map((range) => range.max)).toEqual(['5', '5']);
+  expect(ranges.map((range) => range.max)).toEqual(['5', '5']);
   const fade = host.querySelector<HTMLInputElement>(
     '[aria-label="gallery.videoReview.audioFadeOut"]'
   )!;
@@ -237,6 +245,9 @@ it('bounds a short audio fade to its duration', () => {
     endMax: 2,
   });
   const { field } = renderEditor(clip);
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-animation"]')!.click()
+  );
   setValue(field('audioFadeIn'), '12');
   act(() => field('audioFadeIn').dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(onPatch).toHaveBeenLastCalledWith({ fadeIn: 2 });
@@ -286,3 +297,128 @@ it.each(['voiceover', 'music'] as const)(
     ).toBe(true);
   }
 );
+
+it('offers voiceover tempo choices without replacing an authored custom tempo', () => {
+  const clip = {
+    ...createQuickEditAudioClip({
+      id: 'custom',
+      assetId: 'asset',
+      timelineStart: 0,
+      duration: 4,
+      endMax: 10,
+    }),
+    tempo: 1.37,
+  };
+  act(() =>
+    root.render(
+      <ReviewAudioClipEditor
+        clip={clip}
+        lane="voiceover"
+        busy={false}
+        onPatch={onPatch}
+        onDelete={onDelete}
+      />
+    )
+  );
+  expect(
+    host.querySelector<HTMLInputElement>('[aria-label="gallery.videoReview.voiceoverTempo"]')?.value
+  ).toBe('1.37');
+  const choices = [
+    ...host.querySelectorAll<HTMLButtonElement>(
+      '[data-ui="shared.ui.compact-inspector.segmented-row"] button'
+    ),
+  ];
+  expect(choices.map((choice) => choice.textContent)).toEqual([
+    '0.5×',
+    '0.75×',
+    '1×',
+    '1.5×',
+    '2×',
+    '4×',
+  ]);
+  expect(choices.every((choice) => choice.getAttribute('aria-pressed') === 'false')).toBe(true);
+  expect(onPatch).not.toHaveBeenCalled();
+  act(() => choices[5]!.click());
+  expect(onPatch).toHaveBeenLastCalledWith({ tempo: 4 });
+});
+
+it.each(['voiceover', 'music'] as const)('separates processing from %s level fields', (lane) => {
+  const clip = createQuickEditAudioClip({
+    id: 'effects',
+    assetId: 'asset',
+    timelineStart: 0,
+    duration: 4,
+    endMax: 10,
+  });
+  act(() =>
+    root.render(
+      <ReviewAudioClipEditor
+        clip={clip}
+        lane={lane}
+        busy={false}
+        onPatch={onPatch}
+        onDelete={onDelete}
+      />
+    )
+  );
+  expect(host.querySelector('[data-ui="audio.processing-fields"]')).toBeNull();
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-audio-effects"]')!.click()
+  );
+  expect(host.querySelector('[data-ui="audio.processing-fields"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="gallery.videoReview.audioClipVolume"]')).toBeNull();
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[aria-label="audioProcessing.denoise"]')!.click()
+  );
+  expect(onPatch).toHaveBeenLastCalledWith({
+    audioProcessing: expect.objectContaining({
+      denoise: expect.objectContaining({ enabled: true }),
+    }),
+  });
+});
+
+it('keeps original gain and mute recovery hints while timeline owns range bounds', () => {
+  const patchOriginal = vi.fn();
+  act(() =>
+    root.render(
+      <ReviewOriginalAudioInspector
+        audio={
+          {
+            selectedOriginal: { id: 'gain', start: 1, end: 3, volume: 0.5 },
+            patchOriginal,
+            removeOriginal: vi.fn(),
+          } as never
+        }
+        duration={10}
+        speedMuted
+        originalMuted
+      />
+    )
+  );
+  expect(host.querySelector('[aria-label="gallery.videoReview.rangeStart"]')).toBeNull();
+  expect(host.querySelector('[aria-label="gallery.videoReview.rangeEnd"]')).toBeNull();
+  expect(host.textContent).toContain('gallery.videoReview.audioRangeSpeedHint');
+  expect(host.textContent).toContain('gallery.videoReview.originalAudioMutedHint');
+  const volume = host.querySelector<HTMLInputElement>(
+    'input[aria-label="gallery.videoReview.volume"]'
+  )!;
+  act(() => setValue(volume, '120'));
+  act(() => volume.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+  expect(patchOriginal).toHaveBeenCalledWith('gain', { volume: 1.2 });
+});
+
+it('retains combined level and processing fields for consumers that do not opt into sections', () => {
+  const clip = createQuickEditAudioClip({
+    id: 'legacy',
+    assetId: 'asset',
+    timelineStart: 0,
+    duration: 4,
+    endMax: 10,
+  });
+  act(() =>
+    root.render(<AudioTakeLevelFields clip={clip} disabled={false} showTempo onPatch={onPatch} />)
+  );
+  expect(host.querySelector('[aria-label="gallery.videoReview.audioClipVolume"]')).not.toBeNull();
+  expect(host.querySelector('[data-ui="audio.processing-fields"]')).not.toBeNull();
+  expect(host.querySelector('[data-ui="shared.ui.compact-inspector.segmented-row"]')).toBeNull();
+});

@@ -69,12 +69,25 @@ function fixture(name: string) {
     order: 0,
   };
   const lane = { enabled: true, instances: [instance] };
+  let currentGeometry: ReturnType<typeof createReviewAnnotationGeometry> = geometry;
+  const geometryListeners = new Set<() => void>();
   const editor: ReturnType<typeof useReviewAnnotationEffects> = {
     lane,
     previewLane: lane,
-    geometry,
+    geometry: {
+      read: () => currentGeometry,
+      subscribe(listener) {
+        geometryListeners.add(listener);
+        return () => {
+          geometryListeners.delete(listener);
+        };
+      },
+    },
     gestureId: null,
-    setGeometry: vi.fn(),
+    setGeometry: vi.fn((next) => {
+      currentGeometry = next;
+      for (const listener of geometryListeners) listener();
+    }),
     pending: false,
     failure: null,
     add: vi.fn(),
@@ -112,11 +125,26 @@ function render(
       />
     )
   );
+  openSection('placement');
+}
+function openSection(id: string) {
+  const tab = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((node) =>
+    node.getAttribute('aria-controls')?.endsWith(`-${id}`)
+  );
+  if (tab) act(() => tab.click());
+}
+function reveal(selector: string): Element | null {
+  let found = host.querySelector(selector);
+  if (found) return found;
+  for (const tab of host.querySelectorAll<HTMLButtonElement>('[role="tab"]')) {
+    act(() => tab.click());
+    found = host.querySelector(selector);
+    if (found) return found;
+  }
+  return null;
 }
 function input(label: string) {
-  const node = [...host.querySelectorAll<HTMLInputElement>('input')].find(
-    (element) => element.getAttribute('aria-label') === label
-  );
+  const node = reveal(`input[aria-label="${label}"]`) as HTMLInputElement | null;
   if (!node) throw new Error(`Missing fixture field: ${label}`);
   return node;
 }
@@ -151,13 +179,10 @@ it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners', 'arr
   (name) => {
     const value = fixture(name);
     render(value);
-    expect(host.textContent).toContain(
-      resolveEffectLocaleText(value.document.label, getCurrentLocale())
-    );
     for (const control of value.document.controls) {
       expect(
-        host.querySelector(
-          `[aria-label="${resolveEffectLocaleText(control.label, getCurrentLocale()) || control.id}"]`
+        reveal(
+          `[aria-label="${resolveEffectLocaleText(control.label, getCurrentLocale()) || control.id}"]:not([role="tab"])`
         )
       ).not.toBeNull();
       if (control.kind === 'number' && !control.options?.length)
@@ -171,8 +196,10 @@ it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners', 'arr
           `sdk:${resolveEffectControlGroup(control.group, value.document.controlGroups) ?? 'advanced'}`
       )
     );
-    for (const group of expected)
+    for (const group of expected) {
+      openSection(group);
       expect(host.querySelector(`[data-section="${group}"]`)).not.toBeNull();
+    }
     expect(value.editor.change).not.toHaveBeenCalled();
   }
 );
@@ -181,9 +208,9 @@ it('previews multiline text without history, commits once on Ctrl+Enter and canc
   const value = fixture('title');
   render(value);
   const control = value.document.controls.find((item) => item.id === 'title')!;
-  const node = host.querySelector<HTMLTextAreaElement>(
+  const node = reveal(
     `textarea[aria-label="${resolveEffectLocaleText(control.label, getCurrentLocale())}"]`
-  )!;
+  ) as HTMLTextAreaElement;
   type(node, 'Typed value');
   expect(value.editor.previewGesture).toHaveBeenLastCalledWith({
     controls: { ...value.instance.controls, title: 'Typed value' },
@@ -203,7 +230,9 @@ it('previews multiline text without history, commits once on Ctrl+Enter and canc
 it('applies an SDK visual preset without changing text, geometry or fixed anchors', async () => {
   const value = fixture('callout');
   render(value);
-  const trigger = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+  expect(host.querySelector('[role="tab"][aria-controls$="-presets"]')).toBeNull();
+  openSection('sdk:appearance');
+  const trigger = [...host.querySelectorAll<HTMLButtonElement>('button:not([role="tab"])')].find(
     (node) => node.getAttribute('aria-label') === translate('gallery.videoReview.annotationPresets')
   )!;
   await act(async () => {
@@ -286,11 +315,11 @@ it('shows unavailable immutable source and disables pending controls without rep
 
 it('disables reflected attachment conversion and restores it when valid geometry returns', async () => {
   const value = fixture('title');
-  value.editor.geometry = {
+  value.editor.setGeometry({
     ...geometry,
     contentToViewport: [-2, 0.5, 0, 0, 2, 0, 0, 0, 1],
     viewportToContent: [-0.5, 0.125, 0, 0, 0.5, 0, 0, 0, 1],
-  };
+  });
   render(value);
   expect(host.textContent).toContain(
     translate('gallery.videoReview.annotationAttachmentUnavailable')
@@ -310,7 +339,7 @@ it('disables reflected attachment conversion and restores it when valid geometry
   };
   expect((await open()).disabled).toBe(true);
   act(() => root.render(null));
-  value.editor.geometry = geometry;
+  value.editor.setGeometry(geometry);
   render(value);
   expect(host.textContent).not.toContain(
     translate('gallery.videoReview.annotationAttachmentUnavailable')
@@ -337,6 +366,9 @@ it('retains the SDK type of numeric select options and their localized labels', 
   value.instance.controls[control.id] = 25;
   expect(validateAnimationTemplate(value.document).ok).toBe(true);
   render(value, JSON.stringify(value.document));
+  reveal(
+    `button:not([role="tab"])[aria-label="${resolveEffectLocaleText(control.label, getCurrentLocale())}"]`
+  );
   const trigger = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
     (node) =>
       node.getAttribute('aria-label') === resolveEffectLocaleText(control.label, getCurrentLocale())
@@ -390,8 +422,6 @@ it('offers bounded scrub tracks in displayed units without changing authored val
   expect([x.min, x.max, x.value]).toEqual(['-100', '500', '500']);
   const width = input(`${translate('gallery.videoReview.annotationWidth')} range`);
   expect([width.min, width.max, width.value]).toEqual(['0.01', '200', '40']);
-  const start = input(`${translate('gallery.videoReview.annotationStart')} range`);
-  expect([start.min, start.max, start.value]).toEqual(['0', '3.999', '0']);
   const handle = value.document.objectLayout!.handles![0]!;
   const control = value.document.controls.find((item) => item.id === handle.xControl)!;
   const anchor = input(`${resolveEffectLocaleText(control.label, getCurrentLocale())} range`);
@@ -496,13 +526,18 @@ it('derives the preset label from accepted controls across rerender and reopenin
   const preset = value.document.controlPresets![0]!;
   value.instance.controls = { ...value.instance.controls, ...preset.values };
   render(value);
-  const trigger = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+  openSection('sdk:appearance');
+  let trigger = [...host.querySelectorAll<HTMLButtonElement>('button:not([role="tab"])')].find(
     (node) => node.getAttribute('aria-label') === translate('gallery.videoReview.annotationPresets')
   )!;
   expect(trigger.textContent).toContain(resolveEffectLocaleText(preset.label, getCurrentLocale()));
   value.instance.controls['title'] = 'Changed text';
   value.instance.transform.x = 0.2;
   render(value);
+  openSection('sdk:appearance');
+  trigger = host.querySelector<HTMLButtonElement>(
+    'button:not([role="tab"])[aria-label="gallery.videoReview.annotationPresets"]'
+  )!;
   expect(trigger.textContent).toContain(resolveEffectLocaleText(preset.label, getCurrentLocale()));
   await act(async () => {
     trigger.click();
@@ -531,7 +566,7 @@ it('preserves admitted unbounded auto fields without inventing a range', () => {
 
 it('keeps bound anchors and scale dimensions disabled without geometry, while plain SDK fields retain scrub', () => {
   const value = fixture('callout');
-  value.editor.geometry = null;
+  value.editor.setGeometry(null);
   render(value);
   expect(input(translate('gallery.videoReview.annotationWidth')).disabled).toBe(true);
   const handle = value.document.objectLayout!.handles![0]!;
@@ -541,6 +576,9 @@ it('keeps bound anchors and scale dimensions disabled without geometry, while pl
   expect(input(`${resolveEffectLocaleText(font.label, getCurrentLocale())} range`).disabled).toBe(
     false
   );
+  act(() => value.editor.setGeometry(geometry));
+  expect(input(translate('gallery.videoReview.annotationWidth')).disabled).toBe(false);
+  expect(input(resolveEffectLocaleText(bound.label, getCurrentLocale())).disabled).toBe(false);
   render(value, value.source, true);
   expect(host.querySelectorAll('input[type="range"]')).toHaveLength(0);
 });
@@ -611,7 +649,8 @@ it('keeps a custom group from repeating the host placement icon', () => {
   const source = JSON.stringify(value.document);
   expect(validateAnimationTemplate(value.document).ok).toBe(true);
   render(value, source);
-  expect(host.querySelectorAll('summary svg.lucide-move')).toHaveLength(1);
+  expect(host.querySelectorAll('[role="tab"] svg.lucide-move')).toHaveLength(1);
+  openSection('sdk:geometry');
   expect(host.querySelector('[data-effect-control-group="tracing"] input')).not.toBeNull();
 });
 
@@ -632,4 +671,38 @@ it('uses measured visible bounds even when inspector metadata is a different par
   render(value);
   expect(Number(input(translate('gallery.videoReview.annotationWidth')).value)).toBeCloseTo(20, 6);
   expect(Number(input(translate('gallery.videoReview.annotationHeight')).value)).toBeCloseTo(10, 6);
+});
+
+it('keeps presets under Appearance when a template has no appearance control group', () => {
+  const value = fixture('callout');
+  for (const control of value.document.controls) {
+    if (resolveEffectControlGroup(control.group, value.document.controlGroups) === 'appearance')
+      control.group = 'typography';
+  }
+  expect(validateAnimationTemplate(value.document).ok).toBe(true);
+  render(value, JSON.stringify(value.document));
+  expect(host.querySelector('[role="tab"][aria-controls$="-presets"]')).toBeNull();
+  openSection('sdk:appearance');
+  expect(
+    host.querySelector(
+      '[data-section="sdk:appearance"] button[aria-label="gallery.videoReview.annotationPresets"]'
+    )
+  ).not.toBeNull();
+});
+
+it('starts with SDK text and omits identity, timing, and proportional-scale hints', () => {
+  const value = fixture('callout');
+  render(value);
+  const tabs = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+  expect(tabs[0]?.getAttribute('aria-controls')).toContain('-sdk:content');
+  expect(tabs.some((tab) => tab.getAttribute('aria-controls')?.endsWith('-timing'))).toBe(false);
+  expect(host.textContent).not.toContain(translate('gallery.videoReview.annotationScaleHint'));
+  expect(host.textContent).not.toContain(translate('gallery.videoReview.annotationName'));
+  openSection('sdk:appearance');
+  const enabled = host.querySelector<HTMLButtonElement>(
+    `[aria-label="${translate('gallery.videoReview.annotationEnabled')}"]`
+  )!;
+  expect(enabled).not.toBeNull();
+  act(() => enabled.click());
+  expect(value.editor.change).toHaveBeenCalledWith(value.instance.id, { enabled: false });
 });

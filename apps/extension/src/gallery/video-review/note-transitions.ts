@@ -91,7 +91,8 @@ export function useReviewNoteTransitions(
 /** Pointer owners retain typed ranges; admission holds their selection and final commit together. */
 export function deferReviewGesture(
   beforeAction: ReviewBeforeAction | undefined,
-  select: () => void
+  select: () => void,
+  selection: 'immediate' | 'click' = 'immediate'
 ) {
   let ready = false;
   let cancelled = false;
@@ -99,10 +100,15 @@ export function deferReviewGesture(
   (beforeAction ?? ((action) => action()))(() => {
     if (cancelled) return;
     ready = true;
-    select();
+    if (selection === 'immediate') select();
     commit?.();
   });
   return {
+    select() {
+      if (cancelled) return;
+      if (ready) select();
+      else commit = select;
+    },
     commit(action: () => void) {
       if (cancelled) return;
       if (ready) action();

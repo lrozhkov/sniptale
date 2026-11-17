@@ -3,6 +3,7 @@ import { useRecoveryLifecycle } from './use-recovery-lifecycle';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   QuickEditAdvancedState,
+  QuickEditAdvancedContent,
   QuickEditTrack,
 } from '../../features/video/review/advanced/types';
 import { useReviewAdvancedContent } from './use-advanced-content';
@@ -16,10 +17,14 @@ import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 type PendingSave = { revision: number; value: QuickEditAdvancedState };
 
 /** UI chrome autosave remains outside user history; rendered content uses the history owner. */
-export function useReviewAdvanced(session: Session) {
+export function useReviewAdvanced(session: Session, beforeEdit?: () => void) {
   const snapshot = useReviewSnapshot(session);
   const persisted = snapshot.snapshot.workspace.advanced;
-  const contentState = useReviewAdvancedContent(session, snapshot.document.advancedContent);
+  const contentState = useReviewAdvancedContent(
+    session,
+    snapshot.document.advancedContent,
+    beforeEdit
+  );
   const [backgroundGesture, setBackgroundGesture] = useState<{
     session: Session;
     base: QuickEditAdvancedState['background'];
@@ -40,6 +45,7 @@ export function useReviewAdvanced(session: Session) {
   }, [session]);
   const stage = useCallback(
     (update: (current: QuickEditAdvancedState) => QuickEditAdvancedState) => {
+      beforeEdit?.();
       const next = update(currentRef.current);
       currentRef.current = next;
       const entry: PendingSave = {
@@ -73,7 +79,7 @@ export function useReviewAdvanced(session: Session) {
         EDITOR_AUTOSAVE_POLICY
       );
     },
-    [session]
+    [session, beforeEdit]
   );
   const controls = useTrackControlRequests({
     prepare: async () => {
@@ -102,36 +108,45 @@ export function useReviewAdvanced(session: Session) {
     }
   }, [contentState, controls, session]);
   const content = contentState.content;
+  const previousAdvanced = useRef<{ session: Session; value: QuickEditAdvancedState } | null>(null);
   const advanced = useMemo<QuickEditAdvancedState>(() => {
-    const {
-      sourceFilters: _baselineSourceFilters,
-      cursorFocusPath: _baselineCursorFocusPath,
-      cursorMotions: _baselineCursorMotions,
-      cursorMotionEnabled: _baselineCursorMotionEnabled,
-      annotationEffects: _baselineAnnotationEffects,
-      actionsEnabled: _baselineActionsEnabled,
-      interactionTimeline: _baselineInteractionTimeline,
-      keyAnimations: _baselineKeys,
-      clickAnimations: _baselineClicks,
-      actionAudio: _baselineActionAudio,
-      canvas: _baselineCanvas,
-      windowHeader: _baselineHeader,
-      watermark: _baselineWatermark,
-      presentation: _baselinePresentation,
-      webcam: _baselineWebcam,
-      text: _baselineText,
-      captions: _baselineCaptions,
-      ...workspaceState
-    } = persisted;
-    return {
-      ...workspaceState,
-      ui: optimistic?.value.ui ?? persisted.ui,
-      ...content,
-    };
-  }, [persisted, optimistic, content]);
+    const next = composeReviewAdvanced(persisted, content, optimistic?.value.ui ?? persisted.ui);
+    const previous =
+      previousAdvanced.current?.session === session ? previousAdvanced.current.value : undefined;
+    if (previous) {
+      next.ui = retainReviewFields(previous.ui, next.ui);
+      next.zoom = retainReviewFields(previous.zoom, next.zoom);
+      next.audio = retainReviewFields(previous.audio, {
+        ...next.audio,
+        original: retainReviewFields(previous.audio.original, next.audio.original),
+      });
+      if (previous.annotationEffects && next.annotationEffects)
+        next.annotationEffects = retainReviewFields(
+          previous.annotationEffects,
+          next.annotationEffects
+        );
+      if (previous.webcam && next.webcam)
+        next.webcam = retainReviewFields(previous.webcam, next.webcam);
+    }
+    const value = previous ? retainReviewFields(previous, next) : next;
+    previousAdvanced.current = { session, value };
+    return value;
+  }, [persisted, optimistic, content, session]);
+  const readCurrentContent = contentState.readCurrent;
+  const readCurrent = useCallback(
+    () =>
+      composeReviewAdvanced(
+        session.getSnapshot().snapshot.workspace.advanced,
+        readCurrentContent(),
+        pending.current?.value.ui ?? session.getSnapshot().snapshot.workspace.advanced.ui
+      ),
+    [session, readCurrentContent]
+  );
   return {
     ...contentState.commands,
     advanced,
+    readCurrent,
+    readCurrentContent,
     backgroundPreview:
       backgroundGesture?.session === session && backgroundGesture.base === content.background
         ? backgroundGesture.value
@@ -156,6 +171,52 @@ export function useReviewAdvanced(session: Session) {
     },
     reset,
   };
+}
+
+function composeReviewAdvanced(
+  persisted: QuickEditAdvancedState,
+  content: QuickEditAdvancedContent,
+  ui: QuickEditAdvancedState['ui']
+): QuickEditAdvancedState {
+  const {
+    sourceFilters: _baselineSourceFilters,
+    cursorFocusPath: _baselineCursorFocusPath,
+    cursorMotions: _baselineCursorMotions,
+    cursorMotionEnabled: _baselineCursorMotionEnabled,
+    annotationEffects: _baselineAnnotationEffects,
+    actionsEnabled: _baselineActionsEnabled,
+    interactionTimeline: _baselineInteractionTimeline,
+    keyAnimations: _baselineKeys,
+    clickAnimations: _baselineClicks,
+    actionAudio: _baselineActionAudio,
+    canvas: _baselineCanvas,
+    windowHeader: _baselineHeader,
+    watermark: _baselineWatermark,
+    presentation: _baselinePresentation,
+    webcam: _baselineWebcam,
+    text: _baselineText,
+    captions: _baselineCaptions,
+    ...workspaceState
+  } = persisted;
+  return { ...workspaceState, ui, ...content };
+}
+
+/** Persistence parsing clones JSON branches; equal branches must not restart unrelated consumers. */
+function retainReviewFields<T extends object>(previous: T, next: T): T {
+  const fields = new Map<string, unknown>(Object.entries(previous));
+  const entries = Object.entries(next);
+  let equal = fields.size === entries.length;
+  const result = { ...next };
+  for (const [key, value] of entries) {
+    const prior = fields.get(key);
+    if (
+      fields.has(key) &&
+      (Object.is(prior, value) || JSON.stringify(prior) === JSON.stringify(value))
+    )
+      Reflect.set(result, key, prior);
+    else equal = false;
+  }
+  return equal ? previous : result;
 }
 
 /** Coordinates lane visibility with authored application without dropping stored settings. */
@@ -187,6 +248,11 @@ function reviewAdvancedUiCommands(
         },
       }));
     },
+    setTimelinePreferences: (
+      preferences: Partial<
+        Pick<QuickEditAdvancedState['ui'], 'liveSeekEnabled' | 'annotationMagnetEnabled'>
+      >
+    ) => stage((current) => ({ ...current, ui: { ...current.ui, ...preferences } })),
     setWorkspaceColor: (theme: 'light' | 'dark', color: string | null) =>
       stage((current) => {
         const workspaceColors = { ...current.ui.workspaceColors };

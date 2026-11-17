@@ -245,16 +245,16 @@ it('holds camera phase without slowing the enter animation before an inserted fr
     },
   ]);
   const projected = projectReviewFocus([original], map);
-  for (const [result, source] of [
+  for (const [result] of [
     [2.5, 2.5],
     [3, 3],
-    [4, 3],
-    [4.99, 3],
-    [5.5, 3.5],
+    [4, 4],
+    [4.99, 4.99],
+    [5.5, 5.5],
     [8.5, 6.5],
   ]) {
     expect(evaluateQuickEditCameraAtTime(projected, result!).scale).toBeCloseTo(
-      evaluateQuickEditCameraAtTime([original], source!).scale,
+      evaluateQuickEditCameraAtTime([{ ...original, end: 10 }], result!).scale,
       8
     );
   }

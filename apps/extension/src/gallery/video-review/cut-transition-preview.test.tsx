@@ -526,3 +526,41 @@ it('normalizes permitted immutable native transition captures before drawing and
   );
   expect(normalized.close).toHaveBeenCalledOnce();
 });
+
+it('loads the next seam from transport reads while the parent time remains unchanged', async () => {
+  state.sample
+    .mockResolvedValueOnce({ ...sample(1.9), allocationSize: () => 300 })
+    .mockResolvedValueOnce({ ...sample(5.9), allocationSize: () => 300 });
+  state.right
+    .mockReturnValueOnce({ ...sample(4.1), allocationSize: () => 400 })
+    .mockReturnValueOnce({ ...sample(8.1), allocationSize: () => 400 });
+  const view = mountProvider(true);
+  const binding = {
+    ...view.binding,
+    duration: 10,
+    edits: [
+      ...view.binding.edits,
+      {
+        id: 'second',
+        kind: 'cut' as const,
+        start: 6,
+        end: 8,
+        requestedStart: 6,
+        requestedEnd: 8,
+        transition: { type: 'dissolve' as const, before: 0.5, after: 0.5 },
+      },
+    ],
+  };
+  await view.render(binding);
+  const first = view.provider.read(1.75)!;
+  expect(first.frames?.left.timestamp).toBe(1.9);
+  await act(async () => {
+    expect(view.provider.read(3)).toBeNull();
+  });
+  const second = view.provider.read(3.75)!;
+  expect(second.blend.plan.id).toBe('second');
+  expect(second.frames?.left.timestamp).toBe(5.9);
+  expect(second.frames?.right.timestamp).toBe(8.1);
+  expect(first.lease?.active).toBe(false);
+  expect(binding.time).toBe(1.75);
+});

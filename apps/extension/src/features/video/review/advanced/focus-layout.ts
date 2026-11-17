@@ -20,7 +20,7 @@ function quickEditFocusInterval(region: QuickEditZoomRegion) {
   return region.spatialClock || region.phaseClock ? region : (region.sourceAnchor ?? region);
 }
 
-/** Resolve compatible neighbors without crossing any active focus interval. */
+/** Each focus family resolves its own links; independent overlays can share a camera transition. */
 export function resolveQuickEditFocusLink(
   regions: readonly QuickEditZoomRegion[],
   id: string,
@@ -41,8 +41,7 @@ export function resolveQuickEditFocusLink(
         !region.dormant &&
         region.id !== source.id &&
         region.id !== target.id &&
-        ((source.effect !== '3d' && region.effect !== '3d') ||
-          (source.effect === '3d' && region.effect === '3d')) &&
+        quickEditFocusType(region) === quickEditFocusType(source) &&
         ((interval(region).start < b.start && interval(region).end > a.end) ||
           (interval(region).end === a.end &&
             quickEditFocusType(region) === quickEditFocusType(source) &&
@@ -61,13 +60,17 @@ export function quickEditFocusConflicts(
 ): boolean {
   if (candidate.dormant || candidate.overlapPolicy || quickEditFocusType(candidate) !== 'zoom')
     return false;
-  const a = quickEditFocusInterval(candidate);
+  const resultClock =
+    candidate.timeDomain === 'result' || regions.some((region) => region.timeDomain === 'result');
+  const interval = (region: QuickEditZoomRegion) =>
+    resultClock ? region : quickEditFocusInterval(region);
+  const a = interval(candidate);
   const others = regions.filter((region) => region.id !== excludeId && !region.overlapPolicy);
   return others.some((region) => {
     if (region.dormant || quickEditFocusType(region) !== 'zoom') return false;
-    const b = quickEditFocusInterval(region);
-    const link = resolveQuickEditFocusLink(others, region.id, { sourceTime: true });
-    const end = link ? quickEditFocusInterval(link.target).start : b.end;
+    const b = interval(region);
+    const link = resolveQuickEditFocusLink(others, region.id, { sourceTime: !resultClock });
+    const end = link ? interval(link.target).start : b.end;
     return a.start < end && a.end > b.start;
   });
 }

@@ -342,7 +342,7 @@ it('refuses playback preparation when a selected bundled sample is missing', asy
   expect(onFailure).toHaveBeenCalledExactlyOnceWith('resource-missing');
 });
 
-it('schedules prepared action cues while an external music asset is still loading', async () => {
+it('schedules action cues independently of a cold external music asset', async () => {
   const engine = new FakeEngine();
   let release!: (asset: Blob) => void;
   const pending = new Promise<Blob>((resolve) => {
@@ -369,12 +369,65 @@ it('schedules prepared action cues while an external music asset is still loadin
     ],
   });
   await act(async () => root.render(<f.Harness />));
-  await act(async () => expect(await f.controls.preparePlayback()).toBe(true));
   await act(async () => root.render(<f.Harness playing />));
   await vi.waitFor(() => expect(resolveAsset).toHaveBeenCalledOnce());
   expect(engine.scheduled.length).toBeGreaterThan(0);
   expect(engine.scheduled[0]!.schedule).toMatchObject({ when: 100 });
   await act(async () => release(new Blob()));
+});
+
+it('does not read rolling history windows after admission establishes that no sound cues exist', async () => {
+  const engine = new FakeEngine();
+  const recovered = vi.fn();
+  const source = {
+    ...archiveAudioSource(),
+    admit: vi.fn(async () => ({ maxVoices: 0, busGain: 1, sampleIds: [], firstCueTime: null })),
+  };
+  const f = renderRuntime({
+    createEngine: () => engine,
+    recordingActionSource: source,
+    playing: true,
+    onActionAudioRecovered: recovered,
+  });
+  await act(async () => root.render(<f.Harness />));
+  expect(source.admit).toHaveBeenCalledOnce();
+  expect(source.readWindow).not.toHaveBeenCalled();
+  expect(recovered).toHaveBeenCalledOnce();
+});
+
+it('does not make music wait for a pending recording action window', async () => {
+  const engine = new FakeEngine();
+  const source = archiveAudioSource();
+  const gate = Promise.withResolvers<ReturnType<typeof typingActionPlan>>();
+  source.readWindow.mockImplementation(() => gate.promise);
+  const f = renderRuntime({
+    createEngine: () => engine,
+    outputTime: 3,
+    music: [
+      {
+        id: 'music',
+        assetId: 'project-asset:music',
+        timelineStart: 0,
+        sourceOffset: 0,
+        duration: 10,
+        volume: 1,
+        muted: false,
+        fadeIn: 0,
+        fadeOut: 0,
+      },
+    ],
+    resolveAsset: async () => new Blob(),
+    recordingActionSource: source,
+    createActionSource: () => ({ read: async () => actionBuffer(), dispose() {} }),
+  });
+  await act(async () => root.render(<f.Harness />));
+  await act(async () => expect(await f.controls.preparePlayback()).toBe(true));
+  await act(async () => root.render(<f.Harness playing />));
+  expect(source.readWindow).toHaveBeenCalledOnce();
+  expect(engine.scheduled).toHaveLength(1);
+  await act(async () => root.render(<f.Harness playing={false} />));
+  await act(async () => gate.resolve(typingActionPlan()));
+  expect(engine.scheduled).toHaveLength(1);
 });
 
 function archiveAudioSource() {

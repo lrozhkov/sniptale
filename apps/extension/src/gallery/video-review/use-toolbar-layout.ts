@@ -15,6 +15,8 @@ export function useReviewToolbarLayout() {
         return (
           side.scrollWidth <= side.clientWidth + 1 &&
           Array.from(side.querySelectorAll('button, input')).every((child) => {
+            // Extra commands have a reserved scroll area; their contents must not choose the layout.
+            if (child.closest('.review-selection-specific-actions')) return true;
             const rect = child.getBoundingClientRect();
             return (
               rect.width === 0 || (rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1)
@@ -71,27 +73,62 @@ export function useReviewToolbarLayout() {
       toolbar.dataset['labels'] =
         hidden === 0 ? 'shown' : hidden === buttons.length ? 'hidden' : 'partial';
     };
+    let frame = 0;
+    const schedule = () => {
+      if (frame || !mounted) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        measure();
+      });
+    };
     measure();
-    const resize = new ResizeObserver(measure);
+    const observedWidths = new Map<Element, number>();
+    const resize = new ResizeObserver((entries) => {
+      let changed = false;
+      for (const entry of entries) {
+        const width = entry.contentRect.width;
+        if (width === observedWidths.get(entry.target)) continue;
+        observedWidths.set(entry.target, width);
+        changed = true;
+      }
+      if (changed) schedule();
+    });
+    // Side widths are measured output; available width and transport content are independent inputs.
     resize.observe(toolbar);
-    sides.forEach((side) => resize.observe(side));
+    const transport = toolbar.querySelector('[data-toolbar-transport]');
+    if (transport) resize.observe(transport);
     const content = new MutationObserver((changes) => {
       if (
         changes.some((change) => {
           const target =
             change.target instanceof Element ? change.target : change.target.parentElement;
-          return (
-            !target?.closest('[data-toolbar-transport]') ||
-            !!target?.closest('[data-review-toolbar-label]')
+          if (
+            !target ||
+            target.closest(
+              [
+                'svg,[data-toolbar-transport],.review-timeline-selection-actions',
+                '[data-ui="gallery.videoReview.noteHistoryTools"]',
+              ].join(',')
+            )
+          )
+            return false;
+          if (change.type === 'characterData')
+            return !!target.closest('[data-review-toolbar-label]');
+          return [...change.addedNodes, ...change.removedNodes].some(
+            (node) =>
+              node instanceof Element &&
+              (node.matches('button,[data-review-toolbar-label]') ||
+                !!node.querySelector('button,[data-review-toolbar-label]'))
           );
         })
       )
-        measure();
+        schedule();
     });
     content.observe(toolbar, { subtree: true, childList: true, characterData: true });
-    void document.fonts?.ready.then(measure);
+    void document.fonts?.ready.then(schedule);
     return () => {
       mounted = false;
+      cancelAnimationFrame(frame);
       resize.disconnect();
       content.disconnect();
     };

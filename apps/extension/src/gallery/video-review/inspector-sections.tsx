@@ -1,20 +1,35 @@
 import { createPortal } from 'react-dom';
 import {
+  ReviewSelectionCommandSlotsContext,
+  ReviewCommandMenuContext,
+} from './selection-command-slots';
+import {
   ReviewSelectionActionsContext,
   ReviewTimelineMultiSelectionContext,
 } from './selection-actions';
 import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  useId,
+  useLayoutEffect,
+  useRef,
+  type ReactNode,
+} from 'react';
 import { EllipsisVertical, Layers2, Info, type LucideIcon } from 'lucide-react';
-import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
-import { translate } from '../../platform/i18n';
+import { ReviewInspectorSectionNavigation } from './inspector-section-navigation';
 import { ReviewDetails } from './controls';
+import { translate } from '../../platform/i18n';
 
 const PresentationContext = createContext<{
   value: 'all' | 'sections';
   remembered?: string | undefined;
   remember?: ((id: string) => void) | undefined;
-}>({ value: 'all' });
+  registerSectionCount?: ((owner: object, count: number | null) => void) | undefined;
+}>({ value: 'sections' });
 
 /** Presentation stays outside the video document; disclosure choices survive editor sessions. */
 export function ReviewInspectorPresentation(props: {
@@ -31,6 +46,7 @@ export function ReviewInspectorPresentation(props: {
     | 'speech'
     | 'text';
   selectionScope?: string | undefined;
+  onSectionCountChange?: ((count: number) => void) | undefined;
   children: ReactNode;
 }) {
   const family =
@@ -38,14 +54,29 @@ export function ReviewInspectorPresentation(props: {
       ? (props.selectionScope ?? 'selection')
       : (props.section ?? 'selection');
   const [choices, setChoices] = useState<Readonly<Record<string, string>>>({});
+  const onSectionCountChange = props.onSectionCountChange;
+  const sectionCounts = useRef(new Map<object, number>());
+  const registerSectionCount = useCallback(
+    (owner: object, count: number | null) => {
+      if (count === null) sectionCounts.current.delete(owner);
+      else sectionCounts.current.set(owner, count);
+      onSectionCountChange?.(Math.max(0, ...sectionCounts.current.values()));
+    },
+    [onSectionCountChange]
+  );
   const remembered = choices[family];
   const remember = useCallback(
     (id: string) => setChoices((current) => ({ ...current, [family]: id })),
     [family]
   );
   const context = useMemo(
-    () => ({ value: props.value, remembered, remember }),
-    [props.value, remembered, remember]
+    () => ({
+      value: props.value,
+      remembered,
+      remember,
+      registerSectionCount,
+    }),
+    [props.value, remembered, remember, registerSectionCount]
   );
   return (
     <InspectorDisclosurePreferences scope={`gallery:${family}`}>
@@ -86,25 +117,40 @@ export function reviewInspectorActions(content: ReactNode): ReviewInspectorSecti
   };
 }
 
-/** One section definition drives both the vertical navigation and the collapsible list. */
+/** The inspector header owns placement for the active command menu. */
+export const ReviewInspectorActionTrayContext = createContext<HTMLElement | null>(null);
+
+/** Commands are separate from parameter categories and retain their existing owners. */
+export function ReviewInspectorActionTray({ children }: { children: ReactNode }) {
+  const host = useContext(ReviewInspectorActionTrayContext);
+  const tray = (
+    <div
+      className="review-inspector-action-tray"
+      data-ui="gallery.videoReview.inspectorActionTray"
+      data-section="actions"
+    >
+      <ReviewSelectionCommandSlotsContext value={null}>
+        <ReviewCommandMenuContext value={!!host}>{children}</ReviewCommandMenuContext>
+      </ReviewSelectionCommandSlotsContext>
+    </div>
+  );
+  return host ? createPortal(tray, host) : tray;
+}
+
+/** The same row navigates all item parameters; a single group needs no grouping chrome. */
 export function ReviewInspectorSections({
   sections: suppliedSections,
-  leadingSectionColumn = false,
 }: {
   sections: readonly ReviewInspectorSection[];
-  /** Isolate a large leading group in All mode without changing category order. */
-  leadingSectionColumn?: boolean;
 }) {
   const actionTarget = useContext(ReviewSelectionActionsContext);
   const selectionCount = useContext(ReviewTimelineMultiSelectionContext)?.keys.length ?? 0;
-  const actions = actionTarget?.commandHost
-    ? suppliedSections.find((section) => section.id === 'actions')
-    : undefined;
-  const sections = suppliedSections;
+  const actions = suppliedSections.find((section) => section.id === 'actions');
+  const sections = suppliedSections.filter((section) => section.id !== 'actions');
   const actionPanel =
     actions && actionTarget?.commandHost
       ? createPortal(
-          <>
+          <ReviewSelectionCommandSlotsContext value={actionTarget.commandSlots}>
             {selectionCount > 1 ? (
               <span
                 className="review-selection-count"
@@ -124,64 +170,66 @@ export function ReviewInspectorSections({
               </span>
             ) : null}
             {actions.content}
-          </>,
+          </ReviewSelectionCommandSlotsContext>,
           actionTarget.commandHost
         )
       : null;
   const context = useContext(PresentationContext);
-  const presentation = context.value;
+  const registerSectionCount = context.registerSectionCount;
+  const sectionOwner = useRef({});
+  useLayoutEffect(() => {
+    const owner = sectionOwner.current;
+    registerSectionCount?.(owner, sections.length);
+    return () => registerSectionCount?.(owner, null);
+  }, [registerSectionCount, sections.length]);
   const [local, setLocal] = useState<string>();
+  const id = useId();
   const remembered = context.remembered ?? local;
   const remember = context.remember ?? setLocal;
-  const initial = sections.find((section) => section.id === remembered)?.id ?? sections[0]?.id;
-  // Terminal commands follow the parameters without taking a parameter column of their own.
-  const parameterCount = sections.length - Number(sections.at(-1)?.id === 'actions');
-  const columnBreak =
-    parameterCount <= 1
-      ? sections.length
-      : leadingSectionColumn
-        ? 1
-        : Math.ceil(parameterCount / 2);
-  if (!initial) return actionPanel;
+  const current = sections.find((section) => section.id === remembered) ?? sections[0];
   return (
     <>
       {actionPanel}
-      <div data-ui="gallery.videoReview.inspectorSections" data-presentation={presentation}>
-        {presentation === 'sections' && sections.length > 1 ? (
-          <CategorizedInspector
-            dataUi="gallery.videoReview.inspectorCategories"
-            ariaLabel={translate('scenario.editor.inspectorShowSections')}
-            initialSection={initial}
-            sections={sections}
-            onSectionChange={remember}
-            showSectionHeading
-            renderSection={(id) => (
-              <div key={id} className="review-inspector-section-body" data-section={id}>
-                {sections.find((section) => section.id === id)?.content}
-              </div>
-            )}
-          />
-        ) : (
-          [sections.slice(0, columnBreak), sections.slice(columnBreak)]
-            .filter((column) => column.length > 0)
-            .map((column, index) => (
-              <div className="review-inspector-section-column" key={index}>
-                {column.map(({ id, label, icon, disclosureIcon, content }) => (
-                  <section key={id} data-section={id} className="review-inspector-section">
-                    <ReviewDetails
-                      preferenceId={`section:${id}`}
-                      label={label}
-                      {...(disclosureIcon === null ? {} : { icon: disclosureIcon ?? icon })}
-                      level="section"
-                      initiallyOpen
-                    >
-                      {content}
-                    </ReviewDetails>
-                  </section>
-                ))}
-              </div>
-            ))
-        )}
+      <div
+        data-ui="gallery.videoReview.inspectorSections"
+        data-presentation={context.value === 'all' ? 'all' : 'tabs'}
+        className="flex min-w-0 max-w-full flex-col"
+      >
+        {context.value === 'all' && sections.length > 1 ? (
+          sections.map((section) => (
+            <ReviewDetails
+              key={section.id}
+              level="section"
+              label={section.label}
+              preferenceId={`group:${section.id}`}
+              initiallyOpen
+            >
+              <div data-section={section.id}>{section.content}</div>
+            </ReviewDetails>
+          ))
+        ) : current ? (
+          <>
+            <ReviewInspectorSectionNavigation
+              id={id}
+              value={current.id}
+              items={sections}
+              onChange={remember}
+              label={translate('scenario.editor.inspectorShowSections')}
+            />
+            <div
+              key={current.id}
+              className="review-inspector-section-body"
+              data-section={current.id}
+              role="tabpanel"
+              id={`${id}-${current.id}`}
+              aria-label={current.label}
+              aria-labelledby={sections.length > 1 ? `${id}-${current.id}-tab` : undefined}
+            >
+              {current.content}
+            </div>
+          </>
+        ) : null}
+        {actions ? <ReviewInspectorActionTray>{actions.content}</ReviewInspectorActionTray> : null}
       </div>
     </>
   );

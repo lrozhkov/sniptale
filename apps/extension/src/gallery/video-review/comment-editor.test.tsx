@@ -17,6 +17,16 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
 let root: Root;
 let host: HTMLDivElement;
 
+function reveal<T extends Element = HTMLElement>(selector: string): T | null {
+  let found = host.querySelector<T>(selector);
+  if (found) return found;
+  for (const tab of host.querySelectorAll<HTMLButtonElement>('[role="tab"]')) {
+    act(() => tab.click());
+    found = host.querySelector<T>(selector);
+    if (found) return found;
+  }
+  return null;
+}
 function renderEditor(node: ReactNode) {
   root.render(<InspectorLayout>{node}</InspectorLayout>);
 }
@@ -77,34 +87,24 @@ it('commits text after the debounce and switches the zoom behavior once', async 
   await act(async () => new Promise((resolve) => setTimeout(resolve, 340)));
   expect(onPatch).toHaveBeenCalledWith({ text: 'Hello there' });
 
-  const follow = host.querySelector<HTMLButtonElement>(
-    '[aria-label="gallery.videoReview.followVideo"]'
-  )!;
+  const follow = reveal<HTMLButtonElement>('[aria-label="gallery.videoReview.followVideo"]')!;
   expect(follow.getAttribute('aria-pressed')).toBe('true');
   await act(async () => follow.click());
   expect(onPatch).not.toHaveBeenCalledWith({ attachment: 'content' });
   await act(async () =>
-    host
-      .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.stayOnScreen"]')!
-      .click()
+    reveal<HTMLButtonElement>('[aria-label="gallery.videoReview.stayOnScreen"]')!.click()
   );
   expect(onSwitch).toHaveBeenCalledWith('viewport');
   await act(async () =>
-    host
-      .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.overlayVisible"]')!
-      .click()
+    reveal<HTMLButtonElement>('[aria-label="gallery.videoReview.overlayVisible"]')!.click()
   );
   expect(onPatch).toHaveBeenCalledWith({ visible: false, text: 'Hello there' });
   await act(async () =>
-    host
-      .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.overlayRenderToVideo"]')!
-      .click()
+    reveal<HTMLButtonElement>('[aria-label="gallery.videoReview.overlayRenderToVideo"]')!.click()
   );
   expect(onPatch).toHaveBeenCalledWith({ renderToVideo: false, text: 'Hello there' });
   await act(async () =>
-    host
-      .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.overlayDelete"]')!
-      .click()
+    reveal<HTMLButtonElement>('[aria-label="gallery.videoReview.overlayDelete"]')!.click()
   );
   expect(onDelete).toHaveBeenCalled();
 });
@@ -139,9 +139,7 @@ it('lists overlay comments, selects them, and adds through the section button', 
   await act(async () => (host.querySelectorAll('ol li button')[1] as HTMLButtonElement).click());
   expect(onSelect).toHaveBeenCalledWith('c2');
   await act(async () =>
-    host
-      .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.addOverlayComment"]')!
-      .click()
+    reveal<HTMLButtonElement>('[aria-label="gallery.videoReview.addOverlayComment"]')!.click()
   );
   expect(onAdd).toHaveBeenCalled();
 });
@@ -200,47 +198,56 @@ it('commits pending text when the editor unmounts', async () => {
   expect(onPatch).toHaveBeenCalledWith({ text: 'Draft' });
 });
 
-it('keeps intermediate numeric input and commits the complete style with pending text on blur', async () => {
-  const onPatch = vi.fn();
-  await act(async () =>
-    renderEditor(
-      <ReviewCanvasCommentEditor
-        comment={comment()}
-        annotations={[]}
-        duration={10}
-        busy={false}
-        onPatch={onPatch}
-        onSwitchAttachment={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    )
-  );
-  const area = host.querySelector('textarea')!;
-  const input = host.querySelector<HTMLInputElement>('input[min="10"]')!;
-  await act(async () => {
-    area.focus();
-    typeValue(area, 'New text');
-    input.focus();
-  });
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
-  for (const value of ['', '1', '18']) {
+it('keeps numeric drafts local after changing sections and accepts the complete style on blur', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  try {
+    const onPatch = vi.fn();
+    await act(async () =>
+      renderEditor(
+        <ReviewCanvasCommentEditor
+          comment={comment()}
+          annotations={[]}
+          duration={10}
+          busy={false}
+          onPatch={onPatch}
+          onSwitchAttachment={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      )
+    );
+    const area = host.querySelector('textarea')!;
     await act(async () => {
-      setter.call(input, value);
-      input.dispatchEvent(new Event('input', { bubbles: true }));
+      area.focus();
+      typeValue(area, 'New text');
     });
-    expect(input.value).toBe(value);
-    expect(onPatch).not.toHaveBeenCalled();
+    const input = reveal<HTMLInputElement>(
+      'input[aria-label="gallery.videoReview.overlayFontSize"]'
+    )!;
+    await act(async () => input.focus());
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    for (const value of ['', '1', '18']) {
+      await act(async () => {
+        setter.call(input, value);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      expect(input.value).toBe(value);
+      expect(onPatch).not.toHaveBeenCalled();
+    }
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(340);
+    });
+    expect(onPatch).toHaveBeenCalledExactlyOnceWith({ text: 'New text' });
+    await act(async () => input.blur());
+    expect(onPatch).toHaveBeenCalledWith({
+      text: 'New text',
+      style: { ...comment().style, fontSize: 18 },
+    });
+  } finally {
+    vi.useRealTimers();
   }
-  await act(async () => new Promise((resolve) => setTimeout(resolve, 340)));
-  expect(onPatch).not.toHaveBeenCalled();
-  await act(async () => input.blur());
-  expect(onPatch).toHaveBeenCalledWith({
-    text: 'New text',
-    style: { ...comment().style, fontSize: 18 },
-  });
 });
 
-it('groups overlay management commands in Actions in both inspector modes', async () => {
+it('keeps overlay commands in an unlabelled tray across parameter sections', async () => {
   const render = (mode: 'all' | 'sections') =>
     renderEditor(
       <ReviewInspectorPresentation value={mode}>
@@ -258,16 +265,20 @@ it('groups overlay management commands in Actions in both inspector modes', asyn
   await act(async () => render('all'));
   const remove = host.querySelector('[aria-label="gallery.videoReview.overlayDelete"]')!;
   expect(remove.closest('[data-inspector-choices]')).toBeNull();
-  expect(host.querySelectorAll('[data-level="section"]')).toHaveLength(4);
+  expect(host.querySelectorAll('[data-level="section"]')).toHaveLength(3);
   expect(remove.closest('[data-section="actions"]')).not.toBeNull();
   await act(async () => render('sections'));
-  expect(host.querySelectorAll('nav button')).toHaveLength(4);
+  expect(host.querySelectorAll('[role="tab"]')).toHaveLength(3);
   expect(host.querySelector('textarea')).not.toBeNull();
-  await act(async () => (host.querySelectorAll('nav button')[1] as HTMLButtonElement).click());
-  expect(host.querySelector('input[min="10"]')).not.toBeNull();
+  const style = host.querySelector<HTMLButtonElement>(
+    '[role="tab"][aria-controls$="-appearance"]'
+  )!;
+  await act(async () => style.click());
+  expect(
+    host.querySelector('input[aria-label="gallery.videoReview.overlayFontSize"]')
+  ).not.toBeNull();
   expect(host.querySelector('textarea')).toBeNull();
-  expect(host.querySelector('[aria-label="gallery.videoReview.overlayDelete"]')).toBeNull();
-  await act(async () => (host.querySelectorAll('nav button')[3] as HTMLButtonElement).click());
+  expect(host.querySelector('[aria-label="gallery.videoReview.overlayDelete"]')).not.toBeNull();
   expect(
     host.querySelector('[data-section="actions"] [aria-label="gallery.videoReview.overlayDelete"]')
   ).not.toBeNull();
@@ -293,11 +304,8 @@ it('keeps linked annotation text read-only without copying it into appearance pa
   expect(area.readOnly).toBe(true);
   expect(area.value).toBe('');
   expect(area.placeholder).toBe('gallery.videoReview.overlayLinkedHint');
-  await act(async () =>
-    host
-      .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.overlayVisible"]')!
-      .click()
-  );
+  const visible = reveal<HTMLButtonElement>('[aria-label="gallery.videoReview.overlayVisible"]')!;
+  await act(async () => visible.click());
   expect(onPatch).toHaveBeenCalledWith({ visible: false });
 });
 
@@ -341,8 +349,7 @@ it('disables text editing while the existing comment is busy', async () => {
   );
   expect(host.querySelector('textarea')!.disabled).toBe(true);
   expect(
-    host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.overlayDelete"]')!
-      .disabled
+    reveal<HTMLButtonElement>('[aria-label="gallery.videoReview.overlayDelete"]')!.disabled
   ).toBe(true);
 });
 
@@ -365,16 +372,18 @@ it('preserves stored numeric values when an empty draft loses focus', async () =
       />
     )
   );
-  const input = host.querySelector<HTMLInputElement>('input[min="10"]')!;
+  const input = reveal<HTMLInputElement>(
+    'input[aria-label="gallery.videoReview.overlayFontSize"]'
+  )!;
   expect(input.value).toBe('18');
   await act(async () => {
     input.focus();
-    input.value = '';
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '');
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.blur();
   });
   expect(input.value).toBe('18');
-  expect(onPatch).toHaveBeenCalledWith({ text: 'Hello', style: stored.style });
+  expect(onPatch).not.toHaveBeenCalled();
 });
 
 it('clears the comment draft through its editor and commits after leaving the inspector', async () => {
@@ -395,7 +404,7 @@ it('clears the comment draft through its editor and commits after leaving the in
     )
   );
   const area = host.querySelector('textarea')!;
-  await act(async () => host.querySelector<HTMLButtonElement>('.sniptale-field-clear')!.click());
+  await act(async () => reveal<HTMLButtonElement>('.sniptale-field-clear')!.click());
   expect(area.value).toBe('');
   expect(document.activeElement).toBe(area);
   expect(onDraft).toHaveBeenCalledWith('c1', '');
@@ -419,18 +428,18 @@ it('restores the accepted numeric value on Escape before blur acceptance', async
       />
     )
   );
-  const input = host.querySelector<HTMLInputElement>('input[min="10"]')!;
+  const input = reveal<HTMLInputElement>(
+    'input[aria-label="gallery.videoReview.overlayFontSize"]'
+  )!;
   await act(async () => {
     input.focus();
-    input.value = '25';
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '25');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   });
   expect(input.value).toBe('12');
   expect(document.activeElement).not.toBe(input);
-  expect(onPatch).toHaveBeenCalledWith({
-    text: 'Hello',
-    style: { ...comment().style, fontSize: 12 },
-  });
+  expect(onPatch).not.toHaveBeenCalled();
 });
 
 it.each([
@@ -455,9 +464,7 @@ it.each([
       />
     )
   );
-  const input = host.querySelector<HTMLInputElement>(
-    `input[aria-label="gallery.videoReview.${name}"]`
-  )!;
+  const input = reveal<HTMLInputElement>(`input[aria-label="gallery.videoReview.${name}"]`)!;
   const label = input
     .closest('.sniptale-parameter-row')!
     .querySelector<HTMLSpanElement>('.sniptale-parameter-name')!;
@@ -501,9 +508,7 @@ it.each([
       />
     )
   );
-  const input = host.querySelector<HTMLInputElement>(
-    `input[aria-label="gallery.videoReview.${name}"]`
-  )!;
+  const input = reveal<HTMLInputElement>(`input[aria-label="gallery.videoReview.${name}"]`)!;
   const wheel = new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true });
   await act(async () => {
     input.focus();

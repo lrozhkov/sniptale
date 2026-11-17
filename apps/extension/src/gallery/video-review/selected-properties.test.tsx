@@ -28,7 +28,11 @@ import type { CompositionJoinSettings } from '../../features/video/project/scene
 import { act, type ComponentProps, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
-import { ReviewSelectedProperties, reviewSelectionLabel } from './selected-properties';
+import {
+  ReviewSelectedProperties,
+  reviewSelectionLabel,
+  createReviewInspectorEditCommands,
+} from './selected-properties';
 import type { ReviewEdit } from '../../features/video/review/types';
 
 vi.mock('../../platform/i18n', async (original) => ({
@@ -37,6 +41,7 @@ vi.mock('../../platform/i18n', async (original) => ({
 }));
 const archive = vi.hoisted(() => ({
   dependencies: undefined as RecordingCursorTrajectoryStoreDependencies | undefined,
+  realSource: false,
   mini: vi.fn<(props: ComponentProps<typeof import('./zoom-preview').ReviewZoomPreview>) => void>(),
   results: [] as boolean[],
   availabilityOwners: 0,
@@ -102,10 +107,20 @@ vi.mock('../../workflows/video-review/recording-review', async (original) => {
 vi.mock('./zoom-preview', () => ({
   ReviewZoomPreview: (props: ComponentProps<typeof import('./zoom-preview').ReviewZoomPreview>) => {
     archive.mini(props);
-    return null;
+    return (
+      <button data-preview-id={props.region.id} onClick={() => props.onChange({ centerX: 0.3 })}>
+        Mini preview navigation
+      </button>
+    );
   },
 }));
-vi.mock('./use-zoom-preview-source', () => ({ useZoomPreviewSource: () => null }));
+vi.mock('./use-zoom-preview-source', async (original) => {
+  const actual = await original<typeof import('./use-zoom-preview-source')>();
+  return {
+    useZoomPreviewSource: (file: File | null) =>
+      actual.useZoomPreviewSource(archive.realSource ? file : null),
+  };
+});
 vi.mock('./edit-range-fields', () => ({ ReviewEditRangeFields: () => null }));
 vi.mock('./controls', async (original) => ({
   ...(await original<typeof import('./controls')>()),
@@ -161,6 +176,7 @@ afterEach(async () => {
   cleanup = undefined;
   vi.unstubAllGlobals();
   archive.dependencies = undefined;
+  archive.realSource = false;
   archive.mini.mockClear();
   archive.override = undefined;
   archive.calls.length = 0;
@@ -199,7 +215,9 @@ function mount(transition?: CompositionJoinSettings) {
     editing: {
       selected: edit,
       exporter: { phase: 'idle', index: null },
-      changeSelectedTransition: change,
+      commands: {
+        changeTransition: (_id: string, value: CompositionJoinSettings | null) => change(value),
+      },
     },
     resource: {
       source: { duration: 6 },
@@ -510,6 +528,7 @@ async function mountDesktop(options: { retired?: boolean; playback?: boolean } =
   document.body.append(host);
   const root = createRoot(host);
   let clock = 3;
+  let selectedId = initial.id;
   const playback = options.playback
     ? { video: document.createElement('video'), camera: initial.transform }
     : undefined;
@@ -518,12 +537,12 @@ async function mountDesktop(options: { retired?: boolean; playback?: boolean } =
       zoom: advanced.zoom,
       setZoom,
       timelineDuration: data.source.duration,
-      selection: initial.id,
+      selection: selectedId,
     });
     return (
       <ReviewSelectedProperties
         {...({
-          selection: { kind: 'zoom', id: initial.id },
+          selection: { kind: 'zoom', id: selectedId },
           advanced,
           zoom,
           resource,
@@ -553,8 +572,16 @@ async function mountDesktop(options: { retired?: boolean; playback?: boolean } =
     ...data,
     host,
     render,
+    replaceFile: () => {
+      resource.file = new File(['replacement'], 'replacement.mp4');
+    },
     cursor,
     setZoom,
+    selectAnotherRegion: () => {
+      const next = { ...initial, id: 'second-zoom', start: 10, end: 12 };
+      advanced = { ...advanced, zoom: { ...advanced.zoom, regions: [initial, next] } };
+      selectedId = next.id;
+    },
     tick: (time: number) => {
       clock = time;
     },
@@ -586,6 +613,7 @@ async function mountDesktop(options: { retired?: boolean; playback?: boolean } =
     },
   };
 }
+
 it('enables Cursor for a Desktop archive with null cursorTrack and prepares mini facts', async () => {
   const view = await mountDesktop();
   await vi.waitFor(async () => {
@@ -827,30 +855,8 @@ it('restores a GL parameter after the existing cut command refuses a save', asyn
   ).toBe('0.4');
 });
 
-async function importPresetFile(
-  parent: ParentNode,
-  selection: ReturnType<typeof createGlTransitionSelection>,
-  name = 'Imported'
-) {
-  if (!selection) throw new Error('Missing preset selection');
-  const source = JSON.stringify({
-    format: 'sniptale-gl-preset',
-    version: 1,
-    name,
-    transition: selection,
-  });
-  const file = new File([source], 'imported.sniptale-gl-preset.json');
-  Object.defineProperty(file, 'arrayBuffer', {
-    value: async () => new TextEncoder().encode(source).buffer,
-  });
-  const input = parent.querySelector<HTMLInputElement>('input[type=file]');
-  if (!input) throw new Error('Missing preset file input');
-  Object.defineProperty(input, 'files', { value: [file], configurable: true });
-  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
-}
-
 it.each([true, false])(
-  'imports a GL preset into the selected cut through the existing save command (%s)',
+  'changes a GL selection through the cut control and recovers after refusal (%s)',
   async (accepted) => {
     const initial = {
       type: 'gl' as const,
@@ -861,16 +867,29 @@ it.each([true, false])(
     };
     const view = mount(initial);
     if (!accepted) view.change.mockResolvedValue(false);
-    const selection = createGlTransitionSelection('CrossZoom')!;
+    const select = view.host.querySelector<HTMLSelectElement>(
+      'select[aria-label="gallery.videoReview.zoomTransitionType"]'
+    )!;
+    expect(view.host.querySelector('[role="tab"]')).toBeNull();
+    expect(view.host.querySelector('[data-section="timing"]')).toBeNull();
+    expect(view.host.textContent).not.toContain('gallery.videoReview.intervalBounds');
     expect(
-      view.host.querySelector('[data-gl-preset-owner]')?.getAttribute('data-gl-preset-owner')
-    ).toBe(view.edit.id);
-    await importPresetFile(view.host, selection);
+      view.host.querySelector('input[aria-label="gallery.videoReview.rangeStart"]')
+    ).toBeNull();
+    expect(view.host.querySelector('input[aria-label="gallery.videoReview.rangeEnd"]')).toBeNull();
+    expect(view.host.querySelector('[data-ui="composition.gl-preset-actions"]')).toBeNull();
+    expect(view.host.querySelector('input[type="file"]')).toBeNull();
+    expect(view.host.textContent).not.toContain('gallery.videoReview.cutTransitionEffective');
+    expect(view.host.textContent).not.toContain('videoEditor.effectsLibrary.importGlPreset');
+    expect(view.host.textContent).not.toContain('videoEditor.effectsLibrary.downloadGlPreset');
+    const selection = createGlTransitionSelection('CrossZoom')!;
+    await act(async () => {
+      select.value = 'CrossZoom';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
     expect(view.change).toHaveBeenCalledExactlyOnceWith({ ...initial, selection });
     expect(view.edit.transition).toEqual(accepted ? { ...initial, selection } : initial);
-    expect(
-      view.host.querySelector('[data-ui="composition.gl-preset-actions"] [role=status]')
-    ).toBeNull();
+    expect(select.value).toBe(accepted ? 'CrossZoom' : 'Fade');
   }
 );
 
@@ -899,5 +918,122 @@ it('applies a saved catalogue selection on a Gallery cut through its existing ed
     });
   } finally {
     vi.mocked(useGlTransitionCatalog).mockImplementation(createGlCatalogFixture);
+  }
+});
+
+it('keeps parameter commands stable while refusing edits for a replaced selected identity', () => {
+  type Controller = ReturnType<Parameters<typeof createReviewInspectorEditCommands>[0]>;
+  const first: ReviewEdit = {
+    id: 'first',
+    kind: 'cut',
+    start: 1,
+    end: 2,
+    requestedStart: 1,
+    requestedEnd: 2,
+  };
+  const second: ReviewEdit = { ...first, id: 'second' };
+  const changeFirst = vi.fn(async () => true);
+  const changeSecond = vi.fn(async () => true);
+  const removeFirst = vi.fn(async () => true);
+  const removeSecond = vi.fn(async () => true);
+  const canApply = vi.fn(() => true);
+  const apply = vi.fn(async () => true);
+  let current: Controller = {
+    selected: first,
+    canApply,
+    apply,
+    remove: removeFirst,
+    changeSelectedRate: vi.fn(),
+    changeSelectedAudio: vi.fn(),
+    changeSelectedFreezeDuration: vi.fn(),
+    changeSelectedTransition: changeFirst,
+  };
+  const commands = createReviewInspectorEditCommands(() => current);
+  commands.changeTransition('first', null);
+  expect(changeFirst).toHaveBeenCalledWith(null);
+  current = {
+    ...current,
+    selected: second,
+    remove: removeSecond,
+    changeSelectedTransition: changeSecond,
+  };
+  commands.changeTransition('first', null);
+  commands.remove('first');
+  expect(changeFirst).toHaveBeenCalledTimes(1);
+  expect(changeSecond).not.toHaveBeenCalled();
+  expect(removeFirst).not.toHaveBeenCalled();
+  expect(removeSecond).not.toHaveBeenCalled();
+  commands.changeTransition('second', null);
+  commands.remove('second');
+  expect(changeSecond).toHaveBeenCalledWith(null);
+  expect(removeSecond).toHaveBeenCalledOnce();
+  const range = { kind: 'range' as const, start: 3, end: 4 };
+  expect(commands.canApply('cut', range)).toBe(true);
+  commands.apply('cut', range);
+  expect(apply).toHaveBeenCalledWith('cut', range);
+});
+
+it('retains mini preview navigation across zoom IDs and binds its actions to the current region', async () => {
+  const view = await mountDesktop();
+  const first = view.host.querySelector<HTMLButtonElement>('[data-preview-id]')!;
+  expect(first.dataset['previewId']).toBe('desktop-zoom');
+  const initialCenter = view.advanced.zoom.regions[0]!.transform.centerX;
+  view.selectAnotherRegion();
+  await view.render();
+  const current = view.host.querySelector<HTMLButtonElement>('[data-preview-id]')!;
+  expect(current).toBe(first);
+  expect(current.dataset['previewId']).toBe('second-zoom');
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(archive.mini.mock.calls.at(-1)![0].disabled).toBe(false);
+  });
+  await act(async () => current.click());
+  expect(
+    view.advanced.zoom.regions.find((item) => item.id === 'second-zoom')!.transform.centerX
+  ).toBe(0.3);
+  expect(
+    view.advanced.zoom.regions.find((item) => item.id === 'desktop-zoom')!.transform.centerX
+  ).toBe(initialCenter);
+});
+
+it('retains the actual decoder lease across zoom IDs and releases replaced sources', async () => {
+  archive.realSource = true;
+  const previousCreate = Object.getOwnPropertyDescriptor(URL, 'createObjectURL');
+  const previousRevoke = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL');
+  const createUrl = vi.fn(() => `blob:parameter-source-${createUrl.mock.calls.length}`);
+  const revokeUrl = vi.fn();
+  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createUrl });
+  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeUrl });
+  const load = vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+  const elements = vi.spyOn(document, 'createElement');
+  try {
+    const view = await mountDesktop();
+    const mini = view.host.querySelector<HTMLButtonElement>('[data-preview-id]')!;
+    expect(createUrl).toHaveBeenCalledOnce();
+    view.selectAnotherRegion();
+    await view.render();
+    expect(view.host.querySelector('[data-preview-id]')).toBe(mini);
+    act(() => mini.click());
+    expect(
+      view.advanced.zoom.regions.find((region) => region.id === 'second-zoom')!.transform.centerX
+    ).toBe(0.3);
+    expect(createUrl).toHaveBeenCalledOnce();
+    expect(elements.mock.calls.filter(([name]) => name === 'video')).toHaveLength(1);
+    expect(revokeUrl).not.toHaveBeenCalled();
+    view.replaceFile();
+    await view.render();
+    expect(createUrl).toHaveBeenCalledTimes(2);
+    expect(revokeUrl).toHaveBeenCalledOnce();
+    view.unmount();
+    expect(revokeUrl).toHaveBeenCalledTimes(2);
+  } finally {
+    cleanup?.();
+    cleanup = undefined;
+    elements.mockRestore();
+    load.mockRestore();
+    if (previousCreate) Object.defineProperty(URL, 'createObjectURL', previousCreate);
+    else Reflect.deleteProperty(URL, 'createObjectURL');
+    if (previousRevoke) Object.defineProperty(URL, 'revokeObjectURL', previousRevoke);
+    else Reflect.deleteProperty(URL, 'revokeObjectURL');
   }
 });

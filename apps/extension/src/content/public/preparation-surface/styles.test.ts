@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { parse } from 'postcss';
+import { parse, type Rule } from 'postcss';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const { runtimeInfoGetUrlMock } = vi.hoisted(() => ({
@@ -13,6 +13,11 @@ vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
     getURL: runtimeInfoGetUrlMock,
   },
 }));
+
+vi.mock('./effects.css?inline', async () => {
+  const { readFileSync } = await import('node:fs');
+  return { default: readFileSync(new URL('./effects.css', import.meta.url), 'utf8') };
+});
 
 vi.mock('../../../ui/color-selector/picker.css?inline', async () => {
   const { readFileSync } = await import('node:fs');
@@ -303,4 +308,47 @@ it('includes the shared disclosure geometry in isolated content UI styles', () =
   const styles = createContentEntrypointStyles();
   expect(styles).toContain('.sniptale-disclosure > summary');
   expect(styles).toContain('.sniptale-disclosure > summary::-webkit-details-marker');
+});
+
+it('assembles content interaction gates before capture and drawing effects with exact declarations', () => {
+  const effects = parse(readFileSync(EFFECTS_STYLES_PATH, 'utf8')).nodes.filter(
+    (node) => node.type === 'rule'
+  );
+  const gates = effects.slice(0, 10);
+  expect(gates[0]?.selector).toBe(".sniptale-app:has(.sniptale-toolbar[data-menu-open='true'])");
+  expect(gates[9]?.selector).toContain('> :is(.sniptale-modal-backdrop, .sniptale-modal)');
+  expect(effects[10]?.selector).toBe(".sniptale-app[data-hidden='true']");
+  const assembled = parse(createContentEntrypointStyles()).nodes.filter(
+    (node) => node.type === 'rule'
+  );
+  const normalize = (selector: string) => selector.replace(/\s+/gu, ' ').trim();
+  const snapshot = (rule: Rule) => ({
+    selectors: rule.selectors.map(normalize),
+    declarations: rule.nodes.flatMap((node) =>
+      node.type === 'decl'
+        ? [{ property: node.prop, value: node.value, important: node.important === true }]
+        : []
+    ),
+  });
+  let previous = -1;
+  for (const gate of gates) {
+    const matches = assembled.filter(
+      (rule) => normalize(rule.selector) === normalize(gate.selector)
+    );
+    expect(matches).toHaveLength(1);
+    expect(snapshot(matches[0]!)).toEqual(snapshot(gate));
+    const index = assembled.indexOf(matches[0]!);
+    expect(index).toBeGreaterThan(previous);
+    previous = index;
+  }
+  const capture = assembled.findIndex(
+    (rule) => rule.selector === ".sniptale-app[data-hidden='true']"
+  );
+  expect(capture).toBeGreaterThan(previous);
+});
+
+it('does not lift backdrop effect layers above their connected frames while a menu is open', () => {
+  const contentRuntimeEffectsStylesheet = readFileSync(EFFECTS_STYLES_PATH, 'utf8');
+  expect(contentRuntimeEffectsStylesheet).toMatch(/:not\(\s*\.sniptale-blur-overlay\s*\)/);
+  expect(contentRuntimeEffectsStylesheet).toMatch(/:not\(\s*\.sniptale-focus-overlay\s*\)/);
 });

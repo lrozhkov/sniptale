@@ -1,5 +1,6 @@
 import type React from 'react';
 import { Link2 } from 'lucide-react';
+import { cameraTimelineTime } from '../../../../features/video/project/camera/animation';
 
 import { translate } from '../../../../platform/i18n';
 import { normalizeClipPlaybackRate } from '../../../../features/video/project/timeline/basics';
@@ -112,7 +113,8 @@ function ProjectTimelineClipContent({
       project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
         ? (clip.cameraPositions ?? []).map((position) => {
             const offset =
-              (position.sourceTime - clip.sourceStart) / (clip.playbackRate ?? 1) -
+              cameraTimelineTime(clip, position.sourceTime) -
+              clip.startTime -
               viewModel.offsetSeconds;
             if (offset < 0 || offset > viewModel.visibleDuration) return null;
             return (

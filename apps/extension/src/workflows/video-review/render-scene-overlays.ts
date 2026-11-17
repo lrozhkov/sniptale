@@ -121,7 +121,8 @@ export function drawReviewSceneOverlays(args: {
     scene.cursorMotions,
     scene.sourceTime ?? 0,
     overlayLayout.videoTransform,
-    (args.sourceWidth * overlayLayout.videoTransform.height) / overlayLayout.videoTransform.width
+    (args.sourceWidth * overlayLayout.videoTransform.height) / overlayLayout.videoTransform.width,
+    args.globalResultTime
   );
   const hasContentComment = burned.some(
     (comment) =>

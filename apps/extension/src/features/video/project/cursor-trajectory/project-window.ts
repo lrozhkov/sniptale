@@ -106,21 +106,56 @@ export async function prepareCameraCursorTrajectoryProject(
   read: ReadCursorTrajectoryWindow,
   signal?: AbortSignal
 ): Promise<VideoProject> {
+  return prepareCursorTrajectoryIntervalProject(project, read, signal);
+}
+
+/** Preview history loads bounded native windows ahead of the current frame. */
+export function prepareCursorTrajectoryRangeProject(
+  project: VideoProject,
+  range: { start: number; end: number },
+  read: ReadCursorTrajectoryWindow,
+  signal?: AbortSignal,
+  previous?: VideoProject
+): Promise<VideoProject> {
+  return prepareCursorTrajectoryIntervalProject(project, read, signal, range, previous);
+}
+
+async function prepareCursorTrajectoryIntervalProject(
+  project: VideoProject,
+  read: ReadCursorTrajectoryWindow,
+  signal?: AbortSignal,
+  range?: { start: number; end: number },
+  previous?: CursorTrajectoryRenderProject
+): Promise<VideoProject> {
   const prepared: PreparedWindow[] = [];
   for (const clip of project.clips) {
     signal?.throwIfAborted();
     if (clip.type !== 'VIDEO') continue;
+    if (range && (range.end < clip.startTime || range.start > clip.startTime + clip.duration))
+      continue;
     const group = project.cursorTrack?.sourceObservations?.find(
       (item) => item.sourceInstanceId === clip.sourceInstanceId
     );
     const descriptor = group?.trajectory;
     if (!group || !descriptor || descriptor.totalBlocks === 0) continue;
+    // Reuse only native windows from the same immutable source descriptor in this reader lifetime.
+    const sameDescriptor = previous?.cursorTrack?.sourceObservations?.some(
+      (item) => item.recordingId === group.recordingId && item.trajectory === descriptor
+    );
+    const retained = sameDescriptor ? (previous?.[windowsKey] ?? []) : [];
     // Source playback can expose the full retained interval even when the visible clip is a slice.
-    let active = Math.round(clip.sourceStart * 1_000_000);
-    const end = Math.round((clip.sourceStart + clip.sourceDuration) * 1_000_000);
+    const from = range
+      ? getClipSourceObservationTime(clip, Math.max(clip.startTime, range.start))
+      : clip.sourceStart;
+    const to = range
+      ? getClipSourceObservationTime(clip, Math.min(clip.startTime + clip.duration, range.end))
+      : clip.sourceStart + clip.sourceDuration;
+    if (from === undefined || to === undefined) continue;
+    let active = Math.round(Math.min(from, to) * 1_000_000);
+    const end = Math.round(Math.max(from, to) * 1_000_000);
     while (active <= end) {
       signal?.throwIfAborted();
-      const prior = prepared.find(
+      const prior = [...prepared, ...retained].find(
         (item) =>
           item.recordingId === group.recordingId &&
           item.trajectoryId === descriptor.trajectoryId &&
@@ -141,7 +176,14 @@ export async function prepareCameraCursorTrajectoryProject(
         (window.toTimeUs !== null && active >= window.toTimeUs)
       )
         throw new Error('Camera cursor history coverage is unavailable.');
-      if (!prior)
+      if (
+        !prepared.some(
+          (item) =>
+            item.window === window &&
+            item.recordingId === group.recordingId &&
+            item.trajectoryId === descriptor.trajectoryId
+        )
+      )
         prepared.push(
           Object.freeze({
             recordingId: group.recordingId,
@@ -155,7 +197,7 @@ export async function prepareCameraCursorTrajectoryProject(
   }
   const scratch: CursorTrajectoryRenderProject = {
     ...project,
-    ...(project.actionFeedback
+    ...(!range && project.actionFeedback
       ? {
           actionFeedback: project.actionFeedback.map((group) =>
             group.events ? { ...group, signals: [] } : group
@@ -252,6 +294,7 @@ export function resolvePreparedCursorTrajectoryPosition(
 }
 
 const sourceWindows = new WeakMap<CursorTrajectoryWindow, PreparedCursorSourceWindow>();
+const sourceProjects = new WeakMap<VideoProject, Map<string, PreparedCursorSourceWindow>>();
 interface PreparedCursorSourceWindow {
   readonly samples: readonly VideoProjectCursorSample[];
   readonly knownEndSeconds: number;
@@ -262,10 +305,37 @@ export function preparedCursorTrajectorySourceWindow(
   recordingId: string,
   trajectoryId: string
 ): PreparedCursorSourceWindow | undefined {
-  const window = project[windowsKey]?.find(
-    (item) => item.recordingId === recordingId && item.trajectoryId === trajectoryId
-  )?.window;
-  if (!window) return undefined;
+  const windows = project[windowsKey]
+    ?.filter((item) => item.recordingId === recordingId && item.trajectoryId === trajectoryId)
+    .map((item) => item.window);
+  if (!windows?.length) return undefined;
+  if (windows.length === 1) return cursorTrajectorySourceWindow(windows[0]!, trajectoryId);
+  const retained = sourceProjects.get(project);
+  const key = JSON.stringify([recordingId, trajectoryId]);
+  const cached = retained?.get(key);
+  if (cached) return cached;
+  const samples = new Map<string, VideoProjectCursorSample>();
+  let knownEndSeconds = 0;
+  for (const window of windows) {
+    const source = cursorTrajectorySourceWindow(window, trajectoryId);
+    knownEndSeconds = Math.max(knownEndSeconds, source.knownEndSeconds);
+    for (const sample of source.samples)
+      if (!samples.has(sample.id)) samples.set(sample.id, sample);
+  }
+  const result = Object.freeze({
+    samples: Object.freeze([...samples.values()].sort((a, b) => a.time - b.time)),
+    knownEndSeconds,
+  });
+  const index = retained ?? new Map<string, PreparedCursorSourceWindow>();
+  index.set(key, result);
+  if (!retained) sourceProjects.set(project, index);
+  return result;
+}
+
+function cursorTrajectorySourceWindow(
+  window: CursorTrajectoryWindow,
+  trajectoryId: string
+): PreparedCursorSourceWindow {
   const cached = sourceWindows.get(window);
   if (cached) return cached;
   const samples: VideoProjectCursorSample[] = [];

@@ -1,0 +1,21 @@
+.review-timeline-hint {
+  position: fixed;
+  z-index: 100;
+  pointer-events: auto;
+  width: max-content;
+  max-width: min(400px, calc(100vw - 16px));
+  max-height: min(480px, calc(100vh - 16px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: 8px 12px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: var(--sniptale-radius-sm);
+  background: var(--sniptale-color-surface-panel);
+  color: var(--sniptale-color-text-primary);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
+  font: 400 12px / 1.5 var(--sniptale-font-sans);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-align: start;
+}

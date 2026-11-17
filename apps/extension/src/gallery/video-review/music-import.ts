@@ -1,8 +1,14 @@
+import { reviewInsertionTarget } from './range-placement';
+import {
+  reviewCommandInsertion,
+  type ReviewCommandContext,
+  type ReviewCommandPort,
+} from './command-context';
 import {
   anchorReviewVoiceover,
-  anchorReviewVoiceoverAtSource,
+  projectReviewVoiceover,
 } from '../../features/video/review/voiceover-edits';
-import type { ReviewAudioLane } from './use-review-audio';
+import type { ReviewAudioLane, useReviewAudio } from './use-review-audio';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { readLibraryAudioBindingSource } from '../../composition/persistence/projects/library-asset-binding';
 import { readVideoWorkspace } from '../../composition/persistence/review-workspaces/store';
@@ -20,27 +26,26 @@ import {
   UnsupportedAudioFileError,
 } from '../../workflows/video-review/audio-import';
 import { translate } from '../../platform/i18n';
-import type { useReviewEditorState } from './use-editor-state';
+import type { createVideoReviewSession } from '../../workflows/video-review/session';
 
-type EditorState = ReturnType<typeof useReviewEditorState>;
-type MusicImportState = Pick<
-  EditorState,
-  | 'session'
-  | 'video'
-  | 'busy'
-  | 'canStart'
-  | 'time'
-  | 'source'
-  | 'playbackRange'
-  | 'flushAdvanced'
-  | 'audio'
->;
+type MusicImportState = {
+  session: ReturnType<typeof createVideoReviewSession>;
+  commands: ReviewCommandPort;
+  pause(): void;
+  busy: boolean;
+  canStart(): boolean;
+  flushAdvanced(): Promise<void>;
+  audio: Pick<ReturnType<typeof useReviewAudio>, 'setSelectedId'>;
+};
 type Intent = {
-  session: EditorState['session'];
+  context: ReviewCommandContext;
+  session: ReturnType<typeof createVideoReviewSession>;
   aggregateId: string;
   lane: ReviewAudioLane;
   sourceStart: number;
   sourceEnd: number | null;
+  resultStart: number;
+  resultEnd: number | null;
   controller: AbortController;
 };
 type Operation = {
@@ -154,7 +159,7 @@ export function useReviewMusicImport(state: MusicImportState) {
   const { releasePreview, stopPreview, listen, playingId, loadingId } = useMusicLibraryPreview({
     target: () => intent.current,
     assertCurrent: (target) => assertCurrent(target),
-    pauseMain: () => current.current.video.current?.pause(),
+    pauseMain: () => current.current.pause(),
     setError,
   });
   const cancel = useCallback(() => {
@@ -179,6 +184,7 @@ export function useReviewMusicImport(state: MusicImportState) {
     if (
       intent.current !== target ||
       current.current.session !== target.session ||
+      !current.current.commands.isCurrent(target.context, 'temporal') ||
       target.session.getSnapshot().snapshot.workspace.aggregateId !== target.aggregateId
     )
       throw new Error(translate('gallery.videoReview.musicChanged'));
@@ -194,7 +200,7 @@ export function useReviewMusicImport(state: MusicImportState) {
       const active =
         retainedMusicOperation(operation.current, selection) ??
         createMusicOperation(target, selection, assertCurrent, () => ({
-          sourceDuration: current.current.source.duration,
+          sourceDuration: target.context.scope.sourceDuration,
           flushAdvanced: current.current.flushAdvanced,
         }));
       operation.current = active;
@@ -202,7 +208,7 @@ export function useReviewMusicImport(state: MusicImportState) {
       assertCurrent(target);
       await restoreAttachedMusic(target, active.clipId, asset.assetId);
       assertCurrent(target);
-      current.current.audio.setSelectedId(active.clipId, target.lane);
+      current.current.audio.setSelectedId(active.clipId, target.lane, target.context);
       close();
     } catch (failure) {
       if (intent.current === target && !target.controller.signal.aborted)
@@ -215,18 +221,30 @@ export function useReviewMusicImport(state: MusicImportState) {
   return {
     open: (trigger: HTMLElement, lane: ReviewAudioLane = 'music') => {
       if (current.current.busy || !current.current.canStart() || pending.current) return;
-      close();
       const latest = current.current;
-      latest.video.current?.pause();
-      intent.current = {
-        session: latest.session,
-        aggregateId: latest.session.getSnapshot().snapshot.workspace.aggregateId,
-        lane,
-        sourceStart: latest.playbackRange?.start ?? latest.time,
-        sourceEnd: latest.playbackRange?.end ?? null,
-        controller: new AbortController(),
-      };
-      setAnchor(trigger);
+      const context = latest.commands.capture();
+      if (!context) return;
+      const source = reviewCommandInsertion(context, 'source');
+      const result = reviewCommandInsertion(context, 'result');
+      if (!source || !result) return;
+      const sourceRange = reviewInsertionTarget(source.time, source.range);
+      const resultRange = reviewInsertionTarget(result.time, result.range);
+      latest.commands.admit(context, () => {
+        if (current.current.busy || pending.current) return;
+        close();
+        intent.current = {
+          context,
+          session: latest.session,
+          aggregateId: latest.session.getSnapshot().snapshot.workspace.aggregateId,
+          lane,
+          sourceStart: sourceRange?.start ?? source.time,
+          sourceEnd: sourceRange?.end ?? null,
+          resultStart: resultRange?.start ?? result.time,
+          resultEnd: resultRange?.end ?? null,
+          controller: new AbortController(),
+        };
+        setAnchor(trigger);
+      });
     },
     drawer: anchor
       ? {
@@ -278,32 +296,21 @@ async function commitMusicClip(args: {
   if (before.audio[target.lane].some((clip) => clip.id === clipId))
     throw new Error(translate('gallery.videoReview.musicChanged'));
   const map = createReviewTimeMap(args.sourceDuration, snapshot.document.edits);
-  const start = map.sourceToTimeline(target.sourceStart);
-  const end =
-    target.sourceEnd === null
-      ? map.getDuration()
-      : (map.sourceToTimeline(target.sourceEnd) ??
-        map
-          .getSegments()
-          .find(
-            (segment) =>
-              segment.sourceStart <= target.sourceEnd! && segment.sourceEnd >= target.sourceEnd!
-          )?.resultEnd);
-  const placement =
-    target.lane === 'voiceover'
-      ? {
-          start: target.sourceStart,
-          end: Math.min(target.sourceStart + duration, target.sourceEnd ?? Infinity),
-        }
-      : reviewMusicPlacement(start, end ?? map.getDuration(), before.audio.music);
-  const imported = {
+  const placement = reviewMusicPlacement(
+    target.resultStart,
+    Math.min(target.resultEnd ?? map.getDuration(), map.getDuration()),
+    target.lane === 'music' ? projectReviewVoiceover(before.audio.music, map.getSegments()) : []
+  );
+  if (
+    target.resultEnd !== null &&
+    placement.end < Math.min(target.resultStart + duration, target.resultEnd)
+  )
+    throw new Error(translate('gallery.videoReview.musicNoSpace'));
+  const clip = {
     ...importedAudioClip(assetId, duration, placement.start, placement.end),
     id: clipId,
+    timeDomain: 'result' as const,
   };
-  const clip =
-    target.lane === 'voiceover'
-      ? anchorReviewVoiceoverAtSource(imported, map.getSegments())
-      : imported;
   try {
     await target.session.commitDurable({
       id: crypto.randomUUID(),

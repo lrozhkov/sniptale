@@ -218,7 +218,8 @@ export function authoredCursorFocusPath(path: CursorFocusPath): CursorFocusPath 
 /** Captured anchor geometry always comes from facts; sparse authored controls merge onto that base. */
 export function resolveAuthoredCursorFocusPath(
   derived: CursorFocusPath,
-  authored: CursorFocusPath | undefined
+  authored: CursorFocusPath | undefined,
+  compatibleClocks: (derived: CursorFocusSegment, edit: CursorFocusSegment) => boolean = () => true
 ): CursorFocusPath {
   if (!authored) return derived;
   const segments = derived.segments.map((segment) => ({
@@ -228,6 +229,7 @@ export function resolveAuthoredCursorFocusPath(
   for (const edit of authored.segments) {
     const matches = segments.filter(
       (segment) =>
+        compatibleClocks(segment, edit) &&
         JSON.stringify(segment.binding) === JSON.stringify(edit.binding) &&
         segment.end >= edit.start &&
         segment.start <= edit.end

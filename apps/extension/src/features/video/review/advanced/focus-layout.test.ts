@@ -26,7 +26,7 @@ const geometry = {
 };
 
 it.each(['zoom', 'spotlight'] as const)(
-  'blocks %s transitions across every active focus type in authoring and rendering',
+  'blocks %s transitions only across the same focus family in authoring and rendering',
   (kind) => {
     const a = { ...focus('a', 0, 2, kind), linkTo: 'b' };
     const b = focus('b', 6, 8, kind);
@@ -39,6 +39,15 @@ it.each(['zoom', 'spotlight'] as const)(
       ]) {
         const blocker = focus('blocker', start!, end!, blockerKind);
         const regions = [b, blocker, a];
+        if (blockerKind !== kind) {
+          expect(resolveQuickEditFocusLink(regions, 'a')?.target.id).toBe('b');
+          expect(
+            updateQuickEditZoomRegion(regions.map(unlink), 'a', { linkTo: 'b' }).find(
+              (r) => r.id === 'a'
+            )?.linkTo
+          ).toBe('b');
+          continue;
+        }
         expect(resolveQuickEditFocusLink(regions, 'a')).toBeNull();
         expect(
           updateQuickEditZoomRegion(regions.map(unlink), 'a', { linkTo: 'b' }).find(
@@ -69,7 +78,7 @@ it.each(['zoom', 'spotlight'] as const)(
       ...r,
       sourceAnchor: r.id === 'middle' ? { start: 3, end: 4 } : { start: r.start, end: r.end },
     }));
-    expect(resolveQuickEditFocusLink(anchored, 'a', { sourceTime: true })).toBeNull();
+    expect(resolveQuickEditFocusLink(anchored, 'a', { sourceTime: true })?.target.id).toBe('b');
   }
 );
 

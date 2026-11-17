@@ -4,10 +4,11 @@ import { isVideoProjectUtilityLaneLocked } from './utility-lanes';
 import type { VideoProjectActionFeedback } from './action-feedback/types';
 import {
   projectSourceInteractionActions,
+  isResultSourceInteractionAction,
   parseVideoProjectSourceInteractionDocuments,
 } from './source-interaction-documents';
 import { resolveVideoProjectActionPresentations } from './action-presentation';
-import { getVideoClipSourceTime } from './timeline/rate';
+import { getVideoClipInteractionTime, getVideoClipSourceTime } from './timeline/rate';
 import { isVideoProjectActionPresentationOverride } from './validation/interaction';
 import type { VideoProject, VideoProjectActionPresentationOverride } from './types';
 
@@ -68,7 +69,10 @@ export function editProjectSourceInteraction(
       clip.startTime,
       Math.min(clip.startTime + clip.duration - 1 / project.fps, patch.time)
     );
-    const delta = getVideoClipSourceTime(clip, requested) - getVideoClipSourceTime(clip, current);
+    const clock = isResultSourceInteractionAction(project, event)
+      ? getVideoClipInteractionTime
+      : getVideoClipSourceTime;
+    const delta = clock(clip, requested) - clock(clip, current);
     press = { ...press, start: press.start + delta, end: press.end + delta };
     overrides = overrides.map((item) =>
       item.ref.kind === 'action' && item.ref.id === press.id
