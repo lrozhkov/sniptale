@@ -1,5 +1,5 @@
 import type { RestoredVideoProjectHistory } from '../../../features/video/project/history-capture';
-import type { AssetRef } from '../assets';
+import type { AssetRef } from '../assets/contracts';
 import type { RecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import type { VideoExportFormat, VideoProject } from '../../../features/video/project/types';
 import type { VideoProjectMetadata } from '../../../features/video/project/validation';
