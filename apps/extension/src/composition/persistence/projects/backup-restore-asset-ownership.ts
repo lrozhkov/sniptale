@@ -5,6 +5,7 @@ import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
 import type { StoredProjectExportEntry, VideoProjectEntry } from './contracts';
 import { parseProjectExportEntry, parseVideoProjectEntry } from './read-guards';
+import { collectProjectEntryOwnedAssetIds } from './asset-references';
 import { scenarioChildIsUnrelated } from '../media-library/dependencies';
 
 const PROJECT_ASSET_PREFIX = 'project-asset:';
@@ -30,11 +31,7 @@ export interface ProjectAssetOwnership {
 }
 
 function projectAssetIds(entry: VideoProjectEntry): Set<string> {
-  return new Set(
-    entry.project.assets.flatMap((asset) =>
-      asset.source.kind === 'project-asset' ? [asset.source.projectAssetId] : []
-    )
-  );
+  return new Set(collectProjectEntryOwnedAssetIds(entry));
 }
 
 function addReviewAssetIds(workspace: VideoWorkspace, into: Set<string>): void {

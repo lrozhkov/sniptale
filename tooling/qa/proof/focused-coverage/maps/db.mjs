@@ -1,5 +1,31 @@
 export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   {
+    owner: 'native-project-replacement-consumers',
+    productionFile: 'apps/extension/src/composition/persistence/projects/backup-restore.ts',
+    allowCrossOwner: true,
+    reason:
+      'Archive publication replaces native project graphs and their resource claims. ' +
+      'Native history and actual archive publication prove shared ownership, rollback and cleanup.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/projects/history-publication.test.ts',
+      'apps/extension/src/composition/persistence/projects/backup-restore.review-assets.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.test.ts',
+    ],
+  },
+  {
+    owner: 'native-project-replica-publication',
+    productionFile:
+      'apps/extension/src/composition/persistence/sync-capture/apply-video-project.ts',
+    reason:
+      'Replica publication shares native project, binary residency and Scenario dependency admission. ' +
+      'These consumers prove atomic replacement, receipt retry and resource retention.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/sync-capture/apply-video-project.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-video-project.binary.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-video-project.scenario.test.ts',
+    ],
+  },
+  {
     owner: 'durable-ready-media-locators',
     productionFile: 'apps/extension/src/composition/persistence/assets/ready-media-claims.ts',
     exclusive: true,

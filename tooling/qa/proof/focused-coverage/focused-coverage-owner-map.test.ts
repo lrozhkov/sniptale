@@ -47,11 +47,27 @@ it.each([
   ['projects/mutation-stores.ts', 'sync-capture/checkpoint-schedule.test.ts'],
   ['sync-capture/test-support/apply-video-project.ts', 'sync-capture/capture.integration.test.ts'],
   ['sync-capture/test-support/freeze.ts', 'sync-capture/freeze.test.ts'],
+  ['sync-capture/apply-video-project.ts', 'sync-capture/apply-video-project.binary.test.ts'],
+  ['sync-capture/apply-video-project.ts', 'sync-capture/apply-video-project.scenario.test.ts'],
 ])('selects the native consumer for %s', async (production, consumer) => {
   const module = await importOwnerMap();
   const root = 'apps/extension/src/composition/persistence';
   expect(module.resolveMappedCoverageOwnerTests(`${root}/${production}`)).toContain(
     `${root}/${consumer}`
+  );
+});
+
+it('selects native history and actual archive publication for project replacement', async () => {
+  const module = await importOwnerMap();
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      'apps/extension/src/composition/persistence/projects/backup-restore.ts'
+    )
+  ).toEqual(
+    expect.arrayContaining([
+      'apps/extension/src/composition/persistence/projects/history-publication.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.test.ts',
+    ])
   );
 });
 

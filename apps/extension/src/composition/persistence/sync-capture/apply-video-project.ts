@@ -1,4 +1,10 @@
 import { readCheckpointInTransaction } from './checkpoints';
+import { removeEditorDocumentOwnership } from '../document-assets/ownership';
+import {
+  VIDEO_PROJECT_HISTORY_OWNER_KIND,
+  videoProjectHistoryAssetBindings,
+} from '../projects/history-contracts';
+import { collectProjectEntryOwnedAssetIds } from '../projects/asset-references';
 import { VideoProjectApplyConflictError } from './apply-video-project.contracts';
 import type {
   ApplyPreparedVideoProjectRevisionInput,
@@ -567,6 +573,14 @@ async function publishApplication(
   await stores.presentations.delete(
     createAggregatePresentationKey({ id: root.entry.id, kind: 'video-project' })
   );
+  if (context.current?.history)
+    await removeEditorDocumentOwnership({
+      document: { assets: videoProjectHistoryAssetBindings(context.current.history) },
+      ownerKind: VIDEO_PROJECT_HISTORY_OWNER_KIND,
+      ownerId: root.entry.id,
+      physicalDelete: operation,
+      stores,
+    });
   await publishPreparedVideoProjectRevisionInTransaction({ root, stores, workspaceRevision });
   await publishPreparedVideoProjectSidecarsInTransaction({ root, stores, workspaceRevision });
   for (const item of root.exports ?? []) {
@@ -630,11 +644,7 @@ async function publishApplication(
     },
     Date.now()
   );
-  const detached = new Set(
-    context.current?.project.assets.flatMap((asset) =>
-      asset.source.kind === 'project-asset' ? [asset.source.projectAssetId] : []
-    ) ?? []
-  );
+  const detached = new Set(collectProjectEntryOwnedAssetIds(context.current));
   await releaseUnpublishedProjectAssets(tx, detached, operation);
   if (operation.assetIds.length || operation.privateSources?.length)
     await tx.objectStore(ASSET_OPERATIONS_STORE).put(operation);

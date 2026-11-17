@@ -1,4 +1,9 @@
 import type { ImageWorkspaceIdentity } from '../image-workspaces/identity';
+import { removeEditorDocumentOwnership } from '../document-assets/ownership';
+import {
+  VIDEO_PROJECT_HISTORY_OWNER_KIND,
+  videoProjectHistoryAssetBindings,
+} from './history-contracts';
 import {
   publishPreparedVideoProjectRevisionInTransaction,
   publishPreparedVideoProjectSidecarsInTransaction,
@@ -112,6 +117,14 @@ async function deleteExisting(args: {
 }) {
   const existing = parseVideoProjectEntry(await args.stores.projects.get(args.projectId));
   if (!existing) return;
+  if (existing.history)
+    await removeEditorDocumentOwnership({
+      document: { assets: videoProjectHistoryAssetBindings(existing.history) },
+      ownerKind: VIDEO_PROJECT_HISTORY_OWNER_KIND,
+      ownerId: existing.id,
+      physicalDelete: args.operation,
+      stores: args.stores,
+    });
   for (const id of args.assetOwnership.owned) {
     if (args.assetOwnership.protected.has(id)) continue;
     const published: unknown = await args.stores.media.get(`project-asset:${id}`);

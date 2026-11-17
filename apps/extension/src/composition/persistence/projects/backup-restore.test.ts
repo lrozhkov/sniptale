@@ -20,6 +20,7 @@ import {
   createVideoProjectEntry,
   createVideoProjectEntryWithMediaClip,
 } from './index.test-support';
+import { collectProjectAssetOwnership } from './backup-restore-asset-ownership';
 
 function store(get: (key: IDBValidKey) => unknown = () => undefined) {
   return {
@@ -66,6 +67,31 @@ const ref = {
   sha256: null,
   size: 1,
 };
+
+it.each([false, true])(
+  'includes historical private assets in replacement ownership: shared=%s',
+  async (shared) => {
+    const target = stores();
+    const existing = createVideoProjectEntry({ id: 'replaced' }, { id: 'replaced' });
+    existing.history = {
+      version: 1,
+      epoch: 'old',
+      past: [{ assetId: 'inverse' }],
+      future: [],
+      sources: [{ kind: 'project-asset', id: 'historical-private' }],
+    };
+    const other = createVideoProjectEntry({ id: 'other' }, { id: 'other' });
+    if (shared) other.history = { ...existing.history, epoch: 'other' };
+    target.projects.getAll = vi.fn(async () => [existing, other]);
+    const ownership = await collectProjectAssetOwnership({
+      existing,
+      projectId: existing.id,
+      stores: target,
+    });
+    expect([...ownership.owned]).toEqual(['historical-private']);
+    expect(ownership.protected.has('historical-private')).toBe(shared);
+  }
+);
 
 it('restores an archived temporary project as permanent without changing its graph', async () => {
   const target = stores();

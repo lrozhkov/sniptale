@@ -12,6 +12,7 @@ import { VideoTrackKind } from '../../../features/video/project/types';
 import { preparePersistedVideoProjectHistory } from './history-codec';
 import { getVideoProject, getVideoProjectWorkspace, saveVideoProject } from './index';
 import { deleteVideoProjectInTransaction } from './index.delete';
+import { putVideoProjectBackupRestore } from './backup-restore';
 import { buildPhysicalDeleteOperation } from '../assets';
 import {
   VIDEO_PROJECT_HISTORY_OWNER_KIND,
@@ -118,6 +119,7 @@ beforeEach(async () => {
                     : 'id';
         const created = database.createObjectStore(store, { keyPath });
         if (store === 'asset_owners') created.createIndex('assetId', 'assetId');
+        if (store === 'project_exports') created.createIndex('projectId', 'projectId');
       }
     },
   });
@@ -189,6 +191,74 @@ async function seed(tracks?: ReturnType<typeof createVideoProjectTrack>[]) {
   await tx.done;
   return { entry, prepared, before, after };
 }
+
+it.each(['replace', 'skip', 'abort'] as const)(
+  'retires replaced native history atomically: %s',
+  async (mode) => {
+    const { entry, prepared } = await seed();
+    const original = await db.get('video_projects', entry.id);
+    const [shared, retired] = prepared.refs;
+    if (!shared || !retired) throw new Error('Expected both history directions.');
+    await db.put('asset_owners', {
+      assetId: shared.assetId,
+      ownerKind: 'external',
+      ownerId: 'other',
+      role: 'body',
+    });
+    const beforeOwners = await db.getAll('asset_owners');
+    const beforeRefs = await db.getAll('asset_refs');
+    await db.put('asset_operations', { operationId: 'existing-receipt' });
+    const operation = buildPhysicalDeleteOperation([]);
+    const tx = db.transaction([...EXPECTED_STORES], 'readwrite');
+    const result = await putVideoProjectBackupRestore({
+      operation,
+      root: {
+        assets: [],
+        exports: [],
+        entry: { ...entry, project: { ...entry.project, name: 'Restored' } },
+      },
+      strategy: mode === 'skip' ? 'skip' : 'replace',
+      tx,
+      stores: {
+        assets: tx.objectStore('project_assets'),
+        exports: tx.objectStore('project_exports'),
+        imageIdentities: tx.objectStore('image_workspace_identities'),
+        media: tx.objectStore('media_library'),
+        videoWorkspaces: tx.objectStore('video_workspaces'),
+        videoDrafts: tx.objectStore('video_workspace_drafts'),
+        operations: tx.objectStore('asset_operations'),
+        owners: tx.objectStore('asset_owners'),
+        presentations: tx.objectStore('aggregate_presentations'),
+        projects: tx.objectStore('video_projects'),
+        refs: tx.objectStore('asset_refs'),
+        thumbnails: tx.objectStore('thumbnails'),
+        scenarioAssets: tx.objectStore('scenario_assets'),
+      },
+    });
+    if (mode === 'abort') {
+      // A later caller-owned receipt failure must roll back the complete replacement.
+      await expect(
+        tx.objectStore('asset_operations').add({ operationId: 'existing-receipt' })
+      ).rejects.toThrow();
+      await expect(tx.done).rejects.toThrow();
+    } else await tx.done;
+    if (mode !== 'replace') {
+      expect(await db.get('video_projects', entry.id)).toEqual(original);
+      expect(await db.getAll('asset_owners')).toEqual(beforeOwners);
+      expect(await db.getAll('asset_refs')).toEqual(beforeRefs);
+      if (mode === 'skip') expect(result.imported).toBe(false);
+      return;
+    }
+    expect(result.imported).toBe(true);
+    expect((await db.get('video_projects', entry.id)).project.name).toBe('Restored');
+    expect(await db.getAll('asset_owners')).toEqual([
+      { assetId: shared.assetId, ownerKind: 'external', ownerId: 'other', role: 'body' },
+    ]);
+    expect(await db.get('asset_refs', shared.assetId)).toEqual(shared);
+    expect(await db.get('asset_refs', retired.assetId)).toBeUndefined();
+    expect(operation.assetIds).toEqual([retired.assetId]);
+  }
+);
 
 function gate() {
   let release: () => void = () => {
