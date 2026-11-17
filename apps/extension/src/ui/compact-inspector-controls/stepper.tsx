@@ -21,8 +21,9 @@ export function NumericStepper({
   onFinish,
   onCancel,
 }: NumericStepperProps) {
-  const latest = useRef({ onFinish, onCancel });
-  latest.current = { onFinish, onCancel };
+  const latest = useRef({ onFinish, onCancel, disabled });
+  latest.current = { onFinish, onCancel, disabled };
+  const mounted = useRef(true);
   const release = useRef<(() => void) | null>(null);
   const repeat = useStepperRepeat((direction) => {
     if (!disabled) onStep(direction);
@@ -38,11 +39,19 @@ export function NumericStepper({
     if (commit) latest.current.onFinish?.();
     else latest.current.onCancel?.();
   }, []);
-  useEffect(() => () => finish(false), [finish]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      finish(false);
+    };
+  }, [finish]);
   useEffect(() => {
     if (disabled) finish(false);
   }, [disabled, finish]);
   const start = (direction: 1 | -1, pointerId: number) => {
+    // Focusing the button can synchronously replace or disable this control.
+    if (!mounted.current || latest.current.disabled) return;
     finish(true);
     release.current = bindPointerRelease(pointerId, finish);
     repeat.start(direction);
@@ -112,6 +121,17 @@ function getStepperButtonHandlers({
       }
       event.preventDefault();
       event.stopPropagation();
+      const root = event.currentTarget.getRootNode();
+      const focused =
+        root instanceof ShadowRoot
+          ? root.activeElement
+          : event.currentTarget.ownerDocument.activeElement;
+      const valueField = event.currentTarget.closest(
+        '[data-ui="shared.ui.compact-inspector.numeric-value-field"]'
+      );
+      if (focused && !valueField?.contains(focused)) {
+        event.currentTarget.focus({ preventScroll: true });
+      }
       start(direction, event.pointerId);
     },
   };
@@ -124,6 +144,15 @@ function bindPointerRelease(pointerId: number, finish: (commit: boolean) => void
   };
   const cancel = () => finish(false);
   const handleKeyDown = (event: KeyboardEvent) => {
+    if (
+      ['Tab', 'Enter', ' '].includes(event.key) &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey
+    ) {
+      finish(true);
+      return;
+    }
     if (
       event.key !== 'Escape' &&
       !((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z')

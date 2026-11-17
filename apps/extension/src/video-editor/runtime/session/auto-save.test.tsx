@@ -1208,3 +1208,30 @@ it('rejects a Montage source edit during the extra exit-intent gap', async () =>
   });
   expect(eligible).toBe(false);
 });
+
+it('saves restored content after a cancelled transaction and a delayed preview ACK', async () => {
+  const original = await mountCheckpointProject();
+  const pending = checkpointDeferred<ReturnType<typeof createEmptyVideoProject>>();
+  saveVideoProject
+    .mockImplementationOnce(() => pending.promise)
+    .mockImplementation(async (project) => project);
+  const lease = beginCheckpointGesture();
+  act(() => useVideoEditorStore.getState().renameProject('Cancelled preview'));
+  await flushAutoSaveTimers();
+  const preview = useVideoEditorStore.getState().project!;
+  expect(saveVideoProject).toHaveBeenCalledOnce();
+  act(() => useVideoEditorStore.getState().endProjectHistoryTransaction(lease, 'cancel'));
+  expect(useVideoEditorStore.getState().project?.name).toBe(original.name);
+  expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(0);
+  expect(releaseCheckpoint).not.toHaveBeenCalled();
+  await act(async () => pending.resolve(preview));
+  await flushAutoSaveTimers();
+  expect(useVideoEditorStore.getState().project?.name).toBe(original.name);
+  expect(saveVideoProject).toHaveBeenLastCalledWith(
+    expect.objectContaining({ name: original.name }),
+    expect.anything()
+  );
+  expect(useVideoEditorStore.getState().projectHistory.transaction).toBeNull();
+  expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(0);
+  expect(releaseCheckpoint).toHaveBeenCalledOnce();
+});

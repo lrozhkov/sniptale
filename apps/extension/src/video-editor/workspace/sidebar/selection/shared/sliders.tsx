@@ -1,6 +1,7 @@
 import { useInspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
 import { NumericRow } from '../../../../../ui/compact-inspector-controls';
 import type { CompactInspectorUnit } from '../../../../../ui/compact-inspector-controls/shared';
+import { useInspectorNumericHistory } from './numeric-history';
 import { useDedupedNumberChange } from './number-commit';
 
 type SliderDisplayMapping = {
@@ -163,10 +164,13 @@ function resolveSliderScrub(props: SliderFieldProps, display: SliderDisplayMappi
 
 export function SliderField(props: SliderFieldProps) {
   const inspector = useInspectorLayout();
-  const disabledProps = props.disabled === undefined ? {} : { disabled: props.disabled };
   const changeValue = useDedupedNumberChange(props.onChange, props.value);
   const separateCommitValue = useDedupedNumberChange(props.onCommit ?? props.onChange, props.value);
   const commitValue = props.onCommit ? separateCommitValue : changeValue;
+  const history = useInspectorNumericHistory(props.value, changeValue, {
+    disabled: props.disabled,
+  });
+  const disabledProps = { disabled: props.disabled || history.disabled };
   const step = props.step ?? 1;
   const display = resolveSliderDisplayMapping({
     formatValue: props.formatValue,
@@ -177,18 +181,18 @@ export function SliderField(props: SliderFieldProps) {
   });
   const previewValue = (value: number) => {
     const nextValue = display.toDomainValue(value);
-    if (props.onCommit) {
-      props.onChange(nextValue);
-      return;
-    }
-    changeValue(nextValue);
+    history.preview(() => {
+      if (props.onCommit) props.onChange(nextValue);
+      else changeValue(nextValue);
+    });
   };
   const commitDisplayValue = (value: number) => {
-    commitValue(display.toDomainValue(value));
+    history.commit(() => commitValue(display.toDomainValue(value)));
   };
 
   return (
     <NumericRow
+      key={history.resetKey}
       appearance="plain"
       focusAppearance="accent-box"
       {...(inspector ? {} : { className: 'min-h-8! py-0! grid-cols-[minmax(0,1fr)_auto]!' })}
@@ -203,6 +207,7 @@ export function SliderField(props: SliderFieldProps) {
       {...disabledProps}
       onPreviewValue={previewValue}
       onCommitValue={commitDisplayValue}
+      onCancelValue={history.cancel}
     />
   );
 }

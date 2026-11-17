@@ -1,3 +1,4 @@
+import { InspectorNumericHistoryProvider } from './shared/numeric-history';
 import { InspectSourceVoiceoverPanel } from './inspection/source-voiceover';
 import { EffectPresetEditingProvider } from './effect-instance/editing';
 import { InspectorDisclosurePreferences } from '../../../../composition/inspector-disclosures/state';
@@ -45,9 +46,13 @@ export function WorkspaceSidebarInspectPanel(props: WorkspaceSidebarSelectionPan
             data-ui="video-editor.inspector.body"
             className="min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto px-3 py-3"
           >
-            <EffectPresetEditingProvider key={JSON.stringify(props.selection)}>
-              <SelectionBody {...props} />
-            </EffectPresetEditingProvider>
+            <InspectorNumericHistoryProvider
+              key={JSON.stringify([props.project.id, props.selection])}
+            >
+              <EffectPresetEditingProvider>
+                <SelectionBody {...props} />
+              </EffectPresetEditingProvider>
+            </InspectorNumericHistoryProvider>
           </div>
         </div>
       </InspectorSelectionFamilyContext.Provider>

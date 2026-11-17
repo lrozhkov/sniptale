@@ -1,4 +1,5 @@
 import type { StateCreator } from 'zustand';
+import { applyVideoProjectMutationPatch } from '../../features/video/project/mutation';
 import type { VideoEditorProjectHistoryActions } from '../contracts/commands/history';
 import {
   beginVideoEditorProjectHistoryTransaction,
@@ -32,13 +33,26 @@ export function createVideoEditorProjectHistoryActions(
       });
       return lease;
     },
-    endProjectHistoryTransaction: (lease) =>
+    endProjectHistoryTransaction: (lease, outcome = 'commit') =>
       set((state) => {
         if (!state.project || state.projectHistory.transaction?.lease !== lease) return {};
+        const transaction = state.projectHistory.transaction;
+        let project = state.project;
+        if (
+          outcome === 'cancel' &&
+          transaction.changed &&
+          transaction.before &&
+          transaction.projectId === project.id &&
+          state.projectHistory.projectId === project.id
+        ) {
+          project = applyVideoProjectMutationPatch(transaction.before.project, {});
+        }
         return {
+          ...(project !== state.project ? applyProjectSnapshot(state, project) : {}),
           projectHistory: endVideoEditorProjectHistoryTransaction(
             state.projectHistory,
-            state.project
+            project,
+            outcome
           ),
         };
       }),

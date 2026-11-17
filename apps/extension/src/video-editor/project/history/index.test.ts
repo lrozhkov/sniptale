@@ -1,3 +1,4 @@
+import { createTextClip } from '../../../features/video/project/factories/overlay-clip';
 import { createProjectWithEffects } from '../state/effects.effect-instance.test-support';
 import { createVideoProjectCursorTrack } from '../../../features/video/project/defaults';
 import { materializeVideoProjectCursorSourceObservations } from '../../../features/video/project/cursor-source-observations';
@@ -421,4 +422,106 @@ it('restores independent selections in both navigation directions', () => {
   expect(redo?.status).toBe('applied');
   if (!redo || redo.status !== 'applied') throw new Error('Expected redo');
   expect(redo.selection).toEqual({ kind: 'scene' });
+});
+
+it('cancels the full transaction while preserving Redo and current selection', () => {
+  const store = useVideoEditorStore;
+  const project = createEmptyVideoProject('Original');
+  const clip = createTextClip(project.tracks[0]!.id, project.width, project.height, 0);
+  clip.playbackWindow = {
+    offset: 0.5,
+    holdAt: 3,
+    fadePhase: { offset: 0.5, duration: 4 },
+    gainPhase: { offset: 0.5, duration: 4 },
+  };
+  project.version = 43;
+  project.clips = [clip];
+  project.duration = clip.duration;
+  store.getState().setProject(project);
+  store.getState().renameProject('Redo name');
+  store.getState().undoProject();
+  store.getState().selectClip(clip.id);
+  const before = store.getState().project!;
+  const past = store.getState().projectHistory.past;
+  const future = store.getState().projectHistory.future;
+  const lease = store.getState().beginProjectHistoryTransaction();
+  if (!lease) throw new Error('Missing transaction');
+  store.getState().updateClipFades(clip.id, { fadeInMs: 300 });
+  expect(store.getState().project?.clips[0]?.playbackWindow?.fadePhase).toBeUndefined();
+  store.getState().selectScene();
+  store.getState().endProjectHistoryTransaction(lease, 'cancel');
+  const { updatedAt: _beforeTime, ...expected } = before;
+  const { updatedAt: _afterTime, ...actual } = store.getState().project!;
+  expect(actual).toEqual(expected);
+  expect(store.getState().selection).toEqual({ kind: 'scene' });
+  expect(store.getState().projectHistory).toMatchObject({ transaction: null, error: null });
+  expect(store.getState().projectHistory.past).toBe(past);
+  expect(store.getState().projectHistory.future).toBe(future);
+  store.getState().redoProject();
+  expect(store.getState().project?.name).toBe('Redo name');
+  expect(store.getState().project?.clips[0]?.playbackWindow).toEqual(clip.playbackWindow);
+});
+
+it('keeps an empty cancelled transaction and repeated cancellation free of edits', () => {
+  const store = useVideoEditorStore;
+  store.getState().setProject(createEmptyVideoProject('Original'));
+  const before = store.getState().project;
+  const lease = store.getState().beginProjectHistoryTransaction();
+  if (!lease) throw new Error('Missing transaction');
+  store.getState().endProjectHistoryTransaction(lease, 'cancel');
+  expect(store.getState().project).toBe(before);
+  expect(store.getState().projectHistory).toMatchObject({
+    past: [],
+    future: [],
+    transaction: null,
+  });
+  store.getState().endProjectHistoryTransaction(lease, 'cancel');
+  expect(store.getState().project).toBe(before);
+});
+
+it('does not cancel a foreign lease or restore a retired project', () => {
+  const store = useVideoEditorStore;
+  store.getState().setProject(createEmptyVideoProject('Original'));
+  const lease = store.getState().beginProjectHistoryTransaction();
+  if (!lease) throw new Error('Missing transaction');
+  store.getState().renameProject('Pending');
+  store.getState().endProjectHistoryTransaction(Symbol('foreign'), 'cancel');
+  expect(store.getState().project?.name).toBe('Pending');
+  expect(store.getState().isProjectHistoryTransactionCurrent(lease)).toBe(true);
+  const replacement = createEmptyVideoProject('Replacement');
+  store.getState().setProject(replacement);
+  const current = store.getState().project;
+  store.getState().endProjectHistoryTransaction(lease, 'cancel');
+  expect(store.getState().project).toBe(current);
+  expect(store.getState().project?.id).toBe(replacement.id);
+  expect(store.getState().projectHistory).toMatchObject({
+    past: [],
+    future: [],
+    transaction: null,
+  });
+});
+
+it('preserves immutable effect bytes when cancelling a changed transaction', () => {
+  const project = createProjectWithEffects();
+  const blob = new Blob(['x'], { type: 'image/png' });
+  project.effectSnapshots![0]!.assets = [
+    {
+      id: 'image',
+      kind: 'image',
+      mimeType: 'image/png',
+      byteLength: 1,
+      sha256: 'b'.repeat(64),
+      blob,
+    },
+  ];
+  const store = useVideoEditorStore;
+  store.getState().setProject(project);
+  const original = store.getState().project!.name;
+  const lease = store.getState().beginProjectHistoryTransaction();
+  if (!lease) throw new Error('Missing transaction');
+  store.getState().renameProject('Pending');
+  store.getState().endProjectHistoryTransaction(lease, 'cancel');
+  expect(store.getState().project?.name).toBe(original);
+  expect(store.getState().project?.effectSnapshots?.[0]?.assets[0]?.blob).toBe(blob);
+  expect(store.getState().projectHistory.past).toHaveLength(0);
 });

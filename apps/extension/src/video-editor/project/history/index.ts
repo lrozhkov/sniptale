@@ -4,6 +4,7 @@ import type { VideoProject } from '../../../features/video/project/types';
 import type {
   VideoEditorProjectHistoryError,
   VideoEditorProjectHistoryTransactionLease,
+  VideoEditorProjectHistoryTransactionOutcome,
 } from '../../contracts/commands/history';
 import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 import {
@@ -123,14 +124,15 @@ export function beginVideoEditorProjectHistoryTransaction(
 
 export function endVideoEditorProjectHistoryTransaction(
   history: VideoEditorProjectHistoryState,
-  currentProject: VideoProject
+  currentProject: VideoProject,
+  outcome: VideoEditorProjectHistoryTransactionOutcome = 'commit'
 ): VideoEditorProjectHistoryState {
   const transaction = history.transaction;
   if (!transaction) return history;
   if (history.projectId !== currentProject.id || transaction.projectId !== currentProject.id)
     return failedHistory(currentProject.id, 'projectMismatch');
   const closed = { ...history, transaction: null };
-  if (!transaction.changed || !transaction.before) return closed;
+  if (outcome === 'cancel' || !transaction.changed || !transaction.before) return closed;
   return recordVideoEditorProjectHistory(
     closed,
     transaction.before.project,
