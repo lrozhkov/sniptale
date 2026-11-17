@@ -7,6 +7,7 @@ export {
   type SyncCheckpointReceipt,
 } from './checkpoint-contracts';
 import { MAX_MEDIA_ARCHIVE_ENTRIES } from '../../archive-transfer/contracts';
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 import type {
   ScenarioAssetEntry,
   ScenarioProjectEntry,
@@ -298,7 +299,7 @@ export function captureRootKey(spaceId: string, kind: CaptureRootKind, rootId: s
   return JSON.stringify([spaceId, kind, rootId]);
 }
 
-/** Scenario uses the admitted archive profile; existing pilot families retain their original limits. */
+/** History files add object capacity without expanding material or metadata budgets. */
 export function captureProfileBounds(rootKind: unknown) {
   return rootKind === 'scenario-project'
     ? {
@@ -308,7 +309,9 @@ export function captureProfileBounds(rootKind: unknown) {
       }
     : {
         rows: MAX_CAPTURE_ROWS,
-        objects: MAX_CAPTURE_ROWS * 2,
+        objects:
+          MAX_CAPTURE_ROWS * 2 +
+          (rootKind === 'video-project' ? EDITOR_HISTORY_LIMITS.maxActions : 0),
         metadataBytes: MAX_CAPTURE_METADATA_BYTES,
       };
 }

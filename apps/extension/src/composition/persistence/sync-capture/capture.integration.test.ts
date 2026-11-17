@@ -27,6 +27,7 @@ import { installExperimentalCaptureProfile } from './profile';
 import { applyVideoProjectForCapturePrototype } from './test-support/apply-video-project';
 import type { AssetRef } from '../assets/contracts';
 import type { CapturedChange, SyncCaptureProfile } from './contracts';
+import { collectSyncCaptureClaims } from './claims';
 
 const nativeOwnerMocks = vi.hoisted(() => ({ initDB: vi.fn() }));
 
@@ -112,6 +113,77 @@ beforeEach(async () => {
 });
 
 afterEach(() => vi.restoreAllMocks());
+
+it.each([false, true])(
+  'retains accepted history files after live deletion and replays its receipt: failure=%s',
+  async (failure) => {
+    const historyRef: AssetRef = {
+      assetId: 'history-json',
+      createdAt: 1,
+      location: { kind: 'opfs', objectKey: 'objects/history-json' },
+      mimeType: 'application/json',
+      sha256: 'a'.repeat(64),
+      size: 80,
+    };
+    table('video_projects').set(projectId, {
+      id: projectId,
+      createdAt: 100,
+      updatedAt: 100,
+      workspaceRevision: 1,
+      project: createVideoProject({ id: projectId }),
+      history: {
+        version: 1,
+        epoch: 'epoch',
+        past: [{ assetId: historyRef.assetId }],
+        future: [],
+        sources: [],
+      },
+    });
+    table('asset_refs').set(historyRef.assetId, historyRef);
+    table('asset_owners').set(
+      JSON.stringify(['video-project-history', projectId, 'history:change:history-json']),
+      {
+        assetId: historyRef.assetId,
+        ownerKind: 'video-project-history',
+        ownerId: projectId,
+        role: 'history:change:history-json',
+      }
+    );
+    const capture = async () =>
+      runWithIndexedDbMutation(async (db) => {
+        const { tx } = createProjectMutationStores(db);
+        try {
+          const result = await captureVideoProjectInTransaction(tx, projectId, {
+            origin: 'local-restore',
+            publicationId: 'history-publication',
+          });
+          await tx.done;
+          return result;
+        } catch (error) {
+          return abortIndexedDbMutation(tx, error);
+        }
+      });
+    if (failure) {
+      const before = structuredClone(fixture.rows);
+      failCaptureWrite = true;
+      await expect(capture()).rejects.toThrow();
+      expect(fixture.rows).toEqual(before);
+      failCaptureWrite = false;
+    }
+    await capture();
+    expect(captures()).toHaveLength(1);
+    table('video_projects').delete(projectId);
+    table('asset_refs').delete(historyRef.assetId);
+    table('asset_owners').clear();
+    const before = structuredClone(table('sync_capture'));
+    await capture();
+    expect(table('sync_capture')).toEqual(before);
+    expect(collectSyncCaptureClaims([...table('sync_capture').values()])).toMatchObject({
+      valid: true,
+      assetIds: new Set([historyRef.assetId]),
+    });
+  }
+);
 
 it('coalesces accepted native revisions and refuses the stale numeric writer without another intent', async () => {
   const first = await saveVideoProject(createVideoProject({ id: projectId, name: 'Revision N' }), {

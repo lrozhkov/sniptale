@@ -1,4 +1,11 @@
 import { resolveCapturedProjectAssetSource } from './project-snapshot';
+import { isSha256Digest } from '@sniptale/platform/security/digest';
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
+import {
+  VIDEO_PROJECT_HISTORY_OWNER_KIND,
+  videoProjectHistoryAssetBindings,
+  videoProjectHistoryChangeRefs,
+} from '../projects/history-contracts';
 import {
   freezeImageInTransaction,
   readImageReplicaPredecessorInTransaction,
@@ -345,6 +352,7 @@ class NativeProjectSnapshot {
   }
 
   async freeze(): Promise<CapturedVideoProjectRows> {
+    await this.retainHistory();
     await this.retainProjectSources();
     await this.retainPublishedExports();
     // Growing sets resolve origins and borrowed sources; maps bound cycles and deduplicate rows.
@@ -378,7 +386,11 @@ class NativeProjectSnapshot {
     let ref = this.refs.get(assetId);
     if (!ref) {
       ref = frozenNativeRow(await this.tx.objectStore(ASSET_REFS_STORE).get(assetId), admitRef);
-      requireSupported(ref.assetId === assetId && this.refs.size < MAX_CAPTURE_ROWS);
+      requireSupported(
+        ref.assetId === assetId &&
+          this.refs.size <
+            MAX_CAPTURE_ROWS + videoProjectHistoryAssetBindings(this.project.history).length
+      );
       this.refs.set(assetId, ref);
     }
     requireSupported(ref.size === size && ref.mimeType === mimeType);
@@ -498,6 +510,54 @@ class NativeProjectSnapshot {
         await this.retainScenarioAsset(asset.source.scenarioAssetId);
     }
     for (const id of assetIds) await this.retainAsset(id);
+    for (const source of this.project.history?.sources ?? []) {
+      switch (source.kind) {
+        case 'recording':
+          this.mediaToRead.add(`recording:${source.id}`);
+          break;
+        case 'library-asset':
+          this.mediaToRead.add(source.id);
+          break;
+        case 'project-asset':
+          await this.retainAsset(source.id);
+          break;
+        case 'scenario-asset':
+          await this.retainScenarioAsset(source.id);
+          break;
+        case 'scenario-project':
+          break;
+      }
+    }
+  }
+
+  private async retainHistory(): Promise<void> {
+    const history = this.project.history;
+    if (!history) return;
+    for (const { assetId, role } of videoProjectHistoryAssetBindings(history)) {
+      await requireSourceOwner(
+        this.tx,
+        VIDEO_PROJECT_HISTORY_OWNER_KIND,
+        this.project.id,
+        role,
+        assetId
+      );
+      const ref = frozenNativeRow(
+        await this.tx.objectStore(ASSET_REFS_STORE).get(assetId),
+        admitRef
+      );
+      requireSupported(
+        ref.assetId === assetId &&
+          ref.mimeType === 'application/json' &&
+          ref.sha256 !== null &&
+          isSha256Digest(`sha256:${ref.sha256}`)
+      );
+      this.refs.set(assetId, ref);
+    }
+    let bytes = 0;
+    for (const { assetId } of videoProjectHistoryChangeRefs(history)) {
+      bytes += this.refs.get(assetId)!.size;
+      requireSupported(bytes <= EDITOR_HISTORY_LIMITS.maxBytes);
+    }
   }
 
   private async retainScenarioAsset(childId: string): Promise<void> {

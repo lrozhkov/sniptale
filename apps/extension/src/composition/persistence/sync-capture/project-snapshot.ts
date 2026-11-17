@@ -1,4 +1,11 @@
-import { collectVideoProjectHistorySources } from '../../../features/video/project/history-capture';
+import {
+  collectVideoProjectWorkspaceSources,
+  videoProjectHistoryAssetBindings,
+  videoProjectHistoryChangeRefs,
+  type PersistedVideoProjectHistory,
+} from '../projects/history-contracts';
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
+import { isSha256Digest } from '@sniptale/platform/security/digest';
 import { parseCapturedReview } from './review-snapshot';
 import { parseRecordingEntry } from '../recordings/index.guards';
 import { parseScenarioAssetEntry } from '../scenario/read-guards';
@@ -29,8 +36,12 @@ function identity(value: unknown): value is string {
 function ordinal(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
-function parseRows<T>(value: unknown, parse: (row: unknown) => T | null): T[] | null {
-  if (!Array.isArray(value) || value.length > MAX_CAPTURE_ROWS) return null;
+function parseRows<T>(
+  value: unknown,
+  parse: (row: unknown) => T | null,
+  limit = MAX_CAPTURE_ROWS
+): T[] | null {
+  if (!Array.isArray(value) || value.length > limit) return null;
   const parsed = value.map(parse);
   return parsed.some((row) => row === null) ? null : parsed.filter((row) => row !== null);
 }
@@ -69,6 +80,8 @@ export function collectCapturedProjectScenarioDependencies(
   const owners = new Map<string, Set<string>>();
   if (rows.project.project.source.kind === 'scenario')
     owners.set(rows.project.project.source.scenarioProjectId, new Set());
+  for (const source of rows.project.history?.sources ?? [])
+    if (source.kind === 'scenario-project') owners.set(source.id, new Set());
   for (const asset of rows.scenarioAssets ?? []) {
     const children = owners.get(asset.projectId) ?? new Set<string>();
     children.add(asset.id);
@@ -110,9 +123,12 @@ function parseCapturedRootDependencies(value: unknown): CapturedRootDependency[]
 }
 
 /** Recording identities used by media and authored source bindings share the same original dependency. */
-export function collectCapturedProjectRecordingIds(project: VideoProjectMetadata): Set<string> {
+export function collectCapturedProjectRecordingIds(
+  project: VideoProjectMetadata,
+  history?: PersistedVideoProjectHistory
+): Set<string> {
   return new Set(
-    collectVideoProjectHistorySources(project)
+    collectVideoProjectWorkspaceSources({ project, ...(history ? { history } : {}) })
       .filter((source) => source.kind === 'recording')
       .map((source) => source.id)
   );
@@ -121,7 +137,9 @@ export function collectCapturedProjectRecordingIds(project: VideoProjectMetadata
 /** Select only resources reachable from editable materials, excluding export-only reviews. */
 export function collectCapturedProjectEditingMediaIds(rows: CapturedVideoProjectRows): Set<string> {
   const mediaIds = new Set(
-    [...collectCapturedProjectRecordingIds(rows.project.project)].map((id) => `recording:${id}`)
+    [...collectCapturedProjectRecordingIds(rows.project.project, rows.project.history)].map(
+      (id) => `recording:${id}`
+    )
   );
   const assetIds = new Set<string>();
   for (const asset of rows.project.project.assets) {
@@ -130,6 +148,10 @@ export function collectCapturedProjectEditingMediaIds(rows: CapturedVideoProject
       assetIds.add(asset.source.projectAssetId);
       if (asset.source.originMediaId) mediaIds.add(asset.source.originMediaId);
     }
+  }
+  for (const source of rows.project.history?.sources ?? []) {
+    if (source.kind === 'project-asset') assetIds.add(source.id);
+    if (source.kind === 'library-asset') mediaIds.add(source.id);
   }
   // Set iteration visits newly added review resources and terminates on cycles.
   for (const id of assetIds) {
@@ -211,6 +233,21 @@ function matchesCapturedBinaryRows(rows: CapturedVideoProjectRows): boolean {
     if (new Set(entries.map((entry) => entry.id)).size !== entries.length) return false;
   }
   const resources = new Map(rows.refs.map((ref) => [ref.assetId, ref]));
+  let historyBytes = 0;
+  for (const { assetId } of rows.project.history
+    ? videoProjectHistoryChangeRefs(rows.project.history)
+    : []) {
+    const ref = resources.get(assetId);
+    if (
+      !ref ||
+      ref.mimeType !== 'application/json' ||
+      ref.sha256 === null ||
+      !isSha256Digest(`sha256:${ref.sha256}`)
+    )
+      return false;
+    historyBytes += ref.size;
+    if (historyBytes > EDITOR_HISTORY_LIMITS.maxBytes) return false;
+  }
   return (
     resources.size === rows.refs.length &&
     [
@@ -248,7 +285,11 @@ export function parseCapturedVideoProjectRows(value: unknown): CapturedVideoProj
   const assets = parseRows(value['assets'], parseProjectAssetEntry);
   const exports = parseRows(value['exports'], parseProjectExportEntry);
   const media = parseRows(value['media'], parseMediaLibraryEntry);
-  const refs = parseRows(value['refs'], parseAssetRef);
+  const refs = parseRows(
+    value['refs'],
+    parseAssetRef,
+    MAX_CAPTURE_ROWS + videoProjectHistoryAssetBindings(project?.history).length
+  );
   const sidecars = parseCapturedProjectSidecars(value);
   const recordings =
     value['recordings'] === undefined ? [] : parseRows(value['recordings'], parseRecordingEntry);
@@ -295,11 +336,11 @@ export function parseCapturedVideoProjectRows(value: unknown): CapturedVideoProj
     ...(value['recordings'] === undefined ? {} : { recordings }),
     ...(value['telemetry'] === undefined ? {} : { telemetry }),
   };
-  const neededRecordingIds = collectCapturedProjectRecordingIds(project.project);
+  const neededRecordingIds = collectCapturedProjectRecordingIds(project.project, project.history);
   const neededScenarioChildren = new Set(
-    project.project.assets.flatMap((asset) =>
-      asset.source.kind === 'scenario-asset' ? [asset.source.scenarioAssetId] : []
-    )
+    collectVideoProjectWorkspaceSources(project)
+      .filter((source) => source.kind === 'scenario-asset')
+      .map((source) => source.id)
   );
   if (
     neededScenarioChildren.size !== scenarioAssets.length ||
@@ -408,7 +449,10 @@ class CapturedProjectClosure {
   }
 
   admitProjectSources(): boolean {
-    for (const id of collectCapturedProjectRecordingIds(this.rows.project.project))
+    for (const id of collectCapturedProjectRecordingIds(
+      this.rows.project.project,
+      this.rows.project.history
+    ))
       this.neededMedia.add(`recording:${id}`);
     for (const asset of this.rows.project.project.assets) {
       const source = asset.source;
@@ -432,6 +476,17 @@ class CapturedProjectClosure {
       else if (source.kind === 'scenario-asset' && 'assetId' in resource)
         this.neededRefs.add(resource.assetId);
     }
+    for (const source of this.rows.project.history?.sources ?? []) {
+      if (source.kind === 'project-asset') this.neededAssets.add(source.id);
+      if (source.kind === 'library-asset') this.neededMedia.add(source.id);
+      if (source.kind === 'scenario-asset') {
+        const child = this.rows.scenarioAssets?.find((entry) => entry.id === source.id);
+        if (!child) return false;
+        this.neededRefs.add(child.assetId);
+      }
+    }
+    for (const { assetId } of videoProjectHistoryAssetBindings(this.rows.project.history))
+      this.neededRefs.add(assetId);
     return true;
   }
 
