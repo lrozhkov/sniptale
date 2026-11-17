@@ -7,7 +7,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
-import { parseReviewOperation } from '../../features/video/review/validation';
+import {
+  parseVideoWorkspace,
+  parseVideoWorkspaceDraft,
+} from '../../composition/persistence/review-workspaces/parser';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import { useReviewAdvancedContent } from './use-advanced-content';
 import { useReviewAudio } from './use-review-audio';
@@ -43,30 +46,29 @@ function setup() {
   const commit = vi.fn(
     async (
       args: Parameters<
-        NonNullable<Parameters<typeof createVideoReviewSession>[1]>['commitVideoWorkspace']
+        NonNullable<Parameters<typeof createVideoReviewSession>[1]>['saveVideoWorkspaceSnapshot']
       >[0]
     ) => {
-      const operation = parseReviewOperation(args.operation, 4);
-      if (!operation) throw new Error('Invalid fixture operation.');
-      stored = {
-        ...stored,
-        workspace: {
-          ...stored.workspace,
-          history: [...stored.workspace.history, operation],
-          cursor: stored.workspace.cursor + 1,
-          revision: stored.workspace.revision + 1,
-        },
-      };
+      const workspace = parseVideoWorkspace(args.workspace);
+      if (!workspace) throw new Error('Invalid fixture workspace.');
+      const draft =
+        args.draft === null
+          ? null
+          : parseVideoWorkspaceDraft(args.draft, workspace.source.duration);
+      if (args.draft !== null && !draft) throw new Error('Invalid fixture draft.');
+      expect(args.expectedRevision).toBe(stored.workspace.revision);
+      expect(args.expectedDraftRevision).toBe(stored.draft?.revision ?? null);
+      expect(args.expectedSourceAssetId).toBe(stored.workspace.sourceAssetId);
+      stored = { workspace: { ...workspace, revision: stored.workspace.revision + 1 }, draft };
       return structuredClone(stored);
     }
   );
   const session = createVideoReviewSession(stored, {
-    commitVideoWorkspace: commit,
     readVideoWorkspace: read,
     moveVideoWorkspaceHistory: read,
     saveVideoWorkspaceAdvanced: read,
     saveVideoWorkspaceDraft: read,
-    saveVideoWorkspaceSnapshot: read,
+    saveVideoWorkspaceSnapshot: commit,
   });
   function Harness() {
     const snapshot = useReviewSnapshot(session);
@@ -108,7 +110,7 @@ it('rebases newer buffered mutations onto an acknowledged target and retains the
   expect(content.pending).toBe(true);
   expect(commit).toHaveBeenCalledTimes(1);
   await act(async () => content.flush());
-  expect(commit.mock.calls[1]?.[0].operation).toMatchObject({
+  expect(parseVideoWorkspace(commit.mock.calls[1]?.[0].workspace)?.history.at(-1)).toMatchObject({
     before: { actionsEnabled: false, zoom: { enabled: false } },
     after: { actionsEnabled: false, zoom: { enabled: true } },
   });
@@ -256,10 +258,13 @@ it('retries an older failed capture before a later closed command group', async 
     rejectCapture(new Error('Controlled first capture failure'));
     await Promise.resolve();
   });
-  expect(content.saveFailed).toBe(true);
+  expect(session.getSnapshot()).toMatchObject({ error: 'storage', dirty: true });
   expect(content.content).toMatchObject({ actionsEnabled: false, zoom: { enabled: true } });
-  expect(content.pending).toBe(true);
-  await act(async () => content.flush());
+  expect(session.getSnapshot().dirty).toBe(true);
+  await act(async () => {
+    await content.flush();
+    await session.saveBuffered();
+  });
   const operations = session.getSnapshot().snapshot.workspace.history;
   expect(operations).toHaveLength(2);
   expect(operations[0]).toMatchObject({
@@ -274,7 +279,7 @@ it('retries an older failed capture before a later closed command group', async 
     after: { actionsEnabled: false, zoom: { enabled: true } },
   });
   expect(content.pending).toBe(false);
-  expect(content.saveFailed).toBe(false);
+  expect(session.getSnapshot()).toMatchObject({ error: null, dirty: false });
   expect(commit).toHaveBeenCalledTimes(3);
 });
 
@@ -302,7 +307,7 @@ it('persists cursor motion visibility with the path and preserves unrelated cont
   await act(async () => content.flush());
   expect(content.content.cursorMotionEnabled).toBe(false);
   expect(content.content.cursorMotions).toEqual([motion]);
-  expect(commit.mock.calls[1]?.[0].operation).toMatchObject({
+  expect(parseVideoWorkspace(commit.mock.calls[1]?.[0].workspace)?.history.at(-1)).toMatchObject({
     before: { cursorMotions: [motion] },
     after: { cursorMotionEnabled: false, cursorMotions: [motion] },
   });

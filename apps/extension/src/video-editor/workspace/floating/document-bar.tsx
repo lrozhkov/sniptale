@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { InspectorFieldClear } from '../../../ui/compact-inspector-controls/text-field';
 import { ValueBadge } from '@sniptale/ui/editor-chrome';
 import { translate } from '../../../platform/i18n';
@@ -7,6 +7,8 @@ import {
   useVideoEditorHistoryController,
 } from '../../runtime/controller/composition/hooks';
 import type { VideoEditorHeaderController } from '../../runtime/controller/contracts/header';
+import { useVideoEditorHistoryPort } from '../../runtime/controller/store';
+import type { VideoEditorProjectHistoryTransactionLease } from '../../contracts/commands/history';
 
 const DOCUMENT_BAR_CLASS_NAME = 'flex min-w-0 flex-1 items-center justify-start gap-2';
 
@@ -29,6 +31,26 @@ function VideoEditorProjectTitle({
   projectName,
 }: Pick<VideoEditorDocumentBarProps['header'], 'onRenameProject' | 'projectName'>) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const lease = useRef<VideoEditorProjectHistoryTransactionLease | null>(null);
+  const history = useVideoEditorHistoryPort((port) => ({
+    begin: port.beginProjectHistoryTransaction,
+    end: port.endProjectHistoryTransaction,
+    current: port.isProjectHistoryTransactionCurrent,
+  }));
+  const endHistory = history.end;
+  useEffect(
+    () => () => {
+      const current = lease.current;
+      lease.current = null;
+      if (current) endHistory(current);
+    },
+    [endHistory]
+  );
+  const finish = (outcome?: 'cancel') => {
+    const current = lease.current;
+    lease.current = null;
+    if (current) history.end(current, outcome);
+  };
   return (
     <label
       className={[
@@ -49,7 +71,19 @@ function VideoEditorProjectTitle({
         ref={inputRef}
         aria-label={translate('videoEditor.app.title')}
         value={projectName}
-        onChange={(event) => onRenameProject(event.currentTarget.value)}
+        onChange={(event) => {
+          if (lease.current && !history.current(lease.current)) lease.current = null;
+          lease.current ??= history.begin({ onlyIfIdle: true });
+          if (lease.current) onRenameProject(event.currentTarget.value);
+        }}
+        onBlur={() => finish()}
+        onKeyDown={(event) => {
+          if (event.nativeEvent.isComposing) return;
+          if (event.key !== 'Enter' && event.key !== 'Escape') return;
+          event.preventDefault();
+          if (event.key === 'Escape') finish('cancel');
+          event.currentTarget.blur();
+        }}
         className={`${PROJECT_TITLE_CLASS_NAME} col-start-1 row-start-1 text-ellipsis focus:text-clip`}
       />
       {projectName ? (

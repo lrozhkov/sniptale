@@ -8,7 +8,6 @@ import {
   addReviewTextFragment,
   createReviewTextDocument,
 } from '../../features/video/review/text-document';
-import { parseReviewOperation } from '../../features/video/review/validation';
 import {
   parseVideoWorkspace,
   parseVideoWorkspaceDraft,
@@ -17,11 +16,6 @@ import { createVideoReviewSession } from '../../workflows/video-review/session';
 import { useReviewAdvanced } from './use-advanced';
 import { useReviewText } from './use-review-text';
 import { ReviewTextPhrase } from './speech-phrase';
-import {
-  parseVideoWorkspaceTypingChange,
-  prepareVideoWorkspaceTyping,
-} from '../../composition/persistence/review-workspaces/typing';
-import { replayReviewHistory, reviewDocumentBaseline } from '../../features/video/review/document';
 
 let host: HTMLDivElement;
 let root: Root;
@@ -56,70 +50,28 @@ function setup(autosave = true) {
   };
   const commit = vi.fn(
     async (
-      args:
-        | Parameters<
-            NonNullable<Parameters<typeof createVideoReviewSession>[1]>['commitVideoWorkspace']
-          >[0]
-        | Parameters<
-            NonNullable<
-              NonNullable<
-                Parameters<typeof createVideoReviewSession>[1]
-              >['saveVideoWorkspaceTyping']
-            >
-          >[0]
+      args: Parameters<
+        NonNullable<Parameters<typeof createVideoReviewSession>[1]>['saveVideoWorkspaceSnapshot']
+      >[0]
     ) => {
-      if ('change' in args) {
-        const change = parseVideoWorkspaceTypingChange(args.change);
-        if (!change) throw new Error('Invalid typing capture');
-        const document = replayReviewHistory(
-          stored.workspace.history,
-          stored.workspace.cursor,
-          stored.workspace.source,
-          reviewDocumentBaseline(stored.workspace)
-        );
-        const candidate = prepareVideoWorkspaceTyping(stored.workspace, document, change);
-        stored = { ...stored, workspace: { ...candidate, revision: candidate.revision + 1 } };
-        return structuredClone(stored);
-      }
-      const operation = parseReviewOperation(args.operation, 4);
-      if (!operation) throw new Error('invalid operation');
-      stored = {
-        ...stored,
-        workspace: {
-          ...stored.workspace,
-          revision: stored.workspace.revision + 1,
-          history: [...stored.workspace.history, operation],
-          cursor: stored.workspace.cursor + 1,
-        },
-      };
+      const workspace = parseVideoWorkspace(args.workspace);
+      if (!workspace) throw new Error('Invalid fixture workspace.');
+      const draft =
+        args.draft === null
+          ? null
+          : parseVideoWorkspaceDraft(args.draft, workspace.source.duration);
+      if (args.draft !== null && !draft) throw new Error('Invalid fixture draft.');
+      expect(args.expectedRevision).toBe(stored.workspace.revision);
+      expect(args.expectedDraftRevision).toBe(stored.draft?.revision ?? null);
+      expect(args.expectedSourceAssetId).toBe(stored.workspace.sourceAssetId);
+      stored = { workspace: { ...workspace, revision: stored.workspace.revision + 1 }, draft };
       return structuredClone(stored);
     }
   );
   const session = createVideoReviewSession(stored, {
     acquireSyncCheckpointEdit: checkpointAcquire,
-    commitVideoWorkspace: commit,
-    saveVideoWorkspaceTyping: commit,
     readVideoWorkspace: vi.fn(async () => structuredClone(stored)),
-    saveVideoWorkspaceSnapshot: vi.fn(
-      async (
-        args: Parameters<
-          NonNullable<Parameters<typeof createVideoReviewSession>[1]>['saveVideoWorkspaceSnapshot']
-        >[0]
-      ) => {
-        const workspace = parseVideoWorkspace(args.workspace);
-        if (!workspace) throw new Error('Invalid fixture workspace.');
-        const draft =
-          args.draft === null
-            ? null
-            : parseVideoWorkspaceDraft(args.draft, workspace.source.duration);
-        if (args.draft !== null && !draft) throw new Error('Invalid fixture draft.');
-        stored = {
-          workspace: { ...workspace, revision: stored.workspace.revision + 1 },
-          draft,
-        };
-        return structuredClone(stored);
-      }
-    ),
+    saveVideoWorkspaceSnapshot: commit,
     saveVideoWorkspaceDraft: vi.fn(),
     saveVideoWorkspaceAdvanced: vi.fn(),
     moveVideoWorkspaceHistory: vi.fn(),
@@ -244,11 +196,14 @@ it('acknowledges a committed write after a lost response without appending again
   });
   type('Accepted');
   await act(async () => vi.advanceTimersByTimeAsync(1000));
-  expect(writer.saveFailed).toBe(true);
-  await act(async () => writer.retry());
+  expect(session.getSnapshot()).toMatchObject({ error: 'storage', dirty: true });
+  await act(async () => {
+    await writer.retry();
+    await session.saveBuffered();
+  });
   expect(commit).toHaveBeenCalledOnce();
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
-  expect(writer.saveFailed).toBe(false);
+  expect(session.getSnapshot()).toMatchObject({ error: null, dirty: false });
   type('Next capture');
   await act(async () => vi.advanceTimersByTimeAsync(1000));
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
@@ -268,7 +223,10 @@ it('preserves a newer field capture while recovering the older accepted write', 
   await act(async () => vi.advanceTimersByTimeAsync(1000));
   type('Newer');
   expect(editor.document.fragments[0]?.text).toBe('Newer');
-  await act(async () => writer.retry());
+  await act(async () => {
+    await writer.retry();
+    await session.saveBuffered();
+  });
   expect(commit).toHaveBeenCalledTimes(2);
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
   expect(session.getSnapshot().document.advancedContent.text?.fragments[0]?.text).toBe('Newer');
@@ -328,10 +286,13 @@ it('retains a failed idle save and retries the current text once', async () => {
   commit.mockRejectedValueOnce(new Error('storage'));
   type('Retained draft');
   await act(async () => vi.advanceTimersByTimeAsync(1000));
-  expect(writer.saveFailed).toBe(true);
+  expect(session.getSnapshot()).toMatchObject({ error: 'storage', dirty: true });
   expect(editor.document.fragments[0]?.text).toBe('Retained draft');
-  await act(async () => writer.retry());
-  expect(writer.saveFailed).toBe(false);
+  await act(async () => {
+    await writer.retry();
+    await session.saveBuffered();
+  });
+  expect(session.getSnapshot()).toMatchObject({ error: null, dirty: false });
   expect(commit).toHaveBeenCalledTimes(2);
   expect(session.getSnapshot().document.advancedContent.text?.fragments[0]?.text).toBe(
     'Retained draft'
@@ -439,7 +400,10 @@ it('retains publication admission after blur when the final typing write fails u
   act(() => field.blur());
   await act(async () => vi.advanceTimersByTimeAsync(1000));
   expect(f.checkpointRelease).not.toHaveBeenCalled();
-  await act(async () => writer.retry());
+  await act(async () => {
+    await writer.retry();
+    await f.session.saveBuffered();
+  });
   expect(f.checkpointRelease).toHaveBeenCalledOnce();
   expect(editor.document.fragments[0]?.text).toBe('Latest');
 });

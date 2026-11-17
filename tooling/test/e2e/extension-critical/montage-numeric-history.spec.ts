@@ -153,6 +153,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await expect(undo).toBeEnabled();
       const title = page.getByRole('textbox', { name: 'Video editor', exact: true });
       await title.fill('Next field edit');
+      await title.press('Tab');
       await page.keyboard.press('Escape');
       await page.mouse.up();
       await expect(title).toHaveValue('Next field edit');
@@ -256,7 +257,18 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       const redo = () => active.locator('[data-ui="video-editor.timeline.toolbar.redo"]');
       await expect(title()).toBeVisible();
       for (const name of ['First action', 'Second action']) {
-        await title().fill(name);
+        await title().fill('');
+        await title().pressSequentially(name.slice(0, 3));
+        if (name === 'Second action')
+          await expect
+            .poll(() => nativeHistoryProjection(active, project.id))
+            .toEqual({
+              name: 'Sec',
+              past: 1,
+              future: 0,
+              recovery: true,
+            });
+        await title().pressSequentially(name.slice(3));
         await title().press('Tab');
         await expect
           .poll(async () => (await nativeHistoryProjection(active, project.id)).name)
@@ -344,6 +356,12 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await size().fill('40');
       await size().press('Tab');
       await expect(size()).toHaveValue('40');
+      await title().fill('Cancelled title');
+      await title().press('Escape');
+      await expect(title()).toHaveValue('New branch');
+      await title().fill('Temporary title');
+      await title().fill('New branch');
+      await title().press('Tab');
       await undo().click();
       await expect(title()).toHaveValue('Second action');
       await expect
