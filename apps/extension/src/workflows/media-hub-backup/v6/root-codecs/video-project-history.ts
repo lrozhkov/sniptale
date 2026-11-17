@@ -7,13 +7,22 @@ import type { VideoProjectHistorySourceReference } from '../../../../features/vi
 import { EDITOR_HISTORY_LIMITS } from '../../../../features/editor-history/policy';
 
 /** Portable references identify archive objects, never native immutable files or publication epochs. */
-export interface PortableVideoProjectHistory {
-  version: 1;
-  past: readonly { objectId: string }[];
-  future: readonly { objectId: string }[];
-  recovery?: { objectId: string };
+export type PortableVideoProjectHistory = {
   sources: readonly VideoProjectHistorySourceReference[];
-}
+} & (
+  | {
+      version: 1;
+      past: readonly { objectId: string }[];
+      future: readonly { objectId: string }[];
+      recovery?: { objectId: string };
+    }
+  | {
+      version: 2;
+      past: readonly { value: string }[];
+      future: readonly { value: string }[];
+      recovery?: { value: string };
+    }
+);
 
 function invalid(): never {
   throw new Error('Portable video project history is invalid.');
@@ -45,6 +54,12 @@ export function parsePortableVideoProjectHistory(value: unknown): PortableVideoP
     ])
   )
     return invalid();
+  if (value['version'] === 2) {
+    const parsed = parsePersistedVideoProjectHistory({ ...value, epoch: 'archive' });
+    if (!parsed || parsed.version !== 2) return invalid();
+    const { epoch: _epoch, ...portable } = parsed;
+    return portable;
+  }
   const parsed = parsePersistedVideoProjectHistory({
     version: value['version'],
     epoch: 'archive',
@@ -55,7 +70,7 @@ export function parsePortableVideoProjectHistory(value: unknown): PortableVideoP
       ? {}
       : { recovery: changePointers([value['recovery']])[0] }),
   });
-  if (!parsed) return invalid();
+  if (!parsed || parsed.version !== 1) return invalid();
   return encodePortableVideoProjectHistory(
     parsed,
     new Map(
@@ -71,6 +86,10 @@ export function encodePortableVideoProjectHistory(
   history: PersistedVideoProjectHistory,
   objectsByAssetId: ReadonlyMap<string, string>
 ): PortableVideoProjectHistory {
+  if (history.version === 2) {
+    const { epoch: _epoch, ...portable } = history;
+    return portable;
+  }
   const pointer = ({ assetId }: { assetId: string }) => {
     const objectId = objectsByAssetId.get(assetId);
     if (!objectId) return invalid();
@@ -92,6 +111,10 @@ export function decodePortableVideoProjectHistory(
   epoch: string,
   sources: readonly VideoProjectHistorySourceReference[] = history.sources
 ): PersistedVideoProjectHistory {
+  if (history.version === 2) {
+    const parsed = parsePersistedVideoProjectHistory({ ...history, epoch, sources });
+    return parsed ?? invalid();
+  }
   const pointer = ({ objectId }: { objectId: string }) => {
     const assetId = assetsByObjectId.get(objectId);
     if (!assetId) return invalid();
@@ -112,5 +135,7 @@ export function decodePortableVideoProjectHistory(
 export function portableVideoProjectHistoryPointers(
   history: PortableVideoProjectHistory
 ): readonly { objectId: string }[] {
-  return [...history.past, ...history.future, ...(history.recovery ? [history.recovery] : [])];
+  return history.version === 1
+    ? [...history.past, ...history.future, ...(history.recovery ? [history.recovery] : [])]
+    : [];
 }

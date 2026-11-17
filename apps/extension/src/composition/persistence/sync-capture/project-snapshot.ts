@@ -2,6 +2,7 @@ import {
   collectVideoProjectWorkspaceSources,
   videoProjectHistoryAssetBindings,
   videoProjectHistoryChangeRefs,
+  videoProjectHistoryInlineBytes,
   type PersistedVideoProjectHistory,
 } from '../projects/history-contracts';
 import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
@@ -233,7 +234,10 @@ function matchesCapturedBinaryRows(rows: CapturedVideoProjectRows): boolean {
     if (new Set(entries.map((entry) => entry.id)).size !== entries.length) return false;
   }
   const resources = new Map(rows.refs.map((ref) => [ref.assetId, ref]));
-  let historyBytes = 0;
+  let historyBytes = rows.project.history
+    ? videoProjectHistoryInlineBytes(rows.project.history)
+    : 0;
+  if (historyBytes > EDITOR_HISTORY_LIMITS.maxBytes) return false;
   for (const { assetId } of rows.project.history
     ? videoProjectHistoryChangeRefs(rows.project.history)
     : []) {

@@ -1112,6 +1112,14 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
     validationStores: [VIDEO_PROJECTS_STORE, VIDEO_PROJECT_REVISIONS_STORE],
     diagnostic: 'Video project history stores are unavailable.',
   }),
+  contractOnlyMigration({
+    domainVersions: [{ domainId: 'videoProjects', from: 14, to: 15 }],
+    fromDatabaseVersion: 65,
+    toDatabaseVersion: 66,
+    stores: [VIDEO_PROJECTS_STORE],
+    validationStores: [VIDEO_PROJECTS_STORE, VIDEO_PROJECT_REVISIONS_STORE],
+    diagnostic: 'Video project inline history stores are unavailable.',
+  }),
 ];
 
 function projectPrototypeAnimationPreferences(value: unknown) {

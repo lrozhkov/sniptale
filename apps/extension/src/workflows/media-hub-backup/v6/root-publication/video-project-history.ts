@@ -1,3 +1,4 @@
+import { assertMetadataJson } from '../codec';
 import { createSha256BytesDigest } from '@sniptale/platform/security/digest';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
@@ -36,6 +37,7 @@ import {
 import {
   decodePortableVideoProjectHistory,
   portableVideoProjectHistoryPointers,
+  encodePortableVideoProjectHistory,
 } from '../root-codecs/video-project-history';
 import type { StagedArchiveObject } from '../staging';
 import type { ArchiveRootPublisher } from '../restore';
@@ -221,7 +223,26 @@ export const prepareVideoProjectHistoryStaged: NonNullable<
     assetIds,
     args.session
   );
-  const prepared = await preparePersistedVideoProjectHistory(capture);
+  const prepared = await preparePersistedVideoProjectHistory(
+    capture,
+    new Map(),
+    metadata.history.version
+  );
+  if (metadata.history.version === 2) {
+    const rebound = {
+      ...metadata,
+      history: {
+        ...encodePortableVideoProjectHistory(prepared.history, new Map()),
+        // Portable source identities remain original until publication applies the restore maps.
+        sources: metadata.history.sources,
+      },
+    };
+    assertMetadataJson(rebound);
+    return {
+      ...args,
+      envelope: { ...args.envelope, metadata: rebound },
+    };
+  }
   try {
     const pointers = portableVideoProjectHistoryPointers(metadata.history);
     const refs = new Map(prepared.refs.map((ref) => [ref.assetId, ref]));

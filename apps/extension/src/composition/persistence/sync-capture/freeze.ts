@@ -5,6 +5,7 @@ import {
   VIDEO_PROJECT_HISTORY_OWNER_KIND,
   videoProjectHistoryAssetBindings,
   videoProjectHistoryChangeRefs,
+  videoProjectHistoryInlineBytes,
 } from '../projects/history-contracts';
 import {
   freezeImageInTransaction,
@@ -553,7 +554,8 @@ class NativeProjectSnapshot {
       );
       this.refs.set(assetId, ref);
     }
-    let bytes = 0;
+    let bytes = videoProjectHistoryInlineBytes(history);
+    requireSupported(bytes <= EDITOR_HISTORY_LIMITS.maxBytes);
     for (const { assetId } of videoProjectHistoryChangeRefs(history)) {
       bytes += this.refs.get(assetId)!.size;
       requireSupported(bytes <= EDITOR_HISTORY_LIMITS.maxBytes);

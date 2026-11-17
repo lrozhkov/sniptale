@@ -46,6 +46,20 @@ it('admits Montage history without changing released data or other domain contra
   });
 });
 
+it('admits inline Montage history without rewriting released data or immutable files', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 65
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 66
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, videoProjects: 15 });
+});
+
 it('admits known-source receipts without rewriting any released rows or object bytes', () => {
   const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
     (fixture) => fixture.databaseVersion === 25
@@ -457,7 +471,7 @@ it('adds empty capture and native revision stores without rewriting version 39 r
   expect(
     PERSISTENCE_DOMAIN_REGISTRY.find((domain) => domain.domainId === 'videoProjects')
   ).toMatchObject({
-    schemaVersion: 14,
+    schemaVersion: 15,
     stores: expect.arrayContaining([
       { storeName: 'video_project_revisions', dataClass: 'durable-authority' },
     ]),

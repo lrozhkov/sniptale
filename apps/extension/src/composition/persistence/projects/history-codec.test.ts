@@ -17,7 +17,7 @@ import {
 } from '../../../features/video/project/history-capture';
 import type { AssetRef } from '../assets/contracts';
 import {
-  preparePersistedVideoProjectHistory,
+  preparePersistedVideoProjectHistory as prepareCurrentVideoProjectHistory,
   hydratePersistedVideoProjectHistory,
 } from './history-codec';
 import {
@@ -94,6 +94,68 @@ function fixture() {
   };
   return { first, current, last, capture };
 }
+
+// File-backed fixtures retain coverage for released envelopes and their byte admission.
+const preparePersistedVideoProjectHistory = (
+  capture: VideoProjectHistoryCapture,
+  reusable: ReadonlyMap<string, AssetRef> = new Map()
+) => prepareCurrentVideoProjectHistory(capture, reusable, 1);
+
+it('stores scalar inverses in the native head without per-action OPFS objects', async () => {
+  const { current, capture } = fixture();
+  const prepared = await prepareCurrentVideoProjectHistory(capture);
+  expect(prepared.history.version).toBe(2);
+  expect(prepared.objects).toEqual([]);
+  expect(prepared.refs).toEqual([]);
+  expect(io.write).not.toHaveBeenCalled();
+  const restored = await hydratePersistedVideoProjectHistory({
+    history: prepared.history,
+    refs: [],
+    current,
+  });
+  expect(restored.past.map((entry) => entry.value)).toEqual(
+    capture.past.map((entry) => entry.value)
+  );
+  expect(restored.future.map((entry) => entry.value)).toEqual(
+    capture.future.map((entry) => entry.value)
+  );
+  expect(io.read).not.toHaveBeenCalled();
+});
+
+it('refuses malformed inline values and detached file claims before replay', async () => {
+  const { current, capture } = fixture();
+  const prepared = await prepareCurrentVideoProjectHistory(capture);
+  expect(
+    parsePersistedVideoProjectHistory({
+      ...prepared.history,
+      past: [{ value: capture.past[0]!.value, assetId: 'detached' }],
+    })
+  ).toBeNull();
+  await expect(
+    hydratePersistedVideoProjectHistory({
+      current,
+      history: { ...prepared.history, past: [{ value: 'invalid JSON' }] },
+      refs: [],
+    })
+  ).rejects.toThrow();
+  expect(io.read).not.toHaveBeenCalled();
+  expect(io.write).not.toHaveBeenCalled();
+});
+
+it('counts both inline directions against the logical byte budget without file IO', async () => {
+  const { capture } = fixture();
+  const value = JSON.stringify({ value: 'x'.repeat(4 * 1024 * 1024) });
+  const oversized = { value, bytes: new TextEncoder().encode(value).byteLength, sources: [] };
+  await expect(
+    prepareCurrentVideoProjectHistory({
+      ...capture,
+      past: [oversized],
+      future: [oversized],
+    })
+  ).rejects.toThrow();
+  expect(io.read).not.toHaveBeenCalled();
+  expect(io.write).not.toHaveBeenCalled();
+});
 
 it('roundtrips both directions and retains removed source identities through the native reference graph', async () => {
   const { first, current, last, capture } = fixture();

@@ -842,3 +842,17 @@ it('creates the same exact nonunique due index for a fresh database', () => {
 });
 
 afterEach(() => vi.unstubAllGlobals());
+
+it('admits inline Montage history additively and fences older writers', async () => {
+  const plan = buildDatabaseMigrationPlan(65, 66);
+  expect(plan).toHaveLength(1);
+  expect(plan![0]).toMatchObject({
+    fromDatabaseVersion: 65,
+    toDatabaseVersion: 66,
+    risk: 'additive',
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'videoProjects', from: 14, to: 15 }],
+  });
+  expect(await plan![0]!.estimateAdditionalBytes()).toBe(64 * 1024);
+  expect(buildDatabaseMigrationPlan(66, 65)).toBeNull();
+});

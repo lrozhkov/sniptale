@@ -22,6 +22,7 @@ import {
   parsePersistedVideoProjectHistory,
   videoProjectHistoryAssetBindings,
   videoProjectHistoryChangeRefs,
+  videoProjectHistoryInlineBytes,
   type PersistedVideoProjectHistory,
 } from '../projects/history-contracts';
 import { hydratePersistedVideoProjectHistory } from '../projects/history-codec';
@@ -310,7 +311,8 @@ function parseHistory(value: unknown): PreparedVideoProjectReplicaRoot['history'
       return invalid();
     refs.set(ref.assetId, ref);
   }
-  let bytes = 0;
+  let bytes = videoProjectHistoryInlineBytes(head);
+  if (bytes > EDITOR_HISTORY_LIMITS.maxBytes) return invalid();
   for (const change of videoProjectHistoryChangeRefs(head)) {
     bytes += (refs.get(change.assetId) ?? invalid()).size;
     if (bytes > EDITOR_HISTORY_LIMITS.maxBytes) return invalid();

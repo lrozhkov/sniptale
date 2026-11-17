@@ -96,7 +96,7 @@ beforeEach(() => {
   vi.mocked(loadProjectReplicaExport).mockResolvedValue(null);
 });
 
-it.each(['success', 'journal-refusal', 'write-refusal'])(
+it.each(['success', 'journal-refusal', 'malformed-history'])(
   'tracks rebound history through incoming staging and cleanup: %s',
   async (mode) => {
     const f = await fixture(true);
@@ -107,9 +107,12 @@ it.each(['success', 'journal-refusal', 'write-refusal'])(
       project: decodePortableVideoProjectAssetRefs(metadata.entry.project),
     });
     if (!entry) throw new Error('Expected project');
-    const value = JSON.stringify(
-      createVideoProjectHistoryChange({ ...entry.project, name: 'Before' }, entry.project)
-    );
+    const value =
+      mode === 'malformed-history'
+        ? 'null'
+        : JSON.stringify(
+            createVideoProjectHistoryChange({ ...entry.project, name: 'Before' }, entry.project)
+          );
     const historyBlob = new Blob([value], { type: 'application/json' });
     metadata.history = {
       version: 1,
@@ -175,21 +178,9 @@ it.each(['success', 'journal-refusal', 'write-refusal'])(
       }
     );
     const assets = await import('../../composition/persistence/assets');
-    const write = vi.spyOn(assets, 'writeBlobToAsset').mockImplementation(async (blob) => {
-      if (mode === 'write-refusal') throw new Error('History write refused');
-      const assetId = 'native-rebound-history';
-      files.set(assetId, new File([blob], assetId, { type: blob.type }));
-      return {
-        ref: {
-          assetId,
-          createdAt: 1,
-          size: blob.size,
-          mimeType: blob.type,
-          sha256: null,
-          location: { kind: 'opfs', objectKey: `objects/${assetId}` },
-        },
-      };
-    });
+    const write = vi
+      .spyOn(assets, 'writeBlobToAsset')
+      .mockRejectedValue(new Error('Inline history must not stage inverse files.'));
     if (mode === 'journal-refusal') io.journal.mockRejectedValueOnce(new Error('Journal refused'));
     try {
       const pending = prepareCatalogReplica({
@@ -202,23 +193,22 @@ it.each(['success', 'journal-refusal', 'write-refusal'])(
       if (mode === 'success') {
         const journal = await pending;
         if (journal.payload.kind !== 'video-project') throw new Error('Expected project');
-        expect(journal.payload.input.root.history?.refs.map((ref) => ref.assetId)).toEqual([
-          'native-rebound-history',
-        ]);
+        expect(journal.payload.input.root.history?.refs).toEqual([]);
+        expect(journal.payload.input.root.history?.head).toMatchObject({
+          version: 2,
+          past: [{ value: expect.any(String) }],
+        });
         expect(io.discard.mock.calls.flat()).toEqual(['staged-history']);
       } else {
         await expect(pending).rejects.toThrow(
-          mode === 'journal-refusal' ? 'Journal refused' : 'History write refused'
+          mode === 'journal-refusal' ? 'Journal refused' : /history/i
         );
         expect(new Set(io.discard.mock.calls.flat())).toEqual(
-          new Set([
-            'staged-private',
-            'staged-history',
-            ...(mode === 'journal-refusal' ? ['native-rebound-history'] : []),
-          ])
+          new Set(['staged-private', 'staged-history'])
         );
       }
       expect(io.discard).not.toHaveBeenCalledWith('borrowed');
+      expect(write).not.toHaveBeenCalled();
     } finally {
       write.mockRestore();
     }

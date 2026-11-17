@@ -40,6 +40,14 @@ A retry retains its prepared attempt and journal identity. An exact acknowledgem
 
 This protocol does not activate an editor producer or startup recovery. Archive and sync history codecs must preserve the complete graph before producer activation. Raw native history fields remain invalid at portable receiving boundaries.
 
+## Inline Montage history
+
+Database version 66 advances videoProjects to version 15. The migration preserves existing rows, stores and immutable files. Earlier writers refuse the newer database.
+
+The version 2 history envelope stores inverse JSON values in project metadata. The version 1 file envelope remains readable. Reading does not rewrite either format. The logical byte budget counts each transition, including repeated values and unfinished gesture recovery.
+
+Native publication retains revision, source and identity admission. Inline values grant no publication authority. Cold readers validate both history directions and retained sources. Archive and sync preserve the typed history outside raw native project fields. Accepted replacement releases obsolete inverse files through the existing resource owner.
+
 ## Recording recovery
 
 The recordings domain owns `recording_recovery_sessions` and `recording_recovery_blocks` in the canonical database. Both stores contain authoritative user data. Database version 33 adds these stores and changes the recordings contract from 2 to 3. The migration preserves all earlier rows and immutable media.

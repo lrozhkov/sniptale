@@ -79,7 +79,7 @@ afterEach(async () => {
   await deleteDB(name);
 });
 
-async function seed() {
+async function seed(format: 1 | 2 = 1) {
   const entry = createVideoProjectEntry({ name: 'Current' }, { workspaceRevision: 7 });
   const before = { ...entry.project, name: 'Before' };
   const after = { ...entry.project, name: 'After' };
@@ -91,12 +91,16 @@ async function seed() {
       sources: collectVideoProjectHistorySources(project),
     };
   };
-  const prepared = await preparePersistedVideoProjectHistory({
-    version: 1,
-    epoch: 'epoch',
-    past: [value(before)],
-    future: [value(after)],
-  });
+  const prepared = await preparePersistedVideoProjectHistory(
+    {
+      version: 1,
+      epoch: 'epoch',
+      past: [value(before)],
+      future: [value(after)],
+    },
+    new Map(),
+    format
+  );
   const tx = db.transaction(['video_projects', 'asset_refs', 'asset_owners'], 'readwrite');
   await tx.objectStore('video_projects').put({ ...entry, history: prepared.history });
   for (const ref of prepared.refs) await tx.objectStore('asset_refs').put(ref);
@@ -111,22 +115,25 @@ async function seed() {
   return { entry, prepared, before, after };
 }
 
-it('reads both history directions and the observed native revision from one workspace snapshot', async () => {
-  const { entry, before, after } = await seed();
-  const loaded = await getVideoProjectWorkspace(entry.id);
-  expect(loaded.status).toBe('ready');
-  if (loaded.status !== 'ready' || loaded.history.status !== 'ready')
-    throw new Error('Missing loaded history');
-  expect(loaded.workspaceRevision).toBe(7);
-  expect(
-    applyVideoProjectHistoryChangeValues(loaded.project, loaded.history.value.past[0]!.change)
-  ).toEqual(before);
-  expect(
-    applyVideoProjectHistoryChangeValues(loaded.project, loaded.history.value.future[0]!.change)
-  ).toEqual(after);
-  expect(io.read).toHaveBeenCalledTimes(2);
-  expect(io.write).not.toHaveBeenCalled();
-});
+it.each([1, 2] as const)(
+  'reads both history directions and the observed native revision from one workspace snapshot (format %i)',
+  async (format) => {
+    const { entry, before, after } = await seed(format);
+    const loaded = await getVideoProjectWorkspace(entry.id);
+    expect(loaded.status).toBe('ready');
+    if (loaded.status !== 'ready' || loaded.history.status !== 'ready')
+      throw new Error('Missing loaded history');
+    expect(loaded.workspaceRevision).toBe(7);
+    expect(
+      applyVideoProjectHistoryChangeValues(loaded.project, loaded.history.value.past[0]!.change)
+    ).toEqual(before);
+    expect(
+      applyVideoProjectHistoryChangeValues(loaded.project, loaded.history.value.future[0]!.change)
+    ).toEqual(after);
+    expect(io.read).toHaveBeenCalledTimes(format === 1 ? 2 : 0);
+    expect(io.write).not.toHaveBeenCalled();
+  }
+);
 
 it('keeps the observed project and reference snapshot together when another save wins during file IO', async () => {
   const { entry, prepared } = await seed();
@@ -206,6 +213,21 @@ it('opens legacy projects with absent history without writing a replacement', as
     history: { status: 'absent' },
   });
   expect(await db.get('video_projects', entry.id)).toEqual(entry);
+  expect(io.read).not.toHaveBeenCalled();
+  expect(io.write).not.toHaveBeenCalled();
+});
+
+it('preserves valid current content and malformed inline evidence without file IO or repair', async () => {
+  const { entry, prepared } = await seed(2);
+  const stored = { ...entry, history: { ...prepared.history, past: [{ value: 'invalid JSON' }] } };
+  await db.put('video_projects', stored);
+  io.read.mockClear();
+  expect(await getVideoProjectWorkspace(entry.id)).toMatchObject({
+    status: 'ready',
+    project: entry.project,
+    history: { status: 'unavailable' },
+  });
+  expect(await db.get('video_projects', entry.id)).toEqual(stored);
   expect(io.read).not.toHaveBeenCalled();
   expect(io.write).not.toHaveBeenCalled();
 });

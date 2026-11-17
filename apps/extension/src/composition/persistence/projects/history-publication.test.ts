@@ -42,8 +42,20 @@ const io = vi.hoisted(() => ({
   journals: new Map<string, AssetReadyJournal>(),
   beforePublish: null as ((journal: AssetReadyJournal) => Promise<void>) | null,
   loseAck: false,
+  legacyFileFixtures: true,
   cancel: vi.fn(),
 }));
+vi.mock('./history-codec', async (original) => {
+  const actual = await original<typeof import('./history-codec')>();
+  return {
+    ...actual,
+    preparePersistedVideoProjectHistory: (
+      capture: Parameters<typeof actual.preparePersistedVideoProjectHistory>[0],
+      reusable?: Parameters<typeof actual.preparePersistedVideoProjectHistory>[1]
+    ) =>
+      actual.preparePersistedVideoProjectHistory(capture, reusable, io.legacyFileFixtures ? 1 : 2),
+  };
+});
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
   initDB: async () => {
@@ -124,6 +136,7 @@ beforeEach(async () => {
     },
   });
   io.db = db;
+  io.legacyFileFixtures = true;
   io.files.clear();
   io.journals.clear();
   io.beforePublish = null;
@@ -292,6 +305,28 @@ function attempt(entry: ReturnType<typeof createVideoProjectEntry>, name = 'Edit
   });
 }
 
+it('replaces released file history with inline metadata and journals obsolete byte retirement', async () => {
+  const { entry, prepared } = await seed();
+  const retired = prepared.refs.map((ref) => ref.assetId);
+  expect(retired).toHaveLength(2);
+  io.legacyFileFixtures = false;
+  io.write.mockClear();
+  await attempt(entry)();
+  expect(io.write).not.toHaveBeenCalled();
+  const stored = await db.get('video_projects', entry.id);
+  expect(stored.history).toMatchObject({ version: 2, past: [{ value: expect.any(String) }] });
+  expect(await db.count('asset_owners')).toBe(0);
+  expect(await db.count('asset_refs')).toBe(0);
+  const operations = await db.getAll('asset_operations');
+  expect(operations.flatMap((operation) => operation.assetIds ?? []).sort()).toEqual(
+    retired.sort()
+  );
+  expect(await getVideoProjectWorkspace(entry.id)).toMatchObject({
+    status: 'ready',
+    history: { status: 'ready' },
+  });
+});
+
 it('refuses changed project birth facts before preparing immutable history', async () => {
   const { entry } = await seed();
   const before = await db.get('video_projects', entry.id);
@@ -366,55 +401,65 @@ it.each(['past', 'recovery'])(
   }
 );
 
-it('admits one history publication for parallel writers of the same native revision', async () => {
-  const { entry } = await seed();
-  const bothPrepared = gate();
-  const publish = gate();
-  let count = 0;
-  io.beforePublish = async () => {
-    if (++count === 2) bothPrepared.release();
-    await publish.promise;
-  };
-  const first = attempt(entry, 'First writer')();
-  const second = attempt(entry, 'Second writer')();
-  await bothPrepared.promise;
-  publish.release();
-  const settled = await Promise.allSettled([first, second]);
-  expect(settled.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
-  const rejected = settled.find((result) => result.status === 'rejected');
-  expect(rejected).toMatchObject({
-    status: 'rejected',
-    reason: { name: 'SupersededAssetPublicationError' },
-  });
-  const stored = await db.get('video_projects', entry.id);
-  expect(stored.workspaceRevision).toBe(8);
-  expect(stored.history.past).toHaveLength(1);
-  const owners = await db.getAll('asset_owners');
-  expect(owners).toHaveLength(1);
-  expect(owners[0].assetId).toBe(stored.history.past[0].assetId);
-  expect(await db.count('asset_refs')).toBe(1);
-  expect(await getVideoProjectWorkspace(entry.id)).toMatchObject({
-    status: 'ready',
-    history: { status: 'ready' },
-  });
-});
+it.each([1, 2])(
+  'admits one history publication for parallel writers of the same native revision (format %i)',
+  async (format) => {
+    io.legacyFileFixtures = format === 1;
+    const { entry } = await seed();
+    const bothPrepared = gate();
+    const publish = gate();
+    let count = 0;
+    io.beforePublish = async () => {
+      if (++count === 2) bothPrepared.release();
+      await publish.promise;
+    };
+    const first = attempt(entry, 'First writer')();
+    const second = attempt(entry, 'Second writer')();
+    await bothPrepared.promise;
+    publish.release();
+    const settled = await Promise.allSettled([first, second]);
+    expect(settled.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    const rejected = settled.find((result) => result.status === 'rejected');
+    expect(rejected).toMatchObject({
+      status: 'rejected',
+      reason: { name: 'SupersededAssetPublicationError' },
+    });
+    const stored = await db.get('video_projects', entry.id);
+    expect(stored.workspaceRevision).toBe(8);
+    expect(stored.history.past).toHaveLength(1);
+    const owners = await db.getAll('asset_owners');
+    expect(owners).toHaveLength(format === 1 ? 1 : 0);
+    if (format === 1) expect(owners[0].assetId).toBe(stored.history.past[0].assetId);
+    else
+      expect(stored.history).toMatchObject({ version: 2, past: [{ value: expect.any(String) }] });
+    expect(await db.count('asset_refs')).toBe(format === 1 ? 1 : 0);
+    expect(await getVideoProjectWorkspace(entry.id)).toMatchObject({
+      status: 'ready',
+      history: { status: 'ready' },
+    });
+  }
+);
 
-it('retries the same prepared publication after committed-but-lost acknowledgement', async () => {
-  const { entry } = await seed();
-  io.write.mockClear();
-  const commit = attempt(entry);
-  io.loseAck = true;
-  await expect(commit()).rejects.toThrow('Lost acknowledgement');
-  const committed = await db.get('video_projects', entry.id);
-  expect(committed.workspaceRevision).toBe(8);
-  expect(io.journals.size).toBe(1);
-  const saved = await commit();
-  expect(saved.workspaceRevision).toBe(8);
-  expect(saved.historyPublicationId).toBe(committed.historyPublicationId);
-  expect(await db.get('video_projects', entry.id)).toEqual(committed);
-  expect(io.write).toHaveBeenCalledTimes(1);
-  expect(io.journals.size).toBe(0);
-});
+it.each([1, 2])(
+  'retries the same prepared publication after committed-but-lost acknowledgement (format %i)',
+  async (format) => {
+    io.legacyFileFixtures = format === 1;
+    const { entry } = await seed();
+    io.write.mockClear();
+    const commit = attempt(entry);
+    io.loseAck = true;
+    await expect(commit()).rejects.toThrow('Lost acknowledgement');
+    const committed = await db.get('video_projects', entry.id);
+    expect(committed.workspaceRevision).toBe(8);
+    expect(io.journals.size).toBe(1);
+    const saved = await commit();
+    expect(saved.workspaceRevision).toBe(8);
+    expect(saved.historyPublicationId).toBe(committed.historyPublicationId);
+    expect(await db.get('video_projects', entry.id)).toEqual(committed);
+    expect(io.write).toHaveBeenCalledTimes(format === 1 ? 1 : 0);
+    expect(io.journals.size).toBe(0);
+  }
+);
 
 it('keeps its sync receipt after a lost ACK without adopting newer pending work', async () => {
   const { entry } = await seed();
@@ -556,26 +601,30 @@ async function removeProject(id: string) {
   await tx.done;
 }
 
-it('refuses a prepared history publication after deletion and same-identity recreation', async () => {
-  const { entry } = await seed();
-  const prepared = gate();
-  const publish = gate();
-  io.beforePublish = async () => {
-    prepared.release();
-    await publish.promise;
-  };
-  const committing = attempt(entry)();
-  await prepared.promise;
-  await removeProject(entry.id);
-  const replacement = await saveVideoProject(entry.project, {
-    expectedWorkspaceRevision: null,
-    expectedProject: null,
-  });
-  expect(replacement.workspaceRevision).toBe(8);
-  publish.release();
-  await expect(committing).rejects.toMatchObject({ name: 'SupersededAssetPublicationError' });
-  expect(await db.get('video_projects', entry.id)).toMatchObject(replacement);
-});
+it.each([1, 2])(
+  'refuses a prepared history publication after deletion and same-identity recreation (format %i)',
+  async (format) => {
+    io.legacyFileFixtures = format === 1;
+    const { entry } = await seed();
+    const prepared = gate();
+    const publish = gate();
+    io.beforePublish = async () => {
+      prepared.release();
+      await publish.promise;
+    };
+    const committing = attempt(entry)();
+    await prepared.promise;
+    await removeProject(entry.id);
+    const replacement = await saveVideoProject(entry.project, {
+      expectedWorkspaceRevision: null,
+      expectedProject: null,
+    });
+    expect(replacement.workspaceRevision).toBe(8);
+    publish.release();
+    await expect(committing).rejects.toMatchObject({ name: 'SupersededAssetPublicationError' });
+    expect(await db.get('video_projects', entry.id)).toMatchObject(replacement);
+  }
+);
 
 it('does not resurrect a missing root after an intervening creation and deletion', async () => {
   const entry = createVideoProjectEntry();
@@ -834,62 +883,66 @@ it('cannot mint a second revision when two cold recoveries resume the same journ
   expect(io.write).not.toHaveBeenCalled();
 });
 
-it('persists an unfinished gesture separately from its pre-gesture Undo and Redo anchor', async () => {
-  const { entry, before } = await seed([
-    createVideoProjectTrack('Video', 0, VideoTrackKind.PRIMARY, true),
-    createVideoProjectTrack('Audio', 1, VideoTrackKind.AUDIO),
-  ]);
-  expect(entry.project.tracks.length).toBeGreaterThan(1);
-  const draft = {
-    ...entry.project,
-    name: 'Partial gesture',
-    tracks: entry.project.tracks.slice(0, 1),
-  };
-  const later = {
-    ...entry.project,
-    name: 'Redo target',
-    tracks: entry.project.tracks.map((track, index) =>
-      index === 1 ? { ...track, name: 'Redo track' } : track
-    ),
-  };
-  const value = (target: typeof entry.project, anchor: typeof entry.project) => {
-    const value = JSON.stringify(createVideoProjectHistoryChange(target, anchor));
-    return {
-      value,
-      bytes: new TextEncoder().encode(value).byteLength,
-      sources: collectVideoProjectHistorySources(target),
+it.each([1, 2])(
+  'persists an unfinished gesture separately from its pre-gesture Undo and Redo anchor (format %i)',
+  async (format) => {
+    io.legacyFileFixtures = format === 1;
+    const { entry, before } = await seed([
+      createVideoProjectTrack('Video', 0, VideoTrackKind.PRIMARY, true),
+      createVideoProjectTrack('Audio', 1, VideoTrackKind.AUDIO),
+    ]);
+    expect(entry.project.tracks.length).toBeGreaterThan(1);
+    const draft = {
+      ...entry.project,
+      name: 'Partial gesture',
+      tracks: entry.project.tracks.slice(0, 1),
     };
-  };
-  const saved = await createVideoProjectWorkspaceCommit({
-    project: draft,
-    expectedProject: entry.project,
-    expectedWorkspaceRevision: 7,
-    history: {
-      version: 1,
-      epoch: 'epoch',
-      past: [value(before, entry.project)],
-      future: [value(later, entry.project)],
-      recovery: value(entry.project, draft),
-    },
-  })();
-  expect(saved.history?.recovery).toBeDefined();
-  expect(saved.history?.future).toHaveLength(1);
-  const loaded = await getVideoProjectWorkspace(entry.id);
-  if (loaded.status !== 'ready' || loaded.history.status !== 'ready')
-    throw new Error('Missing draft history');
-  expect(loaded.project.name).toBe('Partial gesture');
-  const recovery = loaded.history.value.recovery;
-  expect(recovery).toBeDefined();
-  const anchor = applyVideoProjectHistoryChangeValues(loaded.project, recovery!.change);
-  expect(anchor).toEqual({ ...entry.project, updatedAt: loaded.project.updatedAt });
-  expect(
-    applyVideoProjectHistoryChangeValues(anchor, loaded.history.value.past[0]!.change)
-  ).toEqual({ ...before, updatedAt: loaded.project.updatedAt });
-  expect(
-    applyVideoProjectHistoryChangeValues(anchor, loaded.history.value.future[0]!.change)
-  ).toEqual({ ...later, updatedAt: loaded.project.updatedAt });
-  expect(await db.count('asset_owners')).toBe(3);
-});
+    const later = {
+      ...entry.project,
+      name: 'Redo target',
+      tracks: entry.project.tracks.map((track, index) =>
+        index === 1 ? { ...track, name: 'Redo track' } : track
+      ),
+    };
+    const value = (target: typeof entry.project, anchor: typeof entry.project) => {
+      const value = JSON.stringify(createVideoProjectHistoryChange(target, anchor));
+      return {
+        value,
+        bytes: new TextEncoder().encode(value).byteLength,
+        sources: collectVideoProjectHistorySources(target),
+      };
+    };
+    const saved = await createVideoProjectWorkspaceCommit({
+      project: draft,
+      expectedProject: entry.project,
+      expectedWorkspaceRevision: 7,
+      history: {
+        version: 1,
+        epoch: 'epoch',
+        past: [value(before, entry.project)],
+        future: [value(later, entry.project)],
+        recovery: value(entry.project, draft),
+      },
+    })();
+    expect(saved.history?.recovery).toBeDefined();
+    expect(saved.history?.future).toHaveLength(1);
+    const loaded = await getVideoProjectWorkspace(entry.id);
+    if (loaded.status !== 'ready' || loaded.history.status !== 'ready')
+      throw new Error('Missing draft history');
+    expect(loaded.project.name).toBe('Partial gesture');
+    const recovery = loaded.history.value.recovery;
+    expect(recovery).toBeDefined();
+    const anchor = applyVideoProjectHistoryChangeValues(loaded.project, recovery!.change);
+    expect(anchor).toEqual({ ...entry.project, updatedAt: loaded.project.updatedAt });
+    expect(
+      applyVideoProjectHistoryChangeValues(anchor, loaded.history.value.past[0]!.change)
+    ).toEqual({ ...before, updatedAt: loaded.project.updatedAt });
+    expect(
+      applyVideoProjectHistoryChangeValues(anchor, loaded.history.value.future[0]!.change)
+    ).toEqual({ ...later, updatedAt: loaded.project.updatedAt });
+    expect(await db.count('asset_owners')).toBe(format === 1 ? 3 : 0);
+  }
+);
 
 it('accepts a ready retry handle before publication and retries without preparing another graph', async () => {
   const { entry, prepared } = await seed();

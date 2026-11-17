@@ -61,7 +61,6 @@ import {
   preparePortableVideoProjectAsset,
 } from '../media-hub-backup/v6/root-codecs/projects';
 import { portableVideoProjectHistoryPointers } from '../media-hub-backup/v6/root-codecs/video-project-history';
-import { createSha256Digest } from '@sniptale/platform/security/digest';
 import {
   readPortableVideoProjectCurrent,
   readPortableVideoProjectHistory,
@@ -610,8 +609,7 @@ async function prepareVideoRoot(
   sender: readonly PortableCausalDependency[],
   refFor: VerifiedObjectResolver,
   deferredExports?: ReadonlyMap<string, DeferredProjectExport>,
-  omitPresentation = false,
-  stageNativeMetadata?: (blob: Blob) => Promise<AssetRef>
+  omitPresentation = false
 ): Promise<ApplyPreparedVideoProjectRevisionInput['root']> {
   const needed = new Set(portableSyncDependencyIds(parsed));
   // Later staging must not replace a predecessor child that another native root can retain.
@@ -712,7 +710,6 @@ async function prepareVideoRoot(
   );
   let history: PreparedVideoProjectReplicaRoot['history'];
   if (parsed.metadata.history) {
-    if (!stageNativeMetadata) throw new Error('Project history staging is unavailable.');
     const objectIds = new Set([
       ...portableVideoProjectHistoryPointers(parsed.metadata.history).map((item) => item.objectId),
       ...(parsed.metadata.entry.project.effectSnapshots ?? []).flatMap((snapshot) =>
@@ -736,20 +733,7 @@ async function prepareVideoRoot(
         childIdMap: scenarioMaps.childIdMap,
       }
     );
-    const byValue = new Map<string, AssetRef>();
-    for (const entry of [
-      ...capture.past,
-      ...capture.future,
-      ...(capture.recovery ? [capture.recovery] : []),
-    ]) {
-      if (byValue.has(entry.value)) continue;
-      const ref = await stageNativeMetadata(new Blob([entry.value], { type: 'application/json' }));
-      byValue.set(entry.value, {
-        ...ref,
-        sha256: (await createSha256Digest(entry.value)).slice('sha256:'.length),
-      });
-    }
-    const prepared = await preparePersistedVideoProjectHistory(capture, byValue);
+    const prepared = await preparePersistedVideoProjectHistory(capture);
     history = { head: prepared.history, refs: prepared.refs };
   }
   const snapshotRefs = (parsed.metadata.entry.project.effectSnapshots ?? []).flatMap((snapshot) =>
@@ -1013,8 +997,7 @@ export async function preparePortableReplica(args: {
         sender,
         refFor,
         args.deferredExports,
-        args.omitPresentation,
-        args.stageNativeMetadata
+        args.omitPresentation
       );
       payload = {
         kind: 'video-project',

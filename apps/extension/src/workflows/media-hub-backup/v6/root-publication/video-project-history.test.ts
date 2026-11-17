@@ -172,7 +172,12 @@ async function scenarioParent(id: string) {
   for (const unit of graph.units) await db.put('scenario_project_units', unit);
 }
 
-async function exportedFixture(stageObjects = true, historicalParent?: string) {
+async function exportedFixture(
+  stageObjects = true,
+  historicalParent?: string,
+  historyFormat: 1 | 2 = 2,
+  projectName = 'Draft'
+) {
   const before = createVideoProjectEntryWithMediaClip({ id: 'project-1', name: 'Before' }).project;
   if (historicalParent) {
     before.source = { kind: 'scenario', scenarioProjectId: historicalParent };
@@ -180,7 +185,7 @@ async function exportedFixture(stageObjects = true, historicalParent?: string) {
   }
   const current = {
     ...before,
-    name: 'Draft',
+    name: projectName,
     assets: [],
     clips: [],
     source: { kind: 'manual' as const },
@@ -195,13 +200,17 @@ async function exportedFixture(stageObjects = true, historicalParent?: string) {
       sources: collectVideoProjectHistorySources(previous),
     };
   };
-  const history = await preparePersistedVideoProjectHistory({
-    version: 1,
-    epoch: 'original-epoch',
-    past: [inverse(before, anchor)],
-    future: [inverse({ ...anchor, name: 'After' }, anchor)],
-    recovery: inverse(anchor, current),
-  });
+  const history = await preparePersistedVideoProjectHistory(
+    {
+      version: 1,
+      epoch: 'original-epoch',
+      past: [inverse(before, anchor)],
+      future: [inverse({ ...anchor, name: 'After' }, anchor)],
+      recovery: inverse(anchor, current),
+    },
+    new Map(),
+    historyFormat
+  );
   await db.put('video_projects', { ...entry, history: history.history });
   for (const ref of history.refs) await db.put('asset_refs', ref);
   for (const binding of videoProjectHistoryAssetBindings(history.history))
@@ -433,10 +442,10 @@ it.each([false, true])(
 it.each(['missing', 'bad-json', 'logical-budget', 'source-closure'] as const)(
   'refuses invalid history before new staging or native publication: %s',
   async (failure) => {
-    const f = await exportedFixture();
+    const f = await exportedFixture(true, undefined, 1);
     const session = await restoreSession('replace');
     const metadata = parsePortableVideoProjectMetadata(f.envelope.metadata);
-    const pointer = metadata.history?.past[0];
+    const pointer = metadata.history?.version === 1 ? metadata.history.past[0] : undefined;
     const object = f.staged.find((object) => object.objectId === pointer?.objectId);
     if (!object || !metadata.history) throw new Error('Missing history fixture');
     if (failure === 'missing') io.files.delete(object.ref.assetId);
@@ -478,7 +487,7 @@ it.each(['missing', 'bad-json', 'logical-budget', 'source-closure'] as const)(
 );
 
 it('cleans partially rebound immutable files after disk failure without changing accepted native history', async () => {
-  const f = await exportedFixture();
+  const f = await exportedFixture(true, undefined, 1);
   const session = await restoreSession('replace');
   const files = [...io.files.keys()].sort();
   const before = await db.get('video_projects', f.entry.id);
@@ -489,6 +498,21 @@ it('cleans partially rebound immutable files after disk failure without changing
   ).rejects.toThrow('Disk full');
   expect([...io.files.keys()].sort()).toEqual(files);
   expect(await db.get('video_projects', f.entry.id)).toEqual(before);
+});
+
+it('rebinds inline history without staging inverse files', async () => {
+  const f = await exportedFixture();
+  const session = await restoreSession('replace');
+  io.write.mockClear();
+  if (!videoProjectRootPublisher.prepareStaged) throw new Error('Missing history preparation');
+  const prepared = await videoProjectRootPublisher.prepareStaged({
+    envelope: f.envelope,
+    staged: f.staged,
+    session,
+  });
+  expect(parsePortableVideoProjectMetadata(prepared.envelope.metadata).history?.version).toBe(2);
+  expect(io.write).not.toHaveBeenCalled();
+  expect(prepared.staged).toEqual(f.staged);
 });
 
 it('skips an existing native project without reading or replacing archive history bytes', async () => {
@@ -505,50 +529,53 @@ it('skips an existing native project without reading or replacing archive histor
   expect(await db.get('video_projects', f.entry.id)).toEqual(before);
 });
 
-it('carries Montage history through a real ZIP, inspection, staging and native publication', async () => {
-  const f = await exportedFixture(false);
-  const output = createArchiveMemorySink();
-  await exportMediaHubBackupV6({
-    sink: output.sink,
-    plan: buildMediaHubBackupExportPlanV6({
-      roots: [f.root],
-      layout: MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT,
-      privacy: {
-        includeSourceMetadata: false,
-        includeTelemetry: false,
-        includeWebSnapshots: false,
-      },
-    }),
-  });
-  const file = new File([output.blob()], 'montage.zip', { type: 'application/zip' });
-  const inspection = await inspectMediaHubBackupV6(file);
-  expect(inspection.rootKeys).toEqual(['video-project:project-1']);
-  const reader = await openArchiveReader(file);
-  try {
-    const metadataEntry = reader.entry(f.root.descriptor.metadataPath);
-    if (!metadataEntry) throw new Error('Missing archived project');
-    const encoded = parseBackupRootEnvelope(
-      parseBoundedJson(await metadataEntry.text()),
-      inspection.manifest
-    );
-    const { envelope } = await decodeBackupMetadata(reader, encoded.envelope);
-    const staged = await stageArchiveRootObjects({ envelope, reader });
-    const session = await restoreSession('duplicate');
-    if (!videoProjectRootPublisher.prepareStaged) throw new Error('Missing history preparation');
-    const prepared = await videoProjectRootPublisher.prepareStaged({ envelope, staged, session });
-    await videoProjectRootPublisher.publish(publicationArgs(prepared, session));
-    const committed = await db.get('asset_operations', session.operationId);
-    const opened = await getVideoProjectWorkspace(committed.rootIdMap['video-project:project-1']);
-    if (opened.status !== 'ready' || opened.history.status !== 'ready')
-      throw new Error('Missing archived history');
-    expect(opened.project.name).toBe('Draft');
-    expect(opened.history.value.past).toHaveLength(1);
-    expect(opened.history.value.future).toHaveLength(1);
-    expect(opened.history.value.recovery).toBeDefined();
-  } finally {
-    await reader.close();
+it.each(['Draft', 'data:example', 'blob:example'])(
+  'carries Montage history through a real ZIP, inspection, staging and native publication: %s',
+  async (projectName) => {
+    const f = await exportedFixture(false, undefined, 2, projectName);
+    const output = createArchiveMemorySink();
+    await exportMediaHubBackupV6({
+      sink: output.sink,
+      plan: buildMediaHubBackupExportPlanV6({
+        roots: [f.root],
+        layout: MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT,
+        privacy: {
+          includeSourceMetadata: false,
+          includeTelemetry: false,
+          includeWebSnapshots: false,
+        },
+      }),
+    });
+    const file = new File([output.blob()], 'montage.zip', { type: 'application/zip' });
+    const inspection = await inspectMediaHubBackupV6(file);
+    expect(inspection.rootKeys).toEqual(['video-project:project-1']);
+    const reader = await openArchiveReader(file);
+    try {
+      const metadataEntry = reader.entry(f.root.descriptor.metadataPath);
+      if (!metadataEntry) throw new Error('Missing archived project');
+      const encoded = parseBackupRootEnvelope(
+        parseBoundedJson(await metadataEntry.text()),
+        inspection.manifest
+      );
+      const { envelope } = await decodeBackupMetadata(reader, encoded.envelope);
+      const staged = await stageArchiveRootObjects({ envelope, reader });
+      const session = await restoreSession('duplicate');
+      if (!videoProjectRootPublisher.prepareStaged) throw new Error('Missing history preparation');
+      const prepared = await videoProjectRootPublisher.prepareStaged({ envelope, staged, session });
+      await videoProjectRootPublisher.publish(publicationArgs(prepared, session));
+      const committed = await db.get('asset_operations', session.operationId);
+      const opened = await getVideoProjectWorkspace(committed.rootIdMap['video-project:project-1']);
+      if (opened.status !== 'ready' || opened.history.status !== 'ready')
+        throw new Error('Missing archived history');
+      expect(opened.project.name).toBe(projectName);
+      expect(opened.history.value.past).toHaveLength(1);
+      expect(opened.history.value.future).toHaveLength(1);
+      expect(opened.history.value.recovery).toBeDefined();
+    } finally {
+      await reader.close();
+    }
   }
-});
+);
 
 it('retains history backing in the native sync capture created by an archive restore', async () => {
   const f = await exportedFixture();

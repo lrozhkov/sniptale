@@ -34,6 +34,7 @@ import {
   videoProjectHistoryAssetBindings,
   type PersistedVideoProjectHistory,
   videoProjectHistoryChangeRefs,
+  videoProjectHistoryInlineBytes,
 } from './history-contracts';
 
 interface PreparedVideoProjectHistory {
@@ -46,8 +47,40 @@ interface PreparedVideoProjectHistory {
 /** Stage owner-captured values once. Reusable references grant no native revision authority. */
 export async function preparePersistedVideoProjectHistory(
   capture: VideoProjectHistoryCapture,
-  reusableAssetsByValue: ReadonlyMap<string, AssetRef> = new Map()
+  reusableAssetsByValue: ReadonlyMap<string, AssetRef> = new Map(),
+  formatVersion: 1 | 2 = 2
 ): Promise<PreparedVideoProjectHistory> {
+  if (formatVersion === 2) {
+    const sources = new Map<string, VideoProjectHistorySourceReference>();
+    const inline = (entry: VideoProjectHistoryCapture['past'][number]) => {
+      if (
+        !Number.isSafeInteger(entry.bytes) ||
+        entry.bytes < 0 ||
+        entry.value.length > EDITOR_HISTORY_LIMITS.maxBytes ||
+        new TextEncoder().encode(entry.value).byteLength !== entry.bytes
+      )
+        throw new Error('Captured video history size is inconsistent.');
+      for (const source of entry.sources)
+        sources.set(JSON.stringify([source.kind, source.id]), source);
+      return { value: entry.value };
+    };
+    if (
+      capture.version !== 1 ||
+      capture.past.length + capture.future.length + (capture.recovery ? 1 : 0) >
+        EDITOR_HISTORY_LIMITS.maxActions
+    )
+      throw new Error('Video history capture is invalid.');
+    const history = parsePersistedVideoProjectHistory({
+      version: 2,
+      epoch: capture.epoch,
+      past: capture.past.map(inline),
+      future: capture.future.map(inline),
+      ...(capture.recovery ? { recovery: inline(capture.recovery) } : {}),
+      sources: [...sources.values()],
+    });
+    if (!history) throw new Error('Video history capture is invalid.');
+    return { history, objects: [], refs: [], assetsByValue: new Map() };
+  }
   const objects: PreparedAssetObject[] = [];
   const refs = new Map<string, AssetRef>();
   const assetsByValue = new Map<string, AssetRef>();
@@ -152,7 +185,7 @@ export async function hydratePersistedVideoProjectHistory(args: {
     refs.set(ref.assetId, ref);
   }
   if (refs.size !== needed.size) throw new Error('Stored video history resource is missing.');
-  let bytes = 0;
+  let bytes = videoProjectHistoryInlineBytes(history);
   for (const entry of videoProjectHistoryChangeRefs(history)) {
     bytes += refs.get(entry.assetId)!.size;
     if (bytes > EDITOR_HISTORY_LIMITS.maxBytes)
@@ -173,6 +206,23 @@ export async function hydratePersistedVideoProjectHistory(args: {
     changes.set(id, JSON.parse(value) as unknown);
     assetsByValue.set(value, ref);
   }
+  type Entry = PersistedVideoProjectHistory['past'][number];
+  const valueKey = (entry: Entry) => ('value' in entry ? entry.value : entry.assetId);
+  const entryValue = (entry: Entry) =>
+    'value' in entry ? entry.value : values.get(entry.assetId)!;
+  const entryBytes = (entry: Entry) =>
+    'value' in entry
+      ? new TextEncoder().encode(entry.value).byteLength
+      : refs.get(entry.assetId)!.size;
+  if (history.version === 2) {
+    for (const entry of [
+      ...history.past,
+      ...history.future,
+      ...(history.recovery ? [history.recovery] : []),
+    ]) {
+      if (!changes.has(entry.value)) changes.set(entry.value, JSON.parse(entry.value) as unknown);
+    }
+  }
   let anchor = args.current;
   let recovery: RestoredVideoProjectHistoryValue | undefined;
   if (history.recovery) {
@@ -180,7 +230,7 @@ export async function hydratePersistedVideoProjectHistory(args: {
       {
         version: 1,
         projectId: args.current.id,
-        past: [changes.get(history.recovery.assetId)],
+        past: [changes.get(valueKey(history.recovery))],
         future: [],
       },
       args.current,
@@ -194,8 +244,8 @@ export async function hydratePersistedVideoProjectHistory(args: {
     await verifyVideoProjectEffectSnapshotIntegrity(anchor);
     recovery = {
       change,
-      value: values.get(history.recovery.assetId)!,
-      bytes: refs.get(history.recovery.assetId)!.size,
+      value: entryValue(history.recovery),
+      bytes: entryBytes(history.recovery),
       sources: collectVideoProjectHistorySources(anchor),
     };
   }
@@ -203,8 +253,8 @@ export async function hydratePersistedVideoProjectHistory(args: {
     {
       version: 1,
       projectId: args.current.id,
-      past: history.past.map((entry) => changes.get(entry.assetId)),
-      future: history.future.map((entry) => changes.get(entry.assetId)),
+      past: history.past.map((entry) => changes.get(valueKey(entry))),
+      future: history.future.map((entry) => changes.get(valueKey(entry))),
     },
     anchor,
     EDITOR_HISTORY_LIMITS
@@ -214,7 +264,7 @@ export async function hydratePersistedVideoProjectHistory(args: {
   for (const source of recovery?.sources ?? [])
     expectedSources.add(JSON.stringify([source.kind, source.id]));
   const restore = async (
-    entries: readonly { assetId: string }[],
+    entries: readonly Entry[],
     parsed: readonly VideoProjectHistoryChange[],
     backwards: boolean
   ) => {
@@ -232,8 +282,8 @@ export async function hydratePersistedVideoProjectHistory(args: {
       for (const source of sources) expectedSources.add(JSON.stringify([source.kind, source.id]));
       restored[index] = {
         change,
-        value: values.get(entries[index]!.assetId)!,
-        bytes: refs.get(entries[index]!.assetId)!.size,
+        value: entryValue(entries[index]!),
+        bytes: entryBytes(entries[index]!),
         sources,
       };
     }

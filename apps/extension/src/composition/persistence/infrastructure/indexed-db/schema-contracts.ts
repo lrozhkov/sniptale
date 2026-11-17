@@ -140,7 +140,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'videoProjects',
-    schemaVersion: 14,
+    schemaVersion: 15,
     stores: [
       { storeName: VIDEO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_PROJECT_REVISIONS_STORE, dataClass: 'durable-authority' },
