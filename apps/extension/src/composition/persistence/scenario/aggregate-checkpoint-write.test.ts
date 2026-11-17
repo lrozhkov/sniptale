@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { stores, createAsset, createDocument } from './aggregate-mutations.test-support';
+import { getScenarioEditingSnapshot } from './history';
 import { commitScenarioAggregateMutation } from './aggregate-mutations';
 import { getScenarioProjectEntry } from './projects/project';
 import {
@@ -240,4 +241,66 @@ it('publishes changed content with its exact Undo and Redo branches', async () =
     empty.editingHistory
   );
   expect(empty.editingHistory).toEqual({ version: 1, past: [], future: [] });
+});
+
+it('appends generic native commands to the editing timeline and cuts the Redo branch', async () => {
+  const first = await commitScenarioAggregateMutation(
+    createGuideProject('Current', 'generic-checkpoint', 1)
+  );
+  const prior = { ...first.project, name: 'Past action' };
+  const future = { ...first.project, name: 'Cancelled future' };
+  const base = await commitScenarioAggregateMutation(first.project, {
+    expectedRevision: first.workspaceRevision,
+    editingHistory: { version: 1, past: [prior], future: [future] },
+  });
+  const next = await commitScenarioAggregateMutation(
+    { ...base.project, name: 'Generic command' },
+    {
+      expectedRevision: base.workspaceRevision,
+    }
+  );
+  expect(next.editingHistory).toEqual({ version: 1, past: [prior, base.project], future: [] });
+  expect(await getScenarioEditingSnapshot(first.project.id)).toEqual(next);
+  expect((await getScenarioProjectEntry(first.project.id))?.editingHistory).toEqual(
+    next.editingHistory
+  );
+  expect(base.editingHistory?.future).toEqual([future]);
+});
+
+it('keeps autosave continuations in their existing action and separates the next action', async () => {
+  const first = await commitScenarioAggregateMutation(
+    createGuideProject('Initial', 'continued-checkpoint', 1)
+  );
+  const base = await commitScenarioAggregateMutation(first.project, {
+    expectedRevision: first.workspaceRevision,
+    editingHistory: { version: 1, past: [], future: [] },
+  });
+  const X = '11111111-1111-4111-8111-111111111111';
+  const Y = '22222222-2222-4222-8222-222222222222';
+  const intermediate = await commitScenarioAggregateMutation(
+    { ...base.project, name: 'A' },
+    {
+      expectedRevision: base.workspaceRevision,
+      historyActionId: X,
+    }
+  );
+  const final = await commitScenarioAggregateMutation(
+    { ...intermediate.project, name: 'AB' },
+    {
+      expectedRevision: intermediate.workspaceRevision,
+      historyActionId: X,
+    }
+  );
+  expect(final.editingHistory?.past).toEqual([base.project]);
+  const next = await commitScenarioAggregateMutation(
+    { ...final.project, tags: ['next'] },
+    {
+      expectedRevision: final.workspaceRevision,
+      historyActionId: Y,
+    }
+  );
+  expect(next.editingHistory?.past).toEqual([base.project, final.project]);
+  expect((await getScenarioProjectEntry(first.project.id))?.editingHistory).toEqual(
+    next.editingHistory
+  );
 });

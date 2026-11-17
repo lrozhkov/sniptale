@@ -1,3 +1,5 @@
+import { areScenarioProjectsEqual } from '../aggregate-comparison';
+import { retainScenarioEditingHistory } from '../editing-history';
 import {
   appendScenarioSavedVersion,
   retainScenarioSavedVersions,
@@ -34,19 +36,31 @@ export function createScenarioProjectEntry(args: {
   historyActionId?: string;
   editingHistory?: ScenarioEditingHistory;
 }): ScenarioProjectEntry {
-  const editingHistory = args.editingHistory ?? args.existing?.editingHistory;
-  if (
-    args.editingHistory === undefined &&
-    editingHistory !== undefined &&
-    args.project !== args.existing?.project
-  )
-    throw new Error('Scenario editing history mutation is not available.');
+  const updatedAt = createScenarioProjectRevision(args.existing, args.updatedAt);
+  const project = { ...args.project, updatedAt };
+  const previousHistory = args.existing?.editingHistory;
+  const editingHistory =
+    args.editingHistory ??
+    (previousHistory !== undefined &&
+    args.existing &&
+    args.project !== args.existing.project &&
+    !areScenarioProjectsEqual(
+      { ...args.project, updatedAt: args.existing.project.updatedAt },
+      args.existing.project
+    )
+      ? retainScenarioEditingHistory(
+          project,
+          args.historyActionId !== undefined &&
+            args.historyActionId === args.existing.lastAcceptedActionId
+            ? previousHistory.past
+            : [...previousHistory.past, args.existing.project]
+        )
+      : previousHistory);
   if (args.historyActionId !== undefined && !isScenarioHistoryActionId(args.historyActionId))
     throw new Error('Invalid scenario history action identity.');
   const workspaceRevision = (args.existing?.workspaceRevision ?? 0) + 1;
   if (!Number.isSafeInteger(workspaceRevision))
     throw new Error('Local Scenario revisions are exhausted.');
-  const updatedAt = createScenarioProjectRevision(args.existing, args.updatedAt);
   const history =
     args.historyPolicy === 'discard'
       ? []
@@ -67,10 +81,7 @@ export function createScenarioProjectEntry(args: {
               : structuredClone(editingHistory),
         }),
     id: args.project.id,
-    project: {
-      ...args.project,
-      updatedAt,
-    },
+    project,
     createdAt: args.existing?.createdAt ?? args.project.createdAt ?? updatedAt,
     updatedAt,
     lifecycle: args.existing

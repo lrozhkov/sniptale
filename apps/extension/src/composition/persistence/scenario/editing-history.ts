@@ -24,6 +24,18 @@ export function parseScenarioEditingHistory(
   const past: GuideProject[] = [];
   const future: GuideProject[] = [];
   if (rawPast.length + rawFuture.length === 0) return { version: 1, past, future };
+  const measure = createScenarioEditingBudget();
+  if (!measure(current)) return null;
+  let index = 0;
+  for (const parsed of parseGuideProjectBatch([...rawPast, ...rawFuture])) {
+    if (parsed.status !== 'ok' || parsed.project.id !== current.id || !measure(parsed.project))
+      return null;
+    (index++ < rawPast.length ? past : future).push(parsed.project);
+  }
+  return { version: 1, past, future };
+}
+
+function createScenarioEditingBudget() {
   const encoder = new TextEncoder();
   const units = new Set<string>();
   const measured = new WeakSet<object>();
@@ -51,12 +63,25 @@ export function parseScenarioEditingHistory(
     }
     return bytes <= EDITOR_HISTORY_LIMITS.maxBytes;
   }
-  if (!measure(current)) return null;
-  let index = 0;
-  for (const parsed of parseGuideProjectBatch([...rawPast, ...rawFuture])) {
-    if (parsed.status !== 'ok' || parsed.project.id !== current.id || !measure(parsed.project))
-      return null;
-    (index++ < rawPast.length ? past : future).push(parsed.project);
+  return measure;
+}
+
+/** Select the nearest past from canonically admitted projects, sharing immutable unit accounting. */
+export function retainScenarioEditingHistory(
+  current: GuideProject,
+  past: readonly GuideProject[]
+): ScenarioEditingHistory {
+  const retained: GuideProject[] = [];
+  if (past.length) {
+    const measure = createScenarioEditingBudget();
+    if (measure(current)) {
+      const start = Math.max(0, past.length - EDITOR_HISTORY_LIMITS.maxActions);
+      for (let index = past.length - 1; index >= start; index--) {
+        const project = past[index]!;
+        if (!measure(project)) break;
+        retained.push(project);
+      }
+    }
   }
-  return { version: 1, past, future };
+  return { version: 1, past: retained.reverse(), future: [] };
 }

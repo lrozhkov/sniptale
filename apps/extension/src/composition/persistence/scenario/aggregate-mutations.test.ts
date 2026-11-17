@@ -961,3 +961,39 @@ it('clears saved revisions and prunes orphaned children without resetting editin
   expect(getStore('scenario_assets').has('old')).toBe(false);
   expect(getStore('scenario_step_editor_documents').has('old-document')).toBe(false);
 });
+
+it('publishes a generic child command with one editing action and replays its exact journal', async () => {
+  const first = await commitScenarioAggregateMutation(
+    createGuideProject('Current', 'checkpoint-journal', 1)
+  );
+  const older = { ...first.project, name: 'Older action' };
+  const future = { ...first.project, name: 'Cancelled future' };
+  const base = await commitScenarioAggregateMutation(first.project, {
+    expectedRevision: first.workspaceRevision,
+    editingHistory: { version: 1, past: [older], future: [future] },
+  });
+  const next = { ...base.project, items: [createGuideStep('Imported image', 'imported-step')] };
+  next.items[0]!.blocks.push(
+    createGuideImageBlock({
+      id: 'imported-image',
+      assetId: 'imported-child',
+      width: 10,
+      height: 10,
+      source: { kind: 'import', filename: 'imported.png' },
+    })
+  );
+  const committed = await commitScenarioAggregateMutation(next, {
+    expectedRevision: base.workspaceRevision,
+    children: { assetPuts: [createAsset(next.id, 'imported-child')] },
+  });
+  expect(committed.editingHistory).toEqual({ version: 1, past: [older, base.project], future: [] });
+  expect((await getScenarioProjectEntry(next.id))?.editingHistory).toEqual(
+    committed.editingHistory
+  );
+  const assets = await import('../assets');
+  const ready = await vi.mocked(assets.createAssetPublicationJournal).mock.results.at(-1)!.value;
+  const before = structuredClone(stores);
+  await expect(scenarioAssetPublicationAdapter.publish(ready)).resolves.toBeUndefined();
+  expect(stores).toEqual(before);
+  expect(base.editingHistory?.future).toEqual([future]);
+});

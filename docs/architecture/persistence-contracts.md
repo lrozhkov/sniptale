@@ -1251,7 +1251,11 @@ Native sync uses a version 1 `native-scenario-unit-history` body in the existing
 
 The CAS save API accepts an explicit editing checkpoint with current content and returns both in its committed snapshot. It validates and detaches the supplied branches before asynchronous preparation. Cursor changes require an exact owner revision even when current content matches storage. These changes preserve saved-revision chronology. The existing transaction validates resource references and publishes current content with both branches atomically. Checkpoint saves cannot carry child publication mutations.
 
-This storage generation has no page checkpoint producer. Generic content replacement still refuses existing editing checkpoints. Metadata-only revisions preserve the checkpoint when callers retain the admitted project object. These writer gates preserve history until the runtime owner supports the complete graph. Archive, sync and explicit checkpoint writes do not complete durable Undo/Redo reopening.
+Generic content commands append the previous current project to an existing editing checkpoint and clear its future branch. The existing constructor applies this rule without tool registration. An exact CAS continuation with the same action identity updates its existing action. A timestamp-only change preserves navigation. It retains the nearest past under the same pooled byte and transition limits as strict admission. It measures shared immutable units once. Metadata-only maintenance preserves editing branches and keeps its saved-version policy.
+
+The editing snapshot reader obtains current content, revision and navigation from one admitted native entry. An explicit empty checkpoint overrides the saved archive. Only legacy entries without a checkpoint derive bounded past from saved revisions. The saved-version query retains its separate archive meaning.
+
+This storage generation has no page checkpoint producer. Archive, sync, native command and editing snapshot support do not complete durable Undo/Redo reopening.
 
 
 Explicit Library removal clears selected resource references from current content, saved revisions and both editing branches. It preserves branch order and historical timestamps. The operation retains existing image slots, captions and layout. It does not append an editing action. The native transaction publishes the sanitized graph and removes child ownership together. Revision exhaustion refuses the transaction and preserves its predecessor.

@@ -1,7 +1,7 @@
 import { createScenarioProjectEntry } from './projects/entry';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { createGuideProject, createGuideStep } from '../../../features/scenario/project/factories';
-import { parseScenarioEditingHistory } from './editing-history';
+import { parseScenarioEditingHistory, retainScenarioEditingHistory } from './editing-history';
 import { parseScenarioProjectEntry } from './read-guards';
 import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 
@@ -119,7 +119,7 @@ it('admits the checkpoint through the logical entry boundary and rejects replace
   ).toBeNull();
 });
 
-it('refuses an older native mutation rather than silently dropping an admitted checkpoint', () => {
+it('appends a generic content action and clears its cancelled future', () => {
   const current = project();
   const existing = {
     id: current.id,
@@ -129,9 +129,8 @@ it('refuses an older native mutation rather than silently dropping an admitted c
     workspaceRevision: 1,
     editingHistory: { version: 1 as const, past: [], future: [{ ...current, name: 'Future' }] },
   };
-  expect(() =>
-    createScenarioProjectEntry({ existing, project: { ...current, name: 'Changed' } })
-  ).toThrow('Scenario editing history mutation is not available.');
+  const next = createScenarioProjectEntry({ existing, project: { ...current, name: 'Changed' } });
+  expect(next.editingHistory).toEqual({ version: 1, past: [current], future: [] });
   expect(existing.editingHistory.future[0]?.name).toBe('Future');
 });
 
@@ -168,4 +167,89 @@ it('preserves editing branches for an admitted metadata-only revision and refuse
       historyPolicy: 'preserve',
     })
   ).toThrow('revisions are exhausted');
+});
+
+it('retains the nearest fifty past actions and measures a shared unit only once', () => {
+  const current = large('Current', 'x');
+  const past = Array.from({ length: 55 }, (_, index) => ({ ...current, name: `Past ${index}` }));
+  const stringify = vi.spyOn(JSON, 'stringify');
+  let retained: ReturnType<typeof retainScenarioEditingHistory>;
+  let bodyCalls = 0;
+  try {
+    retained = retainScenarioEditingHistory(current, past);
+    bodyCalls = stringify.mock.calls.filter(([value]) => value === current.items[0]).length;
+  } finally {
+    stringify.mockRestore();
+  }
+  expect(retained.past).toEqual(past.slice(-50));
+  expect(retained.future).toEqual([]);
+  expect(bodyCalls).toBe(1);
+  expect(past).toHaveLength(55);
+});
+it('trims oldest pooled payloads without reparsing every shortened history', () => {
+  const current = large('Current', 'a');
+  const past = ['b', 'c', 'd', 'e'].map((character) => large(character, character));
+  const retained = retainScenarioEditingHistory(current, past);
+  expect(retained.past.map((project) => project.name)).toEqual(['c', 'd', 'e']);
+  expect(parseScenarioEditingHistory(retained, current)).toEqual(retained);
+  expect(past.map((project) => project.name)).toEqual(['b', 'c', 'd', 'e']);
+});
+it('preserves explicit checkpoints and metadata-only branches without mutating borrowed data', () => {
+  const current = project();
+  const editingHistory = {
+    version: 1 as const,
+    past: [current],
+    future: [{ ...current, name: 'Redo' }],
+  };
+  const existing = {
+    ...createScenarioProjectEntry({ existing: undefined, project: current }),
+    editingHistory,
+  };
+  const metadata = createScenarioProjectEntry({
+    existing,
+    project: existing.project,
+    historyPolicy: 'discard',
+  });
+  expect(metadata.editingHistory).toEqual(editingHistory);
+  expect(metadata.editingHistory).not.toBe(editingHistory);
+  const timestampOnly = createScenarioProjectEntry({
+    existing,
+    project: { ...existing.project, updatedAt: existing.project.updatedAt + 1 },
+  });
+  expect(timestampOnly.editingHistory).toEqual(editingHistory);
+  const explicit = { version: 1 as const, past: [], future: [] };
+  const next = createScenarioProjectEntry({
+    existing,
+    project: { ...existing.project, name: 'Changed' },
+    editingHistory: explicit,
+  });
+  expect(next.editingHistory).toEqual(explicit);
+  expect(existing.editingHistory).toEqual(editingHistory);
+});
+
+it('keeps oversized current content valid by retaining no editing transitions', () => {
+  const current = project('Oversized current');
+  current.items = Array.from({ length: 2 }, (_, index) => {
+    const item = large('Body', '界').items[0]!;
+    if (item.kind !== 'step') throw new Error('Expected an oversized step fixture.');
+    return {
+      ...item,
+      id: `item-${index}`,
+      blocks: item.blocks
+        .slice(0, 95)
+        .map((block, slot) => ({ ...block, id: `block-${index}-${slot}` })),
+    };
+  });
+  expect(
+    parseScenarioProjectEntry({
+      id: current.id,
+      project: current,
+      createdAt: 1,
+      updatedAt: 1,
+      workspaceRevision: 1,
+    })
+  ).not.toBeNull();
+  const retained = retainScenarioEditingHistory(current, [project('Previous')]);
+  expect(retained).toEqual({ version: 1, past: [], future: [] });
+  expect(parseScenarioEditingHistory(retained, current)).toEqual(retained);
 });
