@@ -9,12 +9,16 @@ import {
   EFFECT_RUNTIME_SANDBOX_RENDER_MESSAGE,
 } from '../../contracts/effect-runtime/types';
 import { createAnimationDocument } from './request-boundary.test-support';
+import { finishWorkerStartupOnFirstListener } from './worker.test-support';
 
 vi.mock('../worker/index?worker&inline', () => ({
   default: class FakeWorker {
     onerror = null;
     onmessage = null;
     onmessageerror = null;
+    constructor() {
+      finishWorkerStartupOnFirstListener(this);
+    }
     postMessage(): void {
       throw new Error('worker unavailable');
     }

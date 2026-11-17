@@ -824,3 +824,50 @@ it('authenticates the replacement after a speculative preload timeout before pos
     vi.useRealTimers();
   }
 });
+
+it('keeps both admitted requests alive across cold worker startup and serialized frames', async () => {
+  vi.useFakeTimers();
+  installSynchronousMessageChannel();
+  const executor = createEffectRuntimeSandboxExecutor();
+  const requests: EffectRuntimeRenderMessage[] = [];
+  const ports: MessagePort[] = [];
+  const commands = [createRequest(), { ...createRequest(), requestId: 'request-2', sequenceId: 2 }];
+  try {
+    const pending = commands.map((command) => executor.renderFrame(command));
+    const iframe = document.querySelector('iframe')!;
+    installSandboxResponder(iframe, requests, ports, (request, index, port) => {
+      if (!port) throw new Error('Expected a response port');
+      ports.push(port);
+      setTimeout(
+        () => {
+          port.postMessage({
+            effectInstanceId: request.effectInstanceId,
+            requestId: request.requestId,
+            sequenceId: request.sequenceId,
+            snapshotId: request.snapshotId,
+            kind: 'frame',
+            bitmap: createInputBitmap(),
+            width: request.renderWidth,
+            height: request.renderHeight,
+            acknowledged: {
+              documentId: request.documentRef.id,
+              assetSelectionId: request.assetSelectionRef.id,
+            },
+          });
+        },
+        2700 + index * 1200
+      );
+    });
+    iframe.dispatchEvent(new Event('load'));
+    await vi.advanceTimersByTimeAsync(5100);
+    expect(requests).toHaveLength(2);
+    const results = await Promise.all(pending);
+    for (const result of results) if (result.kind === 'frame') result.bitmap.close();
+    expect(results.map((result) => result.kind)).toEqual(['frame', 'frame']);
+    expect(document.querySelector('iframe')).toBe(iframe);
+  } finally {
+    executor.dispose();
+    for (const port of ports) port.close();
+    vi.useRealTimers();
+  }
+});

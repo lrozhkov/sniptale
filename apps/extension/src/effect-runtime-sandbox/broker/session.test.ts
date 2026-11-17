@@ -12,7 +12,8 @@ import {
 import { createAnimationDocument } from './request-boundary.test-support';
 import { EffectRuntimePreparationError } from './prepare-frame';
 import { createEffectRuntimeBrokerSession } from './session';
-import type { EffectRuntimeWorkerLike } from './worker-request';
+import type { EffectRuntimeWorkerLike } from './worker-startup';
+import { finishWorkerStartupOnFirstListener } from './worker.test-support';
 
 class FakeBitmap implements ImageBitmap {
   readonly close = vi.fn();
@@ -27,6 +28,9 @@ class ReplyWorker implements EffectRuntimeWorkerLike {
   onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
   onmessageerror: ((event: MessageEvent<unknown>) => void) | null = null;
   readonly terminate = vi.fn();
+  constructor(ready = true) {
+    if (ready) finishWorkerStartupOnFirstListener(this);
+  }
   postMessage(): void {
     const request = createWorkerRequest();
     this.onmessage?.(
@@ -295,7 +299,7 @@ it.each([undefined, 'gpu-scene', 'gpu-scene-plan'] as const)(
 );
 
 it('retains idle GPU startup refusal without admitting or charging a frame', () => {
-  const worker = new ReplyWorker();
+  const worker = new ReplyWorker(false);
   const session = createEffectRuntimeBrokerSession({
     compositionBackend: 'gpu-scene',
     workerFactory: () => worker,

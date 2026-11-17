@@ -10,6 +10,7 @@ export const EFFECT_RUNTIME_SANDBOX_READY_MESSAGE = 'sniptale:effect-runtime:rea
 export const EFFECT_RUNTIME_SANDBOX_RENDER_MESSAGE = 'sniptale:effect-runtime:render' as const;
 export const EFFECT_RUNTIME_WORKER_REQUEST = 'sniptale:effect-runtime:worker-request' as const;
 export const EFFECT_RUNTIME_WORKER_RESPONSE = 'sniptale:effect-runtime:worker-response' as const;
+export const EFFECT_RUNTIME_WORKER_READY = 'sniptale:effect-runtime:worker-ready' as const;
 
 export type EffectRuntimeErrorCode =
   | 'cacheMiss'
