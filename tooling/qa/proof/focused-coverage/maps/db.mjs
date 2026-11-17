@@ -380,6 +380,25 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'scenario-native-unit-storage',
+    productionFile: 'apps/extension/src/composition/persistence/scenario/storage-units.ts',
+    exclusive: true,
+    reason:
+      'Unit reference sharing affects native admission and checkpoint publication. ' +
+      'Native revision, recreation and retry suites cover these consumers.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/scenario/storage-units.test.ts',
+      'apps/extension/src/composition/persistence/scenario/storage.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-checkpoint-write.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.identity.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-unit-storage.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-history-storage.test.ts',
+      'apps/extension/src/composition/persistence/scenario/history.test.ts',
+      'apps/extension/src/composition/persistence/scenario/editing-history.test.ts',
+    ],
+  },
+  {
     owner: 'shared-db-scenario-project-entry',
     productionFile: 'apps/extension/src/composition/persistence/scenario/projects/entry.ts',
     reason:

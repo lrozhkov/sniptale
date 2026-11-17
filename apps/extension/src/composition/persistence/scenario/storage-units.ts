@@ -7,6 +7,11 @@ import type { ScenarioProjectEntry } from './contracts';
 import { SCENARIO_HISTORY_LIMIT } from './history-model';
 import { materializeScenarioStorage } from './storage-format';
 
+interface UnitReference {
+  unitId: string;
+  revision: number;
+}
+
 interface UnitRow {
   projectId: string;
   unitId: string;
@@ -94,9 +99,12 @@ export function materializeScenarioUnitStorage(
   if (!parsedUnits) return unavailable(head, rows, units);
   const indexed = parsedUnits;
   const used = new Set<string>();
+  const lists = { guide: new WeakMap<object, unknown[]>(), tour: new WeakMap<object, unknown[]>() };
   function body(values: unknown, kind: 'guide' | 'tour'): unknown[] | null {
     const limit = kind === 'guide' ? GUIDE_LIMITS.maxItems : TOUR_LIMITS.maxSlides;
     if (!Array.isArray(values) || values.length > limit) return null;
+    const previous = lists[kind].get(values);
+    if (previous) return previous;
     const result: unknown[] = [];
     const ids = new Set<string>();
     for (const ref of values) {
@@ -118,6 +126,7 @@ export function materializeScenarioUnitStorage(
       used.add(key);
       result.push(value);
     }
+    lists[kind].set(values, result);
     return result;
   }
   function project(value: unknown): unknown | null {
@@ -168,6 +177,7 @@ export function materializeScenarioUnitStorage(
  * One caller transaction determines row identities; none is a project revision or writer.
  * Canonical input stays stable during this synchronous call. Shared unit objects resolve once
  * per kind; no resolution or content-equality evidence is retained for a later encoding call.
+ * Equal ordered reference lists share their native clone representation. All indexes are local.
  */
 export function encodeScenarioUnitStorage(entry: ScenarioProjectEntry, existingUnits: unknown[]) {
   const candidates = new Map<string, UnitRow[]>();
@@ -186,13 +196,13 @@ export function encodeScenarioUnitStorage(entry: ScenarioProjectEntry, existingU
   }
   const used = new Map<string, UnitRow>();
   const known = {
-    guide: new WeakMap<object, UnitRow>(),
-    tour: new WeakMap<object, UnitRow>(),
+    guide: new WeakMap<object, UnitReference>(),
+    tour: new WeakMap<object, UnitReference>(),
   };
   function reference(value: { id: string }, kind: 'guide' | 'tour') {
     const unitId = `${kind}:${value.id}`;
     const previous = known[kind].get(value);
-    if (previous) return { unitId, revision: previous.revision };
+    if (previous) return previous;
     const own = candidates.get(unitId) ?? [];
     let row = own.find((candidate) => sameScenarioStoredValue(candidate.value, value));
     if (!row) {
@@ -204,17 +214,36 @@ export function encodeScenarioUnitStorage(entry: ScenarioProjectEntry, existingU
       candidates.set(unitId, own);
     }
     used.set(unitKey(unitId, row.revision), row);
-    known[kind].set(value, row);
-    return { unitId, revision: row.revision };
+    const ref = { unitId, revision: row.revision };
+    known[kind].set(value, ref);
+    return ref;
+  }
+  const lists = {
+    guide: new WeakMap<readonly object[], UnitReference[]>(),
+    tour: new WeakMap<readonly object[], UnitReference[]>(),
+  };
+  const sequences = {
+    guide: new Map<string, UnitReference[]>(),
+    tour: new Map<string, UnitReference[]>(),
+  };
+  function references(values: readonly { id: string }[], kind: 'guide' | 'tour') {
+    const previous = lists[kind].get(values);
+    if (previous) return previous;
+    const refs = values.map((value) => reference(value, kind));
+    const key = JSON.stringify(refs);
+    const shared = sequences[kind].get(key) ?? refs;
+    sequences[kind].set(key, shared);
+    lists[kind].set(values, shared);
+    return shared;
   }
   function project(value: GuideProject) {
     const { items, tour, ...root } = value;
-    const current = { ...root, items: items.map((item) => reference(item, 'guide')) };
+    const current = { ...root, items: references(items, 'guide') };
     if (!tour) return current;
     const { slides, ...settings } = tour;
     return {
       ...current,
-      tour: { ...settings, slides: slides.map((slide) => reference(slide, 'tour')) },
+      tour: { ...settings, slides: references(slides, 'tour') },
     };
   }
   const { history, editingHistory, ...current } = entry;

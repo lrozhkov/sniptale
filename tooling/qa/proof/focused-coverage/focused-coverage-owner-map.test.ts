@@ -831,6 +831,16 @@ it.each([
     ],
   },
   {
+    owner: 'native unit storage',
+    production: 'apps/extension/src/composition/persistence/scenario/storage-units.ts',
+    expected: [
+      'apps/extension/src/composition/persistence/scenario/aggregate-checkpoint-write.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.identity.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+      'apps/extension/src/composition/persistence/scenario/storage.test.ts',
+    ],
+  },
+  {
     owner: 'page snapshot',
     production: 'apps/extension/src/scenario-editor/page-shell/runtime/use-state.ts',
     expected: [
