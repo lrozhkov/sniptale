@@ -4,7 +4,7 @@ import {
   isScenarioHistoryActionId,
 } from '../history-model';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
-import type { ScenarioProjectEntry } from '../contracts';
+import type { ScenarioProjectEntry, ScenarioEditingHistory } from '../contracts';
 import {
   createLibraryLifecycle,
   promoteLibraryLifecycle,
@@ -32,9 +32,14 @@ export function createScenarioProjectEntry(args: {
    */
   historyOwnership?: 'borrowed' | 'exclusive';
   historyActionId?: string;
+  editingHistory?: ScenarioEditingHistory;
 }): ScenarioProjectEntry {
-  const editingHistory = args.existing?.editingHistory;
-  if (editingHistory !== undefined && args.project !== args.existing?.project)
+  const editingHistory = args.editingHistory ?? args.existing?.editingHistory;
+  if (
+    args.editingHistory === undefined &&
+    editingHistory !== undefined &&
+    args.project !== args.existing?.project
+  )
     throw new Error('Scenario editing history mutation is not available.');
   if (args.historyActionId !== undefined && !isScenarioHistoryActionId(args.historyActionId))
     throw new Error('Invalid scenario history action identity.');

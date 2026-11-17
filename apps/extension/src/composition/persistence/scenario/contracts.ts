@@ -22,6 +22,7 @@ export interface ScenarioSavedVersion {
 export interface ScenarioProjectSnapshot {
   readonly project: GuideProject;
   readonly workspaceRevision: number;
+  readonly editingHistory?: ScenarioEditingHistory;
   /** Transient receipt for pending work minted by this save, issued only after commit. */
   readonly checkpointReceipt?: SyncCheckpointReceipt;
 }

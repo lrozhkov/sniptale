@@ -1,3 +1,5 @@
+import { collectScenarioResourceReferences } from './resource-references';
+import { parseScenarioEditingHistory } from './editing-history';
 import type { IDBPTransaction } from 'idb';
 import {
   captureScenarioProjectInTransaction,
@@ -32,7 +34,11 @@ import {
   initDB,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
-import type { ScenarioProjectEntry, ScenarioProjectSnapshot } from './contracts';
+import type {
+  ScenarioProjectEntry,
+  ScenarioProjectSnapshot,
+  ScenarioEditingHistory,
+} from './contracts';
 import { createScenarioProjectEntry } from './projects/entry';
 import { isScenarioHistoryActionId } from './history-model';
 import { parseScenarioProjectEntry } from './read-guards';
@@ -111,6 +117,8 @@ interface CommitScenarioAggregateMutationOptions {
   publicationUpdatedAt?: number;
   /** Page-only grouped metadata writes never cross a child-publication journal. */
   historyActionId?: string;
+  /** Exact branches require CAS and cannot enter a child publication journal. */
+  editingHistory?: ScenarioEditingHistory;
 }
 
 interface PreparedCommitScenarioAggregateMutationOptions extends Omit<
@@ -249,6 +257,22 @@ export async function commitScenarioAggregateMutation(
     );
   }
   project = parsed.project;
+  const editingHistory = parseScenarioEditingHistory(options.editingHistory, project);
+  if (
+    editingHistory === null ||
+    (editingHistory !== undefined &&
+      (options.children ||
+        !(
+          options.expectedRevision === null ||
+          (typeof options.expectedRevision === 'number' &&
+            Number.isSafeInteger(options.expectedRevision) &&
+            options.expectedRevision >= 0)
+        )))
+  )
+    return rejectScenarioMutationBeforeHandoff(
+      options.children,
+      new Error('Invalid scenario editing checkpoint admission.')
+    );
   assertChildOwnership(project.id, options.children);
   let preparedChildren: PreparedScenarioAggregateChildMutation | undefined;
   try {
@@ -260,6 +284,7 @@ export async function commitScenarioAggregateMutation(
   const { children: _children, ...optionMetadata } = options;
   const preparedOptions: PreparedCommitScenarioAggregateMutationOptions = {
     ...optionMetadata,
+    ...(editingHistory === undefined ? {} : { editingHistory }),
     ...(preparedChildren ? { children: preparedChildren } : {}),
   };
   const assetRefs = [
@@ -372,8 +397,16 @@ async function commitScenarioAggregateInTransaction(
   try {
     const storage = await readScenarioStorage(tx, project.id);
     const existing = requireSupportedScenarioEntry(storage.logical);
+    if (options.editingHistory !== undefined)
+      assertExpectedScenarioRevision({
+        existing,
+        expectedRevision: options.expectedRevision,
+        expectedUpdatedAt: options.expectedUpdatedAt,
+        projectId: project.id,
+      });
     if (
       existing &&
+      options.editingHistory === undefined &&
       !hasScenarioChildMutations(options.children) &&
       areScenarioProjectsEqual(existing.project, project)
     ) {
@@ -397,6 +430,9 @@ async function commitScenarioAggregateInTransaction(
       return {
         result: {
           project: existing.project,
+          ...(existing.editingHistory === undefined
+            ? {}
+            : { editingHistory: existing.editingHistory }),
           workspaceRevision: existing.workspaceRevision ?? 0,
           ...(checkpointReceipt ? { checkpointReceipt } : {}),
         },
@@ -411,6 +447,7 @@ async function commitScenarioAggregateInTransaction(
       projectId: project.id,
     });
     entry = createScenarioAggregateEntry({ existing, options, project });
+    if (options.editingHistory !== undefined) await assertScenarioCheckpointResources(tx, entry);
     const fence = await readScenarioRevisionFence(tx, project.id);
     if (fence !== null && entry.workspaceRevision <= fence)
       entry = { ...entry, workspaceRevision: fence + 1 };
@@ -449,6 +486,7 @@ async function commitScenarioAggregateInTransaction(
   return {
     result: {
       project: entry.project,
+      ...(entry.editingHistory === undefined ? {} : { editingHistory: entry.editingHistory }),
       workspaceRevision: entry.workspaceRevision ?? 0,
       ...(checkpointReceipt ? { checkpointReceipt } : {}),
     },
@@ -477,6 +515,14 @@ function createScenarioAggregateEntry(args: {
     project: args.project,
     // Both callers privately admit a fresh storage snapshot before constructing this entry.
     historyOwnership: 'exclusive',
+    ...(args.options.editingHistory === undefined
+      ? {}
+      : {
+          editingHistory: args.options.editingHistory,
+          ...(args.existing && areScenarioProjectsEqual(args.existing.project, args.project)
+            ? { historyPolicy: 'preserve' as const }
+            : {}),
+        }),
     ...(args.options.historyActionId === undefined
       ? {}
       : { historyActionId: args.options.historyActionId }),
@@ -485,6 +531,39 @@ function createScenarioAggregateEntry(args: {
       ? {}
       : { updatedAt: args.options.publicationUpdatedAt }),
   });
+}
+
+/** Explicit editing checkpoints can reference only already admitted resources of this root. */
+async function assertScenarioCheckpointResources(
+  tx: ScenarioAggregateTransaction,
+  entry: ScenarioProjectEntry
+): Promise<void> {
+  const references = collectScenarioResourceReferences(entry);
+  for (const id of references.assets) {
+    const asset = parseScenarioAssetEntry(await tx.objectStore(SCENARIO_ASSETS_STORE).get(id));
+    if (!asset || asset.id !== id || asset.projectId !== entry.id)
+      throw new Error('Scenario checkpoint resource is unavailable.');
+    const ref = parseAssetRef(await tx.objectStore(ASSET_REFS_STORE).get(asset.assetId));
+    if (
+      !ref ||
+      ref.assetId !== asset.assetId ||
+      ref.size !== asset.size ||
+      ref.mimeType !== asset.mimeType
+    )
+      throw new Error('Scenario checkpoint resource is unavailable.');
+  }
+  for (const id of references.documents) {
+    const document = parseScenarioStepEditorDocumentEntry(
+      await tx.objectStore(SCENARIO_STEP_EDITOR_DOCUMENTS_STORE).get(id)
+    );
+    if (!document || document.stepId !== id || document.projectId !== entry.id)
+      throw new Error('Scenario checkpoint document is unavailable.');
+    for (const asset of document.document.assets) {
+      const ref = parseAssetRef(await tx.objectStore(ASSET_REFS_STORE).get(asset.assetId));
+      if (!ref || ref.assetId !== asset.assetId)
+        throw new Error('Scenario checkpoint document resource is unavailable.');
+    }
+  }
 }
 
 /** Applies validated scenario child mutations inside the caller's aggregate transaction. */
@@ -668,6 +747,7 @@ async function publishScenarioAssetJournal(
   if (existing && (await isScenarioPublicationAlreadyCommitted(db, existing, payload))) {
     return {
       project: existing.project,
+      ...(existing.editingHistory === undefined ? {} : { editingHistory: existing.editingHistory }),
       workspaceRevision: existing.workspaceRevision ?? 0,
     };
   }
