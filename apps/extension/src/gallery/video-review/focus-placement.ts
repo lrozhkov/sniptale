@@ -12,8 +12,17 @@ import type { ReviewPlaybackRange } from './playback-range';
 import type { useReviewAudio } from './use-review-audio';
 import { reviewInsertionRange, reviewResultInsertionContext } from './range-placement';
 import { translate } from '../../platform/i18n';
+import {
+  reviewCommandInsertion,
+  type ReviewCommandContext,
+  type ReviewCommandPort,
+} from './command-context';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import { projectReviewFocus } from '../../features/video/review/focus-edits';
+import { createTrackProjection } from './track-projection';
 
 type FocusPlacementInput = {
+  commands: ReviewCommandPort;
   playbackRange?: ReviewPlaybackRange | null | undefined;
   selection: ReviewAnchor;
   zoom: ReturnType<typeof useReviewZoomEditor>;
@@ -39,19 +48,30 @@ export function useFocusPlacement(props: FocusPlacementInput, projection: Review
     props.playbackRange ??
     (!props.selectedObject && props.selection.kind === 'range' ? props.selection : null);
   const { setDrawing: setEnabled } = props.zoom;
-  const context = reviewResultInsertionContext({
+  const renderContext = reviewResultInsertionContext({
     time: props.time,
     resultTime: props.outputTime,
     range: selectedRange,
     projection,
   });
-  const targetFor = (type: ReviewFocusType) =>
-    reviewInsertionRange({
-      ...context,
+  const regions = (context?: ReviewCommandContext) =>
+    projectReviewFocus(
+      context?.advanced.zoom.regions ?? props.advanced.zoom.regions,
+      buildReviewTimeMap(
+        context?.scope.sourceDuration ?? props.source.duration,
+        context?.document.edits ?? props.edits
+      )
+    );
+  const targetFor = (type: ReviewFocusType, context?: ReviewCommandContext) => {
+    const insertion = context ? reviewCommandInsertion(context, 'result') : renderContext;
+    if (!insertion) return null;
+    const currentRegions = regions(context);
+    return reviewInsertionRange({
+      ...insertion,
       seconds: 2,
       minimum: 0.001,
       occupied: [
-        ...props.advanced.zoom.regions
+        ...currentRegions
           .filter(
             (region) =>
               !region.dormant &&
@@ -60,13 +80,16 @@ export function useFocusPlacement(props: FocusPlacementInput, projection: Review
           )
           .map((region) => ({
             start: region.start,
-            end: (
-              resolveQuickEditFocusLink(props.advanced.zoom.regions, region.id)?.target ?? region
-            ).end,
+            end: (resolveQuickEditFocusLink(currentRegions, region.id)?.target ?? region).end,
           })),
       ],
     });
-  const candidate = (range: ReviewAnchor, type: ReviewFocusType = props.zoom.insertionType) => {
+  };
+  const candidate = (
+    range: ReviewAnchor,
+    type: ReviewFocusType = props.zoom.insertionType,
+    context?: ReviewCommandContext
+  ) => {
     if (range.kind !== 'range' || range.end - range.start < 0.001) return null;
     const start = range.start;
     const end = range.end;
@@ -80,7 +103,13 @@ export function useFocusPlacement(props: FocusPlacementInput, projection: Review
       type
     );
     region.timeDomain = 'result';
-    const point = props.insertionPoint?.(projection.source(range.start)) ?? { x: 0.5, y: 0.5 };
+    const currentProjection = context
+      ? createTrackProjection(context.scope.sourceDuration, context.document.edits)
+      : projection;
+    const point = props.insertionPoint?.(currentProjection.source(range.start)) ?? {
+      x: 0.5,
+      y: 0.5,
+    };
     region.transform = { ...region.transform, centerX: point.x, centerY: point.y };
     const area = region.spotlight ?? region.border;
     if (area)
@@ -89,19 +118,26 @@ export function useFocusPlacement(props: FocusPlacementInput, projection: Review
         x: Math.max(0, Math.min(1 - area.area.width, point.x - area.area.width / 2)),
         y: Math.max(0, Math.min(1 - area.area.height, point.y - area.area.height / 2)),
       };
-    return quickEditFocusConflicts(props.advanced.zoom.regions, region) ? null : region;
+    return quickEditFocusConflicts(regions(context), region) ? null : region;
   };
-  const commit = (range: ReviewAnchor, type: ReviewFocusType = props.zoom.insertionType) => {
-    const region = candidate(range, type);
-    if (!region || props.advanced.zoom.regions.length >= 512) return;
-    props.onPause();
-    if (props.zoom.addRegion(region, type)) {
+  const commit = (
+    range: Extract<ReviewAnchor, { kind: 'range' }>,
+    type: ReviewFocusType,
+    context: ReviewCommandContext
+  ) => {
+    const region = candidate(range, type, context);
+    if (!region || context.advanced.zoom.regions.length >= 512) return;
+    if (props.zoom.addRegion(region, type, context)) {
+      const currentProjection = createTrackProjection(
+        context.scope.sourceDuration,
+        context.document.edits
+      );
       setEnabled(false);
       props.setSelection({
         kind: 'point',
-        time: projection.source(range.kind === 'range' ? range.start : context.time),
+        time: currentProjection.source(range.start),
       });
-      props.onSeekResult?.(range.kind === 'range' ? range.start : context.time);
+      props.onSeekResult?.(range.start);
     }
   };
   return {
@@ -119,12 +155,25 @@ export function useFocusPlacement(props: FocusPlacementInput, projection: Review
         ? undefined
         : translate('gallery.videoReview.placement_occupied'),
       onToggle: (type: ReviewFocusType = props.zoom.insertionType) => {
-        props.zoom.setInsertionType(type);
-        props.audio.setOriginalTool(false);
-        props.editing.setCutting(false);
-        props.setTrackVisibility('zoom', true);
-        const range = targetFor(type);
-        if (range) commit(range, type);
+        const context = props.commands.capture();
+        if (!context) return;
+        props.commands.admit(context, (accepted) => {
+          if (
+            !props.commands.isCurrent(
+              accepted,
+              'temporal',
+              (current) =>
+                JSON.stringify(current.advanced.zoom) === JSON.stringify(accepted.advanced.zoom)
+            )
+          )
+            return;
+          props.zoom.setInsertionType(type);
+          props.audio.setOriginalTool(false);
+          props.editing.setCutting(false);
+          props.setTrackVisibility('zoom', true);
+          const range = targetFor(type, accepted);
+          if (range) commit(range, type, accepted);
+        });
       },
     },
   };

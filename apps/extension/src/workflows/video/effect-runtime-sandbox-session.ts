@@ -32,6 +32,7 @@ export class EffectRuntimeSandboxSessionManager {
   private requestCount = 0;
   private readonly waitingRequests: { start(): void; refuse(): void }[] = [];
   private disposed = false;
+  private startupUnavailable = false;
   private frameReuseContext = {};
   private session: EffectRuntimeSandboxSession | null = null;
 
@@ -49,9 +50,9 @@ export class EffectRuntimeSandboxSessionManager {
     return this.disposed ? undefined : this.frameReuseContext;
   }
 
-  /** Start transport readiness without admitting a frame; actual requests can retry a failed load. */
+  /** Startup refusal lasts until the owning executor is replaced. */
   preload(): void {
-    if (this.disposed) return;
+    if (this.disposed || this.startupUnavailable) return;
     try {
       this.ensureSession();
     } catch {
@@ -185,11 +186,13 @@ export class EffectRuntimeSandboxSessionManager {
       ensureSession: () => this.ensureSession(),
       isCurrentSession: (session) => this.session === session,
       isDisposed: () => this.disposed,
+      isStartupUnavailable: () => this.startupUnavailable,
       requestTimeoutMs: this.configuration.requestTimeoutMs,
     };
   }
 
   private ensureSession(): EffectRuntimeSandboxSession {
+    if (this.startupUnavailable) throw new Error('EFFECT_RUNTIME_SANDBOX_STARTUP_UNAVAILABLE');
     if (this.session) return this.session;
     const connectionNonce = createEffectRuntimeSandboxConnectionNonce();
     const iframe = createSandboxIframe(
@@ -209,7 +212,12 @@ export class EffectRuntimeSandboxSessionManager {
       this.configuration.loadTimeoutMs
     );
     this.session = created;
-    void created.load.catch(() => this.clearSession(created));
+    void created.load.catch(() => {
+      // Retirement/cancellation of a previous session is not a startup refusal.
+      if (this.session !== created || this.disposed) return;
+      this.startupUnavailable = true;
+      this.clearSession(created);
+    });
     (this.ownerDocument.body ?? this.ownerDocument.documentElement).append(iframe);
     return created;
   }

@@ -6,40 +6,34 @@ import { isRecordingEventsDescriptor } from '../../features/video/project/record
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
-import type { useReviewPlayback } from './use-playback';
+import type { useReviewEditorAudioRuntime } from './use-review-audio-runtime';
 import { useReviewTransport } from './use-review-transport';
+import type { ReviewTransportAudioClock } from './transport';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import { workspace } from '../../composition/persistence/review-workspaces/backup-restore.test-support';
 
 const bridge = vi.hoisted(() => ({
   video: { current: null as HTMLVideoElement | null },
-  options: undefined as Parameters<typeof useReviewPlayback>[0] | undefined,
+  options: undefined as Parameters<typeof useReviewEditorAudioRuntime>[0] | undefined,
   play: vi.fn(),
   pause: vi.fn(),
   preparePlayback: vi.fn(async () => true),
   startPlayback: vi.fn(),
   stopPlayback: vi.fn(),
-}));
-vi.mock('./use-playback', () => ({
-  useReviewPlayback(options: Parameters<typeof useReviewPlayback>[0]) {
-    bridge.options = options;
-    return {
-      video: bridge.video,
-      time: 0,
-      playing: false,
-      seekRevision: 0,
-      play: bridge.play,
-      pause: bridge.pause,
-    };
-  },
+  readAudioClock: vi.fn<() => ReviewTransportAudioClock | null>(() => null),
+  audition: vi.fn(),
 }));
 vi.mock('./use-review-audio-runtime', () => ({
-  useReviewEditorAudioRuntime: () => bridge,
+  useReviewEditorAudioRuntime(options: Parameters<typeof useReviewEditorAudioRuntime>[0]) {
+    bridge.options = options;
+    return bridge;
+  },
 }));
 let cleanup: (() => Promise<void>) | undefined;
 afterEach(async () => {
   await cleanup?.();
   cleanup = undefined;
+  vi.restoreAllMocks();
   vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
@@ -48,17 +42,42 @@ function mount(
   silent = false,
   archive?: Pick<TransportInput, 'interactionTimeline' | 'interactionEnabled' | 'actionAudio'> & {
     project: NonNullable<TransportInput['resource']['historyProject']>;
-  }
+  },
+  edits: TransportInput['edits'] = []
 ) {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   bridge.preparePlayback.mockResolvedValue(true);
-  bridge.video.current = document.createElement('video');
-  bridge.pause.mockImplementation(() => bridge.video.current?.pause());
+  vi.stubGlobal('requestAnimationFrame', () => 1);
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  vi.spyOn(HTMLMediaElement.prototype, 'readyState', 'get').mockReturnValue(3);
+  vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(async function (
+    this: HTMLMediaElement
+  ) {
+    bridge.play();
+    Object.defineProperty(this, 'paused', { configurable: true, value: false });
+    this.dispatchEvent(new Event('play'));
+  });
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(function (
+    this: HTMLMediaElement
+  ) {
+    bridge.pause();
+    Object.defineProperty(this, 'paused', { configurable: true, value: true });
+    this.dispatchEvent(new Event('pause'));
+  });
   const snapshot = { workspace: structuredClone(workspace), draft: null };
+  if (edits.length) {
+    snapshot.workspace.history = edits.map((after, index) => ({
+      id: `edit-${index}`,
+      at: index + 1,
+      target: 'edit',
+      before: null,
+      after,
+    }));
+    snapshot.workspace.cursor = edits.length;
+  }
   const session = createVideoReviewSession(snapshot);
   const root = createRoot(document.createElement('div'));
   const failure = vi.fn();
-  const edits: TransportInput['edits'] = [];
   let hook!: ReturnType<typeof useReviewTransport>;
   function Probe() {
     hook = useReviewTransport({
@@ -89,15 +108,75 @@ function mount(
           }
         : {}),
     });
-    return null;
+    return (
+      <video
+        ref={hook.video}
+        onPlay={() => hook.onMediaPlayback(true)}
+        onPause={() => hook.onMediaPlayback(false)}
+      />
+    );
   }
   act(() => root.render(<Probe />));
+  bridge.video.current = hook.video.current;
   cleanup = async () => {
     act(() => root.unmount());
     await session.dispose();
   };
-  return { get: () => hook, failure };
+  return { get: () => hook, failure, session };
 }
+
+it('wires a graph scheduling projection separately from the output position', async () => {
+  let graph = 10;
+  const identity = {};
+  bridge.readAudioClock.mockImplementation(() => ({
+    identity,
+    graphTime: graph,
+    outputTime: graph - 0.05,
+  }));
+  try {
+    const fixture = mount();
+    act(() => fixture.get().seek(0.2, false));
+    await act(async () => fixture.get().play());
+    graph = 10.1;
+    expect(fixture.get().readPosition().resultTime).toBeCloseTo(0.25, 8);
+    expect(bridge.options?.transportControl?.readSchedulingPosition?.().resultTime).toBeCloseTo(
+      0.3,
+      8
+    );
+  } finally {
+    bridge.readAudioClock.mockReturnValue(null);
+  }
+});
+
+it('uses an accepted temporal edit before React republishes transport props', async () => {
+  const fixture = mount();
+  fixture.session.setAutosaveEnabled(false);
+  const durableRevision = fixture.session.getSnapshot().snapshot.workspace.revision;
+  await fixture.session.commit({
+    id: 'insert-hold',
+    at: 1,
+    target: 'edit',
+    before: null,
+    after: {
+      id: 'new-hold',
+      kind: 'freeze',
+      start: 1,
+      end: 1,
+      requestedStart: 1,
+      requestedEnd: 1,
+      duration: 2,
+      frameTime: 0.98,
+      frameDuration: 0.04,
+    },
+  });
+  expect(fixture.session.getSnapshot().snapshot.workspace.revision).toBe(durableRevision);
+  expect(fixture.get().readPosition().mapRevision).toBe(1);
+  await act(async () => fixture.get().seekResult(1.5));
+  expect(fixture.get().readPosition()).toMatchObject({
+    resultTime: 1.5,
+    source: { kind: 'freeze', sourceTime: 1, mediaTime: 0.98 },
+  });
+});
 it('waits for audio readiness and refuses Play when preparation fails', async () => {
   const mounted = mount();
   bridge.preparePlayback.mockResolvedValueOnce(false);
@@ -106,13 +185,14 @@ it('waits for audio readiness and refuses Play when preparation fails', async ()
   await act(async () => mounted.get().play());
   expect(bridge.preparePlayback).toHaveBeenCalledTimes(2);
   expect(bridge.play).toHaveBeenCalledOnce();
-  await expect(bridge.options!.prepareAfterSeek!()).resolves.toBe(true);
-  bridge.options!.onPreparedPlay!();
   expect(bridge.startPlayback).toHaveBeenCalledOnce();
 });
 it('stops scheduled audio before pausing the native video transport', async () => {
   const mounted = mount();
-  Object.defineProperty(bridge.video.current!, 'paused', { value: false });
+  await act(async () => mounted.get().play());
+  bridge.preparePlayback.mockClear();
+  bridge.stopPlayback.mockClear();
+  bridge.pause.mockClear();
   await act(async () => mounted.get().play());
   expect(bridge.preparePlayback).not.toHaveBeenCalled();
   expect(bridge.stopPlayback).toHaveBeenCalledOnce();
@@ -120,6 +200,7 @@ it('stops scheduled audio before pausing the native video transport', async () =
     bridge.pause.mock.invocationCallOrder[0]!
   );
   const pause = vi.spyOn(bridge.video.current!, 'pause').mockImplementation(() => {});
+  pause.mockClear();
   bridge.options!.onFailure();
   expect(pause).toHaveBeenCalledOnce();
   expect(mounted.failure).toHaveBeenCalledOnce();
@@ -129,6 +210,23 @@ it('does not prepare audible playback for a silent preview', async () => {
   await act(async () => mounted.get().play());
   expect(bridge.preparePlayback).not.toHaveBeenCalled();
   expect(bridge.play).toHaveBeenCalledOnce();
+});
+
+it('pauses the logical transport before an audition can pause its native element', async () => {
+  const mounted = mount();
+  await act(async () => mounted.get().play());
+  bridge.pause.mockClear();
+  bridge.stopPlayback.mockClear();
+  const plan = { duration: 2, descriptors: [] };
+  act(() => mounted.get().actionSoundPreview.audition(plan));
+  expect(mounted.get().playing).toBe(false);
+  expect(bridge.audition).toHaveBeenCalledExactlyOnceWith(plan);
+  expect(bridge.stopPlayback.mock.invocationCallOrder[0]).toBeLessThan(
+    bridge.audition.mock.invocationCallOrder[0]!
+  );
+  expect(bridge.pause.mock.invocationCallOrder[0]).toBeLessThan(
+    bridge.audition.mock.invocationCallOrder[0]!
+  );
 });
 
 it('passes authored timing and independent lane gates to the owned archive sound source', async () => {
@@ -183,15 +281,32 @@ it('passes authored timing and independent lane gates to the owned archive sound
   }
 });
 
-it('stops the logical project clock when audio fails while native video is already held', () => {
-  const mounted = mount();
-  const nativePause = vi.spyOn(bridge.video.current!, 'pause').mockImplementation(() => {});
+it('stops the logical project clock when audio fails while native video is already held', async () => {
+  const mounted = mount(false, undefined, [
+    {
+      id: 'hold',
+      kind: 'freeze',
+      start: 1,
+      end: 1,
+      requestedStart: 1,
+      requestedEnd: 1,
+      duration: 2,
+      frameTime: 0.98,
+      frameDuration: 0.04,
+    },
+  ]);
+  await act(async () => mounted.get().seekResult(1.5));
+  await act(async () => mounted.get().play());
   expect(bridge.video.current!.paused).toBe(true);
-  bridge.options!.onFailure();
+  expect(mounted.get().playing).toBe(true);
+  bridge.stopPlayback.mockClear();
+  bridge.pause.mockClear();
+  await act(async () => bridge.options!.onFailure());
   expect(bridge.stopPlayback).toHaveBeenCalledOnce();
   expect(bridge.pause).toHaveBeenCalledOnce();
-  expect(nativePause).toHaveBeenCalledOnce();
-  expect(mounted.failure).toHaveBeenCalledOnce();
+  expect(mounted.get().playing).toBe(false);
+  expect(mounted.get().readPosition().resultTime).toBe(1.5);
+  expect(mounted.failure).toHaveBeenCalledExactlyOnceWith({ kind: 'audio' });
 });
 
 it('publishes pending audio preparation and clears it when Play is canceled', async () => {

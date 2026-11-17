@@ -69,12 +69,25 @@ function fixture(name: string) {
     order: 0,
   };
   const lane = { enabled: true, instances: [instance] };
+  let currentGeometry: ReturnType<typeof createReviewAnnotationGeometry> = geometry;
+  const geometryListeners = new Set<() => void>();
   const editor: ReturnType<typeof useReviewAnnotationEffects> = {
     lane,
     previewLane: lane,
-    geometry,
+    geometry: {
+      read: () => currentGeometry,
+      subscribe(listener) {
+        geometryListeners.add(listener);
+        return () => {
+          geometryListeners.delete(listener);
+        };
+      },
+    },
     gestureId: null,
-    setGeometry: vi.fn(),
+    setGeometry: vi.fn((next) => {
+      currentGeometry = next;
+      for (const listener of geometryListeners) listener();
+    }),
     pending: false,
     failure: null,
     add: vi.fn(),
@@ -302,11 +315,11 @@ it('shows unavailable immutable source and disables pending controls without rep
 
 it('disables reflected attachment conversion and restores it when valid geometry returns', async () => {
   const value = fixture('title');
-  value.editor.geometry = {
+  value.editor.setGeometry({
     ...geometry,
     contentToViewport: [-2, 0.5, 0, 0, 2, 0, 0, 0, 1],
     viewportToContent: [-0.5, 0.125, 0, 0, 0.5, 0, 0, 0, 1],
-  };
+  });
   render(value);
   expect(host.textContent).toContain(
     translate('gallery.videoReview.annotationAttachmentUnavailable')
@@ -326,7 +339,7 @@ it('disables reflected attachment conversion and restores it when valid geometry
   };
   expect((await open()).disabled).toBe(true);
   act(() => root.render(null));
-  value.editor.geometry = geometry;
+  value.editor.setGeometry(geometry);
   render(value);
   expect(host.textContent).not.toContain(
     translate('gallery.videoReview.annotationAttachmentUnavailable')
@@ -493,7 +506,7 @@ it('preserves admitted unbounded auto fields without inventing a range', () => {
 
 it('keeps bound anchors and scale dimensions disabled without geometry, while plain SDK fields retain scrub', () => {
   const value = fixture('callout');
-  value.editor.geometry = null;
+  value.editor.setGeometry(null);
   render(value);
   expect(input(translate('gallery.videoReview.annotationWidth')).disabled).toBe(true);
   const handle = value.document.objectLayout!.handles![0]!;
@@ -503,6 +516,9 @@ it('keeps bound anchors and scale dimensions disabled without geometry, while pl
   expect(input(`${resolveEffectLocaleText(font.label, getCurrentLocale())} range`).disabled).toBe(
     false
   );
+  act(() => value.editor.setGeometry(geometry));
+  expect(input(translate('gallery.videoReview.annotationWidth')).disabled).toBe(false);
+  expect(input(resolveEffectLocaleText(bound.label, getCurrentLocale())).disabled).toBe(false);
   render(value, value.source, true);
   expect(host.querySelectorAll('input[type="range"]')).toHaveLength(0);
 });

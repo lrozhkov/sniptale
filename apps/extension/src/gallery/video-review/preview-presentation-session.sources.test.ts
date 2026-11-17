@@ -180,22 +180,39 @@ function sourceSession(
   };
 }
 
-it('prepares and captures an independently decoded source with metadata and no native frame', async () => {
-  const f = sourceSession();
-  Object.defineProperty(f.video, 'readyState', { configurable: true, value: 1 });
-  const prepared = await f.prepare();
-  Object.defineProperty(f.video, 'readyState', { configurable: true, value: 0 });
-  expect(() => f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal)).toThrow();
-  Object.defineProperty(f.video, 'readyState', { configurable: true, value: 1 });
-  Object.defineProperty(f.video, 'seeking', { configurable: true, value: true });
-  expect(() => f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal)).toThrow();
-  expect(f.acquire).toHaveBeenCalledOnce();
-  Object.defineProperty(f.video, 'seeking', { configurable: true, value: false });
-  await f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal);
-  expect(f.acquire).toHaveBeenCalledTimes(2);
-  expect(io.decoded).toHaveBeenCalledOnce();
-  expect(io.legacy).not.toHaveBeenCalled();
-});
+it.each([false, true])(
+  'captures the atomic decoded target while main native seek is pending (initial seek: %s)',
+  async (initiallySeeking) => {
+    const f = sourceSession();
+    Object.defineProperty(f.video, 'readyState', { configurable: true, value: 1 });
+    Object.defineProperty(f.video, 'seeking', { configurable: true, value: initiallySeeking });
+    f.video.currentTime = 99;
+    f.input.readPosition = () => ({
+      epoch: 2,
+      mapRevision: 3,
+      resultTime: 6.25,
+      source: { kind: 'freeze', sourceTime: 4, mediaTime: 3.98, segmentId: 'hold' },
+      media: { sourceId: f.input.sourceIdentity, time: 99 },
+    });
+    Object.assign(f.binding, { timestamp: 3.96, nextTimestamp: 4, target: 3.98 });
+    const prepared = await f.prepare();
+    Object.defineProperty(f.video, 'readyState', { configurable: true, value: 0 });
+    expect(() => f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal)).toThrow();
+    Object.defineProperty(f.video, 'readyState', { configurable: true, value: 1 });
+    Object.defineProperty(f.video, 'seeking', { configurable: true, value: true });
+    await f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal);
+    expect(f.acquire).toHaveBeenCalledTimes(2);
+    for (const call of f.acquire.mock.calls)
+      expect(call[0]).toEqual([
+        expect.objectContaining({ url: f.input.sourceIdentity, time: 3.98 }),
+      ]);
+    expect(io.decoded).toHaveBeenCalledOnce();
+    expect(io.decoded.mock.lastCall?.[0].time).toBe(6.25);
+    expect(io.decoded.mock.lastCall?.[0].binding.target).toBe(3.98);
+    expect(io.decoded.mock.lastCall?.[0].binding.timestamp).toBe(3.96);
+    expect(io.legacy).not.toHaveBeenCalled();
+  }
+);
 
 it('retries an initially empty source when metadata arrives and removes that listener on disposal', async () => {
   const f = sourceSession();
@@ -222,11 +239,18 @@ it('requires a native current frame for preparation and direct HTML capture with
   await expect(f.prepare()).rejects.toThrow();
   expect(io.legacy).not.toHaveBeenCalled();
   Object.defineProperty(f.video, 'readyState', { configurable: true, value: 2 });
+  Object.defineProperty(f.video, 'seeking', { configurable: true, value: true });
+  await expect(f.prepare()).rejects.toThrow();
+  Object.defineProperty(f.video, 'seeking', { configurable: true, value: false });
   const prepared = await f.prepare();
   Object.defineProperty(f.video, 'readyState', { configurable: true, value: 1 });
   expect(() => f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal)).toThrow();
   expect(io.legacy).not.toHaveBeenCalled();
   Object.defineProperty(f.video, 'readyState', { configurable: true, value: 2 });
+  Object.defineProperty(f.video, 'seeking', { configurable: true, value: true });
+  expect(() => f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal)).toThrow();
+  expect(io.legacy).not.toHaveBeenCalled();
+  Object.defineProperty(f.video, 'seeking', { configurable: true, value: false });
   f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal);
   expect(io.legacy).toHaveBeenCalledOnce();
   expect(f.acquire).not.toHaveBeenCalled();
@@ -235,6 +259,7 @@ it('requires a native current frame for preparation and direct HTML capture with
 it('uses the independent HTML provider at metadata when precise decoding is unsupported', async () => {
   const f = sourceSession();
   Object.defineProperty(f.video, 'readyState', { configurable: true, value: 1 });
+  Object.defineProperty(f.video, 'seeking', { configurable: true, value: true });
   f.acquire.mockResolvedValue(null);
   const prepared = await f.prepare();
   await f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal);
@@ -339,6 +364,78 @@ it('keeps the physical provider across a seek and explicitly marks the next sour
   expect(f.acquire.mock.calls.at(-1)?.[2]).toEqual({ discontinuity: true });
   expect(io.provider).toHaveBeenCalledOnce();
 });
+
+it.each([false, true])(
+  'preserves strict source acquisition at a fractional EOF (material overshoot: %s)',
+  async (materialOvershoot) => {
+    const actual = await vi.importActual<typeof import('../../workflows/video/preview-source')>(
+      '../../workflows/video/preview-source'
+    );
+    const sourceEnd = 16.981333333333332;
+    const nativeEnd = 16.981333;
+    const opened = vi.fn();
+    const f = sourceSession(() =>
+      actual.createPreviewSourceProvider({
+        open: async () => {
+          opened();
+          return {
+            end: sourceEnd,
+            timeResolution: 90000,
+            async *samples(start) {
+              const timestamps = [0, 16.966666666666665];
+              const first = Math.max(
+                0,
+                timestamps.findLastIndex((value) => value <= start)
+              );
+              for (const timestamp of timestamps.slice(first))
+                yield new VideoSample(new Uint8Array(16), {
+                  format: 'RGBA',
+                  codedWidth: 2,
+                  codedHeight: 2,
+                  timestamp,
+                  duration: sourceEnd - timestamp,
+                });
+            },
+            dispose: vi.fn(),
+          };
+        },
+      })
+    );
+    Object.defineProperty(f.video, 'duration', { configurable: true, value: nativeEnd });
+    f.video.currentTime = nativeEnd;
+    f.input.playing = false;
+    f.input.pausedSourceTime = f.description.sourceTime =
+      sourceEnd + (materialOvershoot ? 0.001 : 0);
+    f.input.pausedResultTime = 15.405671868409954;
+    io.decoded.mockImplementation((args) => ({
+      value: {
+        ...f.captured.value,
+        sourceTime: args.binding.target,
+        resultTime: args.time,
+        source: { ...f.captured.value.source, timestamp: args.binding.timestamp },
+      },
+      release: args.releaseSource,
+    }));
+    if (materialOvershoot) {
+      await expect(f.prepare()).rejects.toThrow('Preview source frame is unavailable.');
+      expect(opened).not.toHaveBeenCalled();
+      expect(io.decoded).not.toHaveBeenCalled();
+      return;
+    }
+    const prepared = await f.prepare();
+    const terminal = await f.hooks.capture(prepared.value, f.input.pausedResultTime, f.signal);
+    expect(io.decoded.mock.lastCall?.[0].binding).toMatchObject({
+      target: nativeEnd,
+      timestamp: 16.966666666666665,
+      nextTimestamp: sourceEnd,
+      heldAtEnd: true,
+    });
+    expect(terminal.value).toMatchObject({ resultTime: f.input.pausedResultTime });
+    expect(f.description.sourceTime).toBe(sourceEnd);
+    expect(f.video.currentTime).toBe(nativeEnd);
+    terminal.release();
+  }
+);
 
 it('releases a late initial probe after the presentation session is disposed', async () => {
   const f = sourceSession();

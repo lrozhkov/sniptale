@@ -1,11 +1,24 @@
 import { ReviewButton } from './controls';
-import type { useReviewEditorState } from './use-editor-state';
-import type { useLoadedReview } from './use-session';
+import type { useLoadedReview, useReviewSnapshot } from './use-session';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ArrowLeft, CircleAlert, LoaderCircle, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { translate } from '../../platform/i18n';
 import { reviewOriginalAudioFeedbackMessage } from './original-audio-feedback';
+import type { ReviewTransportFailure } from './transport';
+
+/** Preserve the failing resource class when transport failures reach the preview curtain. */
+export function reviewPlaybackFailureMessage(failure: ReviewTransportFailure) {
+  return translate(
+    failure.kind !== 'audio'
+      ? 'gallery.videoReview.playbackFailed'
+      : failure.reason === 'voice-limit'
+        ? 'gallery.videoReview.actionAudioLimit'
+        : failure.reason
+          ? 'gallery.videoReview.actionAudioResource'
+          : 'gallery.videoReview.audioPlaybackFailed'
+  );
+}
 
 /** Action feedback stays in the modal; dismissing it never changes document recovery state. */
 export function ReviewFeedback({
@@ -73,9 +86,7 @@ export function ReviewFeedback({
   );
 }
 
-export function reviewErrorMessage(
-  error: ReturnType<typeof useReviewEditorState>['snapshot']['error']
-) {
+export function reviewErrorMessage(error: ReturnType<typeof useReviewSnapshot>['error']) {
   if (error === 'conflict') return translate('gallery.videoReview.conflict');
   if (error === 'changed-source') return translate('gallery.videoReview.sourceChanged');
   if (error === 'missing-media') return translate('gallery.videoReview.missingMedia');

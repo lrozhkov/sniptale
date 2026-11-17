@@ -2,11 +2,21 @@ import { ReviewTimelineMultiSelectionContext } from './selection-actions';
 import { createPortal } from 'react-dom';
 import { useReviewTrackHeader } from './timeline-panes';
 import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
-import { createContext, useContext, type ReactNode, type ComponentProps } from 'react';
+import {
+  createContext,
+  memo,
+  useCallback,
+  useContext,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 import type { QuickEditTrack, QuickEditUiState } from '../../features/video/review/advanced/types';
 import { reviewTrackEnabled } from '../../features/video/review/advanced/track-controls';
-import { ChevronsDownUp, ChevronsUpDown, GripVertical } from 'lucide-react';
-import { translate } from '../../platform/i18n';
+import { ChevronsDownUp, ChevronsUpDown, GripVertical, type LucideIcon } from 'lucide-react';
+import { translate, useAppLocale } from '../../platform/i18n';
 import { ReviewButton, reviewCompactTrackButtonClassName } from './controls';
 import type { useReviewTrackOrder } from './track-order';
 import './track-row.css';
@@ -29,23 +39,164 @@ type ReviewTrackControlsState = {
   setEnabled(track: Exclude<QuickEditTrack, 'source'>, enabled: boolean): void;
   order?: ReturnType<typeof useReviewTrackOrder>;
 };
-const TrackControlsContext = createContext<ReviewTrackControlsState | null>(null);
+type LaneControls = Pick<
+  ReviewTrackControlsState,
+  'busy' | 'configuring' | 'selectTrack' | 'focusItemTrack' | 'setEnabled'
+> & {
+  enabled: boolean;
+  unavailable: boolean;
+  selectable: boolean;
+  selectedTrack: QuickEditTrack | null;
+  order?: Pick<ReturnType<typeof useReviewTrackOrder>, 'interaction'>;
+};
 
-/** Shares lane chrome without owning persisted state or edit admission. */
-export const ReviewTrackControlsProvider = TrackControlsContext.Provider;
-
-/** Visibility actions cannot bypass an off lane master; independent actions remain usable. */
-export function ReviewTrackVisibilityButton({
-  track,
-  ...props
-}: ComponentProps<typeof ReviewButton> & {
-  track: QuickEditTrack;
-}) {
-  const controls = useContext(TrackControlsContext);
-  const unavailable =
-    controls && (!reviewTrackEnabled(controls.ui, track) || controls.unavailable[track]);
-  return <ReviewButton {...props} disabled={props.disabled || !!unavailable} />;
+/** A mounted timeline publishes lane flags separately from its latest command receivers. */
+function createTrackControlsStore(initial: ReviewTrackControlsState | null) {
+  let current = initial;
+  const snapshots = new Map<QuickEditTrack, LaneControls | null>();
+  const listeners = new Map<QuickEditTrack, Set<() => void>>();
+  const selectTrack = (track: QuickEditTrack) => current?.selectTrack?.(track);
+  const focusItemTrack = (track: QuickEditTrack) => current?.focusItemTrack?.(track);
+  const setEnabled: ReviewTrackControlsState['setEnabled'] = (track, enabled) =>
+    current?.setEnabled(track, enabled);
+  const order: NonNullable<LaneControls['order']> = {
+    interaction: (track) => ({
+      onPointerDown: (event) => current?.order?.interaction(track).onPointerDown(event),
+      onKeyDown: (event) => current?.order?.interaction(track).onKeyDown(event),
+    }),
+  };
+  const describe = (track: QuickEditTrack): LaneControls | null =>
+    current
+      ? {
+          enabled: reviewTrackEnabled(current.ui, track),
+          unavailable: !!current.unavailable[track],
+          selectable: !!current.selectable?.[track],
+          selectedTrack: current.selectedTrack === track ? track : null,
+          configuring: current.configuring,
+          busy: current.busy,
+          setEnabled,
+          ...(current.selectTrack ? { selectTrack } : {}),
+          ...(current.focusItemTrack ? { focusItemTrack } : {}),
+          ...(current.order ? { order } : {}),
+        }
+      : null;
+  return {
+    read(track: QuickEditTrack) {
+      if (snapshots.has(track)) return snapshots.get(track) ?? null;
+      const snapshot = describe(track);
+      snapshots.set(track, snapshot);
+      return snapshot;
+    },
+    subscribe(track: QuickEditTrack, listener: () => void) {
+      let lane = listeners.get(track);
+      if (!lane) {
+        lane = new Set();
+        listeners.set(track, lane);
+      }
+      lane.add(listener);
+      return () => {
+        lane.delete(listener);
+      };
+    },
+    update(value: ReviewTrackControlsState | null) {
+      current = value;
+      const changed: QuickEditTrack[] = [];
+      const fields = [
+        'enabled',
+        'unavailable',
+        'selectable',
+        'selectedTrack',
+        'configuring',
+        'busy',
+        'selectTrack',
+        'focusItemTrack',
+        'order',
+      ] as const;
+      for (const [track, previous] of snapshots) {
+        const next = describe(track);
+        if (
+          previous === next ||
+          (previous && next && fields.every((field) => previous[field] === next[field]))
+        )
+          continue;
+        snapshots.set(track, next);
+        changed.push(track);
+      }
+      // Update every cached snapshot before a subscriber can read another lane.
+      for (const track of changed)
+        for (const listener of [...(listeners.get(track) ?? [])]) listener();
+    },
+  };
 }
+
+const TrackControlsContext = createContext<ReturnType<typeof createTrackControlsStore> | null>(
+  null
+);
+
+/** Shares committed lane flags and stable commands within one timeline lifetime. */
+export function ReviewTrackControlsProvider({
+  value,
+  children,
+}: {
+  value: ReviewTrackControlsState | null;
+  children?: ReactNode;
+}) {
+  const [store] = useState(() => createTrackControlsStore(value));
+  useLayoutEffect(() => store.update(value), [store, value]);
+  return <TrackControlsContext.Provider value={store}>{children}</TrackControlsContext.Provider>;
+}
+
+function useTrackControls(track: QuickEditTrack | undefined) {
+  const store = useContext(TrackControlsContext);
+  const subscribe = useCallback(
+    (listener: () => void) => (store && track ? store.subscribe(track, listener) : () => {}),
+    [store, track]
+  );
+  const read = useCallback(() => (store && track ? store.read(track) : null), [store, track]);
+  return useSyncExternalStore(subscribe, read, read);
+}
+
+type TrackVisibilityProps = {
+  track: QuickEditTrack;
+  label: string;
+  enabled: boolean;
+  icon: LucideIcon;
+  disabled?: boolean | undefined;
+  className?: string | undefined;
+  onToggle(): void;
+};
+
+/** Visibility actions cannot bypass an off lane master; commands use committed receivers. */
+export function ReviewTrackVisibilityButton({ track, onToggle, ...props }: TrackVisibilityProps) {
+  const controls = useTrackControls(track);
+  const unavailable = controls && (!controls.enabled || controls.unavailable);
+  const receiver = useRef(onToggle);
+  useLayoutEffect(() => {
+    receiver.current = onToggle;
+  }, [onToggle]);
+  const toggle = useCallback(() => receiver.current(), []);
+  return (
+    <ReviewTrackVisibilityPresentation
+      {...props}
+      disabled={props.disabled || !!unavailable}
+      onToggle={toggle}
+    />
+  );
+}
+
+/** Visual flags and the current glyph change independently from command closures. */
+const ReviewTrackVisibilityPresentation = memo(function ReviewTrackVisibilityPresentation({
+  enabled,
+  icon: Icon,
+  onToggle,
+  ...props
+}: Omit<TrackVisibilityProps, 'track'>) {
+  return (
+    <ReviewButton {...props} aria-pressed={enabled} onClick={onToggle}>
+      <Icon size={14} aria-hidden="true" />
+    </ReviewButton>
+  );
+});
 
 type TrackRowProps = {
   label: string;
@@ -54,20 +205,19 @@ type TrackRowProps = {
   ruler?: boolean;
   /** Muted output remains editable; controls and selection contours stay distinct. */
   muted?: boolean;
-  icon?: ReactNode;
+  icon?: LucideIcon;
+  /** The ruler owns arbitrary live controls instead of a track glyph. */
+  rulerContent?: ReactNode;
   controls?: ReactNode;
   children: ReactNode;
 };
 
 /** Shared row geometry keeps track controls outside the time-coordinate surface. */
 export function ReviewTrackRow(props: TrackRowProps) {
-  const controls = useContext(TrackControlsContext);
   const track = props.track;
-  const unavailable = !!(track && controls?.unavailable[track]);
-  const enabled =
-    !!(track && controls && reviewTrackEnabled(controls.ui, track)) &&
-    !unavailable &&
-    !props.placeholder;
+  const controls = useTrackControls(track);
+  const unavailable = !!(track && controls?.unavailable);
+  const enabled = !!(track && controls?.enabled) && !unavailable && !props.placeholder;
   const multiSelection = useContext(ReviewTimelineMultiSelectionContext);
   const muted = !!props.muted || !!(track && controls && !enabled);
   const visible =
@@ -77,7 +227,15 @@ export function ReviewTrackRow(props: TrackRowProps) {
   if (!visible) return null;
   const header = (
     <ReviewTrackHeader
-      row={{ ...props, muted }}
+      row={{
+        track: props.track,
+        label: props.label,
+        icon: props.icon,
+        controls: props.controls,
+        ruler: props.ruler,
+        rulerContent: props.rulerContent,
+        muted,
+      }}
       controls={controls}
       enabled={enabled}
       unavailable={unavailable}
@@ -110,12 +268,7 @@ export function ReviewTrackRow(props: TrackRowProps) {
             controls?.focusItemTrack?.(track);
         }}
         onPointerDownCapture={(event) => {
-          if (
-            !track ||
-            (!enabled && !controls?.selectable?.[track]) ||
-            controls?.busy ||
-            event.button !== 0
-          )
+          if (!track || (!enabled && !controls?.selectable) || controls?.busy || event.button !== 0)
             return;
           if (
             event.target instanceof Element &&
@@ -150,8 +303,16 @@ function ReviewTrackHeader({
   enabled,
   unavailable,
 }: {
-  row: Pick<TrackRowProps, 'track' | 'muted' | 'label' | 'icon' | 'controls' | 'ruler'>;
-  controls: ReviewTrackControlsState | null;
+  row: {
+    track: TrackRowProps['track'];
+    muted: TrackRowProps['muted'];
+    label: TrackRowProps['label'];
+    icon: TrackRowProps['icon'];
+    controls: TrackRowProps['controls'];
+    ruler: TrackRowProps['ruler'];
+    rulerContent: TrackRowProps['rulerContent'];
+  };
+  controls: LaneControls | null;
   enabled: boolean;
   unavailable: boolean;
 }) {
@@ -166,6 +327,49 @@ function ReviewTrackHeader({
           border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)] px-2"
       onPointerDown={(event) => event.stopPropagation()}
     >
+      {props.ruler ? (
+        props.rulerContent
+      ) : (
+        <>
+          <ReviewTrackHeaderIdentity
+            track={track}
+            label={props.label}
+            icon={props.icon}
+            muted={props.muted}
+            controls={controls}
+            enabled={enabled}
+            unavailable={unavailable}
+          />
+          <div data-track-controls className="flex shrink-0 items-center">
+            {props.controls}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Lane identity changes independently from live item content and lane action receivers. */
+const ReviewTrackHeaderIdentity = memo(function ReviewTrackHeaderIdentity({
+  controls,
+  enabled,
+  unavailable,
+  ...props
+}: {
+  track: TrackRowProps['track'];
+  label: TrackRowProps['label'];
+  icon: TrackRowProps['icon'];
+  muted: TrackRowProps['muted'];
+  controls: LaneControls | null;
+  enabled: boolean;
+  unavailable: boolean;
+}) {
+  useAppLocale();
+  const track = props.track;
+  const Icon = props.icon;
+  const icon = Icon ? <Icon size={14} aria-hidden="true" /> : null;
+  return (
+    <>
       {track && controls?.configuring && controls.order ? (
         <ReviewButton
           label={`${translate('gallery.videoReview.trackReorder')}: ${props.label}`}
@@ -190,17 +394,17 @@ function ReviewTrackHeader({
           }}
         />
       ) : null}
-      {!props.ruler && track && controls?.selectTrack ? (
+      {track && controls?.selectTrack ? (
         <button
           type="button"
           data-review-track-select
           aria-pressed={controls.selectedTrack === track}
-          disabled={(!enabled && !controls.selectable?.[track]) || controls.busy}
+          disabled={(!enabled && !controls.selectable) || controls.busy}
           className="review-track-select flex min-w-0 flex-1 items-center gap-1 text-left"
           title={props.label}
           onClick={() => controls.selectTrack?.(track)}
         >
-          {props.icon}
+          {icon}
           <span className="min-w-0 text-[11px]">
             <span data-track-label className="inline-block whitespace-nowrap">
               {props.label}
@@ -208,25 +412,18 @@ function ReviewTrackHeader({
           </span>
         </button>
       ) : (
-        props.icon
+        icon
       )}
-      {!props.ruler ? (
-        <>
-          {!controls?.selectTrack ? (
-            <span className="min-w-0 flex-1 text-[11px]" title={props.label}>
-              <span data-track-label className="inline-block whitespace-nowrap">
-                {props.label}
-              </span>
-            </span>
-          ) : null}
-          <div data-track-controls className="flex shrink-0 items-center">
-            {props.controls}
-          </div>
-        </>
+      {!controls?.selectTrack ? (
+        <span className="min-w-0 flex-1 text-[11px]" title={props.label}>
+          <span data-track-label className="inline-block whitespace-nowrap">
+            {props.label}
+          </span>
+        </span>
       ) : null}
-    </div>
+    </>
   );
-}
+});
 
 /** Removed source intervals stay visible, but cannot look like sounding/active clip content. */
 export function ReviewTrackCuts({

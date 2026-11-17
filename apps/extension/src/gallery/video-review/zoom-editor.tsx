@@ -18,6 +18,8 @@ import {
   reviewFocusSourceRange,
 } from '../../features/video/review/focus-edits';
 import type { ReviewTimeSegment } from '../../features/video/review/timeline';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import type { ReviewCommandContext } from './command-context';
 import {
   availableQuickEditZoomRange,
   createQuickEditZoomRegion,
@@ -342,7 +344,7 @@ type ZoomEditorArgs = {
   timelineDuration: number;
   timeMap?: readonly ReviewTimeSegment[];
   selection?: string | null;
-  onSelectionChange?(id: string | null): void;
+  onSelectionChange?(id: string | null, context?: ReviewCommandContext): void;
   /** Transient gap-link selection; lives beside the region selection, never persisted. */
   linkSelection?: string | null;
   onLinkSelectionChange?(id: string | null): void;
@@ -466,9 +468,10 @@ export function useReviewZoomEditor(args: ZoomEditorArgs) {
   useEffect(() => {
     setDraft(null);
   }, [selection, setDraft]);
-  const setSelection = (id: string | null) => {
+  const setSelection = (id: string | null, context?: ReviewCommandContext) => {
     if (args.selection === undefined) setLocalSelection(id);
-    args.onSelectionChange?.(id);
+    if (context) args.onSelectionChange?.(id, context);
+    else args.onSelectionChange?.(id);
   };
   const [localLinkSelection, setLocalLinkSelection] = useState<string | null>(null);
   const linkSelection = args.linkSelection === undefined ? localLinkSelection : args.linkSelection;
@@ -551,27 +554,49 @@ export function useReviewZoomEditor(args: ZoomEditorArgs) {
     linkSelection,
     setLinkSelection,
     add,
-    addRegion: (candidate: QuickEditZoomRegion, type: ReviewFocusType = insertionType) => {
+    addRegion: (
+      candidate: QuickEditZoomRegion,
+      type: ReviewFocusType = insertionType,
+      context?: ReviewCommandContext
+    ) => {
+      const timeMap = context
+        ? buildReviewTimeMap(context.scope.sourceDuration, context.document.edits)
+        : args.timeMap;
+      const regions = context
+        ? projectReviewFocus(context.advanced.zoom.regions, timeMap)
+        : args.zoom.regions;
+      const duration = context ? (timeMap?.at(-1)?.resultEnd ?? 0) : args.timelineDuration;
       const region = withReviewFocusType(candidate, type);
       if (
-        !(region.start >= 0 && region.end <= args.timelineDuration && region.start < region.end) ||
-        quickEditFocusConflicts(args.zoom.regions, {
+        !(region.start >= 0 && region.end <= duration && region.start < region.end) ||
+        quickEditFocusConflicts(regions, {
           ...region,
-          ...(region.timeDomain === 'result' ? {} : sourceAnchorPatch(region, args.timeMap)),
+          ...(region.timeDomain === 'result' ? {} : sourceAnchorPatch(region, timeMap)),
         })
       )
         return null;
       const created = fitQuickEditZoomTransitions({
         ...region,
         id: `zoom-${crypto.randomUUID()}`,
-        ...(region.timeDomain === 'result' ? {} : sourceAnchorPatch(region, args.timeMap)),
+        ...(region.timeDomain === 'result' ? {} : sourceAnchorPatch(region, timeMap)),
       });
-      args.setZoom((zoom) => ({
-        ...zoom,
-        enabled: true,
-        regions: insertQuickEditZoomRegion(zoom.regions, created),
-      }));
-      setSelection(created.id);
+      args.setZoom((zoom) => {
+        if (context) {
+          if (quickEditFocusConflicts(projectReviewFocus(zoom.regions, timeMap), created))
+            return zoom;
+          return {
+            ...zoom,
+            enabled: true,
+            regions: [...zoom.regions, created].sort((left, right) => left.start - right.start),
+          };
+        }
+        return {
+          ...zoom,
+          enabled: true,
+          regions: insertQuickEditZoomRegion(zoom.regions, created),
+        };
+      });
+      setSelection(created.id, context);
       return created.id;
     },
     duplicate: (id: string) => {

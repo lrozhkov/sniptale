@@ -45,11 +45,7 @@ export function ReviewSourceLane(props: SelectionProps) {
   const stacked = props.edits?.some((edit) => hasReviewEditOverlap(edit, props.edits));
   const height = stacked ? 'h-[60px]' : props.sourceCompact ? 'h-8' : 'h-12';
   return (
-    <ReviewTrackRow
-      track="source"
-      label={translate('gallery.videoReview.sourceVideo')}
-      icon={<Film size={14} aria-hidden="true" />}
-    >
+    <ReviewTrackRow track="source" label={translate('gallery.videoReview.sourceVideo')} icon={Film}>
       <div
         data-ui="gallery.videoReview.sourceLane"
         className={`relative ${height} rounded bg-[var(--sniptale-color-surface-hover)]

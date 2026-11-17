@@ -21,14 +21,16 @@ type Drag = {
 
 /** One captured gesture previews locally and writes one bounded source-time anchor on release. */
 export function ReviewWebcamPositionMarker(props: {
-  editor: ReturnType<typeof useReviewWebcamEditor>;
+  camera: NonNullable<ReturnType<typeof useReviewWebcamEditor>['camera']>;
+  selected: boolean;
+  commands: Pick<ReturnType<typeof useReviewWebcamEditor>, 'select' | 'navigate' | 'movePosition'>;
   index: number;
   duration: number;
   admit: ReviewBeforeAction;
 }) {
   const snap = useReviewTimelineSnap();
-  const { editor, index, duration, admit } = props;
-  const position = editor.camera!.positions[index]!;
+  const { camera, commands, selected, index, duration, admit } = props;
+  const position = camera.positions[index]!;
   const drag = useRef<Drag | null>(null);
   const [preview, setPreview] = useState<number | null>(null);
   const cancel = () => {
@@ -48,9 +50,7 @@ export function ReviewWebcamPositionMarker(props: {
     };
   }, []);
   const bounded = (time: number) =>
-    moveQuickEditWebcamPosition(editor.camera!, position.id, time, duration).positions[index]!.time;
-  const selected =
-    editor.selection.kind === 'webcam-position' && editor.selection.id === position.id;
+    moveQuickEditWebcamPosition(camera, position.id, time, duration).positions[index]!.time;
   const timeLabel = formatNumber(preview ?? position.time, { maximumFractionDigits: 3 });
   const label = `${translate('gallery.videoReview.webcamPosition')} ${index + 1} · ${timeLabel} s`;
   return (
@@ -95,8 +95,8 @@ export function ReviewWebcamPositionMarker(props: {
           admission: deferReviewGesture(
             admit,
             () => {
-              editor.select({ kind: 'webcam-position', id: position.id });
-              editor.navigate(position.id);
+              commands.select({ kind: 'webcam-position', id: position.id });
+              commands.navigate(position.id);
             },
             'click'
           ),
@@ -130,7 +130,7 @@ export function ReviewWebcamPositionMarker(props: {
         setPreview(null);
         current.admission.commit(() =>
           current.moved
-            ? editor.movePosition(
+            ? commands.movePosition(
                 position.id,
                 bounded(
                   current.time +
@@ -143,7 +143,7 @@ export function ReviewWebcamPositionMarker(props: {
       onPointerCancel={cancel}
       onLostPointerCapture={cancel}
       onClick={(event) => {
-        if (event.detail === 0) admit(() => editor.navigate(position.id));
+        if (event.detail === 0) admit(() => commands.navigate(position.id));
       }}
       onKeyDown={(event) => {
         if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
@@ -151,7 +151,7 @@ export function ReviewWebcamPositionMarker(props: {
         event.stopPropagation();
         const step = event.shiftKey ? 1 : 0.1;
         admit(() =>
-          editor.movePosition(
+          commands.movePosition(
             position.id,
             bounded(position.time + (event.key === 'ArrowLeft' ? -step : step))
           )

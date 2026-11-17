@@ -228,8 +228,9 @@ it('keeps ruler and lane markers aligned across source-time bounds without captu
 });
 
 it('moves the playhead on published frames without a React render and preserves paused navigation', async () => {
-  const { createReviewPlaybackPresentationClock, ReviewPlaybackPresentationClockContext } =
-    await import('./playback-presentation-clock');
+  const { ReviewPlaybackPresentationClockContext } = await import('./playback-presentation-clock');
+  const { createReviewPlaybackPresentationClock } =
+    await import('./playback-presentation-clock.test-support');
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   let playing = true,
     renders = 0;
@@ -272,8 +273,9 @@ it('moves the playhead on published frames without a React render and preserves 
 });
 
 it('updates the clock from presented frames without a root render and rejects stale React time', async () => {
-  const { createReviewPlaybackPresentationClock, ReviewPlaybackPresentationClockContext } =
-    await import('./playback-presentation-clock');
+  const { ReviewPlaybackPresentationClockContext } = await import('./playback-presentation-clock');
+  const { createReviewPlaybackPresentationClock } =
+    await import('./playback-presentation-clock.test-support');
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal(
     'ResizeObserver',

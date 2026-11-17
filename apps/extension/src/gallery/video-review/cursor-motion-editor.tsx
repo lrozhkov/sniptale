@@ -1,7 +1,15 @@
 import { reviewTimelineHint } from './timeline-hints';
 import { reviewInsertionRange } from './range-placement';
+import {
+  reviewCommandInsertion,
+  type ReviewCommandContext,
+  type ReviewCommandPort,
+} from './command-context';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import { projectReviewCursorMotions } from '../../features/video/review/timeline-placement';
+import { createTrackProjection } from './track-projection';
 import { reviewCursorMotionShapeTitleKeys } from './track-items';
-import { useRef, useState, type PointerEvent } from 'react';
+import { memo, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import {
   MousePointer2,
   Trash2,
@@ -12,7 +20,7 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import { translate, formatNumber } from '../../platform/i18n';
+import { translate, formatNumber, useAppLocale } from '../../platform/i18n';
 import {
   CURSOR_MOTION_SHAPES,
   cursorMotionSegment,
@@ -42,24 +50,27 @@ import { ColorField, SegmentedRow, ToggleField } from '../../ui/compact-inspecto
 import { DraftNumericRow } from '../../ui/compact-inspector-controls/numeric-preview';
 import { useReviewTimelineSnap } from './timeline-magnets';
 
+const EMPTY_CURSOR_MOTIONS: CursorMotion[] = [];
+
 export function useReviewCursorMotions(args: {
+  commands: ReviewCommandPort;
   advanced: QuickEditAdvancedState;
   time: number;
   insertionRange?: { start: number; end: number } | null;
-  insertionPoint?(): { x: number; y: number } | null;
+  insertionPoint?(sourceTime: number): { x: number; y: number } | null;
   pause?(): void;
   blockedRanges?: readonly { start: number; end: number }[];
   duration: number;
   selection: ReviewSelection;
   onChange(motions: CursorMotion[]): void;
   onEnabledChange(enabled: boolean): void;
-  select(selection: ReviewSelection): void;
+  select(selection: ReviewSelection, context?: ReviewCommandContext): void;
   seek(time: number, play?: boolean): void;
   canStart(): boolean;
   setMessage(message: string): void;
 }) {
   const [pointId, setPointId] = useState<string>();
-  const motions = args.advanced.cursorMotions ?? [];
+  const motions = args.advanced.cursorMotions ?? EMPTY_CURSOR_MOTIONS;
   const selection = args.selection;
   const selected =
     selection.kind === 'cursor-motion' ? motions.find((m) => m.id === selection.id) : undefined;
@@ -72,50 +83,73 @@ export function useReviewCursorMotions(args: {
     if (selected?.id !== id) setPointId(m.points[0]?.id);
   };
   const add = () => {
-    if (motions.length >= 512 || !args.canStart()) return;
-    const range = reviewInsertionRange({
-      time: args.time,
-      duration: args.duration,
-      seconds: 3,
-      range: args.insertionRange,
-      occupied: [...motions, ...(args.blockedRanges ?? [])],
-      minimum: 0.1,
+    if (!args.canStart()) return;
+    const context = args.commands.capture();
+    if (!context) return;
+    args.commands.admit(context, (accepted) => {
+      if (
+        !args.commands.isCurrent(
+          accepted,
+          'temporal',
+          (current) =>
+            JSON.stringify(current.advanced.cursorMotions) ===
+            JSON.stringify(accepted.advanced.cursorMotions)
+        )
+      )
+        return;
+      const insertion = reviewCommandInsertion(accepted, 'result');
+      if (!insertion) return;
+      const currentMotions =
+        projectReviewCursorMotions(
+          accepted.advanced.cursorMotions,
+          buildReviewTimeMap(accepted.scope.sourceDuration, accepted.document.edits)
+        ) ?? [];
+      if (currentMotions.length >= 512) return;
+      const range = reviewInsertionRange({
+        ...insertion,
+        seconds: 3,
+        occupied: [...currentMotions, ...(args.blockedRanges ?? [])],
+        minimum: 0.1,
+      });
+      if (!range) {
+        args.setMessage(translate('gallery.videoReview.cursorMotionNoSpace'));
+        return;
+      }
+      const { start, end } = range;
+      const projection = createTrackProjection(
+        accepted.scope.sourceDuration,
+        accepted.document.edits
+      );
+      const point = args.insertionPoint?.(projection.source(start)) ?? { x: 0.5, y: 0.5 };
+      const id = crypto.randomUUID();
+      const first = crypto.randomUUID();
+      const m: CursorMotion = {
+        id,
+        start,
+        end,
+        timeDomain: 'result',
+        enabled: true,
+        shape: 'arrow',
+        size: 48,
+        color: '#000000',
+        outline: '#ffffff',
+        shadow: true,
+        easing: 'smooth',
+        points: [
+          { id: first, at: 0, x: point.x, y: point.y },
+          {
+            id: crypto.randomUUID(),
+            at: 1,
+            x: Math.min(0.9, point.x + 0.2),
+            y: Math.min(0.9, point.y + 0.1),
+          },
+        ],
+      };
+      args.onChange([...currentMotions, m]);
+      args.select({ kind: 'cursor-motion', id }, accepted);
+      setPointId(first);
+      args.seek(start, false);
     });
-    if (!range) {
-      args.setMessage(translate('gallery.videoReview.cursorMotionNoSpace'));
-      return;
-    }
-    const { start, end } = range;
-    args.pause?.();
-    const point = args.insertionPoint?.() ?? { x: 0.5, y: 0.5 };
-    const id = crypto.randomUUID();
-    const first = crypto.randomUUID();
-    const m: CursorMotion = {
-      id,
-      start,
-      end,
-      timeDomain: 'result',
-      enabled: true,
-      shape: 'arrow',
-      size: 48,
-      color: '#000000',
-      outline: '#ffffff',
-      shadow: true,
-      easing: 'smooth',
-      points: [
-        { id: first, at: 0, x: point.x, y: point.y },
-        {
-          id: crypto.randomUUID(),
-          at: 1,
-          x: Math.min(0.9, point.x + 0.2),
-          y: Math.min(0.9, point.y + 0.1),
-        },
-      ],
-    };
-    args.onChange([...motions, m]);
-    args.select({ kind: 'cursor-motion', id });
-    setPointId(first);
-    args.seek(start, false);
   };
   const move = (id: string, start: number, end: number) => {
     if (
@@ -162,22 +196,56 @@ export function useReviewCursorMotions(args: {
     args.seek(selected ? Math.min(time, selected.end - 0.000001) : time, false);
   };
   const addPoint = () => {
-    if (!selected || selected.points.length >= 256) return;
-    const at = Math.max(
-      0.001,
-      Math.min(0.999, (args.time - selected.start) / (selected.end - selected.start))
-    );
-    if (selected.points.some((p) => Math.abs(p.at - at) < 0.001)) return;
-    const point = evaluateCursorMotion(
-      [selected],
-      selected.start + at * (selected.end - selected.start)
-    );
-    if (!point) return;
-    const id = crypto.randomUUID();
-    update(selected.id, {
-      points: [...selected.points, { id, at, x: point.x, y: point.y }].sort((a, b) => a.at - b.at),
+    const context = args.commands.capture();
+    if (!context) return;
+    args.commands.admit(context, (accepted) => {
+      if (
+        !args.commands.isCurrent(
+          accepted,
+          'temporal',
+          (current) =>
+            JSON.stringify(current.advanced.cursorMotions) ===
+            JSON.stringify(accepted.advanced.cursorMotions)
+        )
+      )
+        return;
+      const currentMotions =
+        projectReviewCursorMotions(
+          accepted.advanced.cursorMotions,
+          buildReviewTimeMap(accepted.scope.sourceDuration, accepted.document.edits)
+        ) ?? [];
+      const selectedId = accepted.selection.kind === 'cursor-motion' ? accepted.selection.id : null;
+      const selected = currentMotions.find((motion) => motion.id === selectedId);
+      if (!selected || selected.points.length >= 256 || accepted.position.resultTime === null)
+        return;
+      const at = Math.max(
+        0.001,
+        Math.min(
+          0.999,
+          (accepted.position.resultTime - selected.start) / (selected.end - selected.start)
+        )
+      );
+      if (selected.points.some((p) => Math.abs(p.at - at) < 0.001)) return;
+      const point = evaluateCursorMotion(
+        [selected],
+        selected.start + at * (selected.end - selected.start)
+      );
+      if (!point) return;
+      const id = crypto.randomUUID();
+      args.onChange(
+        currentMotions.map((motion) =>
+          motion.id === selected.id
+            ? {
+                ...motion,
+                points: [...selected.points, { id, at, x: point.x, y: point.y }].sort(
+                  (a, b) => a.at - b.at
+                ),
+              }
+            : motion
+        )
+      );
+      setPointId(id);
     });
-    setPointId(id);
   };
   return {
     enabled: args.advanced.cursorMotionEnabled !== false,
@@ -245,34 +313,90 @@ export function useReviewCursorMotions(args: {
 }
 export type ReviewCursorMotionEditor = ReturnType<typeof useReviewCursorMotions>;
 
+type CursorTrackCommands = Pick<
+  ReviewCursorMotionEditor,
+  'toggle' | 'add' | 'choose' | 'update' | 'move' | 'pickPoint'
+>;
+type CursorTrackVisual = Pick<
+  ReviewCursorMotionEditor,
+  'motions' | 'enabled' | 'pointId' | 'duration'
+> & { selectedId: string | undefined };
+
 export function ReviewCursorMotionTrack({
   editor,
-  busy,
-  projection,
-  compact = false,
+  ...props
 }: {
   editor: ReviewCursorMotionEditor;
   busy: boolean;
   compact?: boolean;
   projection: ReviewTrackProjection;
 }) {
+  const locale = useAppLocale();
+  const { toggle, add, choose, update, move, pickPoint } = editor;
+  const current = useRef<CursorTrackCommands>({ toggle, add, choose, update, move, pickPoint });
+  useLayoutEffect(() => {
+    current.current = { toggle, add, choose, update, move, pickPoint };
+  }, [toggle, add, choose, update, move, pickPoint]);
+  const commands = useMemo<CursorTrackCommands>(
+    () => ({
+      toggle: () => current.current.toggle(),
+      add: () => current.current.add(),
+      choose: (id) => current.current.choose(id),
+      update: (id, patch) => current.current.update(id, patch),
+      move: (id, start, end) => current.current.move(id, start, end),
+      pickPoint: (id, time) => current.current.pickPoint(id, time),
+    }),
+    []
+  );
+  return (
+    <CursorMotionTrackBody
+      {...props}
+      compact={props.compact ?? false}
+      motions={editor.motions}
+      enabled={editor.enabled}
+      pointId={editor.pointId}
+      duration={editor.duration}
+      selectedId={editor.selected?.id}
+      commands={commands}
+      locale={locale}
+    />
+  );
+}
+
+const CursorMotionTrackBody = memo(function CursorMotionTrackBody({
+  commands,
+  motions,
+  enabled,
+  pointId,
+  duration,
+  selectedId,
+  busy,
+  projection,
+  compact,
+}: CursorTrackVisual & {
+  commands: CursorTrackCommands;
+  busy: boolean;
+  projection: ReviewTrackProjection;
+  compact: boolean;
+  locale: ReturnType<typeof useAppLocale>;
+}) {
+  const editor = { ...commands, motions, enabled, pointId, duration, selectedId };
   return (
     <ReviewTrackRow
       track="cursorMotion"
       muted={!editor.enabled}
       label={translate('gallery.videoReview.cursorMotionTrack')}
-      icon={<MousePointer2 size={14} />}
+      icon={MousePointer2}
       controls={
         <ReviewTrackVisibilityButton
           track="cursorMotion"
           label={translate('gallery.videoReview.cursorMotionEnabled')}
-          aria-pressed={editor.enabled}
+          enabled={editor.enabled}
           disabled={busy}
           className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-          onClick={editor.toggle}
-        >
-          {editor.enabled ? <Eye size={14} aria-hidden /> : <EyeOff size={14} aria-hidden />}
-        </ReviewTrackVisibilityButton>
+          onToggle={editor.toggle}
+          icon={editor.enabled ? Eye : EyeOff}
+        />
       }
     >
       <div
@@ -297,7 +421,7 @@ export function ReviewCursorMotionTrack({
       </div>
     </ReviewTrackRow>
   );
-}
+});
 function CursorMotionPill({
   motion: m,
   editor,
@@ -307,7 +431,7 @@ function CursorMotionPill({
 }: {
   motion: CursorMotion;
   projection: ReviewTrackProjection;
-  editor: ReviewCursorMotionEditor;
+  editor: CursorTrackVisual & CursorTrackCommands;
   busy: boolean;
   compact: boolean;
 }) {
@@ -331,7 +455,7 @@ function CursorMotionPill({
   >(undefined);
   const suppressClick = useRef(false);
   const range = draft ?? m;
-  const selected = editor.selected?.id === m.id;
+  const selected = editor.selectedId === m.id;
   const down = (event: PointerEvent<HTMLDivElement>) => {
     if (busy || event.button !== 0) return;
     event.stopPropagation();

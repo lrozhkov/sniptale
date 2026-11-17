@@ -8,7 +8,16 @@ import { ReviewTrackVisibilityButton } from './track-row';
 import { ReviewTimelinePanes } from './timeline-panes';
 import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import type { RecordingTelemetryCapabilities } from '../../features/video/project/types';
-import { useContext, Fragment, useCallback, useEffect, useMemo, useRef } from 'react';
+import {
+  memo,
+  useContext,
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from 'react';
 import { REVIEW_TRACK_ORDER } from './track-order';
 import type { QuickEditTrack } from '../../features/video/review/advanced/types';
 import { reviewTrackStatusButtonClassName } from './controls';
@@ -22,7 +31,7 @@ import { createTrackProjection } from './track-projection';
 import { ReviewPlayhead, ReviewRulerRow, ReviewToolbar } from './timeline-chrome';
 import { ReviewSourceLane, ReviewEditBlock } from './timeline-selection';
 import type { ReactNode, CSSProperties } from 'react';
-import { translate } from '../../platform/i18n';
+import { translate, useAppLocale } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import { ReviewTelemetryStrip, type ReviewCursorTimelineInteractions } from './timeline-telemetry';
@@ -383,9 +392,91 @@ function ReviewTimelineEvents(
     () => props.markers.filter((m) => reviewInteractionFamily(m) === props.family),
     [props.markers, props.family]
   );
+  const selectedKind = props.selectedTelemetryRef?.kind;
+  const selectedId = props.selectedTelemetryRef?.id;
+  const selectedTelemetryRef = useMemo(
+    () =>
+      markers.find((marker) => marker.ref.kind === selectedKind && marker.ref.id === selectedId)
+        ?.ref,
+    [markers, selectedKind, selectedId]
+  );
+  const projection = useMemo(
+    () => createTrackProjection(props.duration, props.edits ?? []),
+    [props.duration, props.edits]
+  );
+  const receiver = useRef({
+    marker: props.onMarker,
+    toggle: props.onToggleFamily,
+    update: props.interactionEditor?.update,
+    family: props.family,
+  });
+  useLayoutEffect(() => {
+    receiver.current = {
+      marker: props.onMarker,
+      toggle: props.onToggleFamily,
+      update: props.interactionEditor?.update,
+      family: props.family,
+    };
+  });
+  const commands = useMemo<EventLaneCommands>(
+    () => ({
+      marker: (marker) => receiver.current.marker(marker),
+      toggle: () => receiver.current.toggle?.(receiver.current.family),
+      update: (...args) => receiver.current.update?.(...args),
+    }),
+    []
+  );
   if (props.actionsTrackVisible === false) return null;
-  const enabled =
-    props.family === 'keyboard' ? props.keyboardEnabled !== false : props.mouseEnabled !== false;
+  return (
+    <ReviewEventLanePresentation
+      family={props.family}
+      sourceId={props.sourceId}
+      captureCapabilities={props.captureCapabilities}
+      markers={markers}
+      animated={animated}
+      enabled={
+        props.family === 'keyboard' ? props.keyboardEnabled !== false : props.mouseEnabled !== false
+      }
+      duration={props.duration}
+      width={props.width}
+      zoom={props.zoom}
+      selectedTelemetryRef={selectedTelemetryRef}
+      editable={!!props.interactionEditor}
+      projection={projection}
+      commands={commands}
+    />
+  );
+}
+
+type EventLaneCommands = {
+  marker(marker: ReviewTelemetryMarker): void;
+  toggle(): void;
+  update: NonNullable<TimelineProps['interactionEditor']>['update'];
+};
+
+/** Recorded lane geometry is independent from seek-only transport samples and command closures. */
+const ReviewEventLanePresentation = memo(function ReviewEventLanePresentation(props: {
+  family: 'keyboard' | 'mouse';
+  sourceId: TimelineProps['sourceId'];
+  captureCapabilities: TimelineProps['captureCapabilities'];
+  markers: TimelineProps['markers'];
+  animated: ReadonlySet<string>;
+  enabled: boolean;
+  duration: number;
+  width: number;
+  zoom: number;
+  selectedTelemetryRef: TimelineProps['selectedTelemetryRef'];
+  editable: boolean;
+  projection: ReturnType<typeof createTrackProjection>;
+  commands: EventLaneCommands;
+}) {
+  useAppLocale();
+  const interactionEditor = useMemo(
+    () => (props.editable ? { update: props.commands.update } : undefined),
+    [props.editable, props.commands]
+  );
+  const enabled = props.enabled;
+
   return (
     <ReviewTrackRow
       track={props.family}
@@ -395,18 +486,17 @@ function ReviewTimelineEvents(
           ? 'gallery.videoReview.historyKeyboard'
           : 'gallery.videoReview.historyMouse'
       )}
-      icon={props.family === 'keyboard' ? <Keyboard size={14} /> : <Mouse size={14} />}
+      icon={props.family === 'keyboard' ? Keyboard : Mouse}
       controls={
         <>
           <ReviewTrackVisibilityButton
             track={props.family}
             label={translate('gallery.videoReview.historyEffectsEnabled')}
             className={reviewTrackStatusButtonClassName}
-            aria-pressed={enabled}
-            onClick={() => props.onToggleFamily?.(props.family)}
-          >
-            {enabled ? <Eye size={14} /> : <EyeOff size={14} />}
-          </ReviewTrackVisibilityButton>
+            enabled={enabled}
+            onToggle={props.commands.toggle}
+            icon={enabled ? Eye : EyeOff}
+          />
         </>
       }
     >
@@ -417,23 +507,22 @@ function ReviewTimelineEvents(
       >
         <ReviewTelemetryStrip
           family={props.family}
-          interactionEditor={props.interactionEditor}
+          interactionEditor={interactionEditor}
           sourceId={props.sourceId}
           captureCapabilities={props.captureCapabilities}
-          markers={markers}
-          animatedIds={animated}
+          markers={props.markers}
+          animatedIds={props.animated}
           duration={props.duration}
-          time={props.time}
           width={props.width}
           zoom={props.zoom}
           selectedTelemetryRef={props.selectedTelemetryRef}
-          onMarker={props.onMarker}
+          onMarker={props.commands.marker}
         />
-        <ReviewTrackCuts projection={createTrackProjection(props.duration, props.edits ?? [])} />
+        <ReviewTrackCuts projection={props.projection} />
       </div>
     </ReviewTrackRow>
   );
-}
+});
 
 /** All visible source lanes share inserted display time; durable edits keep original source coordinates. */
 export function ReviewTimeline(props: TimelineProps) {
@@ -441,16 +530,35 @@ export function ReviewTimeline(props: TimelineProps) {
     () => createReviewDisplayMap(props.duration, props.edits ?? []),
     [props.duration, props.edits]
   );
+  // Inserted time changes event geometry only when the edit map or recorded events change.
+  const mappedMarkers = useMemo(
+    () =>
+      props.markers.map((marker) => ({
+        ...marker,
+        start:
+          marker.timeDomain === 'result'
+            ? display.resultToDisplay(marker.start)
+            : display.sourceToDisplay(marker.start),
+        end:
+          marker.timeDomain === 'result'
+            ? display.resultToDisplay(marker.end, 'end')
+            : display.sourceToDisplay(marker.end, 'end'),
+      })),
+    [props.markers, display]
+  );
   const clock = useContext(ReviewPlaybackPresentationClockContext);
   const mappedClock = useMemo(
     () =>
       clock
         ? {
             ...clock,
-            read: () =>
-              clock.readResult
-                ? display.resultToDisplay(clock.readResult())
-                : display.sourceToDisplay(clock.read()),
+            read: () => {
+              const result = clock.readResult?.();
+              // Source-only recording can cross a cut without a visible result sample.
+              return result == null
+                ? display.sourceToDisplay(clock.read())
+                : display.resultToDisplay(result);
+            },
           }
         : null,
     [clock, display]
@@ -472,16 +580,34 @@ export function ReviewTimeline(props: TimelineProps) {
     },
     [display, onHoverTime]
   );
-  const range = (value: ReviewAnchor, inverse = false): ReviewAnchor => {
-    const map = inverse ? display.displayToSource : display.sourceToDisplay;
-    return value.kind === 'point'
-      ? { kind: 'point', time: map(value.time) }
-      : {
-          kind: 'range',
-          start: map(value.start),
-          end: inverse ? map(value.end) : display.sourceToDisplay(value.end, 'end'),
-        };
-  };
+  const range = useCallback(
+    (value: ReviewAnchor, inverse = false): ReviewAnchor => {
+      const map = inverse ? display.displayToSource : display.sourceToDisplay;
+      return value.kind === 'point'
+        ? { kind: 'point', time: map(value.time) }
+        : {
+            kind: 'range',
+            start: map(value.start),
+            end: inverse ? map(value.end) : display.sourceToDisplay(value.end, 'end'),
+          };
+    },
+    [display]
+  );
+  const mappedEdits = useMemo(
+    () =>
+      (props.edits ?? [])
+        .filter((edit) => edit.kind !== 'freeze')
+        .map((edit) => ({
+          ...edit,
+          start: display.sourceToDisplay(edit.start),
+          end: display.sourceToDisplay(edit.end, 'end'),
+        })),
+    [props.edits, display]
+  );
+  const mappedAnnotations = useMemo(
+    () => props.annotations.map((note) => ({ ...note, anchor: range(note.anchor) })),
+    [props.annotations, range]
+  );
   if (!display.parts.some((part) => part.segment.kind === 'freeze'))
     return (
       <ReviewPlaybackPresentationClockContext.Provider value={clock}>
@@ -500,13 +626,6 @@ export function ReviewTimeline(props: TimelineProps) {
     props.resultTime == null
       ? display.sourceToDisplay(props.time)
       : display.resultToDisplay(props.resultTime);
-  const mappedEdits = (props.edits ?? [])
-    .filter((edit) => edit.kind !== 'freeze')
-    .map((edit) => ({
-      ...edit,
-      start: display.sourceToDisplay(edit.start),
-      end: display.sourceToDisplay(edit.end, 'end'),
-    }));
   const insertions = display.parts
     .filter((part) => part.segment.kind === 'freeze')
     .map((part) => {
@@ -593,18 +712,8 @@ export function ReviewTimeline(props: TimelineProps) {
         zoomAnchor={
           props.zoomAnchor == null ? props.zoomAnchor : display.sourceToDisplay(props.zoomAnchor)
         }
-        markers={props.markers.map((marker) => ({
-          ...marker,
-          start:
-            marker.timeDomain === 'result'
-              ? display.resultToDisplay(marker.start)
-              : display.sourceToDisplay(marker.start),
-          end:
-            marker.timeDomain === 'result'
-              ? display.resultToDisplay(marker.end, 'end')
-              : display.sourceToDisplay(marker.end, 'end'),
-        }))}
-        annotations={props.annotations.map((note) => ({ ...note, anchor: range(note.anchor) }))}
+        markers={mappedMarkers}
+        annotations={mappedAnnotations}
         onSeek={seek}
         onSelect={(value) => props.onSelect(range(value, true))}
         {...(props.onEdit

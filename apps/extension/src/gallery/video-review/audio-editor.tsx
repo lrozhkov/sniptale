@@ -145,7 +145,7 @@ export function ReviewAudioClipEditor(props: {
 
 /** Inspector wrapper bound to the audio hook's current selection. */
 export function ReviewAudioInspectorSection(props: {
-  audio: ReturnType<typeof useReviewAudio>;
+  audio: Pick<ReturnType<typeof useReviewAudio>, 'selected' | 'patchClip' | 'removeClip'>;
   busy: boolean;
   recognition?: ReviewInspectorSection;
 }) {

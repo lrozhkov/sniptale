@@ -1,7 +1,17 @@
+import { useZoomPreviewSource } from './use-zoom-preview-source';
+import { createReviewTransportController } from './transport';
 // @vitest-environment jsdom
 import type { ReviewTextDocumentPanel } from './text-panel';
 import type { ReviewTextFragment } from '../../features/video/review/text-types';
-import { act, Suspense, useState, type ComponentProps, type ReactNode } from 'react';
+import {
+  act,
+  Suspense,
+  useState,
+  useMemo,
+  useEffect,
+  type ComponentProps,
+  type ReactNode,
+} from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
@@ -13,8 +23,15 @@ import {
   type ReviewActionAudioTarget,
 } from '../../features/video/review/advanced/action-audio';
 import type { ReviewSourceSpeechBinding } from './speech-panel';
-import type { ReviewSelectedProperties } from './selected-properties';
-import { ReviewInspectorBinding, ReviewDeferredSelection, backupReview } from './inspector-binding';
+import {
+  createReviewInspectorEditCommands,
+  type ReviewSelectedProperties,
+} from './selected-properties';
+import {
+  ReviewInspectorBinding as InspectorSurface,
+  ReviewDeferredSelection,
+  backupReview,
+} from './inspector-binding';
 import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
 import { translate } from '../../platform/i18n';
 
@@ -49,6 +66,8 @@ vi.mock('./advanced-panels', () => ({
 vi.mock('./inspector', () => ({
   ReviewInspector: (props: {
     onOpenVideoEditor(): void;
+    onBack(): void;
+    onClose(): void;
     message: string | null;
     scene: ReactNode;
     speech: ReactNode;
@@ -57,6 +76,8 @@ vi.mock('./inspector', () => ({
     textDocument: ReactNode;
   }) => (
     <div>
+      <button onClick={props.onBack}>Back</button>
+      <button onClick={props.onClose}>Close</button>
       <button onClick={props.onOpenVideoEditor}>Continue in full editor</button>
       <p role="status">{props.message}</p>
       {sceneProbe.enabled ? props.scene : null}
@@ -90,8 +111,8 @@ vi.mock('./speech-panel', () => ({
       <button
         onClick={() =>
           (() => {
-            props.editor.video.current?.pause();
-            props.editor.seek(3, false);
+            props.media.pause();
+            props.media.seek(3, false);
           })()
         }
       >
@@ -101,13 +122,35 @@ vi.mock('./speech-panel', () => ({
   ),
 }));
 const selectedProbe = vi.hoisted(() => vi.fn());
+const retainedProbe = vi.hoisted(() => ({ enabled: false, mounted: vi.fn(), disposed: vi.fn() }));
+function RetainedSelectedResources(props: ComponentProps<typeof ReviewSelectedProperties>) {
+  useZoomPreviewSource(props.resource.file);
+  useEffect(() => {
+    retainedProbe.mounted();
+    return () => retainedProbe.disposed();
+  }, []);
+  const id = 'id' in props.selection ? props.selection.id : props.selection.kind;
+  return (
+    <>
+      <input aria-label="Current selected item" value={id} readOnly />
+      <button onClick={() => props.zoom.change(id, { start: 1 })}>Change current item</button>
+    </>
+  );
+}
+
 vi.mock('./selected-properties', () => ({
+  createReviewInspectorEditCommands: (read: () => FixtureState['editing']) => ({
+    canApply: (...args: Parameters<FixtureState['editing']['canApply']>) =>
+      read().canApply(...args),
+    apply: (...args: Parameters<FixtureState['editing']['apply']>) => read().apply(...args),
+  }),
   reviewSelectionLabel: () => 'Voiceover',
   reviewSelectionIcon: () => undefined,
   ReviewSelectedProperties: (props: ComponentProps<typeof ReviewSelectedProperties>) => {
     selectedProbe(props);
     return (
       <>
+        {retainedProbe.enabled ? <RetainedSelectedResources {...props} /> : null}
         <button onClick={() => void props.flushAdvanced?.()}>Flush clip buffers</button>
         <button onClick={() => props.onSelectText?.('related')}>Open related text</button>
         <button onClick={() => props.onSelectText?.('missing')}>Open missing text</button>
@@ -124,6 +167,137 @@ vi.mock('./selected-properties', () => ({
   },
   ReviewSelectedTextProperties: () => null,
 }));
+
+type FixtureState = ReturnType<typeof import('./use-editor-state').useReviewEditorState>;
+type FixtureProps = Omit<
+  ComponentProps<typeof InspectorSurface>,
+  'model' | 'editors' | 'commands' | 'media' | 'output' | 'exportActions'
+> & { state: FixtureState };
+
+/** Existing behavioral fixtures keep their domain setup while exercising the declared surface boundary. */
+function ReviewInspectorBinding(props: FixtureProps) {
+  const state = props.state;
+  const resource = useMemo(
+    () => ({ ...props.resource, session: state.session }),
+    [props.resource, state.session]
+  );
+  return (
+    <InspectorSurface
+      {...props}
+      resource={resource}
+      model={{
+        document: state.snapshot.document,
+        workspace: {
+          project: state.snapshot.snapshot.workspace.project,
+          aggregateId: state.snapshot.snapshot.workspace.aggregateId,
+          sourceAssetId: state.snapshot.snapshot.workspace.sourceAssetId,
+          effectSnapshots: state.snapshot.snapshot.workspace.effectSnapshots,
+        },
+        save: {
+          pending: state.snapshot.pending,
+          error: state.snapshot.error,
+          advancedPending: state.advancedPending,
+          advancedFailed: state.advancedFailed,
+        },
+        advanced: state.advanced,
+        scene: {
+          zoomRegions: state.features?.zoomRegions,
+          canvas: state.features?.canvas,
+          background: state.features?.background,
+          windowHeader: state.features?.windowHeader,
+        },
+        activeSelection: state.activeSelection,
+        selection: state.selection,
+        playbackRange: state.playbackRange,
+        selected: state.selected,
+        busy: state.busy,
+        playing: state.playing,
+        cursorFocusPath: state.cursorFocusPath,
+        cursorFocusKeys: state.cursorFocusKeys,
+        projected: state.projected,
+        segments: state.timeline.timeMap.getSegments(),
+        resultDuration: state.timeline.resultDuration,
+      }}
+      editors={{
+        annotationEffects: state.annotationEffects ?? {
+          pending: false,
+          gestureId: null,
+          flush: async () => undefined,
+        },
+        cursorMotion: state.cursorMotion,
+        text: state.text,
+        zoom: state.zoom,
+        webcam: state.webcam,
+        watermark: state.watermark,
+        presentation: state.presentation,
+        backgroundImport: state.backgroundImport,
+        interactionEditor: state.interactionEditor,
+        composer: state.composer,
+        editing: {
+          selected: state.editing.selected,
+          commands: createReviewInspectorEditCommands(() => state.editing),
+        },
+      }}
+      commands={{
+        activation: state.commands ?? {
+          capture: () => ({}) as import('./command-context').ReviewCommandContext,
+          admit: (context, action) =>
+            state.beforeAction(() => {
+              state.video.current?.pause();
+              action(context);
+            }),
+          isCurrent: () => true,
+        },
+        setCursorFocusPath: state.setCursorFocusPath,
+        setTrackVisibility: state.setTrackVisibility,
+        setKeyAnimations: state.setKeyAnimations,
+        setActionAudio: state.setActionAudio,
+        setClickAnimations: state.setClickAnimations,
+        setBackground: state.setBackground,
+        previewBackground: state.previewBackground,
+        setCanvas: state.setCanvas,
+        setCaptions: state.setCaptions,
+        setWindowHeader: state.setWindowHeader,
+        setSourceFilters: state.setSourceFilters,
+        setCameraFollowDefaults: state.setCameraFollowDefaults,
+        beforeAction: state.beforeAction,
+        run: state.run,
+        runComposer: state.runComposer,
+        canStart: state.canStart,
+        performAction: state.performAction,
+        setActiveSelection: (selection) => state.setActiveSelection(selection),
+        selectCursorFocusKey: state.selectCursorFocusKey,
+        setMode: state.setMode,
+        setHovered: state.setHovered,
+        setBusy: state.setBusy,
+        setMessage: state.setMessage,
+        selectComment: state.selectComment,
+        add: state.add,
+        leaveNewNote: state.leaveNewNote,
+        retryAdvanced: state.retryAdvanced,
+        flushAdvanced: state.flushAdvanced,
+        registerSpeechFlush: state.registerSpeechFlush,
+        setVoiceoverSilent: state.setVoiceoverSilent,
+        actionSoundPreview: state.actionSoundPreview,
+      }}
+      media={{
+        pause: state.pause ?? (() => state.video.current?.pause()),
+        seek: state.seek,
+        seekResult: state.seekResult ?? vi.fn(),
+        play: state.play,
+        readPosition: () => ({
+          sourceTime: state.time,
+          resultTime: state.timeline.sceneOutputTime,
+          seekRevision: state.seekRevision,
+        }),
+        readVideo: () => state.video.current,
+        toSourceTime: state.timeline.timeMap.timelineToSource,
+      }}
+      output={state.editing.exporter}
+      exportActions={null}
+    />
+  );
+}
 
 async function checkCaptionLockAdmission(
   root: ReturnType<typeof createRoot>,
@@ -339,6 +513,7 @@ it('joins every editor buffer for either recognition source and guards related-t
     expect(failure).toHaveBeenCalledTimes(2);
     await click('Continue in full editor');
     expect(openFullEditor).toHaveBeenCalledTimes(2);
+    pause.mockClear();
 
     await act(async () => root.render(<ReviewInspectorBinding {...props} />));
 
@@ -349,7 +524,7 @@ it('joins every editor buffer for either recognition source and guards related-t
     expect(select).not.toHaveBeenCalled();
     await click('Open related text');
     expect(pause).toHaveBeenCalledOnce();
-    expect(seek).toHaveBeenCalledWith(9, false);
+    expect(seek).not.toHaveBeenCalled();
     expect(select).toHaveBeenCalledWith({ kind: 'text', id: 'related' });
     await click('Seek source phrase');
     expect(seek).toHaveBeenLastCalledWith(3, false);
@@ -371,7 +546,7 @@ it('joins every editor buffer for either recognition source and guards related-t
       ref: { kind: 'action', id: 'recorded' },
     });
     expect(props.navigation.setSection).toHaveBeenCalledWith('selected');
-    expect(seek).toHaveBeenLastCalledWith(1, false);
+    expect(seek).toHaveBeenLastCalledWith(4, false);
 
     const path: CursorFocusPath = {
       version: 1,
@@ -735,7 +910,7 @@ async function checkHistoryPlaybackIsolation(
   await act(async () => button.click());
   expect(beforeAction).toHaveBeenCalledOnce();
   expect(pause).toHaveBeenCalledOnce();
-  expect(seek).toHaveBeenCalledWith(1, false);
+  expect(seek).not.toHaveBeenCalled();
   expect(select).toHaveBeenCalledWith({
     kind: 'telemetry',
     ref: { kind: 'action', id: 'recorded' },
@@ -752,11 +927,11 @@ async function checkHistoryPlaybackIsolation(
   await act(async () => selectedProbe.mock.lastCall![0].onOpenHistory());
   expect(section).toHaveBeenLastCalledWith('history');
   expect(pause).toHaveBeenCalledOnce();
-  expect(seek).toHaveBeenCalledOnce();
+  expect(seek).not.toHaveBeenCalled();
   const blocked = { ...current, state: { ...current.state, beforeAction: vi.fn() } };
   await act(async () => root.render(<ReviewInspectorBinding {...blocked} />));
   await act(async () => button.click());
-  expect(seek).toHaveBeenCalledOnce();
+  expect(seek).not.toHaveBeenCalled();
   await act(async () =>
     root.render(<ReviewInspectorBinding {...blocked} state={{ ...blocked.state, busy: true }} />)
   );
@@ -782,15 +957,41 @@ async function checkLatestHistoryCommands(
     commands.onChange(['recorded'], null);
     commands.onKeyChange?.(['recorded'], null);
     commands.onAudioChange?.([], null);
-    expect(clicks).toHaveBeenCalledWith(state, ['recorded'], null);
-    expect(keys).toHaveBeenCalledWith(state, ['recorded'], null);
-    expect(audio).toHaveBeenCalledWith(state, [], null);
+    expect(clicks).toHaveBeenCalledWith(
+      expect.objectContaining({
+        advanced: state.advanced,
+        projected: state.projected,
+        activeSelection: state.activeSelection,
+      }),
+      ['recorded'],
+      null
+    );
+    expect(keys).toHaveBeenCalledWith(
+      expect.objectContaining({
+        advanced: state.advanced,
+        setKeyAnimations: state.setKeyAnimations,
+      }),
+      ['recorded'],
+      null
+    );
+    expect(audio).toHaveBeenCalledWith(
+      expect.objectContaining({ advanced: state.advanced, setActionAudio: state.setActionAudio }),
+      [],
+      null
+    );
     const target: ReviewActionAudioTarget = {
       ref: { kind: 'action', id: 'recorded' },
       family: 'mouse',
     };
     commands.onAudition?.(target, REVIEW_ACTION_AUDIO_DEFAULT);
-    expect(audition).toHaveBeenCalledWith(state, target, REVIEW_ACTION_AUDIO_DEFAULT);
+    expect(audition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projected: state.projected,
+        actionSoundPreview: state.actionSoundPreview,
+      }),
+      target,
+      REVIEW_ACTION_AUDIO_DEFAULT
+    );
     commands.onStopAudition?.();
     expect(state.actionSoundPreview.stopAudition).toHaveBeenCalled();
   } finally {
@@ -843,5 +1044,320 @@ it('commits selection before suspended properties and admits only the latest pro
     expect(host.querySelector('[aria-busy="false"]')).not.toBeNull();
   } finally {
     await act(async () => root.unmount());
+  }
+});
+
+it.each([
+  { action: 'Back', failure: false },
+  { action: 'Close', failure: false },
+  { action: 'Continue in full editor', failure: false },
+  { action: 'Close', failure: true },
+] as const)(
+  'pauses logical hold time before local $action flush (failure=$failure)',
+  async ({ action, failure }) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    const order: string[] = [];
+    let now = 0;
+    const nativeVideo = document.createElement('video');
+    const nativePause = vi.spyOn(nativeVideo, 'pause').mockImplementation(() => {
+      order.push('native-pause');
+    });
+    const controller = createReviewTransportController(
+      {
+        sourceId: 'blob:inspector-hold',
+        duration: 10,
+        edits: [
+          {
+            id: 'hold',
+            kind: 'freeze',
+            start: 2,
+            end: 2,
+            requestedStart: 2,
+            requestedEnd: 2,
+            duration: 4,
+            frameTime: 1.98,
+            frameDuration: 0.04,
+          },
+        ],
+        original: { volume: 1, muted: false },
+      },
+      {
+        now: () => now,
+        schedule: () => () => undefined,
+        media: {
+          read: () => ({
+            sourceId: 'blob:inspector-hold',
+            time: nativeVideo.currentTime,
+            paused: nativeVideo.paused,
+            ended: false,
+            seeking: false,
+            readyState: 4,
+            errorCode: null,
+          }),
+          pause: nativePause,
+          play: vi.fn(async () => undefined),
+          seek: (time) => {
+            nativeVideo.currentTime = time;
+          },
+          configure: vi.fn(),
+          recoveryMode: vi.fn(),
+          reload: vi.fn(),
+        },
+        audio: { prepare: async () => true, start: vi.fn(), stop: vi.fn() },
+      }
+    );
+    controller.seekResult(3);
+    await controller.play();
+    expect(nativeVideo.paused).toBe(true);
+    expect(controller.getStatusSnapshot().playing).toBe(true);
+    expect(controller.readPosition()).toMatchObject({ resultTime: 3, source: { kind: 'freeze' } });
+    const logicalPause = vi.fn(() => {
+      order.push('transport-pause');
+      controller.pause();
+    });
+    let resume!: () => void;
+    let rejectFlush!: (error: Error) => void;
+    let entered!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const held = new Promise<void>((resolve, reject) => {
+      resume = resolve;
+      rejectFlush = reject;
+    });
+    let pending: Promise<unknown> | undefined;
+    const props = inspectorFixture(
+      createQuickEditAdvancedState(),
+      order,
+      nativePause,
+      vi.fn(),
+      vi.fn(),
+      (next) => next()
+    );
+    const { workspace } =
+      await import('../../composition/persistence/review-workspaces/backup-restore.test-support');
+    const view = {
+      ...props.state.snapshot,
+      document: {
+        ...props.state.snapshot.document,
+        edits: [...controller.getTimeMapSnapshot().edits],
+      },
+      snapshot: { workspace, draft: null },
+      dirty: false,
+      pending: 0,
+      error: null,
+    };
+    const done = vi.fn(() => {
+      order.push('done');
+    });
+    openFullEditor.mockReset();
+    openFullEditor.mockImplementation(async () => {
+      order.push('done');
+    });
+    const run = (job: () => Promise<unknown>) => {
+      const result = job().then(
+        () => undefined,
+        () => {
+          order.push('save-failed');
+        }
+      );
+      pending = result;
+      return result;
+    };
+    const leaving = {
+      ...props,
+      onBack: done,
+      onClose: done,
+      resource: {
+        ...props.resource,
+        url: 'blob:inspector-hold',
+        source: { ...workspace.source, duration: 10 },
+      },
+      state: {
+        ...props.state,
+        pause: logicalPause,
+        video: { current: nativeVideo },
+        features: {
+          ...props.state.features,
+          zoomRegions: [],
+          background: props.state.advanced.background,
+          canvas: props.state.advanced.canvas,
+          windowHeader: props.state.advanced.windowHeader,
+        },
+        time: 2,
+        timeline: {
+          ...props.state.timeline,
+          sceneOutputTime: 3,
+          resultDuration: 14,
+          timeMap: {
+            ...props.state.timeline.timeMap,
+            getSegments: () => controller.getTimeMapSnapshot().segments,
+          },
+        },
+        snapshot: view,
+        playing: true,
+        composer: {
+          ...props.state.composer,
+          flush: () => {
+            order.push('notes');
+            entered();
+            return held;
+          },
+          endCheckpointEditAfterFlush: () => {
+            order.push('end-edit');
+            return true;
+          },
+        },
+        session: {
+          ...props.state.session,
+          getSnapshot: () => view,
+          flush: async () => {
+            order.push('session');
+          },
+          saveBuffered: async () => {
+            order.push('save');
+            return view.snapshot;
+          },
+          getCheckpointExitReceipt: () => null,
+        },
+        run,
+      },
+    };
+    try {
+      await act(async () => root.render(<ReviewInspectorBinding {...leaving} />));
+      order.length = 0;
+      await act(async () => {
+        [...host.querySelectorAll('button')]
+          .find((button) => button.textContent === action)!
+          .click();
+        await started;
+      });
+      expect(logicalPause).toHaveBeenCalledOnce();
+      expect(order.indexOf('transport-pause')).toBeLessThan(order.indexOf('notes'));
+      expect(controller.getStatusSnapshot().playing).toBe(false);
+      const stopped = controller.readPosition().resultTime;
+      now += 1000;
+      controller.tick();
+      expect(controller.readPosition().resultTime).toBe(stopped);
+      expect(done).not.toHaveBeenCalled();
+      expect(openFullEditor).not.toHaveBeenCalled();
+      await act(async () => {
+        if (failure) rejectFlush(new Error('Buffered save refused'));
+        else resume();
+        await pending;
+      });
+      if (failure) {
+        expect(done).not.toHaveBeenCalled();
+        expect(order).not.toContain('advanced');
+        expect(order).not.toContain('end-edit');
+        expect(order.at(-1)).toBe('save-failed');
+      } else {
+        expect(order.filter((entry) => entry !== 'native-pause')).toEqual([
+          'transport-pause',
+          'notes',
+          'advanced',
+          'canvas',
+          action === 'Continue in full editor' ? 'save' : 'session',
+          'end-edit',
+          'done',
+        ]);
+        if (action === 'Continue in full editor') expect(openFullEditor).toHaveBeenCalledOnce();
+        else expect(done).toHaveBeenCalledOnce();
+      }
+    } finally {
+      resume();
+      await pending;
+      controller.dispose();
+      await act(async () => root.unmount());
+      nativePause.mockRestore();
+      host.remove();
+      vi.unstubAllGlobals();
+    }
+  }
+);
+
+it('retains the selected decoder lifetime while same-family fields target the current identity', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const previousCreate = Object.getOwnPropertyDescriptor(URL, 'createObjectURL');
+  const previousRevoke = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL');
+  const createUrl = vi.fn(() => `blob:decoder-${createUrl.mock.calls.length}`);
+  const revokeUrl = vi.fn();
+  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createUrl });
+  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeUrl });
+  const load = vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+  const createElement = vi.spyOn(document, 'createElement');
+  const source = { width: 640, height: 360, duration: 10, mimeType: 'video/webm', size: 5 };
+  const base = inspectorFixture(
+    createQuickEditAdvancedState(),
+    [],
+    vi.fn(),
+    vi.fn(),
+    vi.fn(),
+    (action) => action()
+  );
+  const edit = vi.fn();
+  const resource = {
+    ...base.resource,
+    url: 'blob:selection-source',
+    file: new File(['source'], 'selection.webm'),
+    source,
+  };
+  const render = (id: string, kind: 'zoom' | 'edit' = 'zoom', input = resource) =>
+    root.render(
+      <ReviewInspectorBinding
+        {...base}
+        resource={input}
+        state={{
+          ...base.state,
+          activeSelection: { kind, id },
+          zoom: { ...base.state.zoom, selection: id, change: edit },
+        }}
+      />
+    );
+  retainedProbe.mounted.mockClear();
+  retainedProbe.disposed.mockClear();
+  retainedProbe.enabled = true;
+  try {
+    await act(async () => render('first'));
+    const input = host.querySelector<HTMLInputElement>('[aria-label="Current selected item"]')!;
+    expect(input.value).toBe('first');
+    expect(createUrl).toHaveBeenCalledOnce();
+    expect(retainedProbe.mounted).toHaveBeenCalledOnce();
+    for (const id of ['second', 'third']) {
+      await act(async () => render(id));
+      expect(createUrl).toHaveBeenCalledOnce();
+      expect(retainedProbe.mounted).toHaveBeenCalledOnce();
+      expect(retainedProbe.disposed).not.toHaveBeenCalled();
+      expect(host.querySelector('[aria-label="Current selected item"]')).toBe(input);
+      expect(input.value).toBe(id);
+      await act(async () =>
+        [...host.querySelectorAll('button')]
+          .find((button) => button.textContent === 'Change current item')!
+          .click()
+      );
+      expect(edit).toHaveBeenLastCalledWith(id, { start: 1 });
+    }
+    expect(createElement.mock.calls.filter(([name]) => name === 'video')).toHaveLength(1);
+    expect(revokeUrl).not.toHaveBeenCalled();
+    await act(async () => render('third', 'zoom', { ...resource, url: 'blob:replacement-source' }));
+    expect(createUrl).toHaveBeenCalledTimes(2);
+    await act(async () => render('cut', 'edit', { ...resource, url: 'blob:replacement-source' }));
+    expect(createUrl).toHaveBeenCalledTimes(3);
+    expect(retainedProbe.disposed).toHaveBeenCalledTimes(2);
+  } finally {
+    await act(async () => root.unmount());
+    retainedProbe.enabled = false;
+    createElement.mockRestore();
+    load.mockRestore();
+    if (previousCreate) Object.defineProperty(URL, 'createObjectURL', previousCreate);
+    else Reflect.deleteProperty(URL, 'createObjectURL');
+    if (previousRevoke) Object.defineProperty(URL, 'revokeObjectURL', previousRevoke);
+    else Reflect.deleteProperty(URL, 'revokeObjectURL');
+    host.remove();
+    vi.unstubAllGlobals();
   }
 });

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createReviewCommandFixture } from './editor-fixture.test-support';
 import type { ReviewSelection } from '../../features/video/review/types';
 
 import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
@@ -101,6 +102,12 @@ function Fixture({
   const inspectedId = selectedId ?? (selection.kind === 'text' ? selection.id : undefined);
   current = document.current;
   const editor = useReviewText({
+    commands: createReviewCommandFixture(() => ({
+      duration: 600,
+      time: 0,
+      selection,
+      advanced: { ...createQuickEditAdvancedState(), text: document.current },
+    })),
     document: document.current,
     sourceDuration: 600,
     edits: [],

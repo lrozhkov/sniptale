@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react';
+import { useCallback, useSyncExternalStore, type ReactNode } from 'react';
+import type { ReviewInspectorTrackView } from './inspector-navigation';
 import { ReviewInspectorSectionNavigation } from './inspector-section-navigation';
 import { ReviewInspectorActionTray, type ReviewInspectorSection } from './inspector-sections';
 import {
@@ -52,18 +53,19 @@ export function ReviewTrackWorkspaceHeading({ id, track }: { id: string; track: 
 /** Lane lists stay mounted while the common section row selects individual settings. */
 export function ReviewTrackWorkspace({
   id,
-  tab,
-  onTabChange,
+  track,
+  view,
   list,
   sections,
 }: {
   id: string;
-  tab: 'list' | 'settings';
-  onTabChange(tab: 'list' | 'settings'): void;
+  track: QuickEditTrack;
+  view: ReviewInspectorTrackView;
   list: ReactNode;
   sections: readonly ReviewInspectorSection[];
 }) {
-  const [remembered, remember] = useState<string>();
+  const read = useCallback(() => view.read(track), [view, track]);
+  const { tab, section: remembered } = useSyncExternalStore(view.subscribe, read);
   const parameters = sections.filter((section) => section.id !== 'actions');
   const actions = sections.find((section) => section.id === 'actions');
   const current = parameters.find((section) => section.id === remembered) ?? parameters[0];
@@ -73,8 +75,7 @@ export function ReviewTrackWorkspace({
     ...parameters,
   ];
   const choose = (value: string) => {
-    if (value !== 'list') remember(value);
-    onTabChange(value === 'list' ? 'list' : 'settings');
+    view.choose(track, value);
   };
   return (
     <div

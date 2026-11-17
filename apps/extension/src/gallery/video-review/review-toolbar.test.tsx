@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, Suspense, startTransition } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import {
@@ -11,6 +11,23 @@ import {
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { translate } from '../../platform/i18n';
 
+vi.mock('../../platform/i18n/catalog-transport', () => ({
+  loadCatalogMessages: async (locale: 'en' | 'ru') =>
+    (await import('../test-support/translations.test-support')).loadGalleryCatalogFixture(locale),
+}));
+
+const buttonRenders = vi.hoisted(() => ({ count: 0 }));
+vi.mock('./controls', async (original) => {
+  const actual = await original<typeof import('./controls')>();
+  return {
+    ...actual,
+    ReviewButton: (props: Parameters<typeof actual.ReviewButton>[0]) => {
+      buttonRenders.count++;
+      return <actual.ReviewButton {...props} />;
+    },
+  };
+});
+
 it('annotation addition is advanced-only, admitted through the note owner and blocked during busy phases', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
@@ -18,6 +35,8 @@ it('annotation addition is advanced-only, admitted through the note owner and bl
   const root = createRoot(host);
   const advanced = createQuickEditAdvancedState();
   const toggle = vi.fn();
+  const choose = vi.fn();
+  let admitted: (() => void) | undefined;
   const tool: ReviewAnnotationTool = {
     active: true,
     onToggle: toggle,
@@ -27,11 +46,12 @@ it('annotation addition is advanced-only, admitted through the note owner and bl
     pending: false,
     failure: null,
     retryable: true,
-    onChoose: vi.fn(),
+    onChoose: (value) => {
+      admitted = () => choose(value);
+    },
     onReload: vi.fn(),
     onRetry: vi.fn(),
   };
-  let admitted: (() => void) | undefined;
   const render = async (
     mode: 'basic' | 'advanced',
     busy = false,
@@ -88,9 +108,9 @@ it('annotation addition is advanced-only, admitted through the note owner and bl
     const option = document.querySelector<HTMLButtonElement>('[role="option"]')!;
     expect(option).not.toBeNull();
     await act(async () => option.click());
-    expect(tool.onChoose).not.toHaveBeenCalled();
+    expect(choose).not.toHaveBeenCalled();
     act(() => admitted?.());
-    expect(tool.onChoose).toHaveBeenCalledExactlyOnceWith('title');
+    expect(choose).toHaveBeenCalledExactlyOnceWith('title');
     await render('advanced', true);
     expect(button()?.disabled).toBe(true);
     const selector = () => button()!;
@@ -320,7 +340,12 @@ it('offers five direct focus types, retains the choice, and preserves admission 
           telemetryAvailable
           selection={{ kind: 'point', time: 0 }}
           edits={[]}
-          focusTool={{ active, type, available: true, onToggle }}
+          focusTool={{
+            active,
+            type,
+            available: true,
+            onToggle: (next) => beforeAction(() => onToggle(next ?? type)),
+          }}
           editing={{
             mode: null,
             rate: 2,
@@ -431,5 +456,99 @@ it('shows the density control only in advanced mode without toggling tracks', as
     await act(async () => root.unmount());
     host.remove();
     vi.unstubAllGlobals();
+  }
+});
+
+it('retains five unchanged focus buttons and dispatches only the latest committed receiver', async () => {
+  const { prepareGalleryTranslations } = await import('../test-support/translations.test-support');
+  await prepareGalleryTranslations('en');
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const rootHost = document.createElement('div');
+  const root = createRoot(rootHost);
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.zoom = true;
+  const initial = vi.fn(),
+    latest = vi.fn(),
+    uncommitted = vi.fn();
+  let available = true;
+  const availableFor = vi.fn(() => available);
+  const props = {
+    selectedTrack: 'zoom' as const,
+    advanced,
+    busy: false,
+    composerBusy: false,
+    selection: { kind: 'point' as const, time: 0 },
+    edits: [],
+    telemetryAvailable: true,
+    setMode: vi.fn(),
+    setTrackVisibility: vi.fn(),
+    editing: {
+      mode: null,
+      rate: 2 as const,
+      audio: 'speed' as const,
+      exporter: { index: null, phase: 'idle' as const },
+      setCutting: vi.fn(),
+      toggle: vi.fn(),
+      canApply: vi.fn(() => true),
+      changeRate: vi.fn(),
+      changeAudio: vi.fn(),
+    },
+  };
+  const never = new Promise<void>(() => {});
+  function Pending({ suspend }: { suspend: boolean }) {
+    if (suspend) throw never;
+    return null;
+  }
+  const render = (onToggle: typeof initial, suspend = false, busy = false, hint?: string) => (
+    <Suspense fallback={<span>Pending</span>}>
+      <ReviewTimelineToolbar
+        {...props}
+        busy={busy}
+        focusTool={{
+          active: false,
+          available: true,
+          availableFor,
+          onToggle,
+          ...(hint ? { hint } : {}),
+        }}
+      />
+      <Pending suspend={suspend} />
+    </Suspense>
+  );
+  const lens = () =>
+    rootHost.querySelector<HTMLButtonElement>(
+      `[aria-label="${translate('gallery.videoReview.focusLens')}"]`
+    )!;
+  try {
+    buttonRenders.count = 0;
+    await act(async () => root.render(render(initial)));
+    expect(buttonRenders.count).toBe(5);
+    await act(async () => root.render(render(latest)));
+    expect(availableFor).toHaveBeenCalledTimes(10);
+    expect(buttonRenders.count).toBe(5);
+    await act(async () => lens().click());
+    expect(latest).toHaveBeenCalledExactlyOnceWith('lens');
+    expect(initial).not.toHaveBeenCalled();
+    await act(async () => startTransition(() => root.render(render(uncommitted, true))));
+    await act(async () => lens().click());
+    expect(latest).toHaveBeenCalledTimes(2);
+    expect(uncommitted).not.toHaveBeenCalled();
+    await act(async () => root.render(render(latest, false, true, 'Busy hint')));
+    expect(lens().disabled).toBe(true);
+    expect(lens().title).toBe('Busy hint');
+    expect(buttonRenders.count).toBe(10);
+    available = false;
+    await act(async () => root.render(render(latest)));
+    expect(lens().disabled).toBe(true);
+    expect(buttonRenders.count).toBe(15);
+    const englishLabel = lens().getAttribute('aria-label');
+    await act(async () => prepareGalleryTranslations('ru'));
+    expect(lens().getAttribute('aria-label')).not.toBe(englishLabel);
+    expect(buttonRenders.count).toBe(20);
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+    await prepareGalleryTranslations('en');
   }
 });

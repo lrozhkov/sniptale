@@ -4,7 +4,7 @@ import { Check } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { resolveCompactGridClassName } from '@sniptale/ui/compact-inspector-controls/grid';
 import { cx } from './shared';
-import { useInspectorLayout } from './layout';
+import { useInspectorFitting, useInspectorLayout } from './layout';
 import { CompactSelect } from './select';
 
 export function CompactSegmentedSelector<T extends string>(props: {
@@ -47,49 +47,67 @@ function InspectorSegments<T extends string>(
 ) {
   const host = useRef<HTMLDivElement>(null);
   const [dropdown, setDropdown] = useState(false);
+  const fitting = useInspectorFitting();
+  const lifetime = useRef(0);
   const iconOnly = props.options.every((option) => option.icon !== undefined);
   const labelKey = JSON.stringify(props.options.map((option) => option.label));
   useLayoutEffect(() => {
     const element = host.current;
     if (!element) return;
-    const fit = () => {
+    const token = ++lifetime.current;
+    let disposed = false;
+    const current = () => token === lifetime.current && !disposed && element.isConnected;
+    const measure = () => {
       if (
-        !element.clientWidth ||
+        !current() ||
         element.matches(':focus-within') ||
         element.querySelector('[aria-expanded="true"]')
       )
-        return;
-      const context = document.createElement('canvas').getContext('2d');
-      if (!context) return;
-      const style = getComputedStyle(element);
-      context.font = `500 ${style.fontSize} ${style.fontFamily}`;
-      const labels: unknown = JSON.parse(labelKey);
-      if (
-        !Array.isArray(labels) ||
-        !labels.every((value): value is string => typeof value === 'string')
-      )
-        return;
-      const width = labels.reduce((sum, label) => sum + context.measureText(label).width + 12, 0);
-      setDropdown(!iconOnly && width + 4 + 2 * (labels.length - 1) > element.clientWidth);
+        return null;
+      let next = false;
+      if (!iconOnly) {
+        const available = element.clientWidth;
+        if (!available) return null;
+        const context = document.createElement('canvas').getContext('2d');
+        if (!context) return null;
+        const style = getComputedStyle(element);
+        context.font = `500 ${style.fontSize} ${style.fontFamily}`;
+        const labels: unknown = JSON.parse(labelKey);
+        if (
+          !Array.isArray(labels) ||
+          !labels.every((value): value is string => typeof value === 'string')
+        )
+          return null;
+        const width = labels.reduce((sum, label) => sum + context.measureText(label).width + 12, 0);
+        next = width + 4 + 2 * (labels.length - 1) > available;
+      }
+      return () => {
+        if (current()) setDropdown(next);
+      };
     };
-    fit();
+    const fit = () => {
+      if (!current()) return;
+      if (fitting) fitting.schedule(measure);
+      else measure()?.();
+    };
+    if (fitting) fitting.beforePaint(measure);
+    else measure()?.();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fit);
     observer?.observe(element);
     element
       .querySelectorAll('.sniptale-property-segments > button')
       .forEach((button) => observer?.observe(button));
-    let disposed = false;
-    void document.fonts?.ready.then(() => {
-      if (!disposed) fit();
-    });
+    void document.fonts?.ready.then(fit);
     const afterBlur = () => queueMicrotask(fit);
     element.addEventListener('focusout', afterBlur);
     return () => {
       disposed = true;
+      lifetime.current = token + 1;
+      fitting?.cancel(measure);
       observer?.disconnect();
       element.removeEventListener('focusout', afterBlur);
     };
-  }, [iconOnly, labelKey]);
+  }, [fitting, iconOnly, labelKey]);
   return (
     <div ref={host} className="sniptale-property-choice">
       {dropdown ? (

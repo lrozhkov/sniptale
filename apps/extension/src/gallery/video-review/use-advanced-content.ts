@@ -181,8 +181,13 @@ export function useReviewAdvancedContent(
       setVersion((version) => version + 1);
     }
   }, [session]);
+  const readCurrent = useCallback(
+    () => optimistic.current?.value ?? session.getSnapshot().document.advancedContent,
+    [session]
+  );
   return {
     content: optimistic.current?.value ?? documentContent,
+    readCurrent,
     saveFailed,
     pending: pending.current.length > 0,
     flush,

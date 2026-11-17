@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -8,6 +9,10 @@ import {
   type RefObject,
   type HTMLAttributes,
 } from 'react';
+import {
+  ReviewPlaybackPresentationClockContext,
+  REVIEW_PLAYBACK_UI_INTERVAL_MS,
+} from './playback-presentation-clock';
 import type { ReviewPlaybackRange } from './playback-range';
 import type { ReviewBeforeAction } from './note-transitions';
 import type { ReviewEdit } from '../../features/video/review/types';
@@ -106,15 +111,16 @@ export function useReviewTimelineNavigation(
     });
   };
   const { beforeAction, zoomAnchor, time } = props;
+  const clock = useContext(ReviewPlaybackPresentationClockContext);
   const onZoom = useCallback(
     (value: number) =>
       (beforeAction ?? ((action) => action()))(() => {
         if (value === zoom) return;
         suspend();
-        zoomTarget.current = zoomAnchor ?? time;
+        zoomTarget.current = zoomAnchor ?? clock?.read() ?? time;
         setZoom(value);
       }),
-    [beforeAction, zoomAnchor, time, zoom, suspend]
+    [beforeAction, zoomAnchor, clock, time, zoom, suspend]
   );
   useEffect(() => {
     const node = wheelTarget.current;
@@ -147,6 +153,7 @@ function useReviewPlaybackFollow(
   width: number,
   zoom: number
 ) {
+  const clock = useContext(ReviewPlaybackPresentationClockContext);
   const suspended = useRef(false);
   const previous = useRef({
     playing: false,
@@ -162,6 +169,30 @@ function useReviewPlaybackFollow(
     if (Math.abs(left - position.current.left) > 1) suspend();
     position.current.left = left;
   };
+  const updateFollow = useCallback(
+    (time: number) => {
+      const node = viewport.current;
+      if (
+        !node ||
+        !props.playing ||
+        props.playbackRange ||
+        suspended.current ||
+        zoom <= 1 ||
+        width <= 0 ||
+        props.duration <= 0 ||
+        !Number.isFinite(props.duration) ||
+        !Number.isFinite(time) ||
+        document.visibilityState === 'hidden'
+      )
+        return;
+      const x = (time / props.duration) * width * zoom;
+      if (x >= position.current.left && x < position.current.left + width * 0.95) return;
+      const target = x - width * 0.1;
+      node.scrollLeft = Math.max(0, Math.min(width * (zoom - 1), target));
+      position.current.left = node.scrollLeft;
+    },
+    [props.playing, props.playbackRange, props.duration, viewport, zoom, width]
+  );
   useLayoutEffect(() => {
     const start =
       props.playing && (!previous.current.playing || previous.current.sourceId !== props.sourceId);
@@ -176,26 +207,7 @@ function useReviewPlaybackFollow(
     const node = viewport.current;
     // Play accepts the current viewport, including a paused zoom's deferred scroll event.
     if (start && node && !props.playbackRange) position.current.left = node.scrollLeft;
-    if (
-      !node ||
-      !props.playing ||
-      props.playbackRange ||
-      suspended.current ||
-      zoom <= 1 ||
-      width <= 0 ||
-      props.duration <= 0 ||
-      !Number.isFinite(props.duration) ||
-      !Number.isFinite(props.time) ||
-      document.visibilityState === 'hidden'
-    )
-      return;
-    const x = (props.time / props.duration) * width * zoom;
-    // Keep the page still until its trailing edge; retain context at the next page's start.
-    if (x >= position.current.left && x < position.current.left + width * 0.95) return;
-    const target = x - width * 0.1;
-    node.scrollLeft = Math.max(0, Math.min(width * (zoom - 1), target));
-    // Read back the browser-clamped value so our own asynchronous scroll event is not user input.
-    position.current.left = node.scrollLeft;
+    updateFollow(clock?.read() ?? props.time);
   }, [
     props.playing,
     props.sourceId,
@@ -206,7 +218,19 @@ function useReviewPlaybackFollow(
     viewport,
     width,
     zoom,
+    clock,
+    updateFollow,
   ]);
+  useLayoutEffect(() => {
+    if (!clock || !props.playing) return;
+    let previous = -Infinity;
+    return clock.subscribe(() => {
+      const now = performance.now();
+      if (now - previous < REVIEW_PLAYBACK_UI_INTERVAL_MS) return;
+      previous = now;
+      updateFollow(clock.read());
+    });
+  }, [clock, props.playing, updateFollow]);
   const interaction: HTMLAttributes<HTMLDivElement> = {
     onPointerDownCapture(event) {
       if (

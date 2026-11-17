@@ -1,9 +1,14 @@
 import { reviewInsertionTarget } from './range-placement';
 import {
+  reviewCommandInsertion,
+  type ReviewCommandContext,
+  type ReviewCommandPort,
+} from './command-context';
+import {
   anchorReviewVoiceover,
   projectReviewVoiceover,
 } from '../../features/video/review/voiceover-edits';
-import type { ReviewAudioLane } from './use-review-audio';
+import type { ReviewAudioLane, useReviewAudio } from './use-review-audio';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { readLibraryAudioBindingSource } from '../../composition/persistence/projects/library-asset-binding';
 import { readVideoWorkspace } from '../../composition/persistence/review-workspaces/store';
@@ -21,26 +26,20 @@ import {
   UnsupportedAudioFileError,
 } from '../../workflows/video-review/audio-import';
 import { translate } from '../../platform/i18n';
-import type { useReviewEditorState } from './use-editor-state';
+import type { createVideoReviewSession } from '../../workflows/video-review/session';
 
-type EditorState = ReturnType<typeof useReviewEditorState>;
-type MusicImportState = Pick<
-  EditorState,
-  | 'session'
-  | 'video'
-  | 'busy'
-  | 'canStart'
-  | 'time'
-  | 'source'
-  | 'playbackRange'
-  | 'selection'
-  | 'activeSelection'
-  | 'timeline'
-  | 'flushAdvanced'
-  | 'audio'
->;
+type MusicImportState = {
+  session: ReturnType<typeof createVideoReviewSession>;
+  commands: ReviewCommandPort;
+  pause(): void;
+  busy: boolean;
+  canStart(): boolean;
+  flushAdvanced(): Promise<void>;
+  audio: Pick<ReturnType<typeof useReviewAudio>, 'setSelectedId'>;
+};
 type Intent = {
-  session: EditorState['session'];
+  context: ReviewCommandContext;
+  session: ReturnType<typeof createVideoReviewSession>;
   aggregateId: string;
   lane: ReviewAudioLane;
   sourceStart: number;
@@ -160,7 +159,7 @@ export function useReviewMusicImport(state: MusicImportState) {
   const { releasePreview, stopPreview, listen, playingId, loadingId } = useMusicLibraryPreview({
     target: () => intent.current,
     assertCurrent: (target) => assertCurrent(target),
-    pauseMain: () => current.current.video.current?.pause(),
+    pauseMain: () => current.current.pause(),
     setError,
   });
   const cancel = useCallback(() => {
@@ -185,6 +184,7 @@ export function useReviewMusicImport(state: MusicImportState) {
     if (
       intent.current !== target ||
       current.current.session !== target.session ||
+      !current.current.commands.isCurrent(target.context, 'temporal') ||
       target.session.getSnapshot().snapshot.workspace.aggregateId !== target.aggregateId
     )
       throw new Error(translate('gallery.videoReview.musicChanged'));
@@ -200,7 +200,7 @@ export function useReviewMusicImport(state: MusicImportState) {
       const active =
         retainedMusicOperation(operation.current, selection) ??
         createMusicOperation(target, selection, assertCurrent, () => ({
-          sourceDuration: current.current.source.duration,
+          sourceDuration: target.context.scope.sourceDuration,
           flushAdvanced: current.current.flushAdvanced,
         }));
       operation.current = active;
@@ -208,7 +208,7 @@ export function useReviewMusicImport(state: MusicImportState) {
       assertCurrent(target);
       await restoreAttachedMusic(target, active.clipId, asset.assetId);
       assertCurrent(target);
-      current.current.audio.setSelectedId(active.clipId, target.lane);
+      current.current.audio.setSelectedId(active.clipId, target.lane, target.context);
       close();
     } catch (failure) {
       if (intent.current === target && !target.controller.signal.aborted)
@@ -221,49 +221,30 @@ export function useReviewMusicImport(state: MusicImportState) {
   return {
     open: (trigger: HTMLElement, lane: ReviewAudioLane = 'music') => {
       if (current.current.busy || !current.current.canStart() || pending.current) return;
-      close();
       const latest = current.current;
-      latest.video.current?.pause();
-      const range = reviewInsertionTarget(
-        latest.time,
-        latest.playbackRange ??
-          (latest.activeSelection.kind === 'none' && latest.selection.kind === 'range'
-            ? latest.selection
-            : null)
-      );
-      const selectedRange =
-        latest.playbackRange ??
-        (latest.activeSelection.kind === 'none' && latest.selection.kind === 'range'
-          ? latest.selection
-          : null);
-      const map = createReviewTimeMap(
-        latest.source.duration,
-        latest.session.getSnapshot().document.edits
-      );
-      const resultRange =
-        selectedRange &&
-        ('result' in selectedRange && selectedRange.result
-          ? selectedRange.result
-          : {
-              start: map.sourceToTimeline(selectedRange.start) ?? 0,
-              end: map.sourceToTimeline(selectedRange.end) ?? map.getDuration(),
-            });
-      const result = reviewInsertionTarget(
-        latest.timeline.outputTime ?? map.sourceToTimeline(latest.time) ?? 0,
-        resultRange
-      );
-      intent.current = {
-        session: latest.session,
-        aggregateId: latest.session.getSnapshot().snapshot.workspace.aggregateId,
-        lane,
-        sourceStart: range?.start ?? latest.time,
-        sourceEnd: range?.end ?? null,
-        resultStart:
-          result?.start ?? latest.timeline.outputTime ?? map.sourceToTimeline(latest.time) ?? 0,
-        resultEnd: result?.end ?? null,
-        controller: new AbortController(),
-      };
-      setAnchor(trigger);
+      const context = latest.commands.capture();
+      if (!context) return;
+      const source = reviewCommandInsertion(context, 'source');
+      const result = reviewCommandInsertion(context, 'result');
+      if (!source || !result) return;
+      const sourceRange = reviewInsertionTarget(source.time, source.range);
+      const resultRange = reviewInsertionTarget(result.time, result.range);
+      latest.commands.admit(context, () => {
+        if (current.current.busy || pending.current) return;
+        close();
+        intent.current = {
+          context,
+          session: latest.session,
+          aggregateId: latest.session.getSnapshot().snapshot.workspace.aggregateId,
+          lane,
+          sourceStart: sourceRange?.start ?? source.time,
+          sourceEnd: sourceRange?.end ?? null,
+          resultStart: resultRange?.start ?? result.time,
+          resultEnd: resultRange?.end ?? null,
+          controller: new AbortController(),
+        };
+        setAnchor(trigger);
+      });
     },
     drawer: anchor
       ? {

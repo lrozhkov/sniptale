@@ -4,6 +4,7 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { TextDocument } from '../../ui/text-document';
 import { useReviewEditorShortcuts } from './use-review-shortcuts';
+import { createReviewCommandFixture } from './editor-fixture.test-support';
 import {
   focusReviewRegion,
   reviewKeyboardTarget,
@@ -139,6 +140,7 @@ it('leaves phrase Space with its local receiver while retaining Gallery transpor
     activate = vi.fn();
   function Harness() {
     useReviewEditorShortcuts({
+      commands: createReviewCommandFixture(() => ({ duration: 4, time: 0 })),
       time: 0,
       navigation: { start: 0, end: 4 },
       seek: vi.fn(),

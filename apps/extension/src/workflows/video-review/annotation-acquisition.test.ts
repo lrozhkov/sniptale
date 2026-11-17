@@ -15,7 +15,13 @@ import { createQuickEditAdvancedState } from '../../features/video/review/advanc
 import type { EffectBundleCatalogEntry } from '../../features/video/project/effect-bundle/catalog';
 import { readVerifiedCatalogDocument } from '../../features/video/project/effect-instance/catalog-reader';
 import { createVideoReviewSession } from './session';
-import { applyReviewAnnotationCatalogDocument } from './annotation-acquisition';
+import {
+  applyReviewAnnotationCatalogDocument,
+  ReviewAnnotationAcquisitionError,
+} from './annotation-acquisition';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import * as annotationValidation from '../../features/video/review/annotation-effects/validation';
+import type { ReviewEdit } from '../../features/video/review/types';
 
 const index = new TextEncoder().encode(
   execFileSync(
@@ -339,3 +345,122 @@ it('uses the caller captured identity to locate admission after an unsuccessful 
   expect(fixture.session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
   await fixture.session.dispose();
 });
+
+it.each([
+  { phase: 'catalog', changesMap: true },
+  { phase: 'verification', changesMap: true },
+  { phase: 'catalog', changesMap: false },
+  { phase: 'verification', changesMap: false },
+] as const)(
+  'revalidates the captured temporal target after $phase await (changesMap=$changesMap)',
+  async ({ phase, changesMap }) => {
+    const fixture = setup();
+    const catalog = await importedAnimation();
+    const cut: Extract<ReviewEdit, { kind: 'cut' }> = {
+      id: 'existing-cut',
+      kind: 'cut',
+      start: 6,
+      end: 7,
+      requestedStart: 6,
+      requestedEnd: 7,
+    };
+    await fixture.session.commit({
+      id: 'create-cut',
+      at: 1,
+      target: 'edit',
+      before: null,
+      after: cut,
+    });
+    const temporalMap = () =>
+      JSON.stringify(buildReviewTimeMap(10, fixture.session.getSnapshot().document.edits));
+    const capturedMap = temporalMap();
+    const assertCurrentTarget = () => {
+      if (temporalMap() !== capturedMap)
+        throw new ReviewAnnotationAcquisitionError('changed-source');
+    };
+    let reportReached!: () => void;
+    let resume!: () => void;
+    const reached = new Promise<void>((resolve) => {
+      reportReached = resolve;
+    });
+    const held = new Promise<void>((resolve) => {
+      resume = resolve;
+    });
+    const read = async (...args: Parameters<typeof readVerifiedCatalogDocument>) => {
+      const loaded = await readVerifiedCatalogDocument(...args);
+      if (phase === 'catalog') {
+        reportReached();
+        await held;
+      }
+      return loaded;
+    };
+    const verify = annotationValidation.verifyReviewAnnotationEffectSnapshot;
+    const verification =
+      phase === 'verification'
+        ? vi
+            .spyOn(annotationValidation, 'verifyReviewAnnotationEffectSnapshot')
+            .mockImplementationOnce(async (...args) => {
+              const verified = await verify(...args);
+              reportReached();
+              await held;
+              return verified;
+            })
+        : undefined;
+    const apply = vi.spyOn(fixture.session, 'applyAnnotationEffect');
+    const pending = applyReviewAnnotationCatalogDocument(
+      {
+        ...fixture.args,
+        catalog,
+        documentId: catalog.documents[0]!.id,
+        start: 2,
+        end: 4,
+        timeDomain: 'result',
+        assertCurrentTarget,
+      },
+      { readVerifiedCatalogDocument: read }
+    );
+    const outcome = pending.then(
+      (id) => ({ id, error: null }),
+      (error: unknown) => ({ id: null, error })
+    );
+    try {
+      await reached;
+      // Both writes keep the source identity and durable revision; only one changes result-time coordinates.
+      await fixture.session.commit({
+        id: 'update-cut',
+        at: 2,
+        target: 'edit',
+        before: cut,
+        after: { ...cut, requestedStart: 5.5, ...(changesMap ? { start: 5.5 } : {}) },
+      });
+      expect(fixture.session.getSnapshot().snapshot.workspace.revision).toBe(1);
+      if (changesMap) expect(temporalMap()).not.toBe(capturedMap);
+      else expect(temporalMap()).toBe(capturedMap);
+      resume();
+      const result = await outcome;
+      if (changesMap) {
+        expect(result.error).toMatchObject({ code: 'changed-source' });
+        expect(apply).not.toHaveBeenCalled();
+        expect(
+          fixture.session.getSnapshot().document.advancedContent.annotationEffects?.instances ?? []
+        ).toEqual([]);
+        expect(fixture.session.getSnapshot().snapshot.workspace.effectSnapshots ?? []).toEqual([]);
+        expect(fixture.session.getSnapshot().snapshot.workspace.history).toHaveLength(2);
+      } else {
+        expect(result.error).toBeNull();
+        expect(apply).toHaveBeenCalledOnce();
+        expect(
+          fixture.session.getSnapshot().document.advancedContent.annotationEffects?.instances
+        ).toMatchObject([{ id: result.id, start: 2, end: 4, timeDomain: 'result' }]);
+        expect(fixture.session.getSnapshot().snapshot.workspace.history).toHaveLength(3);
+      }
+      expect(fixture.save).not.toHaveBeenCalled();
+    } finally {
+      resume();
+      await outcome;
+      verification?.mockRestore();
+      apply.mockRestore();
+      await fixture.session.dispose();
+    }
+  }
+);

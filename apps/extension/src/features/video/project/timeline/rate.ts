@@ -2,11 +2,44 @@ import {
   MIN_VIDEO_PROJECT_PLAYBACK_RATE,
   MAX_VIDEO_PROJECT_PLAYBACK_RATE,
 } from '../validation/primitives';
-import type {
-  VideoProjectAudioClip,
-  VideoProjectVideoClip,
-  VideoProjectClip,
-} from '../types/index';
+/** Timing inputs stay below the project model and its camera presentation dependencies. */
+interface ClipPlaybackWindow {
+  offset: number;
+  extent?: number;
+  holdAt?: number;
+  fadePhase?: { offset: number; duration: number };
+  gainPhase?: { offset: number; duration: number };
+}
+
+interface RetainedSourceClock {
+  time: number;
+  sourceTime: number;
+  rate: number;
+}
+
+interface ClipPlacementTiming {
+  startTime: number;
+  duration: number;
+  playbackWindow?: ClipPlaybackWindow;
+}
+
+interface SourceClipTiming extends ClipPlacementTiming {
+  sourceStart: number;
+  sourceDuration: number;
+  playbackRate?: number;
+}
+
+type VideoClipTiming = SourceClipTiming & {
+  type: 'VIDEO';
+  cameraTiming?: {
+    offsetSeconds: number;
+    transitions: 'bounded';
+    timeDomain?: 'result';
+    layoutClock?: RetainedSourceClock;
+  };
+  sourceInteractionTiming?: RetainedSourceClock;
+};
+type AudioClipTiming = SourceClipTiming & { type: 'AUDIO' };
 
 function clampValue(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -30,7 +63,7 @@ export function normalizeClipPlaybackRate(value: number): number {
 
 /** Returns elapsed content time independently from the physical placement. */
 export function getClipPlaybackOffset(
-  clip: Pick<VideoProjectClip, 'startTime' | 'duration' | 'playbackWindow'>,
+  clip: Pick<ClipPlacementTiming, 'startTime' | 'duration' | 'playbackWindow'>,
   currentTime: number
 ): number {
   return (
@@ -40,9 +73,9 @@ export function getClipPlaybackOffset(
 
 /** A sliced placement retains its original envelope clocks instead of restarting them. */
 export function sliceClipPlaybackWindow(
-  clip: Pick<VideoProjectClip, 'duration' | 'playbackWindow'>,
+  clip: Pick<ClipPlacementTiming, 'duration' | 'playbackWindow'>,
   offset: number
-): NonNullable<VideoProjectClip['playbackWindow']> {
+): NonNullable<ClipPlacementTiming['playbackWindow']> {
   const window = clip.playbackWindow;
   const phase = (value: { offset: number; duration: number } | undefined) => ({
     offset: (value?.offset ?? 0) + offset,
@@ -59,9 +92,9 @@ export function sliceClipPlaybackWindow(
 
 /** Content and envelope clocks scale together when the source playback rate changes. */
 export function scaleClipPlaybackWindow(
-  window: NonNullable<VideoProjectClip['playbackWindow']>,
+  window: NonNullable<ClipPlacementTiming['playbackWindow']>,
   factor: number
-): NonNullable<VideoProjectClip['playbackWindow']> {
+): NonNullable<ClipPlacementTiming['playbackWindow']> {
   const phase = (value: { offset: number; duration: number }) => ({
     offset: value.offset * factor,
     duration: value.duration * factor,
@@ -76,7 +109,7 @@ export function scaleClipPlaybackWindow(
 }
 
 export function getMediaClipSourceTime(
-  clip: VideoProjectVideoClip | VideoProjectAudioClip,
+  clip: VideoClipTiming | AudioClipTiming,
   currentTime: number
 ): number {
   const projectOffset = getClipPlaybackOffset(clip, currentTime);
@@ -87,7 +120,7 @@ export function getMediaClipSourceTime(
   );
 }
 
-export function getVideoClipSourceTime(clip: VideoProjectVideoClip, currentTime: number): number {
+export function getVideoClipSourceTime(clip: VideoClipTiming, currentTime: number): number {
   if (clip.playbackWindow?.holdAt === undefined) return getMediaClipSourceTime(clip, currentTime);
   const offset = Math.min(getClipPlaybackOffset(clip, currentTime), clip.playbackWindow.holdAt);
   return (
@@ -98,9 +131,9 @@ export function getVideoClipSourceTime(clip: VideoProjectVideoClip, currentTime:
 }
 
 type CameraLayoutTimedClip = Pick<
-  VideoProjectVideoClip,
+  VideoClipTiming,
   'startTime' | 'sourceStart' | 'playbackRate' | 'playbackWindow'
-> & { cameraTiming?: Pick<NonNullable<VideoProjectVideoClip['cameraTiming']>, 'layoutClock'> };
+> & { cameraTiming?: { layoutClock?: RetainedSourceClock } };
 
 /** Retained camera layout seconds per current timeline second. */
 export function getCameraLayoutRate(clip: CameraLayoutTimedClip): number {
@@ -109,13 +142,13 @@ export function getCameraLayoutRate(clip: CameraLayoutTimedClip): number {
 }
 
 type InteractionTimedClip = Pick<
-  VideoProjectVideoClip,
+  VideoClipTiming,
   'startTime' | 'sourceStart' | 'playbackRate' | 'playbackWindow' | 'sourceInteractionTiming'
 >;
 
 function retainedClockOrigin(
-  clip: Pick<VideoProjectVideoClip, 'startTime' | 'sourceStart' | 'playbackWindow'>,
-  clock: VideoProjectVideoClip['sourceInteractionTiming'],
+  clip: Pick<VideoClipTiming, 'startTime' | 'sourceStart' | 'playbackWindow'>,
+  clock: VideoClipTiming['sourceInteractionTiming'],
   rate: number
 ): number {
   return clock
@@ -153,8 +186,8 @@ export function getVideoClipInteractionTimelineTime(
 
 /** Result authoring joins only through adjacent placements with the same clock phase and speed. */
 export function areVideoClipInteractionClocksContinuous(
-  left: VideoProjectVideoClip,
-  right: VideoProjectVideoClip
+  left: VideoClipTiming,
+  right: VideoClipTiming
 ): boolean {
   return (
     Math.abs(getVideoClipInteractionRate(left) - getVideoClipInteractionRate(right)) < 1e-6 &&
@@ -182,14 +215,14 @@ export function getCameraLayoutTimelineTime(clip: CameraLayoutTimedClip, time: n
 }
 
 export function getSourceTimedClipProjectDuration(
-  clip: Pick<VideoProjectVideoClip | VideoProjectAudioClip, 'playbackRate' | 'sourceDuration'>
+  clip: Pick<VideoClipTiming | AudioClipTiming, 'playbackRate' | 'sourceDuration'>
 ): number {
   return clip.sourceDuration / normalizeClipPlaybackRate(clip.playbackRate ?? 1);
 }
 
 export function getSourceTimedClipProjectOffset(
   clip: Pick<
-    VideoProjectVideoClip | VideoProjectAudioClip,
+    VideoClipTiming | AudioClipTiming,
     'playbackRate' | 'sourceDuration' | 'playbackWindow'
   >,
   sourceOffset: number
@@ -202,7 +235,7 @@ export function getSourceTimedClipProjectOffset(
 }
 
 export function getSourceTimedClipSourceOffset(
-  clip: Pick<VideoProjectVideoClip | VideoProjectAudioClip, 'duration' | 'playbackRate'>,
+  clip: Pick<VideoClipTiming | AudioClipTiming, 'duration' | 'playbackRate'>,
   projectOffset: number
 ): number {
   return (
@@ -212,10 +245,7 @@ export function getSourceTimedClipSourceOffset(
 }
 
 /** Returns the retained visual presentation clock in project seconds for a source clip. */
-export function getVideoClipPresentationTime(
-  clip: VideoProjectVideoClip,
-  currentTime: number
-): number {
+export function getVideoClipPresentationTime(clip: VideoClipTiming, currentTime: number): number {
   return (
     clip.startTime +
     getSourceTimedClipProjectOffset(
@@ -229,13 +259,13 @@ export function getVideoClipPresentationTime(
 
 /** Checks retained source and visual clock continuity at adjacent video edges. */
 export function areVideoClipSourceClocksContinuous(
-  left: VideoProjectVideoClip,
-  right: VideoProjectVideoClip
+  left: VideoClipTiming,
+  right: VideoClipTiming
 ): boolean {
   if (!left.playbackWindow && !right.playbackWindow)
     return Math.abs(left.sourceStart + left.sourceDuration - right.sourceStart) <= 0.000_001;
   if ((left.playbackRate ?? 1) !== (right.playbackRate ?? 1)) return false;
-  const source = (clip: VideoProjectVideoClip, time: number, visual: boolean) => {
+  const source = (clip: VideoClipTiming, time: number, visual: boolean) => {
     const value =
       (visual ? getVideoClipSourceTime(clip, time) : getMediaClipSourceTime(clip, time)) +
       (clip.cameraTiming?.offsetSeconds ?? 0);

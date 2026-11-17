@@ -125,6 +125,16 @@ function resolvePreviewCameraAdmission(props: ZoomCameraScene) {
   return { followPlan, cameraConflicts };
 }
 
+function needsPreviewCameraPlan(scene: ZoomCameraScene) {
+  return (
+    !scene.region.border &&
+    !scene.region.spotlight &&
+    (scene.focus?.regions ?? [scene.region]).some(
+      (region) => region.cursorFocus?.path.mode === 'follow'
+    )
+  );
+}
+
 /** One completed camera preparation binds its geometry and admission status to its scene. */
 export type PreparedZoomCamera = {
   snapshot: ZoomCameraScene;
@@ -172,19 +182,19 @@ export function usePreparedZoomCamera(props: ZoomPreviewProps) {
       playback,
     ]
   );
+  const sourceLifetime = useMemo(
+    () => ({ loadFrame, width: source.width, height: source.height }),
+    [loadFrame, source.width, source.height]
+  );
   const lifetime = useMemo(
-    () => ({ selectionId: region.id, loadFrame, width: source.width, height: source.height }),
-    [region.id, loadFrame, source.width, source.height]
+    () => ({ selectionId: region.id, source: sourceLifetime }),
+    [region.id, sourceLifetime]
   );
-  const needsPlan =
-    !props.region.border &&
-    !props.region.spotlight &&
-    (props.focus?.regions ?? [props.region]).some(
-      (region) => region.cursorFocus?.path.mode === 'follow'
-    );
-  const [completed, setCompleted] = useState<{ owner: object; value: PreparedZoomCamera } | null>(
-    null
-  );
+  const needsPlan = needsPreviewCameraPlan(snapshot);
+  const [completed, setCompleted] = useState<{
+    owner: typeof lifetime;
+    value: PreparedZoomCamera;
+  } | null>(null);
   const [failed, setFailed] = useState<object | null>(null);
   const owner = useMemo(() => {
     const identity = lifetime;
@@ -201,7 +211,9 @@ export function usePreparedZoomCamera(props: ZoomPreviewProps) {
       prepare: async ({ scene }, signal) => {
         signal.throwIfAborted();
         const camera = resolvePreviewCamera(scene);
-        const admission = resolvePreviewCameraAdmission(scene);
+        const admission = needsPreviewCameraPlan(scene)
+          ? resolvePreviewCameraAdmission(scene)
+          : { followPlan: null, cameraConflicts: [] };
         signal.throwIfAborted();
         return lease({ snapshot: scene, camera, admission });
       },
@@ -217,28 +229,32 @@ export function usePreparedZoomCamera(props: ZoomPreviewProps) {
   }, [lifetime]);
   useEffect(() => () => owner.scheduler.dispose(), [owner]);
   const holdFollowDraft = props.previewing === true && props.cursorFollowing === true;
+  const current = completed?.owner === owner.identity ? completed.value : null;
+  // A warm selection can remain visible only within the same decoded source lifetime.
+  const retained = completed?.owner.source === sourceLifetime ? completed.value : null;
   useEffect(() => {
     owner.scheduler.update({
       scene: snapshot,
       generation: 'selected-preview',
-      visible: needsPlan && !holdFollowDraft,
+      visible: needsPlan ? !holdFollowDraft : !current,
       playing: false,
       interacting: false,
       frameRate: null,
       detailedPaused: false,
       pausedTime: 0,
     });
-  }, [owner, snapshot, needsPlan, holdFollowDraft]);
-  const current = completed?.owner === owner.identity ? completed.value : null;
+  }, [owner, snapshot, needsPlan, holdFollowDraft, current]);
   return {
-    value: needsPlan
-      ? current
-      : {
-          snapshot,
-          camera: resolvePreviewCamera(snapshot),
-          admission: { followPlan: null, cameraConflicts: [] },
-        },
-    pending: needsPlan && (holdFollowDraft || current?.snapshot !== snapshot),
+    value: !current
+      ? retained
+      : needsPlan
+        ? current
+        : {
+            snapshot,
+            camera: resolvePreviewCamera(snapshot),
+            admission: { followPlan: null, cameraConflicts: [] },
+          },
+    pending: !current || (needsPlan && (holdFollowDraft || current.snapshot !== snapshot)),
     failed: failed === owner.identity,
     retry: () => owner.scheduler.invalidate(),
   };

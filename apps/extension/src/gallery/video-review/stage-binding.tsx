@@ -81,6 +81,7 @@ type ReviewStageBindingProps = {
   busy: boolean;
   onRegion(value: ReviewRegion): void;
   onReady(): void;
+  onMediaReady?: Parameters<typeof ReviewStage>[0]['onMediaReady'];
   onTime(value: number): void;
   onPlaying(value: boolean): void;
   onEnded?: (() => void) | undefined;
@@ -332,6 +333,7 @@ export function ReviewStageBinding(props: ReviewStageBindingProps) {
         }}
         onRegion={props.onRegion}
         onReady={props.onReady}
+        onMediaReady={props.onMediaReady}
         onTime={props.onTime}
         onPlaying={props.onPlaying}
         onEnded={props.onEnded}

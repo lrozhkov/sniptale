@@ -1,4 +1,5 @@
 import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
+import { createLogger } from '@sniptale/platform/observability/logger';
 import { canCoalescePresentationInteraction } from './preview-presentation-state';
 import type { VideoPreviewRenderer } from '../../features/video/preview/preferences';
 import { prepareReviewCameraPlans } from '../../features/video/review/advanced/camera-plan-preparation';
@@ -52,6 +53,7 @@ type PresentationSnapshot = {
   placement: QuickEditWebcamPlacement | null;
 };
 type CameraSource = ReturnType<typeof createReviewWebcamPreviewSource>;
+const logger = createLogger({ namespace: 'video-review.preview' });
 class PendingPresentation extends Error {
   constructor(readonly retryAfterCapture = false) {
     super();
@@ -60,6 +62,7 @@ class PendingPresentation extends Error {
 type Publication = {
   completed: PresentedFrame;
   prepared: Prepared;
+  position?: ReturnType<NonNullable<PresentationInput['readPosition']>> | undefined;
   retain(): void;
 };
 
@@ -74,6 +77,10 @@ export function createManualPresentationOwner(
 
 /** One mounted lifetime owns renderer, publication, camera and scheduler teardown. */
 class ManualPresentationSession {
+  private readonly requestPositions = new WeakMap<
+    object,
+    ReturnType<NonNullable<PresentationInput['readPosition']>>
+  >();
   private requestGeneration = 0;
   private movementBase: Description | null = null;
   private movementInstance: ReviewAnnotationEffect | null = null;
@@ -199,7 +206,11 @@ class ManualPresentationSession {
       ...(readAsset ? { readAsset } : {}),
       allocation: { describe: graph, replaceLimits: (limits) => resources.replaceLimits(limits) },
       onContextLost: () => {
-        if (!this.disposed) {
+        if (!this.disposed && !this.contextLost) {
+          const error = new Error('Preview GPU context lost.');
+          this.reportFailureContext(error);
+          this.diagnostics.reportFailure(error, 'compose');
+          this.diagnosed = true;
           this.contextLost = true;
           this.reportClock(false);
           this.scheduler.invalidate();
@@ -210,6 +221,12 @@ class ManualPresentationSession {
   }
 
   private sampleTime = () => {
+    const position = this.latest().input.readPosition?.();
+    if (position) {
+      if (!position.source || position.resultTime === null) throw new PendingPresentation();
+      this.clockSample = { sourceTime: position.source.mediaTime, resultTime: position.resultTime };
+      return position.resultTime;
+    }
     const node = this.latest().input.video.current;
     const sourceTime = node?.currentTime;
     const time = sourceTime === undefined ? null : this.latest().input.sourceToResult(sourceTime);
@@ -222,6 +239,10 @@ class ManualPresentationSession {
     request: { scene: Description; generation: string; time: number },
     signal: AbortSignal
   ) => {
+    const position = this.latest().input.readPosition?.();
+    if (position) this.requestPositions.set(request, { ...position });
+    if (position && (!position.source || position.resultTime === null))
+      throw new PendingPresentation();
     if (this.contextLost) throw new Error('Preview context lost');
     if (this.latest().input.backgroundPending) throw new PendingPresentation();
     const rendererPreference = request.scene.renderer ?? 'gpu';
@@ -245,18 +266,22 @@ class ManualPresentationSession {
     this.sequence = Number(request.generation);
     this.resultTime =
       this.latest().input.playing && this.video
-        ? (this.latest().input.sourceToResult(this.video.currentTime) ?? request.time)
+        ? (position?.resultTime ??
+          this.latest().input.sourceToResult(this.video.currentTime) ??
+          request.time)
         : request.time;
-    // Independent source providers need metadata, not a decoded frame from this HTML video.
+    // Independent providers need metadata; only direct HTML capture waits for its native seek.
     if (
       !this.video ||
-      this.video.seeking ||
+      (this.video.seeking && !this.canDecodeSource()) ||
       this.video.readyState < (this.canDecodeSource() ? 1 : 2)
     )
       throw new PendingPresentation();
     if (this.canDecodeSource() && !this.sourceReady)
       await this.prepareSource(
-        this.latest().input.playing ? this.video.currentTime : request.scene.sourceTime,
+        this.latest().input.playing
+          ? (position?.source?.mediaTime ?? this.video.currentTime)
+          : request.scene.sourceTime,
         signal
       );
     signal.throwIfAborted();
@@ -308,7 +333,7 @@ class ManualPresentationSession {
     if (
       !this.current ||
       !video ||
-      video.seeking ||
+      (video.seeking && !this.canDecodeSource()) ||
       video.readyState < (this.canDecodeSource() ? 1 : 2)
     )
       throw new PendingPresentation();
@@ -410,10 +435,20 @@ class ManualPresentationSession {
 
   private sourceDemand(time: number): PreviewSourceDemand {
     const duration = this.video?.duration;
+    // Native duration rounds to microseconds; the accepted endpoint retains container precision.
+    // Match the source owner's two-microsecond rounding only at that terminal sampling boundary.
+    const sampleTime =
+      duration !== undefined &&
+      Number.isFinite(duration) &&
+      duration > 0 &&
+      time > duration &&
+      time - duration <= 0.000002
+        ? duration
+        : time;
     return {
       id: 'source',
       url: this.sourceIdentity,
-      time,
+      time: sampleTime,
       rangeStart: 0,
       ...(duration !== undefined && Number.isFinite(duration) && duration > 0
         ? { rangeEnd: duration, holdEnd: true }
@@ -495,7 +530,7 @@ class ManualPresentationSession {
   private render = async (
     prepared: Prepared,
     frame: RenderFrame,
-    _request: unknown,
+    request: object,
     signal: AbortSignal
   ) => {
     const completed = await reviewExportPhase(signal, 'compose', () =>
@@ -519,6 +554,7 @@ class ManualPresentationSession {
       value: {
         completed,
         prepared,
+        position: this.requestPositions.get(request),
         retain() {
           transferred = true;
         },
@@ -566,6 +602,14 @@ class ManualPresentationSession {
   }
 
   private publish = (value: Publication) => {
+    const position = this.latest().input.readPosition?.();
+    if (
+      value.position &&
+      (!position ||
+        value.position.epoch !== position.epoch ||
+        value.position.mapRevision !== position.mapRevision)
+    )
+      throw new PendingPresentation();
     const host = this.latest().input.host.current;
     if (!host) throw new PendingPresentation();
     this.publishCanvas(host, value);
@@ -594,12 +638,40 @@ class ManualPresentationSession {
     this.waiting = error instanceof PendingPresentation;
     this.reportClock(false);
     if (!this.waiting) {
+      this.reportFailureContext(error);
       this.diagnostics.reportFailure(error);
       this.diagnosed = true;
     }
     this.status(this.waiting ? 'pending' : 'failed');
     if (error instanceof PendingPresentation && error.retryAfterCapture) this.ready();
   };
+
+  private reportFailureContext(error: unknown) {
+    if (!import.meta.env.DEV || globalThis.__SNIPTALE_RELEASE_BUILD__ === true || this.diagnosed)
+      return;
+    try {
+      const position = this.latest().input.readPosition?.();
+      const finite = (value: number | undefined) =>
+        value !== undefined && Number.isFinite(value) ? value : null;
+      logger.warn('Presentation failed.', {
+        ...previewFailureCategory(error),
+        renderer: this.rendererPreference,
+        sourceTime: finite(this.clockSample?.sourceTime ?? this.current?.sourceTime),
+        resultTime: finite(this.resultTime),
+        epoch: finite(position?.epoch),
+        mapRevision: finite(position?.mapRevision),
+        nativeTime: finite(this.video?.currentTime),
+        nativeDuration: finite(this.video?.duration),
+        nativeReadyState: this.video?.readyState ?? null,
+        nativeSeeking: this.video?.seeking ?? null,
+        nativePaused: this.video?.paused ?? null,
+        frameWidth: finite(this.front?.canvas.width),
+        frameHeight: finite(this.front?.canvas.height),
+      });
+    } catch {
+      // Advisory diagnostics must not replace the presentation failure.
+    }
+  }
 
   readonly ready = () => {
     if (!this.disposed && this.waiting) {
@@ -826,6 +898,154 @@ class ManualPresentationSession {
     this.renderer.dispose();
     this.admission.resources.dispose();
   }
+}
+
+/** Only closed cause codes and operation names can leave the presentation owner. */
+function previewFailureCategory(error: unknown) {
+  const messages = new Map([
+    ['Preview source frame is unavailable.', 'source-unavailable'],
+    ['Transition preview unavailable', 'transition-unavailable'],
+    ['Camera preview unavailable', 'camera-unavailable'],
+    ['Invalid presentation time', 'invalid-time'],
+    ['Preview GPU context lost.', 'gpu-context-lost'],
+    ['Effect runtime resource limit exceeded', 'resource-limit'],
+    ['GPU preview overlap is unavailable.', 'gpu-overlap'],
+    ['GPU preview already has a frame in flight.', 'gpu-capacity'],
+    ['Preview frame is already admitted.', 'frame-capacity'],
+    ['Preview scene is stale.', 'scene-stale'],
+    ['Preview renderer is disposed.', 'renderer-disposed'],
+    ['Preview output context is unavailable.', 'output-unavailable'],
+    ['Preview spatial preparation is unavailable.', 'spatial-unavailable'],
+    ['Invalid preview frame time.', 'invalid-frame-time'],
+    ['Invalid preview dimensions.', 'invalid-dimensions'],
+    ['Transition source timestamp is unavailable.', 'transition-timestamp'],
+    ['Transition GPU pixels are unavailable.', 'transition-pixels'],
+    ['GL transition settings are unavailable.', 'transition-settings'],
+    ['Camera GPU pixels are unavailable.', 'camera-pixels'],
+    ['Annotation GPU source is unavailable.', 'annotation-pixels'],
+    ['Enhanced GPU source pixels are unavailable.', 'enhanced-source'],
+    ['Export enhancement source timestamp is unavailable.', 'enhanced-timestamp'],
+    ['Preview window projection is unavailable.', 'window-projection'],
+    ['Preview projection is unavailable.', 'projection'],
+    ['GPU preview queue failed.', 'gpu-queue'],
+    ['GPU CSS filter resource budget exceeded.', 'gpu-filter-budget'],
+    ['GPU content identity budget exceeded.', 'gpu-content-budget'],
+    ['GPU content identity is unavailable.', 'gpu-content-identity'],
+    ['GPU preview texture budget exceeded.', 'gpu-texture-budget'],
+    ['GPU preview filter texture budget exceeded.', 'gpu-filter-texture-budget'],
+    ['GPU preview cache key has conflicting sources.', 'gpu-cache-conflict'],
+    ['GPU preview filter key has conflicting sources or contents.', 'gpu-filter-cache-conflict'],
+    ['GPU CSS filter key has conflicting sources.', 'gpu-css-cache-conflict'],
+    ['GPU presentation storage budget exceeded.', 'gpu-presentation-budget'],
+    ['GPU presentation surface capacity exceeded.', 'gpu-surface-capacity'],
+    ['GPU presentation surface already has a frame in flight.', 'gpu-surface-busy'],
+    ['GPU presentation image is still pending.', 'gpu-image-pending'],
+    ['GPU presentation backing size changed.', 'gpu-backing-changed'],
+    ['GPU presentation destination was not acquired.', 'gpu-destination-missing'],
+    ['GPU preview layer budget exceeded.', 'gpu-layer-budget'],
+    ['GPU paint data budget exceeded.', 'gpu-paint-budget'],
+    ['GPU source is not a raster.', 'gpu-source-kind'],
+  ]);
+  const causes: Error[] = [];
+  for (let value = error; value instanceof Error && causes.length < 4; value = value.cause)
+    causes.push(value);
+  const reason =
+    causes.map((cause) => messages.get(cause.message)).find(Boolean) ??
+    (causes.some((cause) => cause.name === 'GpuPreviewValidationError')
+      ? 'gpu-validation'
+      : causes.some((cause) => cause.name === 'GpuPreviewDeviceError')
+        ? 'gpu-device'
+        : causes.some((cause) =>
+              /^GPU (preview|presentation|source|paint|content|CSS)\b/.test(cause.message)
+            )
+          ? 'gpu-contract'
+          : 'unclassified');
+  const errorType =
+    causes
+      .map((cause) => cause.name)
+      .find((name) =>
+        [
+          'TypeError',
+          'RangeError',
+          'EncodingError',
+          'OperationError',
+          'InvalidStateError',
+          'NotSupportedError',
+          'QuotaExceededError',
+          'SecurityError',
+          'EffectRuntimeResourceError',
+          'GpuPreviewValidationError',
+          'GpuPreviewDeviceError',
+        ].includes(name)
+      ) ?? 'Error';
+  const operations = [
+    'validatePreviewSourceDemands',
+    'resolvePreviewSourceRequest',
+    'resolvePreviewSourceOrdinaryTime',
+    'PreviewSourceOwner.select',
+    'PreviewSourceOwner.advance',
+    'PreviewSourceOwner.restart',
+    'captureDecodedReviewPreviewFrame',
+    'capturePresentationCamera',
+    'ManualPresentationSession.prepare',
+    'ManualPresentationSession.capture',
+    'ManualPresentationSession.render',
+    'ManualPresentationSession.publish',
+  ].filter((operation) => causes.some((cause) => cause.stack?.includes(operation)));
+  const gpuOperations = [
+    'copyExternalImageToTexture',
+    'copyBufferToTexture',
+    'copyTextureToTexture',
+    'writeTexture',
+    'createBindGroup',
+    'setBindGroup',
+    'setPipeline',
+    'createTexture',
+    'submit',
+    'draw',
+    'destroyed',
+    'different device',
+    'out of bounds',
+    'incompatible',
+    'VideoFrame',
+  ].filter((operation) =>
+    causes.some(
+      (cause) =>
+        cause.name === 'GpuPreviewValidationError' &&
+        cause.message.toLowerCase().includes(operation.toLowerCase())
+    )
+  );
+  const gpuDetails = [
+    'geometry',
+    'dimensions',
+    'cache',
+    'texture',
+    'surface',
+    'layer',
+    'paint',
+    'filter',
+    'raster',
+    'pipeline',
+    'groups',
+    'transition',
+    'source',
+    'uniform',
+    'orientation',
+    'lens',
+    'tint',
+    'disposed',
+    'active',
+    'pending',
+    'invalid',
+    'unavailable',
+  ].filter((detail) =>
+    causes.some(
+      (cause) =>
+        /^GPU (preview|presentation|source|paint|content|CSS)\b/.test(cause.message) &&
+        cause.message.toLowerCase().includes(detail)
+    )
+  );
+  return { reason, errorType, operations, gpuOperations, gpuDetails };
 }
 
 /** Camera readiness is independent of the atomic source-frame lease and native transport. */

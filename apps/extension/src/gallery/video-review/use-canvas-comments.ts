@@ -1,6 +1,11 @@
 import { useCallback, useRef, useState } from 'react';
 import type { CanvasComment, ReviewAnnotation } from '../../features/video/review/types';
 import {
+  reviewCommandSourceTime,
+  type ReviewCommandContext,
+  type ReviewCommandPort,
+} from './command-context';
+import {
   createCanvasComment,
   showOnVideoWindow,
   switchCanvasCommentAttachment,
@@ -62,6 +67,7 @@ function staggeredCommentPosition(count: number): { x: number; y: number } {
  * flush points (Back, export preparation) can retry them without the busy guard.
  */
 export function useCanvasComments(args: {
+  commands: ReviewCommandPort;
   session: Session;
   time: number;
   busy: boolean;
@@ -69,13 +75,13 @@ export function useCanvasComments(args: {
   canStart(): boolean;
   run(action: () => Promise<unknown>): Promise<unknown>;
   selectedId?: string | null;
-  onSelectionChange?(id: string | null): void;
+  onSelectionChange?(id: string | null, context?: ReviewCommandContext): void;
 }) {
   const [localSelectedId, setLocalSelectedId] = useState<string | null>(null);
   const selectedId = args.selectedId === undefined ? localSelectedId : args.selectedId;
-  const setSelectedId = (id: string | null) => {
+  const setSelectedId = (id: string | null, context?: ReviewCommandContext) => {
     if (args.selectedId === undefined) setLocalSelectedId(id);
-    args.onSelectionChange?.(id);
+    args.onSelectionChange?.(id, context);
   };
   const drafts = useRef(new Map<string, string>());
   const guard = () => {
@@ -85,26 +91,35 @@ export function useCanvasComments(args: {
   const onDraft = (id: string, text: string) => {
     drafts.current.set(id, text);
   };
-  const insert = async (comment: CanvasComment) => {
+  const insert = async (comment: CanvasComment, context?: ReviewCommandContext) => {
     if (!guard()) return;
-    await args.run(() =>
-      args.session.commit({
+    await args.run(async () => {
+      if (context && !args.commands.isCurrent(context, 'source')) return;
+      return args.session.commit({
         id: crypto.randomUUID(),
         at: Date.now(),
         target: 'canvasComment',
         before: null,
         after: comment,
-      })
-    );
-    setSelectedId(comment.id);
+      });
+    });
+    if (!context || args.commands.isCurrent(context, 'source')) setSelectedId(comment.id, context);
   };
   const add = async () => {
-    const comment = createCanvasComment({
-      id: crypto.randomUUID(),
-      at: args.time,
-      position: staggeredCommentPosition(args.session.getSnapshot().document.canvasComments.length),
+    const context = args.commands.capture();
+    if (!context) return;
+    let pending: Promise<void> | undefined;
+    args.commands.admit(context, (accepted) => {
+      const time = reviewCommandSourceTime(accepted);
+      if (time === null) return;
+      const comment = createCanvasComment({
+        id: crypto.randomUUID(),
+        at: time,
+        position: staggeredCommentPosition(accepted.document.canvasComments.length),
+      });
+      pending = insert(comment, accepted);
     });
-    await insert(comment);
+    await pending;
   };
   /**
    * Shows an existing annotation on the video: one linked overlay whose text the

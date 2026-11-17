@@ -87,7 +87,13 @@ export function useReviewSelectionActions(
   disabled: boolean,
   onSelectKey?: ((key: string | null) => void) | undefined
 ) {
-  const [anchor, setAnchor] = useState<Anchor | null>(null);
+  const selectedKey = reviewTimelineSelectionKey(selection);
+  const [interaction, setInteraction] = useState<{
+    selectionKey: string | null;
+    visible: boolean;
+    multi: boolean;
+    key: string | null | undefined;
+  }>({ selectionKey: selectedKey, visible, multi: false, key: undefined });
   const [commandHost, setHost] = useState<HTMLFieldSetElement | null>(null);
   const [commandSlots, setSlots] = useState<ReviewSelectionCommandSlots>({});
   const setSlot = useCallback((action: ReviewSelectionCommand, host: HTMLSpanElement | null) => {
@@ -111,13 +117,38 @@ export function useReviewSelectionActions(
         delete node.dataset['reviewMultiSelected'];
     };
   }, [keys, multi, selection]);
-  useLayoutEffect(() => {
-    if (!visible) return;
-    const key = reviewTimelineSelectionKey(selection);
-    if (key) setAnchor((current) => (current?.key === key ? current : { key }));
-    else if (!multi) setAnchor(null);
-  }, [selection, visible, multi]);
-  const clear = useCallback(() => setKeys([]), []);
+  const anchoredKey = interaction.key === undefined ? selectedKey : interaction.key;
+  // Selection/visibility changes expire only transient dismissal or click overrides.
+  // Reset before commit so consumers never lose the new canonical action identity.
+  if (
+    interaction.key !== undefined &&
+    (interaction.selectionKey !== selectedKey ||
+      interaction.visible !== visible ||
+      interaction.multi !== multi)
+  )
+    setInteraction({
+      selectionKey: selectedKey,
+      visible,
+      multi,
+      key:
+        !visible || (multi && selectedKey === null) ? anchoredKey : multi ? selectedKey : undefined,
+    });
+  const setAnchor = useCallback(
+    (key: string | null) => {
+      setInteraction((current) => {
+        const currentKey = current.key === undefined ? selectedKey : current.key;
+        return currentKey === key &&
+          (current.key === undefined ||
+            (current.selectionKey === selectedKey &&
+              current.visible === visible &&
+              current.multi === multi))
+          ? current
+          : { selectionKey: selectedKey, visible, multi, key };
+      });
+    },
+    [selectedKey, visible, multi]
+  );
+  const clear = useCallback(() => setKeys((current) => (current.length ? [] : current)), []);
   const captureModified = (event: ReactPointerEvent): boolean => {
     if (
       disabled ||
@@ -171,7 +202,13 @@ export function useReviewSelectionActions(
     if (!event.shiftKey) previous.current = key;
     const activeKey = next.includes(key) ? key : (next.at(-1) ?? null);
     const activeElement = items.find((item) => reviewTimelineElementKey(item) === activeKey);
-    setAnchor(activeElement && activeKey ? { key: activeKey } : null);
+    // Modified gestures own an explicit group anchor, including a canonical-key match.
+    setInteraction({
+      selectionKey: selectedKey,
+      visible,
+      multi,
+      key: activeElement && activeKey ? activeKey : null,
+    });
     onSelectKey?.(activeKey);
     event.preventDefault();
     event.stopPropagation();
@@ -214,7 +251,7 @@ export function useReviewSelectionActions(
       clear();
       previous.current = key;
     }
-    setAnchor({ key });
+    setAnchor(key);
   };
   const captureModifiedRef = useRef(captureModified);
   captureModifiedRef.current = captureModified;
@@ -222,14 +259,13 @@ export function useReviewSelectionActions(
     (event: ReactPointerEvent) => captureModifiedRef.current(event),
     []
   );
-  const dismiss = useCallback(() => setAnchor(null), []);
-  const selectedKey = reviewTimelineSelectionKey(selection);
+  const dismiss = useCallback(() => setAnchor(null), [setAnchor]);
   const target = useMemo(
     () =>
-      visible && anchor && (multi || anchor.key === selectedKey)
-        ? { ...anchor, disabled, commandHost, commandSlots, dismiss }
+      visible && anchoredKey && (multi || anchoredKey === selectedKey)
+        ? { key: anchoredKey, disabled, commandHost, commandSlots, dismiss }
         : null,
-    [visible, anchor, multi, selectedKey, disabled, commandHost, commandSlots, dismiss]
+    [visible, anchoredKey, multi, selectedKey, disabled, commandHost, commandSlots, dismiss]
   );
   const multiSelection = useMemo(
     () => ({ keys, clear, captureModified: captureMulti, deleteAction }),

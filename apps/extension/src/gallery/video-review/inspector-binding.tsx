@@ -1,3 +1,6 @@
+import type { ReviewCommandPort, ReviewCommandContext } from './command-context';
+import type { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
+import type { ReviewTimeSegment } from '../../features/video/review/timeline';
 import { Info, Layers2 } from 'lucide-react';
 import type { ReviewInspectorSection } from './inspector-sections';
 import { ReviewTrackWorkspace, ReviewTrackWorkspaceHeading } from './track-workspace';
@@ -31,7 +34,7 @@ import {
   auditionRecordedActionAudio,
 } from './action-presentation';
 import { ReviewActionHistory } from './action-history';
-import { openVideoEditorPage, openGalleryPage } from '../../platform/navigation/extension-pages';
+import { openVideoEditorPage } from '../../platform/navigation/extension-pages';
 import { ReviewIntervalMap } from './interval-timing';
 import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
 import {
@@ -42,10 +45,14 @@ import {
 } from './selected-properties';
 import type { ReviewAnnotation } from '../../features/video/review/types';
 import { ReviewInspector } from './inspector';
-import type { ReviewInspectorNavigation } from './inspector-navigation';
+import {
+  createReviewInspectorTrackView,
+  type ReviewInspectorNavigation,
+  type ReviewInspectorTrackView,
+} from './inspector-navigation';
 import { ReviewComposer } from './composer';
 import { exportReviewReport } from './report-actions';
-import { ReviewFragmentAction, ReviewInspectorActions } from './edit-actions';
+
 import { ReviewSceneProperties } from './advanced-panels';
 import type { useCanvasComments } from './use-canvas-comments';
 import type { useReviewAudio } from './use-review-audio';
@@ -63,63 +70,87 @@ import {
 } from 'react';
 import { translate } from '../../platform/i18n';
 import type { LoadedReview } from './use-session';
-import type { useReviewEditorState } from './use-editor-state';
+import type { ReviewAnchor, ReviewSelection } from '../../features/video/review/types';
+import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
+import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
+import type { useReviewAdvanced } from './use-advanced';
+import type { useReviewComposer } from './use-session';
+import type { useReviewText } from './use-review-text';
+import type { ReviewInspectorEditCommands } from './selected-properties';
+import type { ReviewBeforeAction } from './note-transitions';
+import type { ReviewSpeechFlushRegistration } from './speech-edit-guard';
+import type { ReviewPlaybackRange } from './playback-range';
+import type { CursorFocusTimelineKey } from '../../features/video/project/cursor-focus-path/timeline';
+import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
+import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
+import type { PresentationSequencePlan } from '../../features/video/review/presentation-sequence';
+import type { ReviewExportReceipt } from '../../workflows/video-review/export-lifecycle';
 
-type InspectorState = Pick<
-  ReturnType<typeof useReviewEditorState>,
-  | 'annotationEffects'
-  | 'selection'
-  | 'text'
-  | 'playbackRange'
-  | 'advancedPending'
-  | 'advancedFailed'
-  | 'retryAdvanced'
+type Session = LoadedReview['session'];
+type SessionView = ReturnType<Session['getSnapshot']>;
+type AdvancedControls = ReturnType<typeof useReviewAdvanced>;
+
+/** Accepted document and selection data. Media, continuous clocks and writers are excluded. */
+type ReviewInspectorModel = {
+  document: SessionView['document'];
+  workspace: {
+    project: SessionView['snapshot']['workspace']['project'];
+    aggregateId: string;
+    sourceAssetId: string;
+    effectSnapshots: SessionView['snapshot']['workspace']['effectSnapshots'];
+  };
+  save: Pick<SessionView, 'pending' | 'error'> & {
+    advancedPending: boolean;
+    advancedFailed: boolean;
+  };
+  advanced: QuickEditAdvancedState;
+  scene: Pick<
+    ReturnType<typeof resolveQuickEditEffectiveState>,
+    'zoomRegions' | 'canvas' | 'background' | 'windowHeader'
+  >;
+  activeSelection: ReviewSelection;
+  selection: ReviewAnchor;
+  playbackRange: ReviewPlaybackRange | null;
+  selected: ReviewAnnotation | null;
+  projected: {
+    markers: readonly ReviewTelemetryMarker[];
+    captureCapabilities?: ComponentProps<typeof ReviewActionHistory>['captureCapabilities'];
+  };
+  cursorFocusPath: CursorFocusPath;
+  cursorFocusKeys: readonly CursorFocusTimelineKey[];
+  segments: readonly ReviewTimeSegment[];
+  resultDuration: number;
+  busy: boolean;
+  playing: boolean;
+};
+
+/** Feature authoring lifecycles remain with their existing domain owners. */
+type ReviewInspectorEditors = {
+  annotationEffects: ReturnType<
+    typeof import('./annotation-effects-editor').useReviewAnnotationEffects
+  >;
+  cursorMotion: ReturnType<typeof import('./cursor-motion-editor').useReviewCursorMotions>;
+  text: ReturnType<typeof useReviewText>;
+  editing: {
+    selected: import('../../features/video/review/types').ReviewEdit | null;
+    commands: ReviewInspectorEditCommands;
+  };
+  zoom: ReturnType<typeof import('./zoom-editor').useReviewZoomEditor>;
+  webcam: ReturnType<typeof import('./webcam-editor').useReviewWebcamEditor>;
+  watermark: ReturnType<typeof import('./use-review-watermark').useReviewWatermark>;
+  presentation: ReturnType<typeof import('./use-review-presentation').useReviewPresentation>;
+  backgroundImport: ReturnType<typeof import('./use-review-background').useReviewBackgroundImport>;
+  interactionEditor: import('./interaction-editor').ReviewInteractionEditor;
+  composer: ReturnType<typeof useReviewComposer>;
+};
+
+/** Explicit edit capabilities; callers retain admission and session lifetime authority. */
+type ReviewInspectorCommands = Pick<
+  AdvancedControls,
   | 'setCursorFocusPath'
-  | 'cursorMotion'
-  | 'cursorFocusPath'
-  | 'cursorFocusKeys'
-  | 'selectCursorFocusKey'
-  | 'setMode'
   | 'setTrackVisibility'
-  | 'backgroundImport'
-  | 'activeSelection'
-  | 'projected'
-  | 'setActiveSelection'
-  | 'editing'
-  | 'session'
-  | 'snapshot'
-  | 'composer'
-  | 'video'
-  | 'time'
-  | 'playing'
-  | 'seekRevision'
-  | 'play'
-  | 'features'
-  | 'selected'
-  | 'setHovered'
-  | 'busy'
-  | 'setBusy'
-  | 'message'
-  | 'setMessage'
-  | 'seek'
-  | 'run'
-  | 'canStart'
-  | 'beforeAction'
-  | 'leaveNewNote'
-  | 'runComposer'
-  | 'selectComment'
-  | 'add'
-  | 'advanced'
-  | 'zoom'
-  | 'webcam'
-  | 'watermark'
-  | 'presentation'
-  | 'timeline'
-  | 'interactionEditor'
   | 'setKeyAnimations'
   | 'setActionAudio'
-  | 'performAction'
-  | 'actionSoundPreview'
   | 'setClickAnimations'
   | 'setBackground'
   | 'previewBackground'
@@ -127,46 +158,83 @@ type InspectorState = Pick<
   | 'setCaptions'
   | 'setWindowHeader'
   | 'setSourceFilters'
-  | 'setOverlaysVisible'
-  | 'resetAdvanced'
   | 'setCameraFollowDefaults'
-  | 'flushAdvanced'
-  | 'registerSpeechFlush'
-  | 'setVoiceoverSilent'
+> & {
+  activation: ReviewCommandPort;
+  beforeAction: ReviewBeforeAction;
+  run(action: () => Promise<unknown>): Promise<unknown>;
+  runComposer(action: () => Promise<unknown>): Promise<unknown>;
+  canStart(): boolean;
+  performAction(action: () => Promise<boolean>): Promise<boolean | undefined>;
+  setActiveSelection(selection: ReviewSelection, context?: ReviewCommandContext): void;
+  selectCursorFocusKey(id: string | undefined, time: number): void;
+  setMode(mode: 'basic' | 'advanced'): void;
+  setHovered(annotation: ReviewAnnotation | null): void;
+  setBusy(value: boolean): void;
+  setMessage(value: string | null): void;
+  selectComment(annotation: ReviewAnnotation): void;
+  add(marker?: ReviewTelemetryMarker): void;
+  leaveNewNote(): void;
+  retryAdvanced(): Promise<void>;
+  flushAdvanced(): Promise<void>;
+  registerSpeechFlush(owner: ReviewSpeechFlushRegistration): () => void;
+  setVoiceoverSilent(value: boolean): void;
+  actionSoundPreview: {
+    audition(
+      plan: ReturnType<
+        typeof import('../../features/video/review/action-audio').buildReviewActionAudioPlan
+      >
+    ): void;
+    stopAudition(): void;
+  };
+};
+
+/** Only the dedicated frame/speech adapters read native media or sampled time. */
+type ReviewInspectorMedia = {
+  pause(): void;
+  seek(time: number, playing?: boolean): void;
+  seekResult(time: number): void;
+  play(): void | Promise<void>;
+  readPosition(): { sourceTime: number; resultTime: number; seekRevision: number };
+  readVideo(): HTMLVideoElement | null;
+  toSourceTime(time: number): number | null;
+};
+
+/** Export admission and progress are projected; the exporter lifetime stays outside the inspector. */
+type ReviewInspectorOutput = {
+  index: ReviewMediaIndex | null;
+  phase: 'idle' | 'exporting' | 'publishing';
+  result: { receipt: ReviewExportReceipt } | null;
+  presentationDuration: PresentationSequencePlan | null;
+  hasBookends: boolean;
+};
+type ReviewInspectorAudio = Pick<
+  ReturnType<typeof useReviewAudio>,
+  | 'assets'
+  | 'selected'
+  | 'selectedOriginal'
+  | 'patchClip'
+  | 'removeClip'
+  | 'patchOriginal'
+  | 'removeOriginal'
+  | 'setOriginal'
+  | 'setLaneVolume'
 >;
 
-/** Adapts the retained playback range to the existing guarded fragment download. */
-function ReviewInspectorFragment({ state }: { state: InspectorState }) {
-  const selectedRange = state.selection.kind === 'range' ? state.selection : undefined;
-  const selection = state.playbackRange
-    ? { kind: 'range' as const, ...state.playbackRange }
-    : selectedRange;
-  if (!selection) return null;
-  const exporter = state.editing.exporter;
-  return (
-    <ReviewFragmentAction
-      showLabel
-      selection={selection}
-      edits={state.snapshot.document.edits}
-      index={exporter.index}
-      snapToKeyframes={state.advanced.ui.mode !== 'advanced'}
-      busy={
-        state.busy ||
-        !!state.composer.before ||
-        exporter.checkingCodecs ||
-        exporter.phase !== 'idle' ||
-        exporter.plan(selection).kind === 'unavailable'
-      }
-      onDownload={exporter.downloadSelection}
-    />
-  );
-}
+type ReviewInspectorAccess = {
+  model: ReviewInspectorModel;
+  editors: ReviewInspectorEditors;
+  commands: ReviewInspectorCommands;
+  media: ReviewInspectorMedia;
+  output: ReviewInspectorOutput;
+  session: Session;
+  toSourceTime(time: number): number | null;
+};
 
 type ReviewInspectorBindingProps = {
   recording?: ReactNode;
   inspectorTrack?: QuickEditTrack;
-  trackTab?: 'list' | 'settings';
-  onTrackTab?(tab: 'list' | 'settings'): void;
+  trackView?: ReviewInspectorTrackView;
   onProject?: (() => void) | undefined;
   backLabel?: string | undefined;
   onJoinPreview?: ((slot: 'intro' | 'outro', target?: 'fade' | 'join') => void) | undefined;
@@ -176,9 +244,14 @@ type ReviewInspectorBindingProps = {
   navigation: ReviewInspectorNavigation;
   onToggleHeight(): void;
   resource: LoadedReview;
-  state: InspectorState;
+  model: ReviewInspectorModel;
+  editors: ReviewInspectorEditors;
+  commands: ReviewInspectorCommands;
+  media: ReviewInspectorMedia;
+  output: ReviewInspectorOutput;
+  exportActions: ReactNode;
   canvasComments: ReturnType<typeof useCanvasComments>;
-  audio: ReturnType<typeof useReviewAudio>;
+  audio: ReviewInspectorAudio;
   onBack(): void;
   onClose(): void;
   onRenameProject?: ((name: string) => Promise<void>) | undefined;
@@ -187,10 +260,14 @@ type ReviewInspectorBindingProps = {
 export function ReviewInspectorBinding({
   onRenameProject,
   inspectorTrack = 'source',
-  trackTab = 'list',
-  onTrackTab,
+  trackView: suppliedTrackView,
   resource,
-  state,
+  model,
+  editors,
+  commands,
+  media,
+  output,
+  exportActions,
   canvasComments,
   audio,
   onBack,
@@ -205,36 +282,44 @@ export function ReviewInspectorBinding({
   onProject,
   backLabel,
 }: ReviewInspectorBindingProps) {
-  const { editing, snapshot, composer, busy, run } = state;
+  const state = {
+    model,
+    editors,
+    commands,
+    media,
+    output,
+    session: resource.session,
+    toSourceTime: media.toSourceTime,
+  };
+  const { busy } = model;
+  const { composer } = editors;
+  const { run } = commands;
   const workspaceId = useId();
+  const [localTrackView] = useState(createReviewInspectorTrackView);
+  const trackView = suppliedTrackView ?? localTrackView;
   const hasTrackSettings =
     inspectorTrack === 'source' ||
-    (state.advanced.ui.mode === 'advanced' &&
+    (state.model.advanced.ui.mode === 'advanced' &&
       ['originalAudio', 'webcam', 'cursorMotion', 'text', 'voiceover', 'music'].includes(
         inspectorTrack
       ));
-  const activeTab = hasTrackSettings ? trackTab : 'list';
   const projectInfo = (
     <ReviewProjectInfo
       resource={resource}
-      name={snapshot.snapshot.workspace.project?.name ?? resource.filename}
+      name={model.workspace.project?.name ?? resource.filename}
       busy={busy}
       onRename={onRenameProject}
-      index={editing.exporter.index}
-      camera={state.webcam.camera}
-      cameraPending={state.webcam.pending}
-      cameraAttempt={state.webcam.resourceAttempt}
-      active={
-        inspectorTrack === 'source' &&
-        activeTab === 'settings' &&
-        ['track', 'project'].includes(navigation.shown)
-      }
+      index={output.index}
+      camera={state.editors.webcam.camera}
+      cameraPending={state.editors.webcam.pending}
+      cameraAttempt={state.editors.webcam.resourceAttempt}
+      active={inspectorTrack === 'source' && ['track', 'project'].includes(navigation.shown)}
     />
   );
 
   const multiSelection = useContext(ReviewTimelineMultiSelectionContext);
   const batch = (multiSelection?.keys.length ?? 0) > 1;
-  const [historySelection, setHistorySelection] = useState<typeof state.activeSelection>();
+  const [historySelection, setHistorySelection] = useState<typeof state.model.activeSelection>();
   const active = useRef(true);
   const live = useRef({ session: state.session, resource });
   live.current = { session: state.session, resource };
@@ -246,7 +331,10 @@ export function ReviewInspectorBinding({
   }, []);
   const isCurrent = () =>
     active.current && live.current.session === state.session && live.current.resource === resource;
-  const leave = (done: () => void) => leaveReviewInspector(state, canvasComments, done, isCurrent);
+  const leave = (done: () => void) => {
+    state.media.pause();
+    leaveReviewInspector(inspectorExit(state), canvasComments, done, isCurrent);
+  };
   const trackList =
     inspectorTrack === 'text' ? (
       reviewInspectorTextDocument(state, canvasComments)
@@ -265,7 +353,31 @@ export function ReviewInspectorBinding({
       <ReviewTrackItemsInspector
         key={inspectorTrack}
         track={inspectorTrack}
-        state={state}
+        document={state.model.document}
+        advanced={state.model.advanced}
+        selection={state.model.activeSelection}
+        snapshots={state.model.workspace.effectSnapshots}
+        busy={
+          state.model.busy ||
+          state.output.phase !== 'idle' ||
+          state.editors.annotationEffects.pending ||
+          !!state.editors.annotationEffects.gestureId
+        }
+        commands={{
+          session: state.session,
+          open: (selection, done) => {
+            const context = state.commands.activation.capture();
+            if (!context) return;
+            state.commands.activation.admit(context, (captured) => {
+              state.commands.setActiveSelection(selection, captured);
+              done();
+            });
+          },
+          canStart: state.commands.canStart,
+          run: state.commands.run,
+          flushAnnotations: state.editors.annotationEffects.flush,
+          flushAdvanced: state.commands.flushAdvanced,
+        }}
         resource={resource}
         audio={audio}
         navigation={navigation}
@@ -275,8 +387,8 @@ export function ReviewInspectorBinding({
     <ReviewTrackWorkspace
       key={inspectorTrack}
       id={workspaceId}
-      tab={activeTab}
-      onTabChange={(tab) => onTrackTab?.(tab)}
+      track={inspectorTrack}
+      view={trackView}
       list={trackList}
       sections={
         inspectorTrack === 'source'
@@ -294,7 +406,7 @@ export function ReviewInspectorBinding({
     />
   );
   return (
-    <ReviewIntervalMap.Provider value={state.timeline.timeMap.getSegments()}>
+    <ReviewIntervalMap.Provider value={state.model.segments}>
       <ReviewInspector
         recording={recording}
         trackHeader={<ReviewTrackWorkspaceHeading id={workspaceId} track={inspectorTrack} />}
@@ -304,18 +416,34 @@ export function ReviewInspectorBinding({
           ) : inspectorTrack === 'originalAudio' ? (
             <ReviewSourceSpeechBinding
               resource={resource}
-              editor={state}
-              audio={audio}
-              flush={() => flushReviewTextVoiceBuffers(state, canvasComments)}
+              originalAudio={state.model.advanced.audio.original}
+              recognitionEnabled={state.model.advanced.ui.mode === 'advanced'}
+              disabled={state.model.busy}
+              sourceAssetId={state.model.workspace.sourceAssetId}
+              sourceAudioAvailable={!!state.output.index?.audioCodec}
+              selection={
+                state.model.playbackRange ??
+                (state.model.selection.kind === 'range' ? state.model.selection : undefined)
+              }
+              beforeAction={state.commands.beforeAction}
+              registerSpeechFlush={state.commands.registerSpeechFlush}
+              onEnableAdvanced={
+                state.model.advanced.ui.mode === 'basic'
+                  ? () => state.commands.setMode('advanced')
+                  : undefined
+              }
+              media={state.media}
+              onOriginalChange={audio.setOriginal}
+              flush={() => flushReviewTextVoiceBuffers(inspectorBuffers(state), canvasComments)}
               renderInspectorSections={workspace}
             />
           ) : inspectorTrack === 'webcam' ? (
-            state.webcam.camera ? (
-              <ReviewWebcamInspector editor={state.webcam} renderSections={workspace} />
+            state.editors.webcam.camera ? (
+              <ReviewWebcamInspector editor={state.editors.webcam} renderSections={workspace} />
             ) : (
               workspace([])
             )
-          ) : state.advanced.ui.mode === 'advanced' ? (
+          ) : state.model.advanced.ui.mode === 'advanced' ? (
             <ReviewScenePropertiesBinding
               track={inspectorTrack}
               file={resource.file}
@@ -340,7 +468,31 @@ export function ReviewInspectorBinding({
             <ReviewTrackItemsInspector
               key={`${resource.filename}:${inspectorTrack}`}
               track={inspectorTrack}
-              state={state}
+              document={state.model.document}
+              advanced={state.model.advanced}
+              selection={state.model.activeSelection}
+              snapshots={state.model.workspace.effectSnapshots}
+              busy={
+                state.model.busy ||
+                state.output.phase !== 'idle' ||
+                state.editors.annotationEffects.pending ||
+                !!state.editors.annotationEffects.gestureId
+              }
+              commands={{
+                session: state.session,
+                open: (selection, done) => {
+                  const context = state.commands.activation.capture();
+                  if (!context) return;
+                  state.commands.activation.admit(context, (captured) => {
+                    state.commands.setActiveSelection(selection, captured);
+                    done();
+                  });
+                },
+                canStart: state.commands.canStart,
+                run: state.commands.run,
+                flushAnnotations: state.editors.annotationEffects.flush,
+                flushAdvanced: state.commands.flushAdvanced,
+              }}
               resource={resource}
               audio={audio}
               navigation={navigation}
@@ -357,39 +509,39 @@ export function ReviewInspectorBinding({
         speech={
           <ReviewSourceSpeechBinding
             resource={resource}
-            editor={state}
-            audio={audio}
-            flush={() => flushReviewTextVoiceBuffers(state, canvasComments)}
+            originalAudio={state.model.advanced.audio.original}
+            recognitionEnabled={state.model.advanced.ui.mode === 'advanced'}
+            disabled={state.model.busy}
+            sourceAssetId={state.model.workspace.sourceAssetId}
+            sourceAudioAvailable={!!state.output.index?.audioCodec}
+            selection={
+              state.model.playbackRange ??
+              (state.model.selection.kind === 'range' ? state.model.selection : undefined)
+            }
+            beforeAction={state.commands.beforeAction}
+            registerSpeechFlush={state.commands.registerSpeechFlush}
+            onEnableAdvanced={
+              state.model.advanced.ui.mode === 'basic'
+                ? () => state.commands.setMode('advanced')
+                : undefined
+            }
+            media={state.media}
+            onOriginalChange={audio.setOriginal}
+            flush={() => flushReviewTextVoiceBuffers(inspectorBuffers(state), canvasComments)}
           />
         }
         preview={preview}
-        beforeAction={state.beforeAction}
+        beforeAction={state.commands.beforeAction}
         fullHeight={fullHeight}
         resizeHandle={resizeHandle}
         navigation={navigation}
         onToggleHeight={onToggleHeight}
-        filename={snapshot.snapshot.workspace.project?.name ?? resource.filename}
+        filename={model.workspace.project?.name ?? resource.filename}
         onRenameProject={onRenameProject}
-        annotations={snapshot.document.annotations}
-        selectedId={state.selected?.id ?? null}
-        busy={busy || editing.exporter.phase !== 'idle'}
-        actions={
-          <ReviewInspectorActions
-            exporter={editing.exporter}
-            fragmentAction={<ReviewInspectorFragment state={state} />}
-            toolKey={`${editing.mode}:${state.zoom.drawing}:${state.zoom.insertionType}:${audio.originalTool}`}
-            onOpenResult={(mediaId) => {
-              void run(() => openGalleryPage({ mediaId }));
-            }}
-            advanced={snapshot.snapshot.workspace.advanced.ui.mode === 'advanced'}
-            hasEdits={snapshot.document.edits.length > 0}
-            busy={busy}
-            composerBusy={!!composer.before}
-            onExport={() => {
-              state.beforeAction(() => void editing.exporter.start());
-            }}
-          />
-        }
+        annotations={model.document.annotations}
+        selectedId={state.model.selected?.id ?? null}
+        busy={busy || state.output.phase !== 'idle'}
+        actions={exportActions}
         actionHistory={
           <ReviewRecordedHistory
             state={state}
@@ -404,7 +556,7 @@ export function ReviewInspectorBinding({
             }}
           />
         }
-        settingsAvailable={state.advanced.ui.mode === 'advanced'}
+        settingsAvailable={state.model.advanced.ui.mode === 'advanced'}
         editingId={composer.annotation?.id}
         composer={
           composer.annotation ? (
@@ -418,21 +570,21 @@ export function ReviewInspectorBinding({
                 String(multiSelection!.keys.length)
               )
             : reviewSelectionLabel({
-                selection: state.activeSelection,
-                markers: state.projected.markers,
-                advanced: state.advanced,
-                editing: state.editing,
+                selection: state.model.activeSelection,
+                markers: state.model.projected.markers,
+                advanced: state.model.advanced,
+                editing: state.editors.editing,
               })
         }
-        selectionPreferenceScope={state.activeSelection.kind}
+        selectionPreferenceScope={state.model.activeSelection.kind}
         selectionIcon={
           batch
             ? Layers2
             : reviewSelectionIcon({
-                selection: state.activeSelection,
-                markers: state.projected.markers,
-                advanced: state.advanced,
-                editing: state.editing,
+                selection: state.model.activeSelection,
+                markers: state.model.projected.markers,
+                advanced: state.model.advanced,
+                editing: state.editors.editing,
               })
         }
         scene={
@@ -445,39 +597,68 @@ export function ReviewInspectorBinding({
           />
         }
         saveStatus={
-          state.advancedFailed
+          state.model.save.advancedFailed
             ? 'failed'
-            : state.advancedPending || snapshot.pending > 0
+            : state.model.save.advancedPending || model.save.pending > 0
               ? 'saving'
               : 'saved'
         }
-        onRetry={() => void run(state.retryAdvanced)}
-        message={snapshot.error ? reviewErrorMessage(snapshot.error) : null}
+        onRetry={() => void run(state.commands.retryAdvanced)}
+        message={model.save.error ? reviewErrorMessage(model.save.error) : null}
         onBack={() => leave(onBack)}
         onClose={() => leave(onClose)}
-        rangeSelected={!!state.playbackRange}
-        onAdd={state.add}
-        onSelect={state.selectComment}
-        onHover={state.setHovered}
-        onOpenVideoEditor={() => openReviewInspectorInVideoEditor(state, canvasComments, isCurrent)}
+        rangeSelected={!!state.model.playbackRange}
+        onAdd={state.commands.add}
+        onSelect={state.commands.selectComment}
+        onHover={state.commands.setHovered}
+        onOpenVideoEditor={() => {
+          state.media.pause();
+          openReviewInspectorInVideoEditor(inspectorExit(state), canvasComments, isCurrent);
+        }}
         {...reviewInspectorNoteActions(state, resource)}
       >
         <ReviewDeferredSelection
           selectionKey={JSON.stringify([
             resource.url,
-            state.activeSelection.kind === 'cursor-focus'
-              ? { kind: 'cursor-focus', id: state.activeSelection.id }
-              : state.activeSelection,
-            multiSelection?.keys,
+            batch ? 'batch' : 'single',
+            state.model.activeSelection.kind,
           ])}
         >
           {batch ? (
-            <ReviewTimelineBatchInspector state={state} duration={resource.source.duration} />
+            <ReviewTimelineBatchInspector
+              document={state.model.document}
+              advanced={state.model.advanced}
+              markers={state.model.projected.markers}
+              cursorFocusPath={state.model.cursorFocusPath}
+              cursorFocusKeys={state.model.cursorFocusKeys}
+              busy={state.model.busy || state.output.phase !== 'idle'}
+              commands={{
+                session: state.session,
+                run: state.commands.run,
+                flushAdvanced: state.commands.flushAdvanced,
+                canStart: state.commands.canStart,
+                setMessage: state.commands.setMessage,
+              }}
+              duration={resource.source.duration}
+            />
           ) : (
-            <ReviewTimelineCloneScope state={state} duration={resource.source.duration}>
+            <ReviewTimelineCloneScope
+              document={state.model.document}
+              advanced={state.model.advanced}
+              selection={state.model.activeSelection}
+              busy={state.model.busy || state.output.phase !== 'idle'}
+              commands={{
+                session: state.session,
+                run: state.commands.run,
+                flushAdvanced: state.commands.flushAdvanced,
+                canStart: state.commands.canStart,
+                setMessage: state.commands.setMessage,
+              }}
+              duration={resource.source.duration}
+            >
               <ReviewSelectionBinding
                 onBackToHistory={
-                  state.activeSelection === historySelection
+                  state.model.activeSelection === historySelection
                     ? () => navigation.setSection('history')
                     : undefined
                 }
@@ -494,7 +675,7 @@ export function ReviewInspectorBinding({
   );
 }
 
-/** Selection commits first; only mounting a different property panel uses background priority. */
+/** Only a family, source or batch-mode change defers mounting; item changes keep current fields and resources. */
 export function ReviewDeferredSelection({
   selectionKey,
   children,
@@ -504,7 +685,7 @@ export function ReviewDeferredSelection({
 }) {
   const readyKey = useDeferredValue(selectionKey);
   const pending = readyKey !== selectionKey;
-  // Old fields must not edit the previous item after the urgent selection has changed.
+  // A different deferred family must not retain editable fields from the previous selection.
   return (
     <div aria-busy={pending} className="min-w-0 space-y-3">
       {pending ? null : children}
@@ -514,52 +695,60 @@ export function ReviewDeferredSelection({
 
 /** Joins the text document to the existing voice buffers and canonical final-video clock. */
 function reviewInspectorTextDocument(
-  state: Pick<
-    InspectorState,
-    | 'text'
-    | 'busy'
-    | 'composer'
-    | 'flushAdvanced'
-    | 'session'
-    | 'video'
-    | 'registerSpeechFlush'
-    | 'beforeAction'
-    | 'setVoiceoverSilent'
-    | 'editing'
-    | 'seek'
-    | 'play'
-  >,
+  state: ReviewInspectorAccess,
   canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>
 ) {
   return (
     <ReviewTextDocumentPanel
-      editor={state.text}
-      snapshots={state.text.snapshots}
+      editor={state.editors.text}
+      snapshots={state.editors.text.snapshots}
       onPlay={(fragment) =>
-        state.beforeAction(() => {
-          state.video.current?.pause();
-          state.seek(state.text.sourceInterval(fragment).start, false);
-          void state.play();
+        state.commands.beforeAction(() => {
+          state.media.pause();
+          state.media.seek(state.editors.text.sourceInterval(fragment).start, false);
+          void state.media.play();
         })
       }
       canCut={(ids) => {
-        const range = reviewTextCutRange(state.text, ids);
-        return !!range && state.editing.canApply('cut', range);
+        const range = reviewTextCutRange(state.editors.text, ids);
+        return !!range && state.editors.editing.commands.canApply('cut', range);
       }}
       onCut={(ids) =>
-        state.beforeAction(() => {
-          const range = reviewTextCutRange(state.text, ids);
-          if (range && state.editing.canApply('cut', range)) void state.editing.apply('cut', range);
+        state.commands.beforeAction(() => {
+          const range = reviewTextCutRange(state.editors.text, ids);
+          if (range && state.editors.editing.commands.canApply('cut', range))
+            void state.editors.editing.commands.apply('cut', range);
         })
       }
-      busy={state.busy || state.editing.exporter.phase !== 'idle'}
+      busy={state.model.busy || state.output.phase !== 'idle'}
       voice={reviewTextVoiceAccess(state, canvasComments)}
       subtitleMainOffset={reviewSubtitleMainOffset(
-        state.editing.exporter.presentationDuration,
-        state.editing.exporter.hasBookends
+        state.output.presentationDuration,
+        state.output.hasBookends
       )}
     />
   );
+}
+
+function recordedPresentation(state: ReviewInspectorAccess) {
+  return {
+    busy: state.model.busy,
+    advanced: state.model.advanced,
+    activeSelection: state.model.activeSelection,
+    projected: state.model.projected,
+    editing: { exporter: { phase: state.output.phase } },
+    timeline: { timeMap: { getSegments: () => state.model.segments } },
+    canStart: state.commands.canStart,
+    setMode: state.commands.setMode,
+    setActiveSelection: state.commands.setActiveSelection,
+    setMessage: state.commands.setMessage,
+    setClickAnimations: state.commands.setClickAnimations,
+    setKeyAnimations: state.commands.setKeyAnimations,
+    setActionAudio: state.commands.setActionAudio,
+    flushAdvanced: state.commands.flushAdvanced,
+    performAction: state.commands.performAction,
+    actionSoundPreview: state.commands.actionSoundPreview,
+  };
 }
 
 const EMPTY_HISTORY_ITEMS: readonly never[] = [];
@@ -571,8 +760,8 @@ function ReviewRecordedHistory({
   onSelection,
 }: {
   family?: 'keyboard' | 'mouse' | undefined;
-  state: InspectorState;
-  onSelection(selection: InspectorState['activeSelection']): void;
+  state: ReviewInspectorAccess;
+  onSelection(selection: ReviewInspectorModel['activeSelection']): void;
 }) {
   const latest = useRef({ state, onSelection });
   latest.current = { state, onSelection };
@@ -584,20 +773,22 @@ function ReviewRecordedHistory({
   >(
     () => ({
       onAudioChange: (targets, patch) => {
-        void changeRecordedActionAudio(latest.current.state, targets, patch);
+        void changeRecordedActionAudio(recordedPresentation(latest.current.state), targets, patch);
       },
       onAudition: (target, style) =>
-        auditionRecordedActionAudio(latest.current.state, target, style),
-      onStopAudition: () => latest.current.state.actionSoundPreview.stopAudition(),
-      onKeyChange: (ids, patch) => changeRecordedKeys(latest.current.state, ids, patch),
-      onChange: (ids, patch) => changeRecordedClicks(latest.current.state, ids, patch),
+        auditionRecordedActionAudio(recordedPresentation(latest.current.state), target, style),
+      onStopAudition: () => latest.current.state.commands.actionSoundPreview.stopAudition(),
+      onKeyChange: (ids, patch) =>
+        changeRecordedKeys(recordedPresentation(latest.current.state), ids, patch),
+      onChange: (ids, patch) =>
+        changeRecordedClicks(recordedPresentation(latest.current.state), ids, patch),
       onSelect: (marker) => {
         const { state, onSelection } = latest.current;
-        state.beforeAction(() => {
-          state.video.current?.pause();
-          state.seek(marker.start, false);
+        const context = state.commands.activation.capture();
+        if (!context) return;
+        state.commands.activation.admit(context, (captured) => {
           const selection = { kind: 'telemetry' as const, ref: marker.ref };
-          state.setActiveSelection(selection);
+          state.commands.setActiveSelection(selection, captured);
           onSelection(selection);
         });
       },
@@ -607,24 +798,28 @@ function ReviewRecordedHistory({
   return (
     <ReviewActionHistory
       {...commands}
-      captureCapabilities={state.projected.captureCapabilities}
+      captureCapabilities={state.model.projected.captureCapabilities}
       markers={
         family
-          ? state.projected.markers.filter((m) => reviewInteractionFamily(m) === family)
-          : state.projected.markers
+          ? state.model.projected.markers.filter((m) => reviewInteractionFamily(m) === family)
+          : state.model.projected.markers
       }
-      activeRef={state.activeSelection.kind === 'telemetry' ? state.activeSelection.ref : undefined}
-      keyAnimations={state.advanced.keyAnimations ?? EMPTY_HISTORY_ITEMS}
-      actionAudio={state.advanced.actionAudio ?? EMPTY_HISTORY_ITEMS}
-      animations={state.advanced.clickAnimations ?? EMPTY_HISTORY_ITEMS}
-      busy={state.busy || state.editing.exporter.phase !== 'idle'}
+      activeRef={
+        state.model.activeSelection.kind === 'telemetry'
+          ? state.model.activeSelection.ref
+          : undefined
+      }
+      keyAnimations={state.model.advanced.keyAnimations ?? EMPTY_HISTORY_ITEMS}
+      actionAudio={state.model.advanced.actionAudio ?? EMPTY_HISTORY_ITEMS}
+      animations={state.model.advanced.clickAnimations ?? EMPTY_HISTORY_ITEMS}
+      busy={state.model.busy || state.output.phase !== 'idle'}
     />
   );
 }
 
 /** Backup joins accepted edits and recovery before reading the exact saved snapshot. */
 export async function backupReview(
-  state: Pick<InspectorState, 'composer' | 'flushAdvanced' | 'session' | 'setMessage'>,
+  state: ReviewInspectorBuffers & { session: Session; setMessage(value: string | null): void },
   canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>
 ) {
   await flushReviewTextVoiceBuffers(state, canvasComments);
@@ -653,20 +848,23 @@ export async function backupReview(
 
 /** Note mutations and report feedback share the existing editor action/session authority. */
 function reviewInspectorNoteActions(
-  state: InspectorState,
+  state: ReviewInspectorAccess,
   resource: LoadedReview
 ): Pick<Parameters<typeof ReviewInspector>[0], 'onEdit' | 'onDelete' | 'onReport'> {
-  const { busy, composer, editing, run, session } = state;
+  const { busy } = state.model;
+  const { composer } = state.editors;
+  const { run } = state.commands;
+  const session = state.session;
   return {
     onEdit: (annotation) =>
-      state.beforeAction(() => {
-        if (state.canStart()) {
-          state.selectComment(annotation);
+      state.commands.beforeAction(() => {
+        if (state.commands.canStart()) {
+          state.commands.selectComment(annotation);
           composer.change(annotation, annotation);
         }
       }),
     onDelete: (annotation) => {
-      if (state.canStart())
+      if (state.commands.canStart())
         void run(() =>
           session.commit({
             id: crypto.randomUUID(),
@@ -678,13 +876,13 @@ function reviewInspectorNoteActions(
         );
     },
     onReport: (action) =>
-      state.beforeAction(() => {
+      state.commands.beforeAction(() => {
         if (busy) return;
-        state.setBusy(true);
-        state.setMessage(null);
-        void exportReviewReport(resource, action, editing.exporter.result?.receipt)
-          .catch(() => state.setMessage(translate('gallery.videoReview.reportFailed')))
-          .finally(() => state.setBusy(false));
+        state.commands.setBusy(true);
+        state.commands.setMessage(null);
+        void exportReviewReport(resource, action, state.output.result?.receipt)
+          .catch(() => state.commands.setMessage(translate('gallery.videoReview.reportFailed')))
+          .finally(() => state.commands.setBusy(false));
       }),
   };
 }
@@ -693,24 +891,23 @@ function ReviewCommentComposer({
   state,
   annotation,
 }: {
-  state: Pick<
-    InspectorState,
-    'composer' | 'busy' | 'runComposer' | 'leaveNewNote' | 'selectComment'
-  >;
+  state: ReviewInspectorAccess;
   annotation: ReviewAnnotation;
 }) {
-  const { composer, busy, runComposer: run } = state;
+  const { composer } = state.editors;
+  const { busy } = state.model;
+  const { runComposer: run } = state.commands;
   return (
     <ReviewComposer
       key={annotation.id}
       annotation={annotation}
       busy={busy || composer.finishing}
-      onLeave={state.leaveNewNote}
+      onLeave={state.commands.leaveNewNote}
       onChange={composer.change}
       onSave={() =>
         void run(async () => {
           await composer.save();
-          state.selectComment(annotation);
+          state.commands.selectComment(annotation);
         })
       }
       onDiscard={() => void run(composer.discard)}
@@ -718,7 +915,11 @@ function ReviewCommentComposer({
   );
 }
 
-export function reviewInspectorContext(state: InspectorState): string {
+export function reviewInspectorContext(state: {
+  composer: Pick<ReviewInspectorEditors['composer'], 'annotation'>;
+  activeSelection: ReviewSelection;
+  advanced: QuickEditAdvancedState;
+}): string {
   if (state.composer.annotation) return `comments:${state.composer.annotation.id}`;
   const selection = state.activeSelection;
   if (selection.kind === 'annotation') return `comments:${selection.id}`;
@@ -732,18 +933,18 @@ export function reviewInspectorContext(state: InspectorState): string {
 
 /** Creating a focus from history enables its workspace lane and shows the authored target frame. */
 function focusRecordedAction(
-  state: InspectorState,
-  region: Parameters<InspectorState['zoom']['addRegion']>[0]
+  state: ReviewInspectorAccess,
+  region: Parameters<ReviewInspectorEditors['zoom']['addRegion']>[0]
 ) {
-  if (state.busy || state.editing.exporter.phase !== 'idle' || !state.canStart()) return;
-  const id = state.zoom.addRegion(region);
+  if (state.model.busy || state.output.phase !== 'idle' || !state.commands.canStart()) return;
+  const id = state.editors.zoom.addRegion(region);
   if (!id) return;
-  if (state.advanced.ui.mode !== 'advanced') state.setMode('advanced');
-  state.zoom.setSelection(id);
-  void state.setTrackVisibility('zoom', true);
-  state.video.current?.pause();
-  const time = state.timeline.timeMap.timelineToSource((region.start + region.end) / 2);
-  if (time !== null) state.seek(time, false);
+  if (state.model.advanced.ui.mode !== 'advanced') state.commands.setMode('advanced');
+  state.editors.zoom.setSelection(id);
+  void state.commands.setTrackVisibility('zoom', true);
+  state.media.pause();
+  const time = state.toSourceTime((region.start + region.end) / 2);
+  if (time !== null) state.media.seek(time, false);
 }
 
 /** Scene controls share busy admission and the existing scene/audio writers. */
@@ -760,77 +961,80 @@ function ReviewScenePropertiesBinding({
   track?: QuickEditTrack;
   file: File;
   onJoinPreview?: ((slot: 'intro' | 'outro', target?: 'fade' | 'join') => void) | undefined;
-  state: InspectorState;
+  state: ReviewInspectorAccess;
   source: LoadedReview['source'];
-  audio: ReturnType<typeof useReviewAudio>;
+  audio: ReviewInspectorAudio;
 }) {
-  const { busy, editing } = state;
+  const { busy } = state.model;
+  const position = state.media.readPosition();
   return (
     <ReviewSceneProperties
       renderSections={renderSections}
       {...(track ? { track } : {})}
-      headerIdentity={state.snapshot.snapshot.workspace.aggregateId}
-      cropPreview={{ file, time: state.time }}
+      headerIdentity={state.model.workspace.aggregateId}
+      cropPreview={{ file, time: position.sourceTime }}
       cursorPath={
         <ReviewCursorPathSettings
-          path={state.cursorFocusPath}
-          cameraFollowDefaults={state.advanced.cameraFollowDefaults}
-          onPolicyChange={state.setCameraFollowDefaults}
-          disabled={busy || state.playing || editing.exporter.phase !== 'idle'}
-          onChange={state.setCursorFocusPath}
+          path={state.model.cursorFocusPath}
+          cameraFollowDefaults={state.model.advanced.cameraFollowDefaults}
+          onPolicyChange={state.commands.setCameraFollowDefaults}
+          disabled={busy || state.model.playing || state.output.phase !== 'idle'}
+          onChange={state.commands.setCursorFocusPath}
         />
       }
-      focus={{ advanced: state.advanced, time: state.timeline.sceneOutputTime }}
-      background={state.advanced.background}
-      canvas={state.advanced.canvas}
-      captions={state.advanced.captions}
-      onCaptions={state.setCaptions}
+      focus={{ advanced: state.model.advanced, time: position.resultTime }}
+      background={state.model.advanced.background}
+      canvas={state.model.advanced.canvas}
+      captions={state.model.advanced.captions}
+      onCaptions={state.commands.setCaptions}
       source={source}
-      onCanvas={state.setCanvas}
+      onCanvas={state.commands.setCanvas}
       presentation={{
-        editor: state.presentation,
-        mainDuration: state.timeline.resultDuration,
+        editor: state.editors.presentation,
+        mainDuration: state.model.resultDuration,
         onJoinPreview,
         output: computeQuickEditSceneSize({
           source,
-          background: state.features.background,
-          canvas: state.features.canvas,
-          windowHeader: state.features.windowHeader,
+          background: state.model.scene.background,
+          canvas: state.model.scene.canvas,
+          windowHeader: state.model.scene.windowHeader,
         }),
       }}
       watermark={{
-        settings: state.advanced.watermark,
+        settings: state.model.advanced.watermark,
         output: computeQuickEditSceneSize({
           source,
-          background: state.features.background,
-          canvas: state.features.canvas,
-          windowHeader: state.features.windowHeader,
+          background: state.model.scene.background,
+          canvas: state.model.scene.canvas,
+          windowHeader: state.model.scene.windowHeader,
         }),
-        onChange: state.watermark.change,
-        onPreview: state.watermark.preview,
-        onImage: state.watermark.image,
-        onError: state.watermark.setError,
-        pending: state.watermark.pending,
-        error: state.watermark.error,
-        onRetry: state.watermark.retry,
-        imagePreviewUrl: state.watermark.imagePreviewUrl,
+        onChange: state.editors.watermark.change,
+        onPreview: state.editors.watermark.preview,
+        onImage: state.editors.watermark.image,
+        onError: state.editors.watermark.setError,
+        pending: state.editors.watermark.pending,
+        error: state.editors.watermark.error,
+        onRetry: state.editors.watermark.retry,
+        imagePreviewUrl: state.editors.watermark.imagePreviewUrl,
       }}
-      sourceFilters={state.advanced.sourceFilters}
-      onSourceFilters={state.setSourceFilters}
-      windowHeader={state.advanced.windowHeader}
-      onWindowHeader={state.setWindowHeader}
-      audio={state.advanced.audio}
-      hasOriginalAudio={editing.exporter.index === null || !!editing.exporter.index.audioCodec}
+      sourceFilters={state.model.advanced.sourceFilters}
+      onSourceFilters={state.commands.setSourceFilters}
+      windowHeader={state.model.advanced.windowHeader}
+      onWindowHeader={state.commands.setWindowHeader}
+      audio={state.model.advanced.audio}
+      hasOriginalAudio={state.output.index === null || !!state.output.index.audioCodec}
       onOriginalVolume={(volume) => audio.setOriginal({ volume })}
       onLaneVolume={audio.setLaneVolume}
-      busy={busy || editing.exporter.phase !== 'idle'}
-      pending={state.backgroundImport.pending}
-      failed={state.backgroundImport.failed}
+      busy={busy || state.output.phase !== 'idle'}
+      pending={state.editors.backgroundImport.pending}
+      failed={state.editors.backgroundImport.failed}
       onImportImage={(file, originMediaId) =>
-        state.beforeAction(() => void state.backgroundImport.importImage(file, originMediaId))
+        state.commands.beforeAction(
+          () => void state.editors.backgroundImport.importImage(file, originMediaId)
+        )
       }
-      setBackground={state.setBackground}
-      onPreviewBackground={state.previewBackground}
+      setBackground={state.commands.setBackground}
+      onPreviewBackground={state.commands.previewBackground}
     />
   );
 }
@@ -843,139 +1047,151 @@ function ReviewSelectionBinding({
   audio,
   canvasComments,
 }: {
-  state: InspectorState;
+  state: ReviewInspectorAccess;
   resource: LoadedReview;
-  audio: ReturnType<typeof useReviewAudio>;
+  audio: ReviewInspectorAudio;
   canvasComments: ReturnType<typeof useCanvasComments>;
   onBackToHistory?: (() => void) | undefined;
 }) {
-  const video = state.video;
-  if (state.activeSelection.kind === 'cursor-motion' && state.advanced.ui.mode === 'advanced')
+  const position = state.media.readPosition();
+  const video = {
+    get current() {
+      return state.media.readVideo();
+    },
+  };
+  if (
+    state.model.activeSelection.kind === 'cursor-motion' &&
+    state.model.advanced.ui.mode === 'advanced'
+  )
     return (
-      <ReviewCursorMotionInspector editor={state.cursorMotion} busy={state.busy || state.playing} />
-    );
-  if (state.activeSelection.kind === 'cursor-focus')
-    return (
-      <ReviewCursorPathEditor
-        path={state.cursorFocusPath}
-        time={state.time}
-        duration={resource.source.duration}
-        onSelect={state.selectCursorFocusKey}
-        selectedKeyId={state.activeSelection.id}
-        recordedKey={state.cursorFocusKeys.find(
-          (key) =>
-            state.activeSelection.kind === 'cursor-focus' && key.id === state.activeSelection.id
-        )}
-        disabled={state.busy || state.playing || state.editing.exporter.phase !== 'idle'}
-        onChange={state.setCursorFocusPath}
+      <ReviewCursorMotionInspector
+        editor={state.editors.cursorMotion}
+        busy={state.model.busy || state.model.playing}
       />
     );
-  if (state.activeSelection.kind === 'annotation-effect') {
-    const selection = state.activeSelection;
-    const instance = state.annotationEffects.lane?.instances.find(
+  if (state.model.activeSelection.kind === 'cursor-focus')
+    return (
+      <ReviewCursorPathEditor
+        path={state.model.cursorFocusPath}
+        time={position.sourceTime}
+        duration={resource.source.duration}
+        onSelect={state.commands.selectCursorFocusKey}
+        selectedKeyId={state.model.activeSelection.id}
+        recordedKey={state.model.cursorFocusKeys.find(
+          (key) =>
+            state.model.activeSelection.kind === 'cursor-focus' &&
+            key.id === state.model.activeSelection.id
+        )}
+        disabled={state.model.busy || state.model.playing || state.output.phase !== 'idle'}
+        onChange={state.commands.setCursorFocusPath}
+      />
+    );
+  if (state.model.activeSelection.kind === 'annotation-effect') {
+    const selection = state.model.activeSelection;
+    const instance = state.editors.annotationEffects.lane?.instances.find(
       (item) => item.id === selection.id
     );
-    const snapshot = state.snapshot.snapshot.workspace.effectSnapshots?.find(
+    const snapshot = state.model.workspace.effectSnapshots?.find(
       (item) => item.id === instance?.snapshotId
     );
     return (
       <ReviewAnnotationInspector
-        key={`${state.snapshot.snapshot.workspace.sourceAssetId}:${state.activeSelection.id}`}
-        editor={state.annotationEffects}
-        id={state.activeSelection.id}
+        key={`${state.model.workspace.sourceAssetId}:${state.model.activeSelection.id}`}
+        editor={state.editors.annotationEffects}
+        id={state.model.activeSelection.id}
         source={snapshot?.source}
         sourceDigest={snapshot?.sha256}
         duration={
-          instance?.timeDomain === 'result'
-            ? state.timeline.resultDuration
-            : resource.source.duration
+          instance?.timeDomain === 'result' ? state.model.resultDuration : resource.source.duration
         }
-        busy={state.busy || state.editing.exporter.phase !== 'idle'}
+        busy={state.model.busy || state.output.phase !== 'idle'}
       />
     );
   }
-  if (state.activeSelection.kind === 'text')
+  if (state.model.activeSelection.kind === 'text')
     return (
       <ReviewSelectedTextProperties
-        key={state.activeSelection.id}
-        editor={state.text}
-        id={state.activeSelection.id}
-        busy={state.busy || state.editing.exporter.phase !== 'idle'}
+        key={state.model.activeSelection.id}
+        editor={state.editors.text}
+        id={state.model.activeSelection.id}
+        busy={state.model.busy || state.output.phase !== 'idle'}
         voice={reviewTextVoiceAccess(state, canvasComments)}
       />
     );
   return (
     <ReviewSelectedProperties
-      registerSpeechFlush={state.registerSpeechFlush}
-      beforeSpeechAction={state.beforeAction}
-      flushAdvanced={() => flushReviewTextVoiceBuffers(state, canvasComments)}
-      onSelectText={(id) =>
-        state.beforeAction(() => {
-          const fragment = state.text.document.fragments.find((entry) => entry.id === id);
-          if (!fragment) return;
-          state.video.current?.pause();
-          state.seek(state.text.sourceInterval(fragment).start, false);
-          state.setActiveSelection({ kind: 'text', id });
-        })
-      }
-      webcam={state.webcam}
-      webcamRange={
-        state.playbackRange ?? (state.selection.kind === 'range' ? state.selection : undefined)
-      }
-      advanced={state.advanced}
-      selection={state.activeSelection}
-      editing={state.editing}
-      zoom={state.zoom}
-      busy={state.busy}
-      onKeyAnimation={(ids, patch) => changeRecordedKeys(state, ids, patch)}
-      onActionAudio={(targets, patch) => {
-        void changeRecordedActionAudio(state, targets, patch);
+      registerSpeechFlush={state.commands.registerSpeechFlush}
+      beforeSpeechAction={state.commands.beforeAction}
+      flushAdvanced={() => flushReviewTextVoiceBuffers(inspectorBuffers(state), canvasComments)}
+      onSelectText={(id) => {
+        const fragment = state.editors.text.document.fragments.find((entry) => entry.id === id);
+        const context = state.commands.activation.capture();
+        if (!fragment || !context) return;
+        state.commands.activation.admit(context, (captured) => {
+          state.commands.setActiveSelection({ kind: 'text', id }, captured);
+        });
       }}
-      onActionAudioAudition={(target, style) => auditionRecordedActionAudio(state, target, style)}
-      onStopActionAudioAudition={state.actionSoundPreview.stopAudition}
-      interactionEditor={state.interactionEditor}
-      onClickAnimation={(ids, patch) => changeRecordedClicks(state, ids, patch)}
+      webcam={state.editors.webcam}
+      webcamRange={
+        state.model.playbackRange ??
+        (state.model.selection.kind === 'range' ? state.model.selection : undefined)
+      }
+      advanced={state.model.advanced}
+      selection={state.model.activeSelection}
+      editing={{ ...state.editors.editing, exporter: state.output }}
+      zoom={state.editors.zoom}
+      busy={state.model.busy}
+      onKeyAnimation={(ids, patch) => changeRecordedKeys(recordedPresentation(state), ids, patch)}
+      onActionAudio={(targets, patch) => {
+        void changeRecordedActionAudio(recordedPresentation(state), targets, patch);
+      }}
+      onActionAudioAudition={(target, style) =>
+        auditionRecordedActionAudio(recordedPresentation(state), target, style)
+      }
+      onStopActionAudioAudition={state.commands.actionSoundPreview.stopAudition}
+      interactionEditor={state.editors.interactionEditor}
+      onClickAnimation={(ids, patch) =>
+        changeRecordedClicks(recordedPresentation(state), ids, patch)
+      }
       {...(onBackToHistory ? { onOpenHistory: onBackToHistory } : {})}
-      markers={state.projected.markers}
+      markers={state.model.projected.markers}
       onFocus={(region) => focusRecordedAction(state, region)}
       onPreviewFrame={(time) => {
-        video.current?.pause();
-        state.seek(time, false);
+        state.media.pause();
+        state.media.seek(time, false);
       }}
       mainVideo={video.current ?? undefined}
-      focusTime={state.timeline.sceneOutputTime}
+      focusTime={position.resultTime}
       playback={
-        state.playing && video.current
+        state.model.playing && video.current
           ? {
               video: video.current,
               source: {
                 url: resource.url,
-                time: state.time,
-                seekRevision: state.seekRevision,
+                time: position.sourceTime,
+                seekRevision: position.seekRevision,
                 segmentStart:
-                  state.timeline.timeMap
-                    .getSegments()
-                    .find(
-                      (part) =>
-                        part.kind !== 'cut' &&
-                        state.time >= part.sourceStart &&
-                        state.time < part.sourceEnd
-                    )?.sourceStart ?? null,
+                  state.model.segments.find(
+                    (part) =>
+                      part.kind !== 'cut' &&
+                      position.sourceTime >= part.sourceStart &&
+                      position.sourceTime < part.sourceEnd
+                  )?.sourceStart ?? null,
               },
               camera: evaluateQuickEditCameraAtTime(
-                state.features.zoomRegions,
-                state.timeline.sceneOutputTime,
+                state.model.scene.zoomRegions,
+                position.resultTime,
                 {
                   source: resource.source,
-                  canvas: state.features.canvas,
-                  background: state.features.background,
-                  windowHeader: state.features.windowHeader,
+                  canvas: state.model.scene.canvas,
+                  background: state.model.scene.background,
+                  windowHeader: state.model.scene.windowHeader,
                 }
               ),
             }
           : undefined
       }
-      toSourceTime={state.timeline.timeMap.timelineToSource}
+      toSourceTime={state.toSourceTime}
       resource={resource}
       audio={audio}
       canvasComments={canvasComments}
@@ -983,9 +1199,35 @@ function ReviewSelectionBinding({
   );
 }
 
+/** Existing durable buffer workflow contract, independent of the inspector view. */
+type ReviewInspectorBuffers = {
+  composer: Pick<ReturnType<typeof useReviewComposer>, 'flush' | 'endCheckpointEditAfterFlush'>;
+  flushAdvanced(): Promise<void>;
+};
+type ReviewInspectorExit = ReviewInspectorBuffers & {
+  session: Session;
+  video: { readonly current: Pick<HTMLVideoElement, 'pause'> | null };
+  run(action: () => Promise<unknown>): Promise<unknown>;
+};
+function inspectorBuffers(state: ReviewInspectorAccess): ReviewInspectorBuffers {
+  return { composer: state.editors.composer, flushAdvanced: state.commands.flushAdvanced };
+}
+function inspectorExit(state: ReviewInspectorAccess): ReviewInspectorExit {
+  return {
+    ...inspectorBuffers(state),
+    session: state.session,
+    run: state.commands.run,
+    video: {
+      get current() {
+        return state.media.readVideo();
+      },
+    },
+  };
+}
+
 /** Leaving waits for the existing independent edit buffers before dismissing the inspector. */
 export function leaveReviewInspector(
-  state: Pick<InspectorState, 'video' | 'run' | 'composer' | 'flushAdvanced' | 'session'>,
+  state: ReviewInspectorExit,
   canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>,
   done: () => void,
   isCurrent: () => boolean
@@ -1002,9 +1244,9 @@ export function leaveReviewInspector(
 
 /** The continuation rechecks local ownership after advisory IPC, including a rejected request. */
 async function prepareReviewCheckpointExit(
-  session: InspectorState['session'],
+  session: ReviewInspectorAccess['session'],
   isCurrent: () => boolean,
-  expected?: InspectorState['snapshot']['snapshot']
+  expected?: SessionView['snapshot']
 ): Promise<() => boolean> {
   if (!isCurrent()) return () => false;
   const before = session.getSnapshot();
@@ -1038,35 +1280,30 @@ async function prepareReviewCheckpointExit(
 
 /** Notes, advanced content and canvas text join the same ordered buffer before explicit API Save. */
 function reviewTextVoiceAccess(
-  state: Pick<
-    InspectorState,
-    | 'composer'
-    | 'flushAdvanced'
-    | 'session'
-    | 'video'
-    | 'registerSpeechFlush'
-    | 'beforeAction'
-    | 'setVoiceoverSilent'
-    | 'editing'
-  >,
+  state: ReviewInspectorAccess,
   canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>
 ) {
   return {
     session: state.session,
-    sourceAudioAvailable: () => !!state.editing.exporter.index?.audioCodec,
-    beforeRequest: () => flushReviewTextVoiceBuffers(state, canvasComments),
+    sourceAudioAvailable: () => !!state.output.index?.audioCodec,
+    beforeRequest: () => flushReviewTextVoiceBuffers(inspectorBuffers(state), canvasComments),
     context: {
-      video: state.video,
-      registerPending: state.registerSpeechFlush,
-      beforeAction: state.beforeAction,
-      setSilent: state.setVoiceoverSilent,
+      transport: { seek: state.media.seekResult, play: state.media.play, pause: state.media.pause },
+      video: {
+        get current() {
+          return state.media.readVideo();
+        },
+      },
+      registerPending: state.commands.registerSpeechFlush,
+      beforeAction: state.commands.beforeAction,
+      setSilent: state.commands.setVoiceoverSilent,
     },
   };
 }
 
 /** All-buffer joins are shared by explicit voice actions and leaving the inspector. */
 export async function flushReviewTextVoiceBuffers(
-  state: Pick<InspectorState, 'composer' | 'flushAdvanced'>,
+  state: ReviewInspectorBuffers,
   canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>
 ) {
   await state.composer.flush();
@@ -1075,7 +1312,7 @@ export async function flushReviewTextVoiceBuffers(
 }
 
 /** Only consecutive canonical phrases on one clock can name an existing temporal Cut. */
-function reviewTextCutRange(editor: InspectorState['text'], ids: readonly string[]) {
+function reviewTextCutRange(editor: ReviewInspectorEditors['text'], ids: readonly string[]) {
   const wanted = new Set(ids);
   const fragments = editor.document.fragments;
   const indexes = fragments.flatMap((fragment, index) => (wanted.has(fragment.id) ? [index] : []));
@@ -1097,7 +1334,7 @@ function reviewTextCutRange(editor: InspectorState['text'], ids: readonly string
 
 /** Transfers only a flushed checkpoint while the originating inspector still owns the session. */
 function openReviewInspectorInVideoEditor(
-  state: Pick<InspectorState, 'run' | 'composer' | 'flushAdvanced' | 'session'>,
+  state: ReviewInspectorBuffers & Pick<ReviewInspectorExit, 'run' | 'session'>,
   canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>,
   isCurrent: () => boolean
 ) {

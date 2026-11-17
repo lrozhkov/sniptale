@@ -5,6 +5,9 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { createReviewTextDocument } from '../../features/video/review/text-document';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import { useReviewText } from './use-review-text';
+import { createReviewCommandFixture } from './editor-fixture.test-support';
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import { reviewAdvancedContentBaseline } from '../../features/video/review/document';
 import { useReviewTrackCreation } from './track-creation-tools';
 import { useReviewTimelinePlaneDrag } from './timeline-drag';
 
@@ -41,12 +44,31 @@ function mount(overrides: Partial<Input> = {}) {
   const openAudio = vi.fn();
   const record = vi.fn();
   const importFile = vi.fn();
+  const prepareImport = vi.fn(
+    (lane: 'music' | 'voiceover', ready: (attach: (file: File) => void) => void) =>
+      ready((file) => importFile(file, lane))
+  );
+  const advanced = createQuickEditAdvancedState();
   let input: Partial<Input> = overrides;
   function Probe() {
     const document = useRef(createReviewTextDocument());
     const [, refresh] = useState(0);
     const [selection, select] = useState<ReviewAnchor>({ kind: 'point', time: 0 });
     editor = useReviewText({
+      commands: createReviewCommandFixture(() => ({
+        duration: 12,
+        time: 0,
+        resultTime: 0,
+        document: {
+          annotations: [],
+          edits,
+          canvasComments: [],
+          advancedContent: { ...reviewAdvancedContentBaseline(advanced), text: document.current },
+        },
+        range: input.range
+          ? { ...input.range, result: { start: input.range.start, end: input.range.end } }
+          : null,
+      })),
       document: document.current,
       edits,
       sourceDuration: 12,
@@ -64,13 +86,11 @@ function mount(overrides: Partial<Input> = {}) {
       sourceId: 'source',
       track: 'text',
       blocked: false,
-      onPause: vi.fn(),
       atEnd: false,
-      beforeAction: undefined,
       range: { kind: 'range', start: 0, end: 3 },
       text: editor,
       onRecordVoiceover: record,
-      onImportFile: importFile,
+      onPrepareImportFile: prepareImport,
       onOpenAudio: openAudio,
       ...input,
     });
@@ -125,6 +145,7 @@ function mount(overrides: Partial<Input> = {}) {
     record,
     openAudio,
     importFile,
+    prepareImport,
     document: () => current!,
     editor: () => editor!,
   };
@@ -160,20 +181,21 @@ it('refuses absent or too short insertion intervals without changing the documen
   expect(f.document().fragments).toEqual([]);
 });
 
-it('keeps the captured audio lane through admission and rejects another source', () => {
-  const pending: (() => void)[] = [];
-  const beforeAction: Input['beforeAction'] = (action) => pending.push(action);
-  const f = mount({ track: 'music', beforeAction });
-  const trigger = f.button('musicLibrary');
-  act(() => trigger.click());
-  expect(f.openAudio).not.toHaveBeenCalled();
-  f.render({ track: 'voiceover', beforeAction });
-  act(() => pending.shift()!());
-  expect(f.openAudio).toHaveBeenCalledExactlyOnceWith(trigger, 'music');
+it('opens a native picker through its command owner and retains the accepted lane', () => {
+  const f = mount({ track: 'music', onOpenAudio: undefined });
   act(() => f.button('audioImport').click());
-  f.render({ track: 'voiceover', sourceId: 'replacement', beforeAction });
-  act(() => pending.shift()!());
-  expect(f.openAudio).toHaveBeenCalledOnce();
+  expect(f.prepareImport).toHaveBeenCalledOnce();
+  f.render({ track: 'voiceover', onOpenAudio: undefined });
+  const picker = f.host.querySelector<HTMLInputElement>('input[type="file"]')!;
+  const file = new File(['audio'], 'music.wav');
+  Object.defineProperty(picker, 'files', { configurable: true, value: [file] });
+  act(() => picker.dispatchEvent(new Event('change', { bubbles: true })));
+  expect(f.importFile).toHaveBeenCalledExactlyOnceWith(file, 'music');
+  act(() => f.button('audioImport').click());
+  f.render({ track: 'voiceover', sourceId: 'replacement', onOpenAudio: undefined });
+  Object.defineProperty(picker, 'files', { configurable: true, value: [file] });
+  act(() => picker.dispatchEvent(new Event('change', { bubbles: true })));
+  expect(f.importFile).toHaveBeenCalledOnce();
 });
 
 it('exposes recording only for voiceover and blocks creation while busy', () => {

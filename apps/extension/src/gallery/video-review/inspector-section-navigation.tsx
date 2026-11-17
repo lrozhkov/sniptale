@@ -3,6 +3,29 @@ import type { LucideIcon } from 'lucide-react';
 import { ReviewButton } from './controls';
 import { translate } from '../../platform/i18n';
 
+type TabMove = { animation: Animation; delta: number };
+type TabMotion = {
+  base: Map<HTMLElement, number>;
+  before: Map<HTMLElement, number> | null;
+  animations: Map<HTMLElement, TabMove>;
+};
+
+function tabMoveOffset(move: TabMove | undefined): number {
+  const progress = move?.animation.effect?.getComputedTiming().progress;
+  return move && progress !== null && progress !== undefined ? move.delta * (1 - progress) : 0;
+}
+
+/** Base positions exclude the transforms owned by this navigation and its viewport origin. */
+function tabBasePositions(element: HTMLElement, moves: TabMotion['animations']) {
+  const origin = element.getBoundingClientRect().left;
+  return new Map(
+    [...element.querySelectorAll<HTMLElement>('[data-inspector-tab-motion]')].map((node) => [
+      node,
+      node.getBoundingClientRect().left - origin - tabMoveOffset(moves.get(node)),
+    ])
+  );
+}
+
 /** One gallery-owned row for lane and item sections; the active surface never translates. */
 export function ReviewInspectorSectionNavigation({
   id,
@@ -19,13 +42,19 @@ export function ReviewInspectorSectionNavigation({
 }) {
   const navigation = useRef<HTMLDivElement>(null);
   const [expandedLabels, setExpandedLabels] = useState(false);
+  const [focusRevision, setFocusRevision] = useState(0);
+  const pendingFocus = useRef<string | null>(null);
+  const motion = useRef<TabMotion>({ base: new Map(), before: null, animations: new Map() });
+  const itemsKey = JSON.stringify(items.map((item) => item.id));
   const labelsKey = JSON.stringify(items.map((item) => item.label));
   useLayoutEffect(() => {
     const element = navigation.current;
     if (!element) return;
     const fit = () => {
       const canvas = document.createElement('canvas').getContext('2d');
-      if (!canvas || !element.clientWidth) return;
+      if (!canvas) return;
+      const availableWidth = element.clientWidth;
+      if (!availableWidth) return;
       const label = element.querySelector('.review-inspector-tab-label');
       if (!label) return;
       canvas.font = getComputedStyle(label).font;
@@ -43,68 +72,87 @@ export function ReviewInspectorSectionNavigation({
         slot.style.setProperty('--review-tab-caption-width', `${widths[index]}px`)
       );
       setExpandedLabels(
-        widths.reduce((sum, width) => sum + width, 0) + (widths.length - 1) * 2 <=
-          element.clientWidth
+        widths.reduce((sum, width) => sum + width, 0) + (widths.length - 1) * 2 <= availableWidth
       );
     };
     fit();
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fit);
+    const refresh = () => {
+      fit();
+      motion.current.base = tabBasePositions(element, motion.current.animations);
+    };
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(refresh);
     observer?.observe(element);
     let disposed = false;
     void document.fonts?.ready.then(() => {
-      if (!disposed) fit();
+      if (!disposed) refresh();
     });
     return () => {
       disposed = true;
       observer?.disconnect();
     };
-  }, [labelsKey]);
-  const motion = useRef<{ before: Map<HTMLElement, number> | null; animations: Animation[] }>({
-    before: null,
-    animations: [],
-  });
+  }, [labelsKey, itemsKey]);
   useLayoutEffect(() => {
     const before = motion.current.before;
     motion.current.before = null;
+    const element = navigation.current;
+    const base = element
+      ? tabBasePositions(element, motion.current.animations)
+      : new Map<HTMLElement, number>();
+    motion.current.base = base;
     if (
       !before ||
       items.length > 8 ||
       window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     )
       return;
-    for (const node of navigation.current?.querySelectorAll<HTMLElement>(
-      '[data-inspector-tab-motion]'
-    ) ?? []) {
+    const moves: { node: HTMLElement; delta: number }[] = [];
+    for (const [node, left] of base) {
       if (node.dataset['active'] === 'true') continue;
       const previous = before.get(node);
       if (previous === undefined || typeof node.animate !== 'function') continue;
-      const delta = previous - node.getBoundingClientRect().left;
+      const delta = previous - left;
       if (Math.abs(delta) < 0.25) continue;
-      motion.current.animations.push(
-        node.animate([{ transform: `translateX(${delta}px)` }, { transform: 'translateX(0)' }], {
-          duration: 100,
-          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-        })
-      );
+      moves.push({ node, delta });
     }
-  }, [value, items.length]);
+    for (const { node, delta } of moves) {
+      const animation = node.animate(
+        [{ transform: `translateX(${delta}px)` }, { transform: 'translateX(0)' }],
+        { duration: 100, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
+      );
+      motion.current.animations.set(node, { animation, delta });
+    }
+  }, [value, items.length, itemsKey, labelsKey, expandedLabels]);
+  useLayoutEffect(() => {
+    const target = pendingFocus.current;
+    pendingFocus.current = null;
+    if (target === null || target !== value) return;
+    const button = [
+      ...(navigation.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? []),
+    ].find((button) => button.id === `${id}-${target}-tab`);
+    if (button && button.ownerDocument.activeElement !== button)
+      button.focus({ preventScroll: true });
+  }, [value, itemsKey, id, focusRevision]);
   useEffect(
     () => () => {
-      for (const animation of motion.current.animations) animation.cancel();
+      for (const { animation } of motion.current.animations.values()) animation.cancel();
+      motion.current.animations.clear();
+      motion.current.base.clear();
       motion.current.before = null;
+      pendingFocus.current = null;
     },
     []
   );
   const choose = (next: string) => {
     if (next === value) return;
-    // Capture the visible positions before cancelling an interrupted move.
+    // Native progress includes the owned easing; command capture needs no layout read.
     motion.current.before = new Map(
-      [
-        ...(navigation.current?.querySelectorAll<HTMLElement>('[data-inspector-tab-motion]') ?? []),
-      ].map((node) => [node, node.getBoundingClientRect().left])
+      [...motion.current.base].map(([node, left]) => [
+        node,
+        left + tabMoveOffset(motion.current.animations.get(node)),
+      ])
     );
-    for (const animation of motion.current.animations) animation.cancel();
-    motion.current.animations = [];
+    for (const { animation } of motion.current.animations.values()) animation.cancel();
+    motion.current.animations.clear();
     onChange(next);
   };
   if (items.length <= 1) return null;
@@ -132,8 +180,13 @@ export function ReviewInspectorSectionNavigation({
               : event.key === 'End'
                 ? items.length - 1
                 : (index + (event.key === 'ArrowRight' ? 1 : -1) + items.length) % items.length;
-          choose(items[next]!.id);
-          event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+          const target = items[next]!.id;
+          const button =
+            event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next];
+          if (target === value && button === button?.ownerDocument.activeElement) return;
+          pendingFocus.current = target;
+          setFocusRevision((revision) => revision + 1);
+          choose(target);
         }}
       >
         {items.map(({ id: sectionId, label, icon: Glyph }) => (

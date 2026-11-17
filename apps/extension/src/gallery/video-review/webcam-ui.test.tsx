@@ -342,13 +342,16 @@ it('keeps camera markers on the source axis and does not create hide intervals t
   expect(field(label('webcamSettings'))).toBeNull();
   pointer(track, 'pointerdown', 100);
   pointer(track, 'pointerup', 100);
-  expect(editor.select).toHaveBeenCalledWith({ kind: 'webcam' });
+  expect(editor.select).toHaveBeenCalledWith({ kind: 'webcam' }, undefined);
   const markers = [
     track.querySelector<HTMLButtonElement>('[title="gallery.videoReview.webcamHidden"]')!,
     track.querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.webcamPosition"]')!,
   ];
   act(() => markers[0]!.click());
-  expect(editor.select).toHaveBeenLastCalledWith({ kind: 'webcam-hidden', id: 'hidden' });
+  expect(editor.select).toHaveBeenLastCalledWith(
+    { kind: 'webcam-hidden', id: 'hidden' },
+    undefined
+  );
   act(() => markers[1]!.click());
   expect(editor.navigate).toHaveBeenCalledWith('position');
   pointer(markers[1]!, 'pointerdown', 600);

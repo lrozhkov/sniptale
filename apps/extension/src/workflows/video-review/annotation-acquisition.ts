@@ -46,11 +46,13 @@ export async function applyReviewAnnotationCatalogDocument(
     /** Unzoomed source plane for content; canonical output canvas for viewport. */
     plane: { width: number; height: number };
     signal: AbortSignal;
+    assertCurrentTarget?(): void;
   },
   deps = acquisition
 ): Promise<string> {
   const { session, signal } = args;
   signal.throwIfAborted();
+  args.assertCurrentTarget?.();
   const source = session.getSnapshot().snapshot.workspace;
   const selected = args.catalog.documents.find((entry) => entry.id === args.documentId);
   if (!args.catalog.enabled || selected?.enabled === false)
@@ -88,6 +90,7 @@ export async function applyReviewAnnotationCatalogDocument(
   )
     throw new ReviewAnnotationAcquisitionError('invalid-range');
   const current = () => {
+    args.assertCurrentTarget?.();
     const workspace = session.getSnapshot().snapshot.workspace;
     if (
       workspace.aggregateId !== source.aggregateId ||

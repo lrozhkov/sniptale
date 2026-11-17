@@ -16,6 +16,12 @@ import { createVideoReviewSession } from '../../workflows/video-review/session';
 import type { LoadedReview } from './use-session';
 import { useReviewEditorState } from './use-editor-state';
 import { ReviewTimelineBinding } from './timeline-binding';
+import { createReviewCommandFixture } from './editor-fixture.test-support';
+import type { ReviewCommandPort } from './command-context';
+import {
+  ReviewPlaybackPresentationClockContext,
+  type ReviewPlaybackPresentationClock,
+} from './playback-presentation-clock';
 import { translate, getCurrentLocale } from '../../platform/i18n';
 import type { EffectBundleCatalogEntry } from '../../features/video/project/effect-bundle/catalog';
 
@@ -194,70 +200,142 @@ function BindingHarness({
   onState,
   onAdd,
   failure,
+  clock,
+  commands,
 }: {
   loaded: LoadedReview;
   beforeAction?: (action: () => void) => void;
   onState(state: ReturnType<typeof useReviewEditorState>): void;
   onAdd?: ReturnType<typeof useReviewEditorState>['annotationEffects']['add'];
   failure?: ReturnType<typeof useReviewEditorState>['annotationEffects']['failure'];
+  clock?: ReviewPlaybackPresentationClock;
+  commands?: ReviewCommandPort;
 }) {
   const state = useReviewEditorState(loaded);
   onState(state);
   return (
-    <ReviewTimelineBinding
-      annotationEffects={
-        onAdd
-          ? {
-              ...state.annotationEffects,
-              add: onAdd,
-              failure: failure ?? state.annotationEffects.failure,
-            }
-          : state.annotationEffects
-      }
-      annotationSourceId={state.snapshot.snapshot.workspace.sourceAssetId}
-      annotationToolCancellation={state.annotationToolCancellation}
-      effectSnapshots={state.snapshot.snapshot.workspace.effectSnapshots ?? []}
-      selectedAnnotationEffectId={
-        state.activeSelection.kind === 'annotation-effect' ? state.activeSelection.id : null
-      }
-      onSelectAnnotationEffect={(id) => state.setActiveSelection({ kind: 'annotation-effect', id })}
-      beforeAction={beforeAction ?? state.beforeAction}
-      editing={state.editing}
-      edits={state.snapshot.document.edits}
-      annotations={state.snapshot.document.annotations}
-      source={state.source}
-      busy={state.busy}
-      composerBusy={false}
-      selection={state.selection}
-      setSelection={state.setSelection}
-      advanced={state.advanced}
-      resultDuration={state.timeline.resultDuration}
-      outputTime={state.timeline.outputTime}
-      toOutputTime={state.timeline.toOutputTime}
-      onCutPlacement={vi.fn()}
-      setTrackVisibility={state.setTrackVisibility}
-      setMode={state.setMode}
-      telemetryAvailable={false}
-      time={state.time}
-      playing={state.playing}
-      markers={[]}
-      selectedTelemetryRef={undefined}
-      zoom={state.zoom}
-      audio={state.audio}
-      audioState={state.advanced.audio}
-      onImportAudioFile={vi.fn()}
-      onRecordVoiceover={vi.fn()}
-      onMarker={vi.fn()}
-      onClearSelection={vi.fn()}
-      selectedObject={false}
-      onComment={vi.fn()}
-      onSeek={state.seek}
-      onPlay={state.play}
-      onPause={state.pause}
-      onOpenExport={vi.fn()}
-    />
+    <ReviewPlaybackPresentationClockContext.Provider value={clock ?? null}>
+      <ReviewTimelineBinding
+        commands={commands ?? state.commands}
+        annotationEffects={
+          onAdd
+            ? {
+                ...state.annotationEffects,
+                add: onAdd,
+                failure: failure ?? state.annotationEffects.failure,
+              }
+            : state.annotationEffects
+        }
+        annotationSourceId={state.snapshot.snapshot.workspace.sourceAssetId}
+        annotationToolCancellation={state.annotationToolCancellation}
+        effectSnapshots={state.snapshot.snapshot.workspace.effectSnapshots ?? []}
+        selectedAnnotationEffectId={
+          state.activeSelection.kind === 'annotation-effect' ? state.activeSelection.id : null
+        }
+        onSelectAnnotationEffect={(id) =>
+          state.setActiveSelection({ kind: 'annotation-effect', id })
+        }
+        beforeAction={beforeAction ?? state.beforeAction}
+        editing={state.editing}
+        edits={state.snapshot.document.edits}
+        annotations={state.snapshot.document.annotations}
+        source={state.source}
+        busy={state.busy}
+        composerBusy={false}
+        selection={state.selection}
+        setSelection={state.setSelection}
+        advanced={state.advanced}
+        resultDuration={state.timeline.resultDuration}
+        outputTime={state.timeline.outputTime}
+        toOutputTime={state.timeline.toOutputTime}
+        onCutPlacement={vi.fn()}
+        setTrackVisibility={state.setTrackVisibility}
+        setMode={state.setMode}
+        telemetryAvailable={false}
+        time={state.time}
+        playing={state.playing}
+        markers={[]}
+        selectedTelemetryRef={undefined}
+        zoom={state.zoom}
+        audio={state.audio}
+        audioState={state.advanced.audio}
+        onImportAudioFile={vi.fn()}
+        onPrepareImportAudioFile={vi.fn()}
+        onRecordVoiceover={vi.fn()}
+        onMarker={vi.fn()}
+        onClearSelection={vi.fn()}
+        selectedObject={false}
+        onComment={vi.fn()}
+        onSeek={state.seek}
+        onPlay={state.play}
+        onPause={state.pause}
+        onOpenExport={vi.fn()}
+      />
+    </ReviewPlaybackPresentationClockContext.Provider>
   );
 }
+
+it('captures annotation insertion from the live result clock after the toolbar rendered', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+  const dialog = document.createElement('dialog');
+  dialog.open = true;
+  dialog.dataset['ui'] = 'gallery.videoReview.dialog';
+  document.body.append(dialog);
+  const root = createRoot(dialog);
+  const add = vi
+    .fn<ReturnType<typeof useReviewEditorState>['annotationEffects']['add']>()
+    .mockResolvedValue(null);
+  let resultTime = 0.25;
+  const loaded = resource('live-clock');
+  const commands = createReviewCommandFixture(() => ({
+    duration: loaded.source.duration,
+    time: 2,
+    resultTime,
+    sourceAssetId: loaded.session.getSnapshot().snapshot.workspace.sourceAssetId,
+  }));
+  try {
+    await act(async () =>
+      root.render(
+        <BindingHarness loaded={loaded} commands={commands} onState={() => {}} onAdd={add} />
+      )
+    );
+    await act(async () =>
+      dialog
+        .querySelector<HTMLButtonElement>(
+          '[data-review-header-track="annotationEffects"] [data-review-track-select]'
+        )!
+        .click()
+    );
+    resultTime = 3.5;
+    await act(async () =>
+      dialog
+        .querySelector<HTMLButtonElement>(
+          `[aria-label="${translate('gallery.videoReview.annotationEffectsAdd')}"]`
+        )!
+        .click()
+    );
+    const option = [...dialog.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+      (node) => node.textContent === catalogFixture.label[getCurrentLocale()]
+    )!;
+    await act(async () => option.click());
+    expect(add).toHaveBeenCalledWith(
+      expect.objectContaining({ start: 3.5, timeDomain: 'result' }),
+      expect.objectContaining({ position: expect.objectContaining({ resultTime: 3.5 }) })
+    );
+  } finally {
+    await act(async () => root.unmount());
+    dialog.remove();
+    vi.unstubAllGlobals();
+  }
+});
 
 it('inserts annotations immediately, retries refusal and ignores a replaced source', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -763,3 +841,48 @@ it.each(['keyboard', 'mouse'] as const)(
     }
   }
 );
+
+it('keeps newer navigation when an attachment publishes its captured selection', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const loaded = resource('retained-selection');
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  let current: ReturnType<typeof useReviewEditorState> | undefined;
+  try {
+    await act(async () =>
+      root.render(
+        <BindingHarness
+          loaded={loaded}
+          onState={(state) => {
+            current = state;
+          }}
+        />
+      )
+    );
+    if (!current) throw new Error('Missing state');
+    const state = current;
+    const context = state.commands.capture()!;
+    await act(async () => state.seekResult(4));
+    expect(state.setActiveSelection({ kind: 'annotation-effect', id: 'first' }, context)).toBe(
+      false
+    );
+    expect(current.activeSelection.kind).toBe('none');
+    const snapshot = state.transport.getStatusSnapshot();
+    const cached = vi.spyOn(state.transport, 'getStatusSnapshot').mockReturnValue({
+      ...snapshot,
+      playing: false,
+      mode: 'paused',
+      position: { ...context.position, resultTime: 5 },
+    });
+    expect(state.setActiveSelection({ kind: 'annotation-effect', id: 'first' }, context)).toBe(
+      false
+    );
+    expect(current.activeSelection.kind).toBe('none');
+    cached.mockRestore();
+  } finally {
+    await act(async () => root.unmount());
+    await loaded.session.dispose();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  }
+});

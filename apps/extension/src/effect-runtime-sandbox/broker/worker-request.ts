@@ -31,8 +31,11 @@ interface WorkerOptions {
 interface EffectRuntimeWorkerLease {
   onReset?(): void;
   worker: EffectRuntimeWorkerLike | null;
+  started: boolean;
+  unavailable: boolean;
 }
 interface EffectRuntimeWorkerSession {
+  readonly unavailable: boolean;
   /** Start trusted worker modules without posting a user frame or consuming queue admission. */
   preload(): void;
   execute(request: EffectRuntimeWorkerMessage): Promise<EffectRuntimeFrameResult>;
@@ -49,13 +52,16 @@ export function createEffectRuntimeWorkerSession(
   const lease: EffectRuntimeWorkerLease = {
     ...(options.onReset ? { onReset: options.onReset } : {}),
     worker: null,
+    started: false,
+    unavailable: false,
   };
   const preload = () => {
-    if (lease.worker) return;
+    if (lease.worker || lease.unavailable) return;
     let worker: EffectRuntimeWorkerLike;
     try {
       worker = options.workerFactory();
     } catch {
+      lease.unavailable = true;
       return;
     }
     lease.worker = worker;
@@ -65,6 +71,7 @@ export function createEffectRuntimeWorkerSession(
       worker.onmessageerror = null;
       worker.terminate();
       lease.worker = null;
+      lease.unavailable = true;
       lease.onReset?.();
     };
     worker.onerror = retire;
@@ -91,14 +98,25 @@ export function createEffectRuntimeWorkerSession(
       );
     return operation.then(({ result }) => result);
   }
-  return { execute, preload };
+  return {
+    execute,
+    preload,
+    get unavailable() {
+      return lease.unavailable;
+    },
+  };
 }
 
 export async function executeEffectRuntimeWorker(
   request: EffectRuntimeWorkerMessage,
   options: WorkerOptions
 ): Promise<EffectRuntimeFrameResult> {
-  return startWorkerOperation(request, options, { worker: null }, true).result;
+  return startWorkerOperation(
+    request,
+    options,
+    { worker: null, started: false, unavailable: false },
+    true
+  ).result;
 }
 
 /** One authority owns publication, transfer, identity, deadline and worker retirement. */
@@ -188,6 +206,8 @@ function startWorkerOperation(
       closeEffectRuntimeWorkerResponse(event.data);
       return;
     }
+    // A reply proves worker startup, independently of per-frame payload admission.
+    lease.started = true;
     if (performance.now() >= deadline) {
       closeEffectRuntimeWorkerResponse(event.data);
       fail('timeout');
@@ -227,14 +247,26 @@ function startWorkerOperation(
     send(request);
   };
   try {
+    if (lease.unavailable) {
+      fail('circuitOpen');
+      return { result, drained };
+    }
+    if (!lease.worker) lease.started = false;
     worker = lease.worker ?? options.workerFactory();
     lease.worker = worker;
-    worker.onerror = () => fail('crashed');
-    worker.onmessageerror = () => fail('malformed');
+    const failWorker = (code: 'crashed' | 'malformed') => {
+      if (!terminateAfterResult && !lease.started) {
+        lease.unavailable = true;
+        fail('circuitOpen');
+      } else fail(code);
+    };
+    worker.onerror = () => failWorker('crashed');
+    worker.onmessageerror = () => failWorker('malformed');
     worker.onmessage = onMessage;
     start();
   } catch {
-    fail('crashed');
+    if (!worker && !terminateAfterResult) lease.unavailable = true;
+    fail(lease.unavailable ? 'circuitOpen' : 'crashed');
     if (!worker) lease.onReset?.();
   }
   return { result, drained };

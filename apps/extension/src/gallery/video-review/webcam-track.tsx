@@ -1,52 +1,105 @@
+import { memo, useLayoutEffect, useMemo, useRef } from 'react';
 import { reviewTimelineHint } from './timeline-hints';
 import { ReviewTrackVisibilityButton } from './track-row';
 import { reviewTrackMetrics, ReviewTrackCuts, ReviewTrackRow } from './track-row';
 import { ReviewWebcamHiddenMarker } from './webcam-hidden-marker';
 import { ReviewWebcamPositionMarker } from './webcam-position-marker';
 import { Camera, Eye, EyeOff } from 'lucide-react';
-import { translate } from '../../platform/i18n';
+import { translate, useAppLocale } from '../../platform/i18n';
 import { reviewCompactTrackButtonClassName } from './controls';
 import { type ReviewBeforeAction } from './note-transitions';
 import type { ReviewTrackProjection } from './track-projection';
 import type { useReviewWebcamEditor } from './webcam-editor';
 
-type Range = { start: number; end: number };
+type WebcamEditor = ReturnType<typeof useReviewWebcamEditor>;
+type WebcamTrackCommands = Pick<
+  WebcamEditor,
+  'toggle' | 'select' | 'resizeHidden' | 'movePosition' | 'navigate'
+> & {
+  admit: ReviewBeforeAction;
+};
+const admitImmediately: ReviewBeforeAction = (action) => action();
+
 /** Camera uses source-axis intervals; hiding it never cuts or changes the main transport. */
 export function ReviewWebcamTrack(props: {
   compact?: boolean;
-  editor: ReturnType<typeof useReviewWebcamEditor>;
+  editor: WebcamEditor;
   projection: ReviewTrackProjection;
   beforeAction?: ReviewBeforeAction | undefined;
 }) {
-  const { projection } = props;
-  const original = props.editor;
-  const display = projection.display;
-  const sourceRange = (range: Range) => ({
-    start: display.displayToResult(range.start),
-    end: display.displayToResult(range.end),
-  });
-  const editor: typeof original = {
-    ...original,
-    camera: original.camera
-      ? {
-          ...original.camera,
-          hiddenRanges: original.camera.hiddenRanges.map((range) => ({
-            ...range,
-            start: display.resultToDisplay(range.start),
-            end: display.resultToDisplay(range.end, 'end'),
-          })),
-          positions: original.camera.positions.map((position) => ({
-            ...position,
-            time: display.resultToDisplay(position.time),
-          })),
-        }
-      : original.camera,
-    hide: (range) => original.hide(sourceRange(range)),
-    resizeHidden: (id, range) => original.resizeHidden(id, sourceRange(range)),
-    canResizeHidden: (id, range) => original.canResizeHidden(id, sourceRange(range)),
-    movePosition: (id, time) => original.movePosition(id, display.displayToResult(time)),
-  };
-  const camera = editor.camera;
+  const locale = useAppLocale();
+  const { camera, toggle, select, resizeHidden, movePosition, navigate } = props.editor;
+  const display = props.projection.display;
+  const admit = props.beforeAction ?? admitImmediately;
+  const current = useRef({ toggle, select, resizeHidden, movePosition, navigate, admit, display });
+  useLayoutEffect(() => {
+    current.current = { toggle, select, resizeHidden, movePosition, navigate, admit, display };
+  }, [toggle, select, resizeHidden, movePosition, navigate, admit, display]);
+  const commands = useMemo<WebcamTrackCommands>(
+    () => ({
+      toggle: () => current.current.toggle(),
+      select: (selection, context) => current.current.select(selection, context),
+      resizeHidden: (id, range) =>
+        current.current.resizeHidden(id, {
+          start: current.current.display.displayToResult(range.start),
+          end: current.current.display.displayToResult(range.end),
+        }),
+      movePosition: (id, time) =>
+        current.current.movePosition(id, current.current.display.displayToResult(time)),
+      navigate: (id) => current.current.navigate(id),
+      admit: (action) => current.current.admit(action),
+    }),
+    []
+  );
+  const projectedCamera = useMemo(
+    () =>
+      camera
+        ? {
+            ...camera,
+            hiddenRanges: camera.hiddenRanges.map((range) => ({
+              ...range,
+              start: display.resultToDisplay(range.start),
+              end: display.resultToDisplay(range.end, 'end'),
+            })),
+            positions: camera.positions.map((position) => ({
+              ...position,
+              time: display.resultToDisplay(position.time),
+            })),
+          }
+        : camera,
+    [camera, display]
+  );
+  const hiddenEnabled =
+    camera?.hiddenRanges
+      .map((range) => (props.editor.canResizeHidden(range.id, range) ? '1' : '0'))
+      .join('') ?? '';
+  const selection = props.editor.selection;
+  return (
+    <WebcamTrackBody
+      camera={projectedCamera}
+      commands={commands}
+      projection={props.projection}
+      compact={props.compact ?? false}
+      hiddenEnabled={hiddenEnabled}
+      locale={locale}
+      selectedHiddenId={selection.kind === 'webcam-hidden' ? selection.id : undefined}
+      selectedPositionId={selection.kind === 'webcam-position' ? selection.id : undefined}
+    />
+  );
+}
+
+const WebcamTrackBody = memo(function WebcamTrackBody(props: {
+  camera: WebcamEditor['camera'];
+  commands: WebcamTrackCommands;
+  projection: ReviewTrackProjection;
+  compact: boolean;
+  hiddenEnabled: string;
+  selectedHiddenId: string | undefined;
+  selectedPositionId: string | undefined;
+  locale: ReturnType<typeof useAppLocale>;
+}) {
+  const { projection, camera } = props;
+  const editor = props.commands;
   const compact = props.compact ?? false;
   const metrics = reviewTrackMetrics(compact);
   if (!camera)
@@ -55,29 +108,28 @@ export function ReviewWebcamTrack(props: {
         placeholder
         track="webcam"
         label={translate('gallery.videoReview.webcam')}
-        icon={<Camera size={14} aria-hidden />}
+        icon={Camera}
       >
         <div className="h-8" />
       </ReviewTrackRow>
     );
-  const admit = props.beforeAction ?? ((action: () => void) => action());
+  const admit = props.commands.admit;
   return (
     <ReviewTrackRow
       track="webcam"
       muted={!camera.enabled}
       label={translate('gallery.videoReview.webcam')}
-      icon={<Camera size={14} aria-hidden />}
+      icon={Camera}
       controls={
         <>
           <ReviewTrackVisibilityButton
             track="webcam"
             label={translate('gallery.videoReview.webcamApply')}
             className={reviewCompactTrackButtonClassName}
-            aria-pressed={camera.enabled}
-            onClick={() => admit(() => void editor.toggle())}
-          >
-            {camera.enabled ? <Eye size={14} /> : <EyeOff size={14} />}
-          </ReviewTrackVisibilityButton>
+            enabled={camera.enabled}
+            onToggle={() => admit(() => void editor.toggle())}
+            icon={camera.enabled ? Eye : EyeOff}
+          />
         </>
       }
     >
@@ -103,7 +155,11 @@ export function ReviewWebcamTrack(props: {
       >
         <ReviewTrackCuts projection={projection} />
         <ReviewWebcamTrackMarkers
-          editor={editor}
+          camera={camera}
+          commands={props.commands}
+          hiddenEnabled={props.hiddenEnabled}
+          selectedHiddenId={props.selectedHiddenId}
+          selectedPositionId={props.selectedPositionId}
           duration={projection.display.duration}
           admit={admit}
           compact={compact}
@@ -111,27 +167,37 @@ export function ReviewWebcamTrack(props: {
       </div>
     </ReviewTrackRow>
   );
-}
+});
 
 /** Authored hide ranges and position anchors share the track's source axis and admission. */
 function ReviewWebcamTrackMarkers({
-  editor,
+  camera,
+  commands,
+  hiddenEnabled,
+  selectedHiddenId,
+  selectedPositionId,
   duration,
   admit,
-  compact = false,
+  compact,
 }: {
-  compact?: boolean;
-  editor: ReturnType<typeof useReviewWebcamEditor>;
+  camera: NonNullable<WebcamEditor['camera']>;
+  commands: WebcamTrackCommands;
+  hiddenEnabled: string;
+  selectedHiddenId: string | undefined;
+  selectedPositionId: string | undefined;
   duration: number;
   admit: ReviewBeforeAction;
+  compact: boolean;
 }) {
-  const camera = editor.camera!;
   return (
     <>
-      {camera.hiddenRanges.map((range) => (
+      {camera.hiddenRanges.map((range, index) => (
         <ReviewWebcamHiddenMarker
           key={range.id}
-          editor={editor}
+          ranges={camera.hiddenRanges}
+          selected={selectedHiddenId === range.id}
+          enabled={hiddenEnabled[index] === '1'}
+          commands={commands}
           id={range.id}
           duration={duration}
           admit={admit}
@@ -141,7 +207,9 @@ function ReviewWebcamTrackMarkers({
       {camera.positions.map((position, index) => (
         <ReviewWebcamPositionMarker
           key={position.id}
-          editor={editor}
+          camera={camera}
+          selected={selectedPositionId === position.id}
+          commands={commands}
           index={index}
           duration={duration}
           admit={admit}

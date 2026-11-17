@@ -8,9 +8,18 @@ import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
-import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react';
+import {
+  memo,
+  useLayoutEffect,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent,
+} from 'react';
 import { Volume2, VolumeX, Link2 } from 'lucide-react';
-import { translate } from '../../platform/i18n';
+import { translate, useAppLocale } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import type {
   QuickEditOriginalAudio,
@@ -41,7 +50,7 @@ type Drag = {
 };
 
 /** Source-time automation shares video coordinates and never affects added audio clips. */
-export function ReviewOriginalAudioTrack(props: {
+type ReviewOriginalAudioTrackProps = {
   compact?: boolean | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   original: QuickEditOriginalAudio;
@@ -55,13 +64,108 @@ export function ReviewOriginalAudioTrack(props: {
   onRange?: ((range: ReviewAnchor) => void) | undefined;
   onSelectSpeed?: ((edit: ReviewEdit) => void) | undefined;
   onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
-}) {
+};
+
+type OriginalAudioEditor = Pick<
+  ReturnType<typeof useReviewAudio>,
+  | 'originalRanges'
+  | 'originalPlayback'
+  | 'originalTool'
+  | 'selectOriginal'
+  | 'patchOriginal'
+  | 'addOriginal'
+> & {
+  selectedOriginalId: string | undefined;
+};
+type OriginalAudioPresentationProps = Omit<ReviewOriginalAudioTrackProps, 'editor'> & {
+  editor?: OriginalAudioEditor | undefined;
+};
+
+/** Publish a narrow command receiver only after React commits the live adapter. */
+export function ReviewOriginalAudioTrack(props: ReviewOriginalAudioTrackProps) {
+  const receivers = {
+    beforeAction: props.beforeAction,
+    onOriginal: props.onOriginal,
+    onRange: props.onRange,
+    onSelectSpeed: props.onSelectSpeed,
+    selectOriginal: props.editor?.selectOriginal,
+    patchOriginal: props.editor?.patchOriginal,
+    addOriginal: props.editor?.addOriginal,
+  };
+  const committed = useRef(receivers);
+  useLayoutEffect(() => {
+    committed.current = receivers;
+  });
+  const commands = useMemo(
+    () => ({
+      beforeAction: ((action) => {
+        const before = committed.current.beforeAction;
+        if (before) before(action);
+        else action();
+      }) satisfies ReviewBeforeAction,
+      onOriginal: (patch: Partial<QuickEditOriginalAudio>) => committed.current.onOriginal(patch),
+      onRange: (range: ReviewAnchor) => committed.current.onRange?.(range),
+      onSelectSpeed: (edit: ReviewEdit) => committed.current.onSelectSpeed?.(edit),
+      selectOriginal: (...args: Parameters<OriginalAudioEditor['selectOriginal']>) =>
+        committed.current.selectOriginal?.(...args),
+      patchOriginal: (...args: Parameters<OriginalAudioEditor['patchOriginal']>) =>
+        committed.current.patchOriginal?.(...args),
+      addOriginal: (...args: Parameters<OriginalAudioEditor['addOriginal']>) =>
+        committed.current.addOriginal?.(...args) ?? false,
+    }),
+    []
+  );
+  const ranges = props.editor?.originalRanges;
+  const playback = props.editor?.originalPlayback;
+  const tool = props.editor?.originalTool;
+  const selectedOriginalId = props.editor?.selectedOriginal?.id;
+  const hasEditor = !!props.editor;
+  const editor = useMemo(
+    () =>
+      hasEditor && ranges && playback && tool !== undefined
+        ? {
+            originalRanges: ranges,
+            originalPlayback: playback,
+            originalTool: tool,
+            selectedOriginalId,
+            selectOriginal: commands.selectOriginal,
+            patchOriginal: commands.patchOriginal,
+            addOriginal: commands.addOriginal,
+          }
+        : undefined,
+    [hasEditor, ranges, playback, tool, selectedOriginalId, commands]
+  );
+  return (
+    <ReviewOriginalAudioPresentation
+      compact={props.compact}
+      original={props.original}
+      waveform={props.waveform}
+      projection={props.projection}
+      duration={props.duration}
+      busy={props.busy}
+      edits={props.edits}
+      selectedEditId={props.selectedEditId}
+      editor={editor}
+      beforeAction={commands.beforeAction}
+      onOriginal={commands.onOriginal}
+      onRange={commands.onRange}
+      onSelectSpeed={commands.onSelectSpeed}
+    />
+  );
+}
+
+const ReviewOriginalAudioPresentation = memo(function ReviewOriginalAudioPresentation(
+  props: OriginalAudioPresentationProps
+) {
+  useAppLocale();
   const duration = props.projection?.duration ?? props.duration;
   const muted = props.original.muted || props.original.volume === 0;
   const gesture = useOriginalAudioGesture(props, duration);
   const preview = gesture.preview;
-  const ranges = props.editor?.originalRanges ?? props.original.ranges ?? [];
-  const rows = reviewAudioClipRows(ranges);
+  const { ranges, rows } = useMemo(() => {
+    const ranges = props.editor?.originalRanges ?? props.original.ranges ?? [];
+    return { ranges, rows: reviewAudioClipRows(ranges) };
+  }, [props.editor?.originalRanges, props.original.ranges]);
   const rowCount = Math.max(1, ...[...rows.values()].map((row) => row + 1));
   const playback = props.editor?.originalPlayback ?? props.original;
   const gainAt = useCallback(
@@ -78,9 +182,7 @@ export function ReviewOriginalAudioTrack(props: {
       track="originalAudio"
       muted={muted}
       label={translate('gallery.videoReview.audioOriginal')}
-      icon={
-        muted ? <VolumeX size={14} aria-hidden="true" /> : <Volume2 size={14} aria-hidden="true" />
-      }
+      icon={muted ? VolumeX : Volume2}
       controls={
         <OriginalAudioControls
           original={props.original}
@@ -123,7 +225,7 @@ export function ReviewOriginalAudioTrack(props: {
               row={rows.get(range.id) ?? 0}
               duration={duration}
               preview={preview}
-              selected={props.editor?.selectedOriginal?.id === range.id}
+              selected={props.editor?.selectedOriginalId === range.id}
               busy={props.busy}
               onSelect={() =>
                 (props.beforeAction ?? ((action) => action()))(() =>
@@ -177,7 +279,7 @@ export function ReviewOriginalAudioTrack(props: {
       </div>
     </ReviewTrackRow>
   );
-}
+});
 
 /** Master gain and mute share the source track's existing mutation admission. */
 function OriginalAudioControls(props: {
@@ -194,15 +296,14 @@ function OriginalAudioControls(props: {
         label={translate(
           muted ? 'gallery.videoReview.restoreSourceAudio' : 'gallery.videoReview.muteSourceAudio'
         )}
-        aria-pressed={!muted}
+        enabled={!muted}
         disabled={props.busy}
         className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-        onClick={() =>
+        onToggle={() =>
           (props.beforeAction ?? ((action) => action()))(() => props.onOriginal({ muted: !muted }))
         }
-      >
-        {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-      </ReviewTrackVisibilityButton>
+        icon={muted ? VolumeX : Volume2}
+      />
     </>
   );
 }
@@ -279,7 +380,7 @@ function ReviewOriginalGainBlock(props: {
 function originalAudioPointerTime(
   event: PointerEvent<HTMLDivElement>,
   duration: number,
-  props: Parameters<typeof ReviewOriginalAudioTrack>[0],
+  props: OriginalAudioPresentationProps,
   drag: Drag | null,
   snap: ReviewTimelineSnap = snapTimelineTime
 ) {
@@ -304,10 +405,7 @@ function originalAudioPointerTime(
 }
 
 /** One pointer transaction for range drawing/resize, with Escape and capture-loss cancellation. */
-function useOriginalAudioGesture(
-  props: Parameters<typeof ReviewOriginalAudioTrack>[0],
-  duration: number
-) {
+function useOriginalAudioGesture(props: OriginalAudioPresentationProps, duration: number) {
   const snap = useReviewTimelineSnap();
   const drag = useRef<Drag | null>(null);
   const [preview, setPreview] = useState<Drag | null>(null);
@@ -474,7 +572,9 @@ function useOriginalAudioGestureLifetime(props: {
   const { drag, drawing, resetPreview } = props;
   const mounted = useRef(true);
   const available = useRef(props.drawing);
-  available.current = props.drawing;
+  useLayoutEffect(() => {
+    available.current = drawing;
+  }, [drawing]);
   const canCommit = useCallback(
     (kind: 'item' | 'range') => mounted.current && (kind === 'item' || available.current),
     []

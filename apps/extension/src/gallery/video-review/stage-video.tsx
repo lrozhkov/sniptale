@@ -38,6 +38,7 @@ export function ReviewSceneVideo(props: {
   drawing: boolean;
   projected: ReviewRegion | null;
   onReady(): void;
+  onMediaReady?: ((event: 'metadata' | 'seeked' | 'ready') => void) | undefined;
   onTime(time: number): void;
   onPlaying(value: boolean): void;
   onEnded?: (() => void) | undefined;
@@ -59,7 +60,12 @@ export function ReviewSceneVideo(props: {
         preload="metadata"
         className="pointer-events-none"
         style={geometry.video}
-        onLoadedMetadata={props.onReady}
+        onLoadedMetadata={() => {
+          props.onMediaReady?.('metadata');
+          props.onReady();
+        }}
+        onSeeked={() => props.onMediaReady?.('seeked')}
+        onCanPlay={() => props.onMediaReady?.('ready')}
         onTimeUpdate={(event) => props.onTime(event.currentTarget.currentTime)}
         onPlay={() => props.onPlaying(true)}
         onPause={() => props.onPlaying(false)}

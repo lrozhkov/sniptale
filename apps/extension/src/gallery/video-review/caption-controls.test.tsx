@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createReviewCommandFixture } from './editor-fixture.test-support';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -99,6 +100,7 @@ it('shows inherited/local style compactly and never stales retained voice by app
             captions: scene,
             playhead: () => 0,
             split: vi.fn(),
+            splitAtPlayhead: vi.fn(),
             merge: vi.fn(),
             remove: vi.fn(),
             change: (id, patch) => {
@@ -156,6 +158,12 @@ it('guards caption navigation and preserves ordinary timeline navigation', async
     setText = vi.fn();
   function Hook() {
     controller = useReviewText({
+      commands: createReviewCommandFixture(() => ({ duration: 10, time: 0 }), {
+        pause,
+        beforeAction: (action) => {
+          if (allow) action();
+        },
+      }),
       document: { version: 1, fragments: [phrase] },
       sourceDuration: 10,
       edits: [],
@@ -175,7 +183,15 @@ it('guards caption navigation and preserves ordinary timeline navigation', async
   expect(select).not.toHaveBeenCalled();
   expect(seek).toHaveBeenCalledExactlyOnceWith(0, false);
   act(() => controller.jump(phrase, true));
-  expect(select).toHaveBeenCalledExactlyOnceWith({ kind: 'text', id: phrase.id });
+  expect(select).toHaveBeenCalledExactlyOnceWith(
+    { kind: 'text', id: phrase.id },
+    expect.objectContaining({
+      position: expect.objectContaining({
+        resultTime: 0,
+        source: expect.objectContaining({ sourceTime: 0 }),
+      }),
+    })
+  );
   allow = false;
   select.mockClear();
   seek.mockClear();
@@ -194,6 +210,7 @@ it('uses Text then Appearance without interval or nested style disclosure', asyn
     captions: createReviewCaptionSettings(),
     playhead: () => 0,
     split: vi.fn(),
+    splitAtPlayhead: vi.fn(),
     merge: vi.fn(),
     remove: vi.fn(),
     change,

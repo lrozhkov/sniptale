@@ -19,6 +19,7 @@ import { ReviewZoomTrack } from './zoom-track';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import type { ReviewEdit } from '../../features/video/review/types';
 import { createTrackProjection } from './track-projection';
+import * as focusLayout from '../../features/video/review/advanced/focus-layout';
 import { reconcileReviewFocus } from '../../features/video/review/focus-edits';
 
 vi.mock('../../platform/i18n', async (importOriginal) => {
@@ -805,4 +806,16 @@ it('snaps a focus trim to a source loop edge through a speed projection', async 
   await view.event(block, 'pointermove', 395);
   await view.event(block, 'pointerup', 395);
   expect(commit).toHaveBeenCalledWith('a', expect.objectContaining({ end: 3 }), 'end');
+});
+
+it('retains focus row geometry while selection changes and invalidates authored ranges', () => {
+  const pack = vi.spyOn(focusLayout, 'packQuickEditFocusRows');
+  const regions = [zoom('first', 0, 2), zoom('second', 1, 3)];
+  const commit = vi.fn();
+  renderTrack(regions, commit, null, { selectedId: 'first' });
+  pack.mockClear();
+  renderTrack(regions, commit, null, { selectedId: 'second' });
+  expect(pack).not.toHaveBeenCalled();
+  renderTrack([...regions, zoom('third', 1.5, 4)], commit, null, { selectedId: 'second' });
+  expect(pack).toHaveBeenCalledOnce();
 });

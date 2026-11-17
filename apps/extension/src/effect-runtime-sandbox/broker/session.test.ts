@@ -294,7 +294,7 @@ it.each([undefined, 'gpu-scene', 'gpu-scene-plan'] as const)(
   }
 );
 
-it('does not charge an idle GPU worker failure to request or failure admission', () => {
+it('retains idle GPU startup refusal without admitting or charging a frame', () => {
   const worker = new ReplyWorker();
   const session = createEffectRuntimeBrokerSession({
     compositionBackend: 'gpu-scene',
@@ -305,8 +305,28 @@ it('does not charge an idle GPU worker failure to request or failure admission',
   expect(session.snapshot()).toEqual({
     activeRequests: 0,
     consecutiveFailures: 0,
-    circuitOpen: false,
+    circuitOpen: true,
   });
+});
+
+it('retains worker constructor refusal across broker frames while a new broker can recover', async () => {
+  const workerFactory = vi.fn(() => {
+    throw new Error('startup');
+  });
+  const session = createEffectRuntimeBrokerSession({
+    compositionBackend: 'gpu-scene',
+    workerFactory,
+    prepare: vi.fn().mockResolvedValue(createWorkerRequest()),
+  });
+  const message = await createMessage();
+  await expect(session.execute(message)).resolves.toMatchObject({ code: 'circuitOpen' });
+  await expect(session.execute(message)).resolves.toMatchObject({ code: 'circuitOpen' });
+  expect(workerFactory).toHaveBeenCalledOnce();
+  const recovered = createEffectRuntimeBrokerSession({
+    workerFactory: () => new ReplyWorker(),
+    prepare: vi.fn().mockResolvedValue(createWorkerRequest()),
+  });
+  await expect(recovered.execute(message)).resolves.toMatchObject({ kind: 'frame' });
 });
 
 it('rejects bitmap commands on a plan-only connection before request admission', async () => {

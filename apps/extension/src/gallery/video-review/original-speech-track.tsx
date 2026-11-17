@@ -9,7 +9,7 @@ import {
 } from './track-row';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { Captions, ClosedCaption } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { memo, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReviewTextFragment } from '../../features/video/review/text-document';
 import { packReviewTextRows } from '../../features/video/review/text-projection';
 import type { useReviewText } from './use-review-text';
@@ -34,22 +34,77 @@ type TextTrackProps = {
   onToggleCaptions?: (() => void) | undefined;
 };
 
+type TextLaneModel = Pick<TextTrackProps, 'selectedId' | 'busy' | 'compact'> &
+  Pick<TextTrackProps['editor'], 'document' | 'projection' | 'sourceInterval'> & {
+    captionsEnabled: boolean;
+    canToggleCaptions: boolean;
+  };
+type TextLaneCommands = {
+  change: TextTrackProps['editor']['change'];
+  onSelect: TextTrackProps['onSelect'];
+  beforeAction: ReviewBeforeAction;
+  onToggleCaptions(): void;
+};
+type TextLaneProps = TextLaneModel & TextLaneCommands;
+
+/** Publish command receivers only after commit; visual props retain their own identities. */
 export function ReviewTextTrack(props: TextTrackProps) {
+  const receivers = {
+    change: props.editor.change,
+    onSelect: props.onSelect,
+    beforeAction: props.beforeAction,
+    onToggleCaptions: props.onToggleCaptions,
+  };
+  const committed = useRef(receivers);
+  useLayoutEffect(() => {
+    committed.current = receivers;
+  });
+  const commands = useMemo<TextLaneCommands>(
+    () => ({
+      change: (...args) => committed.current.change(...args),
+      onSelect: (id) => committed.current.onSelect(id),
+      beforeAction: (action) => {
+        const before = committed.current.beforeAction;
+        if (before) before(action);
+        else action();
+      },
+      onToggleCaptions: () => committed.current.onToggleCaptions?.(),
+    }),
+    []
+  );
+  return (
+    <ReviewTextLane
+      document={props.editor.document}
+      projection={props.editor.projection}
+      sourceInterval={props.editor.sourceInterval}
+      captionsEnabled={props.editor.captions.enabled}
+      canToggleCaptions={!!props.onToggleCaptions}
+      selectedId={props.selectedId}
+      busy={props.busy}
+      compact={props.compact}
+      {...commands}
+    />
+  );
+}
+
+const ReviewTextLane = memo(function ReviewTextLane(props: TextLaneProps) {
   const gesture = useReviewTextTrackGesture(props);
   const preview = gesture.preview;
   useAppLocale();
   const textLabel = translate('gallery.videoReview.speechText');
-  const { sourceInterval, projection } = props.editor;
+  const { sourceInterval, projection } = props;
   const latest = useRef({ props, gesture });
-  latest.current = { props, gesture };
+  useLayoutEffect(() => {
+    latest.current = { props, gesture };
+  });
   const fragments = useMemo(
     () =>
       preview
-        ? props.editor.document.fragments.map((fragment) =>
+        ? props.document.fragments.map((fragment) =>
             preview.id === fragment.id ? preview : fragment
           )
-        : props.editor.document.fragments,
-    [props.editor.document.fragments, preview]
+        : props.document.fragments,
+    [props.document.fragments, preview]
   );
   const ranges = useMemo(
     () =>
@@ -150,20 +205,19 @@ export function ReviewTextTrack(props: TextTrackProps) {
     <ReviewTrackRow
       track="text"
       label={translate('gallery.videoReview.textTrack')}
-      icon={<Captions size={14} aria-hidden />}
+      icon={Captions}
       controls={
         <ReviewTrackVisibilityButton
           track="text"
           label={translate('gallery.videoReview.captionsEnabled')}
-          aria-pressed={props.editor.captions.enabled}
+          enabled={props.captionsEnabled}
           className={`${reviewTrackStatusButtonClassName} !w-7 !min-h-7 !h-7 !px-0`}
-          disabled={props.busy || !props.onToggleCaptions}
-          onClick={() =>
+          disabled={props.busy || !props.canToggleCaptions}
+          onToggle={() =>
             (props.beforeAction ?? ((action) => action()))(() => props.onToggleCaptions?.())
           }
-        >
-          <ClosedCaption size={14} aria-hidden />
-        </ReviewTrackVisibilityButton>
+          icon={ClosedCaption}
+        />
       }
     >
       <div
@@ -172,16 +226,16 @@ export function ReviewTextTrack(props: TextTrackProps) {
         style={{ height: rowCount * step }}
       >
         {items}
-        <ReviewTrackCuts projection={props.editor.projection} />
+        <ReviewTrackCuts projection={props.projection} />
       </div>
     </ReviewTrackRow>
   );
-}
+});
 
 /** One pointer capture owns the disposable preview, admission, Escape and final timing commit. */
-function useReviewTextTrackGesture(props: TextTrackProps) {
+function useReviewTextTrackGesture(props: TextLaneProps) {
   const snap = useReviewTimelineSnap({
-    output: props.editor.projection.display.sourceToDisplay,
+    output: props.projection.display.sourceToDisplay,
     fromDisplay: (time) => time,
   });
   const drag = useRef<{
@@ -197,13 +251,13 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
   const [preview, setPreview] = useState<ReviewTextFragment | null>(null);
   const previewRef = useRef<ReviewTextFragment | null>(null);
   const boundary = drag.current;
-  const boundaryRange = preview ? props.editor.sourceInterval(preview) : null;
+  const boundaryRange = preview ? props.sourceInterval(preview) : null;
   useReviewResizeBoundary(
     boundary,
     boundary &&
       boundary.edge !== 'move' &&
       boundaryRange &&
-      props.editor.document.fragments.some((fragment) => fragment.id === boundary.base.id)
+      props.document.fragments.some((fragment) => fragment.id === boundary.base.id)
       ? boundaryRange[boundary.edge]
       : null,
     boundary?.base,
@@ -214,7 +268,7 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
     setPreview(null);
   };
   useReviewDragEscape(drag, clearPreview);
-  const duration = Math.max(0.01, props.editor.projection.duration);
+  const duration = Math.max(0.01, props.projection.duration);
   const cancel = () => {
     const current = drag.current;
     drag.current = null;
@@ -237,13 +291,8 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
       ...fields,
       timeDomain: 'result' as const,
       start:
-        fragment.timeDomain === 'source'
-          ? props.editor.projection.output(fragment.start)
-          : fragment.start,
-      end:
-        fragment.timeDomain === 'source'
-          ? props.editor.projection.output(fragment.end)
-          : fragment.end,
+        fragment.timeDomain === 'source' ? props.projection.output(fragment.start) : fragment.start,
+      end: fragment.timeDomain === 'source' ? props.projection.output(fragment.end) : fragment.end,
     };
     drag.current = {
       base,
@@ -265,8 +314,8 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
     current.moved ||= Math.abs(event.clientX - current.x) > 3;
     if (!current.moved) return;
     const base = current.base;
-    const limit = base.timeDomain === 'source' ? duration : props.editor.projection.resultDuration;
-    const display = props.editor.projection.display;
+    const limit = base.timeDomain === 'source' ? duration : props.projection.resultDuration;
+    const display = props.projection.display;
     const edge = current.edge === 'end' ? 'end' : 'start';
     const displayed = display.resultToDisplay(base[edge], edge);
     const deltaPixels = event.clientX - current.x;
@@ -277,7 +326,7 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
     const candidates = [
       0,
       display.duration,
-      ...props.editor.document.fragments
+      ...props.document.fragments
         .filter((fragment) => fragment.id !== base.id)
         .flatMap((fragment) => {
           if (fragment.timeDomain === 'result' && !fragment.sourceAnchor)
@@ -285,7 +334,7 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
               display.resultToDisplay(fragment.start),
               display.resultToDisplay(fragment.end, 'end'),
             ];
-          const range = props.editor.sourceInterval(fragment);
+          const range = props.sourceInterval(fragment);
           return [display.sourceToDisplay(range.start), display.sourceToDisplay(range.end, 'end')];
         }),
     ];
@@ -325,7 +374,7 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
       (next.start !== current.base.start || next.end !== current.base.end)
     )
       current.admission.commit(() =>
-        props.editor.change(
+        props.change(
           current.base.id,
           { start: next.start, end: next.end, timeDomain: 'result' },
           current.base.timingRevision

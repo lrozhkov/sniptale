@@ -16,6 +16,7 @@ import { createManualPresentationOwner } from './preview-presentation-session';
 import {
   resolvePresentationDescription,
   createPresentationFeedback,
+  createPresentationFrameStatistics,
   retainPresentationBounds,
   PREVIEW_STATISTICS_INTERVAL_MS,
   type PresentationInput,
@@ -32,6 +33,14 @@ const inactiveStatus: ReviewPreviewPresentationStatus = {
   presentedFPS: null,
   nativeVideoFPS: null,
 };
+function presentationMetadata({
+  presentedFPS: _presentedFPS,
+  nativeVideoFPS: _nativeVideoFPS,
+  ...metadata
+}: ReviewPreviewPresentationStatus) {
+  return metadata;
+}
+const inactiveMetadata = presentationMetadata(inactiveStatus);
 
 /** Current stays hybrid; detailed pause retains one manual owner throughout a gesture. */
 export function isReviewPreviewManual(preferences: QuickPreviewPreferences, playing: boolean) {
@@ -47,7 +56,7 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
   const [pageVisible, setPageVisible] = useState(() => document.visibilityState !== 'hidden');
   const [comments, setComments] = useState<Record<string, { x: number; y: number }>>({});
   const [placement, setPlacement] = useState<QuickEditWebcamPlacement | null>(null);
-  const [reported, setReported] = useState({ key: '', status: inactiveStatus });
+  const [reported, setReported] = useState({ key: '', status: inactiveMetadata });
   const [bounds, setBounds] = useState<Prepared['watermarkBounds'] | null>(null);
   const [camera, setCamera] = useState<PresentationCameraState>({
     phase: 'loading',
@@ -60,6 +69,12 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
     !!(input.scene.sourceFilters && hasSourceImageFilters(input.scene.sourceFilters)) ||
     (typeof navigator !== 'undefined' && !!navigator.gpu) ||
     isReviewPreviewManual(input.preferences, input.playing) ||
+    // Temporal compositions use the existing frame scheduler, not sampled React chrome time.
+    input.scene.zoomRegions.length > 0 ||
+    input.scene.keys.length > 0 ||
+    input.scene.clicks.length > 0 ||
+    (input.scene.outerFadePlan?.visualEnvelope.fadeIn ?? 0) > 0 ||
+    (input.scene.outerFadePlan?.visualEnvelope.fadeOut ?? 0) > 0 ||
     !!(
       input.scene.webcam?.enabled &&
       (input.scene.webcam.split || input.scene.webcam.positions.some((position) => position.split))
@@ -85,7 +100,7 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
   const lifetime = useRef<ReturnType<typeof createPresentationSlot> | null>(null);
   if (lifetime.current?.key !== lifetimeKey) lifetime.current = createPresentationSlot(lifetimeKey);
   const owner = lifetime.current;
-  const status = reported.key === lifetimeKey ? reported.status : inactiveStatus;
+  const status = reported.key === lifetimeKey ? reported.status : inactiveMetadata;
   const cut = useReviewCutTransitionProvider(active ? input.cut : undefined, true, owner.admit);
   const latest = useRef({ input, cut, placement });
   latest.current = { input, cut, placement };
@@ -109,18 +124,21 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
   useLayoutEffect(() => {
     setCamera({ phase: 'loading', duration: 0, ready: false });
     setBounds(null);
-    setReported({ key: owner.key, status: inactiveStatus });
+    setReported({ key: owner.key, status: inactiveMetadata });
+    owner.frameStatistics.publish(inactiveStatus);
     latest.current.input.onStatistics?.(inactiveStatus);
     return () => {
       owner.current?.dispose();
       owner.current = null;
+      owner.frameStatistics.publish(inactiveStatus);
     };
   }, [owner]);
   const reportPresentation = useMemo(
     () =>
       createPresentationFeedback(
-        (value) => setReported({ key: owner.key, status: value }),
-        (value) => latest.current.input.onStatistics?.(value)
+        (value) => setReported({ key: owner.key, status: presentationMetadata(value) }),
+        (value) => latest.current.input.onStatistics?.(value),
+        owner.frameStatistics.publish
       ),
     [owner]
   );
@@ -179,7 +197,7 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
     ...camera,
     onPreviewPlacement: onWebcamPreview,
   };
-  const presentationStatus: ReviewPreviewPresentationStatus = manual
+  const presentationStatus: ReturnType<typeof presentationMetadata> = manual
     ? status
     : {
         ...status,
@@ -192,6 +210,7 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
   return {
     active: manual,
     status: presentationStatus,
+    frameStatistics: owner.frameStatistics.source,
     retry,
     onCommentPreview,
     onWebcamPreview,
@@ -205,6 +224,7 @@ function createPresentationSlot(key: string) {
   const slot = {
     key,
     current: null as Owner | null,
+    frameStatistics: createPresentationFrameStatistics(),
     admit(bytes: readonly [number, number]) {
       if (!slot.current) throw new Error('Preview endpoint owner unavailable');
       return slot.current.retainEndpoints(bytes);

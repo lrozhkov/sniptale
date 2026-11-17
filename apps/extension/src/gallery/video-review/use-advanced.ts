@@ -3,6 +3,7 @@ import { useRecoveryLifecycle } from './use-recovery-lifecycle';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   QuickEditAdvancedState,
+  QuickEditAdvancedContent,
   QuickEditTrack,
 } from '../../features/video/review/advanced/types';
 import { useReviewAdvancedContent } from './use-advanced-content';
@@ -109,31 +110,7 @@ export function useReviewAdvanced(session: Session, beforeEdit?: () => void) {
   const content = contentState.content;
   const previousAdvanced = useRef<{ session: Session; value: QuickEditAdvancedState } | null>(null);
   const advanced = useMemo<QuickEditAdvancedState>(() => {
-    const {
-      sourceFilters: _baselineSourceFilters,
-      cursorFocusPath: _baselineCursorFocusPath,
-      cursorMotions: _baselineCursorMotions,
-      cursorMotionEnabled: _baselineCursorMotionEnabled,
-      annotationEffects: _baselineAnnotationEffects,
-      actionsEnabled: _baselineActionsEnabled,
-      interactionTimeline: _baselineInteractionTimeline,
-      keyAnimations: _baselineKeys,
-      clickAnimations: _baselineClicks,
-      actionAudio: _baselineActionAudio,
-      canvas: _baselineCanvas,
-      windowHeader: _baselineHeader,
-      watermark: _baselineWatermark,
-      presentation: _baselinePresentation,
-      webcam: _baselineWebcam,
-      text: _baselineText,
-      captions: _baselineCaptions,
-      ...workspaceState
-    } = persisted;
-    const next: QuickEditAdvancedState = {
-      ...workspaceState,
-      ui: optimistic?.value.ui ?? persisted.ui,
-      ...content,
-    };
+    const next = composeReviewAdvanced(persisted, content, optimistic?.value.ui ?? persisted.ui);
     const previous =
       previousAdvanced.current?.session === session ? previousAdvanced.current.value : undefined;
     if (previous) {
@@ -155,9 +132,21 @@ export function useReviewAdvanced(session: Session, beforeEdit?: () => void) {
     previousAdvanced.current = { session, value };
     return value;
   }, [persisted, optimistic, content, session]);
+  const readCurrentContent = contentState.readCurrent;
+  const readCurrent = useCallback(
+    () =>
+      composeReviewAdvanced(
+        session.getSnapshot().snapshot.workspace.advanced,
+        readCurrentContent(),
+        pending.current?.value.ui ?? session.getSnapshot().snapshot.workspace.advanced.ui
+      ),
+    [session, readCurrentContent]
+  );
   return {
     ...contentState.commands,
     advanced,
+    readCurrent,
+    readCurrentContent,
     backgroundPreview:
       backgroundGesture?.session === session && backgroundGesture.base === content.background
         ? backgroundGesture.value
@@ -182,6 +171,34 @@ export function useReviewAdvanced(session: Session, beforeEdit?: () => void) {
     },
     reset,
   };
+}
+
+function composeReviewAdvanced(
+  persisted: QuickEditAdvancedState,
+  content: QuickEditAdvancedContent,
+  ui: QuickEditAdvancedState['ui']
+): QuickEditAdvancedState {
+  const {
+    sourceFilters: _baselineSourceFilters,
+    cursorFocusPath: _baselineCursorFocusPath,
+    cursorMotions: _baselineCursorMotions,
+    cursorMotionEnabled: _baselineCursorMotionEnabled,
+    annotationEffects: _baselineAnnotationEffects,
+    actionsEnabled: _baselineActionsEnabled,
+    interactionTimeline: _baselineInteractionTimeline,
+    keyAnimations: _baselineKeys,
+    clickAnimations: _baselineClicks,
+    actionAudio: _baselineActionAudio,
+    canvas: _baselineCanvas,
+    windowHeader: _baselineHeader,
+    watermark: _baselineWatermark,
+    presentation: _baselinePresentation,
+    webcam: _baselineWebcam,
+    text: _baselineText,
+    captions: _baselineCaptions,
+    ...workspaceState
+  } = persisted;
+  return { ...workspaceState, ui, ...content };
 }
 
 /** Persistence parsing clones JSON branches; equal branches must not restart unrelated consumers. */

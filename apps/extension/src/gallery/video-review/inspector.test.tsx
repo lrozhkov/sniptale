@@ -9,6 +9,7 @@ import { useReviewInspectorNavigation } from './inspector-navigation';
 import { ReviewInspectorSections, reviewInspectorActions } from './inspector-sections';
 import type { ReviewSelection } from '../../features/video/review/types';
 
+let ownerRenders = 0;
 let currentNavigation: ReturnType<typeof useReviewInspectorNavigation>;
 
 function ReviewInspector(
@@ -18,6 +19,7 @@ function ReviewInspector(
     exportRequest?: number;
   }
 ) {
+  ownerRenders++;
   const navigation = useReviewInspectorNavigation({
     ...props,
     exportAvailable: !!props.actions,
@@ -496,7 +498,6 @@ it.each([true, false])(
         '[data-ui="gallery.videoReview.inspectorPresentation"]'
       );
       expect(presentation).toBeNull();
-      expect(navigation.presentation).toBe('sections');
       expect(beforeAction).toHaveBeenCalledTimes(1);
       act(() => root.render(<Harness />));
       expect(host.querySelector('output')?.textContent).toBe('speech');
@@ -787,8 +788,10 @@ it('routes visible inspector commands into the header menu in both parameter pre
       '[data-ui="gallery.videoReview.inspectorPresentation"]'
     )!;
     expect(host.querySelector('[aria-label="second-parameter"]')).toBeNull();
+    const beforePresentation = ownerRenders;
     await act(async () => presentation.click());
-    expect(currentNavigation.presentation).toBe('all');
+    expect(presentation.getAttribute('aria-pressed')).toBe('true');
+    expect(ownerRenders).toBe(beforePresentation);
     expect(host.querySelector('[aria-label="first-parameter"]')).not.toBeNull();
     expect(host.querySelector('[aria-label="second-parameter"]')).not.toBeNull();
     expect(host.querySelector('[role="tablist"]')).toBeNull();

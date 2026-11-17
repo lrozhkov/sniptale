@@ -25,15 +25,18 @@ type Drag = {
 
 /** Hide boundaries use source time and one admitted edit; the main video keeps its clock. */
 export function ReviewWebcamHiddenMarker(props: {
-  editor: ReturnType<typeof useReviewWebcamEditor>;
+  ranges: NonNullable<ReturnType<typeof useReviewWebcamEditor>['camera']>['hiddenRanges'];
+  selected: boolean;
+  enabled: boolean;
+  commands: Pick<ReturnType<typeof useReviewWebcamEditor>, 'select' | 'resizeHidden'>;
   id: string;
   duration: number;
   admit: ReviewBeforeAction;
   compact: boolean;
 }) {
-  const { editor, id, duration, admit } = props;
+  const { commands, ranges, selected, enabled, id, duration, admit } = props;
   const snap = useReviewTimelineSnap();
-  const range = editor.camera!.hiddenRanges.find((item) => item.id === id)!;
+  const range = ranges.find((item) => item.id === id)!;
   const drag = useRef<Drag | null>(null);
   const pending = useRef<ReturnType<typeof deferReviewGesture> | null>(null);
   const [preview, setPreview] = useState<Range | null>(null);
@@ -47,7 +50,6 @@ export function ReviewWebcamHiddenMarker(props: {
     setPreview(null);
   }, []);
   useReviewGestureCancellation(cancel);
-  const enabled = editor.canResizeHidden(id, range);
   useEffect(() => {
     if (!enabled) cancel();
   }, [enabled, cancel]);
@@ -72,7 +74,7 @@ export function ReviewWebcamHiddenMarker(props: {
     };
   }, [cancel]);
   const bounded = (original: Range, edge: Edge, time: number): Range => {
-    const others = editor.camera!.hiddenRanges.filter((item) => item.id !== id);
+    const others = ranges.filter((item) => item.id !== id);
     const left = Math.max(
       0,
       ...others.filter((item) => item.end <= original.start).map((item) => item.end)
@@ -100,7 +102,6 @@ export function ReviewWebcamHiddenMarker(props: {
     );
   const metrics = reviewTrackMetrics(props.compact);
   const visible = preview ?? range;
-  const selected = editor.selection.kind === 'webcam-hidden' && editor.selection.id === id;
   return (
     <div
       data-ui="gallery.videoReview.webcamHiddenMarker"
@@ -132,7 +133,7 @@ export function ReviewWebcamHiddenMarker(props: {
         className="absolute inset-0 flex items-center justify-center"
         onClick={(event) => {
           event.stopPropagation();
-          admit(() => editor.select({ kind: 'webcam-hidden', id }));
+          admit(() => commands.select({ kind: 'webcam-hidden', id }));
         }}
       >
         <Scissors size={12} aria-hidden />
@@ -191,7 +192,7 @@ export function ReviewWebcamHiddenMarker(props: {
             )
               current.admission.commit(() => {
                 if (pending.current === current.admission) pending.current = null;
-                editor.resizeHidden(id, current.next);
+                commands.resizeHidden(id, current.next);
               });
             else {
               current.admission.cancel();
@@ -217,7 +218,7 @@ export function ReviewWebcamHiddenMarker(props: {
               pending.current = admission;
               admission.commit(() => {
                 if (pending.current === admission) pending.current = null;
-                editor.resizeHidden(id, next);
+                commands.resizeHidden(id, next);
               });
             }
           }}

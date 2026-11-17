@@ -13,6 +13,7 @@ import type { ReviewSelection } from '../../features/video/review/types';
 import type { VideoProject } from '../../features/video/project/types';
 import { useReviewRecordingHistory } from './use-recording-history';
 import { useReviewPlayback } from './use-playback';
+import { createReviewPlaybackPresentationClock } from './playback-presentation-clock.test-support';
 
 const io = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock('../../workflows/video-review/recording-review', () => ({
@@ -52,6 +53,7 @@ function reader() {
 let root: Root;
 let host: HTMLDivElement;
 let value: ReturnType<typeof useReviewRecordingHistory>;
+let renders = 0;
 function Probe({
   time = 0,
   input = resource,
@@ -63,6 +65,7 @@ function Probe({
   selection?: ReviewSelection;
   options?: Parameters<typeof useReviewRecordingHistory>[3];
 }) {
+  renders++;
   value = useReviewRecordingHistory(input, time, selection, options);
   return null;
 }
@@ -72,6 +75,7 @@ beforeEach(() => {
   document.body.append(host);
   root = createRoot(host);
   io.create.mockReset();
+  renders = 0;
 });
 afterEach(async () => {
   await act(async () => root.unmount());
@@ -232,6 +236,72 @@ it('bounds reuse of an expanded animation window while the playhead advances', a
   expect(owner.read).toHaveBeenCalledTimes(1);
 });
 
+it('prefetches from the live clock without rerendering covered playback samples', async () => {
+  const owner = reader();
+  owner.covers = () => true;
+  io.create.mockReturnValue(owner);
+  const clock = createReviewPlaybackPresentationClock(() => true);
+  await act(async () => root.render(<Probe time={12} options={{ clock }} />));
+  expect(owner.read).toHaveBeenCalledWith(0, { start: 0, end: 3 });
+  const before = renders;
+  for (const time of [0.2, 0.4, 0.8]) await act(async () => clock.publish(time));
+  expect(renders).toBe(before);
+  expect(owner.read).toHaveBeenCalledTimes(1);
+  const refresh = Promise.withResolvers<Prepared>();
+  owner.read.mockReturnValueOnce(refresh.promise);
+  await act(async () => clock.publish(1.1));
+  expect(owner.read).toHaveBeenLastCalledWith(1.1, { start: 0, end: 4.1 });
+  expect(value.pending).toBe(false);
+  expect(renders).toBe(before);
+  await act(async () => clock.publish(6));
+  expect(value.pending).toBe(true);
+  expect(renders).toBe(before + 1);
+  await act(async () => refresh.resolve(prepared(1.1)));
+  expect(owner.read).toHaveBeenLastCalledWith(6, { start: 3, end: 9 });
+  expect(value.pending).toBe(false);
+  const ready = renders;
+  for (const time of [6.1, 6.2, 6.3]) await act(async () => clock.publish(time));
+  expect(renders).toBe(ready);
+});
+
+it('retains clock failure recovery and unsubscribes when the history owner is removed', async () => {
+  const owner = reader();
+  owner.covers = () => true;
+  io.create.mockReturnValue(owner);
+  const clock = createReviewPlaybackPresentationClock(() => true);
+  await act(async () => root.render(<Probe options={{ clock }} />));
+  owner.read.mockRejectedValueOnce(new Error('unavailable'));
+  await act(async () => clock.publish(6));
+  expect(value.failed).toBe(true);
+  const failedReads = owner.read.mock.calls.length;
+  await act(async () => clock.publish(10));
+  expect(owner.read).toHaveBeenCalledTimes(failedReads);
+  await act(async () => value.retry());
+  expect(owner.read).toHaveBeenLastCalledWith(10, { start: 7, end: 13 });
+  expect(value.failed).toBe(false);
+  await act(async () =>
+    root.render(<Probe input={{ source, telemetry: base }} options={{ clock }} />)
+  );
+  const stoppedReads = owner.read.mock.calls.length;
+  await act(async () => clock.publish(15));
+  expect(owner.read).toHaveBeenCalledTimes(stoppedReads);
+  expect(owner.dispose).toHaveBeenCalledOnce();
+});
+
+it('keeps explicit viewport history independent of the live playback clock', async () => {
+  const owner = reader();
+  io.create.mockReturnValue(owner);
+  const clock = createReviewPlaybackPresentationClock(() => true);
+  await act(async () =>
+    root.render(<Probe time={10} options={{ clock, range: { start: 5, end: 15 } }} />)
+  );
+  const before = renders;
+  await act(async () => clock.publish(18));
+  expect(owner.read).toHaveBeenCalledExactlyOnceWith(10, { start: 5, end: 15 });
+  expect(renders).toBe(before);
+  expect(value.pending).toBe(false);
+});
+
 it('keeps strict archived history readable through rounded media EOF, End and seek-back without Retry', async () => {
   const duration = 26.283316666666664;
   const browserTime = 26.283317;
@@ -252,6 +322,12 @@ it('keeps strict archived history readable through rounded media EOF, End and se
   vi.stubGlobal('requestAnimationFrame', () => 1);
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
   const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(function (
+    this: HTMLMediaElement
+  ) {
+    Object.defineProperty(this, 'paused', { configurable: true, value: false });
+    return Promise.resolve();
+  });
   let playback!: ReturnType<typeof useReviewPlayback>;
   function PlaybackHistory() {
     playback = useReviewPlayback({
@@ -267,8 +343,9 @@ it('keeps strict archived history readable through rounded media EOF, End and se
   }
   try {
     await act(async () => root.render(<PlaybackHistory />));
+    await act(async () => playback.play());
     playback.video.current!.currentTime = browserTime;
-    await act(async () => playback.onTime(browserTime));
+    await act(async () => playback.onTime());
     expect(value.failed).toBe(false);
     expect(playback.time).toBe(duration);
     await act(async () => playback.onEnded());
@@ -282,6 +359,7 @@ it('keeps strict archived history readable through rounded media EOF, End and se
     expect(io.create).toHaveBeenCalledOnce();
   } finally {
     pause.mockRestore();
+    play.mockRestore();
   }
 });
 

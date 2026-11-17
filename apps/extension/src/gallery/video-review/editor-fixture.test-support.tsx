@@ -18,6 +18,101 @@ import type {
   moveVideoWorkspaceHistory,
 } from '../../composition/persistence/review-workspaces/store';
 import type { ReviewOperation } from '../../features/video/review/types';
+import type {
+  ReviewAnchor,
+  ReviewDocument,
+  ReviewSelection,
+} from '../../features/video/review/types';
+import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
+import type { ReviewPlaybackRange } from './playback-range';
+import { createReviewCommandPort } from './command-context';
+import { reviewAdvancedContentBaseline } from '../../features/video/review/document';
+import { buildReviewTimeMap, sourceToReviewResult } from '../../features/video/review/timeline';
+
+/** Unit controllers use the same atomic command admission as the mounted editor. */
+export function createReviewCommandFixture(
+  read: () => {
+    duration: number;
+    time: number;
+    resultTime?: number | null;
+    document?: ReviewDocument;
+    advanced?: QuickEditAdvancedState;
+    selection?: ReviewSelection;
+    timelineSelection?: ReviewAnchor;
+    range?: ReviewPlaybackRange | null;
+    session?: object;
+    sourceAssetId?: string;
+    resource?: Blob;
+  },
+  options: { pause?(): void; beforeAction?(action: () => void): void } = {}
+) {
+  const session = {};
+  const resource = new Blob(['command-source']);
+  const advanced = createQuickEditAdvancedState();
+  const sourceUrl = 'blob:command-source';
+  const document: ReviewDocument = {
+    annotations: [],
+    edits: [],
+    canvasComments: [],
+    advancedContent: reviewAdvancedContentBaseline(advanced),
+  };
+  return createReviewCommandPort({
+    read: () => {
+      const current = read();
+      return {
+        scope: {
+          session: current.session ?? session,
+          resource: current.resource ?? resource,
+          sourceAssetId: current.sourceAssetId ?? 'command-source',
+          sourceUrl,
+          sourceDuration: current.duration,
+        },
+        document: current.document ?? document,
+        advanced: current.advanced ?? advanced,
+        selection: current.selection ?? { kind: 'none' },
+        timelineSelection: current.timelineSelection ?? { kind: 'point', time: current.time },
+        playbackRange: current.range ?? null,
+      };
+    },
+    readPosition: () => {
+      const current = read();
+      const segments = buildReviewTimeMap(current.duration, current.document?.edits ?? []);
+      const resultTime =
+        current.resultTime === undefined
+          ? sourceToReviewResult(current.time, segments)
+          : current.resultTime;
+      const segment =
+        resultTime === null
+          ? undefined
+          : segments.find(
+              (part) =>
+                resultTime >= part.resultStart && resultTime < part.resultEnd && part.kind !== 'cut'
+            );
+      const mediaTime =
+        segment?.kind === 'freeze' ? (segment.frameTime ?? current.time) : current.time;
+      return {
+        epoch: 0,
+        mapRevision: 0,
+        resultTime,
+        source:
+          resultTime === null
+            ? null
+            : {
+                kind: segment?.kind === 'freeze' ? 'freeze' : 'video',
+                sourceTime: current.time,
+                mediaTime,
+                segmentId: segment?.freezeId ?? 'source',
+              },
+        media: { sourceId: sourceUrl, time: mediaTime },
+      };
+    },
+    beforeAction: options.beforeAction ?? ((action) => action()),
+    pauseAt: () => {
+      options.pause?.();
+      return true;
+    },
+  });
+}
 
 /** Mirrors the committed-projection adapter using the fixture's accepted history. */
 export function committedEditorFixtureProjection(snapshot: VideoWorkspaceSnapshot) {

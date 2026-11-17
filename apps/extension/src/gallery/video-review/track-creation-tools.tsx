@@ -2,7 +2,6 @@ import { useRef } from 'react';
 import { Captions, Mic, Music, Plus } from 'lucide-react';
 import type { QuickEditTrack } from '../../features/video/review/advanced/types';
 import type { ReviewAnchor } from '../../features/video/review/types';
-import type { ReviewBeforeAction } from './note-transitions';
 import type { useReviewText } from './use-review-text';
 import type { ReviewAudioLane } from './use-review-audio';
 import { ReviewButton, ReviewToolGroup, reviewIconButtonClassName } from './controls';
@@ -12,13 +11,14 @@ type CreationInput = {
   sourceId: string | undefined;
   track: QuickEditTrack;
   blocked: boolean;
-  onPause(): void;
   atEnd: boolean;
-  beforeAction: ReviewBeforeAction | undefined;
   range: Extract<ReviewAnchor, { kind: 'range' }> | undefined;
   text: ReturnType<typeof useReviewText> | undefined;
   onRecordVoiceover(): void;
-  onImportFile(file: File, lane: ReviewAudioLane): void;
+  onPrepareImportFile(
+    lane: ReviewAudioLane,
+    ready: (importFile: (file: File) => void) => void
+  ): void;
   onOpenAudio: ((anchor: HTMLElement, lane: ReviewAudioLane) => void) | undefined;
 };
 
@@ -26,16 +26,11 @@ type CreationInput = {
 export function useReviewTrackCreation(input: CreationInput) {
   const current = useRef(input);
   current.current = input;
-  const admit = (action: () => void) =>
-    (input.beforeAction ?? ((accepted) => accepted()))(() => {
-      if (current.current.sourceId === input.sourceId && !current.current.blocked) action();
-    });
   const addText = (_trigger: HTMLElement) => {
-    const range = input.range;
-    if (range) admit(() => current.current.text?.add(true, range, 'result'));
+    if (!current.current.blocked) current.current.text?.add();
   };
   return {
-    tools: <ReviewTrackCreationTools {...input} addText={addText} admit={admit} />,
+    tools: <ReviewTrackCreationTools {...input} addText={addText} />,
   };
 }
 
@@ -43,7 +38,6 @@ export function useReviewTrackCreation(input: CreationInput) {
 function ReviewTrackCreationTools(
   props: CreationInput & {
     addText(anchor: HTMLElement): void;
-    admit(action: () => void): void;
   }
 ) {
   const input = useRef<HTMLInputElement>(null);
@@ -85,8 +79,7 @@ function ReviewTrackCreationTools(
           const intent = picker.current;
           event.target.value = '';
           picker.current = null;
-          if (file && intent && intent.sourceId === props.sourceId)
-            props.admit(() => intent.importFile(file));
+          if (file && intent && intent.sourceId === props.sourceId) intent.importFile(file);
         }}
       />
       {lane === 'voiceover' && (
@@ -95,7 +88,7 @@ function ReviewTrackCreationTools(
           toolbarLabel={translate('gallery.videoReview.recordVoiceover')}
           className={reviewIconButtonClassName}
           disabled={props.blocked || props.atEnd}
-          onClick={() => props.admit(props.onRecordVoiceover)}
+          onClick={props.onRecordVoiceover}
         >
           <Mic size={16} aria-hidden />
         </ReviewButton>
@@ -107,17 +100,16 @@ function ReviewTrackCreationTools(
         disabled={props.blocked || props.atEnd}
         onClick={(event) => {
           const trigger = event.currentTarget;
-          props.admit(() => {
-            props.onPause();
-            if (props.onOpenAudio) props.onOpenAudio(trigger, lane);
-            else {
+          if (props.onOpenAudio) props.onOpenAudio(trigger, lane);
+          else {
+            props.onPrepareImportFile(lane, (importFile) => {
               picker.current = {
                 sourceId: props.sourceId,
-                importFile: (file) => props.onImportFile(file, lane),
+                importFile,
               };
               input.current?.click();
-            }
-          });
+            });
+          }
         }}
       >
         {lane === 'music' ? <Music size={16} aria-hidden /> : <Plus size={16} aria-hidden />}

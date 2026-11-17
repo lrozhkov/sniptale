@@ -1,3 +1,4 @@
+import { reviewCommandInsertion, type ReviewCommandPort } from './command-context';
 import { reviewTrackEnabled } from '../../features/video/review/advanced/track-controls';
 import { ReviewInteractionAdd } from './interaction-editor';
 import type { ReviewCursorMotionEditor } from './cursor-motion-editor';
@@ -74,6 +75,7 @@ type Editing = ReturnType<typeof useReviewEdits>;
 type Exporter = ReturnType<typeof useReviewExport>;
 
 type TimelineBindingProps = {
+  commands: ReviewCommandPort;
   onHoverIntent?: ((starting: boolean) => void) | undefined;
   onHoverTime?: ((time: number | null, resultTime?: number) => void) | undefined;
   interactionEditor?: import('./interaction-editor').ReviewInteractionEditor;
@@ -139,6 +141,10 @@ type TimelineBindingProps = {
   audioState: QuickEditAudioState;
   waveforms?: ReadonlyMap<string, ReviewWaveform> | undefined;
   onImportAudioFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
+  onPrepareImportAudioFile(
+    lane: ReviewAudioLane,
+    ready: (importFile: (file: File) => void) => void
+  ): void;
   onRecordVoiceover(): void;
   onOpenMusic?: ((anchor: HTMLElement, lane?: ReviewAudioLane) => void) | undefined;
   onOpenSpeech?: (() => void) | undefined;
@@ -198,16 +204,17 @@ function ReviewTimelineToolsBinding(
     reviewEditInsertionRange(kind, props.time, props.source.duration, props.edits, selectedRange);
   const issue = (kind: 'cut' | 'speed') =>
     reviewEditRangeIssue(props, kind, editRange(kind) ?? range);
-  const originalRange = reviewInsertionRange({
-    time: props.time,
-    duration: props.source.duration,
-    seconds: 2,
-    range: selectedRange,
-    occupied: [
-      ...props.edits.filter((edit) => edit.kind === 'cut'),
-      ...(props.audioState.original.ranges ?? []),
-    ],
-  });
+  const originalInsertionRange = () =>
+    reviewInsertionRange({
+      time: props.time,
+      duration: props.source.duration,
+      seconds: 2,
+      range: selectedRange,
+      occupied: [
+        ...props.edits.filter((edit) => edit.kind === 'cut'),
+        ...(props.audioState.original.ranges ?? []),
+      ],
+    });
   return (
     <fieldset
       disabled={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
@@ -222,11 +229,7 @@ function ReviewTimelineToolsBinding(
               label={translate('gallery.videoReview.freezeFrame')}
               className={reviewTextButtonClassName}
               disabled={props.busy || props.editing.freezing}
-              onClick={() =>
-                (props.beforeAction ?? ((action) => action()))(
-                  () => void props.editing.addFreeze?.()
-                )
-              }
+              onClick={() => void props.editing.addFreeze?.()}
             >
               <Snowflake size={15} aria-hidden />
               <span>{translate('gallery.videoReview.freezeFrame')}</span>
@@ -237,13 +240,27 @@ function ReviewTimelineToolsBinding(
         }
         beforeAction={props.beforeAction}
         originalAudioEditor={props.audio}
-        originalInsertionRange={originalRange}
+        originalInsertionRange={originalInsertionRange()}
         onAddOriginal={() => {
-          if (!originalRange) return;
-          props.editing.setCutting(false);
-          props.audio.setOriginalTool(false);
-          props.onPause();
-          if (props.audio.addOriginal(originalRange)) props.onSeek(originalRange.start, false);
+          const context = props.commands.capture();
+          if (!context) return;
+          props.commands.admit(context, (accepted) => {
+            const insertion = reviewCommandInsertion(accepted, 'source');
+            if (!insertion) return;
+            const originalRange = reviewInsertionRange({
+              ...insertion,
+              seconds: 2,
+              occupied: [
+                ...accepted.document.edits.filter((edit) => edit.kind === 'cut'),
+                ...(accepted.advanced.audio.original.ranges ?? []),
+              ],
+            });
+            if (!originalRange) return;
+            props.editing.setCutting(false);
+            props.audio.setOriginalTool(false);
+            if (props.audio.addOriginal(originalRange, accepted))
+              props.onSeek(originalRange.start, false);
+          });
         }}
         rulerRange={props.playbackRange ? range : undefined}
         placementHints={{ cut: placementHint(issue('cut')), speed: placementHint(issue('speed')) }}
@@ -265,8 +282,7 @@ function ReviewTimelineToolsBinding(
             props.clearFocusTool();
             props.audio.setOriginalTool(false);
             props.audio.setOriginalRangeSelected(false);
-            const placement = editRange(kind);
-            if (placement && !issue(kind)) void props.editing.commitRange(placement, null, kind);
+            void props.editing.toggle(kind);
           },
           canApply: (kind) => {
             const placement = editRange(kind);
@@ -328,37 +344,23 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
     onChange: props.onTrackChange,
     activate: trackCommands.activate,
   });
+  const creationContext = reviewResultInsertionContext({
+    time: props.time,
+    resultTime: props.outputTime,
+    range: insertionSelection(props),
+    projection,
+  });
   const creation = useReviewTrackCreation({
     sourceId: props.annotationSourceId,
     track: selectedTrack,
     blocked: blocked,
-    onPause: props.onPause,
-    atEnd: (() => {
-      const context = reviewResultInsertionContext({
-        time: props.time,
-        resultTime: props.outputTime,
-        range: insertionSelection(props),
-        projection,
-      });
-      return (
-        (reviewInsertionTarget(context.time, context.range)?.start ?? context.time) >=
-        context.duration
-      );
-    })(),
-    beforeAction: props.beforeAction,
-    range:
-      reviewInsertionRange({
-        ...reviewResultInsertionContext({
-          time: props.time,
-          resultTime: props.outputTime,
-          range: insertionSelection(props),
-          projection,
-        }),
-        seconds: 3,
-      }) ?? undefined,
+    atEnd:
+      (reviewInsertionTarget(creationContext.time, creationContext.range)?.start ??
+        creationContext.time) >= creationContext.duration,
+    range: reviewInsertionRange({ ...creationContext, seconds: 3 }) ?? undefined,
     text: props.text,
     onRecordVoiceover: props.onRecordVoiceover,
-    onImportFile: props.onImportAudioFile,
+    onPrepareImportFile: props.onPrepareImportAudioFile,
     onOpenAudio: props.onOpenMusic,
   });
   return (
@@ -693,24 +695,57 @@ function useAnnotationPlacement(props: TimelineBindingProps) {
       ),
     [catalog.items, locale]
   );
-  const context = reviewResultInsertionContext({
+  const renderContext = reviewResultInsertionContext({
     time: props.time,
     resultTime: props.outputTime,
     range: insertionSelection(props),
     projection: createTrackProjection(props.source.duration, props.edits),
   });
-  const available = !!reviewInsertionRange({ ...context, seconds: 0.05 });
-  const capture = () => ({
-    sourceId: props.annotationSourceId,
-    start: reviewInsertionTarget(context.time, context.range)?.start ?? context.time,
-    end: reviewInsertionTarget(context.time, context.range)?.end,
-  });
-  const intent = useRef<ReturnType<typeof capture> | null>(null);
+  const available = !!reviewInsertionRange({ ...renderContext, seconds: 0.05 });
+  const capture = () => {
+    const context = props.commands.capture();
+    if (!context) return null;
+    const current = reviewCommandInsertion(context, 'result');
+    if (!current) return null;
+    const target = reviewInsertionTarget(current.time, current.range);
+    return {
+      context,
+      sourceId: context.scope.sourceAssetId,
+      start: target?.start ?? current.time,
+      end: target?.end,
+      duration: current.duration,
+      ready: false,
+      choice: null as string | null,
+    };
+  };
+  const intent = useRef<NonNullable<ReturnType<typeof capture>> | null>(null);
   const clear = useCallback(() => {
     intent.current = null;
   }, []);
+  const arm = (target: NonNullable<ReturnType<typeof capture>>) => {
+    props.commands.admit(target.context, () => {
+      if (intent.current !== target) return;
+      target.ready = true;
+      const choice = target.choice;
+      target.choice = null;
+      if (choice !== null) placeChoice(choice);
+    });
+  };
   const placeChoice = (value: string) => {
     const target = intent.current ?? capture();
+    if (!target) return;
+    if (!intent.current) {
+      intent.current = target;
+      target.choice = value;
+      arm(target);
+      return;
+    }
+    if (!target.ready) {
+      target.choice = value;
+      return;
+    }
+    if (!props.commands.isCurrent(target.context, 'temporal')) return;
+    const projectionDuration = target.duration;
     const choice = choices.find((item) => item.value === value);
     const { width, height } = props.source;
     if (
@@ -722,25 +757,26 @@ function useAnnotationPlacement(props: TimelineBindingProps) {
       target.sourceId !== props.annotationSourceId ||
       width === undefined ||
       height === undefined ||
-      target.start >= context.duration
+      target.start >= projectionDuration
     )
       return;
-    const endMax = context.duration;
+    const endMax = projectionDuration;
     props.editing.setCutting(false);
     props.audio.setOriginalTool(false);
     props.zoom.setDrawing(false);
-    props.onPause();
-    props.onSeekResult?.(target.start);
-    void props.annotationEffects?.add({
-      catalog: choice.catalog,
-      documentId: choice.documentId,
-      start: target.start,
-      timeDomain: 'result',
-      endMax,
-      ...(target.end === undefined ? {} : { end: target.end }),
-      locale,
-      plane: { width, height },
-    });
+    void props.annotationEffects?.add(
+      {
+        catalog: choice.catalog,
+        documentId: choice.documentId,
+        start: target.start,
+        timeDomain: 'result',
+        endMax,
+        ...(target.end === undefined ? {} : { end: target.end }),
+        locale,
+        plane: { width, height },
+      },
+      target.context
+    );
     clear();
   };
   useEffect(() => {
@@ -768,8 +804,9 @@ function useAnnotationPlacement(props: TimelineBindingProps) {
         void props.annotationEffects?.retry();
       },
       onToggle: (_node: HTMLElement) => {
-        intent.current = capture();
-        props.onPause();
+        const target = capture();
+        intent.current = target;
+        if (target) arm(target);
       },
     },
   };

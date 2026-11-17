@@ -52,18 +52,24 @@ export function createEffectRuntimeBrokerSession(
   )
     workerSession.preload();
   return {
-    execute: (value) =>
-      executeSessionRequest(
+    execute: (value) => {
+      if (workerSession.unavailable) {
+        closeEffectRuntimeBitmaps(value);
+        return Promise.resolve(createEffectRuntimeFailure(value, 'circuitOpen'));
+      }
+      return executeSessionRequest(
         value,
         dependencies,
         state,
         workerSession.execute,
         documentCache,
         assetSelectionCache
-      ),
+      );
+    },
     snapshot: () => ({
       activeRequests: state.activeRequests,
       circuitOpen:
+        workerSession.unavailable ||
         state.consecutiveFailures >= EFFECT_RUNTIME_RESOURCE_LIMITS.maxConsecutiveFailures,
       consecutiveFailures: state.consecutiveFailures,
     }),

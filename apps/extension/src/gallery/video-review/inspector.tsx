@@ -106,7 +106,11 @@ export function ReviewInspector(props: {
   saveStatus?: 'saving' | 'saved' | 'failed';
   onRetry?(): void;
 }) {
-  const { presentation, shown, scroll } = props.navigation;
+  const { shown, scroll } = props.navigation;
+  const [presentation, setPresentation] = useState<'all' | 'sections'>('sections');
+  useEffect(() => {
+    if (scroll.current) scroll.current.scrollTop = 0;
+  }, [presentation, scroll]);
   const previewHost = useRef<HTMLDivElement>(null);
   const [actionTrayHost, setActionTrayHost] = useState<HTMLDivElement | null>(null);
   const selectionScope = props.selectionPreferenceScope ?? props.selectionLabel ?? '';
@@ -161,6 +165,10 @@ export function ReviewInspector(props: {
               hintOwner={hintOwner}
               section={recordingShown ? 'recording' : shown}
               hasMultipleSections={sectionCount.scope === selectionScope && sectionCount.count > 1}
+              presentation={presentation}
+              onPresentationChange={() =>
+                setPresentation((current) => (current === 'all' ? 'sections' : 'all'))
+              }
             />
             <ReviewInspectorStatus {...props} />
           </div>
@@ -498,6 +506,8 @@ function ReviewInspectorHeader(
     section: InspectorSection;
     actionMenu: ReactNode;
     hasMultipleSections: boolean;
+    presentation: 'all' | 'sections';
+    onPresentationChange(): void;
   }
 ) {
   const SelectionIcon =
@@ -571,21 +581,17 @@ function ReviewInspectorHeader(
           size="compact"
           dataUi="gallery.videoReview.inspectorPresentation"
           title={translate(
-            props.navigation.presentation === 'all'
+            props.presentation === 'all'
               ? 'scenario.editor.inspectorShowSections'
               : 'scenario.editor.inspectorShowAll'
           )}
-          aria-pressed={props.navigation.presentation === 'all'}
+          aria-pressed={props.presentation === 'all'}
           disabled={!!props.recording}
           onClick={() =>
-            (props.beforeAction ?? ((action) => action()))(() =>
-              props.navigation.setPresentation((current) =>
-                current === 'all' ? 'sections' : 'all'
-              )
-            )
+            (props.beforeAction ?? ((action) => action()))(() => props.onPresentationChange())
           }
         >
-          {props.navigation.presentation === 'all' ? (
+          {props.presentation === 'all' ? (
             <PanelLeft size={16} aria-hidden="true" />
           ) : (
             <List size={16} aria-hidden="true" />

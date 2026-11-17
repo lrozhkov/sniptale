@@ -15,6 +15,7 @@ import {
 } from '../../workflows/video-review/audio-import';
 import type { createVideoReviewSession } from '../../workflows/video-review/session';
 import type { useReviewAudio } from './use-review-audio';
+import type { ReviewCommandContext } from './command-context';
 
 type ReviewSession = ReturnType<typeof createVideoReviewSession>;
 
@@ -25,12 +26,13 @@ export async function saveReviewVoiceoverTake(args: {
   signal: AbortSignal;
   take: Blob;
   onRetained?: () => void;
+  context?: ReviewCommandContext;
   sourceStart: number;
   sourceEnd?: number;
   resultStart?: number;
   resultEnd?: number;
   segments: readonly ReviewTimeSegment[];
-  audio: ReturnType<typeof useReviewAudio>;
+  audio: Pick<ReturnType<typeof useReviewAudio>, 'markImported'>;
   session: ReviewSession;
   takeIds: WeakMap<Blob, string>;
   preparedTakes: WeakMap<Blob, PreparedReviewAudio>;
@@ -54,7 +56,12 @@ export async function saveReviewVoiceoverTake(args: {
       (item) => item.id === clipId && item.assetId === assetId
     );
     if (clip && !args.signal.aborted && args.isCurrent())
-      args.audio.markImported(clip, duration, args.file.name);
+      args.audio.markImported(
+        clip,
+        duration,
+        args.file.name,
+        ...(args.context ? ([args.context] as const) : ([] as const))
+      );
   };
   if (attached()) {
     const prepared = args.preparedTakes.get(args.take);

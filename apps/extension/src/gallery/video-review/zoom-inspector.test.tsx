@@ -68,6 +68,25 @@ it('shares disposable tool navigation between the preview and exact fields', () 
   expect(field('gallery.videoReview.zoomScale')).toBeNull();
   expect(field('gallery.videoReview.perspectiveZ')).not.toBeNull();
   expect(field('gallery.videoReview.perspectiveX')).toBeNull();
+  const preview = [...host.querySelectorAll('button')].find(
+    (button) => button.textContent === 'Rotate preview'
+  )!;
+  act(() =>
+    root.render(
+      <ReviewZoomInspector
+        region={{ ...region, id: 'zoom-2', effect: '3d' }}
+        onChange={onChange}
+        onReset={vi.fn()}
+        onDelete={vi.fn()}
+        preview={<PreviewTools />}
+      />
+    )
+  );
+  expect(
+    [...host.querySelectorAll('button')].find((button) => button.textContent === 'Rotate preview')
+  ).toBe(preview);
+  expect(field('gallery.videoReview.perspectiveZ')).not.toBeNull();
+  expect(field('gallery.videoReview.perspectiveX')).toBeNull();
   expect(onChange).not.toHaveBeenCalled();
 });
 

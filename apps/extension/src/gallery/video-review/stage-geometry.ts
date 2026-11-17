@@ -4,7 +4,7 @@ import {
 } from '../../workflows/video-review/gpu-preview-geometry';
 import { uncropMediaSourceRect } from '../../features/video/project/media-crop';
 import { createReviewAnnotationGeometry } from './annotation-effects-geometry';
-import { useEffect, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useState, type RefObject } from 'react';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
 import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import { resolveVideoExportDimensions } from '../../features/video/project/export/output-dimensions';
@@ -57,7 +57,7 @@ type ReviewStageGeometryInput = {
 };
 
 /** Stage pixels: the host box measured once and on every resize. */
-function useStageMeasure(host: RefObject<HTMLDivElement | null>) {
+export function useReviewStageViewport(host: RefObject<HTMLDivElement | null>) {
   const [size, setSize] = useState({ width: 1, height: 1 });
   useEffect(() => {
     const node = host.current;
@@ -132,7 +132,7 @@ function previewSceneLayout(input: Parameters<typeof computeQuickEditSceneLayout
 }
 
 /** Pure scene geometry keeps CSS fitting separate from canonical output pixels. */
-function resolveStageGeometry(
+export function resolveReviewStageGeometry(
   props: ReviewStageGeometryInput,
   viewport: { width: number; height: number },
   presented?: ReviewPresentedGeometry | null
@@ -299,7 +299,15 @@ export function useReviewStageGeometry(
   host: RefObject<HTMLDivElement | null>,
   presented?: ReviewPresentedGeometry | null
 ) {
-  const viewport = useStageMeasure(host);
+  return useReviewStageGeometryAtViewport(props, useReviewStageViewport(host), presented);
+}
+
+/** Local overlay consumers share the stage measurement without subscribing its media subtree. */
+function useReviewStageGeometryAtViewport(
+  props: ReviewStageGeometryInput,
+  viewport: { width: number; height: number },
+  presented?: ReviewPresentedGeometry | null
+) {
   const represented =
     presented && props.scene
       ? {
@@ -307,6 +315,8 @@ export function useReviewStageGeometry(
           scene: {
             ...props.scene,
             ...presented.scene,
+            canvas: presented.scene.canvas,
+            windowHeader: presented.scene.windowHeader,
             camera: presented.camera,
             ...(props.scene.focus
               ? {
@@ -320,31 +330,42 @@ export function useReviewStageGeometry(
           },
         }
       : props;
-  const geometry = resolveStageGeometry(represented, viewport, presented);
-  const { size, sceneLayout } = geometry;
+  const geometry = resolveReviewStageGeometry(represented, viewport, presented);
+  const commentGeometry = reviewStageCommentGeometry(represented, geometry, presented);
   const reportGeometry = props.comments?.onGeometry;
-  useEffect(() => {
-    if (reportGeometry && sceneLayout)
-      reportGeometry({
-        output: size,
-        projection:
-          sceneLayout.spatial && presented
-            ? reviewPresentedStageProjection(presented, size)
-            : sceneLayout.spatial
-              ? quickEditPlaneProjection(
-                  computeQuickEditSpatialWindow(
-                    sceneLayout,
-                    props.scene?.background ?? { enabled: false }
-                  ),
-                  computeQuickEditSpatialWindow(
-                    sceneLayout,
-                    props.scene?.background ?? { enabled: false }
-                  ),
-                  sceneLayout.spatial
-                )
-              : undefined,
-        videoTransform: sceneLayout.videoTransform,
-      });
-  }, [size, sceneLayout, reportGeometry, props.scene?.background, presented]);
+  useLayoutEffect(() => {
+    if (commentGeometry) reportGeometry?.(commentGeometry);
+  }, [commentGeometry, reportGeometry]);
+
   return geometry;
+}
+
+/** Attachment conversion shares the same accepted frame plane as visible comment handles. */
+export function reviewStageCommentGeometry(
+  props: ReviewStageGeometryInput,
+  geometry: ReturnType<typeof resolveReviewStageGeometry>,
+  presented: ReviewPresentedGeometry | null | undefined
+): ReviewStageCommentGeometry | null {
+  const { size, sceneLayout } = geometry;
+  if (!sceneLayout) return null;
+  return {
+    output: size,
+    projection:
+      sceneLayout.spatial && presented
+        ? reviewPresentedStageProjection(presented, size)
+        : sceneLayout.spatial
+          ? quickEditPlaneProjection(
+              computeQuickEditSpatialWindow(
+                sceneLayout,
+                props.scene?.background ?? { enabled: false }
+              ),
+              computeQuickEditSpatialWindow(
+                sceneLayout,
+                props.scene?.background ?? { enabled: false }
+              ),
+              sceneLayout.spatial
+            )
+          : undefined,
+    videoTransform: sceneLayout.videoTransform,
+  };
 }

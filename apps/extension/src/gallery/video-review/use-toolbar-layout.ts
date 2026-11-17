@@ -82,15 +82,21 @@ export function useReviewToolbarLayout() {
       });
     };
     measure();
-    let observedWidth: number | null = null;
+    const observedWidths = new Map<Element, number>();
     const resize = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width;
-      if (width === undefined || width === observedWidth) return;
-      observedWidth = width;
-      schedule();
+      let changed = false;
+      for (const entry of entries) {
+        const width = entry.contentRect.width;
+        if (width === observedWidths.get(entry.target)) continue;
+        observedWidths.set(entry.target, width);
+        changed = true;
+      }
+      if (changed) schedule();
     });
-    // Measuring changes the side widths itself. Only the toolbar's available width is external input.
+    // Side widths are measured output; available width and transport content are independent inputs.
     resize.observe(toolbar);
+    const transport = toolbar.querySelector('[data-toolbar-transport]');
+    if (transport) resize.observe(transport);
     const content = new MutationObserver((changes) => {
       if (
         changes.some((change) => {

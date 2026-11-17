@@ -111,9 +111,9 @@ function advancedContentAt(snapshot: VideoWorkspaceSnapshot, index = -1) {
   return operation.after;
 }
 
-it('integrates selection, recoverable text, drawing, history and report actions in the modal', async () => {
+it('integrates recoverable notes, drawing and history in the modal', async () => {
   const fixture = createEditorFixture(integration);
-  const { host, root, back, click, fill, show, close, createUrl, revokeUrl, clipboard } = fixture;
+  const { host, root, back, click, fill, show, close, createUrl, revokeUrl } = fixture;
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
     expect(show).toHaveBeenCalled();
@@ -175,6 +175,35 @@ it('integrates selection, recoverable text, drawing, history and report actions 
     await fill('Discarded point note');
     await click('discard');
     expect(host.querySelector('textarea')).toBeNull();
+    await click('common.actions.close');
+    expect(back).toHaveBeenCalledOnce();
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    expect(close).toHaveBeenCalled();
+    expect(revokeUrl).toHaveBeenCalledWith('blob:review');
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('reports accepted notes, recovers report failure and restores a deleted note', async () => {
+  const fixture = createEditorFixture(integration, {
+    history: [
+      {
+        id: 'note-operation',
+        at: 1,
+        target: 'annotation',
+        before: null,
+        after: { id: 'note', text: 'Edited note', anchor: { kind: 'point', time: 0.1 } },
+      },
+    ],
+  });
+  const { host, root, back, click, clipboard } = fixture;
+  try {
+    await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
+    await click('comments');
+    expect(host.textContent).toContain('Edited note');
     await click('copyReport');
     expect(clipboard).toHaveBeenCalledWith(expect.stringContaining('Edited note'));
     await click('downloadReport');
@@ -191,6 +220,18 @@ it('integrates selection, recoverable text, drawing, history and report actions 
     expect(host.textContent).not.toContain('Edited note');
     await click('undo');
     expect(host.textContent).toContain('Edited note');
+    await click('common.actions.close');
+    expect(back).toHaveBeenCalledOnce();
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('opens recorded action properties and exits through the modal menu', async () => {
+  const fixture = createEditorFixture(integration);
+  const { host, root, back, click } = fixture;
+  try {
+    await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
     await click('telemetry');
     const capturedAction = Array.from(
       host.querySelectorAll<HTMLButtonElement>('.review-history-row button')
@@ -203,12 +244,7 @@ it('integrates selection, recoverable text, drawing, history and report actions 
     await click('common.actions.close');
     expect(back).toHaveBeenCalledOnce();
   } finally {
-    await act(async () => root.unmount());
-    host.remove();
-    expect(close).toHaveBeenCalled();
-    expect(revokeUrl).toHaveBeenCalledWith('blob:review');
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+    await fixture.cleanup();
   }
 });
 

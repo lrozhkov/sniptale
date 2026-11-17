@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createReviewCommandFixture } from './editor-fixture.test-support';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
@@ -111,6 +112,22 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
     timelineSelection: { kind: 'point', time: 1 },
     cuts,
   } as unknown as WiringArgs;
+  args.commands = createReviewCommandFixture(
+    () => ({
+      duration: args.sourceDuration,
+      time: args.time,
+      document: args.document,
+      advanced: args.advanced,
+      selection: args.activeSelection,
+      timelineSelection: args.timelineSelection,
+      range: args.playbackRange,
+      session: args.session,
+    }),
+    {
+      pause: () => args.video.current?.pause(),
+      beforeAction: (action) => (args.beforeAction ? args.beforeAction(action) : action()),
+    }
+  );
   function Harness() {
     result = useReviewEditorWiring(args);
     return null;
@@ -151,7 +168,14 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
     originalSelection(null);
     originalSelection('gain-a');
     expect(setTimelineSelection).toHaveBeenLastCalledWith({ kind: 'point', time: 1 });
-    expect(setActiveSelection).toHaveBeenLastCalledWith({ kind: 'original-audio', id: 'gain-a' });
+    expect(setActiveSelection).toHaveBeenLastCalledWith(
+      { kind: 'original-audio', id: 'gain-a' },
+      expect.objectContaining({
+        document: reviewDocument,
+        advanced,
+        scope: expect.objectContaining({ session }),
+      })
+    );
 
     const deleteFocus = mocks.lifecycle.mock.lastCall?.[0].deleteCursorFocus as (
       id: string

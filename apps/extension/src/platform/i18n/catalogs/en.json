@@ -7928,6 +7928,7 @@
       "play": "Play",
       "pause": "Pause",
       "playbackFailed": "The browser could not play this video.",
+      "audioPlaybackFailed": "Could not play the audio.",
       "fit": "Fit",
       "zoomIn": "Zoom in timeline",
       "zoomOut": "Zoom out timeline",

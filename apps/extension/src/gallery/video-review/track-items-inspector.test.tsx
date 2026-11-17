@@ -1,11 +1,49 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, type ComponentProps } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { ReviewTrackItemsInspector } from './track-items-inspector';
+import { ReviewTrackItemsInspector as TrackItemsSurface } from './track-items-inspector';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import type { QuickEditTrack } from '../../features/video/review/advanced/types';
+type FixtureState = ReturnType<typeof import('./use-editor-state').useReviewEditorState>;
+function ReviewTrackItemsInspector(
+  props: Omit<
+    ComponentProps<typeof TrackItemsSurface>,
+    'document' | 'advanced' | 'selection' | 'snapshots' | 'busy' | 'commands'
+  > & { state: FixtureState }
+) {
+  const { state } = props;
+  return (
+    <TrackItemsSurface
+      {...props}
+      document={state.snapshot.document}
+      advanced={state.advanced}
+      selection={state.activeSelection}
+      snapshots={state.snapshot.snapshot.workspace.effectSnapshots}
+      busy={
+        state.busy ||
+        state.editing.exporter.phase !== 'idle' ||
+        state.annotationEffects.pending ||
+        !!state.annotationEffects.gestureId
+      }
+      commands={{
+        session: state.session,
+        open: (selection, done) =>
+          state.beforeAction(() => {
+            state.video.current?.pause();
+            state.setActiveSelection(selection);
+            done();
+          }),
+        canStart: state.canStart,
+        run: state.run,
+        flushAnnotations: state.annotationEffects.flush,
+        flushAdvanced: state.flushAdvanced,
+      }}
+    />
+  );
+}
+
 const renderProbe = vi.hoisted(() => ({ inactiveLabels: 0 }));
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),

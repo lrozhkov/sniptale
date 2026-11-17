@@ -13,6 +13,12 @@ import type { ReviewEdit, ReviewAnchor } from '../../features/video/review/types
 import type { useReviewZoomEditor } from './zoom-editor';
 import type { useReviewAudio, ReviewAudioLane } from './use-review-audio';
 import type { ReviewWaveform } from '../../workflows/video-review/waveform';
+const EMPTY_ANNOTATION_SNAPSHOTS: ComponentProps<typeof ReviewAnnotationEffectsTrack>['snapshots'] =
+  [];
+
+const EMPTY_ANNOTATION_INSTANCES: ComponentProps<typeof ReviewAnnotationEffectsTrack>['instances'] =
+  [];
+
 /** Zoom lane on the result-time scale with shared snap candidates. */
 export function ReviewZoomLane(props: {
   compact: boolean;
@@ -78,13 +84,29 @@ export function ReviewAudioLane(props: {
   busy: boolean;
   onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
 }) {
+  const selectedId = props.audio.selectedId;
+  const selectedClipId =
+    props.lane === 'originalAudio'
+      ? null
+      : selectedId &&
+          (props.lane
+            ? props.audioState[props.lane]
+            : [...props.audioState.voiceover, ...props.audioState.music]
+          ).some((clip) => clip.id === selectedId)
+        ? selectedId
+        : null;
+  const selectedEditId =
+    props.selectedEditId &&
+    props.edits.some((edit) => edit.id === props.selectedEditId && edit.kind === 'speed')
+      ? props.selectedEditId
+      : undefined;
   return (
     <ReviewAudioTrack
       lane={props.lane}
       compact={props.compact}
       beforeAction={props.beforeAction}
       originalEditor={props.audio}
-      selectedEditId={props.selectedEditId}
+      selectedEditId={selectedEditId}
       edits={props.edits}
       onOriginalRange={props.onOriginalRange}
       onSelectSpeed={props.onSelectSpeed}
@@ -97,7 +119,7 @@ export function ReviewAudioLane(props: {
       snapTimes={props.snapTimes}
       audio={props.audioState}
       duration={props.resultDuration}
-      selectedId={props.audio.selectedId}
+      selectedId={selectedClipId}
       busy={props.busy}
       onSelect={props.audio.setSelectedId}
       onMoveClip={props.audio.moveClip}
@@ -136,8 +158,9 @@ export function ReviewAnnotationLane({
   return (
     <ReviewAnnotationEffectsTrack
       {...lane}
+      snapshots={lane.snapshots.length ? lane.snapshots : EMPTY_ANNOTATION_SNAPSHOTS}
       key={JSON.stringify([sourceId, tool])}
-      instances={advanced.annotationEffects?.instances ?? []}
+      instances={advanced.annotationEffects?.instances ?? EMPTY_ANNOTATION_INSTANCES}
       enabled={advanced.annotationEffects?.enabled !== false}
       onEnabled={editor.enabled}
       onSelect={(id) => onSelect?.(id)}

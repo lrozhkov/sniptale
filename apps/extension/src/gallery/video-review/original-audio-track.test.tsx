@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
-import { act, useState } from 'react';
+import { act, useState, Suspense, startTransition } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { ReviewOriginalAudioTrack } from './original-audio-track';
+import * as timelineHints from './timeline-hints';
+import { createTrackProjection } from './track-projection';
 import { ReviewOriginalAudioInspector } from './original-audio-inspector';
 import { useReviewAudio } from './use-review-audio';
 import { useReviewPlayback } from './use-playback';
@@ -587,5 +589,100 @@ it('snaps original-audio resize to edit edges and temporarily releases with Alt'
     expect(f.editor.originalRanges.find((range) => range.id === id)?.end).toBe(7);
   } finally {
     f.close();
+  }
+});
+
+it('keeps original audio presentation asleep when the live editor only refreshes commands', () => {
+  const f = setup();
+  const hints = vi.spyOn(timelineHints, 'reviewTimelineHint');
+  try {
+    act(() => f.editor.addOriginal({ kind: 'range', start: 2, end: 4 }));
+    hints.mockClear();
+    f.setBusy(false);
+    expect(hints).not.toHaveBeenCalled();
+  } finally {
+    hints.mockRestore();
+    f.close();
+  }
+});
+
+it('uses committed source-audio commands and excludes suspended replacements', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const original = { muted: false, volume: 1 };
+  const first = vi.fn();
+  const latest = vi.fn();
+  const abandoned = vi.fn();
+  const pending = new Promise<void>(() => {});
+  function Suspend({ active }: { active: boolean }) {
+    if (active) throw pending;
+    return null;
+  }
+  const tree = (command: typeof first, suspended: boolean) => (
+    <Suspense fallback="pending">
+      <ReviewOriginalAudioTrack
+        original={original}
+        duration={10}
+        busy={false}
+        onOriginal={command}
+      />
+      <Suspend active={suspended} />
+    </Suspense>
+  );
+  try {
+    await act(async () => root.render(tree(first, false)));
+    await act(async () => root.render(tree(latest, false)));
+    await act(async () => startTransition(() => root.render(tree(abandoned, true))));
+    const control = host.querySelector<HTMLButtonElement>(
+      '[data-track-controls] button[aria-pressed]'
+    )!;
+    act(() => control.click());
+    expect(latest).toHaveBeenCalledWith({ muted: true });
+    expect(first).not.toHaveBeenCalled();
+    expect(abandoned).not.toHaveBeenCalled();
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('refreshes source-audio presentation when original data, busy, density or projection changes', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  type Props = Parameters<typeof ReviewOriginalAudioTrack>[0];
+  const original = {
+    muted: false,
+    volume: 1,
+    ranges: [{ id: 'gain', start: 2, end: 4, volume: 0.5 }],
+  };
+  const base: Props = { original, duration: 10, busy: false, onOriginal: vi.fn() };
+  const render = (overrides: Partial<Props>) =>
+    act(() => root.render(<ReviewOriginalAudioTrack {...base} {...overrides} />));
+  const hints = vi.spyOn(timelineHints, 'reviewTimelineHint');
+  try {
+    render({});
+    for (const overrides of [
+      { busy: true },
+      { compact: true },
+      { projection: createTrackProjection(10, []) },
+      { original: { ...original, ranges: [{ id: 'gain', start: 3, end: 5, volume: 0.75 }] } },
+    ]) {
+      render({});
+      hints.mockClear();
+      render(overrides);
+      expect(hints).toHaveBeenCalled();
+    }
+    expect(host.querySelector<HTMLElement>('[data-audio-id="gain"]')!.style.left).toBe('30%');
+    expect(host.textContent).toContain('75%');
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    hints.mockRestore();
+    vi.unstubAllGlobals();
   }
 });

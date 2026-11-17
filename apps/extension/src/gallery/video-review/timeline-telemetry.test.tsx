@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createReviewCommandFixture } from './editor-fixture.test-support';
 import { act, Suspense, startTransition } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -59,7 +60,6 @@ const render = (
       <ReviewTelemetryStrip
         markers={markers}
         duration={10}
-        time={0}
         width={1000}
         zoom={1}
         onMarker={vi.fn()}
@@ -133,7 +133,6 @@ it('groups overflow within three rows and exposes every member for selection', a
       <ReviewTelemetryStrip
         markers={markers}
         duration={10}
-        time={0}
         width={1000}
         zoom={1}
         selectedTelemetryRef={markers[8]!.ref}
@@ -182,7 +181,6 @@ it('holds groups during zoom then repacks without changing height or selected id
         <ReviewTelemetryStrip
           markers={markers}
           duration={10}
-          time={0}
           width={1000}
           zoom={zoom}
           selectedTelemetryRef={markers[8]!.ref}
@@ -222,7 +220,6 @@ it('tints an authored keyboard event without tinting a signal with the same loca
           { ...marker('signal', 'shared', 5, 6), eventType: 'static-frame' },
         ]}
         duration={10}
-        time={0}
         width={1000}
         zoom={1}
         onMarker={vi.fn()}
@@ -243,7 +240,6 @@ it('uses the full editor click cursor for ordinary and double clicks', () => {
       <ReviewTelemetryStrip
         markers={markers}
         duration={10}
-        time={0}
         width={1000}
         zoom={1}
         onMarker={vi.fn()}
@@ -274,7 +270,6 @@ it('keeps commands separately selectable above typing coverage and shows their s
       <ReviewTelemetryStrip
         markers={[typing, key]}
         duration={10}
-        time={0}
         width={1000}
         zoom={1}
         onMarker={onMarker}
@@ -320,7 +315,6 @@ it('keeps technical focus keys hidden and does not author keys from history', ()
           markers={[]}
           cursorFocusKeys={keys}
           duration={10}
-          time={0}
           width={1000}
           zoom={1}
           onMarker={vi.fn()}
@@ -350,7 +344,6 @@ it('does not add a focus key when a packed mouse event receives a double click',
       <ReviewTelemetryStrip
         markers={[{ ...marker('action', 'click', 1), eventType: 'CLICK' }]}
         duration={10}
-        time={0}
         width={1000}
         zoom={1}
         onMarker={vi.fn()}
@@ -371,7 +364,6 @@ it('keeps authored technical coverage hidden without modifying its keys', () => 
       <ReviewTelemetryStrip
         markers={[]}
         duration={10}
-        time={5}
         width={1000}
         zoom={1}
         onMarker={vi.fn()}
@@ -425,18 +417,20 @@ it('keeps static cursor coverage unread across playhead ticks and uses the lates
   const renderAt = (time: number, onMarker = first) =>
     act(() =>
       root.render(
-        <ReviewTelemetryStrip
-          markers={markers}
-          cursorFocusKeys={keys}
-          duration={10}
-          time={time}
-          playing
-          width={1000}
-          zoom={1}
-          onMarker={onMarker}
-          onCursorFocusKey={select}
-          onAddCursorFocusKey={add}
-        />
+        <>
+          <output>{time}</output>
+          <ReviewTelemetryStrip
+            markers={markers}
+            cursorFocusKeys={keys}
+            duration={10}
+            playing
+            width={1000}
+            zoom={1}
+            onMarker={onMarker}
+            onCursorFocusKey={select}
+            onAddCursorFocusKey={add}
+          />
+        </>
       )
     );
   renderAt(0);
@@ -463,7 +457,6 @@ it('does not dispatch a marker through a handler from an uncommitted suspended r
       <ReviewTelemetryStrip
         markers={markers}
         duration={10}
-        time={0}
         width={1000}
         zoom={1}
         onMarker={onMarker}
@@ -502,7 +495,6 @@ it('refreshes memoized telemetry labels, selection, capability and coverage geom
     markers,
     cursorFocusKeys: [key],
     duration: 10,
-    time: 0,
     playing: true,
     width: 1000,
     zoom: 1,
@@ -512,10 +504,10 @@ it('refreshes memoized telemetry labels, selection, capability and coverage geom
   };
   act(() => root.render(<ReviewTelemetryStrip {...base} />));
   const initialTranslations = localeProbe.translations;
-  act(() => root.render(<ReviewTelemetryStrip {...base} time={1} />));
+  act(() => root.render(<ReviewTelemetryStrip {...base} />));
   expect(localeProbe.translations).toBe(initialTranslations);
   localeProbe.locale = 'ru';
-  act(() => root.render(<ReviewTelemetryStrip {...base} time={2} />));
+  act(() => root.render(<ReviewTelemetryStrip {...base} />));
   expect(localeProbe.translations).toBeGreaterThan(initialTranslations);
   act(() =>
     root.render(
@@ -563,6 +555,7 @@ it.each([
     const onMarker = vi.fn();
     const editor = createReviewInteractionEditor({
       advanced: createQuickEditAdvancedState(),
+      commands: createReviewCommandFixture(() => ({ duration: 10, time: 0 })),
       duration: 10,
       time: 0,
       beforeAction: (action) => action(),
@@ -581,7 +574,6 @@ it.each([
         <ReviewTelemetryStrip
           markers={[m]}
           duration={10}
-          time={0}
           width={1000}
           zoom={1}
           onMarker={onMarker}
@@ -645,6 +637,7 @@ it('retains recorded event content when only playback time and editor commands c
   const editor = () => ({
     ...createReviewInteractionEditor({
       advanced,
+      commands: createReviewCommandFixture(() => ({ duration: 10, time: 0, advanced })),
       duration: 10,
       time: 0,
       beforeAction: (action) => action(),
@@ -659,8 +652,8 @@ it('retains recorded event content when only playback time and editor commands c
     update,
   });
   const base = { markers, duration: 10, width: 1000, zoom: 1, onMarker: vi.fn() };
-  act(() => root.render(<ReviewTelemetryStrip {...base} time={0} interactionEditor={editor()} />));
+  act(() => root.render(<ReviewTelemetryStrip {...base} interactionEditor={editor()} />));
   const translations = localeProbe.translations;
-  act(() => root.render(<ReviewTelemetryStrip {...base} time={1} interactionEditor={editor()} />));
+  act(() => root.render(<ReviewTelemetryStrip {...base} interactionEditor={editor()} />));
   expect(localeProbe.translations).toBe(translations);
 });

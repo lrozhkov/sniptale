@@ -104,7 +104,6 @@ function interpolateCameraPanel(from: CameraPanel, to: CameraPanel, weight: numb
 }
 
 import type { VideoProjectTransform } from '../types/layout';
-import type { VideoProjectVideoClip } from '../types/model';
 import { getCameraLayoutTime } from '../timeline/rate';
 
 type SceneSize = { width: number; height: number };
@@ -115,14 +114,17 @@ interface CameraSplitPresentationInput {
   sourceStart: number;
   duration: number;
   playbackRate?: number;
-  playbackWindow?: NonNullable<VideoProjectVideoClip['playbackWindow']>;
+  playbackWindow?: NonNullable<Parameters<typeof getCameraLayoutTime>[0]['playbackWindow']>;
   transform: VideoProjectTransform;
   cameraSplit?: CameraSplitSide | undefined;
   cameraScreenBehavior?: CameraScreenBehavior | undefined;
-  cameraTiming?: Pick<
-    NonNullable<VideoProjectVideoClip['cameraTiming']>,
-    'transitions' | 'timeDomain' | 'layoutClock'
-  >;
+  cameraTiming?: {
+    transitions: 'bounded';
+    timeDomain?: 'result';
+    layoutClock?: NonNullable<
+      NonNullable<Parameters<typeof getCameraLayoutTime>[0]['cameraTiming']>['layoutClock']
+    >;
+  };
   cameraPositions?: readonly {
     sourceTime: number;
     cameraSplit?: CameraSplitSide | null;

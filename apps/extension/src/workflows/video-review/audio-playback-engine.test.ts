@@ -58,6 +58,51 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('exposes an audio reference only while its owned context is running and undisposed', () => {
+  vi.stubGlobal('AudioContext', Context);
+  const engine = createReviewAudioEngine(document.createElement('video'));
+  if (!engine) throw new Error('Missing engine');
+  const context = contexts[0]!;
+  context.currentTime = 4.5;
+  expect(engine.readActiveClock?.()).toMatchObject({ graphTime: 4.5 });
+  context.state = 'suspended';
+  expect(engine.readActiveClock?.()).toBeNull();
+  context.state = 'closed';
+  expect(engine.readActiveClock?.()).toBeNull();
+  context.state = 'running';
+  context.currentTime = 6;
+  expect(engine.readActiveClock?.()).toMatchObject({ graphTime: 6 });
+  engine.dispose();
+  expect(engine.readActiveClock?.()).toBeNull();
+});
+
+it('pairs output timestamp projection with its owned graph clock without changing scheduling time', () => {
+  vi.stubGlobal('AudioContext', Context);
+  vi.spyOn(performance, 'now').mockReturnValue(1000);
+  const engine = createReviewAudioEngine(document.createElement('video'))!;
+  const context = contexts[0]!;
+  context.currentTime = 2;
+  const timestamp = vi.fn<() => AudioTimestamp>(() => ({
+    contextTime: 1.94,
+    performanceTime: 990,
+  }));
+  Object.assign(context, { getOutputTimestamp: timestamp });
+  const sample = engine.readActiveClock?.();
+  expect(sample).toMatchObject({ graphTime: 2, outputTime: 1.95 });
+  expect(engine.now()).toBe(2);
+  expect(context.original.connect).toHaveBeenCalledWith(context.gains[0]);
+  expect(context.gains[0]?.connect).toHaveBeenCalledWith(context.destination);
+  timestamp.mockReturnValue({ contextTime: 0, performanceTime: 0 });
+  expect(engine.readActiveClock?.()).toMatchObject({ graphTime: 2, outputTime: null });
+  timestamp.mockReturnValue({});
+  expect(engine.readActiveClock?.()).toMatchObject({ graphTime: 2, outputTime: null });
+  Object.defineProperty(context, 'getOutputTimestamp', { value: undefined });
+  expect(engine.readActiveClock?.()).toMatchObject({ graphTime: 2 });
+  expect(engine.readActiveClock?.()).not.toHaveProperty('outputTime');
+  engine.dispose();
+  vi.restoreAllMocks();
+});
+
 it('keeps the output bus independent of original gain and disposes both stages once', () => {
   vi.stubGlobal('AudioContext', Context);
   const engine = createReviewAudioEngine(document.createElement('video'));

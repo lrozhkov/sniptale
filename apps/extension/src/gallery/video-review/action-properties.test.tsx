@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createReviewCommandFixture } from './editor-fixture.test-support';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
@@ -280,6 +281,7 @@ function authoredInteractionFixture(family: ReviewAuthoredPress['family']) {
   advanced.interactionTimeline = { presses: [press], overrides: [] };
   const editor = createReviewInteractionEditor({
     advanced,
+    commands: createReviewCommandFixture(() => ({ duration: 6, time: 1, advanced })),
     duration: 6,
     time: 1,
     setMode: vi.fn(),

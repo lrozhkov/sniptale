@@ -153,7 +153,7 @@ function hookFixture() {
   const state: Parameters<typeof useReviewLiveSeek>[1] = {
     advanced: createQuickEditAdvancedState(),
     source,
-    time: 0,
+    resultTime: 0,
     snapshot: {
       document: {
         edits: [
@@ -246,7 +246,7 @@ it('hover uses shared cut/speed clocks, restores on leave/blur/seek and never mu
       await settle();
     });
     expect(hook.visible).toBe(true);
-    state.time = 1;
+    state.resultTime = 1;
     await act(async () => root.render(<Harness />));
     expect(hook.visible).toBe(false);
     expect(args.signal.aborted).toBe(true);
@@ -316,5 +316,125 @@ it('bounds archive history to its owned hover renderer and releases it after a f
     io.open.mockReset();
     io.history.mockReset();
     vi.unstubAllGlobals();
+  }
+});
+
+it('invalidates an unheld hover after a result-only seek within the same freeze', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    clearRect: vi.fn(),
+    drawImage: vi.fn(),
+  } as unknown as CanvasRenderingContext2D);
+  io.open.mockResolvedValue({ renderAtTime: vi.fn(async () => frame()), dispose: vi.fn() });
+  const { state, resource } = hookFixture();
+  const input = Object.assign(state, { resultTime: 6.1 });
+  input.snapshot.document.edits = [
+    {
+      id: 'freeze',
+      kind: 'freeze',
+      start: 4,
+      end: 4,
+      requestedStart: 4,
+      requestedEnd: 4,
+      duration: 3,
+      frameTime: 3.98,
+      frameDuration: 0.04,
+    },
+  ];
+  const root = createRoot(document.createElement('div')),
+    raster = { width: 64, height: 36 };
+  let hook!: ReturnType<typeof useReviewLiveSeek>;
+  function Harness() {
+    hook = useReviewLiveSeek(resource, input, DEFAULT_QUICK_PREVIEW_PREFERENCES, raster, false);
+    return <canvas ref={hook.canvas} />;
+  }
+  try {
+    await act(async () => root.render(<Harness />));
+    await act(async () => {
+      hook.hover(4, 6.9);
+      await settle();
+    });
+    expect(hook.visible).toBe(true);
+    input.resultTime = 6.5;
+    await act(async () => root.render(<Harness />));
+    expect(hook.visible).toBe(false);
+  } finally {
+    await act(async () => root.unmount());
+    getContext.mockRestore();
+    vi.unstubAllGlobals();
+    io.open.mockReset();
+  }
+});
+
+it('keeps freeze hover through cached and late wrong-result receipts; clears on exact completion or Play', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    clearRect: vi.fn(),
+    drawImage: vi.fn(),
+  } as unknown as CanvasRenderingContext2D);
+  io.open.mockResolvedValue({ renderAtTime: vi.fn(async () => frame()), dispose: vi.fn() });
+  const { state, resource } = hookFixture();
+  state.resultTime = 6.1;
+  state.snapshot.document.edits = [
+    {
+      id: 'freeze',
+      kind: 'freeze',
+      start: 4,
+      end: 4,
+      requestedStart: 4,
+      requestedEnd: 4,
+      duration: 3,
+      frameTime: 3.98,
+      frameDuration: 0.04,
+    },
+  ];
+  const root = createRoot(document.createElement('div')),
+    raster = { width: 64, height: 36 };
+  let hook!: ReturnType<typeof useReviewLiveSeek>;
+  function Harness({ blocked = false }: { blocked?: boolean }) {
+    hook = useReviewLiveSeek(resource, state, DEFAULT_QUICK_PREVIEW_PREFERENCES, raster, blocked);
+    return <canvas ref={hook.canvas} />;
+  }
+  try {
+    await act(async () => root.render(<Harness />));
+    await act(async () => hook.onPresentedTime(6.1));
+    await act(async () => {
+      hook.hover(4, 6.9);
+      await settle();
+    });
+    expect(hook.visible).toBe(true);
+    await act(async () => hook.hold());
+    await act(async () => hook.commit(6.9));
+    state.resultTime = 6.9;
+    await act(async () => root.render(<Harness />));
+    expect(hook.visible).toBe(true);
+    await act(async () => hook.onPresentedTime(6.1));
+    expect(hook.visible).toBe(true);
+    await act(async () => hook.onPresentedTime(6.9));
+    expect(hook.visible).toBe(false);
+    await act(async () => {
+      hook.hover(4, 6.4);
+      await settle();
+    });
+    await act(async () => hook.hold());
+    await act(async () => hook.finishIntent(() => 6.9));
+    await act(async () => settle());
+    expect(hook.visible).toBe(false);
+    await act(async () => {
+      hook.hover(4, 6.4);
+      await settle();
+    });
+    await act(async () => {
+      hook.hold();
+      hook.commit(6.4);
+    });
+    expect(hook.visible).toBe(true);
+    await act(async () => root.render(<Harness blocked />));
+    expect(hook.visible).toBe(false);
+  } finally {
+    await act(async () => root.unmount());
+    getContext.mockRestore();
+    vi.unstubAllGlobals();
+    io.open.mockReset();
   }
 });

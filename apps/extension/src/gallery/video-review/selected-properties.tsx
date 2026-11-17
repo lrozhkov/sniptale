@@ -42,7 +42,7 @@ import type { QuickEditAdvancedState } from '../../features/video/review/advance
 import type { LoadedReview } from './use-session';
 import type { useReviewAudio } from './use-review-audio';
 import type { useReviewEdits } from './use-edits';
-import type { useReviewExport } from './use-export';
+import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
 import { ReviewSpeedOptions } from './edit-actions';
 import type { useReviewZoomEditor } from './zoom-editor';
 import {
@@ -88,6 +88,40 @@ import type { useCanvasComments } from './use-canvas-comments';
 import { ReviewWebcamInspector } from './webcam-inspector';
 import type { useReviewWebcamEditor } from './webcam-editor';
 
+type EditController = Pick<
+  ReturnType<typeof useReviewEdits>,
+  | 'selected'
+  | 'canApply'
+  | 'apply'
+  | 'remove'
+  | 'changeSelectedRate'
+  | 'changeSelectedAudio'
+  | 'changeSelectedFreezeDuration'
+  | 'changeSelectedTransition'
+>;
+
+/** Stable parameter commands name their edit; a replaced selection cannot receive an old field value. */
+export function createReviewInspectorEditCommands(read: () => EditController) {
+  const selected = (id: string) => {
+    const current = read();
+    return current.selected?.id === id ? current : null;
+  };
+  return {
+    canApply: (...args: Parameters<EditController['canApply']>) => read().canApply(...args),
+    apply: (...args: Parameters<EditController['apply']>) => read().apply(...args),
+    remove: (id: string) => selected(id)?.remove(),
+    changeRate: (id: string, value: Parameters<EditController['changeSelectedRate']>[0]) =>
+      selected(id)?.changeSelectedRate(value),
+    changeAudio: (id: string, value: Parameters<EditController['changeSelectedAudio']>[0]) =>
+      selected(id)?.changeSelectedAudio(value),
+    changeFreezeDuration: (id: string, value: number) =>
+      selected(id)?.changeSelectedFreezeDuration(value),
+    changeTransition: (id: string, value: CompositionJoinSettings | null) =>
+      selected(id)?.changeSelectedTransition(value),
+  };
+}
+export type ReviewInspectorEditCommands = ReturnType<typeof createReviewInspectorEditCommands>;
+
 type SelectedPropertiesProps = {
   registerSpeechFlush?: (owner: ReviewSpeechFlushRegistration) => () => void;
   beforeSpeechAction?: ReviewBeforeAction;
@@ -97,7 +131,11 @@ type SelectedPropertiesProps = {
   webcamRange?: { start: number; end: number } | undefined;
   selection: ReviewSelection;
   advanced: QuickEditAdvancedState;
-  editing: ReturnType<typeof useReviewEdits> & { exporter: ReturnType<typeof useReviewExport> };
+  editing: {
+    selected: ReviewEdit | null;
+    commands: ReviewInspectorEditCommands;
+    exporter: { index: ReviewMediaIndex | null; phase: 'idle' | 'exporting' | 'publishing' };
+  };
   zoom: ReturnType<typeof useReviewZoomEditor>;
   busy: boolean;
   interactionEditor?: import('./interaction-editor').ReviewInteractionEditor | undefined;
@@ -125,7 +163,15 @@ type SelectedPropertiesProps = {
   playback?: ComponentProps<typeof ReviewZoomPreview>['playback'];
   toSourceTime(time: number): number | null;
   resource: LoadedReview;
-  audio: ReturnType<typeof useReviewAudio>;
+  audio: Pick<
+    ReturnType<typeof useReviewAudio>,
+    | 'selected'
+    | 'selectedOriginal'
+    | 'patchClip'
+    | 'removeClip'
+    | 'patchOriginal'
+    | 'removeOriginal'
+  >;
   canvasComments: ReturnType<typeof useCanvasComments>;
 };
 
@@ -267,7 +313,7 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
             plan={plan}
             busy={busy || editing.exporter.phase !== 'idle'}
             onEdit={(kind) => {
-              if (plan && !plan.removed) void editing.apply(kind, plan.range);
+              if (plan && !plan.removed) void editing.commands.apply(kind, plan.range);
             }}
             onFocus={() => {
               if (plan?.focus) props.onFocus(plan.focus);
@@ -316,7 +362,6 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
             zoom={zoom}
             zoomPreview={(region, previewing = false) => (
               <ReviewZoomPreview
-                key={region.id}
                 disabled={busy || editing.exporter.phase !== 'idle' || selectedHistory.pending}
                 region={zoom.previewRegion(region)}
                 previewing={previewing}
@@ -433,7 +478,7 @@ function SelectedEdit(
           duration={selected.duration}
           disabled={busy}
           onChange={(value) => {
-            void editing.changeSelectedFreezeDuration(value);
+            void editing.commands.changeFreezeDuration(selected.id, value);
           }}
         />
         <ReviewInspectorSections
@@ -444,7 +489,7 @@ function SelectedEdit(
                 label={translate('gallery.videoReview.deleteSelected')}
                 className={reviewDeleteButtonClassName}
                 disabled={busy}
-                onClick={() => void editing.remove()}
+                onClick={() => void editing.commands.remove(selected.id)}
               >
                 <Trash2 size={15} aria-hidden />
                 <span>{translate('gallery.videoReview.deleteSelected')}</span>
@@ -475,8 +520,8 @@ function SelectedEdit(
                     rate={selected.rate}
                     audio={selected.audio}
                     busy={busy}
-                    onRate={editing.changeSelectedRate}
-                    onAudio={editing.changeSelectedAudio}
+                    onRate={(value) => editing.commands.changeRate(selected.id, value)}
+                    onAudio={(value) => editing.commands.changeAudio(selected.id, value)}
                   />
                 ),
               }
@@ -490,7 +535,7 @@ function SelectedEdit(
                     edit={selected}
                     edits={resource.session.getSnapshot().document.edits}
                     duration={resource.source.duration}
-                    onChange={editing.changeSelectedTransition}
+                    onChange={(value) => editing.commands.changeTransition(selected.id, value)}
                   />
                 ),
               },
@@ -499,7 +544,7 @@ function SelectedEdit(
               selectionAction="delete"
               label={translate('gallery.videoReview.deleteSelected')}
               className={`${reviewDeleteButtonClassName} !w-full justify-start`}
-              onClick={() => void editing.remove()}
+              onClick={() => void editing.commands.remove(selected.id)}
             >
               <Trash2 size={15} aria-hidden="true" />
               <span>{translate('gallery.videoReview.deleteSelected')}</span>
@@ -642,7 +687,9 @@ function CutTransitionFields(props: {
 
 /** Header glyphs follow the selected timeline object's visible kind. */
 export function reviewSelectionIcon(
-  state: Pick<SelectedPropertiesProps, 'selection' | 'markers' | 'advanced' | 'editing'>
+  state: Pick<SelectedPropertiesProps, 'selection' | 'markers' | 'advanced'> & {
+    editing: Pick<SelectedPropertiesProps['editing'], 'selected'>;
+  }
 ): LucideIcon | undefined {
   const selection = state.selection;
   switch (selection.kind) {
@@ -696,7 +743,9 @@ export function reviewSelectionIcon(
 }
 
 export function reviewSelectionLabel(
-  state: Pick<SelectedPropertiesProps, 'selection' | 'markers' | 'advanced' | 'editing'>
+  state: Pick<SelectedPropertiesProps, 'selection' | 'markers' | 'advanced'> & {
+    editing: Pick<SelectedPropertiesProps['editing'], 'selected'>;
+  }
 ): string | undefined {
   const selection = state.selection;
   if (selection.kind === 'cursor-motion') return translate('gallery.videoReview.cursorMotionTrack');

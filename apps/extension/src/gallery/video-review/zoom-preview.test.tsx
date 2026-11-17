@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import * as scenePlans from '../../features/video/review/advanced/scene';
 import { ReviewZoomPreview } from './zoom-preview';
+import { ReviewSpatialToolContext } from './spatial-controls';
 import type { ZoomPreviewFrame } from './use-zoom-preview-source';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
@@ -32,11 +33,38 @@ vi.mock('../../workflows/video-review/spatial-render-session', () => ({
   }),
 }));
 
+// Interaction cases use the real scheduler with a microtask clock; the preparation
+// suite controls the real RAF-to-task clock to prove admission after paint.
+vi.mock('./preview-presentation', async (original) => {
+  const actual = await original<typeof import('./preview-presentation')>();
+  return {
+    ...actual,
+    createReviewPresentationPaintClock: () => {
+      let id = 0;
+      const active = new Set<number>();
+      return {
+        requestTick(callback: () => void) {
+          const key = ++id;
+          active.add(key);
+          void Promise.resolve().then(() => {
+            if (active.delete(key)) callback();
+          });
+          return key;
+        },
+        cancelTick(key: number) {
+          active.delete(key);
+        },
+      };
+    },
+  };
+});
+
 let root: Root;
 let host: HTMLDivElement;
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  defaultLoadFrame.mockClear();
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
@@ -68,6 +96,8 @@ const frame: ZoomPreviewFrame = {
   height: 360,
 };
 
+const defaultLoadFrame = vi.fn(async () => frame);
+
 function renderPreview(args: {
   cursorFollowing?: boolean;
   focus?: ComponentProps<typeof ReviewZoomPreview>['focus'];
@@ -81,7 +111,7 @@ function renderPreview(args: {
   onPreview?: (patch: QuickEditZoomRegionPatch | null) => void;
 }) {
   const onChange = args.onChange ?? vi.fn();
-  const loadFrame = args.loadFrame === undefined ? vi.fn(async () => frame) : vi.fn(args.loadFrame);
+  const loadFrame = args.loadFrame === undefined ? defaultLoadFrame : vi.fn(args.loadFrame);
   act(() => {
     root.render(
       <ReviewZoomPreview
@@ -176,20 +206,28 @@ it('rolls the draft back to its origin on Escape and pointer cancel', async () =
   expect(onChange).toHaveBeenLastCalledWith({ centerX: 0.5, centerY: 0.5 });
 });
 
-it('cancels a stale frame load when the mapped source time changes', async () => {
+it('rejects a stale frame completion after selecting another region', async () => {
   const signals: AbortSignal[] = [];
-  const pending = new Array<Promise<ZoomPreviewFrame>>();
+  const complete: ((frame: ZoomPreviewFrame) => void)[] = [];
+  const painted: (ZoomPreviewFrame | null | undefined)[] = [];
+  vi.spyOn(canvasModule, 'ZoomPreviewCanvas').mockImplementation((props) => {
+    painted.push(props.frame);
+    const ready = props.onPaintReady;
+    useEffect(() => {
+      ready?.(!!props.frame);
+    }, [ready, props.frame]);
+    return <canvas />;
+  });
   const view = renderPreview({
     sourceTime: 3,
     loadFrame: (_time, signal) => {
       signals.push(signal);
-      const task = new Promise<ZoomPreviewFrame>(() => undefined);
-      pending.push(task);
-      return task;
+      return new Promise<ZoomPreviewFrame>((resolve) => complete.push(resolve));
     },
   });
+  await act(async () => Promise.resolve());
   expect(view.loadFrame).toHaveBeenCalledTimes(1);
-  const next = region({ start: 6, end: 8 });
+  const next = region({ id: 'next-zoom', start: 6, end: 8 });
   await act(async () => {
     root.render(
       <ReviewZoomPreview
@@ -206,6 +244,12 @@ it('cancels a stale frame load when the mapped source time changes', async () =>
   expect(view.loadFrame).toHaveBeenCalledTimes(2);
   expect(view.loadFrame.mock.calls[1]![0]).toBe(7);
   expect(view.section().getAttribute('data-status')).toBe('loading');
+  const current = { ...frame, image: document.createElement('canvas') };
+  await act(async () => complete[1]!(current));
+  expect(painted.at(-1)).toBe(current);
+  await act(async () => complete[0]!(frame));
+  expect(painted.at(-1)).toBe(current);
+  expect(view.section().getAttribute('data-status')).toBe('ready');
 });
 
 function unavailableGpu() {
@@ -661,59 +705,75 @@ it('routes an admitted spatial gesture once without also moving or seeking the P
   expect(view.loadFrame).toHaveBeenCalledTimes(1);
 });
 
-it('cancels captured spatial coordinates when the scene canvas changes without replacing the target', async () => {
-  const authored = spatialRegion();
-  const onPreview = vi.fn();
-  const onCommit = vi.fn();
-  const loadFrame = vi.fn(async () => frame);
-  const render = (width: number, height: number) =>
-    act(async () =>
-      root.render(
-        <ReviewZoomPreview
-          region={authored}
-          spatialEdit={{ region: authored, revision: 'same-target', onCommit }}
-          background={background}
-          source={{ width: 640, height: 360 }}
-          canvas={{ width, height }}
-          sourceTime={3}
-          loadFrame={loadFrame}
-          onChange={vi.fn()}
-          onPreview={onPreview}
-        />
+it.each(['canvas', 'region'])(
+  'cancels captured spatial coordinates when the %s changes',
+  async (change) => {
+    const authored = spatialRegion();
+    const onPreview = vi.fn();
+    const onCommit = vi.fn();
+    const loadFrame = vi.fn(async () => frame);
+    const render = (width: number, height: number, id = authored.id) => {
+      const selected = { ...authored, id };
+      return act(async () =>
+        root.render(
+          <ReviewZoomPreview
+            region={selected}
+            spatialEdit={{ region: selected, revision: id, onCommit }}
+            background={background}
+            source={{ width: 640, height: 360 }}
+            canvas={{ width, height }}
+            sourceTime={3}
+            loadFrame={loadFrame}
+            onChange={vi.fn()}
+            onPreview={onPreview}
+          />
+        )
+      );
+    };
+    await render(640, 360);
+    await act(async () => previewButton('spatialToolFocus').click());
+    const center = previewButton('spatialFocusCenter');
+    const bounds = host.querySelector('canvas')!.parentElement!;
+    vi.spyOn(bounds, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 480, 270));
+    const release = vi.fn();
+    Object.assign(center, {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+      releasePointerCapture: release,
+    });
+    await act(async () =>
+      center.dispatchEvent(
+        new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 200, clientY: 140 })
       )
     );
-  await render(640, 360);
-  await act(async () => previewButton('spatialToolFocus').click());
-  const center = previewButton('spatialFocusCenter');
-  const bounds = host.querySelector('canvas')!.parentElement!;
-  vi.spyOn(bounds, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 480, 270));
-  const release = vi.fn();
-  Object.assign(center, {
-    setPointerCapture: vi.fn(),
-    hasPointerCapture: () => true,
-    releasePointerCapture: release,
-  });
-  await act(async () =>
-    center.dispatchEvent(
-      new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 200, clientY: 140 })
-    )
-  );
-  await act(async () =>
-    center.dispatchEvent(
-      new MouseEvent('pointermove', { bubbles: true, clientX: 215, clientY: 140 })
-    )
-  );
-  await render(360, 640);
-  expect(release).toHaveBeenCalledTimes(1);
-  expect(onPreview).toHaveBeenLastCalledWith(null);
-  expect(previewButton('spatialFocusCenter')).not.toBe(center);
-  expect(host.querySelector('canvas')!.height).toBeGreaterThan(host.querySelector('canvas')!.width);
-  await act(async () =>
-    center.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 215, clientY: 140 }))
-  );
-  expect(onCommit).not.toHaveBeenCalled();
-  expect(loadFrame).toHaveBeenCalledTimes(1);
-});
+    await act(async () =>
+      center.dispatchEvent(
+        new MouseEvent('pointermove', { bubbles: true, clientX: 215, clientY: 140 })
+      )
+    );
+    await render(
+      change === 'canvas' ? 360 : 640,
+      change === 'canvas' ? 640 : 360,
+      change === 'region' ? 'next-region' : authored.id
+    );
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(onPreview).toHaveBeenLastCalledWith(null);
+    expect(host.querySelector('button[title="gallery.videoReview.spatialFocusCenter"]')).not.toBe(
+      center
+    );
+    if (change === 'canvas')
+      expect(host.querySelector('canvas')!.height).toBeGreaterThan(
+        host.querySelector('canvas')!.width
+      );
+    await act(async () =>
+      center.dispatchEvent(
+        new MouseEvent('pointerup', { bubbles: true, clientX: 215, clientY: 140 })
+      )
+    );
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(loadFrame).toHaveBeenCalledTimes(1);
+  }
+);
 
 it('keeps Area/Result navigation available while following disables manual position dragging', async () => {
   const authored = region();
@@ -785,4 +845,81 @@ it('keeps a published live preview ready when the unrelated paused loader fails'
   expect(view.section().getAttribute('data-playing')).toBe('true');
   expect(view.section().getAttribute('data-status')).toBe('ready');
   expect(host.querySelector('[role="alert"]')).toBeNull();
+});
+
+it.each([false, true])(
+  'resets local view defaults on a new region while retaining navigation (following=%s)',
+  async (cursorFollowing) => {
+    const loadFrame = vi.fn(async () => frame);
+    const view = renderPreview({ cursorFollowing, loadFrame });
+    await act(async () => Promise.resolve());
+    const area = previewButton('zoomPreviewArea');
+    await act(async () =>
+      previewButton(cursorFollowing ? 'zoomPreviewArea' : 'zoomPreviewResult').click()
+    );
+    const next = region({ id: 'zoom-next', start: 6, end: 8 });
+    renderPreview({ cursorFollowing, region: next, sourceTime: 7, loadFrame });
+    await act(async () => Promise.resolve());
+    expect(previewButton('zoomPreviewArea')).toBe(area);
+    expect(view.section().dataset['view']).toBe(cursorFollowing ? 'result' : 'area');
+  }
+);
+
+it('resets local tool and axis for the next region without replacing tool navigation', async () => {
+  const loadFrame = vi.fn(async () => frame);
+  const authored = spatialRegion();
+  const onCommit = vi.fn();
+  renderPreview({
+    region: authored,
+    loadFrame,
+    spatialEdit: { region: authored, revision: 'first', onCommit },
+  });
+  await act(async () => Promise.resolve());
+  const tilt = previewButton('spatialToolTilt');
+  const axisX = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+    (item) => item.textContent === 'X'
+  )!;
+  await act(async () => axisX.click());
+  await act(async () => previewButton('spatialToolFocus').click());
+  const next = { ...authored, id: 'spatial-next' };
+  renderPreview({
+    region: next,
+    loadFrame,
+    spatialEdit: { region: next, revision: 'next', onCommit },
+  });
+  await act(async () => Promise.resolve());
+  expect(previewButton('spatialToolTilt')).toBe(tilt);
+  expect(tilt.getAttribute('aria-pressed')).toBe('true');
+  expect(previewButton('spatialAxisBoth').getAttribute('aria-pressed')).toBe('true');
+  expect(onCommit).not.toHaveBeenCalled();
+});
+
+it('preserves the inspector-owned shared tool when the region changes', async () => {
+  const loadFrame = vi.fn(async () => frame);
+  const onTool = vi.fn();
+  const onCommit = vi.fn();
+  const render = (selected: QuickEditZoomRegion) =>
+    act(async () =>
+      root.render(
+        <ReviewSpatialToolContext value={{ tool: 'rotation', onTool, resetTarget: null }}>
+          <ReviewZoomPreview
+            region={selected}
+            spatialEdit={{ region: selected, revision: selected.id, onCommit }}
+            background={background}
+            source={{ width: 640, height: 360 }}
+            sourceTime={3}
+            loadFrame={loadFrame}
+            onChange={vi.fn()}
+          />
+        </ReviewSpatialToolContext>
+      )
+    );
+  const first = spatialRegion();
+  await render(first);
+  const navigation = previewButton('spatialToolRotation');
+  await render({ ...first, id: 'shared-next' });
+  expect(previewButton('spatialToolRotation')).toBe(navigation);
+  expect(navigation.getAttribute('aria-pressed')).toBe('true');
+  expect(onTool).not.toHaveBeenCalled();
+  expect(onCommit).not.toHaveBeenCalled();
 });

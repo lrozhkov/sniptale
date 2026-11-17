@@ -1,5 +1,5 @@
 import { createGlTransitionGpu, loadLocalGlTransitionAsset } from './gl-transition';
-import { GpuPreviewDeviceError } from './gpu-preview-device-error';
+import { GpuPreviewDeviceError, GpuPreviewValidationError } from './gpu-preview-device-error';
 export { GpuPreviewDeviceError } from './gpu-preview-device-error';
 import { createGpuPreviewSlot } from './gpu-preview-slot';
 import { createGpuPreviewPresentationOwner } from './gpu-preview-presentation';
@@ -182,7 +182,9 @@ export async function createGpuPreviewRenderer(
       failure =
         typeof GPUOutOfMemoryError !== 'undefined' && event.error instanceof GPUOutOfMemoryError
           ? new GpuPreviewDeviceError(event.error.message)
-          : new Error(event.error.message);
+          : typeof GPUValidationError !== 'undefined' && event.error instanceof GPUValidationError
+            ? new GpuPreviewValidationError(event.error.message, { cause: event.error })
+            : new Error(event.error.message);
     };
     device.addEventListener('uncapturederror', uncaptured);
     void device.lost.then((info) => {
@@ -221,7 +223,8 @@ export async function createGpuPreviewRenderer(
         const [programs, checked] = await Promise.allSettled([compiling, validation]);
         if (programs.status === 'rejected') throw programs.reason;
         if (checked.status === 'rejected') throw checked.reason;
-        if (checked.value) throw new Error(checked.value.message);
+        if (checked.value)
+          throw new GpuPreviewValidationError(checked.value.message, { cause: checked.value });
         check(signal);
       } finally {
         encoding.release();

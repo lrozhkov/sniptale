@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewWatermarkOverlay } from './watermark-overlay';
 import { createQuickEditWatermark } from '../../features/video/project/scene/watermark';
+import { createReviewInspectorTrackView } from './inspector-navigation';
 const io = vi.hoisted(() => ({ prepare: vi.fn(), draw: vi.fn(), dispose: vi.fn() }));
 vi.mock('../../features/video/composition/canvas/watermark', () => ({
   createWatermarkRenderer: io.prepare,
@@ -80,6 +81,33 @@ it('draws at output resolution and does not reacquire when only callbacks or pla
     },
   };
   await render();
+  expect(io.prepare).toHaveBeenCalledOnce();
+});
+
+it('updates only watermark editability from inspector-local lane preferences', async () => {
+  const view = createReviewInspectorTrackView();
+  props = { ...props, editingAvailability: view.sourceSettings };
+  let ownerRenders = 0;
+  function PreviewOwner() {
+    ownerRenders++;
+    return <ReviewWatermarkOverlay {...props} />;
+  }
+  await act(async () => root.render(<PreviewOwner />));
+  expect(host.querySelector('button')).toBeNull();
+  const before = ownerRenders;
+  await act(async () => view.choose('source', 'canvas'));
+  expect(host.querySelector('button')).not.toBeNull();
+  await act(async () => view.choose('source', 'watermark'));
+  expect(ownerRenders).toBe(before);
+  expect(io.prepare).toHaveBeenCalledOnce();
+  const handle = button();
+  pointer(handle, 'pointerdown', 440, 230);
+  pointer(handle, 'pointermove', 240, 130);
+  await act(async () => view.show('source', 'list'));
+  expect(host.querySelector('button')).toBeNull();
+  expect(props.onPreview).toHaveBeenLastCalledWith(null);
+  expect(props.onChange).not.toHaveBeenCalled();
+  expect(ownerRenders).toBe(before);
   expect(io.prepare).toHaveBeenCalledOnce();
 });
 it('previews a drag locally and commits exactly once on pointerup', async () => {

@@ -1,31 +1,37 @@
-import { useReviewFreezePlayback } from './use-freeze-playback';
 import {
-  createReviewPlaybackPresentationClock,
-  REVIEW_PLAYBACK_UI_INTERVAL_MS,
-} from './playback-presentation-clock';
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import {
-  createReviewPlaybackRange,
-  reviewPlaybackRangeStart,
-  resolveReviewPlaybackSample,
-  type ReviewPlaybackRange,
-} from './playback-range';
-import { originalAudioGainAt } from '../../features/video/review/advanced/original-audio';
-import { startTransition, useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { useReviewPlaybackRecovery } from './use-playback-recovery';
+  createReviewTransportController,
+  type ReviewTransportPosition,
+  type ReviewTransportFailure,
+  type ReviewTransportAudioRequest,
+  type ReviewTransportAudioClock,
+} from './transport';
+import type { ReviewPlaybackPresentationClock } from './playback-presentation-clock';
 import type { ReviewEdit } from '../../features/video/review/types';
 import type { QuickEditOriginalAudio } from '../../features/video/review/advanced/types';
-import { nearestReviewBoundary } from '../../features/video/review/cuts';
 
 interface ReviewPlaybackProps {
+  sourceId?: string;
   duration: number;
   edits: readonly ReviewEdit[];
+  readEdits?(): readonly ReviewEdit[];
   boundaries(): readonly number[] | undefined;
   onSeek(value: number): void;
-  onFailure(): void;
-  /** A real seek/loop holds its media clock until dependent audio is ready. */
-  prepareAfterSeek?: (() => Promise<boolean>) | undefined;
-  /** Starts prepared audio on the same native transport command, before React reports playing. */
-  onPreparedPlay?: (() => void) | undefined;
+  onFailure(failure: ReviewTransportFailure): void;
+  prepareAfterSeek?:
+    | ((signal: AbortSignal, request: ReviewTransportAudioRequest) => Promise<boolean>)
+    | undefined;
+  onPreparedPlay?: ((request: ReviewTransportAudioRequest) => void) | undefined;
+  onStopPlayback?: (() => void) | undefined;
+  readAudioClock?: (() => ReviewTransportAudioClock | null) | undefined;
   onRecovered?: (() => void) | undefined;
   onInvalidRange?: (() => void) | undefined;
   original: QuickEditOriginalAudio;
@@ -33,347 +39,196 @@ interface ReviewPlaybackProps {
   retainCutTime?: boolean;
 }
 
-/** Owns source-time playback; the persisted original-audio gate and rate live here. */
-function useReviewSourcePlayback(props: ReviewPlaybackProps) {
+/** Native resources and one frame driver adapt the single Gallery transport authority. */
+export function useReviewPlayback(props: ReviewPlaybackProps) {
   const video = useRef<HTMLVideoElement>(null);
-  const [playheadClock] = useState(() =>
-    createReviewPlaybackPresentationClock(
-      () => !!video.current && !video.current.paused && !video.current.error
-    )
-  );
-  const [time, setTime] = useState(0);
-  const [playing, setPlaying] = useState(false);
   const latest = useRef(props);
   latest.current = props;
-  const pendingResume = useRef<{ node: HTMLVideoElement; source: string } | null>(null);
-  const playIntent = useRef(0);
-  const [resumeRevision, requestResume] = useState(0);
-  const prepareAfterSeek = (node: HTMLVideoElement) => {
-    if (!latest.current.prepareAfterSeek) return false;
-    node.pause();
-    setPlaying(false);
-    pendingResume.current = { node, source: node.currentSrc };
-    requestResume((revision) => revision + 1);
-    return true;
-  };
-  useEffect(() => {
-    const request = pendingResume.current;
-    if (!request) return;
-    let active = true;
-    const current = () =>
-      active &&
-      pendingResume.current === request &&
-      video.current === request.node &&
-      request.node.currentSrc === request.source;
-    // All audio consumers must first commit the new seek revision and paused state.
-    queueMicrotask(() => {
-      if (!current()) return;
-      void Promise.resolve()
-        .then(() => latest.current.prepareAfterSeek?.() ?? true)
-        .then(async (ready) => {
-          if (!current()) return;
-          if (!ready) {
-            pendingResume.current = null;
-            return;
-          }
-          latest.current.onPreparedPlay?.();
-          await request.node.play();
-          if (current()) {
-            pendingResume.current = null;
-            latest.current.onRecovered?.();
-          }
-        })
-        .catch(() => {
-          if (current()) {
-            pendingResume.current = null;
-            latest.current.onFailure();
-          }
-        });
-    });
-    return () => {
-      active = false;
-      if (pendingResume.current === request) pendingResume.current = null;
-    };
-  }, [resumeRevision]);
-  const lastUiPublish = useRef(-Infinity);
-  const publishTime = useCallback(
-    (value: number, background = false) => {
-      // Browser media clocks can round the terminal timestamp beyond the project endpoint.
-      if (!Number.isFinite(value)) return;
-      const time = Math.max(0, Math.min(latest.current.duration, value));
-      playheadClock.publish(time);
-      const now = performance.now();
-      if (background && now - lastUiPublish.current < REVIEW_PLAYBACK_UI_INTERVAL_MS) return;
-      lastUiPublish.current = now;
-      setTime(time);
-    },
-    [playheadClock]
-  );
-  const presentation = useRef<{ source: string; active: boolean } | null>(null);
-  const setPresentationActive = useCallback((source: string, active: boolean) => {
-    if (active) presentation.current = { source, active };
-    else if (presentation.current?.source === source) presentation.current.active = false;
-  }, []);
-  const onPresentedTime = useCallback(
-    (source: string, value: number) => {
-      const node = video.current;
-      if (
-        presentation.current?.source !== source ||
-        !presentation.current.active ||
-        !node ||
-        node.paused ||
-        node.error ||
-        !Number.isFinite(value)
-      )
-        return;
-      // Observed playback time must yield to frame preparation and direct editor commands.
-      startTransition(() => publishTime(value, true));
-    },
-    [publishTime]
-  );
-  const [playbackRange, updateRange] = useState<ReviewPlaybackRange | null>(null);
-  const rangeRef = useRef(playbackRange);
-  const [seekRevision, reviseSeek] = useState(0);
-  const [navigationRevision, reviseNavigation] = useState(0);
-  const setRange = (range: ReviewPlaybackRange | null) => {
-    rangeRef.current = range;
-    updateRange(range);
-  };
-  const recovery = useReviewPlaybackRecovery({
-    video,
-    time,
-    playing,
-    stop: () => {
-      video.current?.pause();
-      setPlaying(false);
-    },
-    restore: (value) => synchronize(value, false, true),
-    ready: (value) => {
-      synchronize(value, false);
-      latest.current.onRecovered?.();
-    },
-    fail: () => latest.current.onFailure(),
-  });
-  const synchronize = (value: number, applyEdits: boolean, restoreSource = false) => {
-    const restoring = recovery.currentTime();
-    if (restoring !== null && !restoreSource) return restoring;
-    const node = video.current;
-    const effective = resolveReviewPlaybackSample({
-      time: value,
-      applyEdits,
+  const configuration = useCallback(
+    () => ({
+      sourceId: latest.current.sourceId ?? 'gallery-source',
       duration: latest.current.duration,
-      edits: latest.current.edits,
+      edits: latest.current.readEdits?.() ?? latest.current.edits,
+      original: latest.current.original,
+      silent: latest.current.silent ?? false,
       retainCutTime: latest.current.retainCutTime ?? false,
-      range: rangeRef.current,
+      boundaries: () => latest.current.boundaries(),
+    }),
+    []
+  );
+  const [transport] = useState(() => {
+    let recovery: { node: HTMLVideoElement; preload: HTMLVideoElement['preload'] } | null = null;
+    return createReviewTransportController(configuration(), {
+      now: () => performance.now(),
+      schedule(delay, callback) {
+        const handle = window.setTimeout(callback, delay);
+        return () => window.clearTimeout(handle);
+      },
+      media: {
+        read() {
+          const node = video.current;
+          return node
+            ? {
+                sourceId:
+                  node.currentSrc || node.src || (latest.current.sourceId ?? 'gallery-source'),
+                time: node.currentTime,
+                paused: node.paused,
+                ended: node.ended,
+                seeking: node.seeking,
+                readyState: node.readyState,
+                errorCode: node.error?.code ?? null,
+              }
+            : null;
+        },
+        seek(time) {
+          const node = video.current;
+          if (node && node.currentTime !== time) node.currentTime = time;
+        },
+        async play() {
+          await video.current?.play();
+        },
+        pause() {
+          video.current?.pause();
+        },
+        configure({ rate, muted, volume }) {
+          const node = video.current;
+          if (!node) return;
+          if (node.playbackRate !== rate) node.playbackRate = rate;
+          if (!node.preservesPitch) node.preservesPitch = true;
+          if (node.muted !== muted) node.muted = muted;
+          if (node.volume !== volume) node.volume = volume;
+        },
+        recoveryMode(active) {
+          if (active && video.current)
+            recovery = { node: video.current, preload: video.current.preload };
+          else if (recovery) {
+            recovery.node.preload = recovery.preload;
+            recovery = null;
+          }
+        },
+        reload() {
+          const node = video.current;
+          if (!node) return;
+          node.preload = 'auto';
+          node.load();
+        },
+      },
+      audio: {
+        readClock: () => latest.current.readAudioClock?.() ?? null,
+        prepare: (signal, request) => latest.current.prepareAfterSeek?.(signal, request) ?? true,
+        start: (request) => latest.current.onPreparedPlay?.(request),
+        stop: () => latest.current.onStopPlayback?.(),
+      },
+      onSeek: (time) => latest.current.onSeek(time),
+      onFailure: (failure) => latest.current.onFailure(failure),
+      onRecovered: () => latest.current.onRecovered?.(),
+      onInvalidRange: () => latest.current.onInvalidRange?.(),
     });
-    const next = effective.time;
-    if (effective.looped || restoreSource) reviseSeek((revision) => revision + 1);
-    if (node) {
-      if (restoreSource) node.currentTime = next;
-      if (effective.looped && !node.paused) prepareAfterSeek(node);
-      applyReviewPlaybackSample(node, effective, value, latest.current);
-    }
-    if (
-      !applyEdits ||
-      restoreSource ||
-      !presentation.current?.active ||
-      !node ||
-      node.paused ||
-      node.error
-    )
-      publishTime(next);
-    return next;
-  };
-  const audioSettingsKey = JSON.stringify([
-    props.original,
+  });
+  const status = useSyncExternalStore(transport.subscribeStatus, transport.getStatusSnapshot);
+  const acceptedConfiguration = useMemo(configuration, [
+    configuration,
+    props.sourceId,
+    props.duration,
     props.edits,
+    props.readEdits,
+    props.original,
     props.silent,
     props.retainCutTime,
   ]);
-  const tick = useRef(synchronize);
-  tick.current = synchronize;
+  useLayoutEffect(
+    () => transport.configure(acceptedConfiguration),
+    [transport, acceptedConfiguration]
+  );
+  const syncConfiguration = useCallback(
+    () => transport.configure(configuration()),
+    [transport, configuration]
+  );
+  const lifetime = useRef({ revision: 0 });
   useEffect(() => {
-    const range = rangeRef.current;
-    if (range) {
-      const normalized = createReviewPlaybackRange(range.start, range.end, props.duration);
-      if (!normalized || reviewPlaybackRangeStart(normalized, latest.current.edits) === null) {
-        setRange(null);
-        video.current?.pause();
-        setPlaying(false);
-      } else if (normalized.start !== range.start || normalized.end !== range.end)
-        setRange(normalized);
-    }
-    const node = video.current;
-    if (node) tick.current(node.currentTime, false);
-  }, [audioSettingsKey, props.duration]);
-  usePlaybackFrames(playing, video, tick);
-  const seekSource = (value: number) => {
-    const range = rangeRef.current;
-    if (range && (value < range.start || value >= range.end)) setRange(null);
-    const node = video.current;
-    const resume = !!node && (!node.paused || pendingResume.current !== null);
-    pendingResume.current = null;
-    if (recovery.seek(value)) publishTime(value);
-    else if (video.current) video.current.currentTime = value;
-    reviseSeek((revision) => revision + 1);
-    synchronize(value, false);
-    props.onSeek(value);
-    if (resume && node) prepareAfterSeek(node);
-  };
-  return {
-    playheadClock,
-    cancelPendingPlay: () => {
-      ++playIntent.current;
-      pendingResume.current = null;
-    },
-    video,
-    recovering: recovery.recovering,
-    time,
-    playing,
-    setPlaying,
-    setPresentationActive,
-    onPresentedTime,
-    playbackRange,
-    seekRevision,
-    navigationRevision,
-    setPlaybackRange: (requested: ReviewPlaybackRange | null) => {
-      if (!requested) {
-        setRange(null);
-        return;
-      }
-      const range = createReviewPlaybackRange(requested.start, requested.end, props.duration);
-      if (!range) return;
-      const start = reviewPlaybackRangeStart(range, props.edits);
-      if (start === null) {
-        props.onInvalidRange?.();
-        return;
-      }
-      setRange(range);
-      seekSource(start);
-    },
-    onMediaError: recovery.onMediaError,
-    onEnded: () => {
-      const range = props.retainCutTime ? null : rangeRef.current;
-      const start = range && reviewPlaybackRangeStart(range, props.edits);
-      if (range && start !== null && video.current) {
-        video.current.currentTime = start;
-        reviseSeek((revision) => revision + 1);
-        synchronize(start, true);
-        if (!prepareAfterSeek(video.current))
-          void video.current.play().catch(() => props.onFailure());
-      } else {
-        if (video.current) publishTime(video.current.currentTime);
-        setPlaying(false);
-      }
-    },
-    onTime: (value: number) => synchronize(value, playing),
-    pause: () => {
-      ++playIntent.current;
-      pendingResume.current = null;
-      const node = video.current;
-      node?.pause();
-      // The native pause event is queued; publish its final sample in the paused-state commit.
-      if (node) publishTime(node.currentTime);
-      setPlaying(false);
-    },
-    seek: (value: number, snap = true) => {
-      const clamped = Math.max(0, Math.min(props.duration, value));
-      const boundaries = snap ? props.boundaries() : undefined;
-      const next = boundaries ? nearestReviewBoundary(clamped, boundaries) : clamped;
-      const range = rangeRef.current;
-      if (range && !props.retainCutTime && (next < range.start || next >= range.end))
-        setRange(null);
-      reviseNavigation((revision) => revision + 1);
-      seekSource(next);
-    },
-    play: () => {
-      const intent = ++playIntent.current;
-      pendingResume.current = null;
-      const node = video.current;
-      if (!node) return;
-      if (recovery.retry()) return;
-      if (node.paused) {
-        if (node.currentTime >= props.duration) node.currentTime = 0;
-        synchronize(node.currentTime, true);
-        if (node.currentTime >= props.duration) return;
-        const source = node.currentSrc;
-        latest.current.onPreparedPlay?.();
-        void node.play().then(
-          () => {
-            if (
-              intent === playIntent.current &&
-              video.current === node &&
-              node.currentSrc === source &&
-              !node.paused
-            ) {
-              setPlaying(true);
-              latest.current.onRecovered?.();
-            }
-          },
-          () => {
-            if (
-              intent === playIntent.current &&
-              video.current === node &&
-              node.currentSrc === source
-            )
-              latest.current.onFailure();
-          }
-        );
-      } else {
-        node.pause();
-        setPlaying(false);
-      }
-    },
-  };
-}
-
-/** Applies the resolved source sample and authored audio settings to the native element. */
-function applyReviewPlaybackSample(
-  node: HTMLVideoElement,
-  sample: ReturnType<typeof resolveReviewPlaybackSample>,
-  previousTime: number,
-  props: ReviewPlaybackProps
-) {
-  if (sample.time !== previousTime) node.currentTime = sample.time;
-  if (node.playbackRate !== sample.rate) node.playbackRate = sample.rate;
-  if (node.preservesPitch !== true) node.preservesPitch = true;
-  const gain = originalAudioGainAt(props.original, sample.time, props.edits);
-  const muted = props.silent || sample.muted || gain === 0;
-  if (node.muted !== muted) node.muted = muted;
-  // The element caps at one; the preview audio graph amplifies beyond it.
-  const volume = Math.min(1, gain);
-  if (node.volume !== volume) node.volume = volume;
-  if (sample.time >= props.duration) node.pause();
-}
-
-/** Native frame scheduling and cancellation share one lifecycle, separate from source decisions. */
-function usePlaybackFrames(
-  playing: boolean,
-  video: RefObject<HTMLVideoElement | null>,
-  tick: RefObject<(value: number, applyEdits: boolean, restoreSource?: boolean) => number>
-) {
+    const lifecycle = lifetime.current;
+    const revision = ++lifecycle.revision;
+    return () => {
+      transport.deactivate();
+      queueMicrotask(() => {
+        if (lifecycle.revision === revision) transport.dispose();
+      });
+    };
+  }, [transport]);
   useEffect(() => {
-    if (!playing) return;
+    if (status.mode !== 'playing' && status.mode !== 'preparing') return;
     let frame = 0;
     const advance = () => {
-      const node = video.current;
-      if (node && !node.paused) tick.current(node.currentTime, true);
+      transport.tick();
       frame = requestAnimationFrame(advance);
     };
-    const node = video.current;
-    const paused = () => {
-      if (node) tick.current(node.currentTime, false);
-    };
-    node?.addEventListener('pause', paused);
     frame = requestAnimationFrame(advance);
     return () => {
       cancelAnimationFrame(frame);
-      node?.removeEventListener('pause', paused);
     };
-  }, [playing, video, tick]);
-}
-
-/** One source transport with an explicit clock for inserted hold intervals. */
-export function useReviewPlayback(props: ReviewPlaybackProps) {
-  return useReviewFreezePlayback(useReviewSourcePlayback(props), props.edits, props.duration);
+  }, [transport, status.mode]);
+  // Compatibility consumers share one accepted sample. They cannot publish another clock.
+  const [presentation] = useState(() => {
+    let position = transport.readPosition();
+    const listeners = new Set<() => void>();
+    const clock: ReviewPlaybackPresentationClock = {
+      read: () => position.source?.sourceTime ?? position.media?.time ?? 0,
+      readResult: () => position.resultTime,
+      isPlaying: () => transport.getStatusSnapshot().playing,
+      subscribe(listener) {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    };
+    return {
+      clock,
+      update(next: ReviewTransportPosition) {
+        position = next;
+        for (const listener of listeners) listener();
+      },
+    };
+  });
+  useLayoutEffect(
+    () => transport.subscribePosition(presentation.update),
+    [transport, presentation]
+  );
+  const playheadClock = presentation.clock;
+  const onTime = useCallback(() => {
+    transport.tick();
+    const position = transport.readPosition();
+    return position.source?.sourceTime ?? position.media?.time ?? 0;
+  }, [transport]);
+  const onMediaPlayback = useCallback(
+    (playing: boolean) => transport.observeMedia(playing ? 'play' : 'pause'),
+    [transport]
+  );
+  const onMediaReady = useCallback(
+    (event: 'metadata' | 'seeked' | 'ready') => transport.observeMedia(event),
+    [transport]
+  );
+  return {
+    transport,
+    syncConfiguration,
+    readPosition: transport.readPosition,
+    pauseAt: transport.pauseAt,
+    video,
+    playheadClock,
+    time: status.position.source?.sourceTime ?? status.position.media?.time ?? 0,
+    playing: status.playing,
+    preparingPlayback: status.mode === 'preparing',
+    recovering: status.mode === 'recovering',
+    playbackRange: status.range,
+    seekRevision: status.seekRevision,
+    navigationRevision: status.navigationRevision,
+    pause: transport.pause,
+    seek: transport.seekSource,
+    seekResult: transport.seekResult,
+    play: transport.toggle,
+    setPlaybackRange: transport.setRange,
+    onTime,
+    onMediaPlayback,
+    onMediaReady,
+    onEnded: () => transport.observeMedia('ended'),
+    onMediaError: () => transport.observeMedia('error'),
+  };
 }

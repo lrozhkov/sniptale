@@ -40,6 +40,11 @@ import { useReviewSelectionLifecycle } from './use-review-selection';
 import type { useReviewZoomEditor } from './zoom-editor';
 import { removeReviewWebcamItem } from './webcam-editor';
 import { useReviewText } from './use-review-text';
+import {
+  reviewCommandSourceTime,
+  type ReviewCommandContext,
+  type ReviewCommandPort,
+} from './command-context';
 
 type Session = ReturnType<
   typeof import('../../workflows/video-review/session').createVideoReviewSession
@@ -64,6 +69,7 @@ function projectHistory(
 
 /** Wires advanced lanes to the shared selection, flush, and export boundaries. */
 export function useReviewEditorWiring(args: {
+  commands: ReviewCommandPort;
   session: Session;
   document: ReviewDocument;
   advanced: QuickEditAdvancedState;
@@ -72,9 +78,13 @@ export function useReviewEditorWiring(args: {
   zoom: ReturnType<typeof useReviewZoomEditor>;
   annotationEffects: ReturnType<typeof useReviewAnnotationEffects>;
   activeSelection: ReviewSelection;
-  setActiveSelection: Dispatch<SetStateAction<ReviewSelection>>;
+  setActiveSelection(
+    next: SetStateAction<ReviewSelection>,
+    context?: ReviewCommandContext
+  ): void | boolean;
   clearAnnotation: Dispatch<SetStateAction<ReviewAnnotation | null>>;
   time: number;
+  resultTime?: number | undefined;
   playbackRange: ReviewPlaybackRange | null;
   timelineDuration: number;
   beforeAction?: ReviewBeforeAction;
@@ -103,6 +113,7 @@ export function useReviewEditorWiring(args: {
     [args.telemetry, args.sourceDuration, args.advanced.interactionTimeline]
   );
   const comments = useReviewCommentActions({
+    commands: args.commands,
     composer: args.composer,
     time: args.time,
     playbackRange:
@@ -121,6 +132,7 @@ export function useReviewEditorWiring(args: {
     exporterPhase: args.exporter.phase,
   });
   const canvasComments = useCanvasComments({
+    commands: args.commands,
     session: args.session,
     time: args.time,
     busy: args.busy,
@@ -128,8 +140,8 @@ export function useReviewEditorWiring(args: {
     canStart: args.canStart,
     run: args.run,
     selectedId: args.activeSelection.kind === 'canvas-comment' ? args.activeSelection.id : null,
-    onSelectionChange: (id) =>
-      args.setActiveSelection(id ? { kind: 'canvas-comment', id } : { kind: 'none' }),
+    onSelectionChange: (id, context) =>
+      args.setActiveSelection(id ? { kind: 'canvas-comment', id } : { kind: 'none' }, context),
   });
   const audio = useReviewAudio({
     audio: args.advanced.audio,
@@ -140,16 +152,29 @@ export function useReviewEditorWiring(args: {
     edits: args.document.edits,
     selectedOriginalId:
       args.activeSelection.kind === 'original-audio' ? args.activeSelection.id : null,
-    onOriginalSelection: (id) => {
-      if (id) args.setTimelineSelection({ kind: 'point', time: args.time });
-      args.setActiveSelection(id ? { kind: 'original-audio', id } : { kind: 'none' });
+    onOriginalSelection: (id, context) => {
+      const apply = (captured: ReviewCommandContext) => {
+        const time = reviewCommandSourceTime(captured);
+        const accepted = args.setActiveSelection(
+          id ? { kind: 'original-audio', id } : { kind: 'none' },
+          captured
+        );
+        if (accepted !== false && id && time !== null)
+          args.setTimelineSelection({ kind: 'point', time });
+      };
+      if (context) apply(context);
+      else {
+        const captured = args.commands.capture();
+        if (captured) args.commands.admit(captured, apply);
+      }
     },
     selectedId: args.activeSelection.kind === 'audio' ? args.activeSelection.id : null,
-    onSelectionChange: (value) =>
-      args.setActiveSelection(value ? { kind: 'audio', ...value } : { kind: 'none' }),
+    onSelectionChange: (value, context) =>
+      args.setActiveSelection(value ? { kind: 'audio', ...value } : { kind: 'none' }, context),
   });
   useOriginalAudioToolLifecycle(args.activeSelection.kind, audio);
   const text = useReviewText({
+    commands: args.commands,
     captions: args.advanced.captions,
     document: args.advanced.text,
     snapshots: args.advanced.audio.voiceover.flatMap((clip) =>
@@ -161,6 +186,7 @@ export function useReviewEditorWiring(args: {
     sourceDuration: args.sourceDuration,
     edits: args.document.edits,
     sourceTime: args.time,
+    resultTime: args.resultTime,
     beforeAction: args.beforeAction,
     select: args.setActiveSelection,
     seek: args.seek,
@@ -256,6 +282,7 @@ function useWiredReviewShortcuts(
   cancelAnnotationTool: () => void
 ) {
   useReviewEditorShortcuts({
+    commands: args.commands,
     time: args.time,
     navigation: reviewTimelineNavigationBounds(args.sourceDuration, args.document.edits),
     seek: args.seek,

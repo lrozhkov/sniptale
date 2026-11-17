@@ -199,7 +199,7 @@ export interface EffectRuntimeSandboxExecutor {
   dispose(): void;
   /** Borrow isolated preparation. A caller gate permits later handoff at its intended frame boundary; omission retains startup-only handoff. */
   createWarmExecutor?(canAdopt?: () => boolean): EffectRuntimeSandboxExecutor | undefined;
-  /** Prepare transport readiness without a frame request; an unavailable session can retry. */
+  /** Prepare readiness without a frame; startup refusal lasts until this executor is replaced. */
   preload?(): void;
   /** A local signal can refuse queued work before transfer; submitted results must still drain. */
   prepareGpuFrame?(

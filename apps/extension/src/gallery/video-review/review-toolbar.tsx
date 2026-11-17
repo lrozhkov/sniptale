@@ -1,12 +1,12 @@
 import type { ReviewInspectorNavigation } from './inspector-navigation';
-import type { ReactNode } from 'react';
+import { memo, useCallback, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Box } from 'lucide-react';
 import { ReviewTrackHeightButton } from './track-row';
 import { reviewOriginalAudioPlacementIssue } from './range-placement';
 import type { ReviewFocusType } from './zoom-editor';
 import type { ReviewBeforeAction } from './note-transitions';
 import type { useReviewAudio } from './use-review-audio';
-import { translate } from '../../platform/i18n';
+import { translate, useAppLocale } from '../../platform/i18n';
 import {
   hasSuppressedAdvancedFeatures,
   resolveQuickEditEffectiveFeatures,
@@ -144,7 +144,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
             rate={props.editing.rate}
             audio={props.editing.audio}
             onPointer={() => admit(() => props.editing.setCutting(false))}
-            onToggle={(kind) => admit(() => props.editing.toggle(kind))}
+            onToggle={(kind) => props.editing.toggle(kind)}
             onRate={(rate) => admit(() => props.editing.changeRate(rate))}
             onAudio={(audio) => admit(() => props.editing.changeAudio(audio))}
           />
@@ -158,7 +158,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           <ReviewAnnotationToolControl tool={props.annotationTool} busy={busy} admit={admit} />
         ) : null}
         {track === 'zoom' && features.zoomTrackVisible && props.focusTool ? (
-          <ReviewFocusToolControl tool={props.focusTool} busy={busy} admit={admit} />
+          <ReviewFocusToolControl tool={props.focusTool} busy={busy} />
         ) : null}
         {track === 'originalAudio' &&
         props.originalAudioEditor &&
@@ -245,61 +245,115 @@ export function ReviewTrackControls(props: {
   );
 }
 
-/** Focus insertion owns its action availability and disposable kind selection together. */
+/** Focus commands use the latest committed receiver; the five-button view has scalar inputs. */
 function ReviewFocusToolControl({
   tool,
   busy,
-  admit,
 }: {
   tool: NonNullable<ToolbarProps['focusTool']>;
   busy: boolean;
-  admit: (action: () => void) => void;
 }) {
-  const options = [
-    { type: 'zoom', label: 'gallery.videoReview.zoomRegionLabel', icon: ZoomIn },
-    { type: 'spotlight', label: 'gallery.videoReview.focusSpotlight', icon: ScanEye },
-    { type: 'lens', label: 'gallery.videoReview.focusLens', icon: Search },
-    { type: '3d', label: 'gallery.videoReview.focus3d', icon: Box },
-    { type: 'border', label: 'gallery.videoReview.focusBorder', icon: RectangleHorizontal },
-  ] as const;
+  const receiver = useRef(tool.onToggle);
+  useLayoutEffect(() => {
+    receiver.current = tool.onToggle;
+  }, [tool.onToggle]);
+  const onToggle = useCallback((type: ReviewFocusType) => receiver.current(type), []);
+  return (
+    <ReviewFocusToolPresentation
+      busy={busy}
+      activeType={tool.active ? (tool.type ?? 'zoom') : null}
+      hint={tool.hint}
+      zoomAvailable={tool.availableFor?.('zoom') ?? tool.available}
+      spotlightAvailable={tool.availableFor?.('spotlight') ?? tool.available}
+      lensAvailable={tool.availableFor?.('lens') ?? tool.available}
+      spatialAvailable={tool.availableFor?.('3d') ?? tool.available}
+      borderAvailable={tool.availableFor?.('border') ?? tool.available}
+      onToggle={onToggle}
+    />
+  );
+}
+
+const focusOptions = [
+  {
+    type: 'zoom',
+    available: 'zoomAvailable',
+    label: 'gallery.videoReview.zoomRegionLabel',
+    icon: ZoomIn,
+  },
+  {
+    type: 'spotlight',
+    available: 'spotlightAvailable',
+    label: 'gallery.videoReview.focusSpotlight',
+    icon: ScanEye,
+  },
+  {
+    type: 'lens',
+    available: 'lensAvailable',
+    label: 'gallery.videoReview.focusLens',
+    icon: Search,
+  },
+  { type: '3d', available: 'spatialAvailable', label: 'gallery.videoReview.focus3d', icon: Box },
+  {
+    type: 'border',
+    available: 'borderAvailable',
+    label: 'gallery.videoReview.focusBorder',
+    icon: RectangleHorizontal,
+  },
+] as const;
+
+const ReviewFocusToolPresentation = memo(function ReviewFocusToolPresentation(props: {
+  busy: boolean;
+  activeType: ReviewFocusType | null;
+  hint: string | undefined;
+  zoomAvailable: boolean;
+  spotlightAvailable: boolean;
+  lensAvailable: boolean;
+  spatialAvailable: boolean;
+  borderAvailable: boolean;
+  onToggle(type: ReviewFocusType): void;
+}) {
+  useAppLocale();
   return (
     <div className="flex shrink-0 items-center gap-0.5" data-ui="gallery.videoReview.focusTools">
-      {options.map(({ type, label, icon: Icon }) => (
+      {focusOptions.map(({ type, available, label, icon: Icon }) => (
         <ReviewButton
           key={type}
           label={translate(label)}
           toolbarLabel={translate(label)}
-          title={tool.hint ?? translate(label)}
-          aria-pressed={tool.active && (tool.type ?? 'zoom') === type}
+          title={props.hint ?? translate(label)}
+          aria-pressed={props.activeType === type}
           className={plain}
-          disabled={busy || !(tool.availableFor?.(type) ?? tool.available)}
-          onClick={() => admit(() => tool.onToggle(type))}
+          disabled={props.busy || !props[available]}
+          onClick={() => props.onToggle(type)}
         >
           <Icon size={16} aria-hidden="true" />
         </ReviewButton>
       ))}
     </div>
   );
-}
+});
 
 function ReviewAnnotationToolControl(props: {
   tool: ReviewAnnotationTool;
   busy: boolean;
   admit(action: () => void): void;
 }) {
-  const { tool, busy, admit } = props;
+  const { tool, busy } = props;
   const hint = annotationTypeHint(tool);
   return (
     <div
       className="flex items-center gap-1"
       onPointerDownCapture={(event) => {
-        if (event.target instanceof Element && event.target.closest('[aria-haspopup="listbox"]'))
+        if (
+          event.target instanceof Element &&
+          event.target.closest('[aria-haspopup="listbox"][aria-expanded="false"]')
+        )
           tool.onToggle(event.currentTarget);
       }}
       onKeyDownCapture={(event) => {
         if (
           event.target instanceof Element &&
-          event.target.closest('[aria-haspopup="listbox"]') &&
+          event.target.closest('[aria-haspopup="listbox"][aria-expanded="false"]') &&
           ['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(event.key)
         )
           tool.onToggle(event.currentTarget);
@@ -328,7 +382,7 @@ function ReviewAnnotationToolControl(props: {
           tool.phase !== 'ready' ||
           !tool.options.length
         }
-        onChange={(value) => admit(() => tool.onChoose(value))}
+        onChange={(value) => tool.onChoose(value)}
       />
       <ReviewAnnotationToolFeedback {...props} hint={hint} />
     </div>
@@ -432,7 +486,6 @@ function ReviewOriginalAudioTool({
   props,
   editor,
   busy,
-  admit,
 }: {
   props: Pick<
     ToolbarProps,
@@ -475,7 +528,7 @@ function ReviewOriginalAudioTool({
         title={volumeHint ?? translate('gallery.videoReview.originalAudioRange')}
         className={plain}
         disabled={busy || !sourceAudioReady || !!volumeHint || !props.originalInsertionRange}
-        onClick={() => admit(() => props.onAddOriginal?.())}
+        onClick={() => props.onAddOriginal?.()}
       >
         <Volume2 size={16} aria-hidden="true" />
       </ReviewButton>

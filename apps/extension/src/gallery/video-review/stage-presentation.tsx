@@ -2,12 +2,23 @@ import { LoaderCircle } from 'lucide-react';
 import type { ReviewAnnotationEditing } from './annotation-effects-overlay';
 import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
 import { DelayedLoadingFallback } from '@sniptale/ui/loading-delay';
-import { useEffect, useState, type RefObject, type PointerEvent } from 'react';
+import {
+  useEffect,
+  useState,
+  useMemo,
+  useSyncExternalStore,
+  type RefObject,
+  type PointerEvent,
+} from 'react';
 import { sameQuickEditCamera } from '../../features/video/review/advanced/motion-blur';
 import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
 import { resolveOverlayComments } from '../../features/video/review/comments';
 import { DEFAULT_QUICK_PREVIEW_PREFERENCES } from '../../features/video/preview/quick-preferences';
-import { translate } from '../../platform/i18n';
+import { translate, useAppLocale } from '../../platform/i18n';
+import type {
+  ReviewPreviewFrameStatisticsSource,
+  ReviewPreviewPresentationStatus,
+} from './preview-presentation-state';
 import { ReviewButton } from './controls';
 import { useReviewPreviewPresentation } from './use-preview-presentation';
 import type { ReviewStageScene } from './stage-geometry';
@@ -48,6 +59,8 @@ type PresentationProps = {
         onPresentationActive?: PreviewInput['onPresentationActive'];
         interacting?: boolean;
         sourceToResult: PreviewInput['sourceToResult'];
+        readPosition?: PreviewInput['readPosition'];
+        seekRevision?: number | undefined;
         onRendererStatus?: ((status: PreviewRendererStatus | null) => void) | undefined;
         onRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
         sourceFrameRate?: number | undefined;
@@ -160,6 +173,8 @@ export function useStagePresentation(
     pausedSourceTime: props.comments?.time ?? props.video.current?.currentTime ?? 0,
     pausedResultTime: props.scene?.focus?.time ?? 0,
     sourceToResult: props.preview?.sourceToResult ?? ((time) => time),
+    readPosition: props.preview?.readPosition,
+    seekRevision: props.preview?.seekRevision,
     cameraTransform: pausedCameraOverride(
       props.scene,
       props.preview?.playing ?? false,
@@ -210,7 +225,14 @@ export function ReviewStagePresentationFeedback({
   captions,
   onCaptionSelect,
 }: {
-  presentation: ReturnType<typeof useReviewPreviewPresentation>;
+  presentation: Omit<
+    ReturnType<typeof useReviewPreviewPresentation>,
+    'frameStatistics' | 'status'
+  > & {
+    frameStatistics?: ReviewPreviewFrameStatisticsSource | undefined;
+    status: ReturnType<typeof useReviewPreviewPresentation>['status'] &
+      Partial<Pick<ReviewPreviewPresentationStatus, 'presentedFPS' | 'nativeVideoFPS'>>;
+  };
   showFrameRate: boolean;
   waitingReason?: string | undefined;
   captions?: PresentationProps['captions'];
@@ -276,12 +298,15 @@ export function ReviewStagePresentationFeedback({
       {failed ? (
         <div
           role="alert"
+          data-ui="gallery.videoReview.previewFailure"
           className={[
-            'absolute inset-x-0 top-0 z-40 flex items-center gap-2',
-            'bg-[var(--sniptale-color-surface-panel)] px-3 py-1 text-xs',
+            'absolute inset-x-0 top-0 z-40 flex max-h-full items-start gap-3 overflow-y-auto border-b',
+            'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel-glass)] p-3',
+            'text-sm text-[var(--sniptale-color-text-primary)] shadow-[var(--sniptale-shadow-sm)]',
+            'backdrop-blur-[var(--sniptale-glass-blur)]',
           ].join(' ')}
         >
-          <span>
+          <span className="min-w-0 flex-1 self-center">
             {translate(
               cameraFailed
                 ? 'gallery.videoReview.webcamFailed'
@@ -289,6 +314,7 @@ export function ReviewStagePresentationFeedback({
             )}
           </span>
           <ReviewButton
+            className="shrink-0"
             label={translate('gallery.videoReview.retry')}
             onClick={presentation.retry}
           />
@@ -319,23 +345,47 @@ export function ReviewStagePresentationFeedback({
           />
         ) : null}
         {showFrameRate ? (
-          <output
-            data-ui="gallery.videoReview.previewFPS"
-            title={translate(
-              manual
-                ? 'gallery.videoReview.previewPresentedFrameRate'
-                : 'gallery.videoReview.previewNativeFrameRate'
-            )}
-          >
-            {(manual
-              ? presentation.status.presentedFPS
-              : presentation.status.nativeVideoFPS
-            )?.toFixed(1) ?? '—'}{' '}
-            FPS
-          </output>
+          <ReviewPreviewFrameRate
+            source={presentation.frameStatistics}
+            manual={manual}
+            presentedFPS={presentation.status.presentedFPS ?? null}
+            nativeVideoFPS={presentation.status.nativeVideoFPS ?? null}
+          />
         ) : null}
       </div>
     </>
+  );
+}
+
+const noFrameStatisticsSubscription = () => () => {};
+
+/** FPS publications update only this output; renderer readiness stays with the stage. */
+function ReviewPreviewFrameRate(props: {
+  source: ReviewPreviewFrameStatisticsSource | undefined;
+  manual: boolean;
+  presentedFPS: number | null;
+  nativeVideoFPS: number | null;
+}) {
+  useAppLocale();
+  const fallback = useMemo(
+    () => ({ presentedFPS: props.presentedFPS, nativeVideoFPS: props.nativeVideoFPS }),
+    [props.presentedFPS, props.nativeVideoFPS]
+  );
+  const value = useSyncExternalStore(
+    props.source?.subscribe ?? noFrameStatisticsSubscription,
+    props.source?.read ?? (() => fallback)
+  );
+  return (
+    <output
+      data-ui="gallery.videoReview.previewFPS"
+      title={translate(
+        props.manual
+          ? 'gallery.videoReview.previewPresentedFrameRate'
+          : 'gallery.videoReview.previewNativeFrameRate'
+      )}
+    >
+      {(props.manual ? value.presentedFPS : value.nativeVideoFPS)?.toFixed(1) ?? '—'} FPS
+    </output>
   );
 }
 

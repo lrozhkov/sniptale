@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 import { act, useState } from 'react';
-import { committedEditorFixtureProjection } from './editor-fixture.test-support';
+import {
+  createReviewCommandFixture,
+  committedEditorFixtureProjection,
+} from './editor-fixture.test-support';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
@@ -110,6 +113,15 @@ function setup(
     const [selection, select] = useState<ReviewSelection>({ kind: 'annotation', id: 'note' });
     const [time, seek] = useState(3);
     editor = useReviewWebcamEditor({
+      commands: createReviewCommandFixture(() => ({
+        duration: 12,
+        time,
+        resultTime: time,
+        session: activeSession,
+        document: activeSession.getSnapshot().document,
+        advanced: advanced.readCurrent(),
+        selection,
+      })),
       session: activeSession,
       advanced: {
         ...advanced,

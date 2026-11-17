@@ -144,7 +144,8 @@ function PreparedZoomPreview(
   const [gpuActive, setGpuActive] = useState(
     () => backend === 'gpu' && typeof navigator !== 'undefined' && !!navigator.gpu
   );
-  const [presented, setPresented] = useState<ZoomPreviewGpuInput | null>(null);
+  const [lastPresented, setPresented] = useState<ZoomPreviewGpuInput | null>(null);
+  const presented = lastPresented?.region?.id === region.id ? lastPresented : null;
   const image = useReviewBackgroundImage(props.background);
   const header = useReviewWindowHeader(props.windowHeader, props.source.width, props.source.height);
   const controls = usePreviewToolSelection(props);
@@ -162,8 +163,14 @@ function PreparedZoomPreview(
       ])
     : (playback?.video ?? frame?.image ?? null);
   const paintIdentity = useMemo(
-    () => ({ source: paintSource, view, width: output.width, height: output.height }),
-    [paintSource, view, output.width, output.height]
+    () => ({
+      regionId: region.id,
+      source: paintSource,
+      view,
+      width: output.width,
+      height: output.height,
+    }),
+    [region.id, paintSource, view, output.width, output.height]
   );
   const [painted, setPainted] = useState<{ identity: typeof paintIdentity; ready: boolean } | null>(
     null
@@ -475,13 +482,27 @@ function ZoomPreviewTools({
 
 /** Owns temporary tool/view choices without changing the authored target or transport. */
 function usePreviewToolSelection(props: ZoomPreviewProps) {
-  const [zoomView, setZoomView] = useState<'area' | 'result'>('area');
-  const [followView, setFollowView] = useState<'area' | 'result'>('result');
-  const [localTool, setLocalTool] = useState<SpatialTool>('position');
+  const defaults = {
+    regionId: props.region.id,
+    zoomView: 'area' as 'area' | 'result',
+    followView: 'result' as 'area' | 'result',
+    localTool: 'position' as SpatialTool,
+    axis: 'both' as SpatialAxis,
+  };
+  const [navigation, setNavigation] = useState(defaults);
+  // Reset disposable navigation before committing a new region, while retaining its DOM.
+  if (navigation.regionId !== props.region.id) setNavigation(defaults);
+  const { zoomView, followView, localTool, axis } = navigation;
+  const setZoomView = (zoomView: 'area' | 'result') =>
+    setNavigation((current) => ({ ...current, zoomView }));
+  const setFollowView = (followView: 'area' | 'result') =>
+    setNavigation((current) => ({ ...current, followView }));
+  const setLocalTool = (localTool: SpatialTool) =>
+    setNavigation((current) => ({ ...current, localTool }));
+  const setAxis = (axis: SpatialAxis) => setNavigation((current) => ({ ...current, axis }));
   const shared = useContext(ReviewSpatialToolContext);
   const selectedTool = shared?.tool ?? localTool;
   const setTool = shared?.onTool ?? setLocalTool;
-  const [axis, setAxis] = useState<SpatialAxis>('both');
   const { region } = props;
   const overlay = !!(region.spotlight || region.border);
   const unavailable = !props.spatialEdit || overlay || props.cursorFollowing;

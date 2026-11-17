@@ -2,10 +2,23 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { ReviewLoadStatus } from './feedback';
+import { ReviewLoadStatus, reviewPlaybackFailureMessage } from './feedback';
 import { VideoReviewLoadError } from '../../workflows/video-review/source';
 
 vi.mock('../../platform/i18n', () => ({ translate: (key: string) => key }));
+
+it('keeps audio failures distinct from native video failures in preview feedback', () => {
+  expect(reviewPlaybackFailureMessage({ kind: 'audio' })).toBe(
+    'gallery.videoReview.audioPlaybackFailed'
+  );
+  expect(reviewPlaybackFailureMessage({ kind: 'audio', reason: 'voice-limit' })).toBe(
+    'gallery.videoReview.actionAudioLimit'
+  );
+  expect(reviewPlaybackFailureMessage({ kind: 'media', code: 3 })).toBe(
+    'gallery.videoReview.playbackFailed'
+  );
+  expect(reviewPlaybackFailureMessage({ kind: 'play' })).toBe('gallery.videoReview.playbackFailed');
+});
 
 it('shows only loading feedback until a failure makes recovery actions available', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

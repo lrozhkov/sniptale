@@ -10,7 +10,10 @@ import { lottieSchema } from '../../apps/extension/build/lottie-schema.ts';
 import { i18nCatalogs } from '../../apps/extension/build/i18n-catalogs.ts';
 import { tourPlayerScript } from '../../apps/extension/build/tour-player-script.ts';
 import { videoEffectResources } from '../../apps/extension/build/video-effect-resources.ts';
-import { createZodRuntimeFallbackPlugin } from '../../apps/extension/build/injected-build-support.ts';
+import {
+  createBlobOnlyInlineWorkerPlugin,
+  createZodRuntimeFallbackPlugin,
+} from '../../apps/extension/build/injected-build-support.ts';
 import { layoutPolicy } from '../../apps/extension/build/layout.ts';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -37,7 +40,7 @@ function isolatedSandbox(): Plugin {
         publicDir: false,
         base: '/',
         resolve: { alias: aliases },
-        plugins: [createZodRuntimeFallbackPlugin()],
+        plugins: [createZodRuntimeFallbackPlugin(), createBlobOnlyInlineWorkerPlugin()],
         build: {
           outDir: output,
           emptyOutDir: true,

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createReviewCommandFixture } from './editor-fixture.test-support';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -128,6 +129,13 @@ function setup(autosave = true) {
   function Harness() {
     writer = useReviewAdvanced(session);
     editor = useReviewText({
+      commands: createReviewCommandFixture(() => ({
+        duration: 4,
+        time: 0,
+        session,
+        document: session.getSnapshot().document,
+        advanced: writer.advanced,
+      })),
       document: writer.advanced.text,
       setText: writer.setText,
       endTyping: writer.endTyping,

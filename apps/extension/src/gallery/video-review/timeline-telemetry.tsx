@@ -45,14 +45,15 @@ export type ReviewCursorTimelineInteractions = {
 
 type TelemetryStripProps = ReviewCursorTimelineInteractions & {
   family?: 'keyboard' | 'mouse' | undefined;
-  interactionEditor?: import('./interaction-editor').ReviewInteractionEditor | undefined;
+  interactionEditor?:
+    | Pick<import('./interaction-editor').ReviewInteractionEditor, 'update'>
+    | undefined;
   cursorArchiveAvailable?: boolean | undefined;
   sourceId?: string | undefined;
   captureCapabilities?: RecordingTelemetryCapabilities | null | undefined;
   animatedIds?: ReadonlySet<string>;
   markers: readonly ReviewTelemetryMarker[];
   duration: number;
-  time: number;
   playing?: boolean | undefined;
   width: number;
   zoom: number;

@@ -29,9 +29,18 @@ describe('toolbar-menu-surface contract', () => {
     expect(toolbarMenuSurfaceStylesheet).not.toContain('.sniptale-popover-item {');
     expect(toolbarMenuSurfaceStylesheet).not.toContain('.sniptale-toolbar-menu-item-badge {');
   });
+});
 
-  it('does not lift backdrop effect layers above their connected frames while a menu is open', () => {
-    expect(toolbarMenuSurfaceStylesheet).toMatch(/:not\(\s*\.sniptale-blur-overlay\s*\)/);
-    expect(toolbarMenuSurfaceStylesheet).toMatch(/:not\(\s*\.sniptale-focus-overlay\s*\)/);
-  });
+it('excludes injected content gating from the shared toolbar menu surface', () => {
+  for (const selector of [
+    ".sniptale-app:has(.sniptale-toolbar[data-menu-open='true'])",
+    '.sniptale-toolbar-menu-interaction-guard',
+    ".sniptale-toolbar-positioner:has(> .sniptale-toolbar[data-menu-open='true'])",
+    ".sniptale-toolbar[data-menu-open='true']",
+    '#sniptale-content-app-root:has(',
+  ])
+    expect(toolbarMenuSurfaceStylesheet).not.toContain(selector);
+  expect(toolbarMenuSurfaceStylesheet).toMatch(
+    /\.sniptale-main-toolbar-popover :is\(\.sniptale-modal-backdrop, \.sniptale-modal\)\s*\{[^}]*z-index:\s*2147483647\s*!important;[^}]*pointer-events:\s*auto\s*!important;/su
+  );
 });

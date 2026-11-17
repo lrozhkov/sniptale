@@ -1,6 +1,12 @@
 import { projectReviewWebcam } from '../../features/video/review/timeline-placement';
 import type { ReviewTimeSegment } from '../../features/video/review/time-segment';
 import { reviewInsertionRange, reviewInsertionTarget } from './range-placement';
+import {
+  reviewCommandInsertion,
+  type ReviewCommandContext,
+  type ReviewCommandPort,
+} from './command-context';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { useEffect, useRef, useState } from 'react';
 import {
   createQuickEditWebcam,
@@ -72,6 +78,7 @@ function setReviewWebcamSplit(
 }
 
 type WebcamEditorArgs = {
+  commands: ReviewCommandPort;
   session: LoadedReview['session'];
   advanced: ReturnType<typeof useReviewAdvanced>;
   scene: { width: number; height: number };
@@ -81,9 +88,11 @@ type WebcamEditorArgs = {
   segments?: readonly ReviewTimeSegment[];
   insertionRange?: { start: number; end: number } | null;
   selection: ReviewSelection;
-  select(selection: ReviewSelection): void;
+  select(selection: ReviewSelection, context?: ReviewCommandContext): void;
   pause(): void;
   seek(time: number): void;
+  seekSource?(time: number): void;
+  seekResult?(time: number): void;
   allowed(): boolean;
 };
 
@@ -114,21 +123,58 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
   latest.current = args;
   const acquisition = useReviewWebcamAcquisition(args);
 
-  const mutate = (update: (camera: QuickEditWebcam) => QuickEditWebcam) => {
+  const mutate = (
+    update: (camera: QuickEditWebcam) => QuickEditWebcam,
+    context?: ReviewCommandContext
+  ) => {
     if (!latest.current.allowed() || acquisition.busy()) return;
     latest.current.advanced.setWebcam((current) =>
       current
         ? (parseQuickEditWebcam(
-            update(projectReviewWebcam(current, latest.current.segments) ?? current)
+            update(
+              projectReviewWebcam(
+                current,
+                context
+                  ? buildReviewTimeMap(context.scope.sourceDuration, context.document.edits)
+                  : latest.current.segments
+              ) ?? current
+            )
           ) ?? current)
         : current
     );
   };
-  const choose = (selection: ReviewWebcamSelection) => {
+  const choose = (selection: ReviewWebcamSelection, context?: ReviewCommandContext) => {
     if (!latest.current.allowed()) return;
-    latest.current.pause();
-    latest.current.select(selection);
+    if (context) {
+      latest.current.select(selection, context);
+      return;
+    }
+    const captured = args.commands.capture();
+    if (captured)
+      args.commands.admit(captured, (accepted) => latest.current.select(selection, accepted));
   };
+  const insertion = (context: ReviewCommandContext) => {
+    const camera = projectReviewWebcam(
+      context.advanced.webcam,
+      buildReviewTimeMap(context.scope.sourceDuration, context.document.edits)
+    );
+    const placement = reviewCommandInsertion(
+      context,
+      camera?.timeDomain === 'result' ? 'result' : 'source'
+    );
+    return camera && placement ? { camera, placement } : null;
+  };
+  const compatible = (context: ReviewCommandContext) =>
+    args.commands.isCurrent(
+      context,
+      'temporal',
+      (current) =>
+        JSON.stringify(current.advanced.webcam) === JSON.stringify(context.advanced.webcam)
+    );
+  const seekInsertion = (camera: QuickEditWebcam, time: number) =>
+    (camera.timeDomain === 'result'
+      ? (args.seekResult ?? args.seek)
+      : (args.seekSource ?? args.seek))(time);
   const toggle = async () => {
     if (!latest.current.allowed() || acquisition.busy()) return;
     if (!camera) return acquisition.attach();
@@ -156,27 +202,44 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
       (item) =>
         (!replace || item.id !== hidden?.id) && item.start < range.end && item.end > range.start
     );
-  const hideRange = reviewInsertionRange({
-    time: args.time,
-    duration: args.sourceDuration,
-    seconds: 2,
-    range: args.insertionRange,
-    occupied: camera?.hiddenRanges,
-  });
+  const insertionRange = () =>
+    reviewInsertionRange({
+      time: args.time,
+      duration: args.sourceDuration,
+      seconds: 2,
+      range: args.insertionRange,
+      occupied: camera?.hiddenRanges,
+    });
   return {
-    hideRange,
+    hideRange: insertionRange(),
     addHidden: () => {
-      if (!hideRange || !canHide(hideRange)) return;
-      const id = crypto.randomUUID();
-      mutate((current) => ({
-        ...current,
-        hiddenRanges: [
-          ...current.hiddenRanges,
-          { id, start: hideRange.start, end: hideRange.end },
-        ].sort((a, b) => a.start - b.start),
-      }));
-      choose({ kind: 'webcam-hidden', id });
-      args.seek(hideRange.start);
+      if (!latest.current.allowed() || acquisition.busy()) return;
+      const context = args.commands.capture();
+      if (!context) return;
+      args.commands.admit(context, (accepted) => {
+        if (!compatible(accepted)) return;
+        const current = insertion(accepted);
+        if (!current) return;
+        const hideRange = reviewInsertionRange({
+          ...current.placement,
+          seconds: 2,
+          occupied: current.camera.hiddenRanges,
+        });
+        if (!hideRange) return;
+        const id = crypto.randomUUID();
+        mutate(
+          (camera) => ({
+            ...camera,
+            hiddenRanges: [
+              ...camera.hiddenRanges,
+              { id, start: hideRange.start, end: hideRange.end },
+            ].sort((a, b) => a.start - b.start),
+          }),
+          accepted
+        );
+        choose({ kind: 'webcam-hidden', id }, accepted);
+        seekInsertion(current.camera, hideRange.start);
+      });
     },
     camera,
     pending: acquisition.pending,
@@ -225,8 +288,19 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
       mutate((current) => moveQuickEditWebcamPosition(current, id, time, args.sourceDuration)),
     select: choose,
     selectVisible: () => {
-      const position = camera?.positions.findLast((item) => item.time <= args.time);
-      choose(position ? { kind: 'webcam-position', id: position.id } : { kind: 'webcam' });
+      const context = args.commands.capture();
+      if (!context) return;
+      args.commands.admit(context, (accepted) => {
+        const current = insertion(accepted);
+        if (!current) return;
+        const position = current.camera.positions.findLast(
+          (item) => item.time <= current.placement.time
+        );
+        choose(
+          position ? { kind: 'webcam-position', id: position.id } : { kind: 'webcam' },
+          accepted
+        );
+      });
     },
     patch: (patch: Partial<QuickEditWebcam>) => mutate((current) => ({ ...current, ...patch })),
     place: (placement: QuickEditWebcamPlacement) =>
@@ -234,38 +308,48 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
     setSplit: (split: CameraSplitSide | null) =>
       mutate((current) => setReviewWebcamSplit(current, selectedPosition?.id, split)),
     addPosition: () => {
-      if (!camera || !latest.current.allowed()) return;
-      const time =
-        Math.round(
-          (reviewInsertionTarget(args.time, args.insertionRange)?.start ?? args.time) * 1000
-        ) / 1000;
-      if (time < 0.001 || time >= args.sourceDuration) return;
-      const existing = camera.positions.find((item) => item.time === time);
-      if (existing) {
-        choose({ kind: 'webcam-position', id: existing.id });
-        return;
-      }
-      const id = crypto.randomUUID();
-      mutate((current) => {
-        const previous = current.positions.findLast((item) => item.time <= time);
-        const behavior = previous ? previous.screenBehavior : current.screenBehavior;
-        return {
-          ...current,
-          positions: [
-            ...current.positions,
-            {
-              id,
-              time,
-              placement: previous?.placement ?? current.placement,
-              split: previous ? (previous.split ?? null) : (current.split ?? null),
-              ...(behavior ? { screenBehavior: behavior } : {}),
-              crop: quickEditWebcamCropAt(current, time),
-              transition: { type: 'ease-in-out' as const, duration: 0.5 },
-            },
-          ].sort((a, b) => a.time - b.time),
-        };
+      if (!latest.current.allowed()) return;
+      const context = args.commands.capture();
+      if (!context) return;
+      args.commands.admit(context, (accepted) => {
+        if (!compatible(accepted)) return;
+        const current = insertion(accepted);
+        if (!current) return;
+        const camera = current.camera;
+        const time =
+          Math.round(
+            (reviewInsertionTarget(current.placement.time, current.placement.range)?.start ??
+              current.placement.time) * 1000
+          ) / 1000;
+        if (time < 0.001 || time >= current.placement.duration) return;
+        const existing = camera.positions.find((item) => item.time === time);
+        if (existing) {
+          choose({ kind: 'webcam-position', id: existing.id }, accepted);
+          return;
+        }
+        const id = crypto.randomUUID();
+        mutate((current) => {
+          const previous = current.positions.findLast((item) => item.time <= time);
+          const behavior = previous ? previous.screenBehavior : current.screenBehavior;
+          return {
+            ...current,
+            positions: [
+              ...current.positions,
+              {
+                id,
+                time,
+                placement: previous?.placement ?? current.placement,
+                split: previous ? (previous.split ?? null) : (current.split ?? null),
+                ...(behavior ? { screenBehavior: behavior } : {}),
+                crop: quickEditWebcamCropAt(current, time),
+                transition: { type: 'ease-in-out' as const, duration: 0.5 },
+              },
+            ].sort((a, b) => a.time - b.time),
+          };
+        }, accepted);
+        choose({ kind: 'webcam-position', id }, accepted);
+        seekInsertion(camera, time);
       });
-      choose({ kind: 'webcam-position', id });
     },
     navigate: (id: string | null) => {
       const target = camera?.positions.find((item) => item.id === id);

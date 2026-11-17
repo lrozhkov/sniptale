@@ -12,7 +12,10 @@ import {
 
 /** Manual source gain is independent from the speed edit's linked mute. */
 export function ReviewOriginalAudioInspector(props: {
-  audio: ReturnType<typeof useReviewAudio>;
+  audio: Pick<
+    ReturnType<typeof useReviewAudio>,
+    'selectedOriginal' | 'patchOriginal' | 'removeOriginal'
+  >;
   duration: number;
   speedMuted: boolean;
   originalMuted?: boolean;

@@ -9,7 +9,14 @@ import {
   effectControlIcons,
   effectControlRootIcon,
 } from '../../ui/effect-control-presentation/icons';
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type KeyboardEvent,
+} from 'react';
 import { Copy, Move, Trash2 } from 'lucide-react';
 import { type AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
 import {
@@ -69,6 +76,10 @@ type Props = {
 /** SDK parameters and object commands share the existing admitted annotation transaction. */
 export function ReviewAnnotationInspector(props: Props) {
   const locale = useAppLocale();
+  const geometry = useSyncExternalStore(
+    props.editor.geometry.subscribe,
+    props.editor.geometry.read
+  );
   const document = useMemo(
     () =>
       props.source ? readReviewAnnotationEffectDocument(props.source, props.sourceDigest) : null,
@@ -87,16 +98,27 @@ export function ReviewAnnotationInspector(props: Props) {
   if (!document)
     return <div role="alert">{translate('gallery.videoReview.annotationSourceMissing')}</div>;
   return (
-    <AnnotationParameters {...props} document={document} instance={instance} locale={locale} />
+    <AnnotationParameters
+      {...props}
+      geometry={geometry}
+      document={document}
+      instance={instance}
+      locale={locale}
+    />
   );
 }
 
 function AnnotationParameters(
-  props: Props & { document: AnimationTemplate; instance: ReviewAnnotationEffect; locale: string }
+  props: Props & {
+    geometry: ReturnType<Editor['geometry']['read']>;
+    document: AnimationTemplate;
+    instance: ReviewAnnotationEffect;
+    locale: string;
+  }
 ) {
   const { editor, document, instance, locale } = props;
   const disabled = props.busy || editor.pending;
-  const geometry = editor.geometry;
+  const geometry = props.geometry;
   const values = geometry
     ? resolveReviewAnnotationEffectControls(document, instance, geometry[instance.attachment])
     : {
@@ -171,6 +193,7 @@ function AnnotationParameters(
     values,
     locale,
     editor,
+    geometry,
     disabled,
     preview,
     commit,
@@ -375,6 +398,7 @@ function annotationSdkSections(props: {
   values: Record<string, string | number>;
   locale: string;
   editor: Editor;
+  geometry: ReturnType<Editor['geometry']['read']>;
   disabled: boolean;
   preview(patch: Patch): void;
   commit(): void;
@@ -438,6 +462,7 @@ function annotationSdkSections(props: {
                 value={values[control.id] ?? resolveEffectControlDefault(control, locale)}
                 locale={locale}
                 editor={editor}
+                geometry={props.geometry}
                 disabled={disabled}
                 preview={preview}
                 commit={commit}
@@ -496,6 +521,7 @@ type AnnotationControlProps = {
   value: string | number;
   locale: string;
   editor: Editor;
+  geometry: ReturnType<Editor['geometry']['read']>;
   disabled: boolean;
   preview(patch: Patch): void;
   commit(): void;
@@ -507,15 +533,15 @@ function AnnotationControl(props: AnnotationControlProps) {
   const bound = props.document.objectLayout?.handles?.some(
     (handle) => handle.xControl === control.id || handle.yControl === control.id
   );
-  const disabled = props.disabled || (!!bound && !editor.geometry);
+  const disabled = props.disabled || (!!bound && !props.geometry);
   const patch = (value: string | number): Patch | null => {
     if (bound) {
       const anchors =
-        typeof value === 'number' && editor.geometry
+        typeof value === 'number' && props.geometry
           ? changeReviewAnnotationBoundControl(
               instance,
               props.document,
-              editor.geometry,
+              props.geometry,
               control.id,
               value
             )

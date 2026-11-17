@@ -1,6 +1,6 @@
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { transformReviewAnnotationAnchors } from '../../features/video/review/annotation-effects/layout';
-import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EffectBundleCatalogEntry } from '../../features/video/project/effect-bundle/catalog';
 import type {
   ReviewAnnotationEffect,
@@ -20,10 +20,17 @@ import {
 import type { createVideoReviewSession } from '../../workflows/video-review/session';
 import type { ReviewBeforeAction } from './note-transitions';
 import type { ReviewAnnotationGeometry } from './annotation-effects-geometry';
+import type { ReviewCommandContext, ReviewCommandPort } from './command-context';
 
 /** A transient move updates only stage consumers; the session still owns commit and Undo. */
 export interface ReviewAnnotationMovement {
   subscribe(listener: (instance: ReviewAnnotationEffect | null) => boolean | void): () => void;
+}
+
+/** Accepted stage geometry notifies its local inspector without updating the editor root. */
+interface ReviewAnnotationGeometrySource {
+  read(): ReviewAnnotationGeometry | null;
+  subscribe(listener: () => void): () => void;
 }
 
 type Session = ReturnType<typeof createVideoReviewSession>;
@@ -79,7 +86,8 @@ export function useReviewAnnotationEffects(
     beforeAction?: ReviewBeforeAction | undefined;
     performAction?(action: () => Promise<boolean>): Promise<boolean | undefined>;
     pause(): void;
-    select(selection: ReviewSelection): void;
+    commands?: ReviewCommandPort;
+    select(selection: ReviewSelection, context?: ReviewCommandContext): void;
   },
   acquire = applyReviewAnnotationCatalogDocument
 ) {
@@ -111,16 +119,31 @@ export function useReviewAnnotationEffects(
   }, []);
   const completion = useRef<Promise<boolean> | null>(null);
   const failedChoice = useRef<Choice | null>(null);
-  const [geometry, updateGeometry] = useState<ReviewAnnotationGeometry | null>(null);
-  const reportedGeometry = useRef<ReviewAnnotationGeometry | null>(null);
-  const setGeometry = useCallback((next: ReviewAnnotationGeometry | null) => {
-    // The stage reports after render: reject equal reports before scheduling another root update.
-    if (JSON.stringify(reportedGeometry.current) === JSON.stringify(next)) return;
-    reportedGeometry.current = next;
-    // Derived inspector geometry must not compete with continuous pointer updates.
-    if (next) startTransition(() => updateGeometry(next));
-    else updateGeometry(null);
-  }, []);
+  const failedContext = useRef<ReviewCommandContext | undefined>(undefined);
+  const geometryOwner = useMemo(() => {
+    // Session-local accepted snapshots cannot leak into a replacement source's inspector.
+    let current: ReviewAnnotationGeometry | null = null;
+    const listeners = new Set<() => void>();
+    const geometry: ReviewAnnotationGeometrySource = {
+      read: () => current,
+      subscribe(listener) {
+        listeners.add(listener);
+        return () => {
+          listeners.delete(listener);
+        };
+      },
+    };
+    return {
+      session: args.session,
+      geometry,
+      setGeometry(next: ReviewAnnotationGeometry | null) {
+        if (JSON.stringify(current) === JSON.stringify(next)) return;
+        current = next;
+        for (const listener of listeners) listener();
+      },
+    };
+  }, [args.session]);
+  const { geometry, setGeometry } = geometryOwner;
   const [gesture, setGesture] = useState<Gesture | null>(null);
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
@@ -129,6 +152,7 @@ export function useReviewAnnotationEffects(
     notifyMovement(null);
     draft.current = null;
     failedChoice.current = null;
+    failedContext.current = undefined;
     setGesture(null);
     setGeometry(null);
     bodyMeasurements.clear();
@@ -136,7 +160,11 @@ export function useReviewAnnotationEffects(
     setFailure(null);
     const protect = (event: BeforeUnloadEvent) => {
       const value = draft.current;
-      if (!value || value.session !== args.session || sameInstance(value.before, value.after))
+      if (
+        !value ||
+        value.session !== geometryOwner.session ||
+        sameInstance(value.before, value.after)
+      )
         return;
       event.preventDefault();
       event.returnValue = '';
@@ -150,7 +178,7 @@ export function useReviewAnnotationEffects(
       draft.current = null;
       completion.current = null;
     };
-  }, [args.session, setGeometry, notifyMovement, bodyMeasurements]);
+  }, [geometryOwner.session, setGeometry, notifyMovement, bodyMeasurements]);
   const active = (owner: typeof args, controller: AbortController) =>
     mounted.current && latest.current.session === owner.session && !controller.signal.aborted;
   const currentLane = () => args.session.getSnapshot().document.advancedContent.annotationEffects;
@@ -186,7 +214,8 @@ export function useReviewAnnotationEffects(
   };
   const execute = (
     action: (owner: typeof args, controller: AbortController) => Promise<void | boolean>,
-    fallback: 'edit' | 'save' = 'edit'
+    fallback: 'edit' | 'save' = 'edit',
+    context?: ReviewCommandContext
   ): Promise<boolean> => {
     if (completion.current) return Promise.resolve(false);
     const owner = args;
@@ -202,10 +231,14 @@ export function useReviewAnnotationEffects(
       operation.current = controller;
       setPending(true);
       setFailure(null);
-      owner.pause();
+      if (!context) owner.pause();
       try {
         await owner.flush();
         if (!active(owner, controller)) return false;
+        if (context && !owner.commands?.isCurrent(context, 'temporal')) {
+          setFailure('stale');
+          return false;
+        }
         const result = await action(owner, controller);
         return active(owner, controller) && result !== false;
       } catch {
@@ -216,13 +249,15 @@ export function useReviewAnnotationEffects(
         if (active(owner, controller)) setPending(false);
       }
     };
-    const result = owner.performAction
-      ? Promise.resolve(owner.performAction(admitted)).then((value) => value === true)
-      : new Promise<boolean>((resolve) => {
-          (owner.beforeAction ?? ((continueAction) => continueAction()))(() => {
-            void admitted().then(resolve);
+    const result = context
+      ? Promise.resolve(admitted())
+      : owner.performAction
+        ? Promise.resolve(owner.performAction(admitted)).then((value) => value === true)
+        : new Promise<boolean>((resolve) => {
+            (owner.beforeAction ?? ((continueAction) => continueAction()))(() => {
+              void admitted().then(resolve);
+            });
           });
-        });
     const settled = result.catch(() => {
       if (mounted.current && latest.current.session === owner.session) setFailure(fallback);
       return false;
@@ -251,45 +286,60 @@ export function useReviewAnnotationEffects(
     draft.current = null;
     setGesture(null);
   };
-  const add = (choice: Choice): Promise<string | null> => {
+  const add = (choice: Choice, context?: ReviewCommandContext): Promise<string | null> => {
     if (draft.current) return Promise.resolve(null);
     let createdId: string | null = null;
     const instanceId = crypto.randomUUID();
-    return execute(async (owner, controller) => {
-      failedChoice.current = choice;
-      try {
-        const id = await acquire({
-          ...choice,
-          instanceId,
-          session: owner.session,
-          signal: controller.signal,
-        });
-        if (active(owner, controller)) {
-          failedChoice.current = null;
-          createdId = id;
-          owner.select({ kind: 'annotation-effect', id });
+    return execute(
+      async (owner, controller) => {
+        failedChoice.current = choice;
+        failedContext.current = context;
+        try {
+          const id = await acquire({
+            ...choice,
+            instanceId,
+            session: owner.session,
+            signal: controller.signal,
+            ...(context
+              ? {
+                  assertCurrentTarget: () => {
+                    if (!owner.commands?.isCurrent(context, 'temporal'))
+                      throw new ReviewAnnotationAcquisitionError('changed-source');
+                  },
+                }
+              : {}),
+          });
+          if (active(owner, controller)) {
+            failedChoice.current = null;
+            createdId = id;
+            if (context) owner.select({ kind: 'annotation-effect', id }, context);
+            else owner.select({ kind: 'annotation-effect', id });
+          }
+        } catch (error) {
+          if (!active(owner, controller)) return;
+          const admitted = currentLane()?.instances.find(({ id }) => id === instanceId);
+          if (admitted) {
+            failedChoice.current = null;
+            createdId = admitted.id;
+            if (context) owner.select({ kind: 'annotation-effect', id: admitted.id }, context);
+            else owner.select({ kind: 'annotation-effect', id: admitted.id });
+            setFailure('save');
+          } else if (
+            error instanceof ReviewAnnotationAcquisitionError &&
+            error.code === 'unsupported-kind'
+          ) {
+            failedChoice.current = null;
+            setFailure('unsupported');
+          } else setFailure('acquisition');
+          throw error;
         }
-      } catch (error) {
-        if (!active(owner, controller)) return;
-        const admitted = currentLane()?.instances.find(({ id }) => id === instanceId);
-        if (admitted) {
-          failedChoice.current = null;
-          createdId = admitted.id;
-          owner.select({ kind: 'annotation-effect', id: admitted.id });
-          setFailure('save');
-        } else if (
-          error instanceof ReviewAnnotationAcquisitionError &&
-          error.code === 'unsupported-kind'
-        ) {
-          failedChoice.current = null;
-          setFailure('unsupported');
-        } else setFailure('acquisition');
-        throw error;
-      }
-    }).then(() => createdId);
+      },
+      'edit',
+      context
+    ).then(() => createdId);
   };
   const applyPatch = (item: ReviewAnnotationEffect, patch: Patch): ReviewAnnotationEffect => {
-    const plane = reportedGeometry.current?.[item.attachment];
+    const plane = geometry.read()?.[item.attachment];
     return {
       ...item,
       ...structuredClone(patch),
@@ -459,7 +509,8 @@ export function useReviewAnnotationEffects(
     },
     retry: () => {
       if (draft.current) void commitGesture();
-      else if (failure === 'acquisition' && failedChoice.current) return add(failedChoice.current);
+      else if (failure === 'acquisition' && failedChoice.current)
+        return add(failedChoice.current, failedContext.current);
       else if (failure === 'save')
         void execute(async (owner) => {
           await owner.session.saveBuffered();

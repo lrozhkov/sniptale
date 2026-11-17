@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, useState } from 'react';
+import { act, Profiler, useLayoutEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import {
@@ -193,6 +193,18 @@ it('anchors every supported selection identity and preserves ordered Ctrl and Sh
     expect(actions.multiSelection.keys).toContain('focus:zoom');
     pointer(1, { metaKey: true });
     expect(actions.multiSelection.keys).not.toContain('edit:b');
+    pointer(0, { ctrlKey: true });
+    expect(actions.multiSelection.keys.length).toBeGreaterThan(1);
+    const groupAnchor = actions.target?.key;
+    expect(groupAnchor).toBeTruthy();
+    selected = choices.find((choice) => choice.key === groupAnchor)!.selection;
+    render();
+    expect(actions.target?.key).toBe(groupAnchor);
+    selected = { kind: 'none' };
+    render();
+    expect(actions.target?.key).toBe(groupAnchor);
+    selected = choices[0]!.selection;
+    render();
     disabled = true;
     render();
     const before = actions.multiSelection.keys;
@@ -200,7 +212,10 @@ it('anchors every supported selection identity and preserves ordered Ctrl and Sh
     expect(actions.multiSelection.keys).toEqual(before);
     act(() => actions.multiSelection.clear());
     expect(actions.multiSelection.keys).toEqual([]);
-    act(() => actions.capture({ target: host }));
+    expect(actions.target?.key).toBe('edit:a');
+    act(() =>
+      actions.capture({ target: host.querySelector('[data-ui="gallery.videoReview.timeline"]')! })
+    );
     expect(actions.target).toBeNull();
     expect(command).toHaveBeenCalled();
   } finally {
@@ -250,6 +265,145 @@ it('keeps fragment active for an interval without a selected object, including o
     expect(download).toHaveBeenCalledOnce();
   } finally {
     await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('publishes the canonical selected key in its first and only selection commit', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  let selected = 'first';
+  let actions!: ReturnType<typeof useReviewSelectionActions>;
+  const commits = vi.fn();
+  const renders = vi.fn();
+  const targets: (string | null)[] = [];
+  function Fixture() {
+    renders();
+    actions = useReviewSelectionActions({ kind: 'zoom', id: selected }, true, false);
+    const key = actions.target?.key ?? null;
+    useLayoutEffect(() => {
+      targets.push(key);
+    });
+    return (
+      <div data-ui="gallery.videoReview.timeline">
+        <button data-review-action-key={`focus:${selected}`} />
+      </div>
+    );
+  }
+  const render = () =>
+    act(() =>
+      root.render(
+        <Profiler id="selection-actions" onRender={commits}>
+          <Fixture />
+        </Profiler>
+      )
+    );
+  try {
+    render();
+    commits.mockClear();
+    targets.length = 0;
+    renders.mockClear();
+    selected = 'second';
+    render();
+    expect.soft(renders).toHaveBeenCalledTimes(1);
+    expect.soft(targets[0]).toBe('focus:second');
+    expect.soft(commits).toHaveBeenCalledTimes(1);
+    const target = actions.target;
+    commits.mockClear();
+    targets.length = 0;
+    const item = host.querySelector('button')!;
+    act(() => actions.capture({ target: item }));
+    act(() => actions.capture({ target: item }));
+    act(() => actions.multiSelection.clear());
+    expect.soft(actions.target).toBe(target);
+    expect(commits).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('scopes dismissal to its selection and restores commands through reselect and visibility changes', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  let selection: import('../../features/video/review/types').ReviewSelection = {
+    kind: 'zoom',
+    id: 'first',
+  };
+  let visible = true;
+  let disabled = false;
+  let actions!: ReturnType<typeof useReviewSelectionActions>;
+  function Fixture() {
+    actions = useReviewSelectionActions(selection, visible, disabled);
+    return (
+      <div data-ui="gallery.videoReview.timeline">
+        <button data-review-action-key="focus:first" />
+        <button data-review-action-key="focus:second" />
+        <div data-playback-range-edge="start" />
+        <div data-ui="gallery.videoReview.toolbar">
+          <button data-review-action-key="toolbar" />
+        </div>
+      </div>
+    );
+  }
+  const render = () => act(() => root.render(<Fixture />));
+  try {
+    render();
+    expect(actions.target?.key).toBe('focus:first');
+    act(() => actions.target?.dismiss());
+    expect(actions.target).toBeNull();
+    render();
+    expect(actions.target).toBeNull();
+    act(() =>
+      actions.capture({ target: host.querySelector('[data-review-action-key="focus:first"]')! })
+    );
+    expect(actions.target?.key).toBe('focus:first');
+    act(() => actions.target?.dismiss());
+    selection = { kind: 'zoom', id: 'second' };
+    render();
+    expect(actions.target?.key).toBe('focus:second');
+    selection = { kind: 'zoom', id: 'first' };
+    render();
+    expect(actions.target?.key).toBe('focus:first');
+    act(() => actions.target?.dismiss());
+    visible = false;
+    render();
+    expect(actions.target).toBeNull();
+    visible = true;
+    disabled = true;
+    render();
+    expect(actions.target?.key).toBe('focus:first');
+    expect(actions.target?.disabled).toBe(true);
+    const target = actions.target;
+    act(() => actions.capture({ target: host.querySelector('[data-playback-range-edge]')! }));
+    act(() =>
+      actions.capture({ target: host.querySelector('[data-review-action-key="toolbar"]')! })
+    );
+    act(() =>
+      actions.capture({
+        target: host.querySelector('[data-review-action-key="focus:second"]')!,
+        button: 2,
+      })
+    );
+    expect(actions.target).toBe(target);
+    selection = { kind: 'none' };
+    render();
+    expect(actions.target).toBeNull();
+    visible = false;
+    selection = { kind: 'zoom', id: 'second' };
+    render();
+    expect(actions.target).toBeNull();
+    visible = true;
+    render();
+    expect(actions.target?.key).toBe('focus:second');
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
     vi.unstubAllGlobals();
   }
 });

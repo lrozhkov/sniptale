@@ -202,7 +202,7 @@ it('waits for a mapped result clock and reports completed playing cadence', asyn
   await step(100);
   await step(1200);
   expect(result.status.phase).toBe('ready');
-  expect(result.status.presentedFPS).toBeGreaterThan(0);
+  expect(result.frameStatistics.read().presentedFPS).toBeGreaterThan(0);
   expect(io.render.mock.lastCall![1].resultTime).toBeCloseTo(0.984567, 6);
 });
 
@@ -300,7 +300,7 @@ it('publishes frames without rerendering unchanged controls when FPS is not requ
   await render();
   await step(850);
   await step(1000);
-  expect(result.status.presentedFPS).toBeGreaterThan(0);
+  expect(result.frameStatistics.read().presentedFPS).toBeGreaterThan(0);
 });
 
 it('keeps manual publication cadence available to an explicit statistics consumer', async () => {
@@ -323,13 +323,13 @@ it('paints manual FPS at native readout cadence while reporting frames and failu
   await step(200);
   await step(250);
   const renders = io.hookRender.mock.calls.length;
-  expect(result.status.presentedFPS).toBe(10);
+  expect(result.frameStatistics.read().presentedFPS).toBe(10);
   for (const now of [300, 400, 500, 600]) await step(now);
   expect(io.render).toHaveBeenCalledTimes(7);
   expect(io.hookRender).toHaveBeenCalledTimes(renders);
   expect(statistics.mock.calls.at(-1)![0].presentedFPS).not.toBe(10);
   await step(750);
-  expect(result.status.presentedFPS).not.toBe(10);
+  expect(result.frameStatistics.read().presentedFPS).not.toBe(10);
   io.render.mockRejectedValueOnce(new Error('Frame refused'));
   await step(800);
   expect(result.status.phase).toBe('failed');

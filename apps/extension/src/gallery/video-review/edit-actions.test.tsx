@@ -21,6 +21,7 @@ import {
   ReviewFragmentAction,
   ReviewSpeedOptions,
   ReviewRenderOptions,
+  ReviewInspectorActions,
 } from './edit-actions';
 import { translate } from '../../platform/i18n';
 
@@ -494,6 +495,76 @@ it('applies export frame rate and quality options without adding section divider
     await act(async () => root.render(<ReviewRenderOptions exporter={exporter} busy />));
     expect(rate!.disabled).toBe(true);
     expect(enhancement.disabled).toBe(true);
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('plans and downloads the retained fragment inside the mounted export controls', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const selection = { kind: 'range' as const, start: 2, end: 4 };
+  const plan = vi.fn(() => ({
+    kind: 'ready' as const,
+    video: 'copy' as const,
+    audio: 'copy' as const,
+    reasons: [],
+  }));
+  const downloadSelection = vi.fn();
+  const exporter = {
+    index: {
+      duration: 6,
+      boundaries: [0, 2, 4, 6],
+      videoCodec: 'vp8',
+      audioCodec: null,
+      container: 'webm',
+      rotation: 0,
+    },
+    phase: 'idle',
+    progress: 0,
+    timeEstimate: null,
+    failed: false,
+    failureDetail: null,
+    blocked: null,
+    cameraConflicts: [],
+    result: null,
+    completion: null,
+    checkingCodecs: false,
+    plan,
+    dismissCompletion: vi.fn(),
+    downloadSelection,
+    cancel: vi.fn(),
+    download: vi.fn(),
+  } as unknown as Parameters<typeof ReviewInspectorActions>[0]['exporter'];
+  const render = () =>
+    root.render(
+      <ReviewInspectorActions
+        exporter={exporter}
+        advanced={false}
+        hasEdits
+        busy={false}
+        composerBusy={false}
+        toolKey="retained-range"
+        fragment={{ selection, edits: [] }}
+        onExport={vi.fn()}
+        onOpenResult={vi.fn()}
+      />
+    );
+  try {
+    await act(async () => render());
+    expect(plan).toHaveBeenCalledWith(selection);
+    const fragment = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) =>
+        button.getAttribute('aria-label') === translate('gallery.videoReview.exportSelection')
+    )!;
+    expect(fragment.disabled).toBe(false);
+    await act(async () => fragment.click());
+    expect(downloadSelection).toHaveBeenCalledWith(selection);
+    exporter.phase = 'exporting';
+    await act(async () => render());
+    expect(fragment.disabled).toBe(true);
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();

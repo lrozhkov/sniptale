@@ -22,7 +22,10 @@ import {
 } from './stage-presentation';
 import type { QuickPreviewPreferences } from '../../features/video/preview/quick-preferences';
 import {
-  useReviewStageGeometry,
+  type useReviewStageGeometry,
+  reviewStageCommentGeometry,
+  useReviewStageViewport,
+  resolveReviewStageGeometry,
   resolveReviewClickRaster,
   type ReviewStageScene,
   type ReviewStageCommentGeometry,
@@ -54,9 +57,11 @@ import {
 } from './stage-focus';
 import { ReviewSpotlightOverlay } from './spotlight-overlay';
 import {
-  startTransition,
   useCallback,
   useEffect,
+  useLayoutEffect,
+  useMemo,
+  useSyncExternalStore,
   useRef,
   useState,
   type RefObject,
@@ -112,9 +117,13 @@ type ReviewStageProps = {
         preferences: QuickPreviewPreferences;
         playing: boolean;
         onPresentationActive?: (sourceIdentity: string, active: boolean) => void;
-        onPresentedTime?: (sourceIdentity: string, sourceTime: number) => void;
+        onPresentedTime?: ((sourceIdentity: string, resultTime: number) => void) | undefined;
         interacting?: boolean;
         sourceToResult(time: number): number | null;
+        readPosition?: NonNullable<
+          Parameters<typeof useStagePresentation>[0]['preview']
+        >['readPosition'];
+        seekRevision?: number | undefined;
         onRendererStatus?: ((status: PreviewRendererStatus | null) => void) | undefined;
         onRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
         sourceFrameRate?: number | undefined;
@@ -143,20 +152,18 @@ type ReviewStageProps = {
   comments?: ReviewStageCommentBinding;
   onRegion(value: ReviewRegion): void;
   onReady(): void;
+  onMediaReady?: Parameters<typeof ReviewSceneVideo>[0]['onMediaReady'];
   onTime(time: number): void;
   onPlaying(value: boolean): void;
   onEnded?: (() => void) | undefined;
   onError(): void;
 };
 
-/** Keep native header geometry and pointer inversion aligned with the authored scene. */
-function useStageInteractionGeometry(
-  props: Pick<ReviewStageProps, 'source' | 'scene' | 'drawing' | 'region' | 'onRegion' | 'video'>,
-  geometry: Pick<ReturnType<typeof useReviewStageGeometry>, 'sceneLayout' | 'content'>,
-  presented?: ReviewPresentedGeometry | null,
-  output?: { width: number; height: number }
+/** Native artwork resources change with authored header geometry, not camera receipts. */
+function useStageHeader(
+  props: Pick<ReviewStageProps, 'source' | 'scene'>,
+  sceneLayout: ReturnType<typeof useReviewStageGeometry>['sceneLayout']
 ) {
-  const { sceneLayout, content } = geometry;
   // Match the SVG viewport to the fitted header allocation, including its rounded toolbar rows.
   // A source-rounded SVG in a differently shaped img box otherwise gains internal letterboxing.
   const headerDisplayHeight = sceneLayout
@@ -167,12 +174,20 @@ function useStageInteractionGeometry(
           1e6
       ) / 1e6
     : undefined;
-  const header = useReviewWindowHeader(
+  return useReviewWindowHeader(
     props.scene?.windowHeader,
     props.source.width,
     props.source.height,
     headerDisplayHeight
   );
+}
+
+function reviewStageProjections(
+  props: Pick<ReviewStageProps, 'scene'>,
+  sceneLayout: ReturnType<typeof useReviewStageGeometry>['sceneLayout'],
+  presented: ReviewPresentedGeometry | null | undefined,
+  output: { width: number; height: number }
+) {
   const motion =
     sceneLayout && props.scene
       ? computeQuickEditSceneCamera(sceneLayout, props.scene.background)
@@ -190,6 +205,23 @@ function useStageInteractionGeometry(
     sceneLayout?.spatial && presented && output
       ? reviewPresentedStageProjection(presented, output, 'window')
       : projection;
+  return { motion, projection, windowProjection };
+}
+
+/** Pointer inversion and local drafts follow only the accepted overlay geometry. */
+function useStageInteractionGeometry(
+  props: Pick<ReviewStageProps, 'source' | 'scene' | 'drawing' | 'region' | 'onRegion' | 'video'>,
+  geometry: Pick<ReturnType<typeof useReviewStageGeometry>, 'sceneLayout' | 'content'>,
+  presented: ReviewPresentedGeometry | null | undefined,
+  output: { width: number; height: number }
+) {
+  const { sceneLayout, content } = geometry;
+  const { motion, projection, windowProjection } = reviewStageProjections(
+    props,
+    sceneLayout,
+    presented,
+    output
+  );
   const plane = useReviewDrawingPlane({
     crop: sceneLayout?.sourceCrop,
     inverseProjection: projection
@@ -206,132 +238,295 @@ function useStageInteractionGeometry(
     : props.region
       ? projectVideoRegion(props.region, content)
       : null;
-  return { header, motion, projection, windowProjection, plane, projected };
+  return { motion, projection, windowProjection, plane, projected };
+}
+
+type StageGeometrySource = ReturnType<typeof createStageGeometrySource>;
+type StageDrawingHandlers = ReturnType<typeof useReviewDrawingPlane>;
+
+/** The publication owner already validates frames; this mounted source routes their UI consumers. */
+function createStageGeometrySource(source: string) {
+  let active = false;
+  let current: {
+    geometry: ReviewPresentedGeometry | null;
+    sourceTime: number | undefined;
+    resultTime: number | undefined;
+  } | null = null;
+  let structure: ReviewPresentedGeometry | null = null;
+  let structureKey = '';
+  const listeners = new Set<() => void>();
+  const structuralListeners = new Set<() => void>();
+  return {
+    read: () => current,
+    readStructure: () => structure,
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    subscribeStructure(listener: () => void) {
+      structuralListeners.add(listener);
+      return () => {
+        structuralListeners.delete(listener);
+      };
+    },
+    activate() {
+      active = true;
+    },
+    dispose() {
+      active = false;
+      current = null;
+      structure = null;
+      structureKey = '';
+    },
+    publish(
+      geometry: ReviewPresentedGeometry | null,
+      identity: string | undefined,
+      sourceTime?: number,
+      resultTime = geometry?.resultTime
+    ) {
+      if (!active || (identity !== undefined && identity !== source)) return false;
+      if (
+        current?.geometry === geometry &&
+        current.sourceTime === sourceTime &&
+        current.resultTime === resultTime
+      )
+        return true;
+      current =
+        geometry === null && sourceTime === undefined ? null : { geometry, sourceTime, resultTime };
+      // Canonical aspect and authored frame shell can change while a prior front stays visible.
+      const key = geometry
+        ? JSON.stringify([
+            geometry.logical,
+            geometry.scene.background,
+            geometry.scene.canvas,
+            geometry.scene.windowHeader,
+          ])
+        : '';
+      if (key !== structureKey) {
+        structureKey = key;
+        structure = geometry;
+        for (const listener of structuralListeners) listener();
+      }
+      for (const listener of listeners) listener();
+      return true;
+    },
+  };
+}
+
+function representedStageProps(props: ReviewStageProps, presented: ReviewPresentedGeometry | null) {
+  return presented && props.scene
+    ? {
+        ...props,
+        scene: {
+          ...props.scene,
+          ...presented.scene,
+          canvas: presented.scene.canvas,
+          windowHeader: presented.scene.windowHeader,
+          camera: presented.camera,
+          ...(props.scene.focus
+            ? {
+                focus: {
+                  ...props.scene.focus,
+                  regions: presented.scene.zoomRegions,
+                  time: presented.resultTime,
+                },
+              }
+            : {}),
+        },
+      }
+    : props;
 }
 
 /** One stage binding: the applied scene, drawing plane, and overlay comment stack. */
 export function ReviewStage(props: ReviewStageProps) {
   const host = useRef<HTMLDivElement>(null);
   const publication = useRef<HTMLDivElement>(null);
-  const [receipt, setReceipt] = useState<{
-    source: string;
-    geometry: ReviewPresentedGeometry | null;
-  } | null>(null);
+  const geometrySource = useMemo(() => createStageGeometrySource(props.url), [props.url]);
+  useLayoutEffect(() => {
+    geometrySource.activate();
+    return () => geometrySource.dispose();
+  }, [geometrySource]);
+  const presented = useSyncExternalStore(
+    geometrySource.subscribeStructure,
+    geometrySource.readStructure
+  );
+  const representedProps = representedStageProps(props, presented);
   const onPresentedTime = props.preview?.onPresentedTime;
   const receiveGeometry = useCallback(
     (geometry: ReviewPresentedGeometry | null, sourceTime?: number, sourceIdentity?: string) => {
-      if (sourceIdentity !== undefined && sourceIdentity !== props.url) return;
-      const publish = () => {
-        setReceipt((previous) =>
-          previous?.source === props.url && previous.geometry === geometry
-            ? previous
-            : { source: props.url, geometry }
-        );
-        if (sourceTime !== undefined) onPresentedTime?.(props.url, sourceTime);
-      };
-      // One displayed frame must not cause separate urgent geometry and deferred clock commits.
-      if (props.preview?.playing) startTransition(publish);
-      else publish();
+      if (geometrySource.publish(geometry, sourceIdentity, sourceTime) && geometry)
+        onPresentedTime?.(props.url, geometry.resultTime);
     },
-    [props.url, props.preview?.playing, onPresentedTime]
+    [geometrySource, props.url, onPresentedTime]
   );
-  const presented = receipt?.source === props.url ? receipt.geometry : null;
-  const representedProps =
-    presented && props.scene
-      ? {
-          ...props,
-          scene: {
-            ...props.scene,
-            ...presented.scene,
-            camera: presented.camera,
-            ...(props.scene.focus
-              ? {
-                  focus: {
-                    ...props.scene.focus,
-                    regions: presented.scene.zoomRegions,
-                    time: presented.resultTime,
-                  },
-                }
-              : {}),
-          },
-        }
-      : props;
+  const viewport = useReviewStageViewport(host);
+  const drawingHandlers = useRef<StageDrawingHandlers | null>(null);
+  const reportInputs = useRef({ props, viewport });
+  const reportGeometry = useCallback(() => {
+    const current = reportInputs.current;
+    const accepted = geometrySource.read()?.geometry ?? null;
+    const represented = representedStageProps(current.props, accepted);
+    const geometry = resolveReviewStageGeometry(represented, current.viewport, accepted);
+    const comments = reviewStageCommentGeometry(represented, geometry, accepted);
+    if (comments) current.props.comments?.onGeometry?.(comments);
+    (current.props.onAnnotationGeometry ?? current.props.annotationEditing?.editor.setGeometry)?.(
+      geometry.annotationGeometry
+    );
+  }, [geometrySource]);
+  useLayoutEffect(() => {
+    reportInputs.current = { props, viewport };
+    reportGeometry();
+  });
+  useLayoutEffect(() => geometrySource.subscribe(reportGeometry), [geometrySource, reportGeometry]);
+
   const [cutRaster, setCutRaster] = useState<ReviewCutPreviewRaster>({
     active: false,
     frame: null,
   });
-  const {
-    size,
-    watermarkOutput,
-    annotationGeometry,
-    sceneLayout,
-    zoomLayout,
-    backgroundPaint,
-    content,
-    spotlight,
-    borders,
-    overlayClip,
-  } = useReviewStageGeometry(representedProps, host, presented);
-  useAnnotationGeometryReport(props, annotationGeometry);
+  const displayedGeometry = resolveReviewStageGeometry(representedProps, viewport, presented);
+  const { size, watermarkOutput, sceneLayout, backgroundPaint, spotlight, overlayClip } =
+    displayedGeometry;
+  const requestedGeometry = presented
+    ? resolveReviewStageGeometry(props, viewport)
+    : displayedGeometry;
   const { presentation, beginInteraction } = useStagePresentation(
     props,
     publication,
-    watermarkOutput,
-    size,
+    requestedGeometry.watermarkOutput,
+    requestedGeometry.size,
     receiveGeometry
   );
+  const sourceToResult = props.preview?.sourceToResult;
+  const readPosition = props.preview?.readPosition;
+  const nativeComments = !presentation.active && (props.comments?.items.length ?? 0) > 0;
   useEffect(() => {
     const video = props.video.current;
-    if (presentation.active || !video || !onPresentedTime) return;
+    if (presentation.active || !video || (!onPresentedTime && !nativeComments)) return;
+    let disposed = false;
     let frame: number | null = null;
     let paint: number | null = null;
+    let epoch = 0;
+    let seekTarget: number | null = null;
+    const publishNative = (sourceTime: number) => {
+      if (readPosition?.().source?.kind === 'freeze') return;
+      if (nativeComments)
+        geometrySource.publish(
+          null,
+          props.url,
+          sourceTime,
+          sourceToResult?.(sourceTime) ?? undefined
+        );
+    };
+    const confirmNative = (sourceTime: number) => {
+      if (readPosition?.().source?.kind === 'freeze') return;
+      const resultTime = sourceToResult?.(sourceTime);
+      if (resultTime !== null && resultTime !== undefined) onPresentedTime?.(props.url, resultTime);
+    };
     const cancel = () => {
+      epoch++;
       if (frame !== null) video.cancelVideoFrameCallback(frame);
       if (paint !== null) cancelAnimationFrame(paint);
       frame = null;
       paint = null;
     };
+    const observe = () => {
+      if (frame !== null || typeof video.requestVideoFrameCallback !== 'function') return;
+      const revision = epoch;
+      frame = video.requestVideoFrameCallback((_now, metadata) => {
+        if (disposed || revision !== epoch) return;
+        frame = null;
+        if (!video.seeking) {
+          publishNative(
+            Number.isFinite(metadata?.mediaTime) ? metadata.mediaTime : video.currentTime
+          );
+          if (seekTarget !== null && video.currentTime === seekTarget) {
+            confirmNative(seekTarget);
+            seekTarget = null;
+          }
+        }
+        if (video.seeking || (nativeComments && props.preview?.playing)) observe();
+      });
+    };
     const seeking = () => {
       cancel();
-      const target = video.currentTime;
-      if (typeof video.requestVideoFrameCallback !== 'function') return;
-      const presented = () => {
-        frame = null;
-        if (video.currentTime !== target) return;
-        if (video.seeking) frame = video.requestVideoFrameCallback(presented);
-        else onPresentedTime(props.url, target);
-      };
-      frame = video.requestVideoFrameCallback(presented);
+      seekTarget = video.currentTime;
+      observe();
     };
     const seeked = () => {
-      if (typeof video.requestVideoFrameCallback === 'function') return;
+      if (typeof video.requestVideoFrameCallback === 'function') {
+        observe();
+        return;
+      }
       const target = video.currentTime;
+      const revision = epoch;
       paint = requestAnimationFrame(() => {
         paint = requestAnimationFrame(() => {
           paint = null;
-          if (!video.seeking && video.currentTime === target) onPresentedTime(props.url, target);
+          if (!disposed && revision === epoch && !video.seeking && video.currentTime === target) {
+            publishNative(target);
+            confirmNative(target);
+          }
         });
       });
     };
+    const nativeTime = () => {
+      if (typeof video.requestVideoFrameCallback !== 'function' && !video.seeking)
+        publishNative(video.currentTime);
+    };
     video.addEventListener('seeking', seeking);
     video.addEventListener('seeked', seeked);
+    video.addEventListener('loadeddata', seeked);
+    if (nativeComments) {
+      video.addEventListener('timeupdate', nativeTime);
+      if (typeof video.requestVideoFrameCallback === 'function') observe();
+      else nativeTime();
+    }
     return () => {
+      disposed = true;
       cancel();
       video.removeEventListener('seeking', seeking);
       video.removeEventListener('seeked', seeked);
+      video.removeEventListener('loadeddata', seeked);
+      video.removeEventListener('timeupdate', nativeTime);
     };
-  }, [presentation.active, props.video, props.url, onPresentedTime]);
+  }, [
+    presentation.active,
+    props.video,
+    props.url,
+    props.preview?.playing,
+    sourceToResult,
+    readPosition,
+    onPresentedTime,
+    nativeComments,
+    geometrySource,
+  ]);
   const manual = presentation.active && presentation.status.actualRaster !== null;
-  const { header, motion, projection, windowProjection, plane, projected } =
-    useStageInteractionGeometry(
-      representedProps,
-      {
-        sceneLayout,
-        content,
-      },
-      presented,
-      size
-    );
+  const header = useStageHeader(representedProps, sceneLayout);
+  const { motion, projection } = reviewStageProjections(
+    representedProps,
+    sceneLayout,
+    presented,
+    size
+  );
+  const getFrame = () => (cutRaster.active ? cutRaster.frame : props.video.current);
+  const frame = (
+    <ReviewStageFrame
+      props={representedProps}
+      geometry={{ sceneLayout, size, backgroundPaint, spotlight, overlayClip }}
+      manual={manual}
+      header={header}
+      motion={motion}
+      projection={projection}
+      projected={
+        !manual && props.region ? projectVideoRegion(props.region, displayedGeometry.content) : null
+      }
+      publication={publication}
+      onCutRaster={setCutRaster}
+      getFrame={getFrame}
+    />
+  );
   return (
     <div
       ref={host}
@@ -358,11 +553,158 @@ export function ReviewStage(props: ReviewStageProps) {
           cursor: props.drawing ? 'crosshair' : 'default',
           touchAction: props.drawing ? 'none' : 'auto',
         }}
-        onPointerDown={plane.onPointerDown}
-        onPointerMove={plane.onPointerMove}
-        onPointerUp={plane.onPointerUp}
-        onPointerCancel={plane.onPointerCancel}
+        onPointerDown={(event) => drawingHandlers.current?.onPointerDown(event)}
+        onPointerMove={(event) => drawingHandlers.current?.onPointerMove(event)}
+        onPointerUp={(event) => drawingHandlers.current?.onPointerUp(event)}
+        onPointerCancel={() => drawingHandlers.current?.onPointerCancel()}
       >
+        <ReviewStageGeometryLayers
+          props={props}
+          source={geometrySource}
+          viewport={viewport}
+          manual={manual}
+          header={header}
+          drawingHandlers={drawingHandlers}
+          frame={frame}
+          publication={publication}
+          onCutRaster={setCutRaster}
+          getFrame={getFrame}
+          onCommentPreview={presentation.onCommentPreview}
+          beforeAnnotation={
+            <>
+              {props.webcam ? (
+                <ReviewWebcamOverlay
+                  binding={props.webcam}
+                  main={props.video}
+                  output={size}
+                  manual={presentation.active ? presentation.webcamManual : undefined}
+                  onPreviewPlacement={presentation.onWebcamPreview}
+                />
+              ) : null}
+              {!manual ? (
+                <ReviewKeyOverlay
+                  cues={props.keyCues}
+                  time={props.scene?.focus?.time ?? 0}
+                  output={size}
+                />
+              ) : null}
+              {props.watermark && (
+                <ReviewWatermarkOverlay
+                  {...props.watermark}
+                  output={watermarkOutput}
+                  manual={manual ? presentation.watermarkManual : undefined}
+                />
+              )}
+              {!manual ? (
+                <>
+                  <ReviewCutBlackout binding={props.cutPreview} />
+                  <ReviewStageOuterFade
+                    plan={props.outerFadePlan}
+                    time={props.scene?.focus?.time ?? 0}
+                  />
+                </>
+              ) : null}
+            </>
+          }
+          afterAnnotation={props.previewOverlay}
+        />
+      </div>
+      <ReviewStagePresentationFeedback
+        presentation={presentation}
+        waitingReason={props.preview?.waitingReason}
+        showFrameRate={props.preview?.preferences.showFrameRate ?? false}
+        captions={props.captions}
+        onCaptionSelect={props.onCaptionSelect}
+      />
+    </div>
+  );
+}
+
+/** Only accepted geometry, hit targets and reporting subscribe at the publication cadence. */
+function ReviewStageGeometryLayers({
+  props,
+  source,
+  viewport,
+  manual,
+  header,
+  drawingHandlers,
+  frame,
+  publication,
+  onCutRaster,
+  getFrame,
+  onCommentPreview,
+  beforeAnnotation,
+  afterAnnotation,
+}: {
+  props: ReviewStageProps;
+  source: StageGeometrySource;
+  viewport: { width: number; height: number };
+  manual: boolean;
+  header: ReturnType<typeof useReviewWindowHeader>;
+  drawingHandlers: RefObject<StageDrawingHandlers | null>;
+  frame: ReactNode;
+  publication: RefObject<HTMLDivElement | null>;
+  onCutRaster(value: ReviewCutPreviewRaster): void;
+  getFrame(): CanvasImageSource | null;
+  onCommentPreview: ReturnType<typeof useStagePresentation>['presentation']['onCommentPreview'];
+  beforeAnnotation: ReactNode;
+  afterAnnotation: ReactNode;
+}) {
+  const visibleGeometry = !!(
+    props.drawing ||
+    props.region ||
+    props.zoom ||
+    props.focusPicker ||
+    props.cursorPath ||
+    props.annotationEditing ||
+    props.comments?.items.length
+  );
+  const receipt = useSyncExternalStore(
+    visibleGeometry ? source.subscribe : noStageGeometrySubscription,
+    visibleGeometry ? source.read : noStageGeometrySnapshot
+  );
+  const presented = receipt?.geometry ?? null;
+  const represented = representedStageProps(props, presented);
+  const representedProps =
+    props.comments && receipt?.sourceTime !== undefined
+      ? {
+          ...represented,
+          comments: {
+            ...props.comments,
+            time: receipt.sourceTime,
+            camera: presented?.camera ?? props.comments.camera,
+          },
+        }
+      : represented;
+  const geometry = resolveReviewStageGeometry(representedProps, viewport, presented);
+  const {
+    size,
+    sceneLayout,
+    zoomLayout,
+    backgroundPaint,
+    content,
+    spotlight,
+    borders,
+    overlayClip,
+  } = geometry;
+  const annotationGeometry = geometry.annotationGeometry;
+  const { motion, projection, windowProjection, plane, projected } = useStageInteractionGeometry(
+    representedProps,
+    { sceneLayout, content },
+    presented,
+    size
+  );
+  useLayoutEffect(() => {
+    drawingHandlers.current = plane;
+    return () => {
+      if (drawingHandlers.current === plane) drawingHandlers.current = null;
+    };
+  }, [drawingHandlers, plane]);
+  return (
+    <>
+      {manual || !props.drawing ? (
+        frame
+      ) : (
         <ReviewStageFrame
           props={representedProps}
           geometry={{ sceneLayout, size, backgroundPaint, spotlight, overlayClip }}
@@ -372,82 +714,47 @@ export function ReviewStage(props: ReviewStageProps) {
           projection={projection}
           projected={projected}
           publication={publication}
-          onCutRaster={setCutRaster}
-          getFrame={() => (cutRaster.active ? cutRaster.frame : props.video.current)}
+          onCutRaster={onCutRaster}
+          getFrame={getFrame}
         />
-        {manual && projected && !sceneLayout?.spatial ? (
-          <ReviewRegionOverlay
-            drawing={props.drawing}
-            projected={projected}
-            offset={{ x: 0, y: 0 }}
-          />
-        ) : null}
-        <ReviewStageContent
-          manual={manual}
-          headerImage={header.image}
-          onCommentPreview={presentation.onCommentPreview}
-          getFrame={() => (cutRaster.active ? cutRaster.frame : props.video.current)}
-          props={representedProps}
-          geometry={{ size, sceneLayout, zoomLayout, borders, overlayClip }}
-          projection={projection}
-          windowProjection={windowProjection}
+      )}
+      {manual && projected && !sceneLayout?.spatial ? (
+        <ReviewRegionOverlay
+          drawing={props.drawing}
           projected={projected}
+          offset={{ x: 0, y: 0 }}
         />
-        <ReviewStageComments
-          comments={props.comments}
-          attachment="viewport"
-          visualMode={manual ? 'handles' : undefined}
-          onPreviewPosition={presentation.onCommentPreview}
-          output={size}
-          source={props.source}
-          layout={sceneLayout}
+      ) : null}
+      <ReviewStageContent
+        manual={manual}
+        headerImage={header.image}
+        onCommentPreview={onCommentPreview}
+        getFrame={getFrame}
+        props={representedProps}
+        geometry={{ size, sceneLayout, zoomLayout, borders, overlayClip }}
+        projection={projection}
+        windowProjection={windowProjection}
+        projected={projected}
+      />
+      <ReviewStageComments
+        comments={representedProps.comments}
+        attachment="viewport"
+        visualMode={manual ? 'handles' : undefined}
+        onPreviewPosition={onCommentPreview}
+        output={size}
+        source={props.source}
+        layout={sceneLayout}
+      />
+      {beforeAnnotation}
+      {props.annotationEditing && annotationGeometry && (
+        <ReviewAnnotationOverlay
+          binding={props.annotationEditing}
+          geometry={annotationGeometry}
+          size={size}
         />
-        {props.webcam ? (
-          <ReviewWebcamOverlay
-            binding={props.webcam}
-            main={props.video}
-            output={size}
-            manual={presentation.active ? presentation.webcamManual : undefined}
-            onPreviewPlacement={presentation.onWebcamPreview}
-          />
-        ) : null}
-        {!manual ? (
-          <ReviewKeyOverlay
-            cues={props.keyCues}
-            time={props.scene?.focus?.time ?? 0}
-            output={size}
-          />
-        ) : null}
-        {props.watermark && (
-          <ReviewWatermarkOverlay
-            {...props.watermark}
-            output={watermarkOutput}
-            manual={manual ? presentation.watermarkManual : undefined}
-          />
-        )}
-        {!manual ? (
-          <>
-            <ReviewCutBlackout binding={props.cutPreview} />
-            <ReviewStageOuterFade plan={props.outerFadePlan} time={props.scene?.focus?.time ?? 0} />
-          </>
-        ) : null}
-        {props.annotationEditing && annotationGeometry && (
-          <ReviewAnnotationOverlay
-            binding={props.annotationEditing}
-            geometry={annotationGeometry}
-            size={size}
-          />
-        )}
-        <ReviewStagePresentationFeedback
-          presentation={presentation}
-          waitingReason={props.preview?.waitingReason}
-          showFrameRate={props.preview?.preferences.showFrameRate ?? false}
-          captions={props.captions}
-          onCaptionSelect={props.onCaptionSelect}
-        />
-        {props.previewOverlay}
-      </div>
-    </div>
+      )}
+      {afterAnnotation}
+    </>
   );
 }
 
@@ -523,6 +830,7 @@ function ReviewStageFrame({
         drawing={props.drawing}
         projected={projected}
         onReady={props.onReady}
+        onMediaReady={props.onMediaReady}
         onTime={props.onTime}
         onPlaying={props.onPlaying}
         onEnded={props.onEnded}
@@ -805,13 +1113,5 @@ function reviewBackgroundPlaneProps(props: ReviewStageProps) {
   };
 }
 
-function useAnnotationGeometryReport(
-  props: ReviewStageProps,
-  annotationGeometry: ReturnType<typeof useReviewStageGeometry>['annotationGeometry']
-) {
-  const reportAnnotationGeometry =
-    props.onAnnotationGeometry ?? props.annotationEditing?.editor.setGeometry;
-  useEffect(() => {
-    reportAnnotationGeometry?.(annotationGeometry);
-  }, [annotationGeometry, reportAnnotationGeometry]);
-}
+const noStageGeometrySubscription = () => () => {};
+const noStageGeometrySnapshot = () => null;

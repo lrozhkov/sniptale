@@ -45,16 +45,21 @@ export function shouldEmitBuildSourcemaps(mode: string): boolean {
   return mode !== 'production' && mode !== 'release';
 }
 
-function contentRuntimeDefines(mode: string, buildId: string) {
-  return {
+/** Shared compile-time constants for the packaged full runtime and launcher IIFEs. */
+export function contentRuntimeDefines(mode: string, buildId?: string): Record<string, string> {
+  const defines: Record<string, string> = {
     __ENABLE_DESIGN_SYSTEM__: JSON.stringify(mode !== 'release'),
-    __SNIPTALE_CONTENT_RUNTIME_BUILD_ID__: JSON.stringify(buildId),
     __SNIPTALE_SECURITY_E2E__: JSON.stringify(mode === 'security-e2e'),
     __SNIPTALE_TRACE_WS_URL__: JSON.stringify(getTraceWsUrlForMode(mode)),
     __TRACE_MESSAGES__: JSON.stringify(isTraceMessagesEnabledForMode(mode)),
     'globalThis.__SNIPTALE_RELEASE_BUILD__': JSON.stringify(mode === 'release'),
     'process.env.NODE_ENV': JSON.stringify(mode === 'release' ? 'production' : 'development'),
+    // Packaged scripts have no Vite dev-server environment, including diagnostic builds.
+    'import.meta.env.DEV': 'false',
   };
+  if (buildId !== undefined)
+    defines.__SNIPTALE_CONTENT_RUNTIME_BUILD_ID__ = JSON.stringify(buildId);
+  return defines;
 }
 
 export function buildContentRuntime(mode: string): Plugin {
@@ -129,13 +134,7 @@ export function buildContentRuntimeShim(mode: string): Plugin {
         absWorkingDir: appRoot,
         bundle: true,
         charset: 'utf8',
-        define: {
-          __ENABLE_DESIGN_SYSTEM__: JSON.stringify(mode !== 'release'),
-          __SNIPTALE_SECURITY_E2E__: JSON.stringify(mode === 'security-e2e'),
-          __SNIPTALE_TRACE_WS_URL__: JSON.stringify(getTraceWsUrlForMode(mode)),
-          __TRACE_MESSAGES__: JSON.stringify(isTraceMessagesEnabledForMode(mode)),
-          'globalThis.__SNIPTALE_RELEASE_BUILD__': JSON.stringify(mode === 'release'),
-        },
+        define: contentRuntimeDefines(mode),
         drop: getReleaseDrop(mode),
         entryPoints: [join(repositoryRoot, CONTENT_RUNTIME_SHIM_ENTRY)],
         format: 'iife',

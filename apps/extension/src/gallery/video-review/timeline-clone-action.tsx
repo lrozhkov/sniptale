@@ -1,56 +1,56 @@
+import type { ReviewSelection } from '../../features/video/review/types';
 import { useState, type ReactNode } from 'react';
 import { Copy } from 'lucide-react';
 import { translate } from '../../platform/i18n';
-import type { useReviewEditorState } from './use-editor-state';
+import type { ReviewDocument } from '../../features/video/review/types';
+import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
+import type { LoadedReview } from './use-session';
 import { ReviewButton, reviewTextButtonClassName } from './controls';
 import { ReviewInspectorCloneContext } from './inspector-sections';
 import { canCloneReviewSelection, cloneReviewTimelineSelection } from './timeline-clone';
 import { commitReviewTimelineClonePlan } from './timeline-clone-commit';
 
-type State = Pick<
-  ReturnType<typeof useReviewEditorState>,
-  | 'activeSelection'
-  | 'advanced'
-  | 'busy'
-  | 'editing'
-  | 'session'
-  | 'run'
-  | 'flushAdvanced'
-  | 'canStart'
-  | 'setMessage'
->;
+type MutationCommands = {
+  session: LoadedReview['session'];
+  run(action: () => Promise<unknown>): Promise<unknown>;
+  flushAdvanced(): Promise<void>;
+  canStart(): boolean;
+  setMessage(message: string): void;
+};
 
 /** Single and multi-selection use the same copy planner and durable history owners. */
 export function ReviewTimelineCloneScope({
-  state,
+  document,
+  advanced,
+  selection,
+  commands,
+  busy,
   duration,
   children,
 }: {
-  state: State;
+  document: ReviewDocument;
+  advanced: QuickEditAdvancedState;
+  selection: ReviewSelection;
+  busy: boolean;
+  commands: MutationCommands;
   duration: number;
   children: ReactNode;
 }) {
   const [pending, setPending] = useState(false);
-  const selection = state.activeSelection;
   // These inspectors already expose a copy command through their own authoring owner.
   const available =
     selection.kind !== 'cursor-motion' &&
     selection.kind !== 'zoom' &&
     selection.kind !== 'annotation-effect' &&
-    canCloneReviewSelection(
-      selection,
-      state.advanced,
-      [selection],
-      state.session.getSnapshot().document.edits
-    );
-  const disabled = pending || state.busy || state.editing.exporter.phase !== 'idle';
+    canCloneReviewSelection(selection, advanced, [selection], document.edits);
+  const disabled = pending || busy;
   const copy = async () => {
-    if (!available || disabled || !state.canStart()) return;
+    if (!available || disabled || !commands.canStart()) return;
     setPending(true);
     try {
-      await state.run(async () => {
-        await state.flushAdvanced();
-        const document = state.session.getSnapshot().document;
+      await commands.run(async () => {
+        await commands.flushAdvanced();
+        const document = commands.session.getSnapshot().document;
         const plan = cloneReviewTimelineSelection({
           content: document.advancedContent,
           edits: document.edits,
@@ -58,11 +58,11 @@ export function ReviewTimelineCloneScope({
           duration,
         });
         if (!plan) {
-          state.setMessage(translate('gallery.videoReview.timelineSelectionCloneUnavailable'));
+          commands.setMessage(translate('gallery.videoReview.timelineSelectionCloneUnavailable'));
           return;
         }
         await commitReviewTimelineClonePlan(
-          state.session,
+          commands.session,
           document,
           plan,
           selection.kind !== 'edit'

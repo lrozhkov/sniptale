@@ -57,8 +57,7 @@ export async function createAudioProcessingWorklet(
   let node: AudioWorkletNode | undefined, keepAlive: GainNode | undefined;
   let closed = false,
     phase: 'loading' | 'ready' | 'priming' | 'primed' | 'playing' = 'loading';
-  let primeStart = 0,
-    bufferedEnd = 0;
+  let primeStart = 0;
   let readyResolve!: () => void, readyReject!: (error: Error) => void;
   const ready = new Promise<void>((resolve, reject) => {
     readyResolve = resolve;
@@ -171,7 +170,6 @@ export async function createAudioProcessingWorklet(
         return;
       }
       if (message.kind === 'primed' && phase === 'priming' && message.startFrame === primeStart) {
-        bufferedEnd = message.startFrame + message.bufferedFrames;
         phase = 'primed';
         primeResolve?.();
         primeResolve = primeReject = undefined;
@@ -290,11 +288,11 @@ export async function createAudioProcessingWorklet(
           endFrame <= startFrame ||
           endFrame > options.durationFrames ||
           !Number.isSafeInteger(startFrame) ||
-          startFrame < primeStart ||
-          startFrame >= bufferedEnd
+          startFrame < primeStart
         )
           throw new Error('Audio processing playback interval is invalid.');
-        // The processor catches up from this clock when main-thread dispatch is delayed.
+        // Preparation and dispatch can pass the primed window. The processor catches up
+        // sequentially from its retained DSP state and preserves this playback clock.
         phase = 'playing';
         post({
           kind: 'play',

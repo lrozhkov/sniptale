@@ -2,7 +2,9 @@ import { useAudioPresets } from '../../composition/audio-preset-resources/use-au
 import { AudioPresetControls } from '../../ui/audio/preset-controls';
 import { AudioProcessingFields } from '../../ui/audio/processing-fields';
 import type { AudioProcessing } from '@sniptale/runtime-contracts/audio-effects';
-import type { useReviewEditorState } from './use-editor-state';
+import type { QuickEditOriginalAudio } from '../../features/video/review/advanced/types';
+import type { ReviewBeforeAction } from './note-transitions';
+import type { ReviewSpeechFlushRegistration } from './speech-edit-guard';
 import type { useReviewAudio } from './use-review-audio';
 import type { LoadedReview } from './use-session';
 import { getAIProviderFailureKey } from '../../features/ai/provider-failure-copy';
@@ -465,6 +467,7 @@ function RecognitionResult({ recognition, access }: { recognition: Recognition; 
   const [expanded, setExpanded] = useState<string | null>(null);
   const [limit, setLimit] = useState(50);
   const editor = useReviewText({
+    local: true,
     document: recognition.proposal?.document,
     setText: recognition.setText,
     sourceDuration: recognition.snapshot.snapshot.workspace.source.duration,
@@ -633,64 +636,64 @@ function MultimodalRecognitionSettings({ recognition }: { recognition: Recogniti
 /** Original speech controls bind to the existing audio and timeline authorities. */
 export function ReviewSourceSpeechBinding({
   resource,
-  editor,
-  audio,
+  originalAudio,
+  recognitionEnabled,
+  disabled,
+  sourceAssetId,
+  sourceAudioAvailable,
+  selection,
+  beforeAction,
+  registerSpeechFlush,
+  onEnableAdvanced,
+  media,
+  onOriginalChange,
   flush,
   renderInspectorSections,
 }: {
   resource: LoadedReview;
-  editor: Pick<
-    ReturnType<typeof useReviewEditorState>,
-    | 'advanced'
-    | 'video'
-    | 'timeline'
-    | 'busy'
-    | 'seek'
-    | 'snapshot'
-    | 'playbackRange'
-    | 'selection'
-    | 'beforeAction'
-    | 'registerSpeechFlush'
-    | 'editing'
-    | 'setMode'
-  >;
-  audio: Pick<ReturnType<typeof useReviewAudio>, 'setOriginal'>;
+  originalAudio: QuickEditOriginalAudio;
+  recognitionEnabled: boolean;
+  disabled: boolean;
+  sourceAssetId: string;
+  sourceAudioAvailable: boolean;
+  selection: Parameters<typeof ReviewOriginalSpeechPanel>[0]['selection'];
+  beforeAction: ReviewBeforeAction;
+  registerSpeechFlush(owner: ReviewSpeechFlushRegistration): () => void;
+  onEnableAdvanced?: (() => void) | undefined;
+  media: {
+    readVideo(): HTMLVideoElement | null;
+    pause(): void;
+    seek(time: number, playing?: boolean): void;
+  };
+  onOriginalChange: ReturnType<typeof useReviewAudio>['setOriginal'];
   flush(): Promise<void>;
   renderInspectorSections?: Props['renderInspectorSections'];
 }) {
   return (
     <ReviewOriginalSpeechPanel
       renderInspectorSections={renderInspectorSections}
-      recognitionEnabled={editor.advanced.ui.mode === 'advanced'}
-      mainVideo={editor.video.current ?? undefined}
-      resultTime={editor.timeline.sceneOutputTime}
-      masterAudio={editor.advanced.audio.original}
-      masterDisabled={editor.busy}
-      onMasterVolumeChange={(volume) => audio.setOriginal({ volume })}
+      recognitionEnabled={recognitionEnabled}
+      mainVideo={media.readVideo() ?? undefined}
+      masterAudio={originalAudio}
+      masterDisabled={disabled}
+      onMasterVolumeChange={(volume) => onOriginalChange({ volume })}
       onProcessingChange={(audioProcessing) =>
-        audio.setOriginal({
+        onOriginalChange({
           audioProcessing: audioProcessing ?? { version: 1, bypassed: true, effects: [] },
         })
       }
       onJump={(time) => {
-        editor.video.current?.pause();
-        editor.seek(time, false);
+        media.pause();
+        media.seek(time, false);
       }}
       session={resource.session}
-      original={{
-        file: resource.file,
-        sourceAssetId: editor.snapshot.snapshot.workspace.sourceAssetId,
-      }}
-      selection={
-        editor.playbackRange ?? (editor.selection.kind === 'range' ? editor.selection : undefined)
-      }
-      beforeAction={editor.beforeAction}
+      original={{ file: resource.file, sourceAssetId }}
+      selection={selection}
+      beforeAction={beforeAction}
       flushAdvanced={flush}
-      registerSpeechFlush={editor.registerSpeechFlush}
-      sourceAudioAvailable={!!editor.editing.exporter.index?.audioCodec}
-      {...(editor.advanced.ui.mode === 'basic'
-        ? { onEnableAdvanced: () => editor.setMode('advanced') }
-        : {})}
+      registerSpeechFlush={registerSpeechFlush}
+      sourceAudioAvailable={sourceAudioAvailable}
+      {...(onEnableAdvanced ? { onEnableAdvanced } : {})}
     />
   );
 }

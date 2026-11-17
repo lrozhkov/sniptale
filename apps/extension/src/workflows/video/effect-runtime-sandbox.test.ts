@@ -23,6 +23,7 @@ import {
   createSandboxWireRequest as createWireRequest,
   FakeImageBitmap,
   installCacheRetryResponder,
+  installSandboxResponder,
   installSynchronousMessageChannel,
   respondWithResourceLimit,
 } from './effect-runtime-sandbox.test-support';
@@ -77,7 +78,7 @@ it('fails closed and removes a sandbox iframe when its isolated page cannot load
   expect(iframe?.getAttribute('sandbox')).toBe('allow-scripts');
   expect(new URL(iframe!.src).search).toBe('');
   await expect(resultPromise).resolves.toEqual(
-    expect.objectContaining({ code: 'crashed', kind: 'error' })
+    expect.objectContaining({ code: 'circuitOpen', kind: 'error' })
   );
   expect(document.querySelector('iframe')).toBeNull();
   manager.dispose();
@@ -334,7 +335,7 @@ it.each([undefined, 'gpu-preview', 'gpu-scene', 'gpu-scene-plan'] as const)(
   }
 );
 
-it('reuses preloaded transport and retries failed preload without recreating after disposal', async () => {
+it('retains failed preload for the manager lifetime without recreating after disposal', async () => {
   const manager = new EffectRuntimeSandboxSessionManager(document, {
     loadTimeoutMs: 100,
     requestTimeoutMs: 100,
@@ -345,13 +346,15 @@ it('reuses preloaded transport and retries failed preload without recreating aft
   first.dispatchEvent(new Event('error'));
   await Promise.resolve();
   expect(document.querySelector('iframe')).toBeNull();
-  const request = manager.prepareGpuFrame(createRequest());
-  const replacement = document.querySelector('iframe');
-  expect(replacement).not.toBe(first);
-  expect(document.querySelectorAll('iframe')).toHaveLength(1);
-  expect(document.querySelector('iframe')).toBe(replacement);
+  await expect(manager.prepareGpuFrame(createRequest())).resolves.toMatchObject({
+    code: 'circuitOpen',
+  });
+  manager.preload();
+  await expect(manager.prepareGpuFrame(createRequest())).resolves.toMatchObject({
+    code: 'circuitOpen',
+  });
+  expect(document.querySelector('iframe')).toBeNull();
   manager.dispose();
-  await expect(request).resolves.toMatchObject({ kind: 'error', code: 'crashed' });
   manager.preload();
   expect(document.querySelector('iframe')).toBeNull();
 });
@@ -430,7 +433,7 @@ it('rejects a checked bitmap fallback returned to the plan-only parent', async (
   }
 });
 
-it('retries explicit transport preload without posting frames and retains readiness until disposal', async () => {
+it('requires a new executor after transport startup refusal and retains recovered readiness', async () => {
   installSynchronousMessageChannel();
   const executor = createEffectRuntimeSandboxExecutor({ compositionBackend: 'gpu-scene' });
   const first = document.querySelector('iframe')!;
@@ -442,20 +445,58 @@ it('retries explicit transport preload without posting frames and retains readin
     await Promise.resolve();
     expect(document.querySelector('iframe')).toBeNull();
     executor.preload!();
+    expect(document.querySelector('iframe')).toBeNull();
+    await expect(executor.prepareGpuFrame!(createRequest())).resolves.toMatchObject({
+      code: 'circuitOpen',
+    });
+    executor.dispose();
+    const recovered = createEffectRuntimeSandboxExecutor({ compositionBackend: 'gpu-scene' });
     const replacement = document.querySelector('iframe')!;
     expect(replacement).not.toBe(first);
     const requests: EffectRuntimeRenderMessage[] = [];
     installCacheRetryResponder(replacement, requests, ports);
     replacement.dispatchEvent(new Event('load'));
     await Promise.resolve();
-    executor.preload!();
+    recovered.preload!();
     expect(document.querySelector('iframe')).toBe(replacement);
     expect(requests).toEqual([]);
-    executor.dispose();
+    const prepared = recovered.renderFrame(createRequest());
+    await expect(prepared).resolves.toMatchObject({ kind: 'frame' });
+    recovered.dispose();
     executor.preload!();
     expect(document.querySelector('iframe')).toBeNull();
   } finally {
     executor.dispose();
+    for (const port of ports) port.close();
+  }
+});
+
+it('retains a broker startup refusal without replacing its iframe on later frames', async () => {
+  installSynchronousMessageChannel();
+  const manager = new EffectRuntimeSandboxSessionManager(document, {
+    loadTimeoutMs: 100,
+    requestTimeoutMs: 100,
+    compositionBackend: 'gpu-scene',
+  });
+  manager.preload();
+  const iframe = document.querySelector('iframe')!;
+  const requests: EffectRuntimeRenderMessage[] = [];
+  const ports: MessagePort[] = [];
+  installSandboxResponder(iframe, requests, ports, (request) =>
+    createEffectRuntimeFailure(request, 'circuitOpen')
+  );
+  iframe.dispatchEvent(new Event('load'));
+  try {
+    await expect(manager.renderFrame(createRequest())).resolves.toMatchObject({
+      code: 'circuitOpen',
+    });
+    manager.preload();
+    await expect(manager.renderFrame(createRequest())).resolves.toMatchObject({
+      code: 'circuitOpen',
+    });
+    expect(document.querySelector('iframe')).toBe(iframe);
+  } finally {
+    manager.dispose();
     for (const port of ports) port.close();
   }
 });

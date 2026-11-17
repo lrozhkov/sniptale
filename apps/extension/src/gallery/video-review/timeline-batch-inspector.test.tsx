@@ -2,8 +2,8 @@
 import { act, useContext } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { ReviewTimelineCloneScope } from './timeline-clone-action';
-import { ReviewTimelineBatchInspector } from './timeline-batch-inspector';
+import { ReviewTimelineCloneScope as CloneSurface } from './timeline-clone-action';
+import { ReviewTimelineBatchInspector as BatchSurface } from './timeline-batch-inspector';
 import { ReviewInspectorCloneContext } from './inspector-sections';
 import { ReviewTimelineMultiSelectionContext } from './selection-actions';
 import {
@@ -11,6 +11,53 @@ import {
   createQuickEditAdvancedContent,
 } from '../../features/video/review/advanced/defaults';
 import type { ReviewEdit, ReviewSelection } from '../../features/video/review/types';
+type FixtureState = ReturnType<typeof import('./use-editor-state').useReviewEditorState>;
+function ReviewTimelineBatchInspector(props: { state: FixtureState; duration: number }) {
+  const { state } = props;
+  return (
+    <BatchSurface
+      document={state.snapshot.document}
+      advanced={state.advanced}
+      markers={state.projected.markers}
+      cursorFocusPath={state.cursorFocusPath}
+      cursorFocusKeys={state.cursorFocusKeys}
+      busy={state.busy || state.editing.exporter.phase !== 'idle'}
+      duration={props.duration}
+      commands={{
+        session: state.session,
+        run: state.run,
+        flushAdvanced: state.flushAdvanced,
+        canStart: state.canStart,
+        setMessage: state.setMessage,
+      }}
+    />
+  );
+}
+function ReviewTimelineCloneScope(props: {
+  state: FixtureState;
+  duration: number;
+  children: React.ReactNode;
+}) {
+  const { state } = props;
+  return (
+    <CloneSurface
+      document={state.snapshot?.document ?? state.session.getSnapshot().document}
+      advanced={state.advanced}
+      selection={state.activeSelection}
+      busy={state.busy || state.editing.exporter.phase !== 'idle'}
+      duration={props.duration}
+      commands={{
+        session: state.session,
+        run: state.run,
+        flushAdvanced: state.flushAdvanced,
+        canStart: state.canStart,
+        setMessage: state.setMessage,
+      }}
+    >
+      {props.children}
+    </CloneSurface>
+  );
+}
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
   translate: (key: string) => key,

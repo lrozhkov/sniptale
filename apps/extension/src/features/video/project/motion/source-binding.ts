@@ -1,6 +1,5 @@
 import { mapSourceRangeToProjectSpans } from '../timeline/source-time';
-import { normalizeClipPlaybackRate } from '../timeline/basics';
-import { getClipPlaybackOffset } from '../timeline/rate';
+import { normalizeClipPlaybackRate, getClipPlaybackOffset } from '../timeline/rate';
 import {
   VideoProjectClipType,
   VideoProjectTrackRole,

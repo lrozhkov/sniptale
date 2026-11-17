@@ -283,7 +283,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 it.each(['error', 'messageerror'] as const)(
-  'retries an idle preloaded worker after %s without sending speculative frames',
+  'retains idle worker startup refusal after %s until a new session replaces it',
   async (failure) => {
     const first = new FakeWorker(),
       replacement = new FakeWorker();
@@ -296,16 +296,21 @@ it.each(['error', 'messageerror'] as const)(
     if (failure === 'error') first.onerror?.(new FakeErrorEvent('error'));
     else first.onmessageerror?.(new MessageEvent('messageerror'));
     expect(first.terminate).toHaveBeenCalledOnce();
-    const request = createRequest(),
-      pending = session.execute(request);
+    session.preload();
+    expect(workerFactory).toHaveBeenCalledOnce();
+    const request = createRequest();
+    await expect(session.execute(request)).resolves.toMatchObject({ code: 'circuitOpen' });
+    await expect(session.execute(createRequest())).resolves.toMatchObject({ code: 'circuitOpen' });
+    expect(workerFactory).toHaveBeenCalledOnce();
+    const recovered = createEffectRuntimeWorkerSession({ workerFactory });
+    const pending = recovered.execute(request);
     await Promise.resolve();
-    expect(workerFactory).toHaveBeenCalledTimes(2);
     emitMatchingFrame(replacement, request, new FakeImageBitmap(1280, 720));
     await expect(pending).resolves.toMatchObject({ kind: 'frame' });
   }
 );
 
-it('treats preload construction failure as advisory and preserves the actual request', async () => {
+it('retains synchronous preload refusal until a new worker session replaces it', async () => {
   const worker = new FakeWorker(),
     workerFactory = vi
       .fn()
@@ -315,12 +320,69 @@ it('treats preload construction failure as advisory and preserves the actual req
       .mockReturnValue(worker);
   const session = createEffectRuntimeWorkerSession({ workerFactory });
   expect(() => session.preload()).not.toThrow();
+  expect(() => session.preload()).not.toThrow();
+  expect(workerFactory).toHaveBeenCalledOnce();
+  await expect(session.execute(createRequest())).resolves.toMatchObject({ code: 'circuitOpen' });
+  expect(workerFactory).toHaveBeenCalledOnce();
+  const recovered = createEffectRuntimeWorkerSession({ workerFactory });
   const request = createRequest(),
-    pending = session.execute(request);
+    pending = recovered.execute(request);
   await Promise.resolve();
   emitMatchingFrame(worker, request, new FakeImageBitmap(1280, 720));
   await expect(pending).resolves.toMatchObject({ kind: 'frame' });
   expect(workerFactory).toHaveBeenCalledTimes(2);
+});
+
+it('retains startup failure on the first real request without retrying queued frames', async () => {
+  const workerFactory = vi.fn(() => {
+    throw new Error('startup');
+  });
+  const session = createEffectRuntimeWorkerSession({ workerFactory });
+  await expect(session.execute(createRequest())).resolves.toMatchObject({ code: 'circuitOpen' });
+  await expect(session.execute(createRequest())).resolves.toMatchObject({ code: 'circuitOpen' });
+  const bitmap = new FakeImageBitmap(1280, 720);
+  await expect(
+    session.execute({
+      ...createRequest(),
+      inputFrames: { source: { bitmap, width: 1280, height: 720 } },
+    })
+  ).resolves.toMatchObject({ code: 'circuitOpen' });
+  expect(bitmap.close).toHaveBeenCalledOnce();
+  session.preload();
+  expect(workerFactory).toHaveBeenCalledOnce();
+});
+
+it('retains an asynchronous startup error during the first request', async () => {
+  const worker = new FakeWorker();
+  const workerFactory = vi.fn(() => worker);
+  const session = createEffectRuntimeWorkerSession({ workerFactory });
+  const pending = session.execute(createRequest());
+  await Promise.resolve();
+  worker.onerror?.(new FakeErrorEvent('error'));
+  await expect(pending).resolves.toMatchObject({ code: 'circuitOpen' });
+  await expect(session.execute(createRequest())).resolves.toMatchObject({ code: 'circuitOpen' });
+  expect(workerFactory).toHaveBeenCalledOnce();
+  expect(worker.terminate).toHaveBeenCalledOnce();
+});
+
+it('keeps recovery after an error from a worker that has already answered a frame', async () => {
+  const first = new FakeWorker(),
+    replacement = new FakeWorker();
+  const workerFactory = vi.fn().mockReturnValueOnce(first).mockReturnValue(replacement);
+  const session = createEffectRuntimeWorkerSession({ workerFactory });
+  const request = createRequest();
+  const ready = session.execute(request);
+  await Promise.resolve();
+  emitMatchingFrame(first, request, new FakeImageBitmap(1280, 720));
+  await expect(ready).resolves.toMatchObject({ kind: 'frame' });
+  const failed = session.execute(request);
+  await vi.waitFor(() => expect(first.postMessage).toHaveBeenCalledTimes(2));
+  first.onerror?.(new FakeErrorEvent('error'));
+  await expect(failed).resolves.toMatchObject({ code: 'crashed' });
+  const pending = session.execute(request);
+  await vi.waitFor(() => expect(workerFactory).toHaveBeenCalledTimes(2));
+  emitMatchingFrame(replacement, request, new FakeImageBitmap(1280, 720));
+  await expect(pending).resolves.toMatchObject({ kind: 'frame' });
 });
 
 it.each([1, 600])(

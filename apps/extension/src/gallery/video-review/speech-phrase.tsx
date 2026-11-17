@@ -153,7 +153,14 @@ export function ReviewTextPhrase(props: {
   next?: ReviewTextFragment | undefined;
   editor: Pick<
     ReturnType<typeof useReviewText>,
-    'change' | 'split' | 'merge' | 'remove' | 'playhead' | 'captions' | 'endTyping'
+    | 'change'
+    | 'split'
+    | 'splitAtPlayhead'
+    | 'merge'
+    | 'remove'
+    | 'playhead'
+    | 'captions'
+    | 'endTyping'
   >;
   expanded: boolean;
   selected?: boolean;
@@ -241,7 +248,11 @@ export function ReviewTextPhrase(props: {
               ? translate('gallery.videoReview.textFragmentSplit')
               : translate('gallery.videoReview.textFragmentSplitHint')
           }
-          onClick={() => props.editor.split(fragment.id, caret, boundary ? undefined : playhead)}
+          onClick={() =>
+            boundary
+              ? props.editor.split(fragment.id, caret)
+              : props.editor.splitAtPlayhead(fragment.id, caret)
+          }
         >
           <Scissors size={14} />
         </ReviewButton>

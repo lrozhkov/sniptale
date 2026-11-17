@@ -1,9 +1,10 @@
 import { reviewTimelineHint } from './timeline-hints';
+import { ReviewPlaybackPresentationClockContext } from './playback-presentation-clock';
 import { useReviewTimelineSnap } from './timeline-magnets';
 import { ReviewTrackVisibilityButton } from './track-row';
 import { reviewTrackMetrics, ReviewTrackCuts, ReviewTrackRow } from './track-row';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Eye, EyeOff, Sticker } from 'lucide-react';
 import { translate, useAppLocale } from '../../platform/i18n';
 import type {
@@ -105,36 +106,128 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
         : incoming.instances,
     [incoming.instances, display]
   );
-  const props: TrackProps = display
-    ? {
-        ...incoming,
-        duration: display.duration,
-        time: display.sourceToDisplay(incoming.time),
-        instances,
-        snapTimes: incoming.snapTimes.map((time) => display.sourceToDisplay(time)),
-        onPreview: (range) =>
-          incoming.onPreview({
-            start: display.displayToResult(range.start),
-            end: display.displayToResult(range.end),
-            timeDomain: 'result',
-          }),
-        onPlace: (range, anchor) =>
-          incoming.onPlace?.(
-            {
-              start: display.displayToSource(range.start),
-              ...(range.end === undefined ? {} : { end: display.displayToSource(range.end) }),
-            },
-            anchor
-          ),
-      }
-    : incoming;
+  const clock = useContext(ReviewPlaybackPresentationClockContext);
+  const eventInputs = {
+    time: incoming.time,
+    snapTimes: incoming.snapTimes,
+    display,
+    clock,
+    beforeAction: incoming.beforeAction,
+    onPlace: incoming.onPlace,
+    onEnabled: incoming.onEnabled,
+    onSelect: incoming.onSelect,
+    onBegin: incoming.onBegin,
+    onPreview: incoming.onPreview,
+    onCommit: incoming.onCommit,
+    onCancel: incoming.onCancel,
+  };
+  const receiver = useRef(eventInputs);
+  useLayoutEffect(() => {
+    receiver.current = eventInputs;
+  });
+  const commands = useMemo<AnnotationTrackCommands>(
+    () => ({
+      readTime: () => {
+        const current = receiver.current;
+        return (
+          current.clock?.read() ??
+          (current.display ? current.display.sourceToDisplay(current.time) : current.time)
+        );
+      },
+      readSnapTimes: () => {
+        const current = receiver.current;
+        const display = current.display;
+        return display
+          ? current.snapTimes.map((time) => display.sourceToDisplay(time))
+          : current.snapTimes;
+      },
+      beforeAction: (action) => (receiver.current.beforeAction ?? ((next) => next()))(action),
+      onEnabled: (enabled) => receiver.current.onEnabled(enabled),
+      onSelect: (id) => receiver.current.onSelect(id),
+      onBegin: (id) => receiver.current.onBegin(id),
+      onPreview: (range) => {
+        const current = receiver.current;
+        current.onPreview(
+          current.display
+            ? {
+                start: current.display.displayToResult(range.start),
+                end: current.display.displayToResult(range.end),
+                timeDomain: 'result',
+              }
+            : range
+        );
+      },
+      onPlace: (range, anchor) => {
+        const current = receiver.current;
+        current.onPlace?.(
+          current.display
+            ? {
+                start: current.display.displayToSource(range.start),
+                ...(range.end === undefined
+                  ? {}
+                  : { end: current.display.displayToSource(range.end) }),
+              }
+            : range,
+          anchor
+        );
+      },
+      onCommit: () => receiver.current.onCommit(),
+      onCancel: () => receiver.current.onCancel(),
+    }),
+    []
+  );
+  return (
+    <AnnotationTrackPresentation
+      instances={instances}
+      snapshots={incoming.snapshots}
+      duration={display?.duration ?? incoming.duration}
+      enabled={incoming.enabled}
+      busy={incoming.busy}
+      drawing={incoming.drawing}
+      compact={incoming.compact}
+      projection={incoming.projection}
+      selectedId={incoming.selectedId}
+      {...commands}
+    />
+  );
+}
+
+type AnnotationTrackCommands = Pick<
+  TrackProps,
+  'onEnabled' | 'onSelect' | 'onBegin' | 'onPreview' | 'onCommit' | 'onCancel'
+> & {
+  onPlace: NonNullable<TrackProps['onPlace']>;
+  beforeAction: NonNullable<TrackProps['beforeAction']>;
+  readTime(): number;
+  readSnapTimes(): readonly number[];
+};
+
+type AnnotationTrackVisual = {
+  instances: TrackProps['instances'];
+  snapshots: TrackProps['snapshots'];
+  duration: number;
+  enabled: boolean;
+  busy: boolean;
+  drawing: TrackProps['drawing'];
+  compact: TrackProps['compact'];
+  projection: TrackProps['projection'];
+  selectedId: TrackProps['selectedId'];
+};
+
+/** Local preview/capture stays in this owner; transport and command closures are not visual inputs. */
+const AnnotationTrackPresentation = memo(function AnnotationTrackPresentation(
+  props: AnnotationTrackVisual & AnnotationTrackCommands
+) {
+  const display = props.projection?.display;
   const snapTimelineTime = useReviewTimelineSnap(
     display ? { output: display.sourceToDisplay, fromDisplay: (time) => time } : undefined
   );
   const locale = useAppLocale();
   const drag = useRef<Drag | null>(null);
   const latest = useRef(props);
-  latest.current = props;
+  useLayoutEffect(() => {
+    latest.current = props;
+  });
   const [preview, setPreview] = useState<(Range & { id: string | null }) | null>(null);
   const [guide, setGuide] = useState<number | null>(null);
   const boundary = drag.current?.ready && !drag.current.ended ? drag.current : null;
@@ -179,7 +272,7 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
     }
     return result;
   }, [props.instances]);
-  const snapshotIds = [...new Set(incoming.instances.map((instance) => instance.snapshotId))]
+  const snapshotIds = [...new Set(props.instances.map((instance) => instance.snapshotId))]
     .sort()
     .join(',');
   const neededSnapshots = useMemo(() => new Set(snapshotIds.split(',')), [snapshotIds]);
@@ -235,7 +328,9 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
       });
   };
   const latestFinish = useRef(finish);
-  latestFinish.current = finish;
+  useLayoutEffect(() => {
+    latestFinish.current = finish;
+  });
   useEffect(() => {
     if (!props.drawing && drag.current?.edge === 'draw') latestFinish.current(true);
   }, [props.drawing]);
@@ -244,18 +339,17 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
       track="annotationEffects"
       muted={!props.enabled}
       label={translate('gallery.videoReview.annotationEffects')}
-      icon={<Sticker size={14} aria-hidden />}
+      icon={Sticker}
       controls={
         <ReviewTrackVisibilityButton
           track={'annotationEffects'}
           label={translate('gallery.videoReview.annotationEffectsEnabled')}
-          aria-pressed={props.enabled}
+          enabled={props.enabled}
           disabled={props.busy}
           className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-          onClick={() => props.onEnabled(!props.enabled)}
-        >
-          {props.enabled ? <Eye size={14} aria-hidden /> : <EyeOff size={14} aria-hidden />}
-        </ReviewTrackVisibilityButton>
+          onToggle={() => props.onEnabled(!props.enabled)}
+          icon={props.enabled ? Eye : EyeOff}
+        />
       }
     >
       <div
@@ -286,7 +380,7 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
           event.preventDefault();
           event.stopPropagation();
           const node = event.currentTarget;
-          const start = Math.max(0, Math.min(props.time, props.duration - 0.001));
+          const start = Math.max(0, Math.min(props.readTime(), props.duration - 0.001));
           (props.beforeAction ?? ((action) => action()))(() => props.onPlace?.({ start }, node));
         }}
         onPointerDown={(event) => {
@@ -300,8 +394,8 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
             : [
                 0,
                 props.duration,
-                props.time,
-                ...props.snapTimes,
+                props.readTime(),
+                ...props.readSnapTimes(),
                 ...props.instances.flatMap((item) => [item.start, item.end]),
               ];
           const time = Math.max(
@@ -350,8 +444,8 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
             : [
                 0,
                 props.duration,
-                props.time,
-                ...props.snapTimes,
+                props.readTime(),
+                ...props.readSnapTimes(),
                 ...props.instances.flatMap((item) => [item.start, item.end]),
               ];
           const snap = snapTimelineTime(
@@ -523,8 +617,8 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
                   : [
                       0,
                       props.duration,
-                      props.time,
-                      ...props.snapTimes,
+                      props.readTime(),
+                      ...props.readSnapTimes(),
                       ...props.instances
                         .filter((item) => item.id !== instance.id)
                         .flatMap((item) => [item.start, item.end]),
@@ -599,4 +693,4 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
       </div>
     </ReviewTrackRow>
   );
-}
+});

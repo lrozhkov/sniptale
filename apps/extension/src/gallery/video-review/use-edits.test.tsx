@@ -39,7 +39,8 @@ it('refuses a whole move when independent keyframe snapping would resize the edi
     await act(async () => hook.commitRange({ kind: 'range', start: 7, end: 9 }, existing));
     expect(commit).toHaveBeenCalledWith(
       existing,
-      expect.objectContaining({ start: 7, end: 9, transition: existing.transition })
+      expect.objectContaining({ start: 7, end: 9, transition: existing.transition }),
+      undefined
     );
   } finally {
     act(() => root.unmount());
@@ -195,9 +196,10 @@ it('applies a tool immediately to an existing selected interval and selects the 
     expect(commit).toHaveBeenCalledOnce();
     expect(commit).toHaveBeenCalledWith(
       null,
-      expect.objectContaining({ kind: 'cut', start: 2, end: 4 })
+      expect.objectContaining({ kind: 'cut', start: 2, end: 4 }),
+      undefined
     );
-    expect(onSelectedEditIdChange).toHaveBeenCalledWith(expect.any(String));
+    expect(onSelectedEditIdChange).toHaveBeenCalledWith(expect.any(String), undefined);
     expect(seek).toHaveBeenCalledWith(2);
   } finally {
     act(() => root.unmount());
@@ -371,7 +373,7 @@ it.each(['cut', 'speed'] as const)(
       await act(async () => hook.toggle(kind));
       expect(hook.mode).toBeNull();
       expect(hook.cutting).toBe(false);
-      expect(select).toHaveBeenCalledWith(expect.any(String));
+      expect(select).toHaveBeenCalledWith(expect.any(String), undefined);
       expect(commit).toHaveBeenCalledTimes(2);
     } finally {
       act(() => root.unmount());

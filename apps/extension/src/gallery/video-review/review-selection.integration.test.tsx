@@ -138,15 +138,30 @@ it('preserves an inside playhead when opening properties and seeks to the start 
     );
     await fixture.click('advancedEditing');
     const video = fixture.host.querySelector('video')!;
+    const seek = async (time: number) => {
+      const ruler = fixture.host.querySelector<HTMLElement>(
+        '[data-ui="gallery.videoReview.ruler"]'
+      )!;
+      vi.spyOn(ruler, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 28));
+      Object.assign(ruler, {
+        setPointerCapture: vi.fn(),
+        hasPointerCapture: () => true,
+        releasePointerCapture: vi.fn(),
+      });
+      const clientX = (time / Number(ruler.getAttribute('aria-valuemax'))) * 400;
+      for (const type of ['pointerdown', 'pointerup']) {
+        await act(async () =>
+          ruler.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0, clientX }))
+        );
+      }
+      expect(video.currentTime).toBe(time);
+    };
     for (const [time, expected] of [
       [2, 2],
       [0.5, 1],
       [3, 1],
     ]) {
-      await act(async () => {
-        video.currentTime = time!;
-        video.dispatchEvent(new Event('timeupdate', { bubbles: true }));
-      });
+      await seek(time!);
       await act(async () =>
         fixture.host
           .querySelector<HTMLButtonElement>(
@@ -166,10 +181,7 @@ it('preserves an inside playhead when opening properties and seeks to the start 
         )
       ).not.toBeNull();
     }
-    await act(async () => {
-      video.currentTime = 2;
-      video.dispatchEvent(new Event('timeupdate', { bubbles: true }));
-    });
+    await seek(2);
     await act(async () =>
       fixture.host
         .querySelector<HTMLButtonElement>('[data-selection-slot="interval"] button')!

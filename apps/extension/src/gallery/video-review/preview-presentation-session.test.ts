@@ -39,6 +39,68 @@ afterEach(() => {
   io.presentation.mockClear();
   io.dispose.mockClear();
   io.executor.mockClear();
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
+
+it.each([
+  ['Preview source frame is unavailable.', 'source-unavailable', 'Error'],
+  ['GPU preview overlap is unavailable.', 'gpu-overlap', 'Error'],
+  ['Preview frame is already admitted.', 'frame-capacity', 'Error'],
+  ['Preview scene is stale.', 'scene-stale', 'Error'],
+  [
+    'private copyExternalImageToTexture destroyed details',
+    'gpu-validation',
+    'GpuPreviewValidationError',
+  ],
+  ['private unknown cause', 'unclassified', 'private error name'],
+])('reports one bounded failure context without private data (%s)', (message, reason, name) => {
+  vi.stubEnv('DEV', true);
+  const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  io.renderer.mockReturnValue({ dispose: vi.fn(), maximumInFlight: () => 2 });
+  const video = document.createElement('video');
+  video.currentTime = 7.25;
+  const input = {
+    sourceIdentity: 'blob:private-source',
+    video: { current: video },
+    playing: true,
+    preferences: { renderer: 'gpu', frameRate: 'current', pausedQuality: 'same' },
+  };
+  const report = vi.fn();
+  const owner = createManualPresentationOwner(
+    (() => ({ input, placement: null })) as unknown as Parameters<
+      typeof createManualPresentationOwner
+    >[0],
+    report,
+    vi.fn(),
+    vi.fn()
+  );
+  const cause = new Error(message);
+  cause.name = name!;
+  cause.stack = 'Error: private text\n at validatePreviewSourceDemands (file:///private/path:1)';
+  const error = new Error('private exception', { cause });
+  error.name = 'private identity';
+  const hooks = io.presentation.mock.lastCall![0];
+  hooks.onError(error);
+  hooks.onError(error);
+  expect(warning).toHaveBeenCalledOnce();
+  expect(warning.mock.lastCall).toEqual([
+    '[video-review.preview]',
+    'Presentation failed.',
+    expect.objectContaining({
+      reason,
+      operations: ['validatePreviewSourceDemands'],
+      nativeTime: 7.25,
+      nativeReadyState: 0,
+    }),
+  ]);
+  expect(JSON.stringify(warning.mock.calls)).not.toContain('private');
+  expect(warning.mock.lastCall?.[2]).toMatchObject({
+    gpuOperations:
+      name === 'GpuPreviewValidationError' ? ['copyExternalImageToTexture', 'destroyed'] : [],
+  });
+  expect(report.mock.lastCall?.[0].phase).toBe('failed');
+  owner.dispose();
 });
 
 it('keeps GPU targets hidden until pixels and geometry are ready', async () => {

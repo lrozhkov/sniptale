@@ -273,11 +273,20 @@ export function ReviewZoomTrack(incoming: ZoomTrackProps) {
   );
   const shownRange = (region: QuickEditZoomRegion) =>
     preview?.id === region.id ? preview : region;
-  const shownRegions = props.regions.map((region) => ({ ...region, ...shownRange(region) }));
-  const activeRegions = resolveQuickEditActiveFocusRegions(shownRegions);
-  const activeIds = new Set(activeRegions.map((region) => region.id));
-  const rows = packQuickEditFocusRows(shownRegions);
-  const rowCount = Math.max(1, ...Array.from(rows.values(), (row) => row + 1));
+  const { shownRegions, activeRegions, activeIds, rows, rowCount } = useMemo(() => {
+    const shownRegions = regions.map((region) =>
+      preview?.id === region.id ? { ...region, ...preview } : region
+    );
+    const activeRegions = resolveQuickEditActiveFocusRegions(shownRegions);
+    const rows = packQuickEditFocusRows(shownRegions);
+    return {
+      shownRegions,
+      activeRegions,
+      activeIds: new Set(activeRegions.map((region) => region.id)),
+      rows,
+      rowCount: Math.max(1, ...Array.from(rows.values(), (row) => row + 1)),
+    };
+  }, [regions, preview]);
   const { edits, time, toOutputTime, duration } = props;
   // Visible result-time endpoints, projected edit edges and playhead; codec frames are not focus targets.
   const snapEdges = useMemo(() => {
@@ -297,19 +306,18 @@ export function ReviewZoomTrack(incoming: ZoomTrackProps) {
       track="zoom"
       muted={props.enabled === false}
       label={translate('gallery.videoReview.zoomTrack')}
-      icon={<Focus size={14} aria-hidden="true" />}
+      icon={Focus}
       controls={
         <>
           {props.onToggleEnabled ? (
             <ReviewTrackVisibilityButton
               track={'zoom'}
               label={translate('gallery.videoReview.zoomEnabled')}
-              aria-pressed={props.enabled !== false}
-              onClick={props.onToggleEnabled}
+              enabled={props.enabled !== false}
+              onToggle={props.onToggleEnabled}
               className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-            >
-              {props.enabled === false ? <EyeOff size={14} /> : <Eye size={14} />}
-            </ReviewTrackVisibilityButton>
+              icon={props.enabled === false ? EyeOff : Eye}
+            />
           ) : null}
         </>
       }

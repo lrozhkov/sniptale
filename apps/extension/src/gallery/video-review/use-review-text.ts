@@ -21,6 +21,13 @@ import {
 import type { ReviewEdit, ReviewSelection } from '../../features/video/review/types';
 import type { ReviewBeforeAction } from './note-transitions';
 import { createTrackProjection } from './track-projection';
+import { reviewInsertionRange } from './range-placement';
+import {
+  reviewCommandInsertion,
+  reviewCommandSourceTime,
+  type ReviewCommandContext,
+  type ReviewCommandPort,
+} from './command-context';
 
 export interface ReviewTextFilters {
   query: string;
@@ -84,24 +91,27 @@ export function queryReviewText(
 }
 
 /** Text mutations reuse the advanced-content history writer and the shared source-axis projection. */
-export function useReviewText(args: {
-  captions?: ReviewCaptionSettings | undefined;
-  document: ReviewTextDocument | undefined;
-  snapshots?: readonly ReviewVoiceTextSnapshot[];
-  selection?: ReviewSelection;
-  setText(
-    update: (current: ReviewTextDocument | undefined) => ReviewTextDocument | undefined,
-    typing?: ReviewTextTypingTarget
-  ): void;
-  endTyping?(): void;
-  sourceDuration: number;
-  edits: readonly ReviewEdit[];
-  sourceTime: number;
-  beforeAction?: ReviewBeforeAction | undefined;
-  select(selection: ReviewSelection): void;
-  seek(time: number, snap?: boolean): void;
-  pause(): void;
-}) {
+export function useReviewText(
+  args: {
+    captions?: ReviewCaptionSettings | undefined;
+    document: ReviewTextDocument | undefined;
+    snapshots?: readonly ReviewVoiceTextSnapshot[];
+    selection?: ReviewSelection;
+    setText(
+      update: (current: ReviewTextDocument | undefined) => ReviewTextDocument | undefined,
+      typing?: ReviewTextTypingTarget
+    ): void;
+    endTyping?(): void;
+    sourceDuration: number;
+    edits: readonly ReviewEdit[];
+    sourceTime: number;
+    resultTime?: number | undefined;
+    beforeAction?: ReviewBeforeAction | undefined;
+    select(selection: ReviewSelection, context?: ReviewCommandContext): void;
+    seek(time: number, snap?: boolean): void;
+    pause(): void;
+  } & ({ commands: ReviewCommandPort; local?: false } | { local: true; commands?: undefined })
+) {
   const [error, setError] = useState<Extract<ReviewTextEditResult, { ok: false }>['reason'] | null>(
     null
   );
@@ -130,6 +140,14 @@ export function useReviewText(args: {
     return failure === null;
   };
   const guard = args.beforeAction ?? ((action: () => void) => action());
+  const activate = (action: (context: ReviewCommandContext | null) => void) => {
+    if (args.local) {
+      guard(() => action(null));
+      return;
+    }
+    const context = args.commands.capture();
+    if (context) args.commands.admit(context, action);
+  };
   const change = (
     id: string,
     patch: Parameters<typeof editReviewTextFragment>[2],
@@ -160,16 +178,26 @@ export function useReviewText(args: {
     sourceRange?: { start: number; end: number },
     timeDomain: 'source' | 'result' = 'source'
   ) =>
-    guard(() => {
-      args.pause();
+    activate((context) => {
+      if (!context) args.pause();
+      const placement = context ? reviewCommandInsertion(context, 'result') : null;
+      if (context && !placement) return;
+      const currentProjection = context
+        ? createTrackProjection(context.scope.sourceDuration, context.document.edits)
+        : projection;
+      const range =
+        sourceRange ?? (placement ? reviewInsertionRange({ ...placement, seconds: 3 }) : null);
+      if (context && !range) return;
       const id = crypto.randomUUID();
       const start = Math.max(
         0,
         Math.min(
-          sourceRange && timeDomain === 'result'
-            ? sourceRange.start
-            : projection.output(sourceRange?.start ?? args.sourceTime),
-          sourceRange ? projection.resultDuration : projection.resultDuration - 0.05
+          range && ((context && !sourceRange) || timeDomain === 'result')
+            ? range.start
+            : range
+              ? currentProjection.output(range.start)
+              : (args.resultTime ?? currentProjection.output(args.sourceTime)),
+          range ? currentProjection.resultDuration : currentProjection.resultDuration - 0.05
         )
       );
       if (
@@ -178,18 +206,18 @@ export function useReviewText(args: {
             id,
             start,
             end: Math.min(
-              projection.resultDuration,
-              sourceRange
-                ? timeDomain === 'result'
-                  ? sourceRange.end
-                  : projection.output(sourceRange.end)
+              currentProjection.resultDuration,
+              range
+                ? (context && !sourceRange) || timeDomain === 'result'
+                  ? range.end
+                  : currentProjection.output(range.end)
                 : start + 3
             ),
           })
         )
       ) {
         setCreatedId(id);
-        if (select) args.select({ kind: 'text', id });
+        if (select) args.select({ kind: 'text', id }, context ?? undefined);
       }
     });
   const sourceInterval = useCallback(
@@ -217,7 +245,9 @@ export function useReviewText(args: {
     projection,
     sourceInterval,
     playhead: (fragment: ReviewTextFragment) =>
-      fragment.timeDomain === 'source' ? args.sourceTime : projection.output(args.sourceTime),
+      fragment.timeDomain === 'source'
+        ? args.sourceTime
+        : (args.resultTime ?? projection.output(args.sourceTime)),
     split: (id: string, position: number, time?: number) =>
       guard(() => {
         const nextId = crypto.randomUUID();
@@ -232,6 +262,26 @@ export function useReviewText(args: {
         )
           setCreatedId(nextId);
       }),
+    splitAtPlayhead: (id: string, position: number) =>
+      activate((context) => {
+        const fragment = (context?.advanced.text ?? document).fragments.find(
+          (entry) => entry.id === id
+        );
+        if (!fragment) return;
+        const time = context
+          ? fragment.timeDomain === 'source'
+            ? reviewCommandSourceTime(context)
+            : context.position.resultTime
+          : fragment.timeDomain === 'source'
+            ? args.sourceTime
+            : (args.resultTime ?? projection.output(args.sourceTime));
+        if (time === null || time === undefined) return;
+        const nextId = crypto.randomUUID();
+        if (
+          mutate((current) => splitReviewTextFragment(current, id, { id: nextId, position, time }))
+        )
+          setCreatedId(nextId);
+      }),
     merge: (left: string, right: string) =>
       guard(() => {
         mutate((current) => mergeReviewTextFragments(current, left, right));
@@ -242,10 +292,23 @@ export function useReviewText(args: {
         setError(null);
       }),
     jump: (fragment: ReviewTextFragment, select = false) =>
-      guard(() => {
-        args.pause();
-        if (select) args.select({ kind: 'text', id: fragment.id });
-        else args.seek(sourceInterval(fragment).start, false);
+      activate((context) => {
+        if (!context) args.pause();
+        if (select) args.select({ kind: 'text', id: fragment.id }, context ?? undefined);
+        else {
+          const currentMap = context
+            ? buildReviewTimeMap(context.scope.sourceDuration, context.document.edits)
+            : segments;
+          const currentProjection = context
+            ? createTrackProjection(context.scope.sourceDuration, context.document.edits)
+            : projection;
+          const target = fragment.sourceAnchor
+            ? reviewTextSourceInterval(fragment, currentMap).start
+            : fragment.timeDomain === 'source'
+              ? fragment.start
+              : currentProjection.source(fragment.start);
+          args.seek(target, false);
+        }
       }),
   };
 }

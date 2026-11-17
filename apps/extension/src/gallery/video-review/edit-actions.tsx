@@ -650,7 +650,8 @@ export function ReviewInspectorActions({
   onExport,
   onOpenResult,
   toolKey,
-  fragmentAction,
+  fragmentAction: suppliedFragmentAction,
+  fragment,
 }: {
   exporter: Parameters<typeof ReviewRenderOptions>[0]['exporter'];
   advanced: boolean;
@@ -661,11 +662,33 @@ export function ReviewInspectorActions({
   onOpenResult(mediaId: string): void;
   toolKey: string;
   fragmentAction?: ReactNode;
+  fragment?:
+    | { selection: Extract<ReviewAnchor, { kind: 'range' }>; edits: readonly ReviewEdit[] }
+    | undefined;
 }) {
   const { dismissCompletion } = exporter;
   useEffect(() => () => dismissCompletion(), [dismissCompletion, toolKey]);
   const exportPlan = exporter.plan();
   const checkingCodecs = exporter.checkingCodecs;
+  const fragmentAction =
+    suppliedFragmentAction ??
+    (fragment ? (
+      <ReviewFragmentAction
+        showLabel
+        selection={fragment.selection}
+        edits={fragment.edits}
+        index={exporter.index}
+        snapToKeyframes={!advanced}
+        busy={
+          busy ||
+          composerBusy ||
+          checkingCodecs ||
+          exporter.phase !== 'idle' ||
+          exporter.plan(fragment.selection).kind === 'unavailable'
+        }
+        onDownload={exporter.downloadSelection}
+      />
+    ) : null);
   const settings = advanced ? (
     <ReviewRenderOptions
       exporter={exporter}

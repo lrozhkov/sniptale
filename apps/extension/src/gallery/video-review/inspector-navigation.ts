@@ -35,7 +35,6 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
   useEffect(() => {
     if (!props.recordingAvailable) showRecording(true);
   }, [props.recordingAvailable]);
-  const [presentation, setPresentation] = useState<'all' | 'sections'>('sections');
   const contextKey = props.contextKey ?? 'comments';
   const contextSection: Section = contextKey.startsWith('comments')
     ? 'comments'
@@ -103,7 +102,7 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
   const scroll = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (scroll.current) scroll.current.scrollTop = 0;
-  }, [contextKey, section, presentation]);
+  }, [contextKey, section]);
   const previousSettings = useRef(props.settingsAvailable);
   const previousExportRequest = useRef(0);
   const exportAvailable = props.exportAvailable;
@@ -166,8 +165,6 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
         ? 'comments'
         : section;
   return {
-    presentation,
-    setPresentation,
     recordingShown,
     openRecording: () => showRecording(true),
     shown,
@@ -180,6 +177,52 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
 }
 
 export type ReviewInspectorNavigation = ReturnType<typeof useReviewInspectorNavigation>;
+
+type TrackViewSnapshot = Readonly<{ tab: 'list' | 'settings'; section?: string }>;
+
+/** Mounted inspector preferences publish only to their local consumers, never to the editor root. */
+export function createReviewInspectorTrackView(
+  beforeAction: ReviewBeforeAction = (action) => action()
+) {
+  const initial: TrackViewSnapshot = { tab: 'list' };
+  const lanes = new Map<QuickEditTrack, TrackViewSnapshot>();
+  const listeners = new Set<() => void>();
+  const read = (track: QuickEditTrack) => lanes.get(track) ?? initial;
+  const subscribe = (listener: () => void) => {
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  };
+  const publish = (track: QuickEditTrack, next: TrackViewSnapshot) => {
+    const previous = read(track);
+    if (previous.tab === next.tab && previous.section === next.section) return;
+    lanes.set(track, next);
+    for (const listener of listeners) listener();
+  };
+  const show = (track: QuickEditTrack, tab: TrackViewSnapshot['tab']) =>
+    publish(track, { ...read(track), tab });
+  return {
+    read,
+    subscribe,
+    show,
+    choose(track: QuickEditTrack, section: string) {
+      const previous = read(track);
+      const tab = section === 'list' ? 'list' : 'settings';
+      const next: TrackViewSnapshot = section === 'list' ? { ...previous, tab } : { tab, section };
+      if (previous.tab === next.tab && previous.section === next.section) return;
+      const apply = () => publish(track, next);
+      if (previous.tab === tab) apply();
+      else beforeAction(apply);
+    },
+    sourceSettings: {
+      read: () => read('source').tab === 'settings',
+      subscribe,
+    },
+  };
+}
+
+export type ReviewInspectorTrackView = ReturnType<typeof createReviewInspectorTrackView>;
 
 /** Timeline commands use the same exclusive third context as direct inspector navigation. */
 export function reviewTimelineInspectorCommands(args: {
@@ -234,10 +277,11 @@ export function useReviewInspectorTrackNavigation(props: {
   select(value: ReviewSelection): void;
 }) {
   const [inspectorTrack, setTrack] = useState<QuickEditTrack>('source');
-  const [tabs, setTabs] = useState<Partial<Record<QuickEditTrack, 'list' | 'settings'>>>({});
-  const tab = tabs[inspectorTrack] ?? 'list';
-  const setTab = (value: 'list' | 'settings') =>
-    props.beforeAction(() => setTabs((current) => ({ ...current, [inspectorTrack]: value })));
+  const admission = useRef(props.beforeAction);
+  admission.current = props.beforeAction;
+  const [view] = useState(() =>
+    createReviewInspectorTrackView((action) => admission.current(action))
+  );
   const navigation = props.navigation;
   const resetSelection = () => {
     props.cancelAnnotation.current?.();
@@ -251,7 +295,7 @@ export function useReviewInspectorTrackNavigation(props: {
     props.beforeAction(() => {
       resetSelection();
       setTrack('source');
-      setTabs((current) => ({ ...current, source: 'settings' }));
+      view.show('source', 'settings');
       navigation.setSection('track');
     });
   const trackSection =
@@ -271,7 +315,7 @@ export function useReviewInspectorTrackNavigation(props: {
   const backToTrack = () =>
     props.beforeAction(() => {
       resetSelection();
-      setTabs((current) => ({ ...current, [inspectorTrack]: 'list' }));
+      view.show(inspectorTrack, 'list');
       navigation.setSection(trackSection);
     });
   const openTrack = (track: QuickEditTrack) =>
@@ -282,8 +326,7 @@ export function useReviewInspectorTrackNavigation(props: {
     });
   return {
     track: inspectorTrack,
-    tab,
-    setTab,
+    view,
     setTrack,
     openTrack,
     back: backToTrack,
