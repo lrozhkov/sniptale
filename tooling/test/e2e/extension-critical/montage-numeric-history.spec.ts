@@ -5,6 +5,7 @@ import { applyHarnessBootstrap, VIDEO_EDITOR_HARNESS_PATH } from '../extension-c
 import { createEmptyVideoProject } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { isHydratableVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
 import { createTextClip } from '../../../../apps/extension/src/features/video/project/factories/overlay-clip';
+import { translate } from '../support/catalog-fixture';
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
   test(`Montage numeric gestures create separate history actions ${viewport.name}`, async ({
@@ -180,6 +181,186 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await page.screenshot({ path: info.outputPath('cancelled-fade-clock.png'), fullPage: false });
       await redo.click();
       await expect(fade).toHaveValue('1');
+    } finally {
+      host.server.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+}
+
+async function nativeHistoryProjection(page: import('@playwright/test').Page, id: string) {
+  return page.evaluate(async (id) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('sniptale-db');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      const tx = db.transaction('video_projects');
+      const done = new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onabort = () => reject(tx.error);
+      });
+      const raw = await new Promise<unknown>((resolve, reject) => {
+        const request = tx.objectStore('video_projects').get(id);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      await done;
+      const record = (value: unknown): value is Record<string, unknown> =>
+        typeof value === 'object' && value !== null && !Array.isArray(value);
+      const project = record(raw) && record(raw['project']) ? raw['project'] : null;
+      const history = record(raw) && record(raw['history']) ? raw['history'] : null;
+      return {
+        name: project && typeof project['name'] === 'string' ? project['name'] : null,
+        past: history && Array.isArray(history['past']) ? history['past'].length : null,
+        future: history && Array.isArray(history['future']) ? history['future'].length : null,
+        recovery: history?.['recovery'] !== undefined,
+      };
+    } finally {
+      db.close();
+    }
+  }, id);
+}
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`Montage preserves native history and interrupted editing after reopening ${viewport.name}`, async ({
+    page,
+    context,
+  }, info) => {
+    test.setTimeout(60000);
+    const host = await startHostServer();
+    try {
+      let active = page;
+      await active.setViewportSize(viewport.size);
+      const project = createEmptyVideoProject('Original title');
+      project.duration = 12;
+      const clip = createTextClip(project.tracks[0]!.id, project.width, project.height, 0);
+      clip.duration = 12;
+      clip.style.fontSize = 40;
+      project.clips = [clip];
+      await applyHarnessBootstrap(active, {
+        preserveMediaLibrary: true,
+        videoProjects: [project],
+        storage: { 'sniptale-locale-preference': 'en' },
+      });
+      await active.goto(`${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}`);
+      const title = () =>
+        active.getByRole('textbox', {
+          name: translate('videoEditor.app.title', 'en'),
+          exact: true,
+        });
+      const undo = () => active.locator('[data-ui="video-editor.timeline.toolbar.undo"]');
+      const redo = () => active.locator('[data-ui="video-editor.timeline.toolbar.redo"]');
+      await expect(title()).toBeVisible();
+      for (const name of ['First action', 'Second action']) {
+        await title().fill(name);
+        await title().press('Tab');
+        await expect
+          .poll(async () => (await nativeHistoryProjection(active, project.id)).name)
+          .toBe(name);
+      }
+      await undo().click();
+      await expect
+        .poll(() => nativeHistoryProjection(active, project.id))
+        .toEqual({
+          name: 'First action',
+          past: 1,
+          future: 1,
+          recovery: false,
+        });
+      const url = new URL(active.url());
+      url.searchParams.set('skipSeed', '1');
+      const reopen = async () => {
+        await active.close();
+        active = await context.newPage();
+        await active.setViewportSize(viewport.size);
+        await applyHarnessBootstrap(active, {
+          preserveMediaLibrary: true,
+          storage: { 'sniptale-locale-preference': 'en' },
+        });
+        await active.goto(url.href);
+      };
+      await reopen();
+      await expect(title()).toHaveValue('First action');
+      await expect(undo()).toBeEnabled();
+      await expect(redo()).toBeEnabled();
+      await redo().click();
+      await expect
+        .poll(() => nativeHistoryProjection(active, project.id))
+        .toEqual({
+          name: 'Second action',
+          past: 2,
+          future: 0,
+          recovery: false,
+        });
+      await active.screenshot({ path: info.outputPath('reopened-redo.png'), fullPage: false });
+      const selectSize = async () => {
+        await active.locator(`[data-project-timeline-clip="${clip.id}"]`).click();
+        await active
+          .getByRole('navigation', { name: 'Project inspector' })
+          .getByRole('button', { name: 'Style', exact: true })
+          .click();
+      };
+      const size = () => active.getByRole('textbox', { name: 'Size', exact: true });
+      await selectSize();
+      await size().hover();
+      const range = active.getByRole('slider', { name: 'Size range', exact: true });
+      const box = await range.boundingBox();
+      if (!box) throw new Error('Missing Size range geometry');
+      await active.mouse.move(box.x + box.width * 0.2, box.y + box.height / 2);
+      await active.mouse.down();
+      await active.mouse.move(box.x + box.width * 0.7, box.y + box.height / 2);
+      await expect.poll(async () => Number(await size().inputValue())).toBeGreaterThan(90);
+      const interruptedSize = await size().inputValue();
+      await expect
+        .poll(() => nativeHistoryProjection(active, project.id))
+        .toEqual({
+          name: 'Second action',
+          past: 2,
+          future: 0,
+          recovery: true,
+        });
+      await reopen();
+      await selectSize();
+      await expect(size()).toHaveValue(interruptedSize);
+      await undo().click();
+      await selectSize();
+      await expect(size()).toHaveValue('40');
+      await expect(redo()).toBeEnabled();
+      await title().fill('New branch');
+      await title().press('Tab');
+      await expect
+        .poll(() => nativeHistoryProjection(active, project.id))
+        .toEqual({
+          name: 'New branch',
+          past: 3,
+          future: 0,
+          recovery: false,
+        });
+      await size().fill('80');
+      await size().fill('40');
+      await size().press('Tab');
+      await expect(size()).toHaveValue('40');
+      await undo().click();
+      await expect(title()).toHaveValue('Second action');
+      await expect
+        .poll(() => nativeHistoryProjection(active, project.id))
+        .toEqual({
+          name: 'Second action',
+          past: 2,
+          future: 1,
+          recovery: false,
+        });
+      await reopen();
+      await expect(title()).toHaveValue('Second action');
+      await expect(redo()).toBeEnabled();
+      await active.screenshot({
+        path: info.outputPath('reopened-new-branch.png'),
+        fullPage: false,
+      });
     } finally {
       host.server.closeAllConnections();
       await new Promise<void>((resolve, reject) =>

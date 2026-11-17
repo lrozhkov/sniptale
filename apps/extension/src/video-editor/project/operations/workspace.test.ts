@@ -4,7 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { translate } from '../../../platform/i18n';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { VideoProjectAssetType } from '../../../features/video/project/types';
-import { copyProject, loadInitialProjectFromLocation, openPersistedProject } from './workspace';
+import {
+  createBlankProject,
+  copyProject,
+  loadInitialProjectFromLocation,
+  openPersistedProject,
+} from './workspace';
 import { createPersistedLegacyRecordingProject } from './workspace.test-support';
 
 const {
@@ -34,13 +39,42 @@ vi.mock('../../../composition/persistence/projects/index', async (importOriginal
   deleteProjectAsset,
   getProjectAsset,
   getVideoProject,
+  getVideoProjectWorkspace: async (id: string) => {
+    const result = await getVideoProject(id);
+    return result?.status === 'ready'
+      ? {
+          ...result,
+          workspaceRevision: result.workspaceRevision ?? 0,
+          history: result.history ?? { status: 'absent' },
+        }
+      : result;
+  },
 }));
 
 vi.mock('../../../composition/persistence/projects/index-mutations', async (importOriginal) => ({
   ...(await importOriginal<
     typeof import('../../../composition/persistence/projects/index-mutations')
   >()),
-  commitVideoProjectMutation: saveVideoProject,
+  commitVideoProjectWorkspaceMutation: async (
+    project: import('../../../features/video/project/types').VideoProject,
+    options: Parameters<
+      typeof import('../../../composition/persistence/projects/index-mutations').commitVideoProjectWorkspaceMutation
+    >[1]
+  ) => ({
+    project: await saveVideoProject(project, {
+      ...(options.expectedProject === null
+        ? { baseRevision: null }
+        : {
+            baseRevision: options.expectedProject.updatedAt,
+            expectedWorkspaceRevision: options.expectedWorkspaceRevision,
+          }),
+      ...(options.expectedReviewWorkspace
+        ? { expectedReviewWorkspace: options.expectedReviewWorkspace }
+        : {}),
+      ...(options.libraryBindings ? { libraryBindings: options.libraryBindings } : {}),
+    }),
+    workspaceRevision: (options.expectedWorkspaceRevision ?? 0) + 1,
+  }),
 }));
 
 vi.mock('../../../composition/persistence/recordings/index', async (importOriginal) => ({
@@ -293,7 +327,7 @@ async function verifyMissingProject() {
 async function verifyBlankProjectCreation() {
   const result = await loadInitialProjectFromLocation();
 
-  expect(result).toEqual({ project: null, recordingId: null });
+  expect(result).toEqual({ project: null, recordingId: null, workspace: null });
   expect(saveVideoProject).not.toHaveBeenCalled();
 }
 
@@ -342,7 +376,7 @@ async function verifyPersistedRecordingReferences() {
   getVideoProject.mockResolvedValue({ project: persistedProject, status: 'ready' });
   mockImportedRecordingAsset();
 
-  const project = await openPersistedProject('project-1');
+  const { project } = await openPersistedProject('project-1');
 
   expect(importRecordingProjectAssetMock).not.toHaveBeenCalled();
   expect(project.assets).toEqual(persistedProject.assets);
@@ -356,7 +390,7 @@ async function verifyUnavailablePersistedRecording() {
   });
   getRecording.mockResolvedValue(undefined);
   importRecordingProjectAssetMock.mockRejectedValue(new Error('Missing source'));
-  const project = await openPersistedProject('project-1');
+  const { project } = await openPersistedProject('project-1');
   expect(project.assets[0]?.source).toEqual({ kind: 'recording', recordingId: 'recording-1' });
   expect(importRecordingProjectAssetMock).not.toHaveBeenCalled();
   expect(saveVideoProject).not.toHaveBeenCalled();
@@ -413,7 +447,10 @@ it('retains an existing temporary project before presenting it for editing', asy
     lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: project.updatedAt },
   });
   saveVideoProject.mockResolvedValue(project);
-  await expect(openPersistedProject(project.id)).resolves.toEqual(project);
+  await expect(openPersistedProject(project.id)).resolves.toMatchObject({
+    project,
+    workspaceRevision: 5,
+  });
   expect(saveVideoProject).toHaveBeenCalledWith(project, {
     baseRevision: project.updatedAt,
     expectedWorkspaceRevision: 4,
@@ -435,7 +472,7 @@ it('does not open a temporary project as saved when library retention fails', as
 it('duplicates the whole editable document without sharing mutable state', async () => {
   const original = createEmptyVideoProject('Original');
   saveVideoProject.mockImplementation(async (project) => project);
-  const copy = await copyProject(original, 'Copy');
+  const { project: copy } = await copyProject(original, 'Copy');
   expect(copy).toEqual({
     ...original,
     id: copy.id,
@@ -567,7 +604,7 @@ it.each(['none', 'text', 'image'] as const)(
     };
     const before = structuredClone(original);
     saveVideoProject.mockImplementation(async (project) => project);
-    const copy = await copyProject(original, 'Copy');
+    const { project: copy } = await copyProject(original, 'Copy');
     expect(parseHydratableVideoProject(copy)).not.toBeNull();
     expect(copy.id).not.toBe(original.id);
     expect(copy.watermark).toEqual(original.watermark);
@@ -632,7 +669,7 @@ it.each(['none', 'image', 'video'] as const)(
     original.bookendPresets = { intro: slot, outro: structuredClone(slot) };
     const before = structuredClone(original);
     saveVideoProject.mockImplementation(async (project) => project);
-    const copy = await copyProject(original, 'Copy');
+    const { project: copy } = await copyProject(original, 'Copy');
     expect(parseHydratableVideoProject(copy)).not.toBeNull();
     expect(copy.id).not.toBe(original.id);
     expect(copy.bookendPresets).toEqual(original.bookendPresets);
@@ -650,3 +687,34 @@ it.each(['none', 'image', 'video'] as const)(
 vi.mock('../../../workflows/sync-transfer/editing-admission', () => ({
   ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
 }));
+
+it('opens the admitted current and both history directions with their observed revision', async () => {
+  saveVideoProject.mockClear();
+  const project = createEmptyVideoProject('Saved current');
+  const history = {
+    status: 'ready',
+    value: {
+      projectId: project.id,
+      epoch: 'native-history',
+      past: [],
+      future: [],
+      assetsByValue: new Map(),
+    },
+  };
+  getVideoProject.mockResolvedValue({ status: 'ready', project, workspaceRevision: 19, history });
+  const workspace = await openPersistedProject(project.id);
+  expect(workspace.workspaceRevision).toBe(19);
+  expect(workspace.history).toBe(history);
+  expect(workspace.project.id).toBe(project.id);
+  expect(saveVideoProject).not.toHaveBeenCalled();
+});
+
+it('creates an opening snapshot from the publication ACK without a later database read', async () => {
+  getVideoProject.mockClear();
+  saveVideoProject.mockImplementation(async (project) => ({ ...project, name: 'Acknowledged' }));
+  const result = await createBlankProject('Requested');
+  expect(result.project.name).toBe('Acknowledged');
+  expect(result.workspaceRevision).toBe(1);
+  expect(result.history.status).toBe('absent');
+  expect(getVideoProject).not.toHaveBeenCalled();
+});

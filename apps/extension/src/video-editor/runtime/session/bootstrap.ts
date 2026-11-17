@@ -31,7 +31,12 @@ export function useVideoEditorBootstrap(
           return;
         }
 
-        if (resolved.project) applyLoadedProject(resolved.project, resolved.recordingId);
+        if (resolved.project)
+          applyLoadedProject(
+            resolved.project,
+            resolved.recordingId,
+            resolved.workspace ?? undefined
+          );
 
         setReady(true);
         if (resolved.project) {

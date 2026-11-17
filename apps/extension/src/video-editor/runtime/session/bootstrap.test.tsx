@@ -128,7 +128,7 @@ async function verifyReadyBeforeLibraryRefreshes() {
   });
   await flushEffects();
 
-  expect(applyLoadedProject).toHaveBeenCalledWith(project, 'recording-1');
+  expect(applyLoadedProject).toHaveBeenCalledWith(project, 'recording-1', undefined);
   expect(setReady).toHaveBeenCalledWith(true);
 
   refreshRecordings.resolve();
@@ -161,7 +161,7 @@ async function verifyRefreshFailuresKeepProjectReady() {
   });
   await flushEffects();
 
-  expect(applyLoadedProject).toHaveBeenCalledWith(project, 'recording-2');
+  expect(applyLoadedProject).toHaveBeenCalledWith(project, 'recording-2', undefined);
   expect(setError).not.toHaveBeenCalled();
   expect(setReady).toHaveBeenCalledWith(true);
 }

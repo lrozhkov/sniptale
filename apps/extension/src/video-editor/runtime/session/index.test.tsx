@@ -161,12 +161,18 @@ it('composes asset, preview, playback, load, and lifecycle owners into one runti
       applyLoadedProject: expect.any(Function),
     })
   );
-  renderedController.applyLoadedProject(params.project!, 'recording-2');
+  const workspace = {
+    status: 'ready' as const,
+    project: params.project!,
+    workspaceRevision: 7,
+    history: { status: 'absent' as const },
+  };
+  renderedController.applyLoadedProject(params.project!, 'recording-2', workspace);
   expect(mocks.createApplyLoadedProject).toHaveBeenCalledWith(
     params.projectState.setProject,
     params.projectState.setError
   );
-  expect(applyLoadedProject).toHaveBeenCalledWith(params.project, 'recording-2');
+  expect(applyLoadedProject).toHaveBeenCalledWith(params.project, 'recording-2', workspace);
 });
 
 it('suspends thumbnail work during playback and retains manual suspension after pause', async () => {

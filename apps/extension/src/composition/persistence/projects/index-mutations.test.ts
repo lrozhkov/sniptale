@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { commitVideoProjectMutation, commitVideoProjectWorkspaceMutation } from './index-mutations';
 import { createVideoProjectEntry } from './index.test-support';
 import type { SyncCheckpointReceipt } from '../sync-capture/contracts';
+import { createHistoryRetentionWorkspace } from '../review-workspaces/history-retention.test-support';
 
 const io = vi.hoisted(() => ({ save: vi.fn() }));
 vi.mock('./index', () => ({ saveVideoProject: io.save }));
@@ -41,4 +42,23 @@ it('keeps project-only mutation results free of ACK metadata', async () => {
     },
   });
   expect(await commitVideoProjectMutation(entry.project)).toBe(entry.project);
+});
+
+it('preserves review admission and library binding options when returning the creation ACK', async () => {
+  const entry = createVideoProjectEntry();
+  const expectedReviewWorkspace = createHistoryRetentionWorkspace();
+  io.save.mockResolvedValue(entry);
+  await commitVideoProjectWorkspaceMutation(entry.project, {
+    expectedProject: null,
+    expectedWorkspaceRevision: null,
+    expectedReviewWorkspace,
+    libraryBindings: [],
+  });
+  expect(io.save).toHaveBeenCalledExactlyOnceWith(entry.project, {
+    expectedProject: null,
+    expectedWorkspaceRevision: null,
+    expectedReviewWorkspace,
+    libraryBindings: [],
+    storageClass: 'library',
+  });
 });

@@ -7,13 +7,10 @@ import {
 import { useEffect, useRef } from 'react';
 import { createAutosaveCoordinator } from '@sniptale/platform/data/autosave';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { getVideoProject } from '../../../composition/persistence/projects/index';
-import {
-  captureVideoProjectHydrationOptions,
-  hydrateVideoProject,
-} from '../../../features/video/project/hydration';
-import { resolveVideoProjectReadResult } from '../../../composition/persistence/projects/contracts';
-import { commitVideoProjectWorkspaceMutation } from '../../../composition/persistence/projects/index-mutations';
+import { prepareVideoProjectWorkspaceCommit } from '../../../composition/persistence/projects/workspace-commit';
+import { captureVideoEditorProjectHistory } from '../../project/history';
+import type { VideoProjectHistoryCapture } from '../../../features/video/project/history-capture';
+import type { AssetRef } from '../../../composition/persistence/assets';
 import type { VideoProject } from '../../../features/video/project/types/index';
 import type { VideoEditorLibrariesState } from '../app-model/types';
 import type { VideoEditorSessionActions } from '../../contracts/commands/session';
@@ -26,6 +23,7 @@ import {
 } from './save-readiness';
 import {
   getCurrentVideoEditorProjectSnapshot,
+  getCurrentVideoEditorWorkspaceSnapshot,
   subscribeVideoEditorProjectHistory,
 } from '../controller/store';
 import { EDITOR_AUTOSAVE_POLICY } from '../../../features/autosave/policy';
@@ -55,8 +53,13 @@ type ProjectContext = {
   generation: symbol;
   project: VideoProject;
   savedProject: VideoProject;
-  initialHydrationOptions: ReturnType<typeof captureVideoProjectHydrationOptions>;
-  canonicalBase: Parameters<typeof commitVideoProjectWorkspaceMutation>[1] | undefined;
+  projectSessionId: symbol;
+  canonicalBase: { expectedProject: VideoProject; expectedWorkspaceRevision: number } | null;
+  historyAssetsByValue: ReadonlyMap<string, AssetRef>;
+  pending: {
+    captured: CapturedSave;
+    publish: Awaited<ReturnType<typeof prepareVideoProjectWorkspaceCommit>>;
+  } | null;
   requestedVersion: number;
   savedVersion: number;
   conflict: boolean;
@@ -68,6 +71,7 @@ type CapturedSave = {
   project: VideoProject;
   version: number;
   explicit: boolean;
+  history: VideoProjectHistoryCapture | null;
 };
 
 /** Coalesces uncaptured project edits through the product's document-save policy. */
@@ -146,6 +150,8 @@ function publishAutosaveReadiness(
 }
 
 function createProjectContext(project: VideoProject | null): ProjectContext | null {
+  const snapshot = getCurrentVideoEditorWorkspaceSnapshot();
+  const workspace = snapshot.project?.id === project?.id ? snapshot.nativeWorkspace : null;
   return project
     ? {
         checkpointReceipt: null,
@@ -155,10 +161,18 @@ function createProjectContext(project: VideoProject | null): ProjectContext | nu
         retirement: new AbortController(),
         generation: Symbol(),
         project,
-        savedProject: project,
-        initialHydrationOptions: captureVideoProjectHydrationOptions(),
-        canonicalBase: undefined,
-        requestedVersion: 0,
+        savedProject: workspace?.savedRuntimeProject ?? project,
+        projectSessionId: snapshot.projectSessionId,
+        canonicalBase:
+          workspace && workspace.historyStatus !== 'unavailable'
+            ? {
+                expectedProject: workspace.project,
+                expectedWorkspaceRevision: workspace.workspaceRevision,
+              }
+            : null,
+        historyAssetsByValue: workspace?.historyAssetsByValue ?? new Map(),
+        pending: null,
+        requestedVersion: workspace && project !== workspace.savedRuntimeProject ? 1 : 0,
         savedVersion: 0,
         conflict: false,
         revisionSync: null,
@@ -191,11 +205,19 @@ function scheduleDocumentAutosave(callback: () => void, delay: number) {
 
 function acknowledgeProjectSave(
   captured: CapturedSave,
-  saved: Awaited<ReturnType<typeof commitVideoProjectWorkspaceMutation>>
+  saved: Awaited<ReturnType<Awaited<ReturnType<typeof prepareVideoProjectWorkspaceCommit>>>>
 ): void {
   const current = captured.context;
+  current.historyAssetsByValue = saved.historyAssetsByValue;
+  getCurrentVideoEditorWorkspaceSnapshot().syncNativeWorkspace(current.projectSessionId, {
+    project: saved.project,
+    workspaceRevision: saved.workspaceRevision ?? 0,
+    savedRuntimeProject: captured.project,
+    historyStatus: 'ready',
+    historyAssetsByValue: saved.historyAssetsByValue,
+  });
   current.canonicalBase = {
-    expectedWorkspaceRevision: saved.workspaceRevision,
+    expectedWorkspaceRevision: saved.workspaceRevision ?? 0,
     expectedProject: saved.project,
   };
   const receipt = saved.checkpointReceipt;
@@ -298,12 +320,20 @@ function createVideoEditorAutosave(deps: { persist: typeof persistVideoProject }
     schedule: scheduleDocumentAutosave,
     capture: () => {
       if (!context || !input) throw new Error('The open video project changed.');
+      if (context.pending) return { ...context.pending.captured, explicit };
+      const snapshot = getCurrentVideoEditorWorkspaceSnapshot();
+      if (
+        snapshot.project !== context.project ||
+        snapshot.projectSessionId !== context.projectSessionId
+      )
+        throw new Error('The open video project changed.');
       return {
         context,
         input,
         project: context.project,
         version: context.requestedVersion,
         explicit,
+        history: captureVideoEditorProjectHistory(snapshot.projectHistory, context.project),
       };
     },
     commit: async (captured) => {
@@ -325,10 +355,21 @@ function createVideoEditorAutosave(deps: { persist: typeof persistVideoProject }
         if (disposed || context !== current || (!captured.explicit && !input?.enabled)) return;
         const saved = await deps.persist(
           captured,
-          () => !disposed && context === current && (captured.explicit || Boolean(input?.enabled))
+          () =>
+            !disposed &&
+            context === current &&
+            getCurrentVideoEditorWorkspaceSnapshot().projectSessionId ===
+              current.projectSessionId &&
+            (captured.explicit || Boolean(input?.enabled))
         );
         if (saved) protection.committed = true;
-        if (!saved || disposed || context !== current) return;
+        if (
+          !saved ||
+          disposed ||
+          context !== current ||
+          getCurrentVideoEditorWorkspaceSnapshot().projectSessionId !== current.projectSessionId
+        )
+          return;
         acknowledgeProjectSave(captured, saved);
         if (current.requestedVersion === captured.version && input?.enabled) {
           const sync = captured.input.syncProjectRevision;
@@ -342,11 +383,14 @@ function createVideoEditorAutosave(deps: { persist: typeof persistVideoProject }
           publish('saved');
           replaceVideoEditorUrl(saved.project.id, captured.input.recordingId);
           void captured.input.refreshProjects();
-        } else publish('dirty');
+        } else {
+          publish('dirty');
+          if (input?.enabled) coordinator.request('document', { delay: 0 });
+        }
       } catch (error) {
         flight.failed = true;
         if (disposed || context !== current) return;
-        current.conflict = error instanceof Error && error.name === 'StaleVideoProjectSaveError';
+        current.conflict = isWorkspaceConflict(error);
         if (!current.conflict) logger.error('Failed to save project', error);
         publish(current.conflict ? 'conflict' : 'error');
         throw error;
@@ -357,8 +401,7 @@ function createVideoEditorAutosave(deps: { persist: typeof persistVideoProject }
         finish();
       }
     },
-    classifyFailure: (error) =>
-      error instanceof Error && error.name === 'StaleVideoProjectSaveError' ? 'stop' : 'retry',
+    classifyFailure: (error) => (isWorkspaceConflict(error) ? 'stop' : 'retry'),
   });
   function checkpointExit(turn: ProjectContext): VideoEditorCheckpointExit {
     const receipt = turn.checkpointReceipt;
@@ -396,7 +439,12 @@ function createVideoEditorAutosave(deps: { persist: typeof persistVideoProject }
     update(next: AutosaveInput) {
       input = next;
       const project = next.project;
-      if (!project || context?.project.id !== project.id) {
+      const snapshot = getCurrentVideoEditorWorkspaceSnapshot();
+      if (
+        !project ||
+        context?.project.id !== project.id ||
+        context.projectSessionId !== snapshot.projectSessionId
+      ) {
         retireCheckpointContext(context);
         releaseBarrier?.();
         releaseBarrier = null;
@@ -408,7 +456,9 @@ function createVideoEditorAutosave(deps: { persist: typeof persistVideoProject }
           context.historyLease = history.lease;
           protectHistory(context);
         }
-        publish('saved');
+        const dirty = context && context.project !== context.savedProject;
+        publish(dirty ? 'dirty' : 'saved');
+        if (dirty && next.enabled) coordinator.request('document', EDITOR_AUTOSAVE_POLICY);
         if (context) {
           const registered = context;
           releaseBarrier = registerVideoEditorSaveBarrier(
@@ -464,6 +514,7 @@ function createVideoEditorAutosave(deps: { persist: typeof persistVideoProject }
           if (turn.conflict) throw new Error('The video project has unsaved changes.');
           if (turn.project === turn.savedProject) return;
           const version = turn.requestedVersion;
+          const savedBefore = turn.savedVersion;
           const running = activeCommit;
           if (running?.captured.context === turn && running.captured.version >= version) {
             await waitForProjectCommit(turn, running.finished);
@@ -479,7 +530,11 @@ function createVideoEditorAutosave(deps: { persist: typeof persistVideoProject }
           } finally {
             explicit = false;
           }
-          if (disposed || context !== turn || turn.savedVersion < version)
+          if (
+            disposed ||
+            context !== turn ||
+            (turn.savedVersion < version && turn.savedVersion <= savedBefore)
+          )
             throw new Error('The video project could not be saved.');
         }
         throw new Error('The open video project changed.');
@@ -508,33 +563,37 @@ function createVideoEditorAutosave(deps: { persist: typeof persistVideoProject }
 async function persistVideoProject(
   captured: CapturedSave,
   isCurrent: () => boolean
-): Promise<Awaited<ReturnType<typeof commitVideoProjectWorkspaceMutation>> | null> {
+): Promise<Awaited<
+  ReturnType<Awaited<ReturnType<typeof prepareVideoProjectWorkspaceCommit>>>
+> | null> {
   const project = captured.project;
   if (!isCurrent()) return null;
   const context = captured.context;
-  const base =
-    context.canonicalBase ??
-    (await resolveInitialWorkspaceBase(context.savedProject, context.initialHydrationOptions));
-  if (!isCurrent()) return null;
-  return commitVideoProjectWorkspaceMutation(project, base);
-}
-
-async function resolveInitialWorkspaceBase(
-  project: VideoProject,
-  hydration: ReturnType<typeof captureVideoProjectHydrationOptions>
-): Promise<Parameters<typeof commitVideoProjectWorkspaceMutation>[1]> {
-  const stored = await getVideoProject(project.id);
-  const storedProject = resolveVideoProjectReadResult(stored);
-  if (
-    stored.status !== 'ready' ||
-    stored.lifecycle?.trashedAt !== undefined ||
-    !storedProject ||
-    JSON.stringify(hydrateVideoProject(storedProject, hydration)) !==
-      JSON.stringify(hydrateVideoProject(project, hydration))
-  ) {
-    const error = new Error(`Video project ${project.id} changed in another editor`);
+  if (!context.canonicalBase || !captured.history) {
+    const error = new Error('The video project opening snapshot or history is unavailable.');
     error.name = 'StaleVideoProjectSaveError';
     throw error;
   }
-  return { expectedWorkspaceRevision: stored.workspaceRevision, expectedProject: storedProject };
+  if (!context.pending) {
+    const publish = await prepareVideoProjectWorkspaceCommit({
+      project,
+      history: captured.history,
+      ...context.canonicalBase,
+      reusableHistoryAssetsByValue: context.historyAssetsByValue,
+    });
+    context.pending = { captured, publish };
+  }
+  if (!isCurrent()) return null;
+  const pending = context.pending;
+  const saved = await pending.publish();
+  if (context.pending === pending) context.pending = null;
+  return saved;
+}
+
+function isWorkspaceConflict(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === 'StaleVideoProjectSaveError' ||
+      error.name === 'SupersededAssetPublicationError')
+  );
 }

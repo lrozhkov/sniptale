@@ -39,13 +39,42 @@ vi.mock('../../../composition/persistence/projects/index', async (importOriginal
   deleteProjectAsset,
   getProjectAsset,
   getVideoProject,
+  getVideoProjectWorkspace: async (id: string) => {
+    const result = await getVideoProject(id);
+    return result?.status === 'ready'
+      ? {
+          ...result,
+          workspaceRevision: result.workspaceRevision ?? 0,
+          history: result.history ?? { status: 'absent' },
+        }
+      : result;
+  },
 }));
 
 vi.mock('../../../composition/persistence/projects/index-mutations', async (importOriginal) => ({
   ...(await importOriginal<
     typeof import('../../../composition/persistence/projects/index-mutations')
   >()),
-  commitVideoProjectMutation: saveVideoProject,
+  commitVideoProjectWorkspaceMutation: async (
+    project: import('../../../features/video/project/types').VideoProject,
+    options: Parameters<
+      typeof import('../../../composition/persistence/projects/index-mutations').commitVideoProjectWorkspaceMutation
+    >[1]
+  ) => ({
+    project: await saveVideoProject(project, {
+      ...(options.expectedProject === null
+        ? { baseRevision: null }
+        : {
+            baseRevision: options.expectedProject.updatedAt,
+            expectedWorkspaceRevision: options.expectedWorkspaceRevision,
+          }),
+      ...(options.expectedReviewWorkspace
+        ? { expectedReviewWorkspace: options.expectedReviewWorkspace }
+        : {}),
+      ...(options.libraryBindings ? { libraryBindings: options.libraryBindings } : {}),
+    }),
+    workspaceRevision: (options.expectedWorkspaceRevision ?? 0) + 1,
+  }),
 }));
 
 vi.mock('../../../composition/persistence/recordings/index', async (importOriginal) => ({

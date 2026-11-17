@@ -289,7 +289,7 @@ function requireWorkspaceJournal(journal: AssetReadyJournal): PreparedVideoProje
 }
 
 /** Cold replay admits unknown metadata and complete file contents before native publication. */
-const videoProjectWorkspacePublicationAdapter: AssetPublicationAdapter = {
+export const videoProjectWorkspacePublicationAdapter: AssetPublicationAdapter = {
   domain: VIDEO_PROJECT_WORKSPACE_PUBLICATION_DOMAIN,
   publish: async (journal, permit) => {
     const input = requireWorkspaceJournal(journal);

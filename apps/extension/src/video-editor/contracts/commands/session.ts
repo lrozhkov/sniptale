@@ -1,6 +1,7 @@
+import type { VideoProjectWorkspaceReadResult } from '../../../composition/persistence/projects/contracts';
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import type { VideoProject } from '../../../features/video/project/types/index';
-import type { VideoEditorSaveState } from '../session-state';
+import type { VideoEditorNativeWorkspace, VideoEditorSaveState } from '../session-state';
 import type {
   VideoEditorTypingSpanTarget,
   VideoEditorTypingCompressionRequest,
@@ -8,7 +9,12 @@ import type {
 } from './timeline';
 
 export interface VideoEditorSessionActions {
-  setProject: (project: VideoProject, recordingId?: string | null) => void;
+  setProject: (
+    project: VideoProject,
+    recordingId?: string | null,
+    workspace?: Extract<VideoProjectWorkspaceReadResult, { status: 'ready' }>
+  ) => void;
+  syncNativeWorkspace: (expectedSessionId: symbol, workspace: VideoEditorNativeWorkspace) => void;
   updateProject: (updater: (project: VideoProject) => VideoProject) => void;
   syncProjectRevision: (expectedProject: VideoProject, persistedUpdatedAt: number) => void;
   setReady: (ready: boolean) => void;

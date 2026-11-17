@@ -56,7 +56,7 @@ function useApplyLoadedProject(
   setError: UseVideoEditorRuntimeParams['projectState']['setError']
 ) {
   return useCallback<ApplyLoadedProject>(
-    (project, recordingId) => createApplyLoadedProject(setProject, setError)(project, recordingId),
+    (...args) => createApplyLoadedProject(setProject, setError)(...args),
     [setError, setProject]
   );
 }

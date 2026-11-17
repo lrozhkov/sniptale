@@ -3,11 +3,13 @@ import type { VideoEditorExportRuntimeState } from '../contracts/export-state';
 import type { VideoEditorExportActions } from '../contracts/commands/export';
 import type { VideoEditorProjectActions } from '../contracts/commands/project';
 import type { VideoEditorSessionActions } from '../contracts/commands/session';
-import type { VideoEditorSaveState } from '../contracts/session-state';
+import type { VideoEditorNativeWorkspace, VideoEditorSaveState } from '../contracts/session-state';
 import type { VideoEditorProjectSliceState } from '../project/state/contracts';
 import type { VideoEditorProjectHistoryActions } from '../contracts/commands/history';
 
 interface VideoEditorTimelineState extends VideoEditorProjectSliceState {
+  nativeWorkspace: VideoEditorNativeWorkspace | null;
+  projectSessionId: symbol;
   recordingId: string | null;
   isReady: boolean;
   error: string | null;

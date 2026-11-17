@@ -699,6 +699,34 @@ it('selects the registered replica adapter and continues after a deferred replic
   expect(mocks.deleteJournal.mock.calls).toEqual([['recording']]);
 });
 
+it('retries a Montage ready journal through startup recovery after publication failure', async () => {
+  const { recoverStandaloneAssetPublications } = await import('../assets/recovery');
+  const { videoProjectWorkspacePublicationAdapter } = await import('../projects/workspace-commit');
+  const harness = createDbHarness([]);
+  mocks.runMutation.mockImplementation(async (callback) => callback(harness.db));
+  mocks.recoverStandalone.mockImplementation(recoverStandaloneAssetPublications);
+  const journal = {
+    assetRefs: [],
+    createdAt: 1,
+    domain: videoProjectWorkspacePublicationAdapter.domain,
+    journalId: 'montage-ready',
+    payload: {},
+  };
+  mocks.journals.mockResolvedValue([journal]);
+  const publish = vi.spyOn(videoProjectWorkspacePublicationAdapter, 'publish');
+  publish.mockRejectedValueOnce(new Error('Native publication failed')).mockResolvedValueOnce();
+  try {
+    await expect(recoverPendingAssetPublications()).rejects.toThrow('Native publication failed');
+    expect(mocks.deleteJournal).not.toHaveBeenCalled();
+    await expect(recoverPendingAssetPublications()).resolves.toBe(1);
+    expect(publish).toHaveBeenCalledTimes(2);
+    expect(publish).toHaveBeenLastCalledWith(journal, expect.anything(), expect.anything());
+    expect(mocks.deleteJournal.mock.calls).toEqual([['montage-ready']]);
+  } finally {
+    publish.mockRestore();
+  }
+});
+
 it('queries only each discovered object for writing-cleanup admission', async () => {
   mocks.runMutation.mockImplementation(async (effect) =>
     effect(createRetentionDatabaseFixture(async () => []))

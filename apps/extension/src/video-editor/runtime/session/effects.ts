@@ -29,8 +29,8 @@ export function createApplyLoadedProject(
   setProject: VideoEditorSessionActions['setProject'],
   setError: VideoEditorSessionActions['setError']
 ): ApplyLoadedProject {
-  return (project, recordingId) => {
-    setProject(project, recordingId);
+  return (project, recordingId = null, workspace) => {
+    setProject(project, recordingId, workspace);
     setError(null);
     replaceVideoEditorUrl(project.id, recordingId);
   };
