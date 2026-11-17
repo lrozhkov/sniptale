@@ -21,10 +21,12 @@ it.each(['preview', 'download'] as const)(
       .catch((error: unknown) => error);
     attempt.reportFailure(failure);
     attempt.reportFailure(new EffectRuntimeFrameError('circuitOpen'), 'compose');
-    const operation = destination === 'preview' ? 'preview' : 'export';
     expect(sink).toHaveBeenCalledExactlyOnceWith(
-      `${operation} outcome=failed route=render destination=${destination} ` +
-        'stage=compose code=compose-failed effectCode=timeout'
+      [
+        destination === 'preview' ? 'preview' : 'export',
+        `outcome=failed route=render destination=${destination}`,
+        'stage=compose code=compose-failed effectCode=timeout',
+      ].join(' ')
     );
   }
 );

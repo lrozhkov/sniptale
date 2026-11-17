@@ -48,7 +48,7 @@ export async function prepareEffectRuntimeGpuFramePlans(args: {
       let accepted = false;
       try {
         args.signal?.throwIfAborted();
-        if (result.kind === 'error') throw new EffectRuntimeFrameError(result.code);
+        if (result.kind === 'error') throw EffectRuntimeFrameError.fromFailure(result);
         const source =
           result.kind === 'gpu-plan' ? buildEffectRuntimeGpuPlan(result) : result.bitmap;
         const reservation = scope.reserve(collectEffectRuntimeResultBitmaps(result));

@@ -49,7 +49,7 @@ export async function renderEffectRuntimeFramePlans(args: {
       resourceScope,
       args.signal
     );
-    if (failure) throw new EffectRuntimeFrameError(failure);
+    if (failure) throw failure;
     args.signal?.throwIfAborted();
     return frames;
   } catch (error) {
@@ -93,11 +93,11 @@ async function renderDirectFramePlans(
   frames: MutableEffectRuntimeRenderedFrames,
   resourceScope: EffectRuntimeFrameResourceScope,
   signal?: AbortSignal
-): Promise<EffectRuntimeFrameError['code'] | null> {
+): Promise<EffectRuntimeFrameError | null> {
   for (const plan of plans) {
     signal?.throwIfAborted();
     const result = await executePlan(plan, {});
-    if (result.kind === 'error') return result.code;
+    if (result.kind === 'error') return EffectRuntimeFrameError.fromFailure(result);
     retainOutputBitmap(result.bitmap, resourceScope);
     frames.set(plan.effectInstanceId, toRenderedFrame(plan, result.bitmap));
   }

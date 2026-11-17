@@ -97,7 +97,7 @@ it('keeps a typed sandbox failure explicit and disposes completed output authori
   const f = fixture(undefined, 2);
   await expect(
     renderEffectRuntimeFramePlans({ ...f, plans: [plan('a'), plan('b')] })
-  ).rejects.toMatchObject({ failures: [{ code: 'timeout' }] });
+  ).rejects.toMatchObject({ name: 'EffectRuntimeFrameError', code: 'timeout' });
   expect(f.outputs).toHaveLength(1);
   expect(f.outputs[0]!.close).toHaveBeenCalledOnce();
 });

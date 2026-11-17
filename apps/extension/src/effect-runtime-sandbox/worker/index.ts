@@ -1,5 +1,8 @@
 import { collectEffectRuntimeResultBitmaps } from '../../contracts/effect-runtime/retry-inputs';
-import { EFFECT_RUNTIME_WORKER_RESPONSE } from '../../contracts/effect-runtime/types';
+import {
+  EFFECT_RUNTIME_WORKER_READY,
+  EFFECT_RUNTIME_WORKER_RESPONSE,
+} from '../../contracts/effect-runtime/types';
 import { closeEffectRuntimeBitmaps } from '../../contracts/effect-runtime/bitmap-lifetime';
 import { createEffectRuntimeFailure } from '../../contracts/effect-runtime/identity';
 import { installEffectRuntimeSandboxGuards } from '../policy/guards';
@@ -12,7 +15,14 @@ const ready = initializeLottieRuntime()
     () => true,
     () => false
   )
-  .finally(() => installEffectRuntimeSandboxGuards(self));
+  .finally(() => installEffectRuntimeSandboxGuards(self))
+  .then(
+    (initialized) => {
+      self.postMessage({ type: EFFECT_RUNTIME_WORKER_READY, initialized }, { transfer: [] });
+      return initialized;
+    },
+    () => false
+  );
 const executionState = createEffectRuntimeWorkerExecutionState();
 self.onmessage = (event: MessageEvent<unknown>) => {
   const sendFailure = () => {
