@@ -24,6 +24,8 @@ export type EffectRuntimeErrorCode =
   | 'stale'
   | 'timeout';
 
+export type EffectRuntimeStartupFailureCode = 'crashed' | 'malformed';
+
 export interface EffectRuntimeFrameIdentity {
   effectInstanceId: string;
   requestId: string;
@@ -172,6 +174,8 @@ export interface EffectRuntimeFrameSuccess extends EffectRuntimeFrameIdentity {
 export interface EffectRuntimeFrameFailure extends EffectRuntimeFrameIdentity {
   code: Exclude<EffectRuntimeErrorCode, 'cacheMiss'>;
   kind: 'error';
+  /** Diagnostic cause of the first terminal worker startup refusal. */
+  startupFailureCode?: EffectRuntimeStartupFailureCode;
 }
 
 export interface EffectRuntimeCacheMissFailure extends EffectRuntimeFrameIdentity {

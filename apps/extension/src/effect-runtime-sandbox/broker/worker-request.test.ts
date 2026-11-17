@@ -299,7 +299,10 @@ it.each(['error', 'messageerror'] as const)(
     session.preload();
     expect(workerFactory).toHaveBeenCalledOnce();
     const request = createRequest();
-    await expect(session.execute(request)).resolves.toMatchObject({ code: 'circuitOpen' });
+    await expect(session.execute(request)).resolves.toMatchObject({
+      code: 'circuitOpen',
+      startupFailureCode: failure === 'error' ? 'crashed' : 'malformed',
+    });
     await expect(session.execute(createRequest())).resolves.toMatchObject({ code: 'circuitOpen' });
     expect(workerFactory).toHaveBeenCalledOnce();
     const recovered = createEffectRuntimeWorkerSession({ workerFactory });
@@ -322,7 +325,10 @@ it('retains synchronous preload refusal until a new worker session replaces it',
   expect(() => session.preload()).not.toThrow();
   expect(() => session.preload()).not.toThrow();
   expect(workerFactory).toHaveBeenCalledOnce();
-  await expect(session.execute(createRequest())).resolves.toMatchObject({ code: 'circuitOpen' });
+  await expect(session.execute(createRequest())).resolves.toMatchObject({
+    code: 'circuitOpen',
+    startupFailureCode: 'crashed',
+  });
   expect(workerFactory).toHaveBeenCalledOnce();
   const recovered = createEffectRuntimeWorkerSession({ workerFactory });
   const request = createRequest(),
@@ -338,7 +344,10 @@ it('retains startup failure on the first real request without retrying queued fr
     throw new Error('startup');
   });
   const session = createEffectRuntimeWorkerSession({ workerFactory });
-  await expect(session.execute(createRequest())).resolves.toMatchObject({ code: 'circuitOpen' });
+  await expect(session.execute(createRequest())).resolves.toMatchObject({
+    code: 'circuitOpen',
+    startupFailureCode: 'crashed',
+  });
   await expect(session.execute(createRequest())).resolves.toMatchObject({ code: 'circuitOpen' });
   const bitmap = new FakeImageBitmap(1280, 720);
   await expect(
@@ -359,7 +368,10 @@ it('retains an asynchronous startup error during the first request', async () =>
   const pending = session.execute(createRequest());
   await Promise.resolve();
   worker.onerror?.(new FakeErrorEvent('error'));
-  await expect(pending).resolves.toMatchObject({ code: 'circuitOpen' });
+  await expect(pending).resolves.toMatchObject({
+    code: 'circuitOpen',
+    startupFailureCode: 'crashed',
+  });
   await expect(session.execute(createRequest())).resolves.toMatchObject({ code: 'circuitOpen' });
   expect(workerFactory).toHaveBeenCalledOnce();
   expect(worker.terminate).toHaveBeenCalledOnce();

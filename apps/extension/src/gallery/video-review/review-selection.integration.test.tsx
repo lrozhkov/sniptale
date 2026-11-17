@@ -24,7 +24,55 @@ const integration = vi.hoisted(() => ({
   snapshot: vi.fn(),
   download: vi.fn(),
   export: vi.fn(),
+  editorRender: vi.fn(),
+  inspectorRender: vi.fn(),
+  laneRender: vi.fn(),
+  useSilentMediaFixture: false,
 }));
+vi.mock('./use-review-audio-runtime', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./use-review-audio-runtime')>();
+  return {
+    ...actual,
+    useReviewEditorAudioRuntime: (
+      props: Parameters<typeof actual.useReviewEditorAudioRuntime>[0]
+    ) => {
+      const runtime = actual.useReviewEditorAudioRuntime(
+        integration.useSilentMediaFixture ? { ...props, silent: true } : props
+      );
+      return integration.useSilentMediaFixture ? { ...runtime, startPlayback: () => {} } : runtime;
+    },
+  };
+});
+vi.mock('./use-editor-state', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./use-editor-state')>();
+  return {
+    ...actual,
+    useReviewEditorState: (...args: Parameters<typeof actual.useReviewEditorState>) => {
+      integration.editorRender();
+      return actual.useReviewEditorState(...args);
+    },
+  };
+});
+vi.mock('./inspector-binding', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./inspector-binding')>();
+  return {
+    ...actual,
+    ReviewInspectorBinding: (props: Parameters<typeof actual.ReviewInspectorBinding>[0]) => {
+      integration.inspectorRender();
+      return actual.ReviewInspectorBinding(props);
+    },
+  };
+});
+vi.mock('./track-row', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./track-row')>();
+  return {
+    ...actual,
+    ReviewTrackRow: (props: Parameters<typeof actual.ReviewTrackRow>[0]) => {
+      if (props.track) integration.laneRender(props.track);
+      return actual.ReviewTrackRow(props);
+    },
+  };
+});
 vi.mock('../../workflows/video-review/export-lifecycle', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../workflows/video-review/export-lifecycle')>()),
   exportReviewedVideo: integration.export,
@@ -108,6 +156,82 @@ async function dragRange(
       ).dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, button: 0 }))
     );
 }
+
+it('advances the real Gallery playhead without rendering the editor, inspector or lanes per tick', async () => {
+  const fixture = createEditorFixture(integration);
+  integration.index.mockResolvedValue({
+    duration: 4,
+    boundaries: [0, 4],
+    videoCodec: 'vp8',
+    audioCodec: null,
+    container: 'webm',
+    rotation: 0,
+  });
+  integration.useSilentMediaFixture = true;
+  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+  let now = 0;
+  vi.spyOn(performance, 'now').mockImplementation(() => now);
+  let frameId = 0;
+  const frames = new Map<number, FrameRequestCallback>();
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.set(++frameId, callback);
+    return frameId;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id));
+  const tick = async (video: HTMLVideoElement, time: number) => {
+    await act(async () => {
+      now = time * 1000;
+      video.currentTime = time;
+      video.dispatchEvent(new Event('timeupdate'));
+      const callbacks = [...frames.values()];
+      frames.clear();
+      for (const callback of callbacks) callback(now);
+    });
+  };
+  const counters = [integration.editorRender, integration.inspectorRender, integration.laneRender];
+  const playhead = () =>
+    fixture.host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.rulerPlayhead"]')!;
+  for (const counter of counters) counter.mockClear();
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    const video = fixture.host.querySelector<HTMLVideoElement>(
+      '[data-ui="gallery.videoReview.stage"] video'
+    )!;
+    Object.defineProperties(video, {
+      duration: { value: 4 },
+      readyState: { value: 4 },
+    });
+    await act(async () => {
+      video.dispatchEvent(new Event('loadedmetadata'));
+      video.dispatchEvent(new Event('canplay'));
+    });
+    expect(fixture.button('play').disabled).toBe(false);
+    await fixture.click('play');
+    expect(video.play).toHaveBeenCalled();
+    await tick(video, 0.25);
+    expect(video.paused).toBe(false);
+    for (const counter of counters) {
+      expect(counter).toHaveBeenCalled();
+      counter.mockClear();
+    }
+    let previous = playhead().style.transform;
+    for (const time of [0.5, 0.75, 1, 1.25, 1.5]) {
+      await tick(video, time);
+      const current = playhead().style.transform;
+      expect(current).not.toBe(previous);
+      previous = current;
+    }
+    expect(integration.editorRender).not.toHaveBeenCalled();
+    expect(integration.inspectorRender).not.toHaveBeenCalled();
+    expect(integration.laneRender).not.toHaveBeenCalled();
+  } finally {
+    await fixture.cleanup();
+    integration.useSilentMediaFixture = false;
+  }
+});
 
 it('preserves an inside playhead when opening properties and seeks to the start only from outside', async () => {
   const scrollIntoView = Element.prototype.scrollIntoView;

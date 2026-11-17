@@ -5,6 +5,8 @@ import type {
   EffectRuntimeFrameFailure,
   EffectRuntimeRenderCommand,
 } from '../../contracts/effect-runtime/types';
+import { EffectRuntimeFrameError } from '../../features/video/composition/effect-runtime/runtime/frame-error';
+import { createReviewExportDiagnostics } from '../video-review/export-diagnostics';
 import { createEffectRuntimeSandboxExecutor } from './effect-runtime-sandbox';
 import * as sandboxRender from './effect-runtime-sandbox-render';
 
@@ -482,18 +484,36 @@ it('retains a broker startup refusal without replacing its iframe on later frame
   const iframe = document.querySelector('iframe')!;
   const requests: EffectRuntimeRenderMessage[] = [];
   const ports: MessagePort[] = [];
-  installSandboxResponder(iframe, requests, ports, (request) =>
-    createEffectRuntimeFailure(request, 'circuitOpen')
-  );
+  let firstReply = true;
+  installSandboxResponder(iframe, requests, ports, (request) => {
+    const failure = createEffectRuntimeFailure(request, 'circuitOpen');
+    if (!firstReply) return failure;
+    firstReply = false;
+    return { ...failure, startupFailureCode: 'crashed' };
+  });
   iframe.dispatchEvent(new Event('load'));
   try {
-    await expect(manager.renderFrame(createRequest())).resolves.toMatchObject({
-      code: 'circuitOpen',
-    });
+    const initial = await manager.renderFrame(createRequest());
+    expect(initial).toMatchObject({ code: 'circuitOpen', startupFailureCode: 'crashed' });
+    if (initial.kind !== 'error') throw new Error('Expected a broker startup refusal');
+    const sink = vi.fn();
+    const diagnostics = createReviewExportDiagnostics(
+      { destination: 'preview', route: 'render' },
+      sink
+    );
+    diagnostics.reportFailure(EffectRuntimeFrameError.fromFailure(initial), 'compose');
     manager.preload();
-    await expect(manager.renderFrame(createRequest())).resolves.toMatchObject({
+    const later = await manager.renderFrame(createRequest());
+    expect(later).toMatchObject({
       code: 'circuitOpen',
     });
+    expect(later).not.toHaveProperty('startupFailureCode');
+    if (later.kind !== 'error') throw new Error('Expected the circuit to stay open');
+    diagnostics.reportFailure(EffectRuntimeFrameError.fromFailure(later), 'compose');
+    expect(sink).toHaveBeenCalledExactlyOnceWith(
+      'preview outcome=failed route=render destination=preview stage=compose code=compose-failed effectCode=crashed'
+    );
+    expect(requests).toHaveLength(2);
     expect(document.querySelector('iframe')).toBe(iframe);
   } finally {
     manager.dispose();

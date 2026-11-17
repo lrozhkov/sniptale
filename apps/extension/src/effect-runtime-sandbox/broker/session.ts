@@ -55,7 +55,7 @@ export function createEffectRuntimeBrokerSession(
     execute: (value) => {
       if (workerSession.unavailable) {
         closeEffectRuntimeBitmaps(value);
-        return Promise.resolve(createEffectRuntimeFailure(value, 'circuitOpen'));
+        return Promise.resolve(workerSession.takeUnavailableFailure(value));
       }
       return executeSessionRequest(
         value,

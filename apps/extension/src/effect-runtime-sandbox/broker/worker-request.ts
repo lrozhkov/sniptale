@@ -5,8 +5,10 @@ import {
 } from '../../contracts/effect-runtime/identity';
 import type {
   EffectRuntimeErrorCode,
+  EffectRuntimeFrameFailure,
   EffectRuntimeFrameResult,
   EffectRuntimeSceneResult,
+  EffectRuntimeStartupFailureCode,
   EffectRuntimeWorkerMessage,
 } from '../../contracts/effect-runtime/types';
 import { EFFECT_RUNTIME_RESOURCE_LIMITS } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
@@ -33,9 +35,11 @@ interface EffectRuntimeWorkerLease {
   worker: EffectRuntimeWorkerLike | null;
   started: boolean;
   unavailable: boolean;
+  startupFailure?: EffectRuntimeStartupFailureCode;
 }
 interface EffectRuntimeWorkerSession {
   readonly unavailable: boolean;
+  takeUnavailableFailure(value: unknown): EffectRuntimeFrameFailure;
   /** Start trusted worker modules without posting a user frame or consuming queue admission. */
   preload(): void;
   execute(request: EffectRuntimeWorkerMessage): Promise<EffectRuntimeFrameResult>;
@@ -43,6 +47,20 @@ interface EffectRuntimeWorkerSession {
     request: EffectRuntimeWorkerMessage,
     output: 'gpu-scene'
   ): Promise<EffectRuntimeSceneResult>;
+}
+
+function startupRefusal(
+  value: unknown,
+  startupFailureCode?: EffectRuntimeStartupFailureCode
+): EffectRuntimeFrameFailure {
+  const refusal = createEffectRuntimeFailure(value, 'circuitOpen');
+  return startupFailureCode ? { ...refusal, startupFailureCode } : refusal;
+}
+
+function takeUnavailableFailure(lease: EffectRuntimeWorkerLease, value: unknown) {
+  const startupFailureCode = lease.startupFailure;
+  delete lease.startupFailure;
+  return startupRefusal(value, startupFailureCode);
 }
 
 /** One worker owns retained Lottie players and executes one request at a time. */
@@ -62,20 +80,22 @@ export function createEffectRuntimeWorkerSession(
       worker = options.workerFactory();
     } catch {
       lease.unavailable = true;
+      lease.startupFailure = 'crashed';
       return;
     }
     lease.worker = worker;
-    const retire = () => {
+    const retire = (code: EffectRuntimeStartupFailureCode) => {
       if (lease.worker !== worker) return;
       worker.onerror = null;
       worker.onmessageerror = null;
       worker.terminate();
       lease.worker = null;
       lease.unavailable = true;
+      lease.startupFailure = code;
       lease.onReset?.();
     };
-    worker.onerror = retire;
-    worker.onmessageerror = retire;
+    worker.onerror = () => retire('crashed');
+    worker.onmessageerror = () => retire('malformed');
   };
   let queue = Promise.resolve();
   function execute(request: EffectRuntimeWorkerMessage): Promise<EffectRuntimeFrameResult>;
@@ -101,6 +121,7 @@ export function createEffectRuntimeWorkerSession(
   return {
     execute,
     preload,
+    takeUnavailableFailure: (value) => takeUnavailableFailure(lease, value),
     get unavailable() {
       return lease.unavailable;
     },
@@ -248,16 +269,16 @@ function startWorkerOperation(
   };
   try {
     if (lease.unavailable) {
-      fail('circuitOpen');
+      finish(takeUnavailableFailure(lease, original), true);
       return { result, drained };
     }
     if (!lease.worker) lease.started = false;
     worker = lease.worker ?? options.workerFactory();
     lease.worker = worker;
-    const failWorker = (code: 'crashed' | 'malformed') => {
+    const failWorker = (code: EffectRuntimeStartupFailureCode) => {
       if (!terminateAfterResult && !lease.started) {
         lease.unavailable = true;
-        fail('circuitOpen');
+        finish(startupRefusal(original, code), true);
       } else fail(code);
     };
     worker.onerror = () => failWorker('crashed');
@@ -265,8 +286,10 @@ function startWorkerOperation(
     worker.onmessage = onMessage;
     start();
   } catch {
-    if (!worker && !terminateAfterResult) lease.unavailable = true;
-    fail(lease.unavailable ? 'circuitOpen' : 'crashed');
+    if (!worker && !terminateAfterResult) {
+      lease.unavailable = true;
+      finish(startupRefusal(original, 'crashed'), true);
+    } else fail('crashed');
     if (!worker) lease.onReset?.();
   }
   return { result, drained };

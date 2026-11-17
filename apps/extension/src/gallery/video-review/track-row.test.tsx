@@ -305,6 +305,67 @@ it('publishes only the affected lane flags while commands read the latest commit
   }
 });
 
+it.each(['annotationEffects', 'text'] as const)(
+  'changes %s visibility in both directions without committing unrelated lane controls',
+  async (track) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    const advanced = createQuickEditAdvancedState();
+    const otherCommits = vi.fn();
+    const rows = (
+      <>
+        <ReviewTrackRow track={track} label="Target">
+          <div />
+        </ReviewTrackRow>
+        <Profiler id="unrelated" onRender={otherCommits}>
+          <ReviewTrackRow track="music" label="Music">
+            <div />
+          </ReviewTrackRow>
+          <ReviewTrackRow track="source" label="Source">
+            <div />
+          </ReviewTrackRow>
+        </Profiler>
+      </>
+    );
+    function Fixture() {
+      const [enabled, setEnabled] = useState(true);
+      return (
+        <ReviewTrackControlsProvider
+          value={{
+            ui: { ...advanced.ui, tracks: { ...advanced.ui.tracks, [track]: enabled } },
+            configuring: true,
+            busy: false,
+            unavailable: {},
+            setEnabled: (_track, next) => setEnabled(next),
+          }}
+        >
+          {rows}
+        </ReviewTrackControlsProvider>
+      );
+    }
+    try {
+      await act(async () => root.render(<Fixture />));
+      const toggle = host.querySelector<HTMLButtonElement>(
+        `[data-review-header-track="${track}"] [role="switch"]`
+      )!;
+      expect(toggle.getAttribute('aria-checked')).toBe('true');
+      expect(otherCommits).toHaveBeenCalled();
+      otherCommits.mockClear();
+      for (const expected of ['false', 'true']) {
+        await act(async () => toggle.click());
+        expect(toggle.getAttribute('aria-checked')).toBe(expected);
+        expect(otherCommits).not.toHaveBeenCalled();
+      }
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+      vi.unstubAllGlobals();
+    }
+  }
+);
+
 it('retains header identity during fresh lane and action updates while commands stay live', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');

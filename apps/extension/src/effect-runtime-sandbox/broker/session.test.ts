@@ -319,7 +319,10 @@ it('retains worker constructor refusal across broker frames while a new broker c
     prepare: vi.fn().mockResolvedValue(createWorkerRequest()),
   });
   const message = await createMessage();
-  await expect(session.execute(message)).resolves.toMatchObject({ code: 'circuitOpen' });
+  await expect(session.execute(message)).resolves.toMatchObject({
+    code: 'circuitOpen',
+    startupFailureCode: 'crashed',
+  });
   await expect(session.execute(message)).resolves.toMatchObject({ code: 'circuitOpen' });
   expect(workerFactory).toHaveBeenCalledOnce();
   const recovered = createEffectRuntimeBrokerSession({
