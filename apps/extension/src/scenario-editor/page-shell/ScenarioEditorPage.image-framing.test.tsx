@@ -61,15 +61,13 @@ vi.mock('./image-editor', async (original) => ({
 vi.mock('./runtime/resource-session', () => ({ useGuideResourceSession: () => enterSession }));
 const enterSession = async () => true;
 vi.mock('../../composition/persistence/scenario/history', () => ({
-  getScenarioSavedVersions: async (id: string) => {
+  getScenarioEditingSnapshot: async (id: string) => {
     const project = await io.load(id);
     return project
       ? {
-          currentRevision: 1,
-          versions: [
-            { project, revision: 1, savedAt: project.updatedAt },
-            ...(io.previous() ?? []),
-          ],
+          project,
+          workspaceRevision: 1,
+          editingHistory: { version: 1, past: io.previous() ?? [], future: [] },
         }
       : null;
   },
@@ -794,7 +792,7 @@ it('detaches old media URLs before revocation across undo, redo and a delayed as
     items: [{ ...step, blocks: blocks.map((block) => ({ ...block, assetId: 'prior-original' })) }],
   };
   io.load.mockResolvedValue(project);
-  io.previous.mockReturnValue([{ project: previous, revision: 0, savedAt: 90 }]);
+  io.previous.mockReturnValue([previous]);
   const blob = new Blob(['image'], { type: 'image/png' });
   io.asset.mockResolvedValue(blob);
   const sources = () =>

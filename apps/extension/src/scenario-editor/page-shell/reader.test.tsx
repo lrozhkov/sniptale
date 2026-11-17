@@ -38,15 +38,13 @@ vi.mock('./runtime/html-export', () => ({ exportGuideHtml: io.html }));
 vi.mock('./runtime/resource-session', () => ({ useGuideResourceSession: () => enterSession }));
 const enterSession = async () => true;
 vi.mock('../../composition/persistence/scenario/history', () => ({
-  getScenarioSavedVersions: async (id: string) => {
+  getScenarioEditingSnapshot: async (id: string) => {
     const project = await io.load(id);
     return project
       ? {
-          currentRevision: 1,
-          versions: [
-            { project, revision: 1, savedAt: project.updatedAt },
-            ...(io.previous() ?? []),
-          ],
+          project,
+          workspaceRevision: 1,
+          editingHistory: { version: 1, past: io.previous() ?? [], future: [] },
         }
       : null;
   },

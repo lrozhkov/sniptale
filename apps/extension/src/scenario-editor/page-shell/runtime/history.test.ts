@@ -44,7 +44,7 @@ it('captures final X before Y when X already published a technical maxWait inter
     group: 'tags',
     actionId: Y,
   });
-  expect(state).toHaveProperty('closedCaptures', [{ project: finalX, actionId: X }]);
+  expect(state.past.at(-1)).toBe(finalX);
   expect(state).toHaveProperty('actionId', Y);
   state = reduceGuideHistory(state, {
     kind: 'undo',
@@ -54,7 +54,7 @@ it('captures final X before Y when X already published a technical maxWait inter
   expect(state.present?.tags).toEqual([]);
 });
 
-it('keeps a newer closed Redo capture when an older acknowledgement shares its project object', () => {
+it('keeps the Redo cursor when an older acknowledgement shares its project object', () => {
   const X = '00000000-0000-4000-8000-000000000001';
   const U = '00000000-0000-4000-8000-000000000002';
   const R = '00000000-0000-4000-8000-000000000003';
@@ -75,7 +75,9 @@ it('keeps a newer closed Redo capture when an older acknowledgement shares its p
     project: { ...source, updatedAt: 2 },
     actionId: X,
   });
-  expect(state.closedCaptures?.some((capture) => capture.actionId === R)).toBe(true);
+  expect(state.actionId).toBe(R);
+  expect(state.future).toEqual([]);
+  expect(state.past.map((project) => project.name)).toEqual(['Original']);
 });
 
 it('retains unchanged canonical item references when publishing the current autosave source', () => {
@@ -300,6 +302,8 @@ it('undoes and redoes frameless title and body together in one history entry', (
 it('does not repeatedly serialize retained snapshots when editing another snapshot', () => {
   const reduce = createGuideHistoryReducer();
   const project = createGuideProject('Original', 'measure', 1);
+  const shared = createGuideStep('Shared', 'shared');
+  project.items = [shared];
   const stringify = vi.spyOn(JSON, 'stringify');
   try {
     let state: GuideHistory = { present: null, past: [], future: [], group: null };
@@ -312,7 +316,7 @@ it('does not repeatedly serialize retained snapshots when editing another snapsh
       });
     }
     expect(state.past).toHaveLength(8);
-    expect(stringify.mock.calls.filter(([value]) => value === project)).toHaveLength(1);
+    expect(stringify.mock.calls.filter(([value]) => value === shared)).toHaveLength(1);
     state = reduce(state, { kind: 'undo' });
     expect(state.present?.name).toBe('Edit 6');
     state = reduce(state, { kind: 'redo' });
@@ -335,7 +339,6 @@ it('restores the current cursor and both navigation branches without creating an
       ...initial(),
       group: 'old-group',
       actionId: 'old-action',
-      closedCaptures: [{ project: initial().present!, actionId: 'old-action' }],
     },
     restore
   );
@@ -343,7 +346,6 @@ it('restores the current cursor and both navigation branches without creating an
   expect(state.future).toEqual([after, last]);
   expect(state.group).toBeNull();
   expect(state.actionId).toBeUndefined();
-  expect(state.closedCaptures).toBeUndefined();
   state = reduceGuideHistory(state, { kind: 'redo' });
   expect(state.present?.name).toBe('After');
   state = reduceGuideHistory(state, { kind: 'redo' });
@@ -397,4 +399,86 @@ it('bounds a restored timeline around the current cursor and branches on the nex
   expect(state.future).toEqual([]);
   state = reduceGuideHistory(state, { kind: 'undo' });
   expect(state.present).toBe(project);
+});
+
+it('preserves fifty native transitions sharing one large item on hydration and navigation', () => {
+  const current = createGuideProject('Current', 'pooled-runtime', 100);
+  const item = createGuideStep('Shared', 'shared');
+  item.blocks.push({
+    kind: 'text',
+    id: 'text',
+    paragraphs: Array.from({ length: 30 }, () => ({
+      runs: [{ text: 'x'.repeat(10000), bold: false, italic: false, href: null }],
+    })),
+  });
+  current.items = [item];
+  const past = Array.from({ length: 25 }, (_, index) => ({ ...current, name: `Past ${index}` }));
+  const future = Array.from({ length: 25 }, (_, index) => ({
+    ...current,
+    name: `Future ${index}`,
+  }));
+  const reduce = createGuideHistoryReducer();
+  let state = reduce(initial(), { kind: 'reset', project: current, past, future });
+  expect(state.past).toHaveLength(25);
+  expect(state.future).toHaveLength(25);
+  state = reduce(state, { kind: 'redo' });
+  expect(state.past).toHaveLength(26);
+  expect(state.future).toHaveLength(24);
+  expect(state.present?.name).toBe('Future 0');
+});
+
+it('removes a no-op field group and restores its original Redo even after an intermediate ACK', () => {
+  const current = initial().present!;
+  const before = { ...current, name: 'Before' };
+  const future = { ...current, name: 'Original Redo' };
+  let state = reduceGuideHistory(initial(), {
+    kind: 'reset',
+    project: current,
+    past: [before],
+    future: [future],
+  });
+  state = reduceGuideHistory(state, {
+    kind: 'edit',
+    project: { ...current, name: 'Intermediate' },
+    group: 'name',
+    actionId: 'X',
+  });
+  const intermediate = state.present!;
+  state = reduceGuideHistory(state, {
+    kind: 'publish',
+    project: { ...intermediate, updatedAt: 2 },
+    source: intermediate,
+    actionId: 'X',
+  });
+  state = reduceGuideHistory(state, {
+    kind: 'edit',
+    project: { ...state.present!, name: current.name },
+    group: 'name',
+    actionId: 'ignored',
+  });
+  expect(state.present).toMatchObject({ name: 'Original', updatedAt: 2 });
+  expect(state.past).toEqual([before]);
+  expect(state.future).toEqual([future]);
+  state = reduceGuideHistory(state, { kind: 'redo', actionId: 'R' });
+  expect(state.present?.name).toBe('Original Redo');
+});
+
+it('keeps both branches when a reversible command acknowledges unchanged content', () => {
+  const current = initial().present!;
+  const before = { ...current, name: 'Before' };
+  const after = { ...current, name: 'Redo' };
+  let state = reduceGuideHistory(initial(), {
+    kind: 'reset',
+    project: current,
+    past: [before],
+    future: [after],
+  });
+  state = reduceGuideHistory(state, {
+    kind: 'commit',
+    project: { ...current, updatedAt: 2 },
+    reversible: true,
+  });
+  expect(state.past).toEqual([before]);
+  expect(state.future).toEqual([after]);
+  expect(state.present).toMatchObject({ name: current.name, updatedAt: 2 });
 });

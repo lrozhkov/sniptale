@@ -35,17 +35,29 @@ export function parseScenarioEditingHistory(
   return { version: 1, past, future };
 }
 
-function createScenarioEditingBudget() {
+interface EditingMeasureCache {
+  roots: WeakMap<GuideProject, number>;
+  units: WeakMap<object, { key: string; bytes: number }>;
+}
+
+function createScenarioEditingBudget(cache?: EditingMeasureCache) {
   const encoder = new TextEncoder();
   const units = new Set<string>();
   const measured = new WeakSet<object>();
   let bytes = 0;
   function measure(project: GuideProject): boolean {
     const { items, tour, ...root } = project;
-    bytes += encoder.encode(
-      JSON.stringify({ ...root, items: [], ...(tour ? { tour: { ...tour, slides: [] } } : {}) })
-    ).byteLength;
-    bytes += Math.max(0, items.length - 1) + Math.max(0, (tour?.slides.length ?? 0) - 1);
+    let rootBytes = cache?.roots.get(project);
+    if (rootBytes === undefined) {
+      rootBytes =
+        encoder.encode(
+          JSON.stringify({ ...root, items: [], ...(tour ? { tour: { ...tour, slides: [] } } : {}) })
+        ).byteLength +
+        Math.max(0, items.length - 1) +
+        Math.max(0, (tour?.slides.length ?? 0) - 1);
+      cache?.roots.set(project, rootBytes);
+    }
+    bytes += rootBytes;
     for (const [kind, values] of [
       ['guide', items],
       ['tour', tour?.slides ?? []],
@@ -53,11 +65,15 @@ function createScenarioEditingBudget() {
       for (const unit of values) {
         if (measured.has(unit)) continue;
         measured.add(unit);
-        const json = JSON.stringify(unit);
-        const key = `${kind}:${json}`;
-        if (units.has(key)) continue;
-        units.add(key);
-        bytes += encoder.encode(json).byteLength;
+        let encoded = cache?.units.get(unit);
+        if (!encoded) {
+          const json = JSON.stringify(unit);
+          encoded = { key: `${kind}:${json}`, bytes: encoder.encode(json).byteLength };
+          cache?.units.set(unit, encoded);
+        }
+        if (units.has(encoded.key)) continue;
+        units.add(encoded.key);
+        bytes += encoded.bytes;
         if (bytes > EDITOR_HISTORY_LIMITS.maxBytes) return false;
       }
     }
@@ -66,22 +82,52 @@ function createScenarioEditingBudget() {
   return measure;
 }
 
-/** Select the nearest past from canonically admitted projects, sharing immutable unit accounting. */
+/** Select the nearest states from admitted projects under the shared navigation budget. */
 export function retainScenarioEditingHistory(
   current: GuideProject,
-  past: readonly GuideProject[]
+  past: readonly GuideProject[],
+  future: readonly GuideProject[] = []
 ): ScenarioEditingHistory {
-  const retained: GuideProject[] = [];
-  if (past.length) {
-    const measure = createScenarioEditingBudget();
+  return retainScenarioEditingWindow(current, past, future);
+}
+
+/** One reducer may cache encodings of its immutable projects and units without retaining them. */
+export function createScenarioEditingRetainer() {
+  const cache: EditingMeasureCache = { roots: new WeakMap(), units: new WeakMap() };
+  return (
+    current: GuideProject,
+    past: readonly GuideProject[],
+    future: readonly GuideProject[] = []
+  ) => retainScenarioEditingWindow(current, past, future, cache);
+}
+
+function retainScenarioEditingWindow(
+  current: GuideProject,
+  past: readonly GuideProject[],
+  future: readonly GuideProject[],
+  cache?: EditingMeasureCache
+): ScenarioEditingHistory {
+  const before: GuideProject[] = [];
+  const after: GuideProject[] = [];
+  if (past.length || future.length) {
+    const measure = createScenarioEditingBudget(cache);
     if (measure(current)) {
-      const start = Math.max(0, past.length - EDITOR_HISTORY_LIMITS.maxActions);
-      for (let index = past.length - 1; index >= start; index--) {
-        const project = past[index]!;
-        if (!measure(project)) break;
-        retained.push(project);
+      const distances = Math.max(past.length, future.length);
+      outer: for (let distance = 1; distance <= distances; distance++) {
+        for (const [project, retained] of [
+          [past[past.length - distance], before],
+          [future[distance - 1], after],
+        ] as const) {
+          if (!project) continue;
+          if (
+            before.length + after.length === EDITOR_HISTORY_LIMITS.maxActions ||
+            !measure(project)
+          )
+            break outer;
+          retained.push(project);
+        }
       }
     }
   }
-  return { version: 1, past: retained.reverse(), future: [] };
+  return { version: 1, past: before.reverse(), future: after };
 }

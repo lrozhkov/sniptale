@@ -803,3 +803,32 @@ it('selects immutable native snapshot acknowledgement proof for the review write
     'apps/extension/src/composition/persistence/review-workspaces/store-history-retention.test.ts'
   );
 });
+
+it.each([
+  {
+    owner: 'native checkpoint',
+    production: 'apps/extension/src/composition/persistence/scenario/editing-history.ts',
+    expected: [
+      'apps/extension/src/composition/persistence/scenario/aggregate-checkpoint-write.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.identity.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+    ],
+  },
+  {
+    owner: 'page snapshot',
+    production: 'apps/extension/src/scenario-editor/page-shell/runtime/use-state.ts',
+    expected: [
+      'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.autosave.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.image-framing.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/reader.test.tsx',
+    ],
+  },
+])(
+  'selects Scenario $owner consumers for runtime checkpoint activation',
+  async ({ production, expected }) => {
+    const module = await importOwnerMap();
+    expect(module.resolveMappedCoverageOwnerTests(production)).toEqual(
+      expect.arrayContaining(expected)
+    );
+  }
+);

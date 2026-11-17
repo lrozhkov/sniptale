@@ -1255,7 +1255,11 @@ Generic content commands append the previous current project to an existing edit
 
 The editing snapshot reader obtains current content, revision and navigation from one admitted native entry. An explicit empty checkpoint overrides the saved archive. Only legacy entries without a checkpoint derive bounded past from saved revisions. The saved-version query retains its separate archive meaning.
 
-This storage generation has no page checkpoint producer. Archive, sync, native command and editing snapshot support do not complete durable Undo/Redo reopening.
+The Scenario page loads the editing snapshot and restores both navigation branches without creating an action. Runtime retention shares the native pooled budget across both branches. Each reducer caches encodings of its immutable projects and units through weak references.
+
+Autosave captures current content and the complete editing checkpoint together through the existing ordered coordinator and CAS writer. One latest checkpoint preserves finished actions without draining them into saved revisions. Content equality alone cannot acknowledge a different checkpoint. A late acknowledgement preserves newer pending navigation.
+
+Automatic saves preserve the active edit group. A transient group origin retains its original navigation by reference until the field group ends. Returning to the original content restores that navigation without an empty action. Branches with the same captured nodes and order reuse their native acknowledgement without another write. Generic command acknowledgements supply their canonical navigation checkpoint.
 
 
 Explicit Library removal clears selected resource references from current content, saved revisions and both editing branches. It preserves branch order and historical timestamps. The operation retains existing image slots, captions and layout. It does not append an editing action. The native transaction publishes the sanitized graph and removes child ownership together. Revision exhaustion refuses the transaction and preserves its predecessor.

@@ -20,7 +20,7 @@ const io = vi.hoisted(() => ({
 vi.mock('./resource-session', () => ({ useGuideResourceSession: () => enterSession }));
 const enterSession = async () => true;
 vi.mock('../../../composition/persistence/scenario/history', () => ({
-  getScenarioSavedVersions: io.load,
+  getScenarioEditingSnapshot: io.load,
 }));
 vi.mock('../../../composition/persistence/scenario/store/project-records/assets', () => ({
   getScenarioAssetBlob: io.read,
@@ -85,8 +85,9 @@ beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   window.history.replaceState({}, '', '/?projectId=guide');
   io.load.mockResolvedValue({
-    currentRevision: 1,
-    versions: [{ project: fixture(), revision: 1, savedAt: 1 }],
+    project: fixture(),
+    workspaceRevision: 1,
+    editingHistory: { version: 1 as const, past: [], future: [] },
   });
   io.attach.mockImplementation(async ({ project, objectId }) => {
     const next = structuredClone(project);
@@ -276,8 +277,9 @@ it('releases and reacquires the same media IDs when opening another project', as
   next.id = 'other';
   io.list.mockResolvedValue([{ id: 'other', availability: 'available' }]);
   io.load.mockResolvedValue({
-    currentRevision: 1,
-    versions: [{ project: next, revision: 1, savedAt: 1 }],
+    project: next,
+    workspaceRevision: 1,
+    editingHistory: { version: 1 as const, past: [], future: [] },
   });
   await act(async () => state.openExisting('other'));
   expect(urls.revoke).toHaveBeenCalledWith('blob:voice-1');
@@ -295,12 +297,14 @@ it('refuses an old resource callback after a same-id A/B/A document round trip',
   ]);
   io.load
     .mockResolvedValueOnce({
-      currentRevision: 17,
-      versions: [{ project: other, revision: 17, savedAt: 1 }],
+      project: other,
+      workspaceRevision: 17,
+      editingHistory: { version: 1 as const, past: [], future: [] },
     })
     .mockResolvedValueOnce({
-      currentRevision: 37,
-      versions: [{ project: { ...original, name: 'Reopened A' }, revision: 37, savedAt: 1 }],
+      project: { ...original, name: 'Reopened A' },
+      workspaceRevision: 37,
+      editingHistory: { version: 1 as const, past: [], future: [] },
     });
   await act(async () => state.openExisting('other'));
   await act(async () => state.openExisting(original.id));
@@ -325,8 +329,9 @@ it('refuses a normal document switch during a pending resource mutation and admi
   const other = { ...original, id: 'other', name: 'Other document' };
   io.list.mockResolvedValue([{ id: other.id, availability: 'available' }]);
   io.load.mockResolvedValue({
-    currentRevision: 37,
-    versions: [{ project: other, revision: 37, savedAt: 1 }],
+    project: other,
+    workspaceRevision: 37,
+    editingHistory: { version: 1 as const, past: [], future: [] },
   });
   await act(async () => state.openExisting(other.id));
   expect(io.load).toHaveBeenCalledOnce();
@@ -358,8 +363,9 @@ it('discards a pending resource acknowledgement in a replacement document lifeti
   const other = { ...original, id: 'other', name: 'Other document' };
   io.list.mockResolvedValue([{ id: other.id, availability: 'available' }]);
   io.load.mockResolvedValue({
-    currentRevision: 37,
-    versions: [{ project: other, revision: 37, savedAt: 1 }],
+    project: other,
+    workspaceRevision: 37,
+    editingHistory: { version: 1 as const, past: [], future: [] },
   });
   await act(async () => root.unmount());
   window.history.replaceState({}, '', '/?projectId=other');

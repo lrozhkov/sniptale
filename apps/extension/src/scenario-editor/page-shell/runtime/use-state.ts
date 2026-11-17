@@ -22,7 +22,7 @@ import {
   duplicateScenarioProjectRecord,
   deleteScenarioProjectRecord,
 } from '../../../composition/persistence/scenario/store/public';
-import { getScenarioSavedVersions } from '../../../composition/persistence/scenario/history';
+import { getScenarioEditingSnapshot } from '../../../composition/persistence/scenario/history';
 import { getScenarioAssetBlob } from '../../../composition/persistence/scenario/store/project-records/assets';
 import { replaceScenarioEditorSelectionInUrl } from '../../platform/browser-driver';
 import { useGuideHistory } from './history';
@@ -102,7 +102,7 @@ export function useGuidePageState() {
   const [, publishMutationRelease] = useReducer((revision: number) => revision + 1, 0);
   const autosaving = useRef(false);
   const autosaveOwner = useRef<ReturnType<typeof useGuideAutosave> | null>(null);
-  const { project, reset, commit, publish, actionId, closedCaptures, ...editing } = useGuideHistory(
+  const { project, reset, commit, publish, actionId, editingHistory, ...editing } = useGuideHistory(
     {
       canEdit: () => (!busy.current || autosaving.current) && status !== 'loading',
       onEdit: () => {
@@ -139,9 +139,7 @@ export function useGuidePageState() {
         return;
       }
       if (turn !== generation.current) return;
-      const { loaded, savedSnapshot, previousProjects } = await readGuideHistoryProjection(
-        requestedId.current
-      );
+      const { loaded, savedSnapshot } = await readGuideHistoryProjection(requestedId.current);
       if (turn !== generation.current) return;
       if (!loaded && retained.project) {
         rejectLoad();
@@ -149,7 +147,11 @@ export function useGuidePageState() {
       }
       setActionError(null);
       saved.current = savedSnapshot;
-      reset(loaded, previousProjects);
+      reset(
+        loaded,
+        [...(savedSnapshot?.editingHistory?.past ?? [])],
+        [...(savedSnapshot?.editingHistory?.future ?? [])]
+      );
       setStatus(loaded ? 'ready' : 'missing');
     } catch (error) {
       rejectLoad(error instanceof UnsupportedScenarioTourError ? 'unsupported' : 'unavailable');
@@ -171,19 +173,26 @@ export function useGuidePageState() {
   const acceptProject = (committed: ScenarioProjectSnapshot, reversible = false) => {
     saved.current = committed;
     current.current = { ...current.current, project: committed.project, status: 'saved' };
-    commit(committed.project, reversible);
+    if (committed.editingHistory)
+      reset(
+        committed.project,
+        [...committed.editingHistory.past],
+        [...committed.editingHistory.future]
+      );
+    else commit(committed.project, reversible);
     setStatus('saved');
   };
-  const openProject = async (
-    snapshot: ScenarioProjectSnapshot | null,
-    previous: GuideProject[] = []
-  ) => {
+  const openProject = async (snapshot: ScenarioProjectSnapshot | null) => {
     const committed = snapshot?.project ?? null;
     if (!(await enterResourceSession(committed?.id ?? null))) return;
     generation.current += 1;
     requestedId.current = committed?.id ?? null;
     saved.current = snapshot;
-    reset(committed, previous);
+    reset(
+      committed,
+      [...(snapshot?.editingHistory?.past ?? [])],
+      [...(snapshot?.editingHistory?.future ?? [])]
+    );
     setStatus(committed ? 'saved' : 'empty');
     clearSelection();
     replaceScenarioEditorSelectionInUrl({ projectId: committed?.id ?? null });
@@ -191,7 +200,7 @@ export function useGuidePageState() {
   const autosave = useGuideAutosave({
     project,
     actionId,
-    closedCaptures,
+    editingHistory,
     onSealEdit: editing.sealEdit,
     enabled: autosaveEnabled,
     dirty: status === 'dirty',
@@ -667,19 +676,11 @@ function createGuideCommitDispatcher({
   return commitChange;
 }
 
-/** Reads the canonical saved versions without changing the page's generation or load policy. */
+/** Reads current and exact navigation through the same native snapshot owner as recent projects. */
 async function readGuideHistoryProjection(id: string) {
-  const history = await getScenarioSavedVersions(id);
-  if (!history) await assertScenarioTourSupported(id);
-  const [current, ...previous] = history?.versions ?? [];
-  return {
-    loaded: current?.project ?? null,
-    savedSnapshot:
-      history && current
-        ? { project: current.project, workspaceRevision: history.currentRevision }
-        : null,
-    previousProjects: previous.map((version) => version.project).reverse(),
-  };
+  const snapshot = await getScenarioEditingSnapshot(id);
+  if (!snapshot) await assertScenarioTourSupported(id);
+  return { loaded: snapshot?.project ?? null, savedSnapshot: snapshot };
 }
 
 function narrationMatches(

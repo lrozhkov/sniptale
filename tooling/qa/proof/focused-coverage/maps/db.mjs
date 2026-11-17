@@ -338,6 +338,22 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'scenario-pooled-editing-checkpoint',
+    productionFile: 'apps/extension/src/composition/persistence/scenario/editing-history.ts',
+    exclusive: true,
+    reason:
+      'Shared pooled admission and retention affect native commands and editing snapshots. ' +
+      'Native CAS, revision identity and unit storage proof must accompany runtime activation.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/scenario/editing-history.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-checkpoint-write.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.identity.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-unit-storage.test.ts',
+      'apps/extension/src/composition/persistence/scenario/history.test.ts',
+    ],
+  },
+  {
     owner: 'shared-db-scenario-project-entry',
     productionFile: 'apps/extension/src/composition/persistence/scenario/projects/entry.ts',
     reason:

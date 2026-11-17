@@ -1,7 +1,11 @@
 import { createScenarioProjectEntry } from './projects/entry';
 import { expect, it, vi } from 'vitest';
 import { createGuideProject, createGuideStep } from '../../../features/scenario/project/factories';
-import { parseScenarioEditingHistory, retainScenarioEditingHistory } from './editing-history';
+import {
+  parseScenarioEditingHistory,
+  retainScenarioEditingHistory,
+  createScenarioEditingRetainer,
+} from './editing-history';
 import { parseScenarioProjectEntry } from './read-guards';
 import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 
@@ -252,4 +256,38 @@ it('keeps oversized current content valid by retaining no editing transitions', 
   const retained = retainScenarioEditingHistory(current, [project('Previous')]);
   expect(retained).toEqual({ version: 1, past: [], future: [] });
   expect(parseScenarioEditingHistory(retained, current)).toEqual(retained);
+});
+
+it('shares one pooled budget across both branches and caches immutable encodings per reducer', () => {
+  const current = large('Current', 'x');
+  const past = Array.from({ length: 25 }, (_, index) => ({ ...current, name: `Past ${index}` }));
+  const future = Array.from({ length: 25 }, (_, index) => ({
+    ...current,
+    name: `Future ${index}`,
+  }));
+  const retain = createScenarioEditingRetainer();
+  const stringify = vi.spyOn(JSON, 'stringify');
+  let calls = 0;
+  try {
+    expect(retain(current, past, future)).toEqual({ version: 1, past, future });
+    expect(retain({ ...current, name: 'New current' }, past, future)).toEqual({
+      version: 1,
+      past,
+      future,
+    });
+    calls = stringify.mock.calls.filter(([value]) => value === current.items[0]).length;
+  } finally {
+    stringify.mockRestore();
+  }
+  expect(calls).toBe(1);
+});
+it('keeps a contiguous nearest window when both branches exceed the pooled byte budget', () => {
+  const current = large('Current', 'a');
+  const past = [large('Older', 'b'), large('Before', 'c')];
+  const future = [large('After', 'd'), large('Later', 'e')];
+  const retained = retainScenarioEditingHistory(current, past, future);
+  expect(retained.past).toEqual(past);
+  expect(retained.future).toEqual(future.slice(0, 1));
+  expect(parseScenarioEditingHistory(retained, current)).toEqual(retained);
+  expect(future).toHaveLength(2);
 });
