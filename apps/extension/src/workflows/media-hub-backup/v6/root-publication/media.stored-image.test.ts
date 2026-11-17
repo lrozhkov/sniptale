@@ -158,21 +158,44 @@ it.each([
   }
 );
 
-it.each([false, true])(
-  'restores history-only resources and refuses damaged history before writing, damaged=%s',
-  async (damaged) => {
+it.each(
+  ([1, 2] as const).flatMap((version) => [false, true].map((damaged) => ({ version, damaged })))
+)(
+  'restores history-only resources and refuses damaged history before writing, format=$version damaged=$damaged',
+  async ({ version, damaged }) => {
     const base = { ...createEditorDocumentFixture(), displayName: 'First' };
     const documents = [base, { ...base, displayName: 'Second' }];
     const snapshots = documents.map((document) => JSON.stringify(document));
     const files = new Map([
       ['source', new Blob(['source'], { type: 'image/png' })],
-      ...snapshots.map((snapshot, index): [string, Blob] => [
-        `snapshot-${index}`,
-        new Blob([damaged && index === 1 ? snapshot.replace('Second', 'Broken') + '!' : snapshot], {
-          type: 'application/json',
-        }),
-      ]),
+      ...(version === 1
+        ? snapshots.map((snapshot, index): [string, Blob] => [
+            `snapshot-${index}`,
+            new Blob(
+              [damaged && index === 1 ? snapshot.replace('Second', 'Broken') + '!' : snapshot],
+              {
+                type: 'application/json',
+              }
+            ),
+          ])
+        : []),
     ]);
+    if (version === 2)
+      files.set(
+        'packed',
+        new Blob(
+          [
+            JSON.stringify({
+              version: 1,
+              snapshots: snapshots.map((value, index) =>
+                damaged && index === 1 ? value + '!' : value
+              ),
+              values: [],
+            }),
+          ],
+          { type: 'application/json' }
+        )
+      );
     const staged = [...files].map(([objectId, blob]) => ({
       objectId,
       ref: {
@@ -267,10 +290,13 @@ it.each([false, true])(
             sourceUrl: null,
             document,
             history: {
-              version: 1,
+              version,
               epoch: 'saved-epoch',
               cursor: 0,
-              snapshots: [{ objectId: 'snapshot-0' }, { objectId: 'snapshot-1' }],
+              snapshots:
+                version === 1
+                  ? [{ objectId: 'snapshot-0' }, { objectId: 'snapshot-1' }]
+                  : snapshots.map(() => ({ objectId: 'packed' })),
               values: [],
               actions: [null, { operation: 'rename', target: null }],
             },
@@ -292,11 +318,26 @@ it.each([false, true])(
       expect.objectContaining({
         history: expect.objectContaining({
           cursor: 0,
-          snapshots: [{ assetId: 'native-snapshot-0' }, { assetId: 'native-snapshot-1' }],
+          version,
+          snapshots:
+            version === 1
+              ? [{ assetId: 'native-snapshot-0' }, { assetId: 'native-snapshot-1' }]
+              : snapshots.map(() => ({ assetId: 'native-packed' })),
         }),
       })
     );
-    for (const index of [0, 1])
+    if (version === 2) {
+      expect(
+        mocks.readFile.mock.calls.filter(([ref]) => ref.mimeType === 'application/json')
+      ).toHaveLength(1);
+      expect(storeFor('asset_owners').put).toHaveBeenCalledWith(
+        expect.objectContaining({
+          assetId: 'native-packed',
+          role: 'history:snapshot:native-packed',
+        })
+      );
+    }
+    for (const index of version === 1 ? [0, 1] : [])
       expect(storeFor('asset_owners').put).toHaveBeenCalledWith(
         expect.objectContaining({
           ownerKind: 'image-workspace',

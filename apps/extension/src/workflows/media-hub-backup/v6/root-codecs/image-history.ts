@@ -6,6 +6,8 @@ import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url'
 import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   parsePersistedImageHistory,
+  encodeImageHistoryMetadata,
+  parseImageHistoryMetadata,
   type PersistedImageHistory,
 } from '../../../../composition/persistence/image-workspaces/history-contracts';
 import {
@@ -145,6 +147,7 @@ export async function projectImageHistoryMetadata(args: {
 }): Promise<{
   snapshots: readonly { assetId: string; json: string }[];
   values: readonly NativeValue[];
+  packed?: string;
 }> {
   const json = new Map<string, Promise<string>>();
   const readJson = (assetId: string) => {
@@ -155,14 +158,25 @@ export async function projectImageHistoryMetadata(args: {
     }
     return pending;
   };
+  const packed =
+    args.history.version === 2
+      ? parseImageHistoryMetadata(
+          JSON.parse(await readJson(args.history.snapshots[0]!.assetId)) as unknown,
+          args.history
+        )
+      : null;
+  const packedValues = new Map(packed?.values.map((entry) => [entry.id, entry.value]));
   const units = new Map(args.history.values.map((unit) => [unit.id, unit]));
   const jsonValues = new Map<string, string>();
   for (const unit of args.history.values)
-    if (unit.kind === 'json') jsonValues.set(unit.id, await readJson(unit.assetId));
+    if (unit.kind === 'json')
+      jsonValues.set(unit.id, packed ? packedValues.get(unit.id)! : await readJson(unit.assetId));
   const used = new Set<string>();
   const snapshots: { assetId: string; json: string }[] = [];
-  for (const { assetId } of args.history.snapshots) {
-    const snapshot = args.projectSnapshot(await readJson(assetId));
+  for (const [index, { assetId }] of args.history.snapshots.entries()) {
+    const snapshot = args.projectSnapshot(
+      packed ? packed.snapshots[index]! : await readJson(assetId)
+    );
     const document = decodeEditorImageHistorySnapshot(
       snapshot,
       (token, kind) => {
@@ -190,5 +204,19 @@ export async function projectImageHistoryMetadata(args: {
     if (!isEditorDocument(document)) throw new Error('Image history snapshot metadata is invalid.');
     snapshots.push({ assetId, json: snapshot });
   }
-  return { snapshots, values: args.history.values.filter((unit) => used.has(unit.id)) };
+  const values = args.history.values.filter((unit) => used.has(unit.id));
+  return {
+    snapshots,
+    values,
+    ...(packed
+      ? {
+          packed: encodeImageHistoryMetadata(
+            snapshots.map((entry) => entry.json),
+            values
+              .filter((entry) => entry.kind === 'json')
+              .map((entry) => ({ id: entry.id, kind: 'json', value: jsonValues.get(entry.id)! }))
+          ),
+        }
+      : {}),
+  };
 }

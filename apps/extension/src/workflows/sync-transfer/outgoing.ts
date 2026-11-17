@@ -1,3 +1,4 @@
+import { imageHistoryJsonAssetIds } from '../../composition/persistence/image-workspaces/history-contracts';
 import { openArchiveRootObjectSource } from '../media-hub-backup/v6/object-source';
 import { MAX_EXPANDED_ROOT_METADATA_BYTES } from '../media-hub-backup/v6/contracts';
 import type { AssetResidencyCopy } from '../../composition/persistence/assets/residency-records';
@@ -290,10 +291,7 @@ async function recoverImageHistoryMetadata(
   const { rows } = capture.change;
   const history = rows.workspace?.history;
   if (!history) return;
-  const ids = new Set([
-    ...history.snapshots.map(({ assetId }) => assetId),
-    ...history.values.filter((unit) => unit.kind === 'json').map(({ assetId }) => assetId),
-  ]);
+  const ids = new Set(imageHistoryJsonAssetIds(history));
   const refs = new Map(rows.refs.map((ref) => [ref.assetId, ref]));
   const metadataRefs = [];
   let bytes = 0;
@@ -302,7 +300,7 @@ async function recoverImageHistoryMetadata(
     check(
       ref &&
         ref.mimeType.split(';', 1)[0]!.trim().toLowerCase() === 'application/json' &&
-        ref.size <= 64 * 1024 * 1024
+        ref.size <= (history.version === 2 ? MAX_EXPANDED_ROOT_METADATA_BYTES : 64 * 1024 * 1024)
     );
     bytes += ref.size;
     check(bytes <= MAX_EXPANDED_ROOT_METADATA_BYTES);
@@ -344,7 +342,7 @@ async function recoverImageHistoryMetadata(
         size: ref.size,
         sha256: copy.remote.sha256,
         mimeType: ref.mimeType,
-        maxBytes: 64 * 1024 * 1024,
+        maxBytes: history.version === 2 ? MAX_EXPANDED_ROOT_METADATA_BYTES : 64 * 1024 * 1024,
       },
       recovery.signal
     );

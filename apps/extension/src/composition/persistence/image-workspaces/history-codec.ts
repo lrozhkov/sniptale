@@ -20,6 +20,8 @@ import {
 } from '../assets';
 import {
   parsePersistedImageHistory,
+  encodeImageHistoryMetadata,
+  parseImageHistoryMetadata,
   imageHistoryAssetBindings,
   type PersistedImageHistory,
 } from './history-contracts';
@@ -61,10 +63,12 @@ function imageMime(header: string): string {
 export async function preparePersistedImageHistory(
   checkpoint: EditorImageHistoryCheckpoint,
   options: {
+    formatVersion?: 1 | 2;
     reusableAssetsByValue?: ReadonlyMap<string, AssetRef>;
     reusableImagesByRuntimeUrl?: ReadonlyMap<string, AssetRef>;
   } = {}
 ): Promise<PreparedImageHistory> {
+  const formatVersion = options.formatVersion ?? 2;
   const objects: PreparedAssetObject[] = [];
   const refs = new Map<string, AssetRef>();
   const assetsByValue = new Map<string, AssetRef>();
@@ -97,9 +101,19 @@ export async function preparePersistedImageHistory(
     return ref;
   };
   try {
+    const jsonValues = checkpoint.values.filter(
+      (unit): unit is EditorImageHistoryValue & { kind: 'json' } => unit.kind === 'json'
+    );
+    const packed =
+      formatVersion === 2 ? encodeImageHistoryMetadata(checkpoint.snapshots, jsonValues) : null;
+    if (packed && !options.reusableAssetsByValue?.has(packed))
+      for (const text of [...checkpoint.snapshots, ...jsonValues.map((unit) => unit.value)])
+        if (!isPlainRecord(JSON.parse(text) as unknown))
+          throw new Error('Image history metadata must be an object.');
+    const bundle = packed ? await stage(packed, 'json') : null;
     const values: PersistedImageHistory['values'][number][] = [];
     for (const unit of checkpoint.values) {
-      const ref = await stage(unit.value, unit.kind);
+      const ref = unit.kind === 'json' && bundle ? bundle : await stage(unit.value, unit.kind);
       values.push(
         unit.kind === 'image'
           ? {
@@ -113,9 +127,9 @@ export async function preparePersistedImageHistory(
     }
     const snapshots: { assetId: string }[] = [];
     for (const snapshot of checkpoint.snapshots)
-      snapshots.push({ assetId: (await stage(snapshot, 'json')).assetId });
+      snapshots.push({ assetId: (bundle ?? (await stage(snapshot, 'json'))).assetId });
     const history = parsePersistedImageHistory({
-      version: checkpoint.version,
+      version: formatVersion,
       epoch: checkpoint.epoch,
       cursor: checkpoint.cursor,
       snapshots,
@@ -171,7 +185,10 @@ export async function hydratePersistedImageHistory(args: {
     const ref = refs.get(id);
     if (!ref || ref.mimeType.split(';', 1)[0]!.toLowerCase() !== mime)
       throw new Error('Stored image history resource is missing or has the wrong MIME type.');
-    if (mime === 'application/json' && ref.size > 64 * 1024 * 1024)
+    if (
+      mime === 'application/json' &&
+      ref.size > (history.version === 2 ? IMAGE_HISTORY_MAX_JSON_BYTES : 64 * 1024 * 1024)
+    )
       throw new Error('Stored image history JSON exceeds its metadata bound.');
     let file = files.get(id);
     if (!file) {
@@ -192,10 +209,22 @@ export async function hydratePersistedImageHistory(args: {
     assetsByValue.set(value, ref);
     return value;
   };
+  const packed =
+    history.version === 2
+      ? parseImageHistoryMetadata(
+          JSON.parse(await readJson(history.snapshots[0]!.assetId)) as unknown,
+          history
+        )
+      : null;
+  const packedValues = new Map(packed?.values.map((entry) => [entry.id, entry.value]));
   const values: EditorImageHistoryValue[] = [];
   for (const unit of history.values) {
     if (unit.kind === 'json') {
-      values.push({ id: unit.id, kind: 'json', value: await readJson(unit.assetId) });
+      values.push({
+        id: unit.id,
+        kind: 'json',
+        value: packed ? packedValues.get(unit.id)! : await readJson(unit.assetId),
+      });
       continue;
     }
     const { file, ref } = await read(unit.assetId, imageMime(unit.dataUrl.header));
@@ -227,8 +256,12 @@ export async function hydratePersistedImageHistory(args: {
     values.push({ id: unit.id, kind: 'image', value });
   }
   const snapshots: string[] = [];
-  for (const { assetId } of history.snapshots) snapshots.push(await readJson(assetId));
-  const admitted = parseEditorImageHistoryCheckpoint({ ...history, snapshots, values }, limits);
+  if (packed) snapshots.push(...packed.snapshots);
+  else for (const { assetId } of history.snapshots) snapshots.push(await readJson(assetId));
+  const admitted = parseEditorImageHistoryCheckpoint(
+    { ...history, version: 1, snapshots, values },
+    limits
+  );
   if (!admitted) throw new Error('Stored image history graph is invalid.');
   return { checkpoint: admitted.checkpoint, assetsByValue };
 }

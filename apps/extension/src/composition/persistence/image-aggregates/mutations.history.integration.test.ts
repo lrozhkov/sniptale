@@ -45,6 +45,7 @@ import { parseSyncCaptureRecord } from '../sync-capture/guards';
 const io = vi.hoisted(() => ({
   db: null as IDBPDatabase | null,
   sequence: 0,
+  legacyFileFixture: false,
   files: new Map<string, Blob>(),
   journals: new Map<string, AssetReadyJournal>(),
   beforePublish: null as ((journal: AssetReadyJournal) => Promise<void>) | null,
@@ -52,6 +53,21 @@ const io = vi.hoisted(() => ({
   write: vi.fn(),
   read: vi.fn(),
 }));
+
+vi.mock('../image-workspaces/history-codec', async (original) => {
+  const module = await original<typeof import('../image-workspaces/history-codec')>();
+  return {
+    ...module,
+    preparePersistedImageHistory: (
+      checkpoint: Parameters<typeof module.preparePersistedImageHistory>[0],
+      options: Parameters<typeof module.preparePersistedImageHistory>[1]
+    ) =>
+      module.preparePersistedImageHistory(checkpoint, {
+        ...options,
+        formatVersion: io.legacyFileFixture ? 1 : 2,
+      }),
+  };
+});
 
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
@@ -144,13 +160,14 @@ function document(name: string): EditorDocument {
 
 function history(
   names = ['Original', 'First', 'Second'],
-  cursor = 1
+  cursor = 1,
+  createDocument = document
 ): EditorImageHistoryCheckpoint {
   const values: EditorImageHistoryValue[] = [];
   const ids = new Map<string, string>();
   const snapshots = names.map((name) =>
     encodeEditorImageHistorySnapshot(
-      document(name),
+      createDocument(name),
       {
         intern(value, kind) {
           const found = ids.get(value);
@@ -187,6 +204,7 @@ function gate() {
 beforeEach(async () => {
   vi.clearAllMocks();
   io.sequence = 0;
+  io.legacyFileFixture = false;
   io.files.clear();
   io.journals.clear();
   io.beforePublish = null;
@@ -279,6 +297,8 @@ it('publishes document, history, cursor, redo and every byte owner in one native
   expect(saved.revision).toBe(1);
   const stored = await readStoredImageWorkspace('image');
   expect(stored?.history?.cursor).toBe(1);
+  expect(stored?.history?.version).toBe(2);
+  expect(io.write.mock.calls.filter(([blob]) => blob.type === 'application/json')).toHaveLength(1);
   const opened = await readImageWorkspace('image');
   expect(opened?.document).toEqual(document('First'));
   expect(opened?.history).toEqual(checkpoint);
@@ -802,10 +822,14 @@ it('does not compare every historical ref with every binding during publication'
     }
   };
   const names = Array.from({ length: 101 }, (_, index) => `Project ${index}`);
+  const withBitmap = (name: string) => ({
+    ...document(name),
+    sourceImageData: 'data:image/png;base64,' + btoa('Bitmap '.repeat(1000) + name),
+  });
   await commitImageWorkspace({
     aggregateId: 'image',
-    document: document(names[50]!),
-    history: history(names, 50),
+    document: withBitmap(names[50]!),
+    history: history(names, 50, withBitmap),
     expectedRevision: 0,
     requireExistingRoot: true,
   });
@@ -1133,4 +1157,48 @@ it('reopens native history with its cursor, future snapshots and shared resource
   expect(final.document).toEqual(second);
   reopened.releaseDocumentAssets?.();
   final.releaseDocumentAssets?.();
+});
+
+it('retires legacy JSON ownership atomically when the next save publishes one bundle', async () => {
+  io.legacyFileFixture = true;
+  const checkpoint = history();
+  const saved = await commitImageWorkspace({
+    aggregateId: 'image',
+    document: document('First'),
+    history: checkpoint,
+    expectedRevision: 0,
+    requireExistingRoot: true,
+  });
+  const legacy = (await readStoredImageWorkspace('image'))!.history!;
+  expect(legacy.version).toBe(1);
+  if (legacy.version !== 1) throw new Error('Expected file envelope.');
+  const oldIds = legacy.snapshots.map((entry) => entry.assetId);
+  expect(oldIds.length).toBeGreaterThan(1);
+  const reopened = await readImageWorkspace('image');
+  expect(reopened?.history).toEqual(checkpoint);
+  reopened?.releaseDocumentAssets?.();
+  io.legacyFileFixture = false;
+  io.read.mockClear();
+  io.write.mockClear();
+  await commitImageWorkspace({
+    aggregateId: 'image',
+    document: document('First'),
+    history: checkpoint,
+    expectedRevision: 1,
+    requireExistingRoot: true,
+    reusableAssetsByRuntimeUrl: saved.documentAssetsByRuntimeUrl,
+    reusableHistoryAssetsByValue: saved.historyAssetsByValue!,
+  });
+  const current = (await readStoredImageWorkspace('image'))!;
+  expect(current.history?.version).toBe(2);
+  expect(io.read).not.toHaveBeenCalled();
+  expect(io.write).toHaveBeenCalledTimes(1);
+  expect(io.write.mock.calls[0]![0].type).toBe('application/json');
+  const owners = await database().getAll('asset_owners');
+  expect(owners.some((row) => oldIds.includes(row.assetId))).toBe(false);
+  expect(imageWorkspaceAssetBindings(current).some((row) => oldIds.includes(row.assetId))).toBe(
+    false
+  );
+  expect((await database().getAll('asset_operations')).length).toBeGreaterThan(0);
+  expect((await readImageWorkspace('image'))?.history).toEqual(checkpoint);
 });

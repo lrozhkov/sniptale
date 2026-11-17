@@ -28,6 +28,8 @@ import {
   SYNC_CONNECTION_STORE,
   SECRET_PROTECTION_STORE,
   ASSET_OPERATIONS_STORE,
+  ASSET_REFS_STORE,
+  ASSET_OWNERS_STORE,
   ASSET_RESIDENCY_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
@@ -1119,6 +1121,14 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
     stores: [VIDEO_PROJECTS_STORE],
     validationStores: [VIDEO_PROJECTS_STORE, VIDEO_PROJECT_REVISIONS_STORE],
     diagnostic: 'Video project inline history stores are unavailable.',
+  }),
+  contractOnlyMigration({
+    domainVersions: [{ domainId: 'mediaLibrary', from: 40, to: 41 }],
+    fromDatabaseVersion: 66,
+    toDatabaseVersion: 67,
+    stores: [IMAGE_WORKSPACES_STORE],
+    validationStores: [IMAGE_WORKSPACES_STORE, ASSET_REFS_STORE, ASSET_OWNERS_STORE],
+    diagnostic: 'Image packed history stores are unavailable.',
   }),
 ];
 

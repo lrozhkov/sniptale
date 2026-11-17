@@ -942,3 +942,17 @@ it('admits editing branch unit references without changing released Scenario dat
   expect(target.indexes).toEqual(source.indexes);
   expect(target.domainVersions).toEqual({ ...source.domainVersions, scenarioProjects: 14 });
 });
+
+it('admits packed Image metadata without rewriting released rows or binary resources', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 66
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 67
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, mediaLibrary: 41 });
+});

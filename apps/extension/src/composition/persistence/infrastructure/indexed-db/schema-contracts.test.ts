@@ -856,3 +856,17 @@ it('admits inline Montage history additively and fences older writers', async ()
   expect(await plan![0]!.estimateAdditionalBytes()).toBe(64 * 1024);
   expect(buildDatabaseMigrationPlan(66, 65)).toBeNull();
 });
+
+it('admits packed Image history additively and fences older writers', async () => {
+  const plan = buildDatabaseMigrationPlan(66, 67);
+  expect(plan).toHaveLength(1);
+  expect(plan![0]).toMatchObject({
+    fromDatabaseVersion: 66,
+    toDatabaseVersion: 67,
+    risk: 'additive',
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 40, to: 41 }],
+  });
+  expect(await plan![0]!.estimateAdditionalBytes()).toBe(64 * 1024);
+  expect(buildDatabaseMigrationPlan(67, 66)).toBeNull();
+});

@@ -13,8 +13,18 @@ import type {
   EditorImageHistoryValue,
 } from '../../../features/editor-history/image-checkpoint';
 import type { AssetRef } from '../assets/contracts';
-import { hydratePersistedImageHistory, preparePersistedImageHistory } from './history-codec';
+import {
+  hydratePersistedImageHistory,
+  preparePersistedImageHistory as prepareCurrentImageHistory,
+} from './history-codec';
 import { imageHistoryAssetBindings, parsePersistedImageHistory } from './history-contracts';
+
+function preparePersistedImageHistory(
+  checkpoint: Parameters<typeof prepareCurrentImageHistory>[0],
+  options: Parameters<typeof prepareCurrentImageHistory>[1] = {}
+) {
+  return prepareCurrentImageHistory(checkpoint, { ...options, formatVersion: 1 });
+}
 
 const io = vi.hoisted(() => ({
   sequence: 0,
@@ -147,6 +157,28 @@ function fixture(
     actions,
   };
 }
+
+it.each([2, 30])(
+  'packs %s Image actions in one immutable JSON file while binary images keep their files',
+  async (steps) => {
+    const checkpoint = fixture(steps);
+    const prepared = await prepareCurrentImageHistory(checkpoint);
+    expect(prepared.history.version).toBe(2);
+    expect(prepared.refs.filter((ref) => ref.mimeType === 'application/json')).toHaveLength(1);
+    expect(new Set(prepared.history.snapshots.map((entry) => entry.assetId)).size).toBe(1);
+    expect(io.write.mock.calls.filter(([blob]) => blob.type === 'application/json')).toHaveLength(
+      1
+    );
+    expect(
+      (
+        await hydratePersistedImageHistory({
+          history: prepared.history,
+          refs: prepared.refs,
+        })
+      ).checkpoint
+    ).toEqual(checkpoint);
+  }
+);
 
 it('round-trips an editable SVG browser-frame layer through the shared JSON object owner', async () => {
   const svg = `data:image/svg+xml;charset=utf-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg"><text>' + 'Title '.repeat(1500) + '</text></svg>')}`;
@@ -295,6 +327,7 @@ it('rejects damaged bytes, dangling graph references and exceeded history limits
       limits: { maxActions: 100, maxBytes: 0 },
     })
   ).rejects.toThrow('graph is invalid');
+  if (prepared.history.version !== 1) throw new Error('Expected legacy file fixture.');
   const snapshotId = prepared.history.snapshots[0]!.assetId;
   const original = io.files.get(snapshotId)!;
   const invalid = (await original.text()).replace(
@@ -372,3 +405,66 @@ it.each([null, {}, { version: 2 }, { cursor: -1 }, { actions: [] }, { extra: tru
     expect(io.read).not.toHaveBeenCalled();
   }
 );
+
+it('refuses damaged packed graph metadata without creating replacement files', async () => {
+  const prepared = await prepareCurrentImageHistory(fixture());
+  const id = prepared.history.snapshots[0]!.assetId;
+  const original = io.files.get(id)!;
+  const payload = JSON.parse(await original.text());
+  payload.snapshots[0] = '!' + payload.snapshots[0].slice(1);
+  io.files.set(id, new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+  io.write.mockClear();
+  await expect(
+    hydratePersistedImageHistory({ history: prepared.history, refs: prepared.refs })
+  ).rejects.toThrow();
+  expect(io.write).not.toHaveBeenCalled();
+  expect(io.cleanup).not.toHaveBeenCalled();
+});
+
+it.each(['{', '[]', 'null'])(
+  'refuses malformed packed snapshot input before creating files: %s',
+  async (snapshot) => {
+    const checkpoint = fixture();
+    await expect(
+      prepareCurrentImageHistory({
+        ...checkpoint,
+        snapshots: [snapshot, ...checkpoint.snapshots.slice(1)],
+      })
+    ).rejects.toThrow();
+    expect(io.write).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['snapshot-count', 'unknown-value', 'extra-field'])(
+  'refuses a mismatched packed resource: %s',
+  async (damage) => {
+    const prepared = await prepareCurrentImageHistory(fixture());
+    const id = prepared.history.snapshots[0]!.assetId;
+    const payload = JSON.parse(await io.files.get(id)!.text());
+    if (damage === 'snapshot-count') payload.snapshots.pop();
+    else if (damage === 'unknown-value')
+      payload.values.push({
+        id: IMAGE_HISTORY_VALUE_TOKEN_PREFIX + 'unknown',
+        kind: 'json',
+        value: '{}',
+      });
+    else payload.extra = true;
+    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+    io.files.set(id, blob);
+    const refs = prepared.refs.map((ref) =>
+      ref.assetId === id ? { ...ref, size: blob.size } : ref
+    );
+    io.write.mockClear();
+    await expect(hydratePersistedImageHistory({ history: prepared.history, refs })).rejects.toThrow(
+      'bundle'
+    );
+    expect(io.write).not.toHaveBeenCalled();
+  }
+);
+
+it('cleans the staged bundle if the following bitmap write fails', async () => {
+  io.write.mockImplementationOnce(stageBlob).mockRejectedValueOnce(new Error('Quota'));
+  await expect(prepareCurrentImageHistory(fixture())).rejects.toThrow('Quota');
+  expect(io.cleanup).toHaveBeenCalledWith(['history-1']);
+  expect(io.files.size).toBe(0);
+});

@@ -100,6 +100,7 @@ export async function encodeCapturedImageRoot(
     rows.workspace?.history?.values.map((unit) => [unit.id, unit]) ?? []
   );
   for (const unit of portable.workspace?.history?.values ?? []) {
+    if (rows.workspace?.history?.version === 2 && unit.kind === 'json') continue;
     const native = historyUnits.get(unit.id);
     const ref = native ? refs.get(native.assetId) : undefined;
     if (ref) sourceBindings.set(unit.objectId, ref);
@@ -224,6 +225,7 @@ export async function encodeCapturedImageRoot(
     bind(asset.objectId, source ? refs.get(source.assetId) : undefined);
   }
   for (const unit of portable.workspace?.history?.values ?? []) {
+    if (rows.workspace?.history?.version === 2 && unit.kind === 'json') continue;
     const native = historyUnits.get(unit.id);
     bind(unit.objectId, native ? refs.get(native.assetId) : undefined);
   }

@@ -7,6 +7,7 @@ import {
 import {
   IMAGE_EDITOR_HISTORY_LIMITS,
   IMAGE_HISTORY_MAX_VALUES,
+  IMAGE_HISTORY_MAX_JSON_BYTES,
 } from '../../../features/editor-history/policy';
 import { IMAGE_HISTORY_VALUE_TOKEN_PREFIX } from '../../../features/editor-history/image-snapshot';
 
@@ -22,7 +23,7 @@ type PersistedImageHistoryValue =
 
 /** Native history owns immutable bytes through ordinary asset references, not embedded payloads. */
 export interface PersistedImageHistory {
-  version: 1;
+  version: 1 | 2;
   epoch: string;
   cursor: number;
   snapshots: readonly { assetId: string }[];
@@ -85,7 +86,7 @@ export function parsePersistedImageHistory(
   if (
     !isPlainRecord(value) ||
     Object.keys(value).length !== 6 ||
-    value['version'] !== 1 ||
+    (value['version'] !== 1 && value['version'] !== 2) ||
     typeof value['epoch'] !== 'string' ||
     !value['epoch'].length ||
     value['epoch'].length > 200 ||
@@ -122,7 +123,22 @@ export function parsePersistedImageHistory(
     if (action === undefined || (index === 0 ? action !== null : action === null)) return null;
     actions.push(action);
   }
-  return { version: 1, epoch: value['epoch'], cursor: value['cursor'], snapshots, values, actions };
+  if (value['version'] === 2) {
+    const id = snapshots[0]!.assetId;
+    if (
+      snapshots.some((entry) => entry.assetId !== id) ||
+      values.some((entry) => entry.kind === 'json' && entry.assetId !== id)
+    )
+      return null;
+  }
+  return {
+    version: value['version'],
+    epoch: value['epoch'],
+    cursor: value['cursor'],
+    snapshots,
+    values,
+    actions,
+  };
 }
 
 /** Stable byte roles are shared by publication, deletion, backup, sync and physical retention. */
@@ -136,5 +152,75 @@ export function imageHistoryAssetBindings(
       role: `history:snapshot:${assetId}`,
     })),
     ...history.values.map(({ id, assetId }) => ({ assetId, role: `history:value:${id}` })),
+  ];
+}
+
+/** One immutable JSON bundle contains every snapshot and pooled drawing value. */
+export function encodeImageHistoryMetadata(
+  snapshots: readonly string[],
+  values: readonly { id: string; kind: 'json'; value: string }[]
+): string {
+  return JSON.stringify({ version: 1, snapshots, values });
+}
+
+/** Match the complete bundle to its admitted logical slots before canonical graph validation. */
+export function parseImageHistoryMetadata(
+  value: unknown,
+  history: PersistedImageHistory
+): {
+  snapshots: string[];
+  values: { id: string; kind: 'json'; value: string }[];
+} {
+  if (
+    !isPlainRecord(value) ||
+    Object.keys(value).length !== 3 ||
+    value['version'] !== 1 ||
+    !Array.isArray(value['snapshots']) ||
+    value['snapshots'].length !== history.snapshots.length ||
+    !Array.isArray(value['values'])
+  )
+    throw new Error('Image history metadata bundle is invalid.');
+  const expected = new Set(
+    history.values.filter((entry) => entry.kind === 'json').map((entry) => entry.id)
+  );
+  if (value['values'].length !== expected.size)
+    throw new Error('Image history metadata bundle has different slots.');
+  const values: { id: string; kind: 'json'; value: string }[] = [];
+  const snapshots: string[] = [];
+  let bytes = 0;
+  const encoder = new TextEncoder();
+  const account = (text: string) => {
+    bytes += encoder.encode(text).byteLength;
+    if (bytes > IMAGE_HISTORY_MAX_JSON_BYTES)
+      throw new Error('Image history metadata exceeds its bound.');
+  };
+  for (const entry of value['snapshots']) {
+    if (typeof entry !== 'string') throw new Error('Image history snapshot metadata is invalid.');
+    account(entry);
+    snapshots.push(entry);
+  }
+  for (const entry of value['values']) {
+    if (
+      !isPlainRecord(entry) ||
+      Object.keys(entry).length !== 3 ||
+      entry['kind'] !== 'json' ||
+      typeof entry['id'] !== 'string' ||
+      !expected.delete(entry['id']) ||
+      typeof entry['value'] !== 'string'
+    )
+      throw new Error('Image history drawing metadata is invalid.');
+    account(entry['value']);
+    values.push({ id: entry['id'], kind: 'json', value: entry['value'] });
+  }
+  return { snapshots, values };
+}
+
+/** File recovery includes one JSON bundle for version 2 and individual JSON files for version 1. */
+export function imageHistoryJsonAssetIds(history: PersistedImageHistory): readonly string[] {
+  return [
+    ...new Set([
+      ...history.snapshots.map((entry) => entry.assetId),
+      ...history.values.filter((entry) => entry.kind === 'json').map((entry) => entry.assetId),
+    ]),
   ];
 }

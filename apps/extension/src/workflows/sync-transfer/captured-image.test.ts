@@ -32,7 +32,10 @@ import { parsePortableMediaMetadata } from '../media-hub-backup/v6/root-codecs/m
 import * as nativeOutgoing from '../../composition/persistence/sync-capture/outgoing';
 import { installPersistenceLockManagerForTests } from '../../composition/persistence/infrastructure/mutation-barrier';
 import type { SyncRemoteStore } from './remote-store';
-import { IMAGE_HISTORY_VALUE_TOKEN_PREFIX } from '../../features/editor-history/image-snapshot';
+import {
+  IMAGE_HISTORY_VALUE_TOKEN_PREFIX,
+  encodeEditorImageHistorySnapshot,
+} from '../../features/editor-history/image-snapshot';
 
 const io = vi.hoisted(() => ({
   live: vi.fn(),
@@ -812,8 +815,10 @@ it('prepares portable Image history and remaps all historical resources on recei
   });
   expect(result.kind).toBe('image');
   if (result.kind !== 'image') throw new Error('Expected Image.');
+  const portableHistory = portable.workspace!.history!;
+  if (portableHistory.version !== 1) throw new Error('Expected legacy file history.');
   expect(result.input.workspace?.history?.snapshots).toEqual(
-    portable.workspace!.history!.snapshots.map(({ objectId }) => ({
+    portableHistory.snapshots.map(({ objectId }) => ({
       assetId: `received-${objectId}`,
     }))
   );
@@ -830,6 +835,7 @@ it('prepares portable Image history and remaps all historical resources on recei
 it('keeps a shared unloaded history bitmap remote while reading only history metadata', async () => {
   const rows = imageRowsWithHistory();
   const history = rows.workspace!.history!;
+  if (history.version !== 1) throw new Error('Expected legacy file history.');
   const id = `${IMAGE_HISTORY_VALUE_TOKEN_PREFIX}shared-source`;
   for (const { assetId } of history.snapshots) {
     const blob = io.bytes.get(assetId)!;
@@ -856,7 +862,9 @@ it('keeps a shared unloaded history bitmap remote while reading only history met
   const copy = verifiedDeferredCopy(rows.refs[0]!);
   const encoded = await encodeCapturedImageRoot(rows, new Map([['document-source', copy]]));
   const metadata = parsePortableMediaMetadata(encoded.envelope.metadata);
-  const objectId = metadata.workspace!.history!.values[0]!.objectId;
+  const value = metadata.workspace!.history!.values[0]!;
+  if (!('objectId' in value)) throw new Error('Expected immutable image resource.');
+  const objectId = value.objectId;
   expect(objectId).toBe(metadata.workspace!.document.sourceImage.objectId);
   expect(encoded.retainedObjects).toContainEqual({
     objectId,
@@ -1163,3 +1171,135 @@ it.each([0, 1])(
     expect(encoded.objects).toHaveLength(1);
   }
 );
+
+async function packHistoryRows(
+  rows: CapturedImageRows,
+  snapshots: string[],
+  values: readonly { id: string; kind: 'json'; value: string }[] = []
+) {
+  const blob = new Blob([JSON.stringify({ version: 1, snapshots, values })], {
+    type: 'application/json',
+  });
+  const assetId = 'packed-history';
+  io.bytes.set(assetId, blob);
+  rows.refs = rows.refs.filter((ref) => ref.mimeType !== 'application/json');
+  rows.refs.push({
+    ...rows.refs[0]!,
+    assetId,
+    size: blob.size,
+    mimeType: blob.type,
+    sha256: null,
+    location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+  });
+  rows.workspace!.history = {
+    version: 2,
+    epoch: 'packed-history',
+    cursor: snapshots.length - 1,
+    snapshots: snapshots.map(() => ({ assetId })),
+    values: values.map((unit) => ({ id: unit.id, kind: 'json', assetId })),
+    actions: snapshots.map((_, index) =>
+      index === 0 ? null : { operation: 'update', target: null }
+    ),
+  };
+  return rows;
+}
+
+it('transports one Image history bundle and restores both directions', async () => {
+  const rows = imageRowsWithHistory();
+  const snapshots = await Promise.all(
+    rows.workspace!.history!.snapshots.map(async ({ assetId }) => io.bytes.get(assetId)!.text())
+  );
+  await packHistoryRows(rows, snapshots);
+  rows.workspace!.history!.cursor = 0;
+  io.read.mockClear();
+  const encoded = await encodeCapturedImageRoot(rows);
+  expect(
+    encoded.objects.filter((object) => object.ref.mimeType === 'application/json')
+  ).toHaveLength(1);
+  expect(io.read.mock.calls.filter(([ref]) => ref.mimeType === 'application/json')).toHaveLength(1);
+  const portable = parsePortableMediaMetadata(encoded.envelope.metadata);
+  expect(portable.workspace?.history).toMatchObject({
+    version: 2,
+    cursor: 0,
+    actions: rows.workspace!.history!.actions,
+  });
+  expect(new Set(portable.workspace!.history!.snapshots.map((entry) => entry.objectId)).size).toBe(
+    1
+  );
+  const verified = new Map<string, AssetRef>();
+  for (const object of encoded.objects) {
+    const blob = await readArchiveRootObjectSource(object);
+    const assetId = `received-${object.ref.objectId}`;
+    io.bytes.set(assetId, blob);
+    verified.set(object.ref.objectId, {
+      ...rows.refs[0]!,
+      assetId,
+      size: blob.size,
+      mimeType: object.ref.mimeType,
+      location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+    });
+  }
+  const result = await preparePortableReplica({
+    envelope: encoded.envelope,
+    verifiedObjects: verified,
+    senderDependencies: [],
+    admission: {
+      operationId: 'packed-image-receive',
+      sourceDigest: 'a'.repeat(64),
+      connectionGeneration: 1,
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      expectedLocalGeneration: 0,
+      expectedBasis: [],
+      expectedWorkspaceRevision: null,
+      dependencies: [],
+    },
+  });
+  if (result.kind !== 'image') throw new Error('Expected Image.');
+  expect(result.input.workspace?.history).toMatchObject({
+    version: 2,
+    cursor: 0,
+    snapshots: portable.workspace!.history!.snapshots.map(({ objectId }) => ({
+      assetId: `received-${objectId}`,
+    })),
+  });
+});
+
+it('transports an admitted drawing larger than the general metadata envelope in one history resource', async () => {
+  const rows = imageRowsWithHistory();
+  const document = {
+    ...createEditorDocumentFixture(),
+    sourceImageData: 'data:image/png;base64,ZG9jdW1lbnQ=',
+    canvasJson: JSON.stringify({
+      objects: [{ type: 'textbox', text: 'Authored '.repeat(140_000) }],
+    }),
+  };
+  const values: { id: string; kind: 'json'; value: string }[] = [];
+  const snapshot = encodeEditorImageHistorySnapshot(
+    document,
+    {
+      intern(value, kind) {
+        if (kind !== 'json') throw new Error('Expected drawing JSON.');
+        const id = IMAGE_HISTORY_VALUE_TOKEN_PREFIX + values.length;
+        values.push({ id, kind, value });
+        return id;
+      },
+    },
+    new Set()
+  );
+  const current = await io.bytes.get(rows.workspace!.history!.snapshots[1]!.assetId)!.text();
+  await packHistoryRows(rows, [snapshot, current], values);
+  const encoded = await encodeCapturedImageRoot(rows);
+  expect(
+    new TextEncoder().encode(JSON.stringify(encoded.envelope.metadata)).byteLength
+  ).toBeLessThan(1024 * 1024);
+  expect(
+    encoded.objects.filter((object) => object.ref.mimeType === 'application/json')
+  ).toHaveLength(1);
+  expect(
+    encoded.objects.find((object) => object.ref.mimeType === 'application/json')!.ref.size
+  ).toBeGreaterThan(1024 * 1024);
+  io.canonical = nativeImageCapture(rows);
+  const prepared = await prepareCapturedOutgoing(io.canonical);
+  expect((await parseSyncOperationText(prepared.recordText)).version).toBe(3);
+});

@@ -104,7 +104,11 @@ function fixture(sharedFavicon = false, faviconSource?: 'site' | 'file', svgSour
       id: unit.id,
       kind: 'image',
       assetId,
-      dataUrl: { header: 'data:image/png;base64,', lastCharacter: unit.value.at(-1)!, padding: 0 },
+      dataUrl: {
+        header: 'data:image/png;base64,',
+        lastCharacter: unit.value.at(-1)!,
+        padding: 0,
+      },
     };
   });
   const history: PersistedImageHistory = {
@@ -164,7 +168,8 @@ it('projects an SVG image object through shared bounded JSON without a raster re
   expect(() => assertPortableJson(portable)).not.toThrow();
   expect(
     projected.values.filter(
-      (unit) => unit.kind === 'json' && f.content.get(unit.assetId)?.includes(svg)
+      (unit) =>
+        unit.kind === 'json' && 'assetId' in unit && f.content.get(unit.assetId)?.includes(svg)
     )
   ).toHaveLength(1);
 });
@@ -263,4 +268,70 @@ it('sanitizes historical provenance URLs even when source metadata is included',
   expect(serialized).not.toContain('token=secret');
   expect(serialized).not.toContain('#hash');
   expect(projected.values).toEqual(f.history.values);
+});
+
+it.each([false, true])(
+  'projects packed history privacy after one JSON read, shared=%s',
+  async (shared) => {
+    const f = fixture(shared, 'file');
+    const bundle = JSON.stringify({
+      version: 1,
+      snapshots: f.history.snapshots.map((entry) => f.content.get(entry.assetId)!),
+      values: f.units.filter((unit) => unit.kind === 'json'),
+    });
+    const history: PersistedImageHistory = {
+      ...f.history,
+      version: 2,
+      snapshots: f.history.snapshots.map(() => ({ assetId: 'packed' })),
+      values: f.history.values.map((unit) =>
+        unit.kind === 'json' ? { ...unit, assetId: 'packed' } : unit
+      ),
+    };
+    const original = JSON.stringify(history);
+    const readJson = vi.fn(async (id: string) => {
+      if (id !== 'packed') throw new Error('Must not read bitmap bytes.');
+      return bundle;
+    });
+    const projected = await projectImageHistoryMetadata({
+      history,
+      readJson,
+      projectSnapshot: (snapshot) =>
+        projectImageHistorySnapshotPrivacy(
+          snapshot,
+          createMediaHubBackupExportOptions({ includeSourceMetadata: false })
+        ),
+    });
+    expect(readJson).toHaveBeenCalledTimes(1);
+    expect(projected.packed).not.toContain('Secret page title');
+    expect(projected.packed).not.toContain('example.test');
+    const faviconId = f.units.find((unit) => unit.value === f.favicon)!.id;
+    expect(projected.values.some((unit) => unit.id === faviconId)).toBe(shared);
+    const objects = new Map([...f.objects, ['packed', 'projected-packed']]);
+    const portable = encodePortableImageHistory({
+      history,
+      objectsByAssetId: objects,
+      values: projected.values,
+    });
+    expect(parsePortableImageHistory(portable)).toEqual(portable);
+    const restored = decodePortableImageHistory({
+      history: portable,
+      assetsByObjectId: new Map([...objects.values()].map((id) => [id, `received-${id}`])),
+    });
+    expect(restored).toMatchObject({
+      version: 2,
+      cursor: 1,
+      actions: history.actions,
+      snapshots: projected.snapshots.map(() => ({ assetId: 'received-projected-packed' })),
+    });
+    expect(JSON.stringify(history)).toBe(original);
+  }
+);
+
+it('refuses split JSON bundle pointers and extra portable keys', () => {
+  const history: PersistedImageHistory = { ...fixture().history, version: 2 };
+  expect(
+    parsePortableImageHistory(
+      encodePortableImageHistory({ history, objectsByAssetId: fixture().objects })
+    )
+  ).toBeNull();
 });

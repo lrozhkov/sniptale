@@ -125,7 +125,11 @@ async function collectMediaRoles(
       if (mime === 'application/json' && !jsonIds.has(objectId)) {
         jsonIds.add(objectId);
         metadataBytes += object.size;
-        if (object.size > 64 * 1024 * 1024 || metadataBytes > MAX_EXPANDED_ROOT_METADATA_BYTES)
+        if (
+          object.size >
+            (history.version === 2 ? MAX_EXPANDED_ROOT_METADATA_BYTES : 64 * 1024 * 1024) ||
+          metadataBytes > MAX_EXPANDED_ROOT_METADATA_BYTES
+        )
           throw new Error('Image history exceeds the archive metadata budget.');
       }
     }

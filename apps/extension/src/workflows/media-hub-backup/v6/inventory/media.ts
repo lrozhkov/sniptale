@@ -1,3 +1,4 @@
+import { imageHistoryJsonAssetIds } from '../../../../composition/persistence/image-workspaces/history-contracts';
 import {
   encodePortableImageHistory,
   projectImageHistoryMetadata,
@@ -540,10 +541,7 @@ async function buildWorkspace(args: {
   } = privateWorkspace;
   let portableHistory: PortableImageHistory | undefined;
   if (history) {
-    const jsonIds = new Set([
-      ...history.snapshots.map(({ assetId }) => assetId),
-      ...history.values.filter((unit) => unit.kind === 'json').map(({ assetId }) => assetId),
-    ]);
+    const jsonIds = new Set(imageHistoryJsonAssetIds(history));
     const jsonRefs = new Map<string, AssetRef>();
     let bytes = 0;
     for (const id of jsonIds) {
@@ -552,7 +550,7 @@ async function buildWorkspace(args: {
         !ref ||
         ref.assetId !== id ||
         ref.mimeType.split(';', 1)[0]!.toLowerCase() !== 'application/json' ||
-        ref.size > 64 * 1024 * 1024
+        ref.size > (history.version === 2 ? MAX_EXPANDED_ROOT_METADATA_BYTES : 64 * 1024 * 1024)
       )
         throw new Error('Image history JSON resource is invalid.');
       bytes += ref.size;
@@ -569,12 +567,22 @@ async function buildWorkspace(args: {
       },
       projectSnapshot: (snapshot) => projectImageHistorySnapshotPrivacy(snapshot, args.options),
     });
-    const snapshotObjectIds = projected.snapshots.map(({ json }, index) =>
-      args.collector.add(
-        new Blob([json], { type: 'application/json' }),
-        `${args.entry.id}-history-${index}.json`
-      )
-    );
+    const packedObjectId =
+      projected.packed === undefined
+        ? undefined
+        : args.collector.add(
+            new Blob([projected.packed], { type: 'application/json' }),
+            `${args.entry.id}-history.json`
+          );
+    const snapshotObjectIds = packedObjectId
+      ? projected.snapshots.map(() => packedObjectId)
+      : projected.snapshots.map(({ json }, index) =>
+          args.collector.add(
+            new Blob([json], { type: 'application/json' }),
+            `${args.entry.id}-history-${index}.json`
+          )
+        );
+    if (packedObjectId) objectsByAssetId.set(history.snapshots[0]!.assetId, packedObjectId);
     for (const unit of projected.values)
       if (!objectsByAssetId.has(unit.assetId))
         objectsByAssetId.set(
