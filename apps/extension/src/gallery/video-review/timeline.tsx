@@ -334,6 +334,7 @@ function ReviewTimelineSurface(props: TimelineProps) {
               <ReviewRulerRow
                 controls={props.trackControls}
                 interaction={ruler.interaction}
+                range={plane.trackPreview ?? ruler.range}
                 time={props.time}
                 duration={props.duration}
                 gutter={gutter}

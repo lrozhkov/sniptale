@@ -2,7 +2,7 @@ import { translate } from '../../platform/i18n';
 import type { ExportEnhancementErrorCode } from '../../features/video/composition/export-enhancement/enhancer';
 import type { VideoExportDetailMode } from '../../features/video/project/types/export';
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
-import { buildReviewTimeMap, mapReviewAnchor } from '../../features/video/review/timeline';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { buildReviewActionAudioPlan } from '../../features/video/review/action-audio';
 import { projectReviewTelemetry } from '../../features/video/review/telemetry';
 import { hasQuickEditActionAudio } from '../../features/video/review/advanced/audio-plan';
@@ -11,7 +11,10 @@ import type { VideoProjectExportTimeEstimate } from '../../features/video/projec
 import { useReviewSizeEstimate } from './use-size-estimate';
 import { useReviewExportSettings } from './use-review-export-settings';
 import { configuredReviewExportPlan } from '../../workflows/video-review/export-configuration';
-import { createReviewFragment } from '../../features/video/review/fragment';
+import {
+  createReviewFragment,
+  type ReviewFragmentSelection,
+} from '../../features/video/review/fragment';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   inspectReviewMedia,
@@ -29,7 +32,6 @@ import {
 } from '../../features/video/review/advanced/effective';
 import { downloadGalleryBlob } from '../shared/download';
 import type { LoadedReview } from './use-session';
-import type { ReviewAnchor } from '../../features/video/review/types';
 import { createReviewExportDiagnostics } from '../../workflows/video-review/export-diagnostics';
 
 type ReviewExportBlocker = {
@@ -49,7 +51,7 @@ export function prepareReviewExporter(
 ): ReturnType<typeof useReviewExport> {
   const start = async (
     destination: 'gallery' | 'download' = 'gallery',
-    selection?: Extract<ReviewAnchor, { kind: 'range' }>
+    selection?: ReviewFragmentSelection
   ) => {
     await run(async () => {
       pause();
@@ -284,7 +286,7 @@ export function useReviewExport(resource: LoadedReview) {
     feedback.dismissCompletion,
     setTimeEstimate
   );
-  const plan = (selection?: Extract<ReviewAnchor, { kind: 'range' }>) =>
+  const plan = (selection?: ReviewFragmentSelection) =>
     reviewExportPlan(resource, index, renderSettings, selection);
   const choices = useReviewExportChoices(resource, index, renderSettings);
   const sizeEstimate = useReviewSizeEstimate({
@@ -296,7 +298,7 @@ export function useReviewExport(resource: LoadedReview) {
   });
   const start = async (
     destination: 'gallery' | 'download' = 'gallery',
-    selection?: Extract<ReviewAnchor, { kind: 'range' }>
+    selection?: ReviewFragmentSelection
   ) => {
     if (active.current || !index || checkingCodecs) return;
     const generation = feedback.beginAttempt();
@@ -393,8 +395,7 @@ export function useReviewExport(resource: LoadedReview) {
     retryAssetAvailability: () => {
       if (!active.current) setBlocked(clearMissingAssetBlocker);
     },
-    downloadSelection: (selection: Extract<ReviewAnchor, { kind: 'range' }>) =>
-      start('download', selection),
+    downloadSelection: (selection: ReviewFragmentSelection) => start('download', selection),
     cancel,
     download: async () => {
       if (active.current) return;
@@ -455,7 +456,7 @@ function reviewExportPlan(
   resource: LoadedReview,
   index: ReviewMediaIndex | null,
   renderSettings: ReviewRenderSettings,
-  selection?: Extract<ReviewAnchor, { kind: 'range' }>
+  selection?: ReviewFragmentSelection
 ): QuickEditExportPlan {
   const state = resource.session.getSnapshot();
   return reviewExportInputPlan(
@@ -476,7 +477,7 @@ function reviewExportInputPlan(
   duration: number,
   index: ReviewMediaIndex | null,
   renderSettings: ReviewRenderSettings,
-  selection?: Extract<ReviewAnchor, { kind: 'range' }>
+  selection?: ReviewFragmentSelection
 ): QuickEditExportPlan {
   const fragment =
     selection && index
@@ -502,9 +503,6 @@ function reviewExportInputPlan(
     segments: fullMap,
     applied: resolveQuickEditEffectiveFeatures(advanced).actionsApplied,
   });
-  const ranges = fragment
-    ? mapReviewAnchor({ kind: 'range', start: fragment.start, end: fragment.end }, fullMap).ranges
-    : null;
   const actionAudioPresent =
     !!(
       telemetry?.recordingEvents?.totalBlocks &&
@@ -515,10 +513,7 @@ function reviewExportInputPlan(
     ) ||
     hasQuickEditActionAudio(
       { plan: actionPlan, offset: 0, busGain: 1 },
-      {
-        start: ranges?.[0]?.start ?? (fragment ? actionPlan.duration : 0),
-        end: ranges?.at(-1)?.end ?? actionPlan.duration,
-      }
+      fragment?.result ?? { start: 0, end: actionPlan.duration }
     );
   return configuredReviewExportPlan({
     includeBookends: !selection,

@@ -6,6 +6,7 @@ import { ReviewKeyboardHelp } from './keyboard-help';
 import { reviewWheelZoom } from './timeline-geometry';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { ReviewPlaybackRange } from './playback-range';
+import { ReviewPlaybackRangeOverlay } from './ruler-range';
 import { ReviewResetControl } from './reset-control';
 import { AutosaveControl } from '@sniptale/ui/autosave-control';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -45,10 +46,12 @@ export function ReviewRuler({
   duration,
   width,
   interaction,
+  range,
 }: {
   duration: number;
   width: number;
   interaction?: HTMLAttributes<HTMLDivElement>;
+  range?: ReviewPlaybackRange | null | undefined;
 }) {
   return (
     <div
@@ -58,6 +61,13 @@ export function ReviewRuler({
       className="relative h-7 select-none overflow-hidden outline-none focus-visible:ring-1
         focus-visible:ring-inset focus-visible:ring-[var(--sniptale-color-accent)] touch-none"
     >
+      <ReviewPlaybackRangeOverlay
+        ruler
+        range={range ?? null}
+        duration={duration}
+        gutter={0}
+        width={width}
+      />
       <ReviewRulerTicks duration={duration} width={width} />
     </div>
   );
@@ -112,6 +122,7 @@ export function ReviewRulerRow(props: {
   width: number;
   controls: ReactNode;
   interaction: HTMLAttributes<HTMLDivElement>;
+  range?: ReviewPlaybackRange | null | undefined;
 }) {
   return (
     <div
@@ -123,6 +134,7 @@ export function ReviewRulerRow(props: {
           duration={props.duration}
           width={props.width}
           interaction={props.interaction}
+          range={props.range}
         />
       </ReviewTrackRow>
       <ReviewPlayhead

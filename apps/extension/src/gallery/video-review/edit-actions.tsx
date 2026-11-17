@@ -11,8 +11,11 @@ import { SelectField, SegmentedRow } from '../../ui/compact-inspector-controls';
 import { reviewSelectFieldClassName } from './controls';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { useEffect, useMemo, type ReactNode } from 'react';
-import { createReviewFragment } from '../../features/video/review/fragment';
-import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
+import {
+  createReviewFragment,
+  type ReviewFragmentSelection,
+} from '../../features/video/review/fragment';
+import type { ReviewEdit } from '../../features/video/review/types';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
 import {
   REVIEW_SPEED_RATES,
@@ -389,7 +392,7 @@ export function ReviewEditActions(props: ReviewEditActionProps) {
 
 /** A range-only download affordance; unavailable or fully removed intervals cannot be exported. */
 export function ReviewFragmentAction(props: {
-  selection: ReviewAnchor;
+  selection: Parameters<typeof createReviewFragment>[0]['selection'];
   snapToKeyframes?: boolean;
   showLabel?: boolean;
   persistent?: boolean;
@@ -397,7 +400,7 @@ export function ReviewFragmentAction(props: {
   index: ReviewMediaIndex | null;
   edits: readonly ReviewEdit[];
   busy: boolean;
-  onDownload(selection: Extract<ReviewAnchor, { kind: 'range' }>): void;
+  onDownload(selection: ReviewFragmentSelection): void;
 }) {
   const { selection, index, edits } = props;
   const fragment = useMemo(
@@ -662,9 +665,7 @@ export function ReviewInspectorActions({
   onOpenResult(mediaId: string): void;
   toolKey: string;
   fragmentAction?: ReactNode;
-  fragment?:
-    | { selection: Extract<ReviewAnchor, { kind: 'range' }>; edits: readonly ReviewEdit[] }
-    | undefined;
+  fragment?: { selection: ReviewFragmentSelection; edits: readonly ReviewEdit[] } | undefined;
 }) {
   const { dismissCompletion } = exporter;
   useEffect(() => () => dismissCompletion(), [dismissCompletion, toolKey]);

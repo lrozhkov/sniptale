@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { createReviewExportFixture as fixture } from './export-lifecycle.test-support';
 import { exportReviewedVideo, type ReviewExportClipPlan } from './export-lifecycle';
+import { reviewRenderFrameSchedule } from './render-schedule';
 
 it('shifts fragment clip placements across a leading cut to global output time', async () => {
   const { args, deps } = fixture();
@@ -129,3 +130,70 @@ it.each([true, false])(
     }
   }
 );
+
+it('schedules the zoom on the held frames through the selected end of a download', async () => {
+  const { args, deps } = fixture();
+  args.index.processedVideoCodec = 'vp8';
+  const { workspace } = args.snapshot;
+  workspace.advanced.ui.mode = 'advanced';
+  workspace.advanced.zoom.regions = [
+    {
+      id: 'zoom',
+      start: 2,
+      end: 4,
+      transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'none', duration: 0 },
+      exit: { type: 'none', duration: 0 },
+    },
+  ];
+  workspace.history.push({
+    id: 'insert-hold',
+    at: 2,
+    target: 'edit',
+    before: null,
+    after: {
+      id: 'hold',
+      kind: 'freeze',
+      start: 2,
+      end: 2,
+      requestedStart: 2,
+      requestedEnd: 2,
+      duration: 2,
+      frameTime: 1.96,
+      frameDuration: 0.04,
+    },
+  });
+  workspace.cursor = 2;
+  const writeReviewFrames = vi.fn<
+    NonNullable<Parameters<typeof exportReviewedVideo>[1]>['writeReviewFrames']
+  >(async ({ index, edits }) => {
+    const schedule = reviewRenderFrameSchedule(index.duration, edits, 30);
+    return {
+      videoPackets: schedule.flatMap((window) => window.timestamps).length,
+      audioPackets: 0,
+      resultDuration: schedule.at(-1)!.segment.resultEnd,
+      audioRanges: [],
+    };
+  });
+  const selection = { kind: 'range' as const, start: 1.5, end: 2, result: { start: 1.5, end: 3 } };
+  const before = structuredClone(args.snapshot);
+  const output = await exportReviewedVideo(
+    { ...args, destination: 'download', selection },
+    {
+      ...deps,
+      writeReviewFrames,
+    }
+  );
+  expect(output.receipt.filename).toMatch(/fragment-1\.500-3\.000\.webm$/);
+  expect(writeReviewFrames).toHaveBeenCalledOnce();
+  const call = writeReviewFrames.mock.calls[0]![0];
+  expect(call.fragmentOffset).toBe(1.5);
+  expect(call.advanced.zoom.regions).toEqual(workspace.advanced.zoom.regions);
+  const schedule = reviewRenderFrameSchedule(args.index.duration, call.edits, 30);
+  expect(schedule.map((window) => window.segment.kind)).toEqual(['keep', 'freeze']);
+  expect(schedule[1]!.timestamps[0]! + call.fragmentOffset).toBe(2);
+  expect(schedule[1]!.sourceTimes).toEqual(Array(30).fill(1.96));
+  expect(schedule[1]!.segment.resultEnd).toBe(1.5);
+  expect(args.snapshot).toEqual(before);
+  expect(deps.saveRecordingsBatchSafely).not.toHaveBeenCalled();
+});

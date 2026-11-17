@@ -322,6 +322,7 @@ export function ReviewPlaybackRangeOverlay(props: {
   duration: number;
   gutter: number;
   width: number;
+  ruler?: boolean;
   edgeInteraction?: ReturnType<typeof useReviewRulerRange>['edgeInteraction'] | undefined;
 }) {
   const range = props.range;
@@ -330,24 +331,29 @@ export function ReviewPlaybackRangeOverlay(props: {
   const width = ((range.end - range.start) / props.duration) * props.width;
   return (
     <div
-      data-ui="gallery.videoReview.playbackRangeOverlay"
+      data-ui={
+        props.ruler
+          ? 'gallery.videoReview.rulerRangeOverlay'
+          : 'gallery.videoReview.playbackRangeOverlay'
+      }
       aria-hidden={props.edgeInteraction ? undefined : true}
-      className="pointer-events-none absolute top-0 bottom-2 z-[18] border-x
-        border-[var(--sniptale-color-accent-emphasis)] bg-[var(--sniptale-color-accent)]/5"
+      className={`pointer-events-none absolute ${props.ruler ? 'top-0 bottom-0' : 'top-0 bottom-2 z-[18]'} border-x
+        border-[var(--sniptale-color-accent-emphasis)] bg-[var(--sniptale-color-accent)]/5`}
       style={{ left, width }}
     >
-      {(['start', 'end'] as const).map((edge) => (
-        <span
-          key={edge}
-          data-range-edge={edge}
-          className={`absolute top-0 rounded bg-[var(--sniptale-color-surface-panel)] px-1
-            text-[9px] leading-3 tabular-nums text-[var(--sniptale-color-accent-emphasis)]
+      {props.ruler &&
+        (['start', 'end'] as const).map((edge) => (
+          <span
+            key={edge}
+            data-range-edge={edge}
+            className={`absolute bottom-0 z-[1] rounded bg-[var(--sniptale-color-surface-panel)] px-1
+            text-[9px] leading-[10px] tabular-nums text-[var(--sniptale-color-accent-emphasis)]
             ${edge === 'start' ? 'left-1' : 'right-1'}`}
-          style={{ visibility: width < (edge === 'start' ? 65 : 135) ? 'hidden' : 'visible' }}
-        >
-          {formatPreciseTime(range[edge])}
-        </span>
-      ))}
+            style={{ visibility: width < (edge === 'start' ? 65 : 135) ? 'hidden' : 'visible' }}
+          >
+            {formatPreciseTime(range[edge])}
+          </span>
+        ))}
       {props.edgeInteraction &&
         (['start', 'end'] as const).map((edge) => {
           const { onPointerDown, ...interaction } = props.edgeInteraction!(edge);
