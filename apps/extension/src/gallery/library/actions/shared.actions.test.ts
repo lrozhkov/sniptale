@@ -148,6 +148,7 @@ it.each([
   ['source-unavailable', 'gallery.app.deleteSourceUnavailable'],
   ['unsupported-source', 'gallery.app.deleteUnsupportedSource'],
   ['pending-publication', 'gallery.app.deletePendingPublication'],
+  ['retained-history', 'gallery.app.deleteRetainedHistory'],
 ] as const)('explains wrapped deletion refusal %s', async (reason, messageKey) => {
   const { controller } = createController();
   await createBusyActionRunner(controller)(() =>

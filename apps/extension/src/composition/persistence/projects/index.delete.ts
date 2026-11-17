@@ -9,7 +9,7 @@ import { retainVideoProjectRevisionInTransaction } from './revisions';
 import { captureDeletionInTransaction } from '../sync-capture/capture';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import {
-  collectProjectOwnedAssetIds,
+  collectProjectEntryOwnedAssetIds,
   deleteProjectAssetsUnreferencedByOtherProjects,
 } from './asset-references';
 import { createProjectDeletionStores } from './mutation-stores';
@@ -29,6 +29,12 @@ import {
   MediaAssetDeletionBlockedError,
   StaleMediaAssetDeletePreviewError,
 } from '../media-library/deletion-errors';
+import { removeEditorDocumentOwnership } from '../document-assets/ownership';
+import {
+  VIDEO_PROJECT_HISTORY_OWNER_KIND,
+  videoProjectHistoryAssetBindings,
+} from './history-contracts';
+import { ASSET_OWNERS_STORE, ASSET_REFS_STORE } from '../infrastructure/indexed-db/core.stores';
 
 /** Delete an admitted project in the caller transaction without capture or transaction completion. */
 export async function deleteVideoProjectInTransaction(
@@ -37,8 +43,22 @@ export async function deleteVideoProjectInTransaction(
   operation: PhysicalDeleteAssetOperation
 ): Promise<string[]> {
   const projects = tx.objectStore(VIDEO_PROJECTS_STORE);
-  const existing = parseVideoProjectEntry(await projects.get(id));
-  const projectAssetIds = collectProjectOwnedAssetIds(existing?.project);
+  const raw: unknown = await projects.get(id);
+  const existing = parseVideoProjectEntry(raw);
+  if (raw !== undefined && (!existing || existing.id !== id))
+    throw new MediaAssetDeletionBlockedError('source-unavailable');
+  const projectAssetIds = collectProjectEntryOwnedAssetIds(existing);
+  if (existing?.history)
+    await removeEditorDocumentOwnership({
+      document: { assets: videoProjectHistoryAssetBindings(existing.history) },
+      ownerKind: VIDEO_PROJECT_HISTORY_OWNER_KIND,
+      ownerId: id,
+      physicalDelete: operation,
+      stores: {
+        owners: tx.objectStore(ASSET_OWNERS_STORE),
+        refs: tx.objectStore(ASSET_REFS_STORE),
+      },
+    });
   if (existing)
     await retainVideoProjectRevisionInTransaction(tx, id, existing.workspaceRevision ?? 0);
   await projects.delete(id);
@@ -55,7 +75,7 @@ export async function deleteVideoProject(id: string): Promise<string[]> {
         const entry = parseVideoProjectEntry(raw);
         if (raw !== undefined && (!entry || entry.id !== id))
           throw new MediaAssetDeletionBlockedError('source-unavailable');
-        return [...new Set(collectProjectOwnedAssetIds(entry?.project))].sort();
+        return collectProjectEntryOwnedAssetIds(entry).sort();
       };
       let projectAssetIds = await readSelection();
       const recoverSelection = async () =>
@@ -84,7 +104,7 @@ export async function deleteVideoProject(id: string): Promise<string[]> {
           const existing = parseVideoProjectEntry(raw);
           if (raw !== undefined && (!existing || existing.id !== id))
             throw new MediaAssetDeletionBlockedError('source-unavailable');
-          const currentIds = [...new Set(collectProjectOwnedAssetIds(existing?.project))].sort();
+          const currentIds = collectProjectEntryOwnedAssetIds(existing).sort();
           if (JSON.stringify(currentIds) !== JSON.stringify(projectAssetIds))
             throw new StaleMediaAssetDeletePreviewError();
           const deletedProjectAssetIds = await deleteVideoProjectInTransaction(

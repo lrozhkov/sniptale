@@ -37,7 +37,7 @@ import { collectVideoProjectReferences } from '../library-lifecycle/references';
 import { promoteLinkedRecordingLifecycles } from '../library-lifecycle/project-recordings';
 import { createProjectAssetMediaId } from '../../../features/media-hub/media-id';
 import {
-  collectProjectOwnedAssetIds,
+  collectProjectEntryOwnedAssetIds,
   deleteProjectAssetsUnreferencedByOtherProjects,
   syncProjectAssetMirrorLifecycles,
 } from './asset-references';
@@ -147,9 +147,19 @@ export async function saveVideoProject(
           throw new Error('Invalid review destination source binding.');
         await publishLibraryProjectBindingInTransaction(tx, binding);
       }
-      await assertNewProjectSources(guardedSave.project, existing?.project, stores);
-      const existingProjectAssetIds = collectProjectOwnedAssetIds(existing?.project);
-      const nextProjectAssetIds = new Set(collectProjectOwnedAssetIds(guardedSave.project));
+      await assertNewProjectSources(
+        guardedSave.project,
+        existing?.project,
+        stores,
+        existing?.history ? { next: existing.history, previous: existing.history } : undefined
+      );
+      const existingProjectAssetIds = collectProjectEntryOwnedAssetIds(existing);
+      const nextProjectAssetIds = new Set(
+        collectProjectEntryOwnedAssetIds({
+          project: guardedSave.project,
+          ...(existing?.history ? { history: existing.history } : {}),
+        })
+      );
       const removedProjectAssetIds = guardedSave.preservePersistedAssets
         ? []
         : existingProjectAssetIds.filter(
@@ -181,7 +191,7 @@ export async function saveVideoProject(
         projectStore,
         recordingStore,
       });
-      await promoteProjectSourceLifecycles(entry.project, stores, now);
+      await promoteProjectSourceLifecycles(entry.project, stores, now, entry.history);
       await deleteProjectAssetsUnreferencedByOtherProjects({
         tx,
         operation: physicalDelete,

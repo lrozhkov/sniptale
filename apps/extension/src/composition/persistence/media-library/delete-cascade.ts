@@ -17,7 +17,8 @@ import { recoverMediaSourcePublications } from './delete-cascade.recovery';
 import { createScenarioProjectStore } from '../scenario/storage';
 import { createVideoWorkspaceStore } from '../review-workspaces/storage';
 import { withVideoProjectUsage, withReviewWorkspaceUsage } from './usage-index-keys';
-import { sameMediaSource } from './dependencies';
+import { sameMediaSource, videoHistoryUsesMedia } from './dependencies';
+import { hasVideoProjectHistoryChanges } from '../projects/history-contracts';
 import {
   MediaAssetDeletionBlockedError,
   type MediaAssetGraphDomain,
@@ -249,17 +250,22 @@ async function detachVideoProjects(
   const affected: MediaAssetProjectUsage[] = [];
   const scenarioChildIds = new Set(graph.scenarioChildren.map((child) => child.id));
   for (const entry of graph.videos) {
+    if (videoHistoryUsesMedia(entry.history?.sources ?? [], graph.media, scenarioChildIds))
+      throw new MediaAssetDeletionBlockedError('retained-history');
     const primary = isVideoPrimaryMediaSource(entry.project, graph.media);
     const sources = entry.project.assets
       .filter((asset) => videoSourceUsesMedia(asset.source, graph.media, scenarioChildIds))
       .map((asset) => asset.source);
     if (!primary && sources.length === 0) continue;
+    if (hasVideoProjectHistoryChanges(entry.history))
+      throw new MediaAssetDeletionBlockedError('retained-history');
     affected.push({ id: entry.id, kind: 'video', name: entry.project.name, primary });
     if (primary) throw new PrimaryMediaAssetDeleteError();
     const project = removeVideoProjectLibrarySources(entry.project, sources);
+    const { historyPublicationId: _publicationId, ...independentEntry } = entry;
     await tx.objectStore(VIDEO_PROJECTS_STORE).put!(
       withVideoProjectUsage({
-        ...entry,
+        ...independentEntry,
         project: { ...project, updatedAt: now },
         updatedAt: now,
         workspaceRevision: (entry.workspaceRevision ?? 0) + 1,

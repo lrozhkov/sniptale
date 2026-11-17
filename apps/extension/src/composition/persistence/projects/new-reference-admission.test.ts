@@ -8,6 +8,34 @@ import {
 import { VideoProjectAssetType } from '../../../features/video/project/types';
 
 type Stores = Parameters<typeof assertNewProjectSources>[2];
+
+it('refuses a missing historical source and permits retry after source admission', async () => {
+  const { asset, project, get, stores } = fixture();
+  const current = { ...project, assets: [] };
+  const history = {
+    version: 1 as const,
+    epoch: 'epoch',
+    past: [{ assetId: 'change' }],
+    future: [],
+    sources: [{ kind: 'project-asset' as const, id: asset.id }],
+  };
+  get.mockResolvedValueOnce(undefined);
+  await expect(
+    assertNewProjectSources(current, undefined, stores, { next: history })
+  ).rejects.toThrow('unavailable');
+  await expect(
+    assertNewProjectSources(current, undefined, stores, { next: history })
+  ).resolves.toBeUndefined();
+  expect(history.past).toEqual([{ assetId: 'change' }]);
+  get.mockClear();
+  await expect(
+    assertNewProjectSources(current, current, stores, {
+      next: history,
+      previous: history,
+    })
+  ).resolves.toBeUndefined();
+  expect(get).not.toHaveBeenCalled();
+});
 function fixture(origin?: string) {
   const asset = createProjectAssetEntry({
     id: 'copy',

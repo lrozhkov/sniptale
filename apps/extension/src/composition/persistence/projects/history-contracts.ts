@@ -1,12 +1,21 @@
 import { hasExactKeys, isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   VIDEO_PROJECT_HISTORY_SOURCE_KINDS,
+  collectVideoProjectHistorySources,
   type VideoProjectHistorySourceReference,
 } from '../../../features/video/project/history-capture';
 import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
+import type { VideoProjectMetadata } from '../../../features/video/project/validation';
 
 /** Native ownership identity for immutable Montage inverse-change JSON. */
 export const VIDEO_PROJECT_HISTORY_OWNER_KIND = 'video-project-history';
+
+/** Retained inverses or an unfinished gesture prevent independent current-head rewrites. */
+export function hasVideoProjectHistoryChanges(
+  history: PersistedVideoProjectHistory | undefined
+): boolean {
+  return Boolean(history && (history.past.length || history.future.length || history.recovery));
+}
 
 /** Native head references immutable inverse-change JSON; no project payload repeats in this head. */
 export interface PersistedVideoProjectHistory {
@@ -117,4 +126,18 @@ export function videoProjectHistoryChangeRefs(
   history: PersistedVideoProjectHistory
 ): readonly { assetId: string }[] {
   return [...history.past, ...history.future, ...(history.recovery ? [history.recovery] : [])];
+}
+
+/** Current and retained targets share one logical resource closure for native consumers. */
+export function collectVideoProjectWorkspaceSources(entry: {
+  project: VideoProjectMetadata;
+  history?: PersistedVideoProjectHistory;
+}): readonly VideoProjectHistorySourceReference[] {
+  const sources = new Map<string, VideoProjectHistorySourceReference>();
+  for (const source of [
+    ...collectVideoProjectHistorySources(entry.project),
+    ...(entry.history?.sources ?? []),
+  ])
+    sources.set(JSON.stringify([source.kind, source.id]), source);
+  return [...sources.values()];
 }

@@ -13,6 +13,7 @@ import { createPersistedEditorDocumentFixture } from '../document-assets/test-su
 import { createPagePackageManifestFixture } from '../../../features/web-snapshot/manifest.test-support';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { collectDurableAssetSnapshot } from './retention-authority';
+import { createVideoProjectEntry } from '../projects/index.test-support';
 const mocks = vi.hoisted(() => ({ db: vi.fn(), debug: vi.fn() }));
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({ debug: mocks.debug }),
@@ -32,6 +33,35 @@ function installDatabase(database: { getAll: (store: string) => Promise<unknown[
   mocks.db.mockResolvedValue(fixture);
   return fixture;
 }
+
+it.each([false, true])(
+  'includes native Montage inverse claims in the full GC audit: corrupt=%s',
+  async (corrupt) => {
+    const entry = {
+      ...createVideoProjectEntry(),
+      history: {
+        version: corrupt ? 99 : 1,
+        epoch: 'epoch',
+        past: [{ assetId: 'inverse' }],
+        future: [{ assetId: 'inverse' }],
+        sources: [],
+      },
+    };
+    const expected = {
+      ownerKind: 'video-project-history',
+      ownerId: entry.id,
+      role: 'history:change:inverse',
+      assetId: 'inverse',
+    };
+    installDatabase({
+      getAll: async (name) =>
+        name === 'video_projects' ? [entry] : name === 'asset_owners' ? [expected] : [],
+    });
+    const snapshot = await collectDurableAssetSnapshot();
+    expect(snapshot.authorityValid).toBe(!corrupt);
+    if (!corrupt) expect(snapshot.expectedOwners).toEqual([expected]);
+  }
+);
 
 it('finishes retention validation without waiting for background-tab timers', async () => {
   const yieldTask = vi.fn(async () => undefined);

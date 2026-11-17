@@ -18,7 +18,7 @@ import { createQuickEditAdvancedContent } from '../../../features/video/review/a
 import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
 import { buildReviewTimeMap } from '../../../features/video/review/timeline';
-import { withReviewWorkspaceUsage } from './usage-index-keys';
+import { withReviewWorkspaceUsage, withVideoProjectUsage } from './usage-index-keys';
 import {
   replayReviewHistory,
   reviewAdvancedContentBaseline,
@@ -39,6 +39,36 @@ it('atomically removes placements, library metadata and the last physical owner'
   expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);
   expect(harness.complete).toHaveBeenCalledTimes(1);
 });
+
+it.each(['history-only', 'current-placement', 'recovery'])(
+  'preserves all source and project data when deleting a retained Montage %s dependency',
+  async (mode) => {
+    const original = readCascadeVideoProject();
+    const project =
+      mode === 'history-only' ? { ...original.project, assets: [], clips: [] } : original.project;
+    const entry = withVideoProjectUsage({
+      ...original,
+      project,
+      history: {
+        version: 1,
+        epoch: 'epoch',
+        past: mode === 'recovery' ? [] : [{ assetId: 'history-change' }],
+        future: [],
+        ...(mode === 'recovery' ? { recovery: { assetId: 'recovery-change' } } : {}),
+        sources: mode === 'history-only' ? [{ kind: 'project-asset', id: 'project-asset-1' }] : [],
+      },
+    });
+    rows.get('video_projects')!.set(entry.id, entry);
+    const before = structuredClone(rows);
+    await expect(
+      deleteMediaAssetWithProjectCascade(mediaId, [
+        { id: entry.id, kind: 'video', name: entry.project.name, primary: false },
+      ])
+    ).rejects.toMatchObject({ name: 'MediaAssetDeletionBlockedError', reason: 'retained-history' });
+    expect(rows).toEqual(before);
+    expect(harness.complete).not.toHaveBeenCalled();
+  }
+);
 
 it('rolls back when a new project use was not in the user warning', async () => {
   await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).rejects.toBeInstanceOf(

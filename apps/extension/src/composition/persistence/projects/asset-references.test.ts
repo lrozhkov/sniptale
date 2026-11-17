@@ -39,6 +39,37 @@ it('defers an ordinary save release until mounted Undo readers have drained', as
   });
 });
 
+it('retains a private resource referenced only by a durable Montage history target', async () => {
+  table('project_assets').set('private', createProjectAssetEntry({ id: 'private' }));
+  table('video_projects').set(
+    'retained',
+    createVideoProjectEntry(
+      {},
+      {
+        history: {
+          version: 1,
+          epoch: 'epoch',
+          past: [{ assetId: 'change' }],
+          future: [],
+          sources: [{ kind: 'project-asset', id: 'private' }],
+        },
+      }
+    )
+  );
+  const before = structuredClone(rows);
+  const operation = buildPhysicalDeleteOperation([]);
+  const db = await harness.db();
+  const tx = db.transaction([...rows.keys()], 'readwrite');
+  await deleteProjectAssetsUnreferencedByOtherProjects({
+    tx,
+    operation,
+    projectAssetIds: ['private'],
+  });
+  await tx.done;
+  expect(rows).toEqual(before);
+  expect(operation.assetIds).toEqual([]);
+});
+
 it.each(['unknown-video', 'scenario', 'review'] as const)(
   'retains a private resource used by an external %s consumer',
   async (kind) => {

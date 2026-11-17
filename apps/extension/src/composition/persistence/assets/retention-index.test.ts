@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { collectTargetAssetSnapshot } from './retention-index';
 import { createTargetAssetDatabaseFixture } from './retention-authority.test-support';
+import { createVideoProjectEntry } from '../projects/index.test-support';
 
 const source = { id: 'private', assetId: 'target', createdAt: 1, mimeType: 'image/png', size: 3 };
 const ref = {
@@ -12,6 +13,43 @@ const ref = {
   location: { kind: 'opfs', objectKey: 'objects/target' },
 };
 const owner = { ownerKind: 'project-asset', ownerId: 'private', role: 'body', assetId: 'target' };
+
+it.each([false, true])(
+  'includes native Montage inverse claims in targeted GC: corrupt=%s',
+  async (corrupt) => {
+    const entry = {
+      ...createVideoProjectEntry(),
+      history: {
+        version: corrupt ? 99 : 1,
+        epoch: 'epoch',
+        past: [{ assetId: 'target' }],
+        future: [{ assetId: 'target' }],
+        sources: [],
+      },
+    };
+    const expected = {
+      ownerKind: 'video-project-history',
+      ownerId: entry.id,
+      role: 'history:change:target',
+      assetId: 'target',
+    };
+    const db = createTargetAssetDatabaseFixture(async (name) =>
+      name === 'video_projects'
+        ? [entry]
+        : name === 'asset_owners'
+          ? [expected]
+          : name === 'asset_refs'
+            ? [{ ...ref, mimeType: 'application/json' }]
+            : []
+    );
+    const snapshot = await collectTargetAssetSnapshot(db, ['target']);
+    expect(snapshot.authorityValid).toBe(!corrupt);
+    if (!corrupt) {
+      expect(snapshot.expectedOwners).toEqual([expected]);
+      expect(snapshot.owners).toEqual([expected]);
+    }
+  }
+);
 
 it('returns no retirement authority after cancellation during evidence collection', async () => {
   const controller = new AbortController();

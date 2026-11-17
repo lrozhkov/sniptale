@@ -10,6 +10,8 @@ import type {
 } from '../../../features/video/project/types';
 import type { VideoWorkspace } from '../review-workspaces/contracts';
 import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
+import { parsePersistedVideoProjectHistory } from '../projects/history-contracts';
+import type { VideoProjectHistorySourceReference } from '../../../features/video/project/history-capture';
 
 /** Root identity used by every project projection, independent of presentation metadata. */
 export type MediaDependencyTarget = Pick<MediaLibraryEntry, 'id' | 'source'> & {
@@ -142,17 +144,35 @@ export function videoSourceUsesMedia(
   media: MediaDependencyTarget,
   scenarioChildIds: ReadonlySet<string>
 ): boolean {
-  return videoSourceReferences(source).some(
-    (ref) =>
-      (ref.kind === 'library-asset' && ref.id === media.id) ||
-      (ref.kind === 'recording' &&
-        media.source.kind === 'recording' &&
-        ref.id === media.source.recordingId) ||
-      (ref.kind === 'project-asset' &&
-        ((media.source.kind === 'project-asset' && ref.id === media.source.projectAssetId) ||
-          media.privateProjectAssetIds?.has(ref.id))) ||
-      (ref.kind === 'scenario-asset' && scenarioChildIds.has(ref.id))
+  return videoSourceReferences(source).some((ref) =>
+    sourceReferenceUsesMedia(ref, media, scenarioChildIds)
   );
+}
+
+function sourceReferenceUsesMedia(
+  ref: VideoProjectHistorySourceReference,
+  media: MediaDependencyTarget,
+  scenarioChildIds: ReadonlySet<string>
+): boolean {
+  return (
+    (ref.kind === 'library-asset' && ref.id === media.id) ||
+    (ref.kind === 'recording' &&
+      media.source.kind === 'recording' &&
+      ref.id === media.source.recordingId) ||
+    (ref.kind === 'project-asset' &&
+      ((media.source.kind === 'project-asset' && ref.id === media.source.projectAssetId) ||
+        media.privateProjectAssetIds?.has(ref.id))) ||
+    (ref.kind === 'scenario-asset' && scenarioChildIds.has(ref.id))
+  );
+}
+
+/** Retained targets are dependencies even after their final current placement is removed. */
+export function videoHistoryUsesMedia(
+  sources: readonly VideoProjectHistorySourceReference[],
+  media: MediaDependencyTarget,
+  scenarioChildIds: ReadonlySet<string>
+): boolean {
+  return sources.some((source) => sourceReferenceUsesMedia(source, media, scenarioChildIds));
 }
 
 /** Prove disjointness from every scenario source locator before bypassing full content admission. */
@@ -242,11 +262,26 @@ interface VideoDependencyEnvelope {
   source: VideoProjectSource;
   baseRecordingId: string | null;
   sources: VideoProjectAssetSource[];
+  historySources: readonly VideoProjectHistorySourceReference[];
 }
 
 /** Admit every reference-bearing field independently of render metadata. */
 export function parseVideoDependencyEnvelope(value: unknown): VideoDependencyEnvelope | null {
   if (!isRecord(value) || !isRecord(value['project'])) return null;
+  const publicationId = value['historyPublicationId'];
+  if (
+    publicationId !== undefined &&
+    (value['history'] === undefined ||
+      typeof publicationId !== 'string' ||
+      publicationId.length === 0 ||
+      publicationId.length > 200)
+  )
+    return null;
+  const history =
+    value['history'] === undefined
+      ? undefined
+      : parsePersistedVideoProjectHistory(value['history']);
+  if (history === null) return null;
   const project = value['project'];
   if (
     (project['version'] !== 2 &&
@@ -267,7 +302,12 @@ export function parseVideoDependencyEnvelope(value: unknown): VideoDependencyEnv
     if (!locator) return null;
     sources.push(locator);
   }
-  return { source, baseRecordingId: project['baseRecordingId'], sources };
+  return {
+    source,
+    baseRecordingId: project['baseRecordingId'],
+    sources,
+    historySources: history?.sources ?? [],
+  };
 }
 
 /** Prove disjoint video source envelopes without depending on unrelated render metadata. */
@@ -280,6 +320,7 @@ export function videoEntryIsUnrelated(
   return (
     envelope !== null &&
     !isVideoPrimaryMediaSource(envelope, media) &&
+    !videoHistoryUsesMedia(envelope.historySources, media, scenarioChildIds) &&
     !envelope.sources.some((source) => videoSourceUsesMedia(source, media, scenarioChildIds))
   );
 }

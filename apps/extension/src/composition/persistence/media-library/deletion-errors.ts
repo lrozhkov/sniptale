@@ -28,7 +28,8 @@ export class MediaAssetDeletionBlockedError extends Error {
       | 'invalid-graph'
       | 'source-unavailable'
       | 'unsupported-source'
-      | 'pending-publication',
+      | 'pending-publication'
+      | 'retained-history',
     readonly graphDomain?: MediaAssetGraphDomain
   ) {
     super('Media deletion is blocked.');

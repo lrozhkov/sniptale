@@ -6560,6 +6560,7 @@
       "deleteSourceUnavailable": "The original file data is unavailable. Deletion could not finish; refresh the library and retry.",
       "deleteUnsupportedSource": "This item type cannot be deleted while changing linked projects. Remove it from the projects first.",
       "deletePendingPublication": "The image save has not finished. Wait for it to complete and retry deletion.",
+      "deleteRetainedHistory": "File retained: a linked project needs it for Undo and Redo.",
       "trashEmpty": "Trash Bin is empty",
       "trashNoResults": "No matching items in Trash Bin",
       "trashSearchPlaceholder": "Search",

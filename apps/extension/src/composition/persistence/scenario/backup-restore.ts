@@ -117,9 +117,17 @@ async function deleteExisting(args: {
       const envelope = parseVideoDependencyEnvelope(raw);
       if (!envelope)
         throw new Error('Scenario replacement cannot check related video project dependencies.');
-      for (const source of envelope.sources) {
-        if (source.kind !== 'scenario-asset' || !oldChildren.has(source.scenarioAssetId)) continue;
-        const current = oldChildren.get(source.scenarioAssetId)!;
+      const requiredChildren = new Set([
+        ...envelope.sources.flatMap((source) =>
+          source.kind === 'scenario-asset' ? [source.scenarioAssetId] : []
+        ),
+        ...envelope.historySources.flatMap((source) =>
+          source.kind === 'scenario-asset' ? [source.id] : []
+        ),
+      ]);
+      for (const childId of requiredChildren) {
+        if (!oldChildren.has(childId)) continue;
+        const current = oldChildren.get(childId)!;
         const replacement = args.replacementAssets.find((asset) => asset.entry.id === current.id);
         const entry = replacement && parseScenarioAssetEntry(replacement.entry);
         const currentRef = parseAssetRef(await args.stores.refs.get(current.assetId));

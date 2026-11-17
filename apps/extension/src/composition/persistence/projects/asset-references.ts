@@ -7,6 +7,7 @@ import { parseVideoProjectEntry } from './read-guards';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import type { PhysicalDeleteAssetOperation } from '../assets';
 import { enqueuePrivateSourceRetirement } from '../assets/private-source-retention';
+import type { VideoProjectEntry } from './contracts';
 import {
   createLibraryLifecycle,
   promoteLibraryLifecycle,
@@ -27,7 +28,7 @@ type ProjectAssetMediaStore = ProjectAssetDeleteStore & {
   put(value: unknown): Promise<unknown>;
 };
 
-export function collectProjectOwnedAssetIds(project: VideoProject | undefined): string[] {
+function collectProjectOwnedAssetIds(project: VideoProject | undefined): string[] {
   if (!project) {
     return [];
   }
@@ -35,6 +36,21 @@ export function collectProjectOwnedAssetIds(project: VideoProject | undefined): 
   return project.assets.flatMap((asset) =>
     asset.source.kind === 'project-asset' ? [asset.source.projectAssetId] : []
   );
+}
+
+/** Historical private media stays owned after its last current placement is removed. */
+export function collectProjectEntryOwnedAssetIds(
+  entry: Pick<VideoProjectEntry, 'project' | 'history'> | null | undefined
+): string[] {
+  if (!entry) return [];
+  return [
+    ...new Set([
+      ...collectProjectOwnedAssetIds(entry.project),
+      ...(entry.history?.sources ?? [])
+        .filter((source) => source.kind === 'project-asset')
+        .map((source) => source.id),
+    ]),
+  ];
 }
 
 export async function deleteProjectAssetsUnreferencedByOtherProjects(args: {
@@ -82,7 +98,7 @@ export async function syncProjectAssetMirrorLifecycles(args: {
     ) {
       continue;
     }
-    for (const projectAssetId of collectProjectOwnedAssetIds(otherProject.project)) {
+    for (const projectAssetId of collectProjectEntryOwnedAssetIds(otherProject)) {
       libraryAssetIds.add(projectAssetId);
     }
   }

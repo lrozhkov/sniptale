@@ -26,6 +26,7 @@ import {
   STORE_NAME,
   WEB_SNAPSHOTS_STORE,
   MEDIA_LIBRARY_STORE,
+  VIDEO_PROJECTS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 
@@ -69,6 +70,7 @@ export async function collectDurableAssetSnapshot(
   for (const store of [
     'editor_vector_library',
     STORE_NAME,
+    VIDEO_PROJECTS_STORE,
     PROJECT_ASSETS_STORE,
     PROJECT_EXPORTS_STORE,
     SCENARIO_ASSETS_STORE,

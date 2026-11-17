@@ -11,7 +11,15 @@ import { RECORDING_EVENTS_SNAPSHOT_ROLE } from '../recordings/recording-events/c
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { collectSyncCaptureClaims } from '../sync-capture/claims';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
-import { parseProjectAssetEntry, parseProjectExportEntry } from '../projects/read-guards';
+import {
+  parseProjectAssetEntry,
+  parseProjectExportEntry,
+  parseVideoProjectEntry,
+} from '../projects/read-guards';
+import {
+  VIDEO_PROJECT_HISTORY_OWNER_KIND,
+  videoProjectHistoryAssetBindings,
+} from '../projects/history-contracts';
 import { parseRecordingEntry } from '../recordings/index.guards';
 import { parseScenarioAssetEntry, parseScenarioExportEntry } from '../scenario/read-guards';
 import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
@@ -137,6 +145,18 @@ function sourceOwners(store: string, raw: unknown): AssetOwner[] | null {
       return bodyOwners('recording', parseRecordingEntry(raw));
     case 'project_assets':
       return bodyOwners('project-asset', parseProjectAssetEntry(raw));
+    case 'video_projects': {
+      if (!isRecord(raw)) return null;
+      if (raw['history'] === undefined && raw['historyPublicationId'] === undefined) return [];
+      const entry = parseVideoProjectEntry(raw);
+      return entry
+        ? videoProjectHistoryAssetBindings(entry.history).map((binding) => ({
+            ...binding,
+            ownerKind: VIDEO_PROJECT_HISTORY_OWNER_KIND,
+            ownerId: entry.id,
+          }))
+        : null;
+    }
     case 'project_exports':
       return bodyOwners('project-export', parseProjectExportEntry(raw));
     case 'scenario_assets':
@@ -229,6 +249,8 @@ function appendProjectDependencyKeys(store: string, raw: unknown, keys: Set<stri
         for (const ref of videoSourceReferences(source)) {
           keys.add(rowReferenceKey(ref.kind === 'library-asset' ? 'media' : ref.kind, ref.id));
         }
+      for (const ref of envelope.historySources)
+        keys.add(rowReferenceKey(ref.kind === 'library-asset' ? 'media' : ref.kind, ref.id));
     }
   }
 }

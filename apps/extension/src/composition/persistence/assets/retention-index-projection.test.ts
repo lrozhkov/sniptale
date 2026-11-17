@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createVideoProjectEntry } from '../projects/index.test-support';
 import { projectRetentionRow, projectRowReferenceKeys } from './retention-index-projection';
 import {
   ROW_REFERENCE_FIELD,
@@ -24,6 +25,46 @@ const project = (source: unknown) => ({
     assets: [{ source }],
     invalidPresentation: true,
   },
+});
+
+it('projects immutable Montage history owners and historical source dependencies from the same head', () => {
+  const entry = {
+    ...createVideoProjectEntry(),
+    history: {
+      version: 1,
+      epoch: 'epoch',
+      past: [{ assetId: 'shared-change' }],
+      future: [{ assetId: 'shared-change' }],
+      sources: [
+        { kind: 'project-asset', id: 'removed-private' },
+        { kind: 'library-asset', id: 'origin' },
+      ],
+    },
+  };
+  expect(projectRetentionRow('video_projects', entry)).toMatchObject({
+    valid: true,
+    owners: [
+      {
+        ownerKind: 'video-project-history',
+        ownerId: entry.id,
+        role: 'history:change:shared-change',
+        assetId: 'shared-change',
+      },
+    ],
+  });
+  expect(projectRowReferenceKeys('video_projects', entry)).toEqual(
+    expect.arrayContaining(['asset:shared-change', 'project-asset:removed-private', 'media:origin'])
+  );
+  const malformed = { ...entry, history: { version: 99 } };
+  expect(projectRowReferenceKeys('video_projects', malformed)).toEqual(
+    expect.arrayContaining([UNKNOWN_ASSET_REFERENCES, UNKNOWN_MEDIA_REFERENCES])
+  );
+  expect(
+    projectRowReferenceKeys('video_projects', {
+      ...createVideoProjectEntry(),
+      historyPublicationId: 'orphan-receipt',
+    })
+  ).toEqual(expect.arrayContaining([UNKNOWN_ASSET_REFERENCES, UNKNOWN_MEDIA_REFERENCES]));
 });
 
 describe('native deletion reference projection', () => {

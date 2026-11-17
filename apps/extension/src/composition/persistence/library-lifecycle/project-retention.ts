@@ -79,7 +79,7 @@ export async function repairTemporaryProjectLifecycles(now = Date.now()): Promis
       };
       await visitIndexedDbStoreRows(tx.objectStore(VIDEO_PROJECTS_STORE), async (raw) => {
         const entry = parseVideoProjectEntry(raw);
-        if (entry) await promoteProjectSourceLifecycles(entry.project, stores, now);
+        if (entry) await promoteProjectSourceLifecycles(entry.project, stores, now, entry.history);
         return true;
       });
       for (const raw of await stores.scenarioProjectStore.getAll()) {

@@ -8,7 +8,10 @@ import {
   type MediaDependencyTarget,
 } from './dependencies';
 import type { MediaAssetSource } from './contracts';
-import { createVideoProjectEntryWithMediaClip } from '../projects/index.test-support';
+import {
+  createVideoProjectEntryWithMediaClip,
+  createVideoProjectEntry,
+} from '../projects/index.test-support';
 
 const targets = {
   screenshot: { id: 'image', source: { kind: 'screenshot' } },
@@ -24,6 +27,44 @@ const targets = {
   },
   'web-snapshot': { id: 'web', source: { kind: 'web-snapshot', snapshotId: 'snapshot' } },
 } satisfies Record<MediaAssetSource['kind'], MediaDependencyTarget>;
+
+it.each(['', 0, 'x'.repeat(201), { id: 'receipt' }])(
+  'refuses a malformed history receipt before proving a source unrelated: %j',
+  (historyPublicationId) => {
+    const entry = {
+      ...createVideoProjectEntry(),
+      history: { version: 1, epoch: 'epoch', past: [], future: [], sources: [] },
+      historyPublicationId,
+    };
+    expect(parseVideoDependencyEnvelope(entry)).toBeNull();
+    expect(videoEntryIsUnrelated(entry, targets.screenshot, new Set())).toBe(false);
+  }
+);
+
+it.each([
+  ['recording', 'record', targets.recording],
+  ['project-asset', 'source', targets['project-asset']],
+  ['library-asset', 'image', targets.screenshot],
+  ['scenario-asset', 'child', targets.screenshot],
+])('retains media referenced only by historical %s targets', (kind, id, target) => {
+  const entry = {
+    ...createVideoProjectEntry(),
+    history: {
+      version: 1,
+      epoch: 'epoch',
+      past: [{ assetId: 'change' }],
+      future: [],
+      sources: [{ kind, id }],
+    },
+  };
+  expect(videoEntryIsUnrelated(entry, target, new Set(['child']))).toBe(false);
+  expect(
+    videoEntryIsUnrelated(entry, { id: 'other', source: { kind: 'screenshot' } }, new Set())
+  ).toBe(true);
+  expect(
+    videoEntryIsUnrelated({ ...entry, history: { version: 99 } }, targets.screenshot, new Set())
+  ).toBe(false);
+});
 
 it.each([3, 4, 5] as const)(
   'admits v%s relationships and refuses invalid or future locators',

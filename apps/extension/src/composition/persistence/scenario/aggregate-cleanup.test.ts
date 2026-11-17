@@ -29,6 +29,64 @@ async function commitLegacyFrozenChild(
   if (child.galleryAssetId) getStore('media_library').delete(child.galleryAssetId);
 }
 
+it.each([
+  ['parent-delete', 'historical-child'],
+  ['parent-delete', 'historical-root'],
+  ['child-delete', 'historical-child'],
+  ['prune', 'historical-child'],
+  ['parent-delete', 'recovery-current'],
+  ['child-delete', 'recovery-current'],
+  ['prune', 'recovery-current'],
+] as const)('preserves retained Montage sources during Scenario %s/%s', async (operation, mode) => {
+  const { createVideoProjectEntryWithMediaClip } = await import('../projects/index.test-support');
+  const project = createGuideProject('Retained Montage source');
+  const child = { ...createAsset(project.id), galleryAssetId: 'origin' };
+  await commitLegacyFrozenChild(project, child);
+  const video = createVideoProjectEntryWithMediaClip();
+  video.project.assets[0]!.source = { kind: 'scenario-asset', scenarioAssetId: child.id };
+  if (mode !== 'recovery-current') video.project = { ...video.project, assets: [], clips: [] };
+  video.history = {
+    version: 1,
+    epoch: 'epoch',
+    past: mode === 'recovery-current' ? [] : [{ assetId: 'inverse' }],
+    future: [],
+    ...(mode === 'recovery-current' ? { recovery: { assetId: 'recovery' } } : {}),
+    sources:
+      mode === 'historical-child'
+        ? [{ kind: 'scenario-asset', id: child.id }]
+        : mode === 'historical-root'
+          ? [{ kind: 'scenario-project', id: project.id }]
+          : [],
+  };
+  getStore('video_projects').set(video.id, video);
+  const names = [
+    'scenario_projects',
+    'scenario_project_history',
+    'scenario_project_units',
+    'scenario_project_revisions',
+    'scenario_assets',
+    'asset_owners',
+    'asset_refs',
+    'video_projects',
+    'project_assets',
+    'media_library',
+    'asset_operations',
+  ];
+  const before = names.map((name) => structuredClone(getStore(name)));
+  const run =
+    operation === 'parent-delete'
+      ? deleteScenarioAggregate(project.id)
+      : operation === 'prune'
+        ? pruneScenarioResources(project.id)
+        : commitScenarioAggregateMutation(project, { children: { assetDeletes: [child.id] } });
+  await expect(run).rejects.toMatchObject({
+    name: 'MediaAssetDeletionBlockedError',
+    reason: 'retained-history',
+  });
+  expect(names.map(getStore)).toEqual(before);
+  expect(completePhysicalDeleteOperation).not.toHaveBeenCalled();
+});
+
 it('retains an external montage snapshot when its scenario is replaced from an archive', async () => {
   const { createVideoProjectEntryWithMediaClip } = await import('../projects/index.test-support');
   const { putScenarioProjectBackupRestore } = await import('./backup-restore');
@@ -311,9 +369,13 @@ it('retains shared editor resources while cleaning an orphaned document', async 
   expect(getStore('asset_operations').size).toBe(0);
 });
 
-it.each([true, false])(
-  'retains a scenario snapshot used by a montage with published origin=%s',
-  async (published) => {
+it.each(
+  [true, false].flatMap((published) =>
+    [false, true].map((emptyHistory) => [published, emptyHistory] as const)
+  )
+)(
+  'retains a scenario snapshot with published origin=%s and empty history=%s',
+  async (published, emptyHistory) => {
     const { createVideoProjectEntryWithMediaClip } = await import('../projects/index.test-support');
     const project = createGuideProject('Scenario snapshot owner');
     const child = { ...createAsset(project.id), galleryAssetId: 'original-image' };
@@ -328,9 +390,17 @@ it.each([true, false])(
     const video = createVideoProjectEntryWithMediaClip();
     video.project.source = { kind: 'scenario', scenarioProjectId: project.id };
     video.project.assets[0]!.source = { kind: 'scenario-asset', scenarioAssetId: child.id };
+    if (emptyHistory) {
+      video.history = { version: 1, epoch: 'epoch', past: [], future: [], sources: [] };
+      video.historyPublicationId = 'old-publication';
+    }
     getStore('video_projects').set(video.id, video);
     await deleteScenarioAggregate(project.id);
     const saved = getStore('video_projects').get(video.id) as typeof video;
+    if (emptyHistory) {
+      expect(saved.history).toEqual(video.history);
+      expect(saved).not.toHaveProperty('historyPublicationId');
+    }
     expect(saved.project.source).toEqual({ kind: 'manual' });
     expect(saved.project.assets[0]!.source.kind).toBe('project-asset');
     const source = saved.project.assets[0]!.source;

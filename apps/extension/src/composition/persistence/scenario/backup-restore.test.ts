@@ -691,9 +691,13 @@ it('pins a restored scenario source only after accepting its parent', async () =
   }
 });
 
-it.each(['exact', 'child', 'ref', 'owner'] as const)(
-  'uses child-only indexed admission and checks the %s replacement binding',
-  async (binding) => {
+it.each(
+  ['exact', 'child', 'ref', 'owner'].flatMap((binding) =>
+    ['current', 'history-only'].map((mode) => ({ binding, mode }))
+  )
+)(
+  'uses child-only indexed admission for $mode and checks the $binding replacement binding',
+  async ({ binding, mode }) => {
     const target = stores();
     const current = {
       id: 'child',
@@ -729,6 +733,16 @@ it.each(['exact', 'child', 'ref', 'owner'] as const)(
         source: { kind: 'scenario', scenarioProjectId: 'project' },
       },
     };
+    if (mode === 'history-only') {
+      video.project = { ...video.project, assets: [], clips: [] };
+      video.history = {
+        version: 1,
+        epoch: 'epoch',
+        past: [],
+        future: [{ assetId: 'inverse' }],
+        sources: [{ kind: 'scenario-asset', id: current.id }],
+      };
+    }
     const queries = vi.fn();
     const result = putScenarioProjectBackupRestore({
       operation: operation(),
