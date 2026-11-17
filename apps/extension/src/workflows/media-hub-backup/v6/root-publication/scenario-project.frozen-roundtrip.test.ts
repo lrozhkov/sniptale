@@ -2,7 +2,11 @@ import { createEditorDocumentFixture } from '../../../../editor/document/page-se
 import { createPersistedEditorDocumentFixture } from '../../../../composition/persistence/document-assets/test-support';
 import { encodePortableEditorDocument } from '../root-codecs/editor-document';
 import { encodePortableScenarioProjectEntry } from '../root-codecs/projects';
-import { expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
+import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { materializeScenarioUnitStorage } from '../../../../composition/persistence/scenario/storage-units';
+import { parseScenarioProjectEntry } from '../../../../composition/persistence/scenario/read-guards';
+import { parsePortableScenarioProjectMetadata } from '../root-codecs/projects';
 import { createGuideProject } from '../../../../features/scenario/project/public';
 import {
   createGuideStep,
@@ -14,7 +18,18 @@ import { parseScenarioAssetEntry } from '../../../../composition/persistence/sce
 import { parseMediaLibraryEntry } from '../../../../composition/persistence/media-library/read-guards';
 import { portableJson, session as mediaSession } from './media.review-assets.test-support';
 
-const io = vi.hoisted(() => ({ db: vi.fn() }));
+const io = vi.hoisted(() => ({ db: vi.fn(), files: new Map<string, File>() }));
+afterEach(() => io.files.clear());
+vi.mock('../../../../composition/persistence/assets', async (original) => {
+  const actual = await original<typeof import('../../../../composition/persistence/assets')>();
+  return {
+    ...actual,
+    readAssetFile: (...args: Parameters<typeof actual.readAssetFile>) =>
+      io.files.has(args[0].assetId)
+        ? Promise.resolve(io.files.get(args[0].assetId)!)
+        : actual.readAssetFile(...args),
+  };
+});
 vi.mock('../../../../composition/persistence/infrastructure/indexed-db/core', async (original) => ({
   ...(await original<
     typeof import('../../../../composition/persistence/infrastructure/indexed-db/core')
@@ -39,15 +54,20 @@ function installDatabase(rows: Map<string, Map<string, unknown>>) {
     getAll: async () => [...table(name).values()],
     delete: async (key: IDBValidKey) => table(name).delete(String(key)),
     put: async (value: Record<string, unknown>) => {
-      const key = value['ownerKind']
-        ? String([value['ownerKind'], value['ownerId'], value['role']])
-        : String(
-            value['operationId'] ??
-              value['id'] ??
-              value['stepId'] ??
-              value['assetId'] ??
-              value['aggregateId']
-          );
+      const key =
+        name === 'scenario_project_units'
+          ? String([value['projectId'], value['unitId'], value['revision']])
+          : name === 'scenario_project_history'
+            ? String([value['projectId'], value['revision']])
+            : value['ownerKind']
+              ? String([value['ownerKind'], value['ownerId'], value['role']])
+              : String(
+                  value['operationId'] ??
+                    value['id'] ??
+                    value['stepId'] ??
+                    value['assetId'] ??
+                    value['aggregateId']
+                );
       table(name).set(key, structuredClone(value));
       writes.push({ name, value: structuredClone(value) });
     },
@@ -89,7 +109,7 @@ function installDatabase(rows: Map<string, Map<string, unknown>>) {
   return writes;
 }
 
-function input(strategy: 'replace' | 'skip', staleCheckpoint = false) {
+function input(strategy: 'replace' | 'skip' | 'duplicate', staleCheckpoint = false) {
   const project = createGuideProject('Scenario', 'scenario', 1);
   const step = createGuideStep('Used');
   step.blocks = [
@@ -196,8 +216,115 @@ function input(strategy: 'replace' | 'skip', staleCheckpoint = false) {
     session,
     staged: [{ objectId: 'image', ref }],
   };
-  return { args, media, ref, rows, writes };
+  return { args, media, ref, rows, writes, project };
 }
+
+it.each(['replace', 'duplicate'] as const)(
+  'restores native editing branches and branch-only image/document resources with %s identities',
+  async (strategy) => {
+    const { args, ref, rows, project } = input(strategy);
+    const block = project.items[0]?.kind === 'step' ? project.items[0].blocks[0] : null;
+    if (block?.kind !== 'image') throw new Error('Missing branch image');
+    block.editDocumentId = 'historical-document';
+    const current = { ...project, name: 'Current', items: [], updatedAt: 3 };
+    const native = {
+      id: project.id,
+      project: current,
+      createdAt: 1,
+      updatedAt: 3,
+      workspaceRevision: 3,
+      history: [{ revision: 1, savedAt: 1, project: { ...current, name: 'Saved', updatedAt: 1 } }],
+      editingHistory: {
+        version: 1 as const,
+        past: [{ ...project, name: 'Past' }],
+        future: [{ ...project, name: 'Future' }],
+      },
+    };
+    if (strategy === 'duplicate')
+      rows.set(
+        'scenario_projects',
+        new Map([[project.id, { ...native, editingHistory: undefined }]])
+      );
+    const {
+      editingHistory: graph,
+      history: _legacy,
+      ...entry
+    } = encodePortableScenarioProjectEntry(native);
+    if (!graph) throw new Error('Missing graph');
+    const file = new File([JSON.stringify(graph)], 'history.json', { type: 'application/json' });
+    const graphRef = {
+      ...ref,
+      assetId: 'history-body',
+      mimeType: file.type,
+      size: file.size,
+      location: { kind: 'opfs' as const, objectKey: 'objects/history-body' },
+    };
+    io.files.set(graphRef.assetId, file);
+    args.staged.push({ objectId: 'history', ref: graphRef });
+    args.journal.assetRefs.push(graphRef);
+    const metadata = parsePortableScenarioProjectMetadata(args.envelope.metadata);
+    const document = encodePortableEditorDocument({
+      document: createPersistedEditorDocumentFixture(createEditorDocumentFixture(), 'source'),
+      objectsByAssetId: new Map([['source', 'image']]),
+    });
+    args.envelope.metadata = portableJson({
+      ...metadata,
+      entry,
+      historyObjectId: 'history',
+      stepDocuments: [
+        {
+          projectId: project.id,
+          stepId: 'historical-document',
+          createdAt: 1,
+          updatedAt: 1,
+          document,
+        },
+      ],
+    });
+    await expect(scenarioProjectRootPublisher.publish(args)).resolves.toMatchObject({
+      imported: true,
+    });
+    const head = [...rows.get('scenario_projects')!.values()].find(
+      (value) => isPlainRecord(value) && value['historyFormatVersion'] === 3
+    );
+    if (!isPlainRecord(head) || typeof head['id'] !== 'string')
+      throw new Error('Missing native v3 head');
+    const id = head['id'];
+    const own = (name: string) =>
+      [...(rows.get(name)?.values() ?? [])].filter(
+        (value) => isPlainRecord(value) && value['projectId'] === id
+      );
+    const restored = parseScenarioProjectEntry(
+      materializeScenarioUnitStorage(
+        head,
+        own('scenario_project_history'),
+        own('scenario_project_units')
+      )
+    );
+    if (!restored) throw new Error('Unreadable native graph');
+    expect(restored.project.name).toBe('Current');
+    expect(restored.project.items).toEqual([]);
+    expect(restored.history?.map((version) => version.project.name)).toEqual(['Saved']);
+    expect(restored.editingHistory?.past.map((value) => value.name)).toEqual(['Past']);
+    expect(restored.editingHistory?.future.map((value) => value.name)).toEqual(['Future']);
+    const child = own('scenario_assets').map(parseScenarioAssetEntry)[0];
+    const documentRow = own('scenario_step_editor_documents')[0];
+    if (!child || !isPlainRecord(documentRow)) throw new Error('Missing branch-only resources');
+    for (const snapshot of [...restored.editingHistory!.past, ...restored.editingHistory!.future]) {
+      expect(snapshot.id).toBe(id);
+      const image = snapshot.items[0]?.kind === 'step' ? snapshot.items[0].blocks[0] : null;
+      expect(image).toMatchObject({
+        kind: 'image',
+        assetId: child.id,
+        editDocumentId: documentRow['stepId'],
+      });
+    }
+    expect(id === project.id).toBe(strategy === 'replace');
+    expect(child.id === 'captured').toBe(strategy === 'replace');
+    expect(documentRow['stepId'] === 'historical-document').toBe(strategy === 'replace');
+    expect(child.assetId).toBe(ref.assetId);
+  }
+);
 
 it.each(['replace', 'skip'] as const)(
   'commits the frozen canonical scenario roundtrip using real domain admission: %s',

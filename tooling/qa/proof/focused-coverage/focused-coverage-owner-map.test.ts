@@ -15,6 +15,22 @@ it('keeps committed focused coverage owner maps valid', async () => {
   expect(module.collectFocusedCoverageOwnerMappingViolations()).toEqual([]);
 });
 
+it('selects Scenario archive publication and native identity proof despite a generic exclusive mapping', async () => {
+  const module = await importOwnerMap();
+  const tests = module.resolveMappedCoverageOwnerTests(
+    'apps/extension/src/workflows/media-hub-backup/v6/root-publication/scenario-project-publication.ts'
+  );
+  expect(tests).toEqual(
+    expect.arrayContaining([
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/scenario-project.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/scenario-project.security.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/scenario-project.frozen-roundtrip.test.ts',
+      'apps/extension/src/composition/persistence/scenario/backup-restore.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.identity.test.ts',
+    ])
+  );
+});
+
 it.each([
   ['scenario/resource-references.ts', 'scenario/aggregate-mutations.identity.test.ts'],
   ['scenario/resource-references.ts', 'assets/editing-resources.test.ts'],

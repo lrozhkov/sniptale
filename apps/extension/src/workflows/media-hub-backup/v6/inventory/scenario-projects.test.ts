@@ -20,6 +20,10 @@ import { MAX_ROOT_METADATA_BYTES } from '../contracts';
 import { parseRootEnvelope } from '../codec';
 import { parsePortableScenarioProjectMetadata } from '../root-codecs/projects';
 import { buildScenarioProjectRootInventory } from './scenario-projects';
+import { buildMediaHubBackupExportPlanV6, exportMediaHubBackupV6 } from '../export';
+import { inspectMediaHubBackupV6 } from '../inspect';
+import { openArchiveReader } from '../../../../composition/archive-transfer';
+import { createArchiveMemorySink } from '../../../../composition/archive-transfer/test-support';
 it('exports large saved history as a separate bounded object without inflating root metadata', async () => {
   const project = createGuideProject('Guide', 'guide', 1);
   const step = createGuideStep('Text', 'step');
@@ -64,6 +68,77 @@ it('exports large saved history as a separate bounded object without inflating r
   const history: unknown = JSON.parse(await (await readArchiveRootObjectSource(object)).text());
   expect(history).toHaveLength(20);
   expect(object.ref.mimeType).toBe('application/json');
+});
+
+it('archives current, saved and both editing branches with shared units', async () => {
+  const project = createGuideProject('Current', 'guide', 100);
+  const step = createGuideStep('Shared', 'step');
+  step.blocks.push({
+    kind: 'text',
+    id: 'text',
+    paragraphs: createGuideParagraphs(Array(30).fill('x'.repeat(10_000)).join('\n')),
+  });
+  project.items = [step];
+  const entry = {
+    id: project.id,
+    project,
+    createdAt: 1,
+    updatedAt: 100,
+    workspaceRevision: 100,
+    history: Array.from({ length: 20 }, (_, i) => ({
+      revision: i + 1,
+      savedAt: i + 1,
+      project: { ...project, updatedAt: i + 1 },
+    })),
+    editingHistory: {
+      version: 1 as const,
+      past: Array.from({ length: 25 }, (_, i) => ({ ...project, name: `Past ${i}` })),
+      future: Array.from({ length: 25 }, (_, i) => ({ ...project, name: `Future ${i}` })),
+    },
+  };
+  const before = structuredClone(entry);
+  const roots = await buildScenarioProjectRootInventory({
+    db: {
+      transaction: () => scenarioTransaction([entry]),
+      get: async () => undefined,
+      getAll: async (name) => (name === 'scenario_projects' ? [entry] : []),
+      getAllFromIndex: async () => [],
+    },
+    options: createMediaHubBackupExportOptions(),
+    paths: createArchivePathAllocator(),
+  });
+  const envelope = await roots[0]!.load();
+  const metadata = parsePortableScenarioProjectMetadata(envelope.metadata);
+  expect(metadata.entry).not.toHaveProperty('history');
+  expect(metadata.entry).not.toHaveProperty('editingHistory');
+  const object = envelope.objects.find((item) => item.ref.objectId === metadata.historyObjectId);
+  if (!object) throw new Error('Missing pooled history object');
+  const body = await readArchiveRootObjectSource(object);
+  expect(body.size).toBeLessThan(400_000);
+  const value: unknown = JSON.parse(await body.text());
+  expect(value).toMatchObject({
+    kind: 'scenario-unit-history',
+    version: 1,
+    units: [expect.any(Object)],
+  });
+  const plan = buildMediaHubBackupExportPlanV6({
+    roots,
+    privacy: { includeSourceMetadata: true, includeTelemetry: false, includeWebSnapshots: false },
+  });
+  const sink = createArchiveMemorySink();
+  await exportMediaHubBackupV6({ plan, sink: sink.sink });
+  const inspected = await inspectMediaHubBackupV6(sink.blob());
+  expect(inspected.descriptors).toHaveLength(1);
+  const archive = await openArchiveReader(sink.blob());
+  try {
+    const stored = archive.entry(object.ref.path);
+    if (!stored) throw new Error('Missing checked ZIP history');
+    expect(stored.compressedSize).toBeLessThan(stored.size / 2);
+    expect(JSON.parse(await stored.text())).toEqual(value);
+  } finally {
+    await archive.close();
+  }
+  expect(entry).toEqual(before);
 });
 
 it.each(['guide', 'tour'] as const)(

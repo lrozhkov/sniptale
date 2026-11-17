@@ -104,6 +104,17 @@ export function projectScenarioPrivacy(
   return {
     ...entry,
     project: projectGuidePrivacy(entry.project, options),
+    ...(entry.editingHistory
+      ? {
+          editingHistory: {
+            version: 1,
+            past: entry.editingHistory.past.map((project) => projectGuidePrivacy(project, options)),
+            future: entry.editingHistory.future.map((project) =>
+              projectGuidePrivacy(project, options)
+            ),
+          },
+        }
+      : {}),
     ...(entry.history
       ? {
           history: entry.history.map((version) => ({

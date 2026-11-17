@@ -15,6 +15,8 @@ import { openArchiveReader } from '../../../../composition/archive-transfer';
 import { buildMediaHubBackupExportPlanV6, exportMediaHubBackupV6 } from '../export';
 import { inspectMediaHubBackupV6 } from '../inspect';
 import { parseManifestV6 } from '../codec';
+import { createGuideProject } from '../../../../features/scenario/project/factories';
+import { encodePortableScenarioProjectEntry } from './projects';
 
 const reader: ArchiveReader = { close: vi.fn(), entries: () => [], entry: () => null };
 const object = {
@@ -355,6 +357,72 @@ it('checks saved history JSON before staging and refuses an absent sidecar', asy
       []
     )
   ).rejects.toThrow('history');
+});
+
+it('admits a compact editing sidecar before staging and refuses a mismatched current or future format', async () => {
+  const project = createGuideProject('Current', 'root', 1);
+  const {
+    editingHistory,
+    history: _legacy,
+    ...entry
+  } = encodePortableScenarioProjectEntry({
+    id: project.id,
+    project,
+    createdAt: 1,
+    updatedAt: 1,
+    workspaceRevision: 1,
+    editingHistory: { version: 1, past: [], future: [{ ...project, name: 'Future' }] },
+  });
+  if (!editingHistory) throw new Error('Missing compact history');
+  const metadata = {
+    entry,
+    assets: [],
+    exports: [],
+    exportThumbnails: [],
+    stepDocuments: [],
+    historyObjectId: 'body',
+  };
+  assertMetadataJson(metadata);
+  const root = envelope('scenario-project', metadata);
+  const json = JSON.stringify(editingHistory);
+  root.objects = [
+    { ...object, mimeType: 'application/json', size: new TextEncoder().encode(json).byteLength },
+  ];
+  root.descriptor.totalBytes = root.objects[0]!.size;
+  const jsonReader = (text: string): ArchiveReader => ({
+    ...reader,
+    entry: () => ({
+      ...root.objects[0]!,
+      compressedSize: text.length,
+      crc32: 0,
+      directory: false,
+      pipeTo: vi.fn(),
+      text: async () => text,
+    }),
+  });
+  await expect(
+    assertArchiveRootObjectInventory(root, jsonReader(json), [])
+  ).resolves.toBeUndefined();
+  await expect(
+    assertArchiveRootObjectInventory(
+      root,
+      jsonReader(JSON.stringify({ ...editingHistory, version: 2 })),
+      []
+    )
+  ).rejects.toThrow();
+  const mismatched = {
+    entry: { ...entry, project: { ...project, name: 'Different current' } },
+    assets: [],
+    exports: [],
+    exportThumbnails: [],
+    stepDocuments: [],
+    historyObjectId: 'body',
+  };
+  assertMetadataJson(mismatched);
+  root.metadata = mismatched;
+  await expect(assertArchiveRootObjectInventory(root, jsonReader(json), [])).rejects.toThrow(
+    'differs from metadata'
+  );
 });
 
 it('admits exact Scenario history roles without bytes only for metadata discovery', async () => {

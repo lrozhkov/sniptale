@@ -16,7 +16,7 @@ import {
 import {
   parsePortableScenarioProjectMetadata,
   parsePortableVideoProjectMetadata,
-  decodePortableScenarioHistory,
+  decodePortableScenarioHistoryBody,
   MAX_PORTABLE_SCENARIO_HISTORY_BYTES,
   type PortableScenarioProjectMetadata,
   type PortableVideoProjectMetadata,
@@ -174,12 +174,13 @@ async function collectScenarioRoles(
     if (reader === null) return;
     const entry = reader.entry(object.path);
     if (!entry) throw new Error('Media backup saved history is missing.');
-    decodePortableScenarioHistory(
+    decodePortableScenarioHistoryBody(
       parseBoundedJson(
         await entry.text(MAX_PORTABLE_SCENARIO_HISTORY_BYTES),
         MAX_PORTABLE_SCENARIO_HISTORY_BYTES
       ),
-      metadata.entry.id
+      metadata.entry.id,
+      metadata.entry.project
     );
   }
 }

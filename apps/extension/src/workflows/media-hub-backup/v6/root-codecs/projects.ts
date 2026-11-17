@@ -32,6 +32,12 @@ import {
 import { assertExactPortableVideoProjectAssetInventory } from './video-project-asset-inventory';
 import { assertUniquePortableScenarioChildIdentities } from './scenario-project-identities';
 import { parseScenarioExportEntry } from '../../../../composition/persistence/scenario/read-guards';
+import {
+  encodePortableScenarioUnitHistory,
+  decodePortableScenarioUnitHistory,
+  type PortableScenarioUnitHistory,
+} from './scenario-history';
+import { sameScenarioStoredValue } from '../../../../composition/persistence/scenario/storage-units';
 
 /** Portable image keys add eight bytes per image; array separators add one per version. */
 export const MAX_PORTABLE_SCENARIO_HISTORY_BYTES =
@@ -144,6 +150,7 @@ interface PortableScenarioSavedVersion {
 }
 type EncodedScenarioProjectEntry = PortableScenarioProjectMetadata['entry'] & {
   history?: PortableScenarioSavedVersion[];
+  editingHistory?: PortableScenarioUnitHistory;
 };
 
 export interface PortableScenarioProjectMetadata {
@@ -164,8 +171,6 @@ export interface PortableScenarioProjectMetadata {
 export function encodePortableScenarioProjectEntry(
   entry: ScenarioProjectEntry
 ): EncodedScenarioProjectEntry {
-  if (entry.editingHistory !== undefined)
-    throw new Error('Scenario editing history transfer is not available.');
   const versions = parseScenarioSavedVersions(
     entry.history,
     entry.id,
@@ -177,7 +182,12 @@ export function encodePortableScenarioProjectEntry(
   return {
     ...rest,
     project: encodePortableGuideProject(entry.project),
-    ...(versions.length
+    ...(entry.editingHistory === undefined
+      ? {}
+      : {
+          editingHistory: encodePortableScenarioUnitHistory(entry),
+        }),
+    ...(versions.length && entry.editingHistory === undefined
       ? {
           history: versions.map((version) => ({
             ...version,
@@ -327,6 +337,36 @@ export function decodePortableScenarioHistory(
   if (!isPortableScenarioHistory(value, projectId))
     throw new Error('Portable guide history is invalid.');
   return value;
+}
+
+/** Legacy arrays and compact checkpoint graphs use the same bounded history object role. */
+export function decodePortableScenarioHistoryBody(
+  value: unknown,
+  projectId: string,
+  current: JsonValue
+): {
+  history: PortableScenarioSavedVersion[];
+  editingHistory?: { version: 1; past: JsonValue[]; future: JsonValue[] };
+} {
+  if (Array.isArray(value)) return { history: decodePortableScenarioHistory(value, projectId) };
+  if (
+    new TextEncoder().encode(JSON.stringify(value)).byteLength > MAX_PORTABLE_SCENARIO_HISTORY_BYTES
+  )
+    throw new Error('Portable guide history exceeds the metadata limit.');
+  const entry = decodePortableScenarioUnitHistory(value, projectId);
+  if (!sameScenarioStoredValue(encodePortableGuideProject(entry.project), current))
+    throw new Error('Portable Scenario history current project differs from metadata.');
+  return {
+    history: (entry.history ?? []).map((version) => ({
+      ...version,
+      project: encodePortableGuideProject(version.project),
+    })),
+    editingHistory: {
+      version: 1,
+      past: entry.editingHistory!.past.map(encodePortableGuideProject),
+      future: entry.editingHistory!.future.map(encodePortableGuideProject),
+    },
+  };
 }
 
 function isPortableScenarioHistory(

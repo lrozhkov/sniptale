@@ -109,7 +109,7 @@ it('admits portable HTML bodies and refuses local pointers or malformed catalogu
   ).toThrow();
 });
 
-it('refuses native editing branches at the portable boundary until graph transfer admission exists', () => {
+it('encodes native editing branches in a sidecar graph while refusing inline checkpoint metadata', () => {
   const project = createGuideProject('Guide', 'guide', 1);
   const entry = { id: project.id, project, createdAt: 1, updatedAt: 1, workspaceRevision: 1 };
   const editingHistory = {
@@ -117,9 +117,12 @@ it('refuses native editing branches at the portable boundary until graph transfe
     past: [],
     future: [{ ...project, name: 'Future' }],
   };
-  expect(() => encodePortableScenarioProjectEntry({ ...entry, editingHistory })).toThrow(
-    'transfer is not available'
-  );
+  expect(
+    encodePortableScenarioProjectEntry({ ...entry, editingHistory }).editingHistory
+  ).toMatchObject({
+    kind: 'scenario-unit-history',
+    version: 1,
+  });
   const portable = encodePortableScenarioProjectEntry(entry);
   expect(() =>
     parsePortableScenarioProjectMetadata({
