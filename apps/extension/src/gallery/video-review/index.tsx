@@ -232,6 +232,21 @@ function ReviewEditor({
           <div
             ref={panels.container}
             data-ui="gallery.videoReview.workspace"
+            onPointerDownCapture={(event) => {
+              const field =
+                event.target instanceof Element
+                  ? event.target.closest(
+                      [
+                        'textarea,input:not([type])',
+                        'input:is([type="text"],[type="number"],[type="search"])',
+                        '[contenteditable]:not([contenteditable="false"])',
+                      ].join(',')
+                    )
+                  : null;
+              const continuingFieldEdit =
+                field !== null && field === event.currentTarget.ownerDocument.activeElement;
+              if (event.button === 0 && !continuingFieldEdit) state.advancedState.endTyping();
+            }}
             style={{
               ...workspaceColor.style,
               gridTemplateColumns: `minmax(0,1fr) ${panels.inspectorWidth}px`,

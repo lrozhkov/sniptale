@@ -290,6 +290,84 @@ it('passes the coherent EffectV1 snapshots into the Gallery presentation preview
   expect(observed.preview?.effectSnapshots?.[0]?.documentId).toBe('sniptale-callout');
 });
 
+it('keeps two accepted root pointer gestures in separate Undo actions before autosave', async () => {
+  const read = setup();
+  await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={vi.fn()} />));
+  const workspace = host.querySelector('[data-ui="gallery.videoReview.workspace"]')!;
+  const button = document.createElement('button');
+  workspace.append(button);
+  const readsBefore = read.mock.calls.length;
+  for (const volume of [1.4, 1.5]) {
+    act(() => {
+      button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+      state().audio.setOriginal({ volume });
+    });
+  }
+  expect(state().advanced.audio.original.volume).toBe(1.5);
+  expect(loaded.session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
+  expect(read).toHaveBeenCalledTimes(readsBefore);
+  expect(save).not.toHaveBeenCalled();
+  for (const volume of [1.4, 1]) {
+    await act(async () => {
+      await state().moveHistory('undo');
+    });
+    expect(state().advanced.audio.original.volume).toBe(volume);
+  }
+  for (const volume of [1.4, 1.5]) {
+    await act(async () => {
+      await state().moveHistory('redo');
+    });
+    expect(state().advanced.audio.original.volume).toBe(volume);
+  }
+  expect(loaded.session.getSnapshot().snapshot.workspace.history).toHaveLength(2);
+  expect(save).not.toHaveBeenCalled();
+});
+
+it.each(['text', 'number', 'search', 'textarea', 'contenteditable'])(
+  'keeps a focused %s field group when the pointer only moves its caret',
+  async (kind) => {
+    setup();
+    await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={vi.fn()} />));
+    const workspace = host.querySelector('[data-ui="gallery.videoReview.workspace"]')!;
+    const field = document.createElement(
+      kind === 'textarea' ? 'textarea' : kind === 'contenteditable' ? 'div' : 'input'
+    );
+    if (field instanceof HTMLInputElement) field.type = kind;
+    if (kind === 'contenteditable') {
+      field.setAttribute('contenteditable', 'true');
+      field.tabIndex = 0;
+    }
+    workspace.append(field);
+    field.focus();
+    act(() => state().audio.setOriginal({ volume: 1.4 }));
+    act(() => {
+      field.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+      state().audio.setOriginal({ volume: 1.5 });
+    });
+    await act(async () => {
+      await state().moveHistory('undo');
+    });
+    expect(state().advanced.audio.original.volume).toBe(1);
+    expect(loaded.session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  }
+);
+
+it('does not split a content group for a non-primary root pointer', async () => {
+  setup();
+  await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={vi.fn()} />));
+  const workspace = host.querySelector('[data-ui="gallery.videoReview.workspace"]')!;
+  act(() => state().audio.setOriginal({ volume: 1.4 }));
+  act(() => {
+    workspace.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 2 }));
+    state().audio.setOriginal({ volume: 1.5 });
+  });
+  await act(async () => {
+    await state().moveHistory('undo');
+  });
+  expect(state().advanced.audio.original.volume).toBe(1);
+  expect(loaded.session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+});
+
 it('routes rare commands into one More menu in Basic and Advanced without permanent project actions', async () => {
   setup();
   await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={vi.fn()} />));
