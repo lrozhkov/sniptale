@@ -385,9 +385,8 @@ class VideoReviewSession {
     attempt.attempted = true;
   }
 
-  private requestBufferPublication() {
-    if (this.state.autosaveEnabled && !this.disposed)
-      this.publication.request('buffer', EDITOR_AUTOSAVE_POLICY);
+  private requestBufferPublication(policy: AutosavePolicy = EDITOR_AUTOSAVE_POLICY) {
+    if (this.state.autosaveEnabled && !this.disposed) this.publication.request('buffer', policy);
   }
 
   private acceptLocalSnapshot(snapshot: VideoWorkspaceSnapshot) {
@@ -735,6 +734,7 @@ class VideoReviewSession {
           await this.commitTypingCapture(captured, content, change.typing);
           this.captures.acknowledge(captured);
           this.emit();
+          if (this.state.dirty) this.requestBufferPublication({ delay: 0 });
           this.releaseCheckpointIfIdle();
           return;
         }
@@ -785,6 +785,8 @@ class VideoReviewSession {
     }
     this.captures.acknowledge(captured);
     this.emit();
+    // Captures already waited for their policy; reuse the native lane without a second delay.
+    if (this.state.dirty) this.requestBufferPublication({ delay: 0 });
     this.releaseCheckpointIfIdle();
   }
 
