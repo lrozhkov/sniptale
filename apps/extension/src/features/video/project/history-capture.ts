@@ -1,7 +1,8 @@
+import type { VideoProjectHistoryChange } from './history-change';
 import type { VideoProjectMetadata } from './validation';
 
 /** Typed native source locators; selection and translated descriptions do not retain resources. */
-const VIDEO_PROJECT_HISTORY_SOURCE_KINDS = [
+export const VIDEO_PROJECT_HISTORY_SOURCE_KINDS = [
   'recording',
   'library-asset',
   'project-asset',
@@ -9,9 +10,40 @@ const VIDEO_PROJECT_HISTORY_SOURCE_KINDS = [
   'scenario-project',
 ] as const;
 
-interface VideoProjectHistorySourceReference {
+export interface VideoProjectHistorySourceReference {
   kind: (typeof VIDEO_PROJECT_HISTORY_SOURCE_KINDS)[number];
   id: string;
+}
+
+/** One immutable, already encoded inverse change and its target state's source closure. */
+interface VideoProjectHistoryCapturedValue {
+  value: string;
+  bytes: number;
+  sources: readonly VideoProjectHistorySourceReference[];
+}
+
+/** A decoded inverse whose bytes and replay were admitted by the persistence reader. */
+export interface RestoredVideoProjectHistoryValue extends VideoProjectHistoryCapturedValue {
+  change: VideoProjectHistoryChange;
+}
+
+/** Admitted history for one project; transient selection is not persisted. */
+export interface RestoredVideoProjectHistory {
+  projectId: string;
+  epoch: string;
+  past: readonly RestoredVideoProjectHistoryValue[];
+  future: readonly RestoredVideoProjectHistoryValue[];
+  recovery?: RestoredVideoProjectHistoryValue;
+}
+
+/** Owned runtime capture; publication and native revision authority remain with persistence. */
+export interface VideoProjectHistoryCapture {
+  version: 1;
+  epoch: string;
+  past: readonly VideoProjectHistoryCapturedValue[];
+  future: readonly VideoProjectHistoryCapturedValue[];
+  /** Restore the pre-gesture anchor from the separately saved current draft. */
+  recovery?: VideoProjectHistoryCapturedValue;
 }
 
 /** Source facts can outlive their current clip placement in the same admitted project. */

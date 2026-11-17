@@ -11,11 +11,18 @@ import {
 import { useVideoEditorStore } from '../../state/store';
 import {
   VIDEO_EDITOR_PROJECT_HISTORY_ACTION_LIMIT,
+  captureVideoEditorProjectHistory,
+  restoreVideoEditorProjectHistory,
+  beginVideoEditorProjectHistoryTransaction,
+  endVideoEditorProjectHistoryTransaction,
   recordVideoEditorProjectHistory,
   resetVideoEditorProjectHistory,
   undoVideoEditorProjectHistory,
   redoVideoEditorProjectHistory,
 } from '.';
+import { parseVideoProjectHistoryCheckpoint } from '../../../features/video/project/history-checkpoint';
+import { applyVideoProjectHistoryChangeValues } from '../../../features/video/project/history-change';
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 
 afterEach(() => {
   useVideoEditorStore.setState(useVideoEditorStore.getInitialState(), true);
@@ -175,6 +182,7 @@ describe('video editor project history', () => {
     useVideoEditorStore.getState().setProject(active);
     useVideoEditorStore.setState({
       projectHistory: {
+        epoch: crypto.randomUUID(),
         projectId: stale.id,
         past: recordVideoEditorProjectHistory(resetVideoEditorProjectHistory(stale.id), stale, {
           ...stale,
@@ -524,4 +532,175 @@ it('preserves immutable effect bytes when cancelling a changed transaction', () 
   expect(store.getState().project?.name).toBe(original);
   expect(store.getState().project?.effectSnapshots?.[0]?.assets[0]?.blob).toBe(blob);
   expect(store.getState().projectHistory.past).toHaveLength(0);
+});
+
+it('captures retained history without encoding old payloads and retains its epoch through navigation', () => {
+  let project = createEmptyVideoProject('Initial');
+  let history = resetVideoEditorProjectHistory(project.id);
+  const epoch = history.epoch;
+  for (let index = 0; index < 50; index++) {
+    const next = { ...project, name: `Edit ${index}` };
+    history = recordVideoEditorProjectHistory(history, project, next);
+    project = next;
+  }
+  const stringify = vi.spyOn(JSON, 'stringify');
+  let captured;
+  try {
+    captured = captureVideoEditorProjectHistory(history);
+    expect(captured?.past).toHaveLength(50);
+    expect(stringify).not.toHaveBeenCalled();
+    expect(captureVideoEditorProjectHistory(history)).toEqual(captured);
+    expect(stringify).not.toHaveBeenCalled();
+  } finally {
+    stringify.mockRestore();
+  }
+  expect(captured?.epoch).toBe(epoch);
+  expect(captured?.past.every((entry) => !entry.value.includes('selection'))).toBe(true);
+  const undone = undoVideoEditorProjectHistory(history, project);
+  if (!undone || undone.status !== 'applied') throw new Error('Undo refused');
+  const after = captureVideoEditorProjectHistory(undone.history);
+  expect(after?.epoch).toBe(epoch);
+  expect(after?.past).toHaveLength(49);
+  expect(after?.future).toHaveLength(1);
+  expect(resetVideoEditorProjectHistory(project.id).epoch).not.toBe(epoch);
+});
+
+it('captures the old source identity after deleting its final current placement', () => {
+  const project = createEmptyVideoProject('Source');
+  project.baseRecordingId = 'retained-recording';
+  project.source = { kind: 'recording', recordingId: 'retained-recording' };
+  const next = { ...project, baseRecordingId: null, source: { kind: 'manual' as const } };
+  const history = recordVideoEditorProjectHistory(
+    resetVideoEditorProjectHistory(project.id),
+    project,
+    next
+  );
+  expect(captureVideoEditorProjectHistory(history)?.past[0]?.sources).toContainEqual({
+    kind: 'recording',
+    id: 'retained-recording',
+  });
+  const pending = {
+    ...history,
+    transaction: { before: null, changed: false, lease: Symbol(), projectId: project.id },
+  };
+  expect(captureVideoEditorProjectHistory(pending)).toBeNull();
+  expect(captureVideoEditorProjectHistory({ ...history, error: 'snapshotFailed' })).toBeNull();
+});
+
+it('captures a draft recovery inverse without sealing the live gesture or dropping its Redo branch', () => {
+  const project = createEmptyVideoProject('Before');
+  const later = { ...project, name: 'Later' };
+  const recorded = recordVideoEditorProjectHistory(
+    resetVideoEditorProjectHistory(project.id),
+    project,
+    later
+  );
+  const undo = undoVideoEditorProjectHistory(recorded, later);
+  if (!undo || undo.status !== 'applied') throw new Error('Undo refused');
+  const before = undo.project;
+  const baseline = captureVideoEditorProjectHistory(undo.history)!;
+  const draft = { ...before, name: 'Partial gesture' };
+  const history = recordVideoEditorProjectHistory(
+    beginVideoEditorProjectHistoryTransaction(undo.history, before),
+    before,
+    draft
+  );
+  const lease = history.transaction!.lease;
+  const captured = captureVideoEditorProjectHistory(history, draft)!;
+  expect(captured.future).toEqual(baseline.future);
+  expect(captured.past).toEqual(baseline.past);
+  expect(history.transaction?.lease).toBe(lease);
+  expect(history.past).toBe(undo.history.past);
+  expect(history.future).toBe(undo.history.future);
+  const raw: unknown = JSON.parse(captured.recovery!.value);
+  const checkpoint = parseVideoProjectHistoryCheckpoint(
+    { version: 1, projectId: draft.id, past: [raw], future: [] },
+    draft,
+    EDITOR_HISTORY_LIMITS
+  );
+  expect(checkpoint).not.toBeNull();
+  expect(applyVideoProjectHistoryChangeValues(draft, checkpoint!.past[0]!)).toEqual(before);
+  const closed = endVideoEditorProjectHistoryTransaction(history, draft);
+  expect(closed.past).toHaveLength(1);
+  expect(closed.future).toEqual([]);
+  expect(captureVideoEditorProjectHistory(closed)?.past[0]?.value).toBe(captured.recovery?.value);
+});
+
+it('preserves the original Redo branch when an active gesture returns to its initial values', () => {
+  const project = createEmptyVideoProject('Before');
+  const later = { ...project, name: 'Later' };
+  const undo = undoVideoEditorProjectHistory(
+    recordVideoEditorProjectHistory(resetVideoEditorProjectHistory(project.id), project, later),
+    later
+  );
+  if (!undo || undo.status !== 'applied') throw new Error('Undo refused');
+  const base = captureVideoEditorProjectHistory(undo.history);
+  const active = recordVideoEditorProjectHistory(
+    beginVideoEditorProjectHistoryTransaction(undo.history, undo.project),
+    undo.project,
+    { ...undo.project, name: 'Temporary' }
+  );
+  expect(captureVideoEditorProjectHistory(active, undo.project)).toEqual(base);
+  expect(active.transaction).not.toBeNull();
+  expect(captureVideoEditorProjectHistory(active)).toBeNull();
+  expect(captureVideoEditorProjectHistory(active, { ...undo.project, id: 'other' })).toBeNull();
+});
+
+it('counts draft recovery within the action cap and keeps an oversized current draft independent', () => {
+  let project = createEmptyVideoProject('Initial');
+  let history = resetVideoEditorProjectHistory(project.id);
+  for (let index = 0; index < 50; index++) {
+    const next = { ...project, name: `Edit ${index}` };
+    history = recordVideoEditorProjectHistory(history, project, next);
+    project = next;
+  }
+  const draft = { ...project, name: 'Draft' };
+  const active = recordVideoEditorProjectHistory(
+    beginVideoEditorProjectHistoryTransaction(history, project),
+    project,
+    draft
+  );
+  const captured = captureVideoEditorProjectHistory(active, draft)!;
+  expect(captured.past).toHaveLength(49);
+  expect(captured.recovery).toBeDefined();
+  expect(active.past).toHaveLength(50);
+  const large = createEmptyVideoProject('x'.repeat(9 * 1024 * 1024));
+  const small = { ...large, name: 'Small draft' };
+  const hugeInverse = recordVideoEditorProjectHistory(
+    beginVideoEditorProjectHistoryTransaction(resetVideoEditorProjectHistory(large.id), large),
+    large,
+    small
+  );
+  const bounded = captureVideoEditorProjectHistory(hugeInverse, small);
+  expect(bounded).toMatchObject({ past: [], future: [] });
+  expect(bounded).not.toHaveProperty('recovery');
+  expect(small.name).toBe('Small draft');
+  expect(hugeInverse.transaction).not.toBeNull();
+});
+
+it('adopts admitted encoded inverses without serializing retained payloads again', () => {
+  const project = createEmptyVideoProject('Current');
+  const change = { kind: 'record' as const, fields: [] };
+  Object.defineProperty(change, 'toJSON', {
+    value: () => {
+      throw new Error('Payload reencoded');
+    },
+  });
+  const value = { change, value: '{"kind":"record","fields":[]}', bytes: 29, sources: [] };
+  const restored = restoreVideoEditorProjectHistory(project.id, {
+    projectId: project.id,
+    epoch: 'admitted',
+    past: [value],
+    future: [],
+  });
+  expect(restored.error).toBeNull();
+  expect(captureVideoEditorProjectHistory(restored)?.past[0]?.value).toBe(value.value);
+  expect(
+    restoreVideoEditorProjectHistory('other-project', {
+      projectId: project.id,
+      epoch: 'admitted',
+      past: [value],
+      future: [],
+    }).error
+  ).toBe('projectMismatch');
 });
