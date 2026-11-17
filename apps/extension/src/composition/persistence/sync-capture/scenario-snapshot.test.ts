@@ -1,3 +1,4 @@
+import { materializeDetachedScenarioHistory } from './scenario-history';
 import { readArchiveRootObjectSource } from '../../../workflows/media-hub-backup/v6/object-source.test-support';
 import { readCheckpointInTransaction } from './checkpoints';
 import { deferCheckpointInTransaction } from './checkpoints';
@@ -334,6 +335,32 @@ it('freezes Scenario history above the pilot metadata budget as a hashed Blob in
   expect(decoded).toEqual(historical);
 });
 
+it('freezes both editing branches outside the current metadata', async () => {
+  const project = createGuideProject('Current', 'checkpoint-guide', 100);
+  const entry = {
+    ...createScenarioProjectEntry({ project, existing: undefined, updatedAt: 100 }),
+    editingHistory: {
+      version: 1 as const,
+      past: [{ ...project, name: 'Before' }],
+      future: [{ ...project, name: 'After' }],
+    },
+  };
+  expect(parseScenarioProjectEntry(entry)).not.toBeNull();
+  const db = await initDB();
+  const tx = db.transaction([...SCENARIO_CAPTURE_STORES], 'readwrite');
+  await writeScenarioStorage(tx, {
+    storage: await readScenarioStorage(tx, project.id),
+    existing: undefined,
+    entry,
+  });
+  const frozen = await freezeScenarioInTransaction(tx, project.id);
+  await tx.done;
+  expect(frozen.entry).not.toHaveProperty('history');
+  expect(frozen.entry).not.toHaveProperty('editingHistory');
+  expect(frozen.history?.blob.size).toBeGreaterThan(0);
+  expect(parseCapturedScenarioRows(frozen)).not.toBeNull();
+});
+
 it('uses the existing archive resource budget for a Guide with more than 32 retained children', async () => {
   const project = createGuideProject('Many resources', 'guide', 1);
   getStore('scenario_projects').set(
@@ -592,7 +619,7 @@ it.each([false, true])(
   }
 );
 
-it('refuses native editing checkpoints before sync graph transfer can discard their branches', async () => {
+it('captures detached editing checkpoints without modifying native rows', async () => {
   const project = createGuideProject('Guide', 'guide', 1);
   const entry = {
     ...createScenarioProjectEntry({ existing: undefined, project, updatedAt: 2 }),
@@ -608,9 +635,10 @@ it('refuses native editing checkpoints before sync graph transfer can discard th
   await tx.done;
   const before = structuredClone(stores);
   const read = database.transaction([...SCENARIO_CAPTURE_STORES], 'readonly');
-  await expect(freezeScenarioInTransaction(read, project.id)).rejects.toThrow(
-    'Invalid native Scenario sync snapshot'
-  );
+  const captured = await freezeScenarioInTransaction(read, project.id);
+  await read.done;
+  const body: unknown = JSON.parse(await captured.history!.blob.text());
+  expect(materializeDetachedScenarioHistory(captured.entry, body)).toEqual(entry);
   expect(stores).toEqual(before);
   expect(
     parseCapturedScenarioRows({

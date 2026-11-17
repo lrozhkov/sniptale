@@ -29,7 +29,7 @@ import type {
 
 /** One native writer snapshot; large retained versions remain immutable inline bytes until preparation. */
 export interface CapturedScenarioRows {
-  entry: Omit<ScenarioProjectEntry, 'history'>;
+  entry: Omit<ScenarioProjectEntry, 'history' | 'editingHistory'>;
   history?: { blob: Blob; sha256: string };
   assets: ScenarioAssetEntry[];
   documents: StoredScenarioStepEditorDocumentEntry[];

@@ -1,3 +1,4 @@
+import { detachScenarioHistory } from '../../composition/persistence/sync-capture/scenario-history';
 import type { ApplyPreparedVideoProjectRevisionInput } from '../../composition/persistence/sync-capture/apply-video-project';
 import type { VideoProjectEntry } from '../../composition/persistence/projects/contracts';
 import {
@@ -94,8 +95,7 @@ export async function preparePortableScenarioRoot(args: {
     },
     staged: args.objectIds.map((objectId) => ({ objectId, ref: args.refFor(objectId) })),
   });
-  const { history, ...entry } = prepared.root.entry;
-  const historyText = history?.length ? JSON.stringify(history) : null;
+  const { current: entry, text: historyText } = detachScenarioHistory(prepared.root.entry);
   const historyRef =
     historyText === null
       ? undefined

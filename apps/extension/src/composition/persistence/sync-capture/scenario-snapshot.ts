@@ -15,7 +15,7 @@ import {
 } from '../scenario/read-guards';
 import { parseScenarioStepEditorDocumentEntry } from '../scenario/editor-documents/index.guards';
 import { readScenarioStorage } from '../scenario/storage';
-import { SCENARIO_HISTORY_BYTE_LIMIT, SCENARIO_HISTORY_LIMIT } from '../scenario/history-model';
+import { detachScenarioHistory, MAX_NATIVE_SCENARIO_HISTORY_BYTES } from './scenario-history';
 import { parseMediaLibraryEntry, parseMediaThumbnailEntry } from '../media-library/read-guards';
 import type { MediaLibraryEntry } from '../media-library/contracts';
 import { parseAggregatePresentationEntry } from '../aggregate-presentations/parser';
@@ -27,8 +27,7 @@ import {
 } from './contracts';
 import { describeImageMetadata } from './image-snapshot';
 
-export const MAX_NATIVE_SCENARIO_HISTORY_BYTES =
-  SCENARIO_HISTORY_BYTE_LIMIT + SCENARIO_HISTORY_LIMIT + 1;
+export { MAX_NATIVE_SCENARIO_HISTORY_BYTES } from './scenario-history';
 
 export type { CapturedScenarioRows } from './contracts';
 
@@ -325,9 +324,9 @@ export async function freezeScenarioInTransaction(
   id: string
 ): Promise<CapturedScenarioRows> {
   const entry = parseScenarioProjectEntry((await readScenarioStorage(tx, id)).logical);
-  if (!entry || entry.id !== id || entry.editingHistory !== undefined) invalid();
-  const { history, ...current } = entry;
-  const historyBytes = history?.length ? new TextEncoder().encode(JSON.stringify(history)) : null;
+  if (!entry || entry.id !== id) invalid();
+  const { current, text } = detachScenarioHistory(entry);
+  const historyBytes = text === null ? null : new TextEncoder().encode(text);
   const assets = await readScenarioChildRows(
     tx,
     stores.SCENARIO_ASSETS_STORE,
