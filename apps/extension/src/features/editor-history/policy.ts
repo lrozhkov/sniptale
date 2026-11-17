@@ -16,7 +16,15 @@ export const IMAGE_HISTORY_MAX_VALUES = 100_000;
 export const IMAGE_EDITOR_HISTORY_LIMITS = Object.freeze({
   maxActions: MAX_EDITOR_ACTIONS,
   maxBytes: 32 * 1024 * 1024,
+  maxAssetBytes: 64 * 1024 * 1024,
 });
+
+/** Raster pooling is optional for callers that use a single combined test budget. */
+export interface ImageEditorHistoryLimits {
+  readonly maxActions: number;
+  readonly maxBytes: number;
+  readonly maxAssetBytes?: number;
+}
 
 /** Previous committed Scenario checkpoints have a separate budget from user Undo. */
 export const SCENARIO_SAVED_VERSION_LIMITS = Object.freeze({

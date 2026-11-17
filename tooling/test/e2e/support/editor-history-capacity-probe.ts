@@ -16,6 +16,7 @@ import {
   createEditorSnapshotHistory,
   pushEditorSnapshotHistory,
   captureEditorHistoryCheckpoint,
+  restoreEditorHistoryCheckpoint,
 } from '../../../../apps/extension/src/editor/controller/history';
 import { createEmptyVideoProject } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { createTextClip } from '../../../../apps/extension/src/features/video/project/factories/overlay-clip';
@@ -207,4 +208,77 @@ export async function inspect(kind: CapacityEditor, id: string) {
     volume: document.advancedContent.audio.original.volume,
     future: value.workspace.history.length - value.workspace.cursor,
   };
+}
+
+/** Adds three placements of two real bitmaps through the native project publisher. */
+export async function seedRasterBudget([first, second]: [string, string], dimension: number) {
+  const { id } = await seed('image');
+  const previous = await readImageWorkspace(id);
+  if (!previous?.history) throw new Error('Missing original Image history.');
+  try {
+    const history = restoreEditorHistoryCheckpoint(previous.history);
+    if (!history) throw new Error('Image predecessor was not admitted.');
+    const document = {
+      ...previous.document,
+      canvasJson: JSON.stringify({
+        objects: [first, second, first].map((src, index) => ({
+          type: 'Image',
+          version: '6.6.1',
+          sniptaleId: `large-layer-${index}`,
+          originX: 'left',
+          originY: 'top',
+          left: index * 75,
+          top: 0,
+          width: dimension,
+          height: dimension,
+          scaleX: 75 / dimension,
+          scaleY: 75 / dimension,
+          src,
+          crossOrigin: null,
+        })),
+      }),
+    };
+    pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => document });
+    const checkpoint = captureEditorHistoryCheckpoint(history);
+    if (!checkpoint || checkpoint.snapshots.length !== 1001)
+      throw new Error('The imported project raster consumed structural history.');
+    await commitImageWorkspace({
+      aggregateId: id,
+      document,
+      history: checkpoint,
+      expectedRevision: previous.revision,
+      expectedGeneration: previous.sourceGeneration ?? null,
+      requireExistingRoot: true,
+      imageContentState: 'edited',
+      ...(previous.documentAssetsByRuntimeUrl
+        ? { reusableAssetsByRuntimeUrl: previous.documentAssetsByRuntimeUrl }
+        : {}),
+      ...(previous.historyAssetsByValue
+        ? { reusableHistoryAssetsByValue: previous.historyAssetsByValue }
+        : {}),
+    });
+  } finally {
+    previous.releaseDocumentAssets?.();
+  }
+  const stored = await readStoredImageWorkspace(id);
+  if (!stored?.history) throw new Error('Missing published raster history.');
+  const images = stored.history.values.filter((unit) => unit.kind === 'image');
+  return {
+    id,
+    headBytes: new TextEncoder().encode(JSON.stringify(stored)).byteLength,
+    imageReferences: images.length,
+    physicalImageIds: new Set(images.map((unit) => unit.assetId)).size,
+    documentUsesHistoryImage: images.every((unit) =>
+      stored.document.assets.some((asset) => asset.assetId === unit.assetId)
+    ),
+    encodedBytes: first.length + second.length,
+  };
+}
+
+/** Reads the durable cursor without decoding the image for each assertion poll. */
+export async function inspectRasterBudget(id: string) {
+  const stored = await readStoredImageWorkspace(id);
+  if (!stored?.history) throw new Error('Missing native Image history.');
+  const { cursor, snapshots } = stored.history;
+  return { count: snapshots.length - 1, cursor, future: snapshots.length - cursor - 1 };
 }

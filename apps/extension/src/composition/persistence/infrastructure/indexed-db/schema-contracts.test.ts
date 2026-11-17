@@ -888,3 +888,17 @@ it('fences older writers before they can truncate 1000-action editor history', a
   expect(await plan![0]!.estimateAdditionalBytes()).toBe(64 * 1024);
   expect(buildDatabaseMigrationPlan(68, 67)).toBeNull();
 });
+
+it('fences older mixed-budget Image writers before admitting separate raster history', async () => {
+  const plan = buildDatabaseMigrationPlan(68, 69);
+  expect(plan).toHaveLength(1);
+  expect(plan![0]).toMatchObject({
+    fromDatabaseVersion: 68,
+    toDatabaseVersion: 69,
+    risk: 'additive',
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 42, to: 43 }],
+  });
+  expect(await plan![0]!.estimateAdditionalBytes()).toBe(64 * 1024);
+  expect(buildDatabaseMigrationPlan(69, 68)).toBeNull();
+});

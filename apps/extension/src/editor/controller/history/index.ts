@@ -11,7 +11,10 @@ import {
 import { isEditorDocument } from '../../../features/editor/document/guards';
 import { type EditorDocument } from '../../../features/editor/document/types';
 import { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
-import { IMAGE_EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
+import {
+  IMAGE_EDITOR_HISTORY_LIMITS,
+  type ImageEditorHistoryLimits,
+} from '../../../features/editor-history/policy';
 import { createDeferredEditorHistory, scheduleEditorHistoryAfterPaint } from './deferred';
 import { createEditorHistoryCostIndex } from './retention-cost';
 import type {
@@ -35,12 +38,33 @@ type EditorHistoryAssets = {
   cost: ReturnType<typeof createEditorHistoryCostIndex>;
   actionLimit: number;
   byteLimit: number;
+  assetByteLimit: number | undefined;
   descriptions: Map<string, EditorHistoryDescription>;
   actions: Map<string, Map<string, EditorHistoryAction>>;
   deferred?: ReturnType<typeof createDeferredEditorHistory>;
 };
 
 const historyAssets = new WeakMap<SnapshotHistory<string>, EditorHistoryAssets>();
+
+function createHistoryCost(
+  bytes: ReadonlyMap<string, number>,
+  kindsByToken: ReadonlyMap<string, EditorImageHistoryValueKind>,
+  maxBytes: number,
+  maxActions: number,
+  maxAssetBytes?: number
+) {
+  return createEditorHistoryCostIndex(
+    bytes,
+    maxAssetBytes === undefined
+      ? undefined
+      : {
+          kindsByToken,
+          maxBytes,
+          maxActions,
+          maxAssetBytes,
+        }
+  );
+}
 
 function internHistoryValue(
   value: string,
@@ -62,16 +86,18 @@ function internHistoryValue(
   return token;
 }
 
-function encodeEditorSnapshot(
-  document: EditorDocument,
-  assets: EditorHistoryAssets,
-  tokens: Set<string>
-): string {
+function encodeEditorSnapshot(document: EditorDocument, assets: EditorHistoryAssets): string {
+  const tokens = new Set<string>();
+  const favicon = document.browserFrame?.faviconDataUrl;
+  let faviconUses = 0;
   const objects: EditorHistoryDescription['objects'] = [];
   const snapshot = encodeEditorImageHistorySnapshot(
     document,
     {
-      intern: (value, kind) => internHistoryValue(value, assets, kind),
+      intern(value, kind) {
+        if (kind === 'image' && value === favicon) faviconUses++;
+        return internHistoryValue(value, assets, kind);
+      },
     },
     tokens,
     (token, object) => {
@@ -80,6 +106,11 @@ function encodeEditorSnapshot(
     }
   );
   const metadata: unknown = JSON.parse(snapshot);
+  assets.cost.register(
+    snapshot,
+    tokens,
+    favicon && faviconUses === 1 ? assets.byValue.get(favicon) : undefined
+  );
   if (isRecord(metadata)) {
     delete metadata['canvasJson'];
     delete metadata['richShapes'];
@@ -114,32 +145,38 @@ function pruneEditorHistoryAssets(
 
 export function createEditorSnapshotHistory(
   document: EditorDocument,
-  limits: Readonly<{ maxActions: number; maxBytes: number }> = IMAGE_EDITOR_HISTORY_LIMITS
+  limits: ImageEditorHistoryLimits = IMAGE_EDITOR_HISTORY_LIMITS
 ): SnapshotHistory<string> {
   const bytesByToken = new Map<string, number>();
+  const kindsByToken = new Map<string, EditorImageHistoryValueKind>();
   const assets: EditorHistoryAssets = {
     byValue: new Map(),
     byToken: new Map(),
-    kindsByToken: new Map(),
+    kindsByToken,
     nextId: 0,
     epoch: crypto.randomUUID(),
     allocationPrefix: IMAGE_HISTORY_VALUE_TOKEN_PREFIX,
     bytesByToken,
-    cost: createEditorHistoryCostIndex(bytesByToken),
+    cost: createHistoryCost(
+      bytesByToken,
+      kindsByToken,
+      limits.maxBytes,
+      limits.maxActions,
+      limits.maxAssetBytes
+    ),
     actionLimit: limits.maxActions,
     byteLimit: limits.maxBytes,
+    assetByteLimit: limits.maxAssetBytes,
     descriptions: new Map(),
     actions: new Map(),
   };
-  const tokens = new Set<string>();
-  const snapshot = encodeEditorSnapshot(document, assets, tokens);
-  assets.cost.register(snapshot, tokens);
+  const snapshot = encodeEditorSnapshot(document, assets);
   assets.cost.measure([snapshot]);
   const history = new SnapshotHistory<string>(snapshot, {
     limit: limits.maxActions + 1,
     maxBytes: limits.maxBytes,
     measureBytes: assets.cost.measure,
-    measureWindowBytes: assets.cost.measureWindow,
+    measureWindowBytes: assets.cost.measureSelectionWindow,
   });
   bindEditorHistoryAssets(history, assets);
   return history;
@@ -203,14 +240,24 @@ function captureProposedEditorHistory(
   document: EditorDocument
 ): EditorImageHistoryCheckpoint | null {
   const bytesByToken = new Map(assets.bytesByToken);
-  const cost = createEditorHistoryCostIndex(bytesByToken);
+  const kindsByToken = new Map(assets.kindsByToken);
+  const cost = createHistoryCost(
+    bytesByToken,
+    kindsByToken,
+    assets.byteLimit,
+    assets.actionLimit,
+    assets.assetByteLimit
+  );
   const snapshots = history.getSnapshots();
-  for (const snapshot of snapshots) cost.register(snapshot, assets.cost.tokensFor(snapshot));
+  for (const snapshot of snapshots) {
+    const { tokens, privateFavicon } = assets.cost.referencesFor(snapshot);
+    cost.register(snapshot, tokens, privateFavicon);
+  }
   const detached: EditorHistoryAssets = {
     ...assets,
     byValue: new Map(assets.byValue),
     byToken: new Map(assets.byToken),
-    kindsByToken: new Map(assets.kindsByToken),
+    kindsByToken,
     bytesByToken,
     cost,
     descriptions: new Map(assets.descriptions),
@@ -222,7 +269,7 @@ function captureProposedEditorHistory(
     limit: assets.actionLimit + 1,
     maxBytes: assets.byteLimit,
     measureBytes: cost.measure,
-    measureWindowBytes: cost.measureWindow,
+    measureWindowBytes: cost.measureSelectionWindow,
   });
   historyAssets.set(candidate, detached);
   pushEditorSnapshotHistory({ history: candidate, muted: false, exportDocument: () => document });
@@ -232,24 +279,32 @@ function captureProposedEditorHistory(
 /** Creates a new runtime lifetime only after its complete retained graph has been admitted. */
 export function restoreEditorHistoryCheckpoint(
   value: unknown,
-  limits: Readonly<{ maxActions: number; maxBytes: number }> = IMAGE_EDITOR_HISTORY_LIMITS
+  limits: ImageEditorHistoryLimits = IMAGE_EDITOR_HISTORY_LIMITS
 ): SnapshotHistory<string> | null {
   const admitted = parseEditorImageHistoryCheckpoint(value, limits);
   if (!admitted) return null;
-  const { checkpoint, tokensBySnapshot, bytesByToken } = admitted;
+  const { checkpoint, tokensBySnapshot, privateFaviconsBySnapshot, bytesByToken } = admitted;
   const tokenBytes = new Map(bytesByToken);
+  const kindsByToken = new Map(checkpoint.values.map((unit) => [unit.id, unit.kind]));
   const assets: EditorHistoryAssets = {
     byValue: new Map(checkpoint.values.map((unit) => [unit.value, unit.id])),
     byToken: new Map(checkpoint.values.map((unit) => [unit.id, unit.value])),
-    kindsByToken: new Map(checkpoint.values.map((unit) => [unit.id, unit.kind])),
+    kindsByToken,
     bytesByToken: tokenBytes,
     nextId: 0,
     epoch: checkpoint.epoch,
     // A new allocation namespace cannot reuse a retired ID from a previous writer lifetime.
     allocationPrefix: `${IMAGE_HISTORY_VALUE_TOKEN_PREFIX}${crypto.randomUUID()}:`,
-    cost: createEditorHistoryCostIndex(tokenBytes),
+    cost: createHistoryCost(
+      tokenBytes,
+      kindsByToken,
+      limits.maxBytes,
+      limits.maxActions,
+      limits.maxAssetBytes
+    ),
     actionLimit: limits.maxActions,
     byteLimit: limits.maxBytes,
+    assetByteLimit: limits.maxAssetBytes,
     descriptions: new Map(),
     actions: new Map(),
   };
@@ -260,9 +315,9 @@ export function restoreEditorHistoryCheckpoint(
       identities.set(unit.id, describeEditorHistoryObject(unit.id, object));
     }
   for (const [index, snapshot] of checkpoint.snapshots.entries()) {
-    assets.cost.register(snapshot, tokensBySnapshot[index]!);
     const metadata: unknown = JSON.parse(snapshot);
     if (!isRecord(metadata)) return null;
+    assets.cost.register(snapshot, tokensBySnapshot[index]!, privateFaviconsBySnapshot[index]);
     const canvas: unknown =
       typeof metadata['canvasJson'] === 'string' ? JSON.parse(metadata['canvasJson']) : null;
     const objectTokens: unknown[] =
@@ -294,7 +349,7 @@ export function restoreEditorHistoryCheckpoint(
     limit: limits.maxActions + 1,
     maxBytes: limits.maxBytes,
     measureBytes: assets.cost.measure,
-    measureWindowBytes: assets.cost.measureWindow,
+    measureWindowBytes: assets.cost.measureSelectionWindow,
   });
   pruneEditorHistoryAssets(history, assets);
   bindEditorHistoryAssets(history, assets);
@@ -406,11 +461,7 @@ export function resetEditorSnapshotHistory(
 ): void {
   cancelDeferredEditorHistory(history);
   const assets = historyAssets.get(history);
-  const tokens = new Set<string>();
-  const snapshot = assets
-    ? encodeEditorSnapshot(document, assets, tokens)
-    : JSON.stringify(document);
-  assets?.cost.register(snapshot, tokens);
+  const snapshot = assets ? encodeEditorSnapshot(document, assets) : JSON.stringify(document);
   history.reset(snapshot);
   if (assets) pruneEditorHistoryAssets(history, assets);
 }
@@ -498,11 +549,9 @@ export function pushEditorSnapshotHistory(options: {
   flushDeferredEditorHistory(options.history);
 
   const assets = historyAssets.get(options.history);
-  const tokens = new Set<string>();
   const snapshot = assets
-    ? encodeEditorSnapshot(options.exportDocument(), assets, tokens)
+    ? encodeEditorSnapshot(options.exportDocument(), assets)
     : JSON.stringify(options.exportDocument());
-  assets?.cost.register(snapshot, tokens);
   if (assets) captureEditorHistoryAction(assets, options.history.getCurrent(), snapshot);
   options.history.push(snapshot);
   if (assets) pruneEditorHistoryAssets(options.history, assets);
@@ -524,12 +573,8 @@ export function replaceCurrentEditorSnapshotHistory(options: {
   const previous = snapshots[index - 1];
   const current = snapshots[index];
   const action = previous && current ? assets?.actions.get(previous)?.get(current) : undefined;
-  const tokens = new Set<string>();
   const document = options.exportDocument();
-  const snapshot = assets
-    ? encodeEditorSnapshot(document, assets, tokens)
-    : JSON.stringify(document);
-  assets?.cost.register(snapshot, tokens);
+  const snapshot = assets ? encodeEditorSnapshot(document, assets) : JSON.stringify(document);
   const replaced = history.replaceCurrent(options.expectedRevision, snapshot);
   if (replaced && previous && action && assets) assets.actions.get(previous)?.set(snapshot, action);
   if (assets) pruneEditorHistoryAssets(history, assets);

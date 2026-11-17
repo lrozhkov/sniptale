@@ -237,3 +237,139 @@ it('restores a retained prefix baseline and rejects a bad checkpoint without tou
   expect(redoEditorSnapshot(restored)?.displayName).toBe('B');
   expect(redoEditorSnapshot(restored)?.displayName).toBe('C');
 });
+
+it('keeps an imported raster outside structural history and preserves it across Undo, reopen and branching', () => {
+  const limits = { maxActions: 10, maxBytes: 3000, maxAssetBytes: 6000 };
+  const base = createMockDocument();
+  const renamed = { ...base, displayName: 'Before import' };
+  const image = 'data:image/png;base64,' + 'A'.repeat(7000);
+  const imported = {
+    ...renamed,
+    canvasJson: JSON.stringify({ objects: [{ type: 'image', sniptaleId: 'layer', src: image }] }),
+  };
+  const history = createEditorSnapshotHistory(base, limits);
+  for (const document of [renamed, imported])
+    pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => document });
+  expect(history.getSnapshots()).toHaveLength(3);
+  expect(undoEditorSnapshot(history)).toEqual(renamed);
+  const restored = restoreEditorHistoryCheckpoint(
+    JSON.parse(JSON.stringify(captureEditorHistoryCheckpoint(history))) as unknown,
+    limits
+  )!;
+  expect(restored).not.toBeNull();
+  expect(redoEditorSnapshot(restored)).toEqual(imported);
+  expect(undoEditorSnapshot(restored)).toEqual(renamed);
+  const branch = { ...renamed, displayName: 'New branch' };
+  pushEditorSnapshotHistory({ history: restored, muted: false, exportDocument: () => branch });
+  expect(redoEditorSnapshot(restored)).toBeNull();
+  expect(
+    captureEditorHistoryCheckpoint(restored)!.values.some((unit) => unit.value === image)
+  ).toBe(false);
+});
+
+it('bounds superseded raster versions independently of structural metadata', () => {
+  const limits = { maxActions: 10, maxBytes: 20_000, maxAssetBytes: 6000 };
+  const base = createMockDocument();
+  const documents = ['A', 'B', 'C'].map((character) => ({
+    ...base,
+    canvasJson: JSON.stringify({
+      objects: [
+        {
+          type: 'image',
+          sniptaleId: 'layer',
+          src: 'data:image/png;base64,' + character.repeat(5000),
+        },
+      ],
+    }),
+  }));
+  const history = createEditorSnapshotHistory(base, limits);
+  for (const document of documents)
+    pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => document });
+  expect(history.getSnapshots()).toHaveLength(2);
+  expect(undoEditorSnapshot(history)).toEqual(documents[1]);
+  expect(undoEditorSnapshot(history)).toBeNull();
+  expect(redoEditorSnapshot(history)).toEqual(documents[2]);
+  const checkpoint = captureEditorHistoryCheckpoint(history)!;
+  expect(checkpoint.values.filter((unit) => unit.kind === 'image')).toHaveLength(2);
+  expect(restoreEditorHistoryCheckpoint(checkpoint, limits)).not.toBeNull();
+});
+
+it('preserves affordable Redo through a derived raster update while undone', () => {
+  const limits = { maxActions: 10, maxBytes: 20_000, maxAssetBytes: 6000 };
+  const base = createMockDocument();
+  const makeDocument = (displayName: string, rasters: string) => ({
+    ...base,
+    displayName,
+    canvasJson: JSON.stringify({
+      objects: [...rasters].map((character) => ({
+        type: 'image',
+        sniptaleId: character,
+        src: 'data:image/png;base64,' + character.repeat(5000),
+      })),
+    }),
+  });
+  const first = makeDocument('First', 'A');
+  const without = makeDocument('Without image', '');
+  const returned = makeDocument('Image restored', 'A');
+  const last = makeDocument('Last', '');
+  const history = createEditorSnapshotHistory(first, limits);
+  for (const document of [without, returned, last])
+    pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => document });
+  expect(history.getState().size).toBe(4);
+  history.seek(0);
+  const updated = makeDocument('First', 'AB');
+  expect(
+    replaceCurrentEditorSnapshotHistory({
+      history,
+      expectedRevision: history.getRevision(),
+      exportDocument: () => updated,
+    })
+  ).toBe(true);
+  const restored = restoreEditorHistoryCheckpoint(captureEditorHistoryCheckpoint(history), limits)!;
+  expect(readCurrentEditorSnapshot(restored)).toEqual(updated);
+  expect(redoEditorSnapshot(restored)).toEqual(without);
+  expect(redoEditorSnapshot(restored)).toEqual(returned);
+  expect(redoEditorSnapshot(restored)).toBeNull();
+});
+
+it('keeps every captured raster graph admissible through cursor, replacement, overflow and branch changes', () => {
+  const limits = { maxActions: 6, maxBytes: 3000, maxAssetBytes: 6000 };
+  const base = createMockDocument();
+  const history = createEditorSnapshotHistory(base, limits);
+  for (let step = 1; step <= 60; step++) {
+    const before = history.getSnapshots().length;
+    if (step % 7 === 0) {
+      undoEditorSnapshot(history);
+      expect(history.getSnapshots()).toHaveLength(before);
+    } else if (step % 11 === 0) {
+      redoEditorSnapshot(history);
+      expect(history.getSnapshots()).toHaveLength(before);
+    } else {
+      const image =
+        'data:image/png;base64,' +
+        String.fromCharCode(65 + (step % 8)).repeat(step % 3 ? 5000 : 1000);
+      const document = {
+        ...base,
+        displayName: `Edit ${step}`,
+        canvasJson: JSON.stringify({
+          objects: [{ type: 'image', sniptaleId: 'layer', src: image }],
+        }),
+      };
+      if (step % 5 === 0)
+        replaceCurrentEditorSnapshotHistory({
+          history,
+          expectedRevision: history.getRevision(),
+          exportDocument: () => document,
+        });
+      else pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => document });
+      expect(readCurrentEditorSnapshot(history)).toEqual(document);
+    }
+    const restored = restoreEditorHistoryCheckpoint(
+      captureEditorHistoryCheckpoint(history),
+      limits
+    );
+    expect(restored, `admission after operation ${step}`).not.toBeNull();
+    expect(readCurrentEditorSnapshot(restored)).toEqual(readCurrentEditorSnapshot(history));
+    expect(restored!.getSnapshots()).toHaveLength(history.getSnapshots().length);
+  }
+});

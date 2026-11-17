@@ -8,6 +8,7 @@ import {
 import {
   IMAGE_EDITOR_HISTORY_LIMITS,
   IMAGE_HISTORY_MAX_JSON_BYTES,
+  type ImageEditorHistoryLimits,
 } from '../../../features/editor-history/policy';
 import { blobToDataUrl, dataUrlToBlob } from '../../../platform/media-utils/data-url';
 import {
@@ -154,7 +155,7 @@ export async function preparePersistedImageHistory(
 export async function hydratePersistedImageHistory(args: {
   history: unknown;
   refs: readonly unknown[];
-  limits?: Readonly<{ maxActions: number; maxBytes: number }>;
+  limits?: ImageEditorHistoryLimits;
 }): Promise<{
   checkpoint: EditorImageHistoryCheckpoint;
   assetsByValue: ReadonlyMap<string, AssetRef>;

@@ -30,6 +30,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** Returns the pooled favicon reference that source privacy projection can remove. */
+function readEditorHistoryFaviconToken(snapshot: unknown): string | undefined {
+  if (!isRecord(snapshot) || !isRecord(snapshot['browserFrame'])) return undefined;
+  const favicon = snapshot['browserFrame']['faviconDataUrl'];
+  return typeof favicon === 'string' && favicon.startsWith(IMAGE_HISTORY_VALUE_TOKEN_PREFIX)
+    ? favicon
+    : undefined;
+}
+
 function isCanvasSvgSource(key: string, value: unknown): boolean {
   // SVG sources stay in the shared object JSON; raster units use binary byte aliases.
   return key === 'src' && typeof value === 'string' && /^data:image\/svg\+xml[;,]/.test(value);
@@ -116,6 +125,7 @@ interface EditorImageHistoryDecodeOptions {
   bounds?: EditorImageHistoryDecodeBounds;
   /** Checkpoints use canonical object-version references; legacy in-memory snapshots may be inline. */
   requirePooledObjects?: boolean;
+  visitFaviconReference?: (token: string | undefined) => void;
 }
 interface Decoding extends EditorImageHistoryDecodeOptions {
   read: EditorImageHistoryValueReader;
@@ -196,6 +206,7 @@ export function decodeEditorImageHistorySnapshot(
 ): unknown {
   const document: unknown = JSON.parse(value);
   if (!read || !isRecord(document)) return document;
+  options.visitFaviconReference?.(readEditorHistoryFaviconToken(document));
   const decoding: Decoding = { read, ...options, objectCharacters: 0, definitionTokens: new Set() };
   restoreSharedFields(document, DOCUMENT_POOLED_FIELDS, decoding, false);
   const definitions = document['vectorDefinitions'];

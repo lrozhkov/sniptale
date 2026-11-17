@@ -1157,6 +1157,14 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
     ],
     diagnostic: 'Editor history capacity stores are unavailable.',
   }),
+  contractOnlyMigration({
+    domainVersions: [{ domainId: 'mediaLibrary', from: 42, to: 43 }],
+    fromDatabaseVersion: 68,
+    toDatabaseVersion: 69,
+    stores: [IMAGE_WORKSPACES_STORE],
+    validationStores: [IMAGE_WORKSPACES_STORE, ASSET_REFS_STORE, ASSET_OWNERS_STORE],
+    diagnostic: 'Image raster history stores are unavailable.',
+  }),
 ];
 
 function projectPrototypeAnimationPreferences(value: unknown) {

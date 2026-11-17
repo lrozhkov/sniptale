@@ -254,6 +254,64 @@ it.each([false, true])(
   }
 );
 
+it.each([
+  { olderLayer: true, newestLayer: false, reserve: true },
+  { olderLayer: false, newestLayer: false, reserve: false },
+  { olderLayer: true, newestLayer: true, reserve: false },
+])(
+  'keeps raster admission after removing a favicon, older layer=$olderLayer, newest layer=$newestLayer',
+  async ({ olderLayer, newestLayer, reserve }) => {
+    const f = fixture(olderLayer, 'file');
+    const newest = f.history.snapshots.at(-1)!.assetId;
+    const last = JSON.parse(f.content.get(newest)!) as Record<string, unknown>;
+    f.content.set(
+      newest,
+      JSON.stringify({
+        ...last,
+        sourceImageData: 'data:image/png;base64,QUJDRA==',
+        canvasJson: newestLayer ? last['canvasJson'] : '{"objects":[]}',
+      })
+    );
+    const projected = await projectImageHistoryMetadata({
+      history: f.history,
+      readJson: async (assetId) => f.content.get(assetId)!,
+      projectSnapshot: (snapshot) =>
+        projectImageHistorySnapshotPrivacy(
+          snapshot,
+          createMediaHubBackupExportOptions({ includeSourceMetadata: false })
+        ),
+    });
+    const retained = new Set(projected.values.map(({ id }) => id));
+    const favicon = f.units.find(({ value }) => value === f.favicon)!;
+    const source = f.units.find(({ kind, id }) => kind === 'image' && id !== favicon.id)!;
+    const original = {
+      version: 1,
+      epoch: f.history.epoch,
+      cursor: f.history.cursor,
+      actions: f.history.actions,
+      snapshots: f.history.snapshots.map(({ assetId }) => f.content.get(assetId)!),
+      values: f.units,
+    };
+    const afterRedaction = {
+      ...original,
+      snapshots: projected.snapshots.map(({ json }) => json),
+      values: f.units.filter(({ id }) => retained.has(id)),
+    };
+    const justBelow = {
+      maxActions: 10,
+      maxBytes: 30_000,
+      maxAssetBytes: source.value.length + (reserve ? favicon.value.length : 0) - 1,
+    };
+    expect(retained.has(favicon.id)).toBe(olderLayer);
+    expect(afterRedaction.snapshots.at(-1)).toContain('"faviconDataUrl":null');
+    const exact = { ...justBelow, maxAssetBytes: justBelow.maxAssetBytes + 1 };
+    expect(parseEditorImageHistoryCheckpoint(original, exact)).not.toBeNull();
+    expect(parseEditorImageHistoryCheckpoint(afterRedaction, exact)).not.toBeNull();
+    expect(parseEditorImageHistoryCheckpoint(original, justBelow)).toBeNull();
+    expect(parseEditorImageHistoryCheckpoint(afterRedaction, justBelow)).toBeNull();
+  }
+);
+
 it('sanitizes historical provenance URLs even when source metadata is included', async () => {
   const f = fixture();
   const projected = await projectImageHistoryMetadata({

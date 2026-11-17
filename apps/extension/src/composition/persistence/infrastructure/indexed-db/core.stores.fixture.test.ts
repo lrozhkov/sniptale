@@ -975,3 +975,17 @@ it('admits 1000 editor transitions without rewriting released rows or immutable 
     scenarioProjects: 15,
   });
 });
+
+it('admits independent Image raster budgets without rewriting version 68 projects or files', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 68
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 69
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, mediaLibrary: 43 });
+});

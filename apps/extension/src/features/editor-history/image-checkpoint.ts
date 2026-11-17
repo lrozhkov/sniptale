@@ -3,7 +3,11 @@ import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives
 import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
 import { isEditorDocument } from '../editor/document/public';
 import { parseEditorHistoryAction, type EditorHistoryAction } from './action';
-import { IMAGE_EDITOR_HISTORY_LIMITS, IMAGE_HISTORY_MAX_VALUES } from './policy';
+import {
+  IMAGE_EDITOR_HISTORY_LIMITS,
+  IMAGE_HISTORY_MAX_VALUES,
+  type ImageEditorHistoryLimits,
+} from './policy';
 import {
   decodeEditorImageHistorySnapshot,
   IMAGE_HISTORY_VALUE_TOKEN_PREFIX,
@@ -39,6 +43,7 @@ export interface EditorImageHistoryCheckpoint {
 }
 
 interface AdmittedEditorImageHistory {
+  privateFaviconsBySnapshot: (string | undefined)[];
   checkpoint: EditorImageHistoryCheckpoint;
   /** Resource closures and lengths are disposable admission indexes, not stored trust evidence. */
   tokensBySnapshot: readonly ReadonlySet<string>[];
@@ -97,7 +102,7 @@ function parseValues(value: unknown): {
 /** Strictly admits a detached retained graph without materializing the same image per state. */
 export function parseEditorImageHistoryCheckpoint(
   value: unknown,
-  limits: Readonly<{ maxActions: number; maxBytes: number }> = IMAGE_EDITOR_HISTORY_LIMITS
+  limits: ImageEditorHistoryLimits = IMAGE_EDITOR_HISTORY_LIMITS
 ): AdmittedEditorImageHistory | null {
   try {
     if (
@@ -133,12 +138,17 @@ export function parseEditorImageHistoryCheckpoint(
     }
     const units = new Map(parsed.values.map((unit) => [unit.id, unit]));
     const tokensBySnapshot: Set<string>[] = [];
+    const privateFaviconsBySnapshot: (string | undefined)[] = [];
     const reachable = new Set<string>();
     const encoder = new TextEncoder();
     let metadataBytes = 0;
     let minimumBaseline = Number.POSITIVE_INFINITY;
+    let newestImages = 0;
+    const separateImages = limits.maxAssetBytes !== undefined;
     for (const snapshot of value['snapshots']) {
       const tokens = new Set<string>();
+      let favicon: string | undefined;
+      let faviconUses = 0;
       const document = decodeEditorImageHistorySnapshot(
         snapshot,
         (token, kind) => {
@@ -155,26 +165,52 @@ export function parseEditorImageHistoryCheckpoint(
             throw new Error('Invalid image history resource reference.');
           tokens.add(token);
           reachable.add(token);
+          if (token === favicon) faviconUses++;
           // Preserve the MIME contract (retained masks require PNG), after validating the real value once.
           return kind === 'image' ? parsed.imageWitnesses.get(unit.id)! : unit.value;
         },
         {
           bounds: EDITOR_IMAGE_HISTORY_DECODE_BOUNDS,
           requirePooledObjects: true,
+          visitFaviconReference: (token) => {
+            favicon = token;
+          },
         }
       );
       if (!isEditorDocument(document)) return null;
       const bytes = encoder.encode(snapshot).byteLength;
       metadataBytes += bytes;
       let baseline = bytes;
-      for (const token of tokens) baseline += parsed.bytes.get(token)!;
+      newestImages = 0;
+      for (const token of tokens) {
+        if (separateImages && units.get(token)!.kind === 'image')
+          newestImages += parsed.bytes.get(token)!;
+        else baseline += parsed.bytes.get(token)!;
+      }
       minimumBaseline = Math.min(minimumBaseline, baseline);
       tokensBySnapshot.push(tokens);
+      privateFaviconsBySnapshot.push(faviconUses === 1 ? favicon : undefined);
     }
     if (reachable.size !== parsed.values.length) return null;
     let total = metadataBytes;
-    for (const token of reachable) total += parsed.bytes.get(token)!;
+    let images = 0;
+    for (const token of reachable) {
+      if (separateImages && units.get(token)!.kind === 'image') images += parsed.bytes.get(token)!;
+      else total += parsed.bytes.get(token)!;
+    }
     if (total - minimumBaseline > limits.maxBytes) return null;
+    if (limits.maxAssetBytes !== undefined) {
+      const favicon = privateFaviconsBySnapshot.at(-1);
+      // A redacted favicon counts only when another layer will still need its bytes.
+      const sharedFaviconBytes =
+        favicon &&
+        tokensBySnapshot.some(
+          (tokens, index) => privateFaviconsBySnapshot[index] !== favicon && tokens.has(favicon)
+        )
+          ? (parsed.bytes.get(favicon) ?? 0)
+          : 0;
+      if (images - newestImages + sharedFaviconBytes > limits.maxAssetBytes) return null;
+    }
     return {
       checkpoint: {
         version: 1,
@@ -185,6 +221,7 @@ export function parseEditorImageHistoryCheckpoint(
         actions,
       },
       tokensBySnapshot,
+      privateFaviconsBySnapshot,
       bytesByToken: parsed.bytes,
     };
   } catch {

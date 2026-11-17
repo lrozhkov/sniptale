@@ -1229,11 +1229,15 @@ Physical database version 67 advances the mediaLibrary contract to version 41. T
 
 New native history envelopes use version 2. One immutable JSON file contains all snapshots and pooled drawing values. Logical slots reference this shared file. Raster payloads retain their existing immutable asset references. Version 1 envelopes remain readable. A later save replaces individual JSON files through the existing atomic publisher. Existing cleanup removes obsolete files after publication.
 
-Portable history version 2 uses the same shared JSON file. Privacy projection still checks every snapshot and removes unused resources before archive creation. Archive and sync receivers check the complete bundle against its declared slots. The metadata, record and runtime retention budgets remain unchanged. Cursor changes reuse the bundle. A content change creates one replacement bundle through coalesced autosave.
+Portable history version 2 uses the same shared JSON file. Privacy projection still checks every snapshot and removes unused resources before archive creation. Archive and sync receivers check the complete bundle against its declared slots. Cursor changes reuse the bundle. A content change creates one replacement bundle through coalesced autosave.
 
 Physical database version 62 adds `image_workspace_identities` and advances the mediaLibrary contract to version 40. The additive 61→62 migration preserves existing documents, history, assets and presentations. Earlier writers refuse the newer database before mutation.
 
-Image history retains a cursor, actions and references to immutable snapshot and object versions. Unchanged raster bytes and drawing payloads share retained resources. Ordinary history retention permits 1000 transitions and 32 MiB of pooled payload. Current content remains available when history retention removes transitions.
+Image history retains a cursor, actions and references to immutable snapshot and object versions. Unchanged raster bytes and drawing payloads share retained resources. History keeps up to 1000 transitions and 32 MiB of additional snapshot metadata and pooled drawing data. Current content remains available when history retention removes transitions.
+
+Image retention has a separate 64 MiB limit for encoded raster values that the newest retained state does not use. The editor counts each shared raster value once. The limit also includes a newest-state favicon if removing source metadata would leave the bytes in an earlier state only. Undo and Redo move the cursor without changing which state sets the raster allowance. Native storage keeps raster bytes in immutable assets.
+
+Database version 69 advances the mediaLibrary contract to version 43. The additive migration preserves existing rows and files. Earlier writers refuse the newer database before they apply their combined history budget.
 
 Native admission limits history JSON to 512 MiB and 100,000 values before file reads. These admission limits do not replace the smaller runtime retention budget. Canvas SVG sources remain in bounded object JSON. Raster resources retain their existing validators.
 

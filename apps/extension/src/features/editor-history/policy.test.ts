@@ -9,7 +9,11 @@ import {
 
 it('keeps reversible edits and previous saved versions under independent product budgets', () => {
   expect(EDITOR_HISTORY_LIMITS).toEqual({ maxActions: 1000, maxBytes: 32 * 1024 * 1024 });
-  expect(IMAGE_EDITOR_HISTORY_LIMITS).toEqual({ maxActions: 1000, maxBytes: 32 * 1024 * 1024 });
+  expect(IMAGE_EDITOR_HISTORY_LIMITS).toEqual({
+    maxActions: 1000,
+    maxBytes: 32 * 1024 * 1024,
+    maxAssetBytes: 64 * 1024 * 1024,
+  });
   expect(SCENARIO_SAVED_VERSION_LIMITS).toEqual({ maxActions: 20, maxBytes: 16 * 1024 * 1024 });
   expect(Object.isFrozen(EDITOR_HISTORY_LIMITS)).toBe(true);
   expect(Object.isFrozen(SCENARIO_SAVED_VERSION_LIMITS)).toBe(true);

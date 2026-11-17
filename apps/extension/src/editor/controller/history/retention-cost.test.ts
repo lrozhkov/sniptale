@@ -127,3 +127,85 @@ it('preserves the existing nearest-cursor retention through push, branch, replac
     expect(actual.getState()).toEqual(expected.getState());
   }
 });
+
+it('keeps project rasters outside metadata while bounding older unique raster versions', () => {
+  const mib = 1024 * 1024;
+  const bytes = new Map([
+    ['source', 100 * mib],
+    ['import', 60 * mib],
+    ['revision', 50 * mib],
+    ['later', 40 * mib],
+  ]);
+  const kinds = new Map<string, 'image' | 'json'>([...bytes.keys()].map((id) => [id, 'image']));
+  const index = createEditorHistoryCostIndex(bytes, {
+    kindsByToken: kinds,
+    maxBytes: 32 * mib,
+    maxAssetBytes: 64 * mib,
+  });
+  index.register('a', new Set(['source']));
+  index.register('bb', new Set(['source', 'import']));
+  index.register('ccc', new Set(['source', 'revision']));
+  index.register('dddd', new Set(['source', 'later']));
+  expect(index.measure(['a', 'bb'])).toBe(2);
+  expect(index.measure(['a', 'bb', 'ccc'])).toBe(5);
+  expect(index.measure(['a', 'bb', 'ccc', 'dddd'])).toBe(32 * mib + 1);
+  expect(index.measure(['ccc', 'dddd'])).toBe(4);
+});
+
+it('matches independent raster and structural limits for every changing cursor window', () => {
+  const bytes = new Map([
+    ['source', 100_000],
+    ['a', 700],
+    ['b', 1100],
+    ['c', 1900],
+    ['drawing', 300],
+  ]);
+  const kinds = new Map<string, 'image' | 'json'>(
+    [...bytes.keys()].map((id) => [id, id === 'drawing' ? 'json' : 'image'])
+  );
+  const budget = { kindsByToken: kinds, maxBytes: 2000, maxAssetBytes: 2500 };
+  const index = createEditorHistoryCostIndex(bytes, budget);
+  const resources = new Map<string, ReadonlySet<string>>();
+  const favicons = new Map<string, string>();
+  const structural = new Map([...bytes].filter(([id]) => kinds.get(id) === 'json'));
+  const values = Array.from({ length: 12 }, (_, i) => {
+    const value = `state-${i}`;
+    const tokens = new Set(['source']);
+    if (i % 2) tokens.add('a');
+    if (i % 3) tokens.add('b');
+    if (i % 5) tokens.add('c');
+    if (i % 4) tokens.add('drawing');
+    if ((i < 6 || i > 8) && i % 3) favicons.set(value, 'b');
+    resources.set(value, tokens);
+    index.register(value, tokens, favicons.get(value));
+    return value;
+  });
+  function reference(range: readonly string[]) {
+    const rasters = new Set(
+      range.flatMap((value) => [...resources.get(value)!].filter((id) => kinds.get(id) === 'image'))
+    );
+    const newestValue = range[range.length - 1]!;
+    const newest = resources.get(newestValue)!;
+    const favicon = favicons.get(newestValue);
+    const extra = [...rasters]
+      .filter(
+        (id) =>
+          !newest.has(id) ||
+          (id === favicon &&
+            range
+              .slice(0, -1)
+              .some((value) => favicons.get(value) !== id && resources.get(value)!.has(id)))
+      )
+      .reduce((sum, id) => sum + bytes.get(id)!, 0);
+    return extra > budget.maxAssetBytes
+      ? budget.maxBytes + 1
+      : referenceCost(range, resources, structural);
+  }
+  expect(index.measure(values)).toBe(reference(values));
+  for (let cursor = 0; cursor < values.length; cursor++) {
+    const measure = index.measureWindow(values, cursor);
+    for (let start = 0; start <= cursor; start++)
+      for (let end = values.length - 1; end >= cursor; end--)
+        expect(measure(start, end)).toBe(reference(values.slice(start, end + 1)));
+  }
+});
