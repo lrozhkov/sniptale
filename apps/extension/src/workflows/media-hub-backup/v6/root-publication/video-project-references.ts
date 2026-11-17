@@ -4,8 +4,39 @@ import type {
   VideoProjectSource,
 } from '../../../../features/video/project/types';
 import { scenarioAssetRestoreKey } from '../reference-keys';
+import type { VideoProjectHistorySourceReference } from '../../../../features/video/project/history-capture';
 
 const UNRESOLVED_SOURCE_ERROR = 'Portable video project source reference is unresolved.';
+
+/** History keeps the same typed logical identities as current project references. */
+export function transformPortableVideoProjectHistorySources(
+  sources: readonly VideoProjectHistorySourceReference[],
+  assetIds: ReadonlyMap<string, string>,
+  rootIds: Readonly<Record<string, string>>,
+  childIds: Readonly<Record<string, string>>
+): VideoProjectHistorySourceReference[] {
+  return sources.map((source) => {
+    let id: string;
+    switch (source.kind) {
+      case 'recording':
+        id = requireRecordingId(rootIds, source.id);
+        break;
+      case 'library-asset':
+        id = requireMediaId(rootIds, source.id);
+        break;
+      case 'project-asset':
+        id = requireProjectAssetId(assetIds, source.id);
+        break;
+      case 'scenario-project':
+        id = requireScenarioProjectId(rootIds, source.id);
+        break;
+      case 'scenario-asset':
+        id = requireScenarioAssetId(childIds, source.id);
+        break;
+    }
+    return { kind: source.kind, id };
+  });
+}
 
 function requireMediaId(rootIds: Readonly<Record<string, string>>, sourceId: string): string {
   const restoredId = rootIds[`media:library-item:${sourceId}`];

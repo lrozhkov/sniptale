@@ -17,6 +17,7 @@ import { inspectMediaHubBackupV6 } from '../inspect';
 import { parseManifestV6 } from '../codec';
 import { createGuideProject } from '../../../../features/scenario/project/factories';
 import { encodePortableScenarioProjectEntry } from './projects';
+import { EDITOR_HISTORY_LIMITS } from '../../../../features/editor-history/policy';
 
 const reader: ArchiveReader = { close: vi.fn(), entries: () => [], entry: () => null };
 const object = {
@@ -73,6 +74,49 @@ const video = (mimeType = 'image/png') =>
     ],
     projectExports: [],
   });
+
+it.each(['mime', 'missing', 'logical-budget'] as const)(
+  'refuses invalid Montage history object roles before staging: %s',
+  async (failure) => {
+    const metadata = {
+      entry: { id: 'root', project: { assets: [] } },
+      projectAssets: [],
+      projectExports: [],
+      history: {
+        version: 1,
+        past: [{ objectId: 'body' }, { objectId: 'body' }],
+        future: [],
+        sources: [],
+      },
+    };
+    const root = envelope('video-project', metadata);
+    root.objects =
+      failure === 'missing'
+        ? []
+        : [
+            {
+              ...object,
+              mimeType: failure === 'mime' ? 'image/png' : 'application/json',
+              size: failure === 'logical-budget' ? EDITOR_HISTORY_LIMITS.maxBytes / 2 + 1 : 3,
+            },
+          ];
+    await expect(assertArchiveRootObjectInventory(root, null, [])).rejects.toThrow();
+  }
+);
+
+it('requires the history role instead of silently treating its bodies as unused', async () => {
+  const entry = { id: 'root', project: { assets: [] } };
+  const root = envelope('video-project', {
+    entry,
+    projectAssets: [],
+    projectExports: [],
+    history: { version: 1, past: [{ objectId: 'body' }], future: [], sources: [] },
+  });
+  root.objects = [{ ...object, mimeType: 'application/json' }];
+  await assertArchiveRootObjectInventory(root, null, []);
+  root.metadata = { entry, projectAssets: [], projectExports: [] };
+  await expect(assertArchiveRootObjectInventory(root, null, [])).rejects.toThrow('unused');
+});
 
 it.each([false, true])(
   'refuses unsupported Scenario MIME before staging (shared=%s)',

@@ -38,6 +38,10 @@ import {
   type PortableScenarioUnitHistory,
 } from './scenario-history';
 import { sameScenarioStoredValue } from '../../../../composition/persistence/scenario/storage-units';
+import {
+  parsePortableVideoProjectHistory,
+  type PortableVideoProjectHistory,
+} from './video-project-history';
 
 /** Portable image keys add eight bytes per image; array separators add one per version. */
 export const MAX_PORTABLE_SCENARIO_HISTORY_BYTES =
@@ -68,7 +72,7 @@ interface PortableEffectSnapshot extends Omit<VideoProjectEffectSnapshot, 'asset
 }
 
 export interface PortableVideoProjectMetadata {
-  entry: Omit<VideoProjectEntry, 'project'> & {
+  entry: Omit<VideoProjectEntry, 'project' | 'history' | 'historyPublicationId'> & {
     project: Omit<VideoProjectEntry['project'], 'effectSnapshots'> & {
       effectSnapshots?: PortableEffectSnapshot[];
     };
@@ -77,6 +81,7 @@ export interface PortableVideoProjectMetadata {
   projectAssets: PortableProjectAsset[];
   projectExports: PortableProjectExport[];
   thumbnail?: PortableMediaThumbnail;
+  history?: PortableVideoProjectHistory;
 }
 
 /** Removes the local byte identity from a native video project asset row. */
@@ -505,8 +510,18 @@ export function parsePortableVideoProjectMetadata(value: unknown): PortableVideo
     project: value.entry.project,
     projectAssets,
     projectExports,
+    ...(value.history
+      ? { historicalSources: parsePortableVideoProjectHistory(value.history).sources }
+      : {}),
   });
-  return { ...value, projectAssets, projectExports };
+  return {
+    ...value,
+    projectAssets,
+    projectExports,
+    ...(value.history === undefined
+      ? {}
+      : { history: parsePortableVideoProjectHistory(value.history) }),
+  };
 }
 
 export function parsePortableScenarioProjectMetadata(

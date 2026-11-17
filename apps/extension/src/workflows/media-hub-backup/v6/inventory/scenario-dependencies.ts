@@ -26,6 +26,7 @@ import { collectVideoProjectReferences } from '../../../../composition/persisten
 import { createRecordingMediaId } from '../../../../features/media-hub/media-id';
 import { scenarioLibraryMediaId } from '../../../../composition/persistence/scenario/library-publication';
 import type { MediaHubBackupExportOptions } from '../contracts';
+import { collectVideoProjectWorkspaceSources } from '../../../../composition/persistence/projects/history-contracts';
 
 interface BackupDependencySelection {
   media: { required: Set<string>; selected: string[] };
@@ -72,20 +73,12 @@ function collectVideoDependencies(
     for (const id of references.recordingIds) {
       mediaIds.add(createRecordingMediaId(id));
     }
-    if (entry.project.source.kind === 'scenario') {
-      scenarioIds.add(entry.project.source.scenarioProjectId);
-    }
-    for (const asset of entry.project.assets) {
-      if (asset.source.kind === 'library-asset') {
-        mediaIds.add(asset.source.mediaId);
-        continue;
-      }
-      if (asset.source.kind !== 'scenario-asset') continue;
-      const scenarioAsset = scenarioAssets.get(asset.source.scenarioAssetId);
+    for (const source of collectVideoProjectWorkspaceSources(entry)) {
+      if (source.kind === 'scenario-project') scenarioIds.add(source.id);
+      if (source.kind !== 'scenario-asset') continue;
+      const scenarioAsset = scenarioAssets.get(source.id);
       if (!scenarioAsset) {
-        throw new Error(
-          `Selected video project requires a missing scenario asset: ${asset.source.scenarioAssetId}.`
-        );
+        throw new Error(`Selected video project requires a missing scenario asset: ${source.id}.`);
       }
       scenarioIds.add(scenarioAsset.projectId);
     }

@@ -2,6 +2,8 @@ import { decodePortableImageHistory, projectImageHistoryMetadata } from './image
 import { MAX_EXPANDED_ROOT_METADATA_BYTES } from '../contracts';
 import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { EDITOR_HISTORY_LIMITS } from '../../../../features/editor-history/policy';
+import { portableVideoProjectHistoryPointers } from './video-project-history';
 import type { ArchiveReader } from '../../../../composition/archive-transfer';
 import { assertSafeScenarioAssetStorageMetadata } from '../../../../composition/persistence/scenario/projects/guards';
 import { parseBoundedJson } from '../codec';
@@ -196,6 +198,16 @@ function collectVideoRoles(
     if (item.thumbnail) pointer(item.thumbnail.objectId);
   }
   if (metadata.thumbnail) pointer(metadata.thumbnail.objectId);
+  let historyBytes = 0;
+  for (const { objectId } of metadata.history
+    ? portableVideoProjectHistoryPointers(metadata.history)
+    : []) {
+    const object = pointer(objectId);
+    historyBytes += object.size;
+    if (object.mimeType !== 'application/json' || historyBytes > EDITOR_HISTORY_LIMITS.maxBytes)
+      throw new Error('Media backup video history exceeds its metadata profile.');
+    body(objectId, 'application/json', object.size);
+  }
   presentation(metadata.presentation);
   if (metadata.entry.project.effectSnapshots !== undefined) {
     if (!Array.isArray(metadata.entry.project.effectSnapshots))

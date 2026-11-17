@@ -1,4 +1,8 @@
-import { parseAssetRef, type AssetRef } from '../../../../composition/persistence/assets';
+import {
+  parseAssetRef,
+  parseAssetOwner,
+  type AssetRef,
+} from '../../../../composition/persistence/assets';
 import type { MediaHubBackupRootPreparation } from '../contracts';
 import {
   inventoryProjectThumbnail,
@@ -57,6 +61,13 @@ import {
 import { METADATA_ROOT, withDraftRoot } from '../layout';
 import { buildPortableAggregatePresentation } from './presentation';
 import { isRecord } from '../../../../composition/persistence/infrastructure/indexed-db/read-primitives';
+import { collectProjectEntryOwnedAssetIds } from '../../../../composition/persistence/projects/asset-references';
+import { hydratePersistedVideoProjectHistory } from '../../../../composition/persistence/projects/history-codec';
+import {
+  VIDEO_PROJECT_HISTORY_OWNER_KIND,
+  videoProjectHistoryAssetBindings,
+} from '../../../../composition/persistence/projects/history-contracts';
+import { encodePortableVideoProjectHistory } from '../root-codecs/video-project-history';
 
 interface VideoInventoryDatabase extends InventoryDatabase, VideoReviewBackupDatabase {}
 
@@ -152,13 +163,7 @@ async function buildProjectAssets(
   referencedIds: Set<string>
 ) {
   const output = [];
-  const ids = [
-    ...new Set(
-      entry.project.assets.flatMap((asset) =>
-        asset.source.kind === 'project-asset' ? [asset.source.projectAssetId] : []
-      )
-    ),
-  ];
+  const ids = collectProjectEntryOwnedAssetIds(entry);
   for (const [index, id] of ids.entries()) {
     const asset = parseProjectAssetEntry(await db.get(PROJECT_ASSETS_STORE, id));
     if (!asset) throw new Error(`Video project asset is invalid: ${id}.`);
@@ -373,6 +378,37 @@ async function buildVideoProjectRoot(args: {
     args.deferredAssets
   );
   const referencedIds = new Set<string>();
+  const historyObjects = new Map<string, string>();
+  if (args.entry.history) {
+    const bindings = videoProjectHistoryAssetBindings(args.entry.history);
+    for (const binding of bindings) {
+      const owner = parseAssetOwner(
+        await args.db.get('asset_owners', [
+          VIDEO_PROJECT_HISTORY_OWNER_KIND,
+          args.entry.id,
+          binding.role,
+        ])
+      );
+      if (
+        !owner ||
+        owner.assetId !== binding.assetId ||
+        owner.ownerId !== args.entry.id ||
+        owner.ownerKind !== VIDEO_PROJECT_HISTORY_OWNER_KIND ||
+        owner.role !== binding.role
+      )
+        throw new Error('Stored video history ownership is unavailable.');
+    }
+    await hydratePersistedVideoProjectHistory({
+      current: args.entry.project,
+      history: args.entry.history,
+      refs: await Promise.all(bindings.map(({ assetId }) => args.db.get('asset_refs', assetId))),
+    });
+    for (const [index, { assetId }] of bindings.entries())
+      historyObjects.set(
+        assetId,
+        await collector.addAsset(args.db, assetId, `history-${index + 1}.json`, 'application/json')
+      );
+  }
   const sourceAssets = await buildProjectAssets(args.db, args.entry, collector, referencedIds);
   const projectExports = await buildProjectExports({
     db: args.db,
@@ -388,11 +424,7 @@ async function buildVideoProjectRoot(args: {
       args.db,
       args.entry,
       collector,
-      new Set(
-        args.entry.project.assets.flatMap((asset) =>
-          asset.source.kind === 'project-asset' ? [asset.source.projectAssetId] : []
-        )
-      ),
+      new Set(collectProjectEntryOwnedAssetIds(args.entry)),
       referencedIds
     )),
   ];
@@ -410,9 +442,10 @@ async function buildVideoProjectRoot(args: {
     aggregateKind: 'video-project',
     db: args.db,
   });
+  const { history: _history, historyPublicationId: _publication, ...portableEntry } = args.entry;
   const metadata: PortableVideoProjectMetadata = {
     entry: {
-      ...args.entry,
+      ...portableEntry,
       project: {
         ...(encodePortableVideoProjectAssetRefs(project) as typeof project),
         ...(portableSnapshots ? { effectSnapshots: portableSnapshots } : {}),
@@ -420,6 +453,9 @@ async function buildVideoProjectRoot(args: {
     },
     projectAssets,
     projectExports,
+    ...(args.entry.history
+      ? { history: encodePortableVideoProjectHistory(args.entry.history, historyObjects) }
+      : {}),
     ...(projectThumbnail ? { thumbnail: projectThumbnail } : {}),
     ...(presentation ? { presentation } : {}),
   };

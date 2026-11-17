@@ -13,6 +13,65 @@ import {
   type PreparedVideoProjectRevision,
   type VideoProjectRevisionPublicationStores,
 } from './revision-publication';
+import type { AssetRef } from '../assets';
+
+const historyRef: AssetRef = {
+  assetId: 'history-json',
+  createdAt: 1,
+  location: { kind: 'opfs', objectKey: 'objects/history-json' },
+  mimeType: 'application/json',
+  sha256: 'a'.repeat(64),
+  size: 80,
+};
+
+it.each(['valid', 'missing', 'wrong-mime', 'bad-digest', 'extra'] as const)(
+  'publishes only the exact prepared history resource closure: %s',
+  async (mode) => {
+    const fixture = createReviewWorkspaceStoreFixture(() => false);
+    const root = prepared();
+    root.entry.history = {
+      version: 1,
+      epoch: 'restore',
+      past: [{ assetId: historyRef.assetId }],
+      future: [],
+      sources: [{ kind: 'project-asset', id: 'project-asset-1' }],
+    };
+    root.historyRefs = [historyRef];
+    if (mode === 'missing') root.historyRefs = [];
+    else if (mode === 'wrong-mime') root.historyRefs = [{ ...historyRef, mimeType: 'text/plain' }];
+    else if (mode === 'bad-digest') root.historyRefs = [{ ...historyRef, sha256: 'invalid' }];
+    else if (mode === 'extra') root.historyRefs = [historyRef, { ...historyRef, assetId: 'extra' }];
+    const before = structuredClone(fixture.rows);
+    const tx = fixture.database.transaction([...fixture.rows.keys()], 'readwrite');
+    const publish = publishPreparedVideoProjectRevisionInTransaction({
+      root,
+      stores: publicationStores(tx),
+      workspaceRevision: 9,
+    });
+    if (mode !== 'valid') {
+      await expect(publish).rejects.toThrow('history references');
+      tx.abort();
+      await expect(tx.done).rejects.toThrow();
+      expect(fixture.rows).toEqual(before);
+      return;
+    }
+    await publish;
+    await tx.done;
+    expect(fixture.rows.get('asset_refs')!.get(historyRef.assetId)).toEqual(historyRef);
+    expect(
+      fixture.rows
+        .get('asset_owners')!
+        .get(
+          JSON.stringify(['video-project-history', root.entry.id, 'history:change:history-json'])
+        )
+    ).toEqual({
+      assetId: historyRef.assetId,
+      ownerKind: 'video-project-history',
+      ownerId: root.entry.id,
+      role: 'history:change:history-json',
+    });
+  }
+);
 
 type Fixture = ReturnType<typeof createReviewWorkspaceStoreFixture>;
 type Transaction = ReturnType<Fixture['database']['transaction']>;

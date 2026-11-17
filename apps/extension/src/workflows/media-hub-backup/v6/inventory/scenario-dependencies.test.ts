@@ -81,79 +81,97 @@ beforeEach(() => {
   mocks.buildVideoProjects.mockResolvedValue([]);
 });
 
-it('includes the scenario root that owns selected video source dependencies', async () => {
-  const video = createVideoProjectEntryWithMediaClip();
-  video.id = 'project-1';
-  video.project.id = 'project-1';
-  video.project.source = { kind: 'scenario', scenarioProjectId: 'scenario-1' };
-  video.project.assets[0]!.source = {
-    kind: 'scenario-asset',
-    scenarioAssetId: 'scenario-image',
-  };
-  const scenario = {
-    createdAt: 1,
-    id: 'scenario-1',
-    project: createGuideProject('Scenario', 'scenario-1', 1),
-    updatedAt: 1,
-    workspaceRevision: 1,
-  };
-  const scenarioAsset = {
-    assetId: 'physical-image',
-    createdAt: 1,
-    galleryAssetId: null,
-    height: 100,
-    id: 'scenario-image',
-    mimeType: 'image/png',
-    projectId: 'scenario-1',
-    size: 4,
-    width: 100,
-  };
-  mocks.db.getAll.mockImplementation(async (store: string) => {
-    if (store === VIDEO_PROJECTS_STORE) return [video];
-    if (store === SCENARIO_PROJECTS_STORE) return [scenario];
-    if (store === SCENARIO_ASSETS_STORE) return [scenarioAsset];
-    return [];
-  });
-  mocks.buildScenarios.mockResolvedValue([scenarioRoot('scenario-1')]);
-  mocks.buildMedia.mockResolvedValue([
-    {
-      descriptor: {
-        metadataPath: '_sniptale/metadata/media/scenario-image.json',
-        mediaSubtype: 'library-item',
-        objectCount: 0,
-        rootId: 'scenario-asset:scenario-image',
-        rootKind: 'media',
-        totalBytes: 0,
+it.each([false, true])(
+  'includes the scenario root that owns selected video source dependencies: historical=%s',
+  async (historical) => {
+    const video = createVideoProjectEntryWithMediaClip();
+    video.id = 'project-1';
+    video.project.id = 'project-1';
+    video.project.source = { kind: 'scenario', scenarioProjectId: 'scenario-1' };
+    video.project.assets[0]!.source = {
+      kind: 'scenario-asset',
+      scenarioAssetId: 'scenario-image',
+    };
+    const scenario = {
+      createdAt: 1,
+      id: 'scenario-1',
+      project: createGuideProject('Scenario', 'scenario-1', 1),
+      updatedAt: 1,
+      workspaceRevision: 1,
+    };
+    const scenarioAsset = {
+      assetId: 'physical-image',
+      createdAt: 1,
+      galleryAssetId: null,
+      height: 100,
+      id: 'scenario-image',
+      mimeType: 'image/png',
+      projectId: 'scenario-1',
+      size: 4,
+      width: 100,
+    };
+    if (historical) {
+      video.history = {
+        version: 1,
+        epoch: 'retained',
+        past: [{ assetId: 'inverse' }],
+        future: [],
+        sources: [
+          { kind: 'scenario-project', id: 'scenario-1' },
+          { kind: 'scenario-asset', id: 'scenario-image' },
+        ],
+      };
+      video.project.source = { kind: 'manual' };
+      video.project.assets = [];
+      video.project.clips = [];
+    }
+    mocks.db.getAll.mockImplementation(async (store: string) => {
+      if (store === VIDEO_PROJECTS_STORE) return [video];
+      if (store === SCENARIO_PROJECTS_STORE) return [scenario];
+      if (store === SCENARIO_ASSETS_STORE) return [scenarioAsset];
+      return [];
+    });
+    mocks.buildScenarios.mockResolvedValue([scenarioRoot('scenario-1')]);
+    mocks.buildMedia.mockResolvedValue([
+      {
+        descriptor: {
+          metadataPath: '_sniptale/metadata/media/scenario-image.json',
+          mediaSubtype: 'library-item',
+          objectCount: 0,
+          rootId: 'scenario-asset:scenario-image',
+          rootKind: 'media',
+          totalBytes: 0,
+        },
+        load: vi.fn(),
+        summary: {
+          draftCount: 0,
+          recordingCount: 0,
+          sourceMetadataCount: 0,
+          telemetryCount: 0,
+          thumbnailCount: 0,
+          webSnapshotCount: 0,
+        },
       },
-      load: vi.fn(),
-      summary: {
-        draftCount: 0,
-        recordingCount: 0,
-        sourceMetadataCount: 0,
-        telemetryCount: 0,
-        thumbnailCount: 0,
-        webSnapshotCount: 0,
-      },
-    },
-  ]);
+    ]);
 
-  await buildMediaHubBackupExportPlanFromLibraryV6(options());
+    await buildMediaHubBackupExportPlanFromLibraryV6(options());
 
-  expect(mocks.buildScenarios).toHaveBeenCalledWith(
-    expect.objectContaining({
-      options: expect.objectContaining({
-        selected: expect.objectContaining({ scenarioProjectIds: ['scenario-1'] }),
-      }),
-    })
-  );
-  expect(mocks.buildMedia).toHaveBeenCalledWith(
-    expect.objectContaining({
-      options: expect.objectContaining({
-        selected: expect.objectContaining({ mediaAssetIds: ['scenario-asset:scenario-image'] }),
-      }),
-    })
-  );
-});
+    expect(mocks.buildScenarios).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          selected: expect.objectContaining({ scenarioProjectIds: ['scenario-1'] }),
+        }),
+      })
+    );
+    expect(mocks.buildMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          selected: expect.objectContaining({ mediaAssetIds: ['scenario-asset:scenario-image'] }),
+        }),
+      })
+    );
+  }
+);
 
 it('fails when an admitted video depends on an excluded draft scenario', async () => {
   const video = createVideoProjectEntry({

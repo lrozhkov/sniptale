@@ -59,6 +59,7 @@ export interface ArchiveRootPublisher {
   prepareStaged?(args: {
     envelope: MediaHubBackupRootEnvelope;
     staged: StagedArchiveObject[];
+    session?: ArchiveRestoreSession;
   }): Promise<{ envelope: MediaHubBackupRootEnvelope; staged: StagedArchiveObject[] }>;
   checkpointSkipIfExisting?(args: {
     envelope: MediaHubBackupRootEnvelope;
@@ -188,7 +189,7 @@ async function restoreArchiveRoot(args: {
       ...(args.signal ? { signal: args.signal } : {}),
     });
     if (args.publisher.prepareStaged) {
-      const prepared = await args.publisher.prepareStaged({ envelope, staged });
+      const prepared = await args.publisher.prepareStaged({ envelope, staged, session });
       envelope = prepared.envelope;
       staged = prepared.staged;
     }
