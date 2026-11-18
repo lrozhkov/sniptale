@@ -38,7 +38,7 @@ function admittedVideoProjects(rows: unknown[], options: MediaHubBackupExportOpt
     const entry = parseVideoProjectEntry(raw);
     if (
       !entry ||
-      !options.selected?.videoProjectIds.includes(entry.id) ||
+      (options.scope === 'selected' && !options.selected?.videoProjectIds.includes(entry.id)) ||
       (entry.lifecycle?.storageClass === 'temporary' && !options.includeDrafts)
     ) {
       return [];
@@ -88,14 +88,14 @@ function collectVideoDependencies(
 
 function admittedScenarioIds(
   rows: unknown[],
-  selectedIds: ReadonlySet<string>,
+  selectedIds: ReadonlySet<string> | null,
   includeDrafts: boolean
 ): Set<string> {
   return new Set(
     rows.flatMap((raw) => {
       const entry = parseScenarioProjectEntry(raw);
       return entry &&
-        selectedIds.has(entry.id) &&
+        (selectedIds === null || selectedIds.has(entry.id)) &&
         (entry.lifecycle?.storageClass !== 'temporary' || includeDrafts)
         ? [entry.id]
         : [];
@@ -105,9 +105,10 @@ function admittedScenarioIds(
 
 export async function resolveBackupDependencySelection(
   db: Awaited<ReturnType<typeof initDB>>,
-  options: MediaHubBackupExportOptions
+  options: MediaHubBackupExportOptions,
+  admission: { includeAllDependencies?: boolean } = {}
 ): Promise<BackupDependencySelection> {
-  if (options.scope === 'all') {
+  if (options.scope === 'all' && !admission.includeAllDependencies) {
     return {
       media: { required: new Set(), selected: [] },
       scenarios: { required: new Set(), selected: [] },
@@ -128,10 +129,12 @@ export async function resolveBackupDependencySelection(
   ]);
   const admittedScenarios = admittedScenarioIds(
     await getAllScenarioStoredProjects(db),
-    selectedScenarioIds,
+    options.scope === 'all' ? null : selectedScenarioIds,
     options.includeDrafts
   );
-  const selectedMediaIds = new Set(options.selected?.mediaAssetIds ?? []);
+  const selectedMediaIds = new Set(
+    options.scope === 'all' ? published : (options.selected?.mediaAssetIds ?? [])
+  );
   for (const mediaId of videoDependencies.mediaIds) selectedMediaIds.add(mediaId);
   for (const asset of scenarioAssets.values()) {
     if (!admittedScenarios.has(asset.projectId)) continue;
@@ -165,6 +168,10 @@ export async function resolveBackupDependencySelection(
     const workspace = parseVideoWorkspace(raw);
     return workspace ? [workspace] : [];
   });
+  if (options.scope === 'all') {
+    for (const workspace of reviews)
+      if (workspace.sourceMediaId) reviewOwners.add(workspace.aggregateId);
+  }
   const projectAssets = (await db.getAll(PROJECT_ASSETS_STORE)).flatMap((raw) => {
     const entry = parseProjectAssetEntry(raw);
     return entry ? [entry] : [];
@@ -174,12 +181,9 @@ export async function resolveBackupDependencySelection(
     expanded = false;
     for (const asset of projectAssets) {
       const id = `project-asset:${asset.id}`;
-      if (
-        !asset.originMediaId ||
-        (!reviewOwners.has(id) && !selectedMediaIds.has(id)) ||
-        selectedMediaIds.has(asset.originMediaId)
-      )
-        continue;
+      if (!asset.originMediaId || (!reviewOwners.has(id) && !selectedMediaIds.has(id))) continue;
+      if (options.scope === 'all') videoDependencies.mediaIds.add(asset.originMediaId);
+      if (selectedMediaIds.has(asset.originMediaId)) continue;
       selectedMediaIds.add(asset.originMediaId);
       videoDependencies.mediaIds.add(asset.originMediaId);
       expanded = true;
@@ -192,7 +196,9 @@ export async function resolveBackupDependencySelection(
           reviewOwners.add(reference);
           expanded = true;
         }
-        if (!published.has(reference) || selectedMediaIds.has(reference)) continue;
+        if (!published.has(reference)) continue;
+        if (options.scope === 'all') videoDependencies.mediaIds.add(reference);
+        if (selectedMediaIds.has(reference)) continue;
         selectedMediaIds.add(reference);
         videoDependencies.mediaIds.add(reference);
         expanded = true;

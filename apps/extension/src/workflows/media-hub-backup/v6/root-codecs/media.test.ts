@@ -4,6 +4,7 @@ import { parsePortableMediaMetadata } from './media';
 import { nestedMediaReviewFixture } from '../root-publication/media.review-assets.test-support';
 import { encodePortableReviewAssetRefs } from '../../../../composition/persistence/review-workspaces/asset-refs';
 import { createQuickEditWebcam } from '../../../../features/video/review/advanced/webcam';
+import { createLibraryLifecycle } from '../../../../composition/persistence/library-lifecycle/contracts';
 
 function metadata() {
   return {
@@ -171,6 +172,48 @@ it('rejects invalid byte ownership, local identity, history and review source', 
     'association'
   );
 });
+
+it('admits the original claim only through the archive format boundary', () => {
+  const input = { ...metadata(), savedIndependently: false };
+  expect(() => parsePortableMediaMetadata(input)).toThrow('explicit format admission');
+  expect(
+    parsePortableMediaMetadata(input, { allowLibraryRelationships: true }).savedIndependently
+  ).toBe(false);
+  expect(() =>
+    parsePortableMediaMetadata(
+      { ...input, originalSaveId: 'local-witness' },
+      { allowLibraryRelationships: true }
+    )
+  ).toThrow('Portable media root metadata is invalid');
+});
+
+it.each(['stored-asset', 'screenshot'] as const)(
+  'refuses a linked Quick Edit source from an unsupported native family (%s)',
+  (kind) => {
+    const { projectExport: _projectExport, ...input } = metadata();
+    const projectId = 'export:quick-project:linked';
+    const lifecycle = createLibraryLifecycle('library', 1);
+    expect(() =>
+      parsePortableMediaMetadata(
+        {
+          ...input,
+          entry: { ...input.entry, id: projectId, kind: 'video', lifecycle, source: { kind } },
+          linkedSourceMediaId: 'unsupported-source',
+          videoReview: {
+            ...input.videoReview,
+            workspace: {
+              ...input.videoReview.workspace,
+              aggregateId: projectId,
+              formatVersion: 3,
+              project: { name: 'Linked project', lifecycle },
+            },
+          },
+        },
+        { allowLibraryRelationships: true }
+      )
+    ).toThrow('Portable Library project link is invalid');
+  }
+);
 
 it('accepts historical WebM project exports without an explicit MIME type', () => {
   const input = metadata();

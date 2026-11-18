@@ -48,6 +48,7 @@ import {
   type AssetRef,
 } from '../../../../composition/persistence/assets';
 import { parseImageWorkspaceEntry } from '../../../../composition/persistence/image-workspaces/parser';
+import type { StoredImageWorkspaceEntry } from '../../../../composition/persistence/image-workspaces/contracts';
 import type {
   MediaLibraryEntry,
   MediaLibraryItem,
@@ -178,7 +179,8 @@ interface MediaObjectCollector {
 function createMediaObjectCollector(
   rootIndex: number,
   paths: ArchivePathAllocator,
-  deferredAssets?: DeferredInventoryAssets
+  deferredAssets: DeferredInventoryAssets | undefined,
+  dependencyOnly: boolean
 ): MediaObjectCollector {
   const collector = createObjectCollector(
     `media-${String(rootIndex + 1).padStart(6, '0')}`,
@@ -191,11 +193,12 @@ function createMediaObjectCollector(
         blob,
         filename || `object-${collector.objects.length + 1}`,
         mimeType,
-        directory
+        dependencyOnly ? undefined : directory
       );
     },
     addStream: collector.addStreamObject,
-    addAsset: collector.addAsset,
+    addAsset: (db, assetId, filename, mimeType, directory) =>
+      collector.addAsset(db, assetId, filename, mimeType, dependencyOnly ? undefined : directory),
     objects: collector.objects,
     references: collector.references,
     sizeOf(objectId) {
@@ -523,9 +526,18 @@ async function buildWorkspace(args: {
   entry: MediaLibraryEntry;
   isImageAggregate: boolean;
   options: MediaHubBackupExportOptions;
+  linkedImage?: StoredImageWorkspaceEntry;
 }): Promise<PortableMediaMetadata['workspace']> {
   if (!args.isImageAggregate) return undefined;
   const stored = parseImageWorkspaceEntry(await args.db.get(IMAGE_WORKSPACES_STORE, args.entry.id));
+  if (
+    args.linkedImage &&
+    (!stored ||
+      stored.sourceMediaId !== args.linkedImage.sourceMediaId ||
+      stored.revision !== args.linkedImage.revision ||
+      stored.lifecycle?.updatedAt !== args.linkedImage.lifecycle?.updatedAt)
+  )
+    throw new Error('Image project changed during backup preparation.');
   if (!stored) return undefined;
   const privateWorkspace = projectImageWorkspacePrivacy(stored, args.options);
   const objectsByAssetId = new Map<string, string>();
@@ -540,6 +552,8 @@ async function buildWorkspace(args: {
     document,
     history,
     publicationId: _publicationId,
+    sourceMediaId: _sourceMediaId,
+    lifecycle: _lifecycle,
     ...workspaceMetadata
   } = privateWorkspace;
   let portableHistory: PortableImageHistory | undefined;
@@ -640,6 +654,8 @@ function buildRootSummary(args: {
 async function buildMediaRoot(args: {
   expectedReview?: VideoWorkspaceSnapshot | undefined;
   sourceMediaId?: string;
+  linkedImage?: StoredImageWorkspaceEntry;
+  includeLibraryRelationships?: boolean;
   db: MediaInventoryDatabase;
   cursorStore?: CursorTrajectoryArchiveStore;
   item: MediaLibraryItem;
@@ -650,15 +666,27 @@ async function buildMediaRoot(args: {
   rootIndex: number;
 }): Promise<MediaHubBackupRootInventoryItem> {
   await args.prepareRoot?.({
-    rootKind: args.sourceMediaId ? 'video-review' : 'media',
-    rootId: args.item.id,
+    rootKind: args.sourceMediaId && !args.linkedImage ? 'video-review' : 'media',
+    rootId: args.linkedImage?.sourceMediaId ?? args.item.id,
   });
   const sourceEntry = parseMediaLibraryEntry(
     await args.db.get(MEDIA_LIBRARY_STORE, args.sourceMediaId ?? args.item.id)
   );
   if (!sourceEntry) throw new Error(`Media backup row is invalid: ${args.item.id}.`);
-  const entry = { ...sourceEntry, id: args.item.id };
-  const collector = createMediaObjectCollector(args.rootIndex, args.paths, args.deferredAssets);
+  const linkedSourceMediaId =
+    args.linkedImage?.sourceMediaId ??
+    (args.includeLibraryRelationships ? args.sourceMediaId : undefined);
+  const entry = {
+    ...sourceEntry,
+    id: args.item.id,
+    ...(linkedSourceMediaId && args.item.lifecycle ? { lifecycle: args.item.lifecycle } : {}),
+  };
+  const collector = createMediaObjectCollector(
+    args.rootIndex,
+    args.paths,
+    args.deferredAssets,
+    linkedSourceMediaId !== undefined
+  );
   const source = await buildMediaSource({
     collector,
     db: args.db,
@@ -673,13 +701,16 @@ async function buildMediaRoot(args: {
       entry.source.kind === 'stored-asset' ||
       entry.source.kind === 'project-asset') &&
     (entry.kind === 'image' || entry.kind === 'screenshot');
-  const thumbnail = await buildThumbnail({ collector, db: args.db, entry, isImageAggregate });
+  const thumbnail = linkedSourceMediaId
+    ? undefined
+    : await buildThumbnail({ collector, db: args.db, entry, isImageAggregate });
   const workspace = await buildWorkspace({
     collector,
     db: args.db,
     entry,
     isImageAggregate,
     options: args.options,
+    ...(args.linkedImage ? { linkedImage: args.linkedImage } : {}),
   });
   const presentation = isImageAggregate
     ? await buildPortableAggregatePresentation({
@@ -707,6 +738,11 @@ async function buildMediaRoot(args: {
       source: entry.source.kind === 'stored-asset' ? { kind: 'stored-asset' } : entry.source,
     },
     originalObjectId: source.originalObjectId,
+    ...(linkedSourceMediaId
+      ? { linkedSourceMediaId }
+      : args.includeLibraryRelationships && sourceEntry.savedIndependently !== undefined
+        ? { savedIndependently: sourceEntry.savedIndependently }
+        : {}),
     ...(presentation ? { presentation } : {}),
     ...(source.recording ? { recording: source.recording } : {}),
     ...(source.projectAsset ? { projectAsset: source.projectAsset } : {}),
@@ -717,7 +753,7 @@ async function buildMediaRoot(args: {
     ...(source.webSnapshot ? { webSnapshot: source.webSnapshot } : {}),
     ...(workspace ? { workspace } : {}),
   };
-  if (args.sourceMediaId) {
+  if (args.sourceMediaId && !linkedSourceMediaId) {
     const localId = entry.id.slice(entry.id.indexOf(':') + 1);
     if (metadata.entry.source.kind === 'recording' && metadata.recording) {
       if (metadata.videoReview)
@@ -792,6 +828,9 @@ async function readArchivedReview(
 export async function buildMediaRootInventory(args: {
   expectedReview?: VideoWorkspaceSnapshot | undefined;
   reviewWorkspaceHeads?: readonly unknown[];
+  imageProjects?: readonly StoredImageWorkspaceEntry[];
+  includeLibraryRelationships?: boolean;
+  requiredMediaIds?: ReadonlySet<string>;
   db: MediaInventoryDatabase;
   cursorStore?: CursorTrajectoryArchiveStore;
   items: MediaLibraryItem[];
@@ -805,11 +844,32 @@ export async function buildMediaRootInventory(args: {
   const items = args.items
     .filter(
       (item) =>
-        isMediaBackupItemSelected(item, args.options) && !args.coveredProjectMediaIds?.has(item.id)
+        isMediaBackupItemSelected(item, args.options) &&
+        !args.coveredProjectMediaIds?.has(item.id) &&
+        (args.options.scope !== 'all' ||
+          !args.includeLibraryRelationships ||
+          item.savedIndependently !== false ||
+          args.requiredMediaIds?.has(item.id))
     )
     .sort((a, b) => a.id.localeCompare(b.id));
   for (const [rootIndex, item] of items.entries()) {
     roots.push(await buildMediaRoot({ ...args, item, rootIndex }));
+  }
+  const byId = new Map(args.items.map((item) => [item.id, item]));
+  for (const image of args.imageProjects ?? []) {
+    const sourceMediaId = image.sourceMediaId;
+    const original = sourceMediaId ? byId.get(sourceMediaId) : undefined;
+    if (!sourceMediaId || !original || !image.lifecycle)
+      throw new Error('Image project original is unavailable for backup.');
+    roots.push(
+      await buildMediaRoot({
+        ...args,
+        item: { ...original, id: image.aggregateId, lifecycle: image.lifecycle },
+        sourceMediaId,
+        linkedImage: image,
+        rootIndex: roots.length,
+      })
+    );
   }
   for (const head of args.reviewWorkspaceHeads ?? []) {
     if (
@@ -825,8 +885,13 @@ export async function buildMediaRootInventory(args: {
       continue;
     const archived = await readArchivedReview(args.db, head['aggregateId']);
     const sourceMediaId = archived.workspace.sourceMediaId;
-    const source = args.items.find((item) => item.id === sourceMediaId);
-    if (!source || archived.workspace.project?.lifecycle.trashedAt !== undefined) continue;
+    const source = sourceMediaId ? byId.get(sourceMediaId) : undefined;
+    if (
+      !source ||
+      (!args.includeLibraryRelationships &&
+        archived.workspace.project?.lifecycle.trashedAt !== undefined)
+    )
+      continue;
     const item = {
       ...source,
       id: archived.workspace.aggregateId,

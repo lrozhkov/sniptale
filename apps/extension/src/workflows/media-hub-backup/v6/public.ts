@@ -6,11 +6,13 @@ import {
 } from '../../../composition/archive-transfer';
 import {
   initDB,
+  IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   SCENARIO_PROJECTS_STORE,
   VIDEO_ANIMATION_PACKAGES_STORE,
   VIDEO_GL_TRANSITION_PRESETS_STORE,
   VIDEO_PROJECTS_STORE,
+  VIDEO_WORKSPACES_STORE,
 } from '../../../composition/persistence/infrastructure/indexed-db/core';
 import type { ArchiveRestoreStrategy } from '../../../composition/persistence/assets';
 import { recoverAssetPublications } from '../../../composition/persistence/asset-publication-recovery';
@@ -257,6 +259,17 @@ export async function inspectMediaHubBackup(file: Blob): Promise<MediaHubBackupS
     const id = visual
       ? portableId.slice(visualKind === 'animation' ? 'animation:'.length : 'transition:'.length)
       : portableId;
+    const projectKind =
+      prefix === 'media:library-item:' ? inspection.linkedProjectKinds?.get(id) : undefined;
+    if (projectKind) {
+      const records = await Promise.all([
+        db.get(MEDIA_LIBRARY_STORE, id),
+        db.get(IMAGE_WORKSPACES_STORE, id),
+        db.get(VIDEO_WORKSPACES_STORE, id),
+      ]);
+      if (records.some((record) => record !== undefined)) conflicts.push(key);
+      continue;
+    }
     const store =
       prefix === 'media:library-item:'
         ? MEDIA_LIBRARY_STORE

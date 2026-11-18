@@ -155,25 +155,29 @@ export function prepareStandaloneMediaVideoReview(args: {
   metadata: Pick<PortableMediaMetadata, 'entry' | 'videoReview'>;
   original: StagedArchiveObject;
   reviewAssets: readonly PreparedMediaReviewAsset[];
+  linkedSource?: { mediaId: string; assetId: string; recordingId?: string };
 }): ReturnType<typeof prepareVideoReviewRestore> | null {
   if (!args.metadata.videoReview) return null;
   if (args.metadata.videoReview.workspace.source.size !== args.original.ref.size) {
     throw new Error('Restored video review bytes are inconsistent.');
   }
-  return prepareVideoReviewRestore({
+  const targetRecordingId =
+    args.linkedSource?.recordingId ??
+    (args.mediaId.startsWith('recording:') ? args.mediaId.slice('recording:'.length) : undefined);
+  const review = prepareVideoReviewRestore({
     review: args.metadata.videoReview,
     sourceAggregateId: args.metadata.entry.id,
     targetAggregateId: args.mediaId,
-    sourceAssetId: args.original.ref.assetId,
+    sourceAssetId: args.linkedSource?.assetId ?? args.original.ref.assetId,
     assetIdMap: new Map(args.reviewAssets.map((asset) => [asset.sourceId, asset.entry.id])),
-    ...(args.metadata.entry.source.kind === 'recording' && args.mediaId.startsWith('recording:')
+    ...(args.metadata.entry.source.kind === 'recording' && targetRecordingId
       ? {
-          recordingIdMap: new Map([
-            [args.metadata.entry.source.recordingId, args.mediaId.slice('recording:'.length)],
-          ]),
+          recordingIdMap: new Map([[args.metadata.entry.source.recordingId, targetRecordingId]]),
         }
       : {}),
   });
+  if (args.linkedSource) review.workspace.sourceMediaId = args.linkedSource.mediaId;
+  return review;
 }
 
 export async function hasMediaReviewAssetConflict(

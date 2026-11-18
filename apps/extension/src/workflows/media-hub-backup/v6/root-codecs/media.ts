@@ -62,11 +62,13 @@ export interface PortableAggregatePresentation {
 }
 
 export interface PortableMediaMetadata {
-  entry: Omit<MediaLibraryEntry, 'blob' | 'source'> & {
+  entry: Omit<MediaLibraryEntry, 'blob' | 'source' | 'savedIndependently' | 'originalSaveId'> & {
     source:
       | Exclude<MediaLibraryEntry['source'], { kind: 'stored-asset' }>
       | { kind: 'stored-asset' };
   };
+  savedIndependently?: boolean;
+  linkedSourceMediaId?: string;
   originalObjectId: string;
   projectAsset?: Omit<StoredProjectAssetEntry, 'assetId'>;
   projectExport?: Omit<StoredProjectExportEntry, 'assetId'>;
@@ -89,6 +91,14 @@ export interface PortableMediaMetadata {
     history?: PortableImageHistory;
   };
   presentation?: PortableAggregatePresentation;
+}
+
+/** Independent Quick Edit projects use the original's native source family. */
+export function linkedQuickEditPrefix(sourceKind: unknown): string | null {
+  if (sourceKind === 'project-export') return 'export:quick-project:';
+  if (sourceKind === 'recording' || sourceKind === 'project-asset')
+    return `${sourceKind}:quick-project:`;
+  return null;
 }
 
 /** Removes the local byte identity from a project-asset media original. */
@@ -144,7 +154,10 @@ export function encodePortablePresentation(args: {
   };
 }
 
-export function parsePortableMediaMetadata(value: unknown): PortableMediaMetadata {
+export function parsePortableMediaMetadata(
+  value: unknown,
+  admission: { allowLibraryRelationships?: boolean } = {}
+): PortableMediaMetadata {
   if (
     typeof value !== 'object' ||
     value === null ||
@@ -158,10 +171,17 @@ export function parsePortableMediaMetadata(value: unknown): PortableMediaMetadat
     'blob' in value.entry ||
     'savedIndependently' in value.entry ||
     'originalSaveId' in value.entry ||
+    'originalSaveId' in value ||
+    ('savedIndependently' in value && typeof value.savedIndependently !== 'boolean') ||
     !Array.isArray((value as { entry: { tags?: unknown } }).entry.tags)
   ) {
     throw new Error('Portable media root metadata is invalid.');
   }
+  if (
+    !admission.allowLibraryRelationships &&
+    ('savedIndependently' in value || 'linkedSourceMediaId' in value)
+  )
+    throw new Error('Portable Library relationships require explicit format admission.');
   const metadata = { ...value } as Partial<PortableMediaMetadata>;
   if (
     [
@@ -228,6 +248,36 @@ export function parsePortableMediaMetadata(value: unknown): PortableMediaMetadat
       const history = parsePortableImageHistory(metadata.workspace.history);
       if (!history) throw new Error('Portable image history is invalid.');
       metadata.workspace.history = history;
+    }
+  }
+  if (Object.hasOwn(metadata, 'linkedSourceMediaId')) {
+    const sourceId = metadata.linkedSourceMediaId;
+    const entry = metadata.entry;
+    const kind = entry?.source?.kind;
+    const reviewPrefix = linkedQuickEditPrefix(kind);
+    if (
+      typeof sourceId !== 'string' ||
+      sourceId.length === 0 ||
+      sourceId.length > 256 ||
+      !entry ||
+      sourceId === entry.id ||
+      metadata.savedIndependently !== undefined ||
+      metadata.thumbnail !== undefined ||
+      metadata.webSnapshot !== undefined ||
+      entry.lifecycle?.storageClass !== 'library' ||
+      (metadata.workspace
+        ? metadata.workspace.aggregateId !== entry.id ||
+          metadata.videoReview !== undefined ||
+          (entry.kind !== 'image' && entry.kind !== 'screenshot') ||
+          !entry.mimeType.startsWith('image/') ||
+          (kind !== 'screenshot' && kind !== 'stored-asset' && kind !== 'project-asset')
+        : !metadata.videoReview?.workspace.project ||
+          metadata.presentation !== undefined ||
+          !reviewPrefix ||
+          !entry.id.startsWith(reviewPrefix) ||
+          entry.id.length === reviewPrefix.length)
+    ) {
+      throw new Error('Portable Library project link is invalid.');
     }
   }
   return metadata as PortableMediaMetadata;
@@ -315,7 +365,14 @@ function validateRecordingMedia(metadata: Partial<PortableMediaMetadata>): void 
   const source = entry?.source;
   if (metadata.recording === undefined && source?.kind !== 'recording') return;
   const recording = parsePortableRecording(metadata.recording);
-  if (!recording || !entry || !hasMatchingRecordingIdentity(entry, recording.entry)) {
+  if (
+    !recording ||
+    !entry ||
+    !hasMatchingRecordingIdentity(
+      { ...entry, id: metadata.linkedSourceMediaId ?? entry.id },
+      recording.entry
+    )
+  ) {
     throw new Error('Portable recording association is invalid.');
   }
   metadata.recording = recording;
@@ -393,6 +450,7 @@ function hasMatchingRecordingIdentity(
 
 function validateProjectMedia(metadata: Partial<PortableMediaMetadata>): void {
   const source = metadata.entry?.source;
+  const sourceMediaId = metadata.linkedSourceMediaId ?? metadata.entry?.id;
   if (metadata.projectAsset !== undefined || source?.kind === 'project-asset') {
     const raw: unknown = metadata.projectAsset;
     const parsed =
@@ -404,8 +462,8 @@ function validateProjectMedia(metadata: Partial<PortableMediaMetadata>): void {
       parsed.originMediaId !== undefined ||
       source?.kind !== 'project-asset' ||
       source.projectAssetId !== parsed.id ||
-      metadata.entry?.id !== `project-asset:${parsed.id}` ||
-      metadata.entry.mimeType !== parsed.mimeType
+      sourceMediaId !== `project-asset:${parsed.id}` ||
+      metadata.entry?.mimeType !== parsed.mimeType
     ) {
       throw new Error('Portable project video asset association is invalid.');
     }
@@ -423,8 +481,8 @@ function validateProjectMedia(metadata: Partial<PortableMediaMetadata>): void {
       source?.kind !== 'project-export' ||
       source.exportId !== parsed.id ||
       source.projectId !== parsed.projectId ||
-      metadata.entry?.id !== `export:${parsed.id}` ||
-      metadata.entry.mimeType !== (parsed.mimeType ?? 'video/webm')
+      sourceMediaId !== `export:${parsed.id}` ||
+      metadata.entry?.mimeType !== (parsed.mimeType ?? 'video/webm')
     ) {
       throw new Error('Portable project export association is invalid.');
     }

@@ -1,4 +1,9 @@
 import { retireJournalRecordingEventStages } from '../../../composition/persistence/recordings/recording-events/staging';
+import {
+  initDB,
+  SYNC_CAPTURE_STORE,
+} from '../../../composition/persistence/infrastructure/indexed-db/core';
+import { readEnabledCaptureProfile } from '../../../composition/persistence/sync-capture/capture';
 import type { DurableAssetLifecyclePermit } from '../../../composition/persistence/infrastructure/mutation-barrier';
 import { runWithDurableAssetLifecycleLock } from '../../../composition/persistence/infrastructure/mutation-barrier';
 import { retireJournalCursorTrajectoryStages } from '../../../composition/persistence/recordings/cursor-trajectory/staging';
@@ -44,6 +49,7 @@ import {
   assertReviewProjectLayout,
   assertCursorAttachmentLayout,
   assertImageHistoryLayout,
+  assertLinkedLibraryLayout,
 } from './layout';
 import { decodeBackupMetadata } from './metadata-transport';
 import { assertArchiveRootObjectInventory } from './root-codecs/object-inventory';
@@ -142,6 +148,7 @@ async function loadEnvelope(
   assertReviewProjectLayout(decoded.metadata, manifest.layout);
   assertCursorAttachmentLayout(decoded.metadata, manifest.layout);
   assertImageHistoryLayout(decoded.metadata, manifest.layout);
+  assertLinkedLibraryLayout(decoded.metadata, manifest.layout);
   if (isSharedBackupLayout(manifest.layout))
     await assertArchiveRootObjectInventory(decoded, reader, manifest.sharedObjects ?? []);
   return decoded;
@@ -263,6 +270,13 @@ export async function restoreMediaHubBackupV6(args: {
       operationId: args.operationId,
       permit,
     });
+    if ([...(inspection.linkedProjectKinds?.values() ?? [])].includes('image')) {
+      const db = await initDB();
+      const tx = db.transaction([SYNC_CAPTURE_STORE], 'readonly');
+      const profile = await readEnabledCaptureProfile(tx);
+      await tx.done;
+      if (profile) throw new Error('Linked Image restore requires a compatible WebDAV profile.');
+    }
     const publishers = new Map(args.publishers.map((publisher) => [publisher.profile, publisher]));
     const reader = await openArchiveReader(args.file);
     try {
@@ -282,12 +296,16 @@ export async function restoreMediaHubBackupV6(args: {
       }
       const descriptors = await orderLibraryRestoreRoots(allDescriptors, async (descriptor) => {
         const envelope = await loadEnvelope(reader, descriptor, inspection.manifest, args.signal);
-        const metadata = parsePortableMediaMetadata(envelope.metadata);
-        return (metadata.reviewAssets ?? []).flatMap((asset) =>
+        const metadata = parsePortableMediaMetadata(envelope.metadata, {
+          allowLibraryRelationships: true,
+        });
+        const dependencies = (metadata.reviewAssets ?? []).flatMap((asset) =>
           [asset.libraryMediaId, asset.entry.originMediaId].filter(
             (id): id is string => Boolean(id) && id !== descriptor.rootId
           )
         );
+        if (metadata.linkedSourceMediaId) dependencies.push(metadata.linkedSourceMediaId);
+        return dependencies;
       });
       for (const descriptor of descriptors) {
         if (args.signal?.aborted) {

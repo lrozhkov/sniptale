@@ -24,7 +24,9 @@ function validateDocumentAssets(
       envelope.descriptor.rootKind === 'media' &&
       envelope.descriptor.mediaSubtype === 'library-item'
     ) {
-      const metadata = parsePortableMediaMetadata(envelope.metadata);
+      const metadata = parsePortableMediaMetadata(envelope.metadata, {
+        allowLibraryRelationships: true,
+      });
       if (metadata.workspace) {
         decodePortableEditorDocument({ document: metadata.workspace.document, assetsByObjectId });
         if (metadata.workspace.history)

@@ -235,7 +235,7 @@ it.each([
     if (kind === 'duplicate') table.push({ ...row });
     if (kind === 'unused') table.push({ ...row, id: 'unused', path: 'Screenshots/two.png' });
     if (kind === 'legacy-table') manifest['layout'] = 'library-folders-v2';
-    if (kind === 'future') manifest['layout'] = 'library-folders-v6';
+    if (kind === 'future') manifest['layout'] = 'library-folders-v8';
     return manifest;
   });
   await expect(inspectMediaHubBackupV6(file)).rejects.toThrow();

@@ -31,6 +31,7 @@ import {
   assertReviewProjectLayout,
   assertCursorAttachmentLayout,
   assertImageHistoryLayout,
+  assertLinkedLibraryLayout,
   resolveMediaHubBackupMetadataLayout,
   type MediaHubBackupLayout,
 } from './layout';
@@ -240,6 +241,7 @@ export async function exportMediaHubBackupV6(args: {
       assertReviewProjectLayout(payload.metadata, args.plan.manifest.layout);
       assertCursorAttachmentLayout(payload.metadata, args.plan.manifest.layout);
       assertImageHistoryLayout(payload.metadata, args.plan.manifest.layout);
+      assertLinkedLibraryLayout(payload.metadata, args.plan.manifest.layout);
       const prepared = shared?.roots[index];
       const envelope =
         prepared?.metadata ??

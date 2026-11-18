@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import {
   assertCursorAttachmentLayout,
   assertImageHistoryLayout,
+  assertLinkedLibraryLayout,
   MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT,
   assertReviewProjectLayout,
   hasCursorAttachmentMetadata,
@@ -90,7 +91,7 @@ it('admits v5 through the manifest and shared envelope reader while refusing his
       sharedObjects: [],
     })
   ).toThrow('require library-folders-v5');
-  expect(() => parseManifestV6({ ...manifest, layout: 'library-folders-v7' })).toThrow(
+  expect(() => parseManifestV6({ ...manifest, layout: 'library-folders-v8' })).toThrow(
     'Unsupported'
   );
 });
@@ -124,6 +125,26 @@ it('retains previous shared capabilities and does not select Image layout from a
   expect(
     resolveMediaHubBackupMetadataLayout('library-folders-v3', {
       authored: { workspace: { history: [] } },
+    })
+  ).toBe('library-folders-v3');
+});
+
+it('selects the linked Library root layout for an explicit original claim or project link', () => {
+  for (const metadata of [{ savedIndependently: false }, { linkedSourceMediaId: 'original' }]) {
+    const layout = resolveMediaHubBackupMetadataLayout(
+      MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT,
+      metadata
+    );
+    expect(layout).toBe('library-folders-v7');
+    expect(isSharedBackupLayout(layout)).toBe(true);
+    expect(() => assertLinkedLibraryLayout(metadata, layout)).not.toThrow();
+    expect(() =>
+      assertLinkedLibraryLayout(metadata, MEDIA_HUB_BACKUP_IMAGE_HISTORY_LAYOUT)
+    ).toThrow('require library-folders-v7');
+  }
+  expect(
+    resolveMediaHubBackupMetadataLayout('library-folders-v3', {
+      workspace: { document: { savedIndependently: false } },
     })
   ).toBe('library-folders-v3');
 });

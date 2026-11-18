@@ -254,7 +254,11 @@ async function collectTypedInventory(
       );
     }
   } else if (descriptor.rootKind === 'media') {
-    await collectMediaRoles(parsePortableMediaMetadata(envelope.metadata), inventory, reader);
+    await collectMediaRoles(
+      parsePortableMediaMetadata(envelope.metadata, { allowLibraryRelationships: true }),
+      inventory,
+      reader
+    );
   } else if (descriptor.rootKind === 'scenario-project') {
     await collectScenarioRoles(
       parsePortableScenarioProjectMetadata(envelope.metadata),
