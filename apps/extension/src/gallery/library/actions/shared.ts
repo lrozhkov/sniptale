@@ -24,6 +24,7 @@ type GalleryActionContext = {
     | 'backup-export'
     | 'backup-import';
   materialType:
+    | 'image-project'
     | 'quick-edit-project'
     | 'media'
     | 'scenario-project'

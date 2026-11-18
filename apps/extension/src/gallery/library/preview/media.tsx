@@ -237,6 +237,13 @@ function PreviewMediaLoadFeedback(props: {
   );
 }
 
+function isImagePreviewItem(item: PreviewPanelProps['item']) {
+  return (
+    item.type === 'image-project' ||
+    (isGalleryMediaItem(item) && (isImageKind(item.kind) || item.kind === 'web-archive'))
+  );
+}
+
 function PreviewMediaFrames(
   props: Pick<PreviewPanelProps, 'item' | 'previewUrl' | 'trashMode'> & {
     transition: ReturnType<typeof usePreviewMediaTransition>;
@@ -246,11 +253,7 @@ function PreviewMediaFrames(
 ) {
   const { transition, imageZoom } = props;
   const frame = transition.frame;
-  const isImagePreview = Boolean(
-    frame?.previewUrl &&
-    isGalleryMediaItem(frame.item) &&
-    (isImageKind(frame.item.kind) || frame.item.kind === 'web-archive')
-  );
+  const isImagePreview = Boolean(frame?.previewUrl && isImagePreviewItem(frame.item));
   const layers = frame ? [frame] : [];
   if (transition.prepareVideo)
     layers.push({
@@ -317,9 +320,7 @@ export function PreviewMedia(
     | 'trashMode'
   > & { onVideoDuration?: VideoDurationListener | undefined }
 ) {
-  const isMediaItem = isGalleryMediaItem(props.item);
-  const isImageTarget =
-    isMediaItem && (isImageKind(props.item.kind) || props.item.kind === 'web-archive');
+  const isImageTarget = isImagePreviewItem(props.item);
   const transition = usePreviewMediaTransition({
     item: props.item,
     navigationPosition: props.navigation?.current,
@@ -329,11 +330,7 @@ export function PreviewMedia(
     onPresented: props.onPresented,
   });
   const frame = transition.frame;
-  const isImagePreview = Boolean(
-    frame?.previewUrl &&
-    isGalleryMediaItem(frame.item) &&
-    (isImageKind(frame.item.kind) || frame.item.kind === 'web-archive')
-  );
+  const isImagePreview = Boolean(frame?.previewUrl && isImagePreviewItem(frame.item));
   const imageZoom = usePreviewImageZoom(
     isImagePreview,
     frame?.previewUrl ?? null,

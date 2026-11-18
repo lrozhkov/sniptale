@@ -2,7 +2,7 @@ import {
   commitImagePresentation,
   readImageAggregateOriginalDocument,
 } from '../../composition/persistence/image-aggregates';
-import { getMediaAssetBlob } from '../../composition/persistence/media-library/index.library';
+import { readImageOriginalSource } from '../../composition/persistence/image-workspaces/read';
 import type { EditorDocument } from '../../features/editor/document/types';
 import { createImageThumbnailBlob } from '../../platform/media-utils/image-thumbnail';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -29,7 +29,7 @@ async function refreshOriginalPresentation(
   generation: string | null
 ): Promise<void> {
   try {
-    const previewBlob = await getMediaAssetBlob(aggregateId);
+    const { blob: previewBlob } = await readImageOriginalSource(aggregateId);
     if (!previewBlob) return;
     const thumbnailBlob = await createImageThumbnailBlob(previewBlob);
     await commitImagePresentation({

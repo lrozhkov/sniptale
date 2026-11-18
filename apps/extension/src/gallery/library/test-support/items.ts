@@ -2,6 +2,7 @@ import type { ScenarioProjectSummary } from '../../../features/scenario/contract
 import type { ScenarioExportEntry } from '@sniptale/runtime-contracts/scenario/types/session';
 import type {
   GalleryItem,
+  GalleryImageProjectItem,
   GalleryMediaItem,
   GalleryScenarioExportItem,
   GalleryScenarioItem,
@@ -59,6 +60,43 @@ export function createMediaItem(overrides: Partial<GalleryMediaItem> = {}): Gall
     ...(overrides.recordingGroup ? { recordingGroup: overrides.recordingGroup } : {}),
     ...(overrides.recordingGroupView ? { recordingGroupView: overrides.recordingGroupView } : {}),
     type: overrides.type ?? 'media',
+  };
+}
+
+export function createImageProjectItem(): GalleryImageProjectItem {
+  const lifecycle = { storageClass: 'library' as const, savedAt: 1, updatedAt: 1 };
+  const project = {
+    aggregateId: 'image-edit',
+    sourceMediaId: 'original-image',
+    name: 'Image edit',
+    lifecycle,
+    createdAt: 1,
+    updatedAt: 1,
+    revision: 1,
+    width: 120,
+    height: 80,
+  };
+  return {
+    id: `image-project:${project.aggregateId}`,
+    entityId: project.aggregateId,
+    type: 'image-project',
+    kind: 'image',
+    project,
+    filename: project.name,
+    lifecycle,
+    createdAt: 1,
+    updatedAt: 1,
+    hasThumbnail: true,
+    size: 0,
+    sourceTitle: null,
+    sourceUrl: null,
+    sourceFavicon: null,
+    sourceAvailable: true,
+    tags: [],
+    duration: null,
+    mimeType: 'application/x-sniptale-image-project',
+    width: project.width,
+    height: project.height,
   };
 }
 

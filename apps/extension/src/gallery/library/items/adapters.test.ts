@@ -32,6 +32,53 @@ function createMediaLibraryItem(overrides: Partial<MediaLibraryItem> = {}): Medi
   };
 }
 
+it('presents two saved image projects and one original as independent cards', () => {
+  const original = createMediaLibraryItem();
+  const items = createGalleryItems({
+    mediaItems: [original],
+    imageProjects: ['one', 'two'].map((id) => ({
+      aggregateId: id,
+      sourceMediaId: original.id,
+      name: `Edit ${id}`,
+      lifecycle: createLibraryLifecycle('library', 12),
+      createdAt: 12,
+      updatedAt: 12,
+      revision: 2,
+      width: 144,
+      height: 80,
+    })),
+    presentations: [
+      {
+        aggregateId: 'one',
+        aggregateKind: 'image',
+        presentationRevision: 2,
+        thumbnailBlob: new Blob(['preview']),
+        updatedAt: 13,
+      },
+    ],
+    scenarioProjects: [],
+    scenarioExportsByProjectId: new Map(),
+    thumbnailIds: new Set(),
+    videoProjects: [],
+  });
+  expect(items).toEqual([
+    expect.objectContaining({
+      id: 'image-project:one',
+      entityId: 'one',
+      type: 'image-project',
+      hasThumbnail: true,
+    }),
+    expect.objectContaining({
+      id: 'image-project:two',
+      entityId: 'two',
+      type: 'image-project',
+      hasThumbnail: false,
+    }),
+    expect.objectContaining({ id: original.id, type: 'media', hasThumbnail: false }),
+  ]);
+  expect(items.every(isGallerySelectableItem)).toBe(true);
+});
+
 it('keeps stored scenario images on the media thumbnail path without an aggregate revision', () => {
   const [item] = createGalleryItems({
     mediaItems: [
@@ -50,6 +97,32 @@ it('keeps stored scenario images on the media thumbnail path without an aggregat
 
   expect(item?.hasThumbnail).toBe(true);
   expect(item?.presentationRevision).toBeUndefined();
+});
+
+it('keeps an edited image presentation after its original moves to durable asset storage', () => {
+  const [item] = createGalleryItems({
+    mediaItems: [
+      createMediaLibraryItem({
+        source: { kind: 'stored-asset', assetId: 'original-bytes' },
+        imageContentState: 'edited',
+        workspaceRevision: 3,
+      }),
+    ],
+    presentations: [
+      {
+        aggregateId: 'asset-1',
+        aggregateKind: 'image',
+        updatedAt: 10,
+        presentationRevision: 3,
+        thumbnailBlob: new Blob(['edited']),
+      },
+    ],
+    scenarioProjects: [],
+    scenarioExportsByProjectId: new Map(),
+    thumbnailIds: new Set(),
+    videoProjects: [],
+  });
+  expect(item).toMatchObject({ id: 'asset-1', presentationRevision: 3, hasThumbnail: true });
 });
 
 it('reconstructs each saved export under its own source project after a library reload', () => {

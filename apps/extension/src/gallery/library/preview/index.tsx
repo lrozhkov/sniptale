@@ -68,6 +68,8 @@ function UnavailableProjectNotice({ item }: Pick<PreviewPanelProps, 'item'>) {
 
 function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' | 'trashMode'>) {
   const isDraft = props.item.lifecycle?.storageClass === 'temporary';
+  const projectRetainsOriginal =
+    isGalleryMediaItem(props.item) && props.item.savedIndependently === false;
   const folder = getGalleryItemFolder(props.item.kind);
   const CategoryIcon = getGalleryFolderIcon(folder);
 
@@ -76,11 +78,15 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' 
       <div className="min-w-0">
         <h2 className="flex min-h-9 items-center gap-2 pr-20 text-[14px] leading-5 font-medium">
           <CategoryIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
-          {FOLDER_LABELS[folder]}
+          {props.item.type === 'image-project'
+            ? translate('gallery.preview.imageProject')
+            : FOLDER_LABELS[folder]}
         </h2>
         <div className="mt-1 flex items-center gap-2 text-sm text-[var(--sniptale-color-text-muted)]">
           <span>{formatDate(props.item.createdAt)}</span>
-          {!props.trashMode && props.item.lifecycle?.storageClass === 'library' ? (
+          {!props.trashMode &&
+          !projectRetainsOriginal &&
+          props.item.lifecycle?.storageClass === 'library' ? (
             <span
               title={translate('gallery.app.permanentStorage')}
               aria-label={translate('gallery.app.permanentStorage')}
@@ -88,6 +94,7 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' 
               <BadgeCheck size={14} aria-hidden="true" />
             </span>
           ) : null}
+          {projectRetainsOriginal ? <PreviewPromotionAction {...props} /> : null}
         </div>
         {isDraft && !props.trashMode ? (
           <div

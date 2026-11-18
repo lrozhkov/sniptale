@@ -3,7 +3,7 @@ import {
   ensureScenarioHtmlArtifactAvailable,
 } from '../../../workflows/sync-transfer/editing-admission';
 import { renameQuickEditProject } from '../../../workflows/media-hub/trash';
-import { canOpenGalleryProject } from '../items/types';
+import { canOpenGalleryProject, usesGalleryImagePresentation } from '../items/types';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { getMediaAssetBlob } from '../../../composition/persistence/media-library/index.library.ts';
 import type { MediaLibraryEntry } from '../../../composition/persistence/media-library/contracts';
@@ -68,6 +68,11 @@ export function getPreviewMetadataValues(
 
 export function openInEditor(item: GalleryItem) {
   if (isGalleryRemoteItem(item)) return;
+  if (item.type === 'image-project') {
+    if (canOpenGalleryProject(item))
+      void browserTabs.create({ url: buildEditorUrl({ assetId: item.entityId }) });
+    return;
+  }
   if (item.type === 'quick-edit-project') {
     if (canOpenGalleryProject(item))
       void openGalleryPage({ mediaId: item.entityId, quickEdit: true });
@@ -137,10 +142,9 @@ async function withPreviewItemBlob(
       return;
     }
     const assetId = previewItem.entityId ?? previewItem.id;
-    const blob =
-      previewItem.source.kind === 'screenshot'
-        ? await getAggregatePreviewBlob({ id: assetId, kind: 'image' })
-        : await getMediaAssetBlob(assetId);
+    const blob = usesGalleryImagePresentation(previewItem)
+      ? await getAggregatePreviewBlob({ id: assetId, kind: 'image' })
+      : await getMediaAssetBlob(assetId);
     if (!blob) {
       throw createMissingBlobError(previewItem.filename);
     }
@@ -168,12 +172,7 @@ export function downloadPreviewItem(
 
 function getPreviewImageAggregate(controller: GalleryPreviewController) {
   const item = controller.state.preview.session.item;
-  return item &&
-    isGalleryMediaItem(item) &&
-    isImageKind(item.kind) &&
-    item.source.kind === 'screenshot'
-    ? item
-    : null;
+  return item && isGalleryMediaItem(item) && usesGalleryImagePresentation(item) ? item : null;
 }
 
 function getEditedPreviewImageAggregate(controller: GalleryPreviewController) {

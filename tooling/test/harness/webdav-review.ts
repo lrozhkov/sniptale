@@ -195,6 +195,14 @@ export function createWebdavReviewHarness(connected: () => SyncRemoteStore) {
     );
     const source = await sourceFile(mediaId);
     let current = (await loadVideoReviewSource(mediaId, new AbortController().signal)).snapshot;
+    const archiveId = `${sourceKind}:quick-project:${crypto.randomUUID()}`;
+    current = await createVideoWorkspaceProject({
+      aggregateId: mediaId,
+      expectedRevision: current.workspace.revision,
+      expectedSourceAssetId: source.ref.assetId,
+      expectedGeneration: current.workspace.generation,
+      newProjectId: archiveId,
+    });
     const before = reviewAdvancedContentBaseline(current.workspace.advanced);
     const after = {
       ...structuredClone(before),
@@ -205,13 +213,13 @@ export function createWebdavReviewHarness(connected: () => SyncRemoteStore) {
       }),
     };
     current = await commitVideoWorkspace({
-      aggregateId: mediaId,
+      aggregateId: archiveId,
       expectedRevision: current.workspace.revision,
       expectedSourceAssetId: source.ref.assetId,
       operation: { id: crypto.randomUUID(), at: 1, target: 'advancedContent', before, after },
     });
     current = await commitVideoWorkspace({
-      aggregateId: mediaId,
+      aggregateId: archiveId,
       expectedRevision: current.workspace.revision,
       expectedSourceAssetId: source.ref.assetId,
       operation: {
@@ -227,7 +235,7 @@ export function createWebdavReviewHarness(connected: () => SyncRemoteStore) {
       },
     });
     await saveVideoWorkspaceDraft({
-      aggregateId: mediaId,
+      aggregateId: archiveId,
       expectedRevision: current.workspace.revision,
       expectedSourceAssetId: source.ref.assetId,
       expectedDraftRevision: null,
@@ -237,13 +245,6 @@ export function createWebdavReviewHarness(connected: () => SyncRemoteStore) {
         text: 'WebDAV retained recovery',
         anchor: { kind: 'point', time: 2 },
       },
-    });
-    const archiveId = `${sourceKind}:quick-project:${crypto.randomUUID()}`;
-    await createVideoWorkspaceProject({
-      aggregateId: mediaId,
-      expectedRevision: current.workspace.revision,
-      expectedSourceAssetId: source.ref.assetId,
-      archiveId,
     });
     current = (await readVideoWorkspace(mediaId))!;
     check(current, 'Default review is missing after New.');

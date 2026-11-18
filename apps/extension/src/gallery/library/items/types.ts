@@ -1,5 +1,6 @@
 import type { SyncRemoteCatalogCard } from '../../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import type { VideoWorkspaceSummary } from '../../../composition/persistence/review-workspaces/summaries';
+import type { ImageWorkspaceProjectSummary } from '../../../composition/persistence/image-workspaces/read';
 import type { RecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import type {
   ImageContentState,
@@ -38,6 +39,7 @@ interface GalleryItemBase {
 
 export interface GalleryMediaItem extends GalleryItemBase {
   recordingMetadata?: RecordingMetadata;
+  savedIndependently?: MediaLibraryItem['savedIndependently'];
   duration: number | null;
   entityId?: string;
   height: number | null;
@@ -103,6 +105,18 @@ export interface GalleryQuickEditProjectItem extends GalleryItemBase {
   width: number;
 }
 
+export interface GalleryImageProjectItem extends GalleryItemBase {
+  duration: null;
+  entityId: string;
+  height: number;
+  kind: 'image';
+  mimeType: 'application/x-sniptale-image-project';
+  project: ImageWorkspaceProjectSummary;
+  type: 'image-project';
+  sourceAvailable: boolean;
+  width: number;
+}
+
 export function isGalleryQuickEditProjectItem(
   item: GalleryItem
 ): item is GalleryQuickEditProjectItem {
@@ -129,11 +143,20 @@ export type GalleryItem =
   | GalleryMediaItem
   | GalleryScenarioItem
   | GalleryScenarioExportItem
+  | GalleryImageProjectItem
   | GalleryVideoProjectItem
   | GalleryQuickEditProjectItem;
 
 export function isGalleryMediaItem(item: GalleryItem): item is GalleryMediaItem {
   return item.type === 'media';
+}
+
+export function usesGalleryImagePresentation(item: GalleryMediaItem): boolean {
+  return (
+    (item.kind === 'image' || item.kind === 'screenshot') &&
+    (item.source.kind === 'screenshot' ||
+      (item.source.kind === 'stored-asset' && typeof item.presentationRevision === 'number'))
+  );
 }
 
 export function isGalleryScenarioItem(item: GalleryItem): item is GalleryScenarioItem {
@@ -157,6 +180,7 @@ export function isGallerySelectableItem(item: GalleryItem): boolean {
     item.type === 'media' ||
     item.type === 'scenario' ||
     item.type === 'scenario-export' ||
+    item.type === 'image-project' ||
     item.type === 'video-project' ||
     item.type === 'quick-edit-project'
   );
@@ -181,6 +205,7 @@ export function canOpenGalleryProject(item: GalleryItem): boolean {
   if (isGalleryRemoteItem(item))
     return !item.remote.conflict && !item.remote.unavailable && !item.remote.deleted;
   if (item.lifecycle?.trashedAt !== undefined) return false;
+  if (item.type === 'image-project') return item.sourceAvailable;
   if (item.type === 'scenario') return item.project.availability === 'available';
   return (
     (item.type === 'video-project' || item.type === 'quick-edit-project') &&

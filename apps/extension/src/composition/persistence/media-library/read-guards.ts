@@ -177,6 +177,8 @@ export function parseMediaLibraryEntry(value: unknown): MediaLibraryEntry | null
     updatedAt: value['updatedAt'],
   });
   if (lifecycle === null) return null;
+  const savedIndependently = value['savedIndependently'];
+  if (savedIndependently !== undefined && typeof savedIndependently !== 'boolean') return null;
   const recordingGroup =
     value['recordingGroup'] === undefined
       ? undefined
@@ -200,6 +202,7 @@ export function parseMediaLibraryEntry(value: unknown): MediaLibraryEntry | null
     sourceUrl: sanitizeProvenanceUrl(value['sourceUrl']),
     tags: value['tags'],
     ...(lifecycle === undefined ? {} : { lifecycle }),
+    ...(savedIndependently === undefined ? {} : { savedIndependently }),
     ...(recordingGroup === undefined ? {} : { recordingGroup }),
     updatedAt: value['updatedAt'],
     width: value['width'],
@@ -233,4 +236,13 @@ export function parseMediaThumbnailEntry(value: unknown): MediaThumbnailEntry | 
     updatedAt: value['updatedAt'],
     width: value['width'],
   };
+}
+
+export function isCollectableProjectOriginal(entry: MediaLibraryEntry | null): boolean {
+  return (
+    entry?.savedIndependently === false &&
+    entry.lifecycle?.storageClass === 'library' &&
+    entry.lifecycle.trashedAt === undefined &&
+    entry.imageContentState !== 'edited'
+  );
 }

@@ -18,6 +18,7 @@ import { parseManifestV6 } from '../codec';
 import { createGuideProject } from '../../../../features/scenario/project/factories';
 import { encodePortableScenarioProjectEntry } from './projects';
 import { EDITOR_HISTORY_LIMITS } from '../../../../features/editor-history/policy';
+import { parsePortableMediaMetadata } from './media';
 
 const reader: ArchiveReader = { close: vi.fn(), entries: () => [], entry: () => null };
 const object = {
@@ -51,6 +52,23 @@ const media = (mimeType = 'image/png') =>
     entry: { id: 'root', tags: [], source: { kind: 'screenshot' }, mimeType, size: 3 },
     originalObjectId: 'body',
   });
+
+it('rejects native Original claims and linked workspace fields in legacy media archives', () => {
+  const entry = { id: 'root', tags: [], source: { kind: 'screenshot' } };
+  const metadata = { entry, originalObjectId: 'body' };
+  expect(() =>
+    parsePortableMediaMetadata({
+      ...metadata,
+      entry: { ...entry, savedIndependently: false },
+    })
+  ).toThrow('Portable media root metadata is invalid');
+  expect(() =>
+    parsePortableMediaMetadata({
+      ...metadata,
+      workspace: { sourceMediaId: 'unrelated-original' },
+    })
+  ).toThrow('Portable image workspace is invalid');
+});
 const scenario = (mimeType = 'image/png') =>
   envelope('scenario-project', {
     entry: { id: 'root', project: {} },

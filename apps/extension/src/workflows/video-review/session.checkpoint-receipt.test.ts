@@ -335,19 +335,21 @@ it('opens safely without a receipt when a legacy opening adapter omits transient
 
 function projectCreationAck(initial: VideoWorkspaceSnapshot, command: string) {
   const sourceId = initial.workspace.sourceMediaId ?? initial.workspace.aggregateId;
-  const { sourceMediaId: _source, ...body } = initial.workspace;
+  const body = initial.workspace;
+  const projectId = `${sourceId.split(':', 1)[0]}:quick-project:${command}`;
   return {
     workspace: {
       ...body,
-      aggregateId: sourceId,
-      revision: body.revision + 1,
+      aggregateId: projectId,
+      sourceMediaId: sourceId,
+      revision: 1,
       createdAt: body.createdAt + 1,
     },
     draft: null,
     checkpointReceipt: { ...receipt(2), rootId: initial.workspace.aggregateId },
-    archiveCheckpointReceipt: {
+    newProjectCheckpointReceipt: {
       ...receipt(5),
-      rootId: `${sourceId.split(':', 1)[0]}:quick-project:${command}`,
+      rootId: projectId,
     },
     ...(initial.workspace.aggregateId !== sourceId
       ? {
@@ -361,24 +363,27 @@ it('forwards only validated creation roles and keeps all metadata out of canonic
   const f = fixture();
   const command = token(77);
   const ack = projectCreationAck(f.initial, command);
-  const create = vi.fn(async () => ({ ...ack, retainedEditorCheckpointReceipt: receipt(2) }));
+  const create = vi.fn(async () => ({
+    ...ack,
+    retainedEditorCheckpointReceipt: { ...receipt(2), rootId: 'recording:other' },
+  }));
   const session = createVideoReviewSession(f.initial, {
     ...f.deps,
     createVideoWorkspaceProject: create,
   });
   const created = await session.createProject(command);
-  expect(created.archiveCheckpointReceipt).toEqual(ack.archiveCheckpointReceipt);
+  expect(created.newProjectCheckpointReceipt).toEqual(ack.newProjectCheckpointReceipt);
   expect(created.retainedEditorCheckpointReceipt).toBeUndefined();
   expect(created).not.toHaveProperty('checkpointReceipt');
   expect(session.getCheckpointExitReceipt()).toBeNull();
   expect(JSON.stringify(session.getSnapshot())).not.toMatch(
-    /checkpointReceipt|archiveCheckpointReceipt|retainedEditorCheckpointReceipt/u
+    /checkpointReceipt|newProjectCheckpointReceipt|retainedEditorCheckpointReceipt/u
   );
   await session.dispose();
   await f.session.dispose();
 });
 
-it('preserves the archive B and retained A roles when the newly selected default is C', async () => {
+it('preserves receipt roles for both projects when the editor used an independent ID', async () => {
   const f = fixture();
   const command = token(78);
   const initial = {
@@ -396,10 +401,10 @@ it('preserves the archive B and retained A roles when the newly selected default
     createVideoWorkspaceProject: vi.fn(async () => ack),
   });
   const created = await session.createProject(command);
-  expect(created.workspace.aggregateId).toBe(id);
-  expect(created.archiveCheckpointReceipt).toEqual(ack.archiveCheckpointReceipt);
+  expect(created.workspace.aggregateId).toBe(ack.newProjectCheckpointReceipt.rootId);
+  expect(created.newProjectCheckpointReceipt).toEqual(ack.newProjectCheckpointReceipt);
   expect(created.retainedEditorCheckpointReceipt).toEqual(ack.retainedEditorCheckpointReceipt);
-  expect(created.archiveCheckpointReceipt?.rootId).not.toBe(id);
+  expect(created.newProjectCheckpointReceipt?.rootId).not.toBe(id);
   expect(created.retainedEditorCheckpointReceipt?.rootId).not.toBe(id);
   expect(session.getCheckpointExitReceipt()).toBeNull();
   expect(JSON.stringify(session.getSnapshot())).not.toContain('CheckpointReceipt');
@@ -411,21 +416,21 @@ it('does not resurrect prior creation roles from a completed command replay or a
   const f = fixture();
   const command = token(79);
   const ack = projectCreationAck(f.initial, command);
-  const { checkpointReceipt: _generic, archiveCheckpointReceipt: _archive, ...canonical } = ack;
+  const { checkpointReceipt: _generic, newProjectCheckpointReceipt: _archive, ...canonical } = ack;
   const create = vi
     .fn()
     .mockResolvedValueOnce(ack)
     .mockResolvedValueOnce(canonical)
-    .mockResolvedValueOnce({ ...ack, archiveCheckpointReceipt: receipt(2) });
+    .mockResolvedValueOnce({ ...ack, newProjectCheckpointReceipt: receipt(2) });
   const session = createVideoReviewSession(f.initial, {
     ...f.deps,
     createVideoWorkspaceProject: create,
   });
   await session.createProject(command);
   const replay = await session.createProject(command);
-  expect(replay).not.toHaveProperty('archiveCheckpointReceipt');
+  expect(replay).not.toHaveProperty('newProjectCheckpointReceipt');
   expect(replay).not.toHaveProperty('retainedEditorCheckpointReceipt');
-  expect((await session.createProject(command)).archiveCheckpointReceipt).toBeUndefined();
+  expect((await session.createProject(command)).newProjectCheckpointReceipt).toBeUndefined();
   await session.dispose();
   await f.session.dispose();
 });
@@ -449,7 +454,7 @@ it('drops delayed creation role authority after this mounted session has been di
   const disposal = session.dispose();
   reply.resolve(ack);
   const created = await creating;
-  expect(created).not.toHaveProperty('archiveCheckpointReceipt');
+  expect(created).not.toHaveProperty('newProjectCheckpointReceipt');
   expect(created).not.toHaveProperty('retainedEditorCheckpointReceipt');
   await disposal;
   await f.session.dispose();

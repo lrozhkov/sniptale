@@ -104,7 +104,7 @@ function assertNoDurableReceipt() {
   for (const rows of fixture.rows.values())
     for (const value of rows.values())
       expect(JSON.stringify(value)).not.toMatch(
-        /checkpointReceipt|archiveCheckpointReceipt|retainedEditorCheckpointReceipt/u
+        /checkpointReceipt|newProjectCheckpointReceipt|retainedEditorCheckpointReceipt/u
       );
 }
 
@@ -395,15 +395,19 @@ it('returns no receipt and preserves native data when transaction completion ref
   expect(fixture.rows).toEqual(before);
 });
 
-function createProject(snapshot: VideoWorkspaceSnapshot, archiveId: string) {
-  return createVideoWorkspaceProject({ ...identity(snapshot), archiveId });
+function createProject(snapshot: VideoWorkspaceSnapshot, newProjectId: string) {
+  return createVideoWorkspaceProject({
+    ...identity(snapshot),
+    expectedGeneration: snapshot.workspace.generation,
+    newProjectId,
+  });
 }
 
 it('leaves every pending UUID and native row stable on a completed New replay with newer work', async () => {
   const opened = await openVideoWorkspace(id, source);
-  const archiveId = 'recording:quick-project:replay';
-  const created = await createProject(opened, archiveId);
-  const archive = await readVideoWorkspace(archiveId);
+  const newProjectId = 'recording:quick-project:replay';
+  const created = await createProject(opened, newProjectId);
+  const archive = await readVideoWorkspace(newProjectId);
   if (!archive) throw new Error('Missing archive.');
   await saveVideoWorkspaceDraft({
     ...identity(archive),
@@ -416,15 +420,15 @@ it('leaves every pending UUID and native row stable on a completed New replay wi
     advanced: created.workspace.advanced,
   });
   const before = structuredClone(fixture.rows);
-  const replay = await createProject(opened, archiveId);
+  const replay = await createProject(opened, newProjectId);
   expect(replay.workspace).toEqual(latest.workspace);
-  expect(replay).not.toHaveProperty('archiveCheckpointReceipt');
+  expect(replay).not.toHaveProperty('newProjectCheckpointReceipt');
   expect(replay).not.toHaveProperty('retainedEditorCheckpointReceipt');
   expect(replay).not.toHaveProperty('checkpointReceipt');
   expect(fixture.rows).toEqual(before);
 });
 
-it('issues the fresh archive role after tx.done and never assigns the reset default as an exit role', async () => {
+it('acknowledges both project checkpoints only after the transaction commits', async () => {
   const initial = await openVideoWorkspace(id, source);
   const opened = await saveVideoWorkspaceDraft({
     ...identity(initial),
@@ -432,12 +436,12 @@ it('issues the fresh archive role after tx.done and never assigns the reset defa
     annotation,
     before: null,
   });
-  const archiveId = 'recording:quick-project:fresh';
+  const newProjectId = 'recording:quick-project:fresh';
   const before = structuredClone(fixture.rows);
   const held = gate();
   commitGate = held;
   let acknowledged = false;
-  const creating = createProject(opened, archiveId).then((value) => {
+  const creating = createProject(opened, newProjectId).then((value) => {
     acknowledged = true;
     return value;
   });
@@ -446,19 +450,18 @@ it('issues the fresh archive role after tx.done and never assigns the reset defa
   expect(fixture.rows).toEqual(before);
   held.finish.resolve();
   const created = await creating;
-  expect(created.archiveCheckpointReceipt).toEqual({
+  expect(created.newProjectCheckpointReceipt).toEqual({
     rootKind: 'video-review',
-    rootId: archiveId,
-    revision: pending(archiveId).revision,
+    rootId: newProjectId,
+    revision: pending(newProjectId).revision,
   });
-  expect(created.retainedEditorCheckpointReceipt).toBeUndefined();
-  expect(created.workspace.aggregateId).toBe(id);
-  expect(created.archiveCheckpointReceipt?.rootId).not.toBe(id);
-  expect((await readVideoWorkspace(archiveId))?.draft?.annotation).toEqual(annotation);
+  expect(created.retainedEditorCheckpointReceipt?.rootId).toBe(id);
+  expect(created.workspace.aggregateId).toBe(newProjectId);
+  expect((await readVideoWorkspace(id))?.draft?.annotation).toEqual(annotation);
   assertNoDurableReceipt();
 });
 
-it('names archive B and retained editor A separately from reset default C and emits no replay selections', async () => {
+it('binds both receipts to their project IDs and emits neither on replay', async () => {
   const opened = await openVideoWorkspace(id, source);
   const archiveA = 'recording:quick-project:editor-a';
   await createProject(opened, archiveA);
@@ -472,8 +475,8 @@ it('names archive B and retained editor A separately from reset default C and em
   });
   const archiveB = 'recording:quick-project:archive-b';
   const created = await createProject(editor, archiveB);
-  expect(created.workspace.aggregateId).toBe(id);
-  expect(created.archiveCheckpointReceipt).toEqual({
+  expect(created.workspace.aggregateId).toBe(archiveB);
+  expect(created.newProjectCheckpointReceipt).toEqual({
     rootKind: 'video-review',
     rootId: archiveB,
     revision: pending(archiveB).revision,
@@ -483,8 +486,9 @@ it('names archive B and retained editor A separately from reset default C and em
     rootId: archiveA,
     revision: pending(archiveA).revision,
   });
+  const retained = (await readVideoWorkspace(archiveA))!;
   const newer = await saveVideoWorkspaceDraft({
-    ...identity(editor),
+    ...identity(retained),
     expectedDraftRevision: editor.draft!.revision,
     annotation: { ...annotation, text: 'Newer A' },
     before: null,
@@ -492,7 +496,7 @@ it('names archive B and retained editor A separately from reset default C and em
   expect(newer.checkpointReceipt?.revision).toBe(pending(archiveA).revision);
   const beforeReplay = structuredClone(fixture.rows);
   const replay = await createProject(editor, archiveB);
-  expect(replay).not.toHaveProperty('archiveCheckpointReceipt');
+  expect(replay).not.toHaveProperty('newProjectCheckpointReceipt');
   expect(replay).not.toHaveProperty('retainedEditorCheckpointReceipt');
   expect(replay).not.toHaveProperty('checkpointReceipt');
   expect(fixture.rows).toEqual(beforeReplay);
@@ -501,19 +505,19 @@ it('names archive B and retained editor A separately from reset default C and em
 
 it('rolls back both New identities and roles after commit refusal and retries the same command once', async () => {
   const opened = await openVideoWorkspace(id, source);
-  const archiveId = 'recording:quick-project:retry';
+  const newProjectId = 'recording:quick-project:retry';
   const before = structuredClone(fixture.rows);
   const held = gate();
   commitGate = held;
-  const creating = createProject(opened, archiveId);
+  const creating = createProject(opened, newProjectId);
   const rejected = expect(creating).rejects.toThrow('Commit refused');
   await held.entered.promise;
   held.finish.reject(new Error('Commit refused'));
   await rejected;
   expect(fixture.rows).toEqual(before);
-  const created = await createProject(opened, archiveId);
-  expect(created.archiveCheckpointReceipt?.revision).toBe(pending(archiveId).revision);
-  expect((await readVideoWorkspace(archiveId))?.workspace.sourceMediaId).toBe(id);
+  const created = await createProject(opened, newProjectId);
+  expect(created.newProjectCheckpointReceipt?.revision).toBe(pending(newProjectId).revision);
+  expect((await readVideoWorkspace(newProjectId))?.workspace.sourceMediaId).toBe(id);
 });
 
 it(
@@ -521,17 +525,17 @@ it(
     'New response is lost',
   async () => {
     const opened = await openVideoWorkspace(id, source);
-    const archiveId = 'recording:quick-project:lost';
+    const newProjectId = 'recording:quick-project:lost';
     const held = gate();
     io.ack = held;
-    const creating = createProject(opened, archiveId);
+    const creating = createProject(opened, newProjectId);
     const rejected = expect(creating).rejects.toThrow('Lost ACK');
     await held.entered.promise;
     const before = structuredClone(fixture.rows);
     held.finish.reject(new Error('Lost ACK'));
     await rejected;
-    const replay = await createProject(opened, archiveId);
-    expect(replay).not.toHaveProperty('archiveCheckpointReceipt');
+    const replay = await createProject(opened, newProjectId);
+    expect(replay).not.toHaveProperty('newProjectCheckpointReceipt');
     expect(replay).not.toHaveProperty('retainedEditorCheckpointReceipt');
     expect(replay).not.toHaveProperty('checkpointReceipt');
     expect(fixture.rows).toEqual(before);
@@ -541,25 +545,25 @@ it(
 it('creates local-only projects without inventing exit roles or storing ACK metadata', async () => {
   fixture.rows.get('sync_capture')!.delete('profile');
   const opened = await openVideoWorkspace(id, source);
-  const archiveId = 'recording:quick-project:local';
-  const created = await createProject(opened, archiveId);
+  const newProjectId = 'recording:quick-project:local';
+  const created = await createProject(opened, newProjectId);
   expect(created).not.toHaveProperty('checkpointReceipt');
-  expect(created).not.toHaveProperty('archiveCheckpointReceipt');
+  expect(created).not.toHaveProperty('newProjectCheckpointReceipt');
   expect(created).not.toHaveProperty('retainedEditorCheckpointReceipt');
-  expect(await readVideoWorkspace(archiveId)).not.toBeNull();
+  expect(await readVideoWorkspace(newProjectId)).not.toBeNull();
   expect(fixture.rows.get('sync_capture')!.size).toBe(0);
   assertNoDurableReceipt();
 });
 
 it('keeps a delayed creation ACK bound to its committed archive token after a newer archive save', async () => {
   const opened = await openVideoWorkspace(id, source);
-  const archiveId = 'recording:quick-project:delayed';
+  const newProjectId = 'recording:quick-project:delayed';
   const held = gate();
   io.ack = held;
-  const creating = createProject(opened, archiveId);
+  const creating = createProject(opened, newProjectId);
   await held.entered.promise;
-  const original = pending(archiveId).revision;
-  const archive = await readVideoWorkspace(archiveId);
+  const original = pending(newProjectId).revision;
+  const archive = await readVideoWorkspace(newProjectId);
   if (!archive) throw new Error('Missing committed archive.');
   const newer = await saveVideoWorkspaceDraft({
     ...identity(archive),
@@ -567,15 +571,15 @@ it('keeps a delayed creation ACK bound to its committed archive token after a ne
     annotation,
     before: null,
   });
-  expect(newer.checkpointReceipt?.revision).toBe(pending(archiveId).revision);
-  expect(pending(archiveId).revision).not.toBe(original);
+  expect(newer.checkpointReceipt?.revision).toBe(pending(newProjectId).revision);
+  expect(pending(newProjectId).revision).not.toBe(original);
   held.finish.resolve();
   const acknowledged = await creating;
-  expect(acknowledged.archiveCheckpointReceipt).toEqual({
+  expect(acknowledged.newProjectCheckpointReceipt).toEqual({
     rootKind: 'video-review',
-    rootId: archiveId,
+    rootId: newProjectId,
     revision: original,
   });
-  expect(acknowledged.archiveCheckpointReceipt).not.toEqual(newer.checkpointReceipt);
+  expect(acknowledged.newProjectCheckpointReceipt).not.toEqual(newer.checkpointReceipt);
   assertNoDurableReceipt();
 });

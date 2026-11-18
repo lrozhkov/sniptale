@@ -1,5 +1,6 @@
 import { createRemoteRootGalleryItem } from './adapters';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { createImageProjectItem } from '../test-support/items';
 import {
   createMediaItem,
   createScenarioItem,
@@ -91,6 +92,22 @@ beforeEach(() => {
   vi.clearAllMocks();
   getAggregatePresentationMock.mockResolvedValue(undefined);
   getGalleryProjectCoverMock.mockResolvedValue(undefined);
+});
+
+it('reads the image project thumbnail without reaching for the original file', async () => {
+  const item = createImageProjectItem();
+  const thumbnailBlob = new Blob(['project'], { type: 'image/png' });
+  getAggregatePresentationMock.mockResolvedValueOnce({ thumbnailBlob, updatedAt: 2 });
+
+  await expect(ensureGalleryItemThumbnail(item)).resolves.toMatchObject({
+    assetId: item.id,
+    blob: thumbnailBlob,
+  });
+  expect(getAggregatePresentationMock).toHaveBeenCalledExactlyOnceWith({
+    id: item.entityId,
+    kind: 'image',
+  });
+  expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
 });
 
 it('returns existing thumbnails without rebuilding them', async () => {

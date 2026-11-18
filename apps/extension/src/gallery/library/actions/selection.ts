@@ -20,7 +20,7 @@ import {
   permanentlyDeleteLibraryItem,
 } from '../../../workflows/media-hub/trash';
 import type { LibraryTrashTarget } from '../../../composition/persistence/library-lifecycle/trash';
-import { type GalleryBusyAction, createGalleryUserFacingActionError } from './shared';
+import type { GalleryBusyAction } from './shared';
 import {
   getGalleryDeletionContextKey,
   type GalleryDeletionOpening,
@@ -32,6 +32,7 @@ import { listMediaAssetProjectUsageBatch } from '../../../composition/persistenc
 function splitSelectableTargets(targets: GalleryItem[]) {
   return {
     media: targets.filter(isGalleryMediaItem),
+    images: targets.filter((item) => item.type === 'image-project'),
     quickEdits: targets.filter(isGalleryQuickEditProjectItem),
     scenarios: targets.filter(isGalleryScenarioItem),
     videoProjects: targets.filter(isGalleryVideoProjectItem),
@@ -41,6 +42,13 @@ function splitSelectableTargets(targets: GalleryItem[]) {
 
 function trashTarget(item: GalleryItem): LibraryTrashTarget {
   if (isGalleryRemoteItem(item)) throw new Error('Remote roots have no local trash target.');
+  if (item.type === 'image-project')
+    return {
+      kind: 'image-project',
+      id: item.entityId,
+      expectedRevision: item.project.revision,
+      expectedLifecycleUpdatedAt: item.project.lifecycle.updatedAt,
+    };
   if (item.type === 'quick-edit-project')
     return {
       kind: 'quick-edit-project',
@@ -88,12 +96,14 @@ async function preparePermanentDeletion(
   withBusy: GalleryBusyAction,
   isCurrent: () => boolean
 ): Promise<GalleryPreparedDeletion | null> {
-  const { media, scenarios, videoProjects, exports, quickEdits } = splitSelectableTargets([
+  const { media, images, scenarios, videoProjects, exports, quickEdits } = splitSelectableTargets([
     ...targets,
   ]);
   const scenarioIds = new Set(scenarios.map((item) => item.entityId));
   const independentExports = exports.filter((item) => !scenarioIds.has(item.project.id));
+  const selectedOriginalIds = new Set(media.map((item) => item.entityId ?? item.id));
   const removedProjectKeys = new Set([
+    ...images.map((item) => `image:${item.entityId}`),
     ...quickEdits.map((item) => `review:${item.entityId}`),
     ...scenarios.map((item) => `scenario:${item.entityId}`),
     ...videoProjects.map((item) => `video:${item.entityId}`),
@@ -104,41 +114,28 @@ async function preparePermanentDeletion(
       const usageById = await listMediaAssetProjectUsageBatch(
         media.map((item) => item.entityId ?? item.id)
       );
-      const expectedUsageById = new Map(
-        [...usageById].map(([id, usage]) => [
-          id,
-          usage.filter((project) => !removedProjectKeys.has(`${project.kind}:${project.id}`)),
-        ])
-      );
       if (!isCurrent()) return;
       const affectedProjects = [
         ...new Map(
-          [...expectedUsageById.values()]
+          [...usageById.values()]
             .flat()
+            .filter((project) => !removedProjectKeys.has(`${project.kind}:${project.id}`))
             .map((project) => [`${project.kind}:${project.id}`, project])
         ).values(),
       ];
-      const primaryProjects = [...expectedUsageById.values()]
-        .flat()
-        .filter((project) => project.primary);
-      if (primaryProjects.length > 0)
-        throw createGalleryUserFacingActionError(
-          [
-            translate('gallery.app.deleteBlockedPrimary'),
-            `${primaryProjects.map((project) => project.name).join(', ')}.`,
-            translate('gallery.app.deletePrimaryNextStep'),
-          ].join(' ')
-        );
-      const warning =
-        affectedProjects.length > 0
-          ? [
-              translate('gallery.app.deleteAffectsProjects'),
-              `${affectedProjects.map((project) => project.name).join(', ')}.`,
-              translate('gallery.app.deleteHistoryWarning'),
-            ].join(' ')
-          : '';
+      if (affectedProjects.length > 0) {
+        prepared = {
+          warning: [
+            translate('gallery.app.deleteBlockedReferences'),
+            `(${affectedProjects.map((project) => project.name).join(', ')}).`,
+            translate('gallery.app.deleteReferencesNextStep'),
+          ].join(' '),
+          confirm: null,
+        };
+        return;
+      }
       prepared = {
-        warning: `${translate('gallery.app.permanentDeleteConfirm')} ${warning}`.trim(),
+        warning: translate('gallery.app.permanentDeleteConfirm'),
         confirm: async () => {
           if (!isCurrent()) return false;
           let deleted = false;
@@ -149,12 +146,17 @@ async function preparePermanentDeletion(
                   ...independentExports,
                   ...scenarios,
                   ...videoProjects,
+                  ...images,
                   ...quickEdits,
                   ...media,
                 ]) {
                   await permanentlyDeleteLibraryItem(
                     {
                       target: trashTarget(item),
+                      ...(item.type === 'image-project' &&
+                      selectedOriginalIds.has(item.project.sourceMediaId)
+                        ? { releaseUnclaimedOriginal: false }
+                        : {}),
                       lifecycle: {
                         updatedAt: item.lifecycle?.updatedAt ?? item.updatedAt,
                         ...(item.lifecycle?.trashedAt !== undefined
@@ -162,7 +164,7 @@ async function preparePermanentDeletion(
                           : {}),
                       },
                     },
-                    expectedUsageById.get(item.entityId ?? item.id)
+                    isGalleryMediaItem(item) ? [] : undefined
                   );
                 }
                 deleted = true;

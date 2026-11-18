@@ -7,6 +7,8 @@ import {
 import { parseScenarioExportEntry } from '../../composition/persistence/scenario/read-guards';
 import type { SyncNativeEditingRoot } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import { listVideoWorkspaceSummaries } from '../../composition/persistence/review-workspaces/summaries';
+import { listImageWorkspaceProjectSummaries } from '../../composition/persistence/image-workspaces/read';
+import { deleteImageWorkspaceProject } from '../../composition/persistence/image-aggregates';
 import {
   deleteVideoWorkspaceProject,
   renameVideoWorkspaceProject,
@@ -29,7 +31,11 @@ import {
   listScenarioExports,
   deleteScenarioExport,
 } from '../../composition/persistence/scenario/projects';
-import { deleteMediaThumbnail } from '../../composition/persistence/media-library/index.library.ts';
+import {
+  deleteMediaLibraryAsset,
+  deleteMediaThumbnail,
+  listCollectableProjectOriginalIds,
+} from '../../composition/persistence/media-library/index.library.ts';
 import { deleteScenarioProjectRecord } from '../../composition/persistence/scenario/store/public';
 import {
   listMediaAssetProjectUsage,
@@ -54,6 +60,7 @@ async function withTrashPublicationResources(
   await runWithAssetResourceRead(async () => {
     const roots: SyncNativeEditingRoot[] = [];
     for (const target of targets) {
+      if (target.kind === 'image-project') continue;
       if (target.kind === 'scenario-export') {
         const db = await initDB();
         const entry = parseScenarioExportEntry(await db.get(SCENARIO_EXPORTS_STORE, target.id));
@@ -100,7 +107,8 @@ export async function permanentlyDeleteTrashItem(
 /** Release only the confirmed root through its existing aggregate/resource owner. */
 async function deleteLibraryTarget(
   target: LibraryTrashTarget,
-  expectedUsage?: readonly MediaAssetProjectUsage[]
+  expectedUsage?: readonly MediaAssetProjectUsage[],
+  releaseUnclaimedOriginal = true
 ): Promise<void> {
   if (target.kind === 'media') {
     await deleteMediaLibraryAssetsBatchSafely(
@@ -109,6 +117,13 @@ async function deleteLibraryTarget(
     );
   } else if (target.kind === 'quick-edit-project') {
     await deleteVideoWorkspaceProject(target.id, target.expectedRevision);
+  } else if (target.kind === 'image-project') {
+    const sourceId = await deleteImageWorkspaceProject(
+      target.id,
+      target.expectedRevision,
+      target.expectedLifecycleUpdatedAt
+    );
+    if (releaseUnclaimedOriginal) await tryCollectProjectOriginal(sourceId);
   } else if (target.kind === 'scenario-project') {
     await deleteScenarioProjectRecord(target.id);
   } else if (target.kind === 'video-project') {
@@ -119,16 +134,34 @@ async function deleteLibraryTarget(
   }
 }
 
+async function tryCollectProjectOriginal(id: string): Promise<void> {
+  try {
+    await deleteMediaLibraryAsset(id, { projectRetainedOnly: true });
+  } catch {
+    void maintenanceLog.append({ operation: 'trash', code: 'conflict', counts: { retained: 1 } });
+  }
+}
+
+/** Recover interrupted last-project deletion independently of Trash expiration policy. */
+export async function cleanupProjectOriginals(signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return;
+  for (const id of await listCollectableProjectOriginalIds(signal)) {
+    if (signal.aborted) return;
+    await tryCollectProjectOriginal(id);
+  }
+}
+
 /** Explicitly confirmed manual deletion accepts both active and retained Trash roots. */
 export async function permanentlyDeleteLibraryItem(
   entry: {
     target: LibraryTrashTarget;
     lifecycle: Pick<LibraryLifecycle, 'updatedAt' | 'trashedAt'>;
+    releaseUnclaimedOriginal?: boolean;
   },
   expectedUsage?: readonly MediaAssetProjectUsage[]
 ): Promise<void> {
   await runWithStoredItemLifecycle(entry.target, entry.lifecycle, () =>
-    deleteLibraryTarget(entry.target, expectedUsage)
+    deleteLibraryTarget(entry.target, expectedUsage, entry.releaseUnclaimedOriginal)
   );
   publishMediaHubLibraryChanged('delete', [entry.target.id]);
 }
@@ -141,11 +174,12 @@ export async function cleanupLibraryTrash(
 ): Promise<{ failedCount: number }> {
   if (signal?.aborted || !policy.trashCleanupEnabled) return { failedCount: 0 };
   const cutoff = now - (policy.trashRetentionDays ?? 30) * 86_400_000;
-  const [media, videos, scenarios, quickEdits] = await Promise.all([
+  const [media, videos, scenarios, quickEdits, images] = await Promise.all([
     listMediaLibrary(),
     listVideoProjectEntries(),
     listScenarioProjectEntries(),
     listVideoWorkspaceSummaries(),
+    listImageWorkspaceProjectSummaries(),
   ]);
   const candidates: TrashDeletionTarget[] = [];
   const append = (target: LibraryTrashTarget, trashedAt: number | undefined) => {
@@ -164,6 +198,17 @@ export async function cleanupLibraryTrash(
   quickEdits.forEach((item) =>
     append(
       { kind: 'quick-edit-project', id: item.aggregateId, expectedRevision: item.revision },
+      item.lifecycle.trashedAt
+    )
+  );
+  images.forEach((item) =>
+    append(
+      {
+        kind: 'image-project',
+        id: item.aggregateId,
+        expectedRevision: item.revision,
+        expectedLifecycleUpdatedAt: item.lifecycle.updatedAt,
+      },
       item.lifecycle.trashedAt
     )
   );

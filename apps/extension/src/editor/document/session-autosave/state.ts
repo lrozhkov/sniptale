@@ -6,7 +6,10 @@ import {
 } from '../../../composition/persistence/sync-capture/checkpoint-publication';
 import type { EditorDocument } from '../../../features/editor/document/types';
 import type { AssetRef } from '../../../composition/persistence/assets';
-import type { CommitImageWorkspaceResult } from '../../../composition/persistence/image-aggregates';
+import type {
+  CommitImageWorkspaceInput,
+  CommitImageWorkspaceResult,
+} from '../../../composition/persistence/image-aggregates';
 import type { createAutosaveCoordinator } from '@sniptale/platform/data/autosave';
 import type { EditorImageHistoryCheckpoint } from '../../../features/editor-history/image-checkpoint';
 
@@ -21,6 +24,7 @@ export interface ActiveEditorSessionContext {
   capturedAt?: number;
   durableRevision: number;
   sourceGeneration?: string | null;
+  original?: CommitImageWorkspaceInput['original'];
   requireExistingRoot?: boolean;
   sourceUrl: string | null;
   sourceTitle: string | null;

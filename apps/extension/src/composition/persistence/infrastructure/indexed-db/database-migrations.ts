@@ -1165,6 +1165,18 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
     validationStores: [IMAGE_WORKSPACES_STORE, ASSET_REFS_STORE, ASSET_OWNERS_STORE],
     diagnostic: 'Image raster history stores are unavailable.',
   }),
+  contractOnlyMigration({
+    domainVersions: [{ domainId: 'mediaLibrary', from: 43, to: 44 }],
+    fromDatabaseVersion: 69,
+    toDatabaseVersion: 70,
+    stores: [VIDEO_WORKSPACES_STORE],
+    validationStores: [
+      VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_HISTORY_STORE,
+      VIDEO_WORKSPACE_DRAFTS_STORE,
+    ],
+    diagnostic: 'Quick-edit workspace stores are unavailable.',
+  }),
 ];
 
 function projectPrototypeAnimationPreferences(value: unknown) {

@@ -166,12 +166,13 @@ function parseImageReplicaIdentity(value: Record<string, unknown>): ImageReplica
 }
 
 function parseImageReplicaSource(value: Record<string, unknown>) {
-  const media = parseMediaLibraryEntry(value['media']);
+  const entry = parseMediaLibraryEntry(value['media']);
+  if (!entry) return null;
+  const { savedIndependently: _localClaim, ...media } = entry;
   const originalRef = parseAssetRef(value['originalRef']);
   const projectAsset =
     value['projectAsset'] === undefined ? undefined : parseProjectAssetEntry(value['projectAsset']);
   if (
-    !media ||
     media.blob !== undefined ||
     !isImageCaptureSource(media) ||
     (value['projectAsset'] !== undefined && !projectAsset) ||
@@ -220,6 +221,7 @@ function parseImageReplicaDocument(value: Record<string, unknown>, media: MediaL
     [...needed].some((id) => !ids.has(id)) ||
     (workspace &&
       (workspace.aggregateId !== media.id ||
+        workspace.sourceMediaId !== undefined ||
         workspace.revision !== media.workspaceRevision ||
         !ordinal(workspace.revision)))
   )

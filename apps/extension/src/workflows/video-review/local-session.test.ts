@@ -15,6 +15,7 @@ import { createHash } from 'node:crypto';
 import { readReviewAnnotationEffectDocument } from '../../features/video/review/annotation-effects/validation';
 import type { ReviewAnnotationEffectSnapshot } from '../../features/video/review/annotation-effects/types';
 import { createHistoryRetentionWorkspace } from '../../composition/persistence/review-workspaces/history-retention.test-support';
+import { EDITOR_HISTORY_LIMITS } from '../../features/editor-history/policy';
 
 function initial(): VideoWorkspaceSnapshot {
   return {
@@ -66,9 +67,13 @@ it.each([600, 1190])(
       },
     };
     const updated = commit(opened, operation);
-    expect(updated.workspace.history.length).toBeLessThanOrEqual(50);
+    expect(updated.workspace.history).toHaveLength(
+      Math.min(cursor + 1, EDITOR_HISTORY_LIMITS.maxActions)
+    );
     expect(updated.workspace.revision).toBe(workspace.revision);
-    expect(updated.workspace.formatVersion).toBe(2);
+    expect(updated.workspace.formatVersion).toBe(
+      cursor + 1 > EDITOR_HISTORY_LIMITS.maxActions ? 2 : workspace.formatVersion
+    );
     expect(document(updated)).toEqual({
       ...before,
       annotations: [...before.annotations, operation.after!].sort((a, b) =>

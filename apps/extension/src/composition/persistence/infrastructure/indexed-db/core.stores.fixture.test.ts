@@ -989,3 +989,18 @@ it('admits independent Image raster budgets without rewriting version 68 project
   expect(target.indexes).toEqual(source.indexes);
   expect(target.domainVersions).toEqual({ ...source.domainVersions, mediaLibrary: 43 });
 });
+
+it('admits quick-edit generations without changing version 69 native rows or files', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 69
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 70
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, mediaLibrary: 44 });
+  expect(buildDatabaseMigrationPlan(70, 69)).toBeNull();
+});

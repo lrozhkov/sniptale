@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   move: vi.fn(),
   restore: vi.fn(),
   quickEdits: vi.fn(),
+  deleteImageProject: vi.fn(),
   deleteQuickEdit: vi.fn(),
   renameQuickEdit: vi.fn(),
   videos: vi.fn(),
@@ -18,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   guard: vi.fn(),
   lifecycleGuard: vi.fn(),
   deleteMedia: vi.fn(),
+  collectableOriginals: vi.fn(),
+  deleteOriginal: vi.fn(),
   deleteVideo: vi.fn(),
   deleteScenario: vi.fn(),
   publish: vi.fn(),
@@ -27,6 +30,12 @@ vi.mock('../sync-transfer/editing-admission', () => ({
 }));
 vi.mock('../../composition/persistence/review-workspaces/summaries', () => ({
   listVideoWorkspaceSummaries: mocks.quickEdits,
+}));
+vi.mock('../../composition/persistence/image-workspaces/read', () => ({
+  listImageWorkspaceProjectSummaries: vi.fn().mockResolvedValue([]),
+}));
+vi.mock('../../composition/persistence/image-aggregates', () => ({
+  deleteImageWorkspaceProject: mocks.deleteImageProject,
 }));
 vi.mock('../../composition/persistence/review-workspaces/project-commands', () => ({
   deleteVideoWorkspaceProject: mocks.deleteQuickEdit,
@@ -41,7 +50,9 @@ vi.mock('../../composition/persistence/library-lifecycle/trash', () => ({
 }));
 vi.mock('../../composition/persistence/media-library', () => ({ listMediaLibrary: mocks.media }));
 vi.mock('../../composition/persistence/media-library/index.library.ts', () => ({
+  deleteMediaLibraryAsset: mocks.deleteOriginal,
   deleteMediaThumbnail: mocks.deleteThumbnail,
+  listCollectableProjectOriginalIds: mocks.collectableOriginals,
 }));
 vi.mock('../../composition/persistence/projects', () => ({
   listVideoProjectEntries: mocks.videos,
@@ -64,6 +75,7 @@ vi.mock('../../features/media-hub/events', () => ({
 }));
 import {
   cleanupLibraryTrash,
+  cleanupProjectOriginals,
   moveLibraryItemsToTrash,
   restoreLibraryTrashItems,
   renameQuickEditProject,
@@ -78,6 +90,7 @@ beforeEach(() => {
     async (_target, _lifecycle, action: () => Promise<void>) => action()
   );
   mocks.media.mockResolvedValue([]);
+  mocks.collectableOriginals.mockResolvedValue([]);
   mocks.quickEdits.mockResolvedValue([]);
   mocks.videos.mockResolvedValue([]);
   mocks.scenarios.mockResolvedValue([]);
@@ -98,6 +111,29 @@ it('default and legacy policies never enumerate or delete trash', async () => {
   });
   expect(mocks.media).not.toHaveBeenCalled();
   expect(mocks.guard).not.toHaveBeenCalled();
+});
+
+it('retries the unclaimed original after a committed project purge and failed first collection', async () => {
+  const target = {
+    kind: 'image-project' as const,
+    id: 'project',
+    expectedRevision: 4,
+    expectedLifecycleUpdatedAt: 5,
+  };
+  mocks.deleteImageProject.mockResolvedValueOnce('original');
+  mocks.deleteOriginal.mockRejectedValueOnce(new Error('pending publication'));
+  await permanentlyDeleteLibraryItem({ target, lifecycle: { updatedAt: 5 } });
+  expect(mocks.publish).toHaveBeenCalledExactlyOnceWith('delete', ['project']);
+
+  const signal = new AbortController().signal;
+  mocks.collectableOriginals.mockResolvedValueOnce(['original']);
+  await cleanupProjectOriginals(signal);
+  expect(mocks.collectableOriginals).toHaveBeenCalledExactlyOnceWith(signal);
+  expect(mocks.deleteImageProject).toHaveBeenCalledExactlyOnceWith('project', 4, 5);
+  expect(mocks.deleteOriginal.mock.calls).toEqual([
+    ['original', { projectRetainedOnly: true }],
+    ['original', { projectRetainedOnly: true }],
+  ]);
 });
 
 it('purges only expired trash by admission time and retains referenced media', async () => {

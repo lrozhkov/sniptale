@@ -12,12 +12,22 @@ import {
   type MediaDependencyTarget,
 } from './dependencies';
 import { parseScenarioAssetEntry } from '../scenario/read-guards';
+import { IMAGE_WORKSPACES_STORE } from '../infrastructure/indexed-db/core.stores';
 
 interface DependencyReadTransaction {
   objectStore(name: string): {
     get(key: IDBValidKey): Promise<unknown>;
-    index(name: string): { getAll(key: IDBValidKey): Promise<unknown[]> };
+    index(name: string): { getAll(key: IDBValidKey, count?: number): Promise<unknown[]> };
   };
+}
+
+export async function readImageSourceClaims(tx: DependencyReadTransaction, mediaId: string) {
+  const index = tx.objectStore(IMAGE_WORKSPACES_STORE).index(ROW_REFERENCE_INDEX);
+  const [linked, unknown] = await Promise.all([
+    index.getAll(rowReferenceKey('media', mediaId), 1),
+    index.getAll(UNKNOWN_MEDIA_REFERENCES, 1),
+  ]);
+  return { linked: linked.length > 0, unknown: unknown.length > 0 };
 }
 
 /** Native locators select candidates; callers still admit each source in their own snapshot. */

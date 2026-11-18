@@ -72,9 +72,13 @@ Explicit media backup v6 excludes pending recordings and retained safety copies.
 
 ## Admission and migration
 
-Quick-edit projects can share one source video. The source media ID identifies its default workspace. An archived workspace retains its own aggregate ID and an explicit `sourceMediaId`. Source lookup, usage, retention, authorization, and transfer resolve that reference. History and draft writes retain the workspace aggregate ID.
+Quick-edit projects can share one source video. The original workspace can use the source media ID. Other projects have their own workspace ID and an explicit `sourceMediaId`. Source lookup, usage, retention, authorization, and transfer resolve that reference. History and draft writes use the workspace ID.
 
-Creating a project copies the complete previous default into an independent archive. One transaction creates the archive and replaces the default. The default revision increases, so delayed writes cannot replace the new project. A stable archive ID identifies a repeated command. Failure preserves the previous default.
+One transaction creates the new project and increases the revision of the previous project. The previous project keeps its ID, content, history, and recovery draft. A retry with the same command ID returns the project that the command created. After permanent deletion of that project, the previous revision cannot authorize its creation again. If the transaction fails, the previous project and its revision remain available for retry.
+
+New and restored quick-edit projects receive a local generation. Project creation checks the generation of the previous project. If the previous project has the same ID and revision after recreation, its new generation prevents the delayed command. Backup and sync exclude the local generation from portable project content.
+
+Database version 70 advances the mediaLibrary contract to version 44. The transition keeps the existing rows and files. Older writers refuse the new contract before they write a workspace.
 
 Database version 36 changes the mediaLibrary contract to 28. The migration preserves existing rows, history, recovery, stores, and indexes. Earlier writers cannot admit this database. Portable backup gives each archived project an independent media root. Restore binds that project to its restored source.
 

@@ -4,6 +4,7 @@ import {
   captureVideoProjectInTransaction,
   captureScenarioProjectInTransaction,
 } from '../sync-capture/capture';
+import { isImageCaptureSource } from '../sync-capture/image-snapshot';
 import {
   readStoredVideoWorkspaceProject,
   writeVideoWorkspaceProject,
@@ -11,6 +12,8 @@ import {
 import { parseVideoWorkspace } from '../review-workspaces/parser';
 import { materializeVideoWorkspaceProject } from '../review-workspaces/project-metadata';
 import { readWorkspaceStorage } from '../review-workspaces/storage';
+import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
+import { restoreImageWorkspaceIdentity } from '../image-workspaces/identity';
 import { createScenarioProjectStore, getScenarioStoredProject } from '../scenario/storage';
 import { withVideoProjectUsage } from '../media-library/usage-index-keys';
 import {
@@ -22,6 +25,7 @@ import {
   WEB_SNAPSHOTS_STORE,
   ASSET_REFS_STORE,
   ASSET_OWNERS_STORE,
+  IMAGE_WORKSPACE_IDENTITIES_STORE,
   IMAGE_WORKSPACES_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   THUMBNAILS_STORE,
@@ -45,6 +49,12 @@ import type { LibraryLifecycleTarget } from './promotion';
 export type LibraryTrashTarget =
   | LibraryLifecycleTarget
   | { kind: 'scenario-export'; id: string }
+  | {
+      kind: 'image-project';
+      id: string;
+      expectedRevision: number;
+      expectedLifecycleUpdatedAt: number;
+    }
   | { kind: 'quick-edit-project'; id: string; expectedRevision: number };
 
 const TRASH_LOCK = 'sniptale:library-trash';
@@ -70,6 +80,7 @@ export function runWithLibraryTrashMutation<T>(operation: () => Promise<T>): Pro
 }
 
 function targetStore(target: LibraryTrashTarget) {
+  if (target.kind === 'image-project') return IMAGE_WORKSPACES_STORE;
   if (target.kind === 'quick-edit-project') return VIDEO_WORKSPACES_STORE;
   return target.kind === 'media'
     ? MEDIA_LIBRARY_STORE
@@ -81,6 +92,14 @@ function targetStore(target: LibraryTrashTarget) {
 }
 
 function parseTarget(target: LibraryTrashTarget, value: unknown) {
+  if (target.kind === 'image-project') {
+    const parsed = parseImageWorkspaceEntry(value);
+    return parsed?.sourceMediaId &&
+      parsed.aggregateId === target.id &&
+      parsed.revision === target.expectedRevision
+      ? parsed
+      : null;
+  }
   if (target.kind === 'quick-edit-project') {
     const parsed = parseVideoWorkspace(value);
     if (!parsed || parsed.aggregateId !== target.id || parsed.revision !== target.expectedRevision)
@@ -111,7 +130,8 @@ function encodeTargetLifecycle(
   entry: NonNullable<ReturnType<typeof parseTarget>>,
   lifecycle: LibraryLifecycle
 ) {
-  if (target.kind === 'quick-edit-project') throw new StaleTrashItemError();
+  if (target.kind === 'quick-edit-project' || target.kind === 'image-project')
+    throw new StaleTrashItemError();
   if (target.kind === 'video-project') return withVideoProjectUsage({ ...entry, lifecycle });
   if (target.kind !== 'scenario-export') return { ...entry, lifecycle };
   const catalogue = parseScenarioExportEntry(entry);
@@ -145,6 +165,7 @@ async function mutateTrash(
           WEB_SNAPSHOTS_STORE,
           ASSET_REFS_STORE,
           ASSET_OWNERS_STORE,
+          IMAGE_WORKSPACE_IDENTITIES_STORE,
           IMAGE_WORKSPACES_STORE,
           VIDEO_WORKSPACE_DRAFTS_STORE,
           THUMBNAILS_STORE,
@@ -163,6 +184,30 @@ async function mutateTrash(
       try {
         const changed: LibraryTrashTarget[] = [];
         for (const target of targets) {
+          if (target.kind === 'image-project') {
+            const store = tx.objectStore(IMAGE_WORKSPACES_STORE);
+            const project = parseImageWorkspaceEntry(await store.get(target.id));
+            if (
+              !project?.sourceMediaId ||
+              project.aggregateId !== target.id ||
+              project.revision !== target.expectedRevision ||
+              !project.lifecycle
+            )
+              throw new StaleTrashItemError();
+            const { trashedAt, ...active } = project.lifecycle;
+            if (restore ? trashedAt === undefined : trashedAt !== undefined) continue;
+            if (active.updatedAt !== target.expectedLifecycleUpdatedAt)
+              throw new StaleTrashItemError();
+            const updatedAt = Math.max(now, active.updatedAt + 1);
+            if (restore) await restoreImageWorkspaceIdentity(tx, target.id);
+            const { publicationId, ...workspace } = project;
+            await store.put({
+              ...workspace,
+              ...(!restore && publicationId ? { publicationId } : {}),
+              lifecycle: { ...active, updatedAt, ...(restore ? {} : { trashedAt: updatedAt }) },
+            });
+            continue;
+          }
           if (target.kind === 'quick-edit-project') {
             const { workspace } = await readStoredVideoWorkspaceProject(tx, target.id);
             if (workspace.revision !== target.expectedRevision) throw new StaleTrashItemError();
@@ -196,6 +241,17 @@ async function mutateTrash(
             continue;
           if (restore) {
             const { trashedAt: _trashedAt, ...active } = lifecycle;
+            const media = target.kind === 'media' ? parseMediaLibraryEntry(entry) : null;
+            if (media && isImageCaptureSource(media)) {
+              await restoreImageWorkspaceIdentity(tx, target.id);
+              const workspaces = tx.objectStore(IMAGE_WORKSPACES_STORE);
+              const workspace = parseImageWorkspaceEntry(await workspaces.get(target.id));
+              if (workspace?.aggregateId === target.id && workspace.publicationId) {
+                // Acknowledgements from the previous lifetime cannot authorize further writes.
+                const { publicationId: _previousReceipt, ...restoredWorkspace } = workspace;
+                await workspaces.put(restoredWorkspace);
+              }
+            }
             // A restored draft receives a full retention window rather than expiring immediately.
             await store.put(
               encodeTargetLifecycle(target, entry, {

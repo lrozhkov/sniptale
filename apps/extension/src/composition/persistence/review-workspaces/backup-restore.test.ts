@@ -36,18 +36,20 @@ const draft = {
 it.each(['legacy', 'physical'] as const)(
   'exports full %s undo/redo and field recovery, excluding the local source object identity',
   async (format) => {
+    const native = { ...workspace, generation: crypto.randomUUID() };
     const review = await readVideoReviewForBackup({
       aggregateId: workspace.aggregateId,
       sourceAssetId: 'original-local',
       db: snapshotDatabase(
-        format === 'physical' ? workspaceStorageHead(workspace, []) : workspace,
+        format === 'physical' ? workspaceStorageHead(native, []) : native,
         draft,
-        format === 'physical' ? workspaceStorageRows(workspace) : []
+        format === 'physical' ? workspaceStorageRows(native) : []
       ),
     });
     expect(review?.workspace.history).toEqual(workspace.history);
     expect(review?.workspace.cursor).toBe(0);
     expect(review?.workspace).not.toHaveProperty('sourceAssetId');
+    expect(review?.workspace).not.toHaveProperty('generation');
     expect(review?.workspace).toHaveProperty('formatVersion', 1);
     expect(review?.workspace).not.toHaveProperty('historyLength');
     expect(review?.draft).toEqual(draft);
@@ -64,7 +66,11 @@ it.each(['legacy', 'physical'] as const)(
     const workspaces = { put: vi.fn() };
     const drafts = { put: vi.fn(), delete: vi.fn() };
     await putVideoReviewRestore({ review: restored, workspaces, drafts });
-    expect(workspaces.put).toHaveBeenCalledWith(withReviewWorkspaceUsage(restored.workspace));
+    expect(workspaces.put).toHaveBeenCalledWith({
+      ...withReviewWorkspaceUsage(restored.workspace),
+      generation: expect.any(String),
+    });
+    expect(workspaces.put.mock.calls[0]?.[0].generation).not.toBe(native.generation);
     expect(drafts.put).toHaveBeenCalledWith(restored.draft);
     expect(drafts.delete).not.toHaveBeenCalled();
   }
@@ -86,6 +92,12 @@ it('refuses corrupt or stale source state instead of silently dropping it from b
   expect(() => parsePortableVideoReview({ workspace, draft }, workspace.aggregateId)).toThrow(
     'invalid'
   );
+  expect(() =>
+    parsePortableVideoReview(
+      { workspace: { ...portable, generation: 'local-generation' }, draft },
+      workspace.aggregateId
+    )
+  ).toThrow('invalid');
   expect(() =>
     parsePortableVideoReview(
       { workspace: { ...portable, history: [...portable.history, ...portable.history] }, draft },
@@ -210,7 +222,10 @@ it('roundtrips disabled webcam settings, redo history and recovery through porta
   const workspaces = { put: vi.fn() },
     drafts = { put: vi.fn(), delete: vi.fn() };
   await putVideoReviewRestore({ review: restored, workspaces, drafts });
-  expect(workspaces.put).toHaveBeenCalledWith(withReviewWorkspaceUsage(restored.workspace));
+  expect(workspaces.put).toHaveBeenCalledWith({
+    ...withReviewWorkspaceUsage(restored.workspace),
+    generation: expect.any(String),
+  });
 });
 
 it('backs up disabled image history and restores it with newly allocated asset references', async () => {
@@ -271,7 +286,10 @@ it('backs up disabled image history and restores it with newly allocated asset r
   const workspaces = { put: vi.fn() },
     drafts = { put: vi.fn(), delete: vi.fn() };
   await putVideoReviewRestore({ review: restored, workspaces, drafts });
-  expect(workspaces.put).toHaveBeenCalledWith(withReviewWorkspaceUsage(restored.workspace));
+  expect(workspaces.put).toHaveBeenCalledWith({
+    ...withReviewWorkspaceUsage(restored.workspace),
+    generation: expect.any(String),
+  });
 });
 
 it.each([false, true])(
@@ -414,7 +432,10 @@ it('transfers an inactive image choice even without history', async () => {
   const workspaces = { put: vi.fn() },
     drafts = { put: vi.fn(), delete: vi.fn() };
   await putVideoReviewRestore({ review: restored, workspaces, drafts });
-  expect(workspaces.put).toHaveBeenCalledWith(withReviewWorkspaceUsage(restored.workspace));
+  expect(workspaces.put).toHaveBeenCalledWith({
+    ...withReviewWorkspaceUsage(restored.workspace),
+    generation: expect.any(String),
+  });
 });
 
 it('backs up remembered watermark bytes and remaps the exact slot across a restored aggregate', async () => {
@@ -474,7 +495,10 @@ it('backs up remembered watermark bytes and remaps the exact slot across a resto
   const workspaces = { put: vi.fn() },
     drafts = { put: vi.fn(), delete: vi.fn() };
   await putVideoReviewRestore({ review: restored, workspaces, drafts });
-  expect(workspaces.put).toHaveBeenCalledWith(withReviewWorkspaceUsage(restored.workspace));
+  expect(workspaces.put).toHaveBeenCalledWith({
+    ...withReviewWorkspaceUsage(restored.workspace),
+    generation: expect.any(String),
+  });
 });
 
 it('backs up and restores scene variants under none including history and recovery with new identities', async () => {

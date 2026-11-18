@@ -37,7 +37,12 @@ function buildSelectedBackupScope(
     mediaAssetIds: [
       ...new Set(
         items
-          .filter((item) => isGalleryMediaItem(item) || item.type === 'quick-edit-project')
+          .filter(
+            (item) =>
+              isGalleryMediaItem(item) ||
+              item.type === 'quick-edit-project' ||
+              item.type === 'image-project'
+          )
           .map((item) => item.entityId ?? item.id)
       ),
     ],

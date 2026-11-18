@@ -39,6 +39,10 @@ vi.mock('../../composition/persistence/review-workspaces/summaries', () => ({
   listVideoWorkspaceSummaries: vi.fn().mockResolvedValue([]),
 }));
 
+vi.mock('../../composition/persistence/image-workspaces/read', () => ({
+  listImageWorkspaceProjectSummaries: vi.fn().mockResolvedValue([]),
+}));
+
 vi.mock('../../composition/persistence/library-lifecycle/project-retention', () => ({
   repairTemporaryProjectLifecycles: repairTemporaryProjectLifecyclesMock,
 }));
@@ -157,6 +161,7 @@ describe('loadGalleryLibrarySnapshot', () => {
     expect(getStorageEstimateInfoMock).toHaveBeenCalledTimes(1);
     expect(createGalleryItemsMock).toHaveBeenCalledWith({
       mediaItems,
+      imageProjects: [],
       presentations: [],
       quickEditProjects: [],
       scenarioExportsByProjectId: new Map([

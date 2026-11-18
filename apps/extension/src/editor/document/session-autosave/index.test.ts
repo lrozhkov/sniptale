@@ -26,6 +26,40 @@ import {
   publishLibraryChangedMock,
 } from './autosave.test-support';
 
+it('passes the original binding only on the first save of an image project', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  const original = { mediaId: 'original', generation: 'original-generation' };
+  autosave.updateContext({ original });
+  commitWorkspaceMock.mockResolvedValueOnce({
+    ...createWorkspaceCommitResult(1),
+    sourceGeneration: 'project-generation',
+  });
+
+  await autosave.persistSnapshot(() => createDocument('initial edit'));
+  await autosave.persistSnapshot(() => createDocument('following edit'));
+
+  expect(commitWorkspaceMock).toHaveBeenNthCalledWith(
+    1,
+    expect.objectContaining({ original, expectedRevision: 0, expectedGeneration: null })
+  );
+  expect(commitWorkspaceMock).toHaveBeenNthCalledWith(
+    2,
+    expect.objectContaining({
+      expectedRevision: 1,
+      expectedGeneration: 'project-generation',
+      requireExistingRoot: true,
+    })
+  );
+  expect(commitWorkspaceMock.mock.calls[1]?.[0]).not.toHaveProperty('original');
+  expect(publishLibraryChangedMock).toHaveBeenCalledExactlyOnceWith('update', [
+    'original',
+    'image-1',
+  ]);
+  autosave.dispose();
+});
+
 it('coalesces expired uncaptured autosaves behind an acquired workspace write', async () => {
   const { createEditorSessionAutosaveService } = await import('./');
   const autosave = createEditorSessionAutosaveService();

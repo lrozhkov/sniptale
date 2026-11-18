@@ -312,6 +312,17 @@ export function projectRowReferenceKeys(store: string, raw: unknown): string[] {
   appendProjectDependencyKeys(store, raw, keys);
   appendPrivateOriginKeys(store, raw, keys);
   appendScenarioOriginKeys(store, raw, keys);
+  if (store === 'image_workspaces' && isRecord(raw) && raw['sourceMediaId'] !== undefined) {
+    const sourceId = raw['sourceMediaId'];
+    keys.add(
+      typeof sourceId === 'string' &&
+        sourceId.length > 0 &&
+        sourceId.length <= 256 &&
+        sourceId !== raw['aggregateId']
+        ? rowReferenceKey('media', sourceId)
+        : UNKNOWN_MEDIA_REFERENCES
+    );
+  }
   // A head/history pair needs scoped admission in the workspace storage owner.
   if (store === 'video_workspaces' || store === 'video_workspace_history')
     keys.add(UNKNOWN_HISTORY_REFERENCES);

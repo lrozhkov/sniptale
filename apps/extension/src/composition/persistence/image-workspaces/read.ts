@@ -18,6 +18,13 @@ import { parseProjectAssetEntry } from '../projects/read-guards';
 import { parseAssetRef } from '../assets/guards';
 import { readAssetFile, MissingAssetObjectError } from '../assets';
 import type { MediaLibraryEntry } from '../media-library/contracts';
+import type { LibraryLifecycle } from '../library-lifecycle/contracts';
+import { SYNC_CAPTURE_STORE } from '../infrastructure/indexed-db/core.stores';
+import {
+  ROW_REFERENCE_INDEX,
+  rowReferenceKey,
+} from '../infrastructure/indexed-db/row-index-contract';
+import { readEnabledCaptureProfile } from '../sync-capture/capture';
 
 const logger = createLogger({ namespace: 'ImageWorkspacesDb' });
 
@@ -103,7 +110,8 @@ export async function readImageWorkspace(
     if (raw !== undefined) logger.warn('Ignoring invalid image workspace entry', { aggregateId });
     return undefined;
   }
-  if (identity?.retired) throw new Error('Image workspace lifetime has ended.');
+  if (identity?.retired || entry.lifecycle?.trashedAt !== undefined)
+    throw new Error('Image workspace is unavailable.');
   return hydrateWorkspace(entry, refs, identity?.generation ?? null, includeHistory);
 }
 
@@ -118,7 +126,13 @@ export async function readImageOriginalSource(
 }> {
   const db = await initDB();
   const tx = db.transaction(
-    [MEDIA_LIBRARY_STORE, IMAGE_WORKSPACE_IDENTITIES_STORE, PROJECT_ASSETS_STORE, ASSET_REFS_STORE],
+    [
+      MEDIA_LIBRARY_STORE,
+      IMAGE_WORKSPACES_STORE,
+      IMAGE_WORKSPACE_IDENTITIES_STORE,
+      PROJECT_ASSETS_STORE,
+      ASSET_REFS_STORE,
+    ],
     'readonly'
   );
   const mediaRead: Promise<unknown> = tx.objectStore(MEDIA_LIBRARY_STORE).get(aggregateId);
@@ -126,7 +140,33 @@ export async function readImageOriginalSource(
     mediaRead,
     readImageWorkspaceIdentity(tx, aggregateId),
   ]);
-  const asset = parseMediaLibraryEntry(raw) ?? undefined;
+  const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
+  const projectRow: unknown =
+    raw === undefined ? await tx.objectStore(IMAGE_WORKSPACES_STORE).get(aggregateId) : undefined;
+  const project = parseImageWorkspaceEntry(projectRow);
+  if (projectRow !== undefined && (!project || project.aggregateId !== aggregateId))
+    throw new Error('Image project metadata is invalid.');
+  if (project?.lifecycle?.trashedAt !== undefined) throw new Error('Image workspace is in Trash.');
+  const sourceMediaId = project?.sourceMediaId;
+  const original = parseMediaLibraryEntry(
+    sourceMediaId === undefined ? raw : await mediaStore.get(sourceMediaId)
+  );
+  if (
+    sourceMediaId !== undefined &&
+    (!original ||
+      original.id !== sourceMediaId ||
+      (original.kind !== 'screenshot' && original.kind !== 'image'))
+  )
+    throw new MissingAssetObjectError(sourceMediaId);
+  const asset =
+    project && original && sourceMediaId !== undefined
+      ? {
+          ...original,
+          id: project.aggregateId,
+          workspaceRevision: project.revision,
+          imageContentState: 'edited' as const,
+        }
+      : (original ?? undefined);
   let assetId: string | undefined;
   if (asset?.source.kind === 'stored-asset') assetId = asset.source.assetId;
   if (asset?.source.kind === 'project-asset') {
@@ -163,6 +203,100 @@ export async function readStoredImageWorkspaces(): Promise<StoredImageWorkspaceE
     .map(parseImageWorkspaceEntry)
     .filter((entry): entry is StoredImageWorkspaceEntry => entry !== null)
     .sort((left, right) => right.updatedAt - left.updatedAt);
+}
+
+export interface ImageWorkspaceProjectSummary {
+  aggregateId: string;
+  sourceMediaId: string;
+  name: string | null;
+  lifecycle: LibraryLifecycle;
+  createdAt: number;
+  updatedAt: number;
+  revision: number;
+  width: number;
+  height: number;
+}
+
+export async function listImageWorkspaceProjectSummaries(): Promise<
+  ImageWorkspaceProjectSummary[]
+> {
+  return (await readStoredImageWorkspaces()).flatMap((workspace) => {
+    const { aggregateId, sourceMediaId, lifecycle, createdAt, updatedAt, revision, document } =
+      workspace;
+    if (sourceMediaId === undefined || lifecycle === undefined) return [];
+    return [
+      {
+        aggregateId,
+        sourceMediaId,
+        name: document.displayName?.trim() || null,
+        lifecycle,
+        createdAt,
+        updatedAt,
+        revision,
+        width: document.canvasWidth,
+        height: document.canvasHeight,
+      },
+    ];
+  });
+}
+
+/** Read only projects bound to the selected original, with no hydration or publication. */
+export async function listImageProjectsForEditing(mediaId: string): Promise<{
+  canCreateIndependentProject: boolean;
+  projects: { id: string; name: string; updatedAt: number }[];
+}> {
+  const db = await initDB();
+  const tx = db.transaction(
+    [MEDIA_LIBRARY_STORE, IMAGE_WORKSPACES_STORE, SYNC_CAPTURE_STORE],
+    'readonly'
+  );
+  const store = tx.objectStore(IMAGE_WORKSPACES_STORE);
+  const originalRead: Promise<unknown> = tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId);
+  const projectsRead: Promise<unknown[]> = store
+    .index(ROW_REFERENCE_INDEX)
+    .getAll(rowReferenceKey('media', mediaId));
+  const legacyRead: Promise<unknown> = store.get(mediaId);
+  const [raw, rows, legacy, profile] = await Promise.all([
+    originalRead,
+    projectsRead,
+    legacyRead,
+    readEnabledCaptureProfile(tx),
+  ]);
+  await tx.done;
+  const original = parseMediaLibraryEntry(raw);
+  if (
+    !original ||
+    original.id !== mediaId ||
+    original.lifecycle?.trashedAt !== undefined ||
+    (original.kind !== 'screenshot' && original.kind !== 'image')
+  )
+    throw new MissingAssetObjectError(mediaId);
+
+  const projects = rows
+    .map(parseImageWorkspaceEntry)
+    .filter(
+      (workspace): workspace is StoredImageWorkspaceEntry =>
+        workspace !== null &&
+        workspace.sourceMediaId === mediaId &&
+        workspace.lifecycle?.trashedAt === undefined
+    )
+    .map((workspace) => ({
+      id: workspace.aggregateId,
+      name: workspace.document.displayName?.trim() || original.filename,
+      updatedAt: workspace.updatedAt,
+    }));
+  const previous = parseImageWorkspaceEntry(legacy);
+  if (previous?.aggregateId === mediaId && original.imageContentState === 'edited') {
+    projects.push({
+      id: mediaId,
+      name: previous.document.displayName?.trim() || original.filename,
+      updatedAt: previous.updatedAt,
+    });
+  }
+  return {
+    canCreateIndependentProject: profile === null,
+    projects: projects.sort((left, right) => right.updatedAt - left.updatedAt),
+  };
 }
 
 export async function hydrateImageWorkspaces(

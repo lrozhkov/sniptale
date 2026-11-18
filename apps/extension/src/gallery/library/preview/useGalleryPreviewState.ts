@@ -11,6 +11,7 @@ import {
 import { getMediaAssetBlob } from '../../../composition/persistence/media-library/index.library.ts';
 import { getWebSnapshotScreenshotFile } from '../../../composition/persistence/web-snapshots';
 import { isGalleryMediaItem } from '../items';
+import { usesGalleryImagePresentation } from '../items/types';
 import { createPreviewResources } from './resources';
 import type { GalleryPreviewPresentation, GalleryPreviewSessionState } from '../types';
 import { getAggregatePreviewBlob } from '../../../composition/persistence/aggregate-presentations';
@@ -48,6 +49,10 @@ function resetDraftState(args: GalleryPreviewDraftStateSetters) {
   syncDraftState({ filename: '', tags: [] }, args);
 }
 
+function hasPreviewBlob(item: NonNullable<GalleryPreviewSessionState['item']>) {
+  return isGalleryMediaItem(item) || item.type === 'image-project';
+}
+
 function normalizePreviewSelectionChange(
   current: GalleryPreviewSessionState,
   next: GalleryPreviewSessionState
@@ -62,7 +67,7 @@ function normalizePreviewSelectionChange(
   if (
     currentItemId !== nextItemId ||
     !nextWithRememberedInspector.item ||
-    !isGalleryMediaItem(nextWithRememberedInspector.item)
+    !hasPreviewBlob(nextWithRememberedInspector.item)
   ) {
     return {
       ...nextWithRememberedInspector,
@@ -70,7 +75,7 @@ function normalizePreviewSelectionChange(
         currentItemId !== nextItemId ? (current.requestRevision ?? 0) + 1 : current.requestRevision,
       url: null,
       loadStatus:
-        nextWithRememberedInspector.item && isGalleryMediaItem(nextWithRememberedInspector.item)
+        nextWithRememberedInspector.item && hasPreviewBlob(nextWithRememberedInspector.item)
           ? 'loading'
           : undefined,
     };
@@ -91,12 +96,14 @@ function normalizePreviewSelectionChange(
 async function loadPreviewBlob(
   previewItem: NonNullable<GalleryPreviewSessionState['item']>
 ): Promise<Blob | null> {
+  if (previewItem.type === 'image-project')
+    return (await getAggregatePreviewBlob({ id: previewItem.entityId, kind: 'image' })) ?? null;
   if (!isGalleryMediaItem(previewItem)) {
     return null;
   }
 
   const assetId = previewItem.entityId ?? previewItem.id;
-  if (previewItem.source.kind === 'screenshot') {
+  if (usesGalleryImagePresentation(previewItem)) {
     return (await getAggregatePreviewBlob({ id: assetId, kind: 'image' })) ?? null;
   }
   if (previewItem.kind === 'web-archive') {
@@ -219,7 +226,7 @@ export function useGalleryPreviewState() {
   useEffect(() => () => resources.dispose(), [resources]);
   useEffect(() => {
     resources.begin(requestRevision);
-    if (!previewItem || !isGalleryMediaItem(previewItem)) {
+    if (!previewItem || !hasPreviewBlob(previewItem)) {
       resources.dispose();
       return;
     }

@@ -235,6 +235,9 @@ async function promoteMediaAggregate(assetId: string): Promise<void> {
     if (!media) throw new Error(`Stored media ${assetId} was not found.`);
     const lifecycle = media.lifecycle ?? createLibraryLifecycle('library', media.updatedAt);
     if (lifecycle.storageClass === 'library') {
+      if (media.savedIndependently === false && lifecycle.trashedAt === undefined) {
+        await mediaStore.put({ ...media, savedIndependently: true });
+      }
       await tx.done;
       return;
     }

@@ -998,7 +998,7 @@ it('preserves workspace colors against a parallel stale UI writer and through re
   expect(reopened.workspace.history).toEqual([]);
 });
 
-it('starts a new default while preserving complete quick-project history and recovery', async () => {
+it('creates an independent project and preserves the previous identity, history and recovery', async () => {
   let previous = await openVideoWorkspace(id, source);
   previous = await commitVideoWorkspace({
     aggregateId: id,
@@ -1020,28 +1020,28 @@ it('starts a new default while preserving complete quick-project history and rec
     before: null,
     expectedDraftRevision: null,
   });
-  const archiveId = 'recording:quick-project:archive';
+  const newProjectId = 'recording:quick-project:archive';
   const next = await createVideoWorkspaceProject({
     aggregateId: id,
     expectedRevision: previous.workspace.revision,
     expectedSourceAssetId: previous.workspace.sourceAssetId,
-    archiveId,
+    expectedGeneration: previous.workspace.generation,
+    newProjectId,
   });
   expect(next.workspace).toMatchObject({
-    aggregateId: id,
-    revision: previous.workspace.revision + 1,
+    aggregateId: newProjectId,
+    sourceMediaId: id,
+    revision: 1,
     history: [],
     cursor: 0,
   });
   expect(next.workspace.createdAt).toBeGreaterThan(previous.workspace.createdAt);
   expect(next.draft).toBeNull();
-  const archived = await readVideoWorkspace(archiveId);
-  expect(archived).toEqual({
-    workspace: { ...previous.workspace, aggregateId: archiveId, sourceMediaId: id },
-    draft: { ...previous.draft, aggregateId: archiveId },
+  expect(await openVideoWorkspace(id, source)).toEqual({
+    workspace: { ...previous.workspace, revision: previous.workspace.revision + 1 },
+    draft: previous.draft,
   });
-  expect(await openVideoWorkspace(id, source)).toEqual(next);
-  expect(await openVideoWorkspace(archiveId, source)).toEqual(archived);
+  expect(await openVideoWorkspace(newProjectId, source)).toEqual(next);
   await expect(
     commitVideoWorkspace({
       aggregateId: id,
@@ -1063,11 +1063,12 @@ it('acknowledges New retry without resetting subsequent edits or changing anothe
     aggregateId: id,
     expectedRevision: previous.workspace.revision,
     expectedSourceAssetId: previous.workspace.sourceAssetId,
-    archiveId: 'recording:quick-project:retry',
+    expectedGeneration: previous.workspace.generation,
+    newProjectId: 'recording:quick-project:retry',
   };
   const next = await createVideoWorkspaceProject(args);
   const edited = await commitVideoWorkspace({
-    aggregateId: id,
+    aggregateId: next.workspace.aggregateId,
     expectedRevision: next.workspace.revision,
     expectedSourceAssetId: next.workspace.sourceAssetId,
     operation,
@@ -1075,7 +1076,7 @@ it('acknowledges New retry without resetting subsequent edits or changing anothe
   expect(await createVideoWorkspaceProject(args)).toEqual(edited);
   expect(await readVideoWorkspace(otherId)).toEqual(other);
   await expect(
-    createVideoWorkspaceProject({ ...args, archiveId: 'recording:quick-project:competing' })
+    createVideoWorkspaceProject({ ...args, newProjectId: 'recording:quick-project:competing' })
   ).rejects.toMatchObject({ code: 'conflict' });
   expect(await readVideoWorkspace('recording:quick-project:competing')).toBeNull();
 });
@@ -1087,37 +1088,41 @@ it('rolls back New failure and allows the same command to retry', async () => {
     aggregateId: id,
     expectedRevision: previous.workspace.revision,
     expectedSourceAssetId: previous.workspace.sourceAssetId,
-    archiveId: 'recording:quick-project:failed',
+    expectedGeneration: previous.workspace.generation,
+    newProjectId: 'recording:quick-project:failed',
   };
   harness.failure = true;
   await expect(createVideoWorkspaceProject(args)).rejects.toThrow();
   expect(rows).toEqual(before);
   harness.failure = false;
   const next = await createVideoWorkspaceProject(args);
-  expect(next.workspace.revision).toBe(previous.workspace.revision + 1);
-  expect((await readVideoWorkspace(args.archiveId))?.workspace.history).toEqual(
-    previous.workspace.history
-  );
+  expect(next.workspace.aggregateId).toBe(args.newProjectId);
+  expect((await readVideoWorkspace(id))?.workspace.history).toEqual(previous.workspace.history);
 });
 
-it('creates New from an archived project without replacing that project', async () => {
+it('creates another sibling without replacing its originating project', async () => {
   const initial = await openVideoWorkspace(id, source);
   await createVideoWorkspaceProject({
     aggregateId: id,
     expectedRevision: initial.workspace.revision,
     expectedSourceAssetId: initial.workspace.sourceAssetId,
-    archiveId: 'recording:quick-project:first',
+    expectedGeneration: initial.workspace.generation,
+    newProjectId: 'recording:quick-project:first',
   });
   const first = await readVideoWorkspace('recording:quick-project:first');
-  if (!first) throw new Error('Missing archived project');
+  if (!first) throw new Error('Missing independent project');
   const next = await createVideoWorkspaceProject({
     aggregateId: first.workspace.aggregateId,
     expectedRevision: first.workspace.revision,
     expectedSourceAssetId: first.workspace.sourceAssetId,
-    archiveId: 'recording:quick-project:second',
+    expectedGeneration: first.workspace.generation,
+    newProjectId: 'recording:quick-project:second',
   });
-  expect(next.workspace.aggregateId).toBe(id);
-  expect(await readVideoWorkspace('recording:quick-project:first')).toEqual(first);
+  expect(next.workspace.aggregateId).toBe('recording:quick-project:second');
+  expect(await readVideoWorkspace('recording:quick-project:first')).toEqual({
+    ...first,
+    workspace: { ...first.workspace, revision: first.workspace.revision + 1 },
+  });
   expect(
     (await readVideoWorkspace('recording:quick-project:second'))?.workspace.sourceMediaId
   ).toBe(id);
@@ -1129,10 +1134,11 @@ it('admits only one of two parallel New commands from the same project revision'
     aggregateId: id,
     expectedRevision: opened.workspace.revision,
     expectedSourceAssetId: opened.workspace.sourceAssetId,
+    expectedGeneration: opened.workspace.generation,
   };
   const results = await Promise.allSettled([
-    createVideoWorkspaceProject({ ...args, archiveId: 'recording:quick-project:parallel-a' }),
-    createVideoWorkspaceProject({ ...args, archiveId: 'recording:quick-project:parallel-b' }),
+    createVideoWorkspaceProject({ ...args, newProjectId: 'recording:quick-project:parallel-a' }),
+    createVideoWorkspaceProject({ ...args, newProjectId: 'recording:quick-project:parallel-b' }),
   ]);
   expect(results.map((result) => result.status)).toEqual(['fulfilled', 'rejected']);
   expect(results[1]).toMatchObject({ reason: { code: 'conflict' } });
@@ -1141,7 +1147,7 @@ it('admits only one of two parallel New commands from the same project revision'
   expect((await readVideoWorkspace(id))?.workspace.revision).toBe(opened.workspace.revision + 1);
 });
 
-it('rolls back an archive already written when the new default write fails', async () => {
+it('rolls back the new project when updating the previous workspace fails', async () => {
   let armed = false;
   let heads = 0;
   const fixture = createReviewWorkspaceStoreFixture(
@@ -1156,28 +1162,48 @@ it('rolls back an archive already written when the new default write fails', asy
       aggregateId: id,
       expectedRevision: opened.workspace.revision,
       expectedSourceAssetId: opened.workspace.sourceAssetId,
-      archiveId: 'recording:quick-project:partial',
+      expectedGeneration: opened.workspace.generation,
+      newProjectId: 'recording:quick-project:partial',
     })
   ).rejects.toThrow();
   expect(fixture.rows).toEqual(before);
 });
 
-it('retains the archived quick project source after the new default project is purged', async () => {
+it('retains the original and refuses replay after the new project is purged', async () => {
   const opened = await openVideoWorkspace(id, source);
-  const next = await createVideoWorkspaceProject({
+  const command = {
     aggregateId: id,
     expectedRevision: opened.workspace.revision,
     expectedSourceAssetId: opened.workspace.sourceAssetId,
-    archiveId: 'recording:quick-project:retained',
-  });
-  await deleteVideoWorkspaceProject(id, next.workspace.revision);
-  expect(await readVideoWorkspace(id)).toBeNull();
-  expect(
-    (await readVideoWorkspace('recording:quick-project:retained'))?.workspace.sourceAssetId
-  ).toBe(opened.workspace.sourceAssetId);
-  expect(
-    (await openVideoWorkspace('recording:quick-project:retained', source)).workspace.aggregateId
-  ).toBe('recording:quick-project:retained');
+    expectedGeneration: opened.workspace.generation,
+    newProjectId: 'recording:quick-project:retained',
+  };
+  const next = await createVideoWorkspaceProject(command);
+  await deleteVideoWorkspaceProject(next.workspace.aggregateId, next.workspace.revision);
+  expect(await readVideoWorkspace(next.workspace.aggregateId)).toBeNull();
+  expect((await readVideoWorkspace(id))?.workspace.sourceAssetId).toBe(
+    opened.workspace.sourceAssetId
+  );
+  await expect(createVideoWorkspaceProject(command)).rejects.toMatchObject({ code: 'conflict' });
+});
+
+it('rejects an old New command after recreating its parent at the same revision', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const command = {
+    aggregateId: id,
+    expectedRevision: opened.workspace.revision,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    expectedGeneration: opened.workspace.generation,
+    newProjectId: 'recording:quick-project:delayed',
+  };
+  await deleteVideoWorkspaceProject(id, opened.workspace.revision);
+  const reopened = await openVideoWorkspace(id, source);
+  expect(reopened.workspace.revision).toBe(command.expectedRevision);
+  expect(reopened.workspace.sourceAssetId).toBe(command.expectedSourceAssetId);
+  const before = structuredClone(rows);
+  await expect(createVideoWorkspaceProject(command)).rejects.toMatchObject({ code: 'conflict' });
+  expect(rows).toEqual(before);
+  expect(await readVideoWorkspace(command.newProjectId)).toBeNull();
 });
 
 it('publishes text anchors atomically and retains them through conflict, retry, history and reopen', async () => {

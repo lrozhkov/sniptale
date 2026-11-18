@@ -10,6 +10,7 @@ import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing
 import { useEditorStore } from '../../state/useEditorStore';
 import { scheduleImagePresentation } from './presentation';
 import { EDITOR_AUTOSAVE_POLICY } from '../../../features/autosave/policy';
+import { publishMediaHubLibraryChanged } from '../../../features/media-hub/events';
 import {
   checkpointEditForAutosave,
   settleAutosaveCheckpointEdit,
@@ -72,6 +73,8 @@ function adoptWorkspaceAcknowledgement(
   state.activeContext.durableRevision = result.revision;
   state.activeContext.sourceGeneration = result.sourceGeneration ?? null;
   state.activeContext.requireExistingRoot = true;
+  const original = state.activeContext.original;
+  delete state.activeContext.original;
   state.documentAssetsByRuntimeUrl = result.documentAssetsByRuntimeUrl;
   if (result.historyAssetsByValue) state.historyAssetsByValue = result.historyAssetsByValue;
   // A later insertion can publish a definition while this older document awaits its ACK.
@@ -79,6 +82,8 @@ function adoptWorkspaceAcknowledgement(
     ...result.documentAssetsByVectorDefinitionId,
     ...state.documentAssetsByVectorDefinitionId,
   ]);
+  if (original)
+    publishMediaHubLibraryChanged('update', [original.mediaId, state.activeContext.aggregateId]);
   return true;
 }
 
@@ -128,6 +133,7 @@ async function persistEditorSessionDocument(
           reusableHistoryAssetsByValue: args.state.historyAssetsByValue,
           expectedRevision: args.context.durableRevision,
           expectedGeneration: args.context.sourceGeneration ?? null,
+          ...(args.context.original ? { original: args.context.original } : {}),
           ...(args.context.requireExistingRoot ? { requireExistingRoot: true } : {}),
           sourceUrl: args.context.sourceUrl,
           sourceTitle: args.document.displayName ?? args.context.sourceTitle,

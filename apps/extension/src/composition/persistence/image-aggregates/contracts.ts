@@ -18,6 +18,8 @@ export interface CommitImageWorkspaceInput {
   sourceTitle?: string | null;
   sourceUrl?: string | null;
   sourceFavicon?: string | null;
+  /** Supplies the observed original on the first save of an independent project. */
+  original?: { mediaId: string; generation: string | null };
   sourceGuard?: {
     aggregateId: string;
     presentationRevision: number;

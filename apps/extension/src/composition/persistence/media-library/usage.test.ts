@@ -38,6 +38,7 @@ import {
 let media: MediaLibraryEntry;
 let childRows: unknown[];
 let reviewRows: unknown[];
+let imageRows: { aggregateId: string; sourceMediaId: string; document?: unknown }[];
 let video = createVideoProjectEntryWithMediaClip();
 let extraMedia: MediaLibraryEntry | null;
 let snapshotCount = 0;
@@ -83,6 +84,7 @@ beforeEach(() => {
     },
   ];
   reviewRows = [];
+  imageRows = [];
   mocks.initDB.mockImplementation(async () => {
     const fixture = createReviewWorkspaceStoreFixture(() => false);
     for (const rows of fixture.rows.values()) rows.clear();
@@ -102,6 +104,7 @@ beforeEach(() => {
         typeof row.aggregateId === 'string'
       )
         fixture.rows.get('video_workspaces')!.set(row.aggregateId, row);
+    for (const row of imageRows) fixture.rows.get('image_workspaces')!.set(row.aggregateId, row);
     const transaction = fixture.database.transaction.bind(fixture.database);
     return {
       transaction: (stores: string[], mode: string) => {
@@ -134,6 +137,20 @@ beforeEach(() => {
 
 it('returns no project use when the library identity no longer exists', async () => {
   expect(await listMediaAssetProjectUsage('missing')).toEqual([]);
+});
+
+it('lists only the image projects linked to the requested original', async () => {
+  imageRows = [
+    { aggregateId: 'image-one', sourceMediaId: media.id, document: { displayName: 'First edit' } },
+    { aggregateId: 'image-two', sourceMediaId: media.id },
+    { aggregateId: 'unrelated', sourceMediaId: 'another-original' },
+  ];
+  const usages = await listMediaAssetProjectUsage(media.id);
+  expect(usages.filter((usage) => usage.kind === 'image')).toEqual([
+    { id: 'image-one', kind: 'image', name: 'First edit', primary: true },
+    { id: 'image-two', kind: 'image', name: media.filename, primary: true },
+  ]);
+  expect(globalReads).not.toHaveBeenCalled();
 });
 
 it('marks a recording as required by the primary video project', async () => {

@@ -127,8 +127,13 @@ export function collectReadyJournalMediaKeys(
   switch (journal.domain) {
     case VIDEO_PROJECT_WORKSPACE_PUBLICATION_DOMAIN:
       return workspacePublicationKeys(payload);
-    case 'image-workspace':
-      return [identityKey('media', recordIdentity(payload, 'aggregateId'))];
+    case 'image-workspace': {
+      const keys = [identityKey('media', recordIdentity(payload, 'aggregateId'))];
+      if (payload['original'] !== undefined) {
+        keys.push(identityKey('media', recordIdentity(payload['original'], 'mediaId')));
+      }
+      return [...new Set(keys)];
+    }
     case 'project-assets':
     case 'project-exports':
       return projectPublicationKeys(journal.domain, payload);

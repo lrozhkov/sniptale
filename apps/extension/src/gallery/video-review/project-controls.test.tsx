@@ -191,12 +191,14 @@ function projectCommandFixture(retained = false) {
   });
   const create = vi.fn<(command: string) => Promise<VideoWorkspaceProjectCreationAcknowledgement>>(
     async (command) => ({
-      workspace: { ...snapshot.workspace, aggregateId: 'recording:source' },
+      workspace: {
+        ...snapshot.workspace,
+        aggregateId: `recording:quick-project:${command}`,
+        sourceMediaId: 'recording:source',
+      },
       draft: null,
-      archiveCheckpointReceipt: rootReceipt(`recording:quick-project:${command}`),
-      ...(retained
-        ? { retainedEditorCheckpointReceipt: rootReceipt(snapshot.workspace.aggregateId) }
-        : {}),
+      newProjectCheckpointReceipt: rootReceipt(`recording:quick-project:${command}`),
+      retainedEditorCheckpointReceipt: rootReceipt(snapshot.workspace.aggregateId),
     })
   );
   const created = vi.fn();
@@ -245,7 +247,7 @@ function projectCommandFixture(retained = false) {
 }
 
 it.each([false, true])(
-  'requests only fixed New roles before opening the returned default; retained=%s',
+  'requests both project receipts before opening the returned project; independent=%s',
   async (retained) => {
     const f = projectCommandFixture(retained);
     try {
@@ -253,12 +255,9 @@ it.each([false, true])(
       const command = f.create.mock.calls[0]![0];
       expect(requestExit.mock.calls.map((call) => call[0].rootId)).toEqual([
         `recording:quick-project:${command}`,
-        ...(retained ? ['recording:editor-a'] : []),
+        retained ? 'recording:editor-a' : 'recording:source',
       ]);
-      expect(requestExit.mock.calls.some((call) => call[0].rootId === 'recording:source')).toBe(
-        false
-      );
-      expect(f.created).toHaveBeenCalledExactlyOnceWith('recording:source');
+      expect(f.created).toHaveBeenCalledExactlyOnceWith(`recording:quick-project:${command}`);
     } finally {
       f.cleanup();
     }

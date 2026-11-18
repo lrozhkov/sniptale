@@ -342,9 +342,11 @@ async function newVideoWorkspace(
   const advanced = createQuickEditAdvancedState();
   const legacy = parseVideoWorkspace({
     aggregateId,
+    generation: crypto.randomUUID(),
+    ...(aggregateId !== media.id ? { sourceMediaId: media.id } : {}),
     formatVersion: 1,
     source,
-    sourceAssetId: await readSourceAssetId(tx, aggregateId),
+    sourceAssetId: await readSourceAssetId(tx, media.id),
     revision: await allocateVideoReviewRevision(tx, aggregateId, revision),
     history: [],
     cursor: 0,
@@ -408,98 +410,84 @@ export async function openVideoWorkspace(
   });
 }
 
-/** Atomically preserves the current default and starts an independent empty project for its source. */
+/** Create a sibling with its own ID and retain the current project at its original ID. */
 export async function createVideoWorkspaceProject(args: {
   aggregateId: string;
   expectedRevision: number;
   expectedSourceAssetId: string;
-  archiveId: string;
+  expectedGeneration: string | undefined;
+  newProjectId: string;
 }): Promise<VideoWorkspaceProjectCreationAcknowledgement> {
-  if (!args.archiveId || args.archiveId.length > 256 || args.archiveId === args.aggregateId)
+  if (
+    !args.newProjectId ||
+    args.newProjectId.length > 256 ||
+    args.newProjectId === args.aggregateId
+  )
     throw new VideoWorkspaceError('invalid');
   let fresh = false;
-  let archiveCheckpointReceipt: SyncCheckpointReceipt | null = null;
+  let newProjectCheckpointReceipt: SyncCheckpointReceipt | null = null;
   const created = await mutate(
     args.aggregateId,
     async (tx, _prepared, _physicalDelete, media, opened) => {
       if (!opened) throw new VideoWorkspaceError('conflict');
-      const sourceMediaId = opened.snapshot.workspace.sourceMediaId ?? args.aggregateId;
+      const previous = opened.snapshot.workspace;
       const sourceKind = media.source.kind === 'project-export' ? 'export' : media.source.kind;
-      const sourcePrefix = `${sourceKind}:`;
-      if (!args.archiveId.startsWith(sourcePrefix) || args.archiveId.length === sourcePrefix.length)
-        throw new VideoWorkspaceError('invalid');
+      const prefix = `${sourceKind}:quick-project:`;
       if (
-        args.archiveId === sourceMediaId ||
-        (await tx.objectStore(MEDIA_LIBRARY_STORE).get(args.archiveId))
+        !args.newProjectId.startsWith(prefix) ||
+        args.newProjectId.length === prefix.length ||
+        args.newProjectId === media.id ||
+        (await tx.objectStore(MEDIA_LIBRARY_STORE).get(args.newProjectId))
       )
         throw new VideoWorkspaceError('invalid');
-      const previousArchive = await readSnapshot(tx, args.archiveId);
-      const current =
-        sourceMediaId === args.aggregateId ? opened : await readSnapshot(tx, sourceMediaId);
       if (
-        opened.snapshot.workspace.sourceAssetId !== args.expectedSourceAssetId ||
-        opened.snapshot.workspace.project?.lifecycle.trashedAt !== undefined ||
-        current?.snapshot.workspace.project?.lifecycle.trashedAt !== undefined ||
+        previous.sourceAssetId !== args.expectedSourceAssetId ||
+        previous.generation !== args.expectedGeneration ||
+        previous.project?.lifecycle.trashedAt !== undefined ||
         media.lifecycle?.trashedAt !== undefined
       )
         throw new VideoWorkspaceError('conflict');
-      if (previousArchive) {
-        // The stable command identity acknowledges a completed publication without resetting newer work.
+      const existing = await readSnapshot(tx, args.newProjectId);
+      if (existing) {
         if (
-          previousArchive.snapshot.workspace.sourceMediaId !== sourceMediaId ||
-          previousArchive.snapshot.workspace.sourceAssetId !== args.expectedSourceAssetId ||
-          !current
+          existing.snapshot.workspace.sourceMediaId !== media.id ||
+          existing.snapshot.workspace.sourceAssetId !== previous.sourceAssetId ||
+          existing.snapshot.workspace.project?.lifecycle.trashedAt !== undefined
         )
           throw new VideoWorkspaceError('conflict');
-        return current.snapshot;
+        return existing.snapshot;
       }
+      if (previous.revision !== args.expectedRevision) throw new VideoWorkspaceError('conflict');
       try {
-        await assertUnusedVideoReviewIdentity(tx, args.archiveId);
+        await assertUnusedVideoReviewIdentity(tx, args.newProjectId);
       } catch {
         throw new VideoWorkspaceError('conflict');
       }
-      if (opened.snapshot.workspace.revision !== args.expectedRevision)
-        throw new VideoWorkspaceError('conflict');
-      const previous = current?.snapshot ?? opened.snapshot;
-      if (previous.workspace.sourceAssetId !== args.expectedSourceAssetId)
-        throw new VideoWorkspaceError('changed-source');
-      const archive = parseVideoWorkspace({
-        ...previous.workspace,
-        aggregateId: args.archiveId,
-        sourceMediaId,
+
+      const now = Math.max(Date.now(), previous.createdAt + 1, previous.updatedAt);
+      const workspace = await newVideoWorkspace(tx, args.newProjectId, previous.source, media, now);
+      // Advance the original CAS so the same command cannot recreate a purged result.
+      const retained = {
+        ...previous,
         revision: await allocateVideoReviewRevision(
           tx,
-          args.archiveId,
-          previous.workspace.revision
+          previous.aggregateId,
+          previous.revision + 1
         ),
-      });
-      if (!archive) throw new VideoWorkspaceError('invalid');
-      const now = Math.max(
-        Date.now(),
-        previous.workspace.createdAt + 1,
-        previous.workspace.updatedAt
-      );
-      const workspace = await newVideoWorkspace(
-        tx,
-        sourceMediaId,
-        previous.workspace.source,
-        media,
-        now,
-        current ? current.snapshot.workspace.revision + 1 : 1
-      );
-      await replaceWorkspaceStorage(tx, archive, indexedWorkspace(archive).usageReferenceKeys);
-      if (previous.draft)
-        await tx
-          .objectStore(VIDEO_WORKSPACE_DRAFTS_STORE)
-          .put({ ...previous.draft, aggregateId: args.archiveId });
+      };
       await replaceWorkspaceStorage(tx, workspace, indexedWorkspace(workspace).usageReferenceKeys);
-      await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(sourceMediaId);
-      archiveCheckpointReceipt = await captureCheckpointReceiptInTransaction(
+      await writeWorkspaceStorage(tx, {
+        storage: opened.storage,
+        previous,
+        workspace: retained,
+        mode: 'cursor',
+        usageReferenceKeys: indexedWorkspace(retained).usageReferenceKeys,
+      });
+      newProjectCheckpointReceipt = await captureCheckpointReceiptInTransaction(
         tx,
-        { rootKind: 'video-review', rootId: args.archiveId },
-        () => captureVideoReviewInTransaction(tx, args.archiveId)
+        { rootKind: 'video-review', rootId: workspace.aggregateId },
+        () => captureVideoReviewInTransaction(tx, workspace.aggregateId)
       );
-      await captureVideoReviewInTransaction(tx, sourceMediaId);
       fresh = true;
       return { workspace, draft: null };
     },
@@ -508,11 +496,10 @@ export async function createVideoWorkspaceProject(args: {
     () => fresh
   );
   return {
-    ...created,
-    ...(archiveCheckpointReceipt ? { archiveCheckpointReceipt } : {}),
-    ...(fresh &&
-    args.aggregateId !== created.workspace.aggregateId &&
-    created.checkpointReceipt?.rootId === args.aggregateId
+    workspace: created.workspace,
+    draft: created.draft,
+    ...(newProjectCheckpointReceipt ? { newProjectCheckpointReceipt } : {}),
+    ...(created.checkpointReceipt
       ? { retainedEditorCheckpointReceipt: created.checkpointReceipt }
       : {}),
   };

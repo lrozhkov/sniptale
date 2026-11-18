@@ -52,10 +52,10 @@ export function useReviewProjectCommands(
                   );
                 };
                 if (!canContinue()) return;
-                if (created.archiveCheckpointReceipt) {
+                if (created.newProjectCheckpointReceipt) {
                   try {
                     await createSyncProductClient().requestCheckpointExit(
-                      created.archiveCheckpointReceipt
+                      created.newProjectCheckpointReceipt
                     );
                   } catch {
                     /* Committed creation and its original pending deadline survive a missed advisory request. */

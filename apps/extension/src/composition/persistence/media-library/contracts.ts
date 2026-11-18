@@ -8,7 +8,7 @@ export type { MediaAssetKind } from '../../../features/media-hub/media-types';
 
 export interface MediaAssetProjectUsage {
   id: string;
-  kind: 'scenario' | 'video' | 'review';
+  kind: 'scenario' | 'video' | 'review' | 'image';
   name: string;
   primary: boolean;
 }
@@ -47,6 +47,8 @@ export interface MediaLibraryEntry {
   sourceFavicon: string | null;
   tags: string[];
   lifecycle?: LibraryLifecycle;
+  /** False when a project retains this source without a separate save in Originals. */
+  savedIndependently?: boolean;
   recordingGroup?: RecordingGroupMember;
   /** Monotonic editable-workspace revision. Restored original-only images can retain a nonzero revision. */
   /** Missing only on pre-v24 persisted rows; readers normalize it to revision 0. */

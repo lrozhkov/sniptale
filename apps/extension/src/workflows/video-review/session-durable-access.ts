@@ -45,11 +45,7 @@ export const reviewSessionPersistence = {
   },
   async createVideoWorkspaceProject(args: Parameters<typeof createVideoWorkspaceProject>[0]) {
     const created = await createVideoWorkspaceProject(args);
-    publishMediaHubLibraryChanged('update', [
-      args.aggregateId,
-      args.archiveId,
-      created.workspace.aggregateId,
-    ]);
+    publishMediaHubLibraryChanged('update', [args.aggregateId, created.workspace.aggregateId]);
     return created;
   },
   saveVideoWorkspaceSnapshot,

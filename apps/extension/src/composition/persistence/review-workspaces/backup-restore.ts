@@ -17,7 +17,7 @@ import {
 
 /** Portable review includes all history and field recovery, but no local OPFS identity. */
 export interface PortableVideoReview {
-  workspace: Omit<VideoWorkspace, 'sourceAssetId' | 'typing' | 'sourceMediaId'>;
+  workspace: Omit<VideoWorkspace, 'sourceAssetId' | 'typing' | 'sourceMediaId' | 'generation'>;
   draft: VideoWorkspaceDraft | null;
 }
 
@@ -36,7 +36,8 @@ function parsePortableVideoReviewShape(
     !isRecord(value['workspace']) ||
     'sourceAssetId' in value['workspace'] ||
     'typing' in value['workspace'] ||
-    'sourceMediaId' in value['workspace']
+    'sourceMediaId' in value['workspace'] ||
+    'generation' in value['workspace']
   ) {
     throw new Error('Portable video review is invalid.');
   }
@@ -93,6 +94,7 @@ export async function readVideoReviewForBackup(args: {
     sourceAssetId: _localId,
     typing: _typing,
     sourceMediaId: _sourceMediaId,
+    generation,
     ...portable
   } = workspace;
   const result = parsePortableVideoReviewShape(
@@ -105,6 +107,7 @@ export async function readVideoReviewForBackup(args: {
       sourceAssetId,
       typing: _expectedTyping,
       sourceMediaId: _expectedMediaId,
+      generation: expectedGeneration,
       ...expectedWorkspace
     } = args.expectedSnapshot.workspace;
     const expected = parsePortableVideoReviewShape(
@@ -112,7 +115,11 @@ export async function readVideoReviewForBackup(args: {
       args.aggregateId,
       true
     );
-    if (sourceAssetId !== args.sourceAssetId || JSON.stringify(result) !== JSON.stringify(expected))
+    if (
+      sourceAssetId !== args.sourceAssetId ||
+      generation !== expectedGeneration ||
+      JSON.stringify(result) !== JSON.stringify(expected)
+    )
       throw new Error('Video review changed before backup. Retry the backup.');
   }
   return result;
@@ -199,7 +206,9 @@ export async function putVideoReviewRestore(args: {
     delete(key: string): Promise<unknown>;
   };
 }): Promise<void> {
-  await args.workspaces.put(withReviewWorkspaceUsage(args.review.workspace));
+  await args.workspaces.put(
+    withReviewWorkspaceUsage({ ...args.review.workspace, generation: crypto.randomUUID() })
+  );
   if (args.review.draft) await args.drafts.put(args.review.draft);
   else await args.drafts.delete(args.review.workspace.aggregateId);
 }

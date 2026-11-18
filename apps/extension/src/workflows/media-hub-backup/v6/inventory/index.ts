@@ -3,6 +3,7 @@ import type { VideoWorkspaceSnapshot } from '../../../../composition/persistence
 import { parsePortableVideoProjectMetadata } from '../root-codecs/projects';
 import {
   initDB,
+  IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   VIDEO_WORKSPACES_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
@@ -17,6 +18,7 @@ import { buildScenarioProjectRootInventory } from './scenario-projects';
 import { buildVideoProjectRootInventory } from './video-projects';
 import { resolveBackupDependencySelection } from './scenario-dependencies';
 import { MEDIA_HUB_BACKUP_SHARED_LAYOUT } from '../layout';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 
 interface LibraryInventoryAdmission {
   expectedReview?: VideoWorkspaceSnapshot | undefined;
@@ -24,14 +26,41 @@ interface LibraryInventoryAdmission {
   prepareRoot?: MediaHubBackupRootPreparation;
 }
 
+function assertPortableImageWorkspaceSelection(
+  workspaces: unknown[],
+  selected: ReadonlySet<string> | null
+): void {
+  if (
+    workspaces.some(
+      (row) =>
+        isRecord(row) &&
+        row['sourceMediaId'] !== undefined &&
+        (selected === null ||
+          (typeof row['aggregateId'] === 'string' && selected.has(row['aggregateId'])))
+    )
+  ) {
+    throw new Error('This backup format cannot include independent image projects.');
+  }
+}
+
 async function collectNativeLibraryRoots(
   options: MediaHubBackupExportOptions,
   admission: LibraryInventoryAdmission
 ) {
   const db = await initDB();
+  const selected = options.scope === 'all' ? null : new Set(options.selected?.mediaAssetIds);
+  const checkImageProjects = selected === null || selected.size > 0;
+  const snapshot = db.transaction([MEDIA_LIBRARY_STORE, IMAGE_WORKSPACES_STORE], 'readonly');
+  const mediaRead: Promise<unknown[]> = snapshot.objectStore(MEDIA_LIBRARY_STORE).getAll();
+  const imageRead: Promise<unknown[]> = checkImageProjects
+    ? snapshot.objectStore(IMAGE_WORKSPACES_STORE).getAll()
+    : Promise.resolve([]);
+  const [mediaRows, workspaces] = await Promise.all([mediaRead, imageRead]);
+  await snapshot.done;
+  assertPortableImageWorkspaceSelection(workspaces, selected);
   const dependencies = await resolveBackupDependencySelection(db, options);
   const effectiveOptions = withRequiredBackupDependencies(options, dependencies);
-  const items = (await db.getAll(MEDIA_LIBRARY_STORE))
+  const items = mediaRows
     .map(parseMediaLibraryEntry)
     .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
     .map((entry) => ({ ...entry, hasThumbnail: false }));
@@ -87,6 +116,11 @@ async function collectNativeLibraryRoots(
       scenarioProjectIds: exportedScenarioIds,
       videoProjectIds: new Set(videoProjects.map((root) => root.descriptor.rootId)),
     });
+  // Individual root preparation can reread native state after the initial inventory.
+  if (checkImageProjects) {
+    const current: unknown[] = await db.getAll(IMAGE_WORKSPACES_STORE);
+    assertPortableImageWorkspaceSelection(current, selected);
+  }
   return { db, paths, media, scenarioProjects, videoProjects };
 }
 

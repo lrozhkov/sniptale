@@ -1,7 +1,7 @@
 import { getMediaThumbnail } from '../../../composition/persistence/media-library/index.library';
 import type { MediaThumbnailEntry } from '../../../composition/persistence/media-library/contracts';
 import { getAggregatePresentation } from '../../../composition/persistence/aggregate-presentations';
-import type { GalleryItem } from './types';
+import { type GalleryItem, usesGalleryImagePresentation } from './types';
 import { ensureLegacyGalleryThumbnail } from './legacy-thumbnails';
 import { getGalleryProjectCover } from './project-covers';
 import { readRemoteGalleryThumbnail } from './remote-thumbnails';
@@ -10,11 +10,8 @@ const THUMBNAIL_WIDTH = 320;
 const THUMBNAIL_HEIGHT = 180;
 
 function resolveEditableAggregateRef(item: GalleryItem) {
-  if (
-    item.type === 'media' &&
-    (item.kind === 'image' || item.kind === 'screenshot') &&
-    item.source.kind === 'screenshot'
-  ) {
+  if (item.type === 'image-project') return { id: item.entityId, kind: 'image' as const };
+  if (item.type === 'media' && usesGalleryImagePresentation(item)) {
     return { id: item.entityId ?? item.id, kind: 'image' as const };
   }
   return null;

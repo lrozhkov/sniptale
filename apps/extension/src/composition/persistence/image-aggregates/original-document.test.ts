@@ -1,13 +1,11 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  getMedia: vi.fn(),
-  getBlob: vi.fn(),
+  readOriginal: vi.fn(),
   blobToDataUrl: vi.fn(async () => 'data:image/png;base64,b3JpZ2luYWw='),
 }));
-vi.mock('../media-library/index.library', () => ({
-  getMediaLibraryEntry: mocks.getMedia,
-  getMediaAssetBlob: mocks.getBlob,
+vi.mock('../image-workspaces/read', () => ({
+  readImageOriginalSource: mocks.readOriginal,
 }));
 vi.mock('../../../platform/media-utils/data-url', () => ({
   blobToDataUrl: mocks.blobToDataUrl,
@@ -19,18 +17,20 @@ beforeEach(() => vi.clearAllMocks());
 
 it('builds a clean document from retained source bytes after edits', async () => {
   const blob = new Blob(['original'], { type: 'image/png' });
-  mocks.getMedia.mockResolvedValue({
-    id: 'image-1',
-    kind: 'image',
-    originalFilename: 'capture.png',
-    width: 100,
-    height: 80,
+  mocks.readOriginal.mockResolvedValue({
+    asset: {
+      id: 'image-project',
+      kind: 'image',
+      originalFilename: 'capture.png',
+      width: 100,
+      height: 80,
+    },
+    blob,
   });
-  mocks.getBlob.mockResolvedValue(blob);
 
-  const document = await readImageAggregateOriginalDocument('image-1');
+  const document = await readImageAggregateOriginalDocument('image-project');
 
-  expect(mocks.getBlob).toHaveBeenCalledWith('image-1');
+  expect(mocks.readOriginal).toHaveBeenCalledWith('image-project');
   expect(mocks.blobToDataUrl).toHaveBeenCalledWith(blob);
   expect(document).toMatchObject({
     sourceImageData: 'data:image/png;base64,b3JpZ2luYWw=',
@@ -52,7 +52,9 @@ it('builds a clean document from retained source bytes after edits', async () =>
 });
 
 it('returns no original when the asset bytes are unavailable', async () => {
-  mocks.getMedia.mockResolvedValue({ id: 'image-1', kind: 'image' });
-  mocks.getBlob.mockResolvedValue(undefined);
+  mocks.readOriginal.mockResolvedValue({
+    asset: { id: 'image-1', kind: 'image' },
+    blob: undefined,
+  });
   await expect(readImageAggregateOriginalDocument('image-1')).resolves.toBeNull();
 });

@@ -27,7 +27,11 @@ import { getRecording } from '../recordings/index';
 import { getWebSnapshotPackageFile } from '../web-snapshots';
 import type { MediaLibraryEntry, MediaLibraryItem, MediaThumbnailEntry } from './contracts';
 import { parseDbEntries } from '../infrastructure/indexed-db/read-primitives';
-import { parseMediaLibraryEntry, parseMediaThumbnailEntry } from './read-guards';
+import {
+  isCollectableProjectOriginal,
+  parseMediaLibraryEntry,
+  parseMediaThumbnailEntry,
+} from './read-guards';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import { listMediaAssetProjectUsage } from './usage';
 import type { MediaAssetProjectUsage } from './usage';
@@ -70,6 +74,31 @@ export async function listMediaLibrary(): Promise<MediaLibraryItem[]> {
       hasThumbnail: thumbnailIds.has(entry.id),
     }))
     .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/** Discover recovery candidates without loading thumbnails or project documents. */
+export async function listCollectableProjectOriginalIds(signal: AbortSignal): Promise<string[]> {
+  const db = await initDB();
+  const pageSize = 64;
+  const ids: string[] = [];
+  let range: IDBKeyRange | undefined;
+  while (!signal.aborted) {
+    const tx = db.transaction(MEDIA_LIBRARY_STORE, 'readonly');
+    const [rows, keys]: [unknown[], IDBValidKey[]] = await Promise.all([
+      tx.store.getAll(range, pageSize),
+      tx.store.getAllKeys(range, pageSize),
+    ]);
+    await tx.done;
+    for (const row of rows) {
+      const entry = parseMediaLibraryEntry(row);
+      if (entry && isCollectableProjectOriginal(entry)) ids.push(entry.id);
+    }
+    const lastKey = keys.at(-1);
+    if (keys.length < pageSize || lastKey === undefined) break;
+    // Later pages and removals can interleave with ordinary library mutations.
+    range = IDBKeyRange.lowerBound(lastKey, true);
+  }
+  return ids;
 }
 
 export async function listMediaThumbnailIds(): Promise<string[]> {
@@ -207,13 +236,14 @@ export async function addMediaLibraryEntryTags(
 
 export async function deleteMediaLibraryAsset(
   assetId: string,
-  options: { expectedUsage?: readonly MediaAssetProjectUsage[] } = {}
+  options: { expectedUsage?: readonly MediaAssetProjectUsage[]; projectRetainedOnly?: boolean } = {}
 ): Promise<void> {
   const db = await initDB();
   try {
     await runWithPersistenceMutationTransition(() =>
       runWithDurableAssetLifecycleLock(async (permit) => {
         const entry = parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, assetId));
+        if (options.projectRetainedOnly && !isCollectableProjectOriginal(entry)) return;
         // Missing roots still have pending image/sync media-ID claims that can publish later.
         const target = entry ?? { id: assetId };
         const claims = await readAssetReadyPublicationClaims(target, permit);
@@ -225,9 +255,14 @@ export async function deleteMediaLibraryAsset(
           throw new MediaAssetDeletionBlockedError('pending-publication');
         if (!entry) return;
         const consumers = await listMediaAssetProjectUsage(assetId);
+        if (options.projectRetainedOnly && consumers.length > 0) return;
         if (consumers.length > 0 && !options.expectedUsage)
           throw new Error('The media asset is still used by projects.');
-        await deleteMediaAssetWithProjectCascade(assetId, options.expectedUsage ?? [], permit);
+        if (options.projectRetainedOnly) {
+          await deleteMediaAssetWithProjectCascade(assetId, [], permit, true);
+        } else {
+          await deleteMediaAssetWithProjectCascade(assetId, options.expectedUsage ?? [], permit);
+        }
       })
     );
   } catch (error) {

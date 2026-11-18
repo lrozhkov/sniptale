@@ -320,6 +320,33 @@ it.each<MediaLibraryEntry['source']>([
   expect(dbMocks.deleteCascadeMock).toHaveBeenCalledWith('linked', usage, expect.any(Object));
 });
 
+it('collects an unclaimed project original and retains a manual save or another project', async () => {
+  const original = createMediaEntry({
+    id: 'original',
+    kind: 'image',
+    source: { kind: 'screenshot' },
+  });
+  const retained = { ...original, savedIndependently: false };
+  dbMocks.getMock
+    .mockResolvedValueOnce({ ...retained, savedIndependently: true })
+    .mockResolvedValue(retained);
+  dbMocks.listMediaAssetProjectUsageMock.mockResolvedValueOnce([
+    { id: 'remaining-project', kind: 'image', name: 'Remaining project', primary: true },
+  ]);
+
+  await deleteMediaLibraryAsset(original.id, { projectRetainedOnly: true });
+  await deleteMediaLibraryAsset(original.id, { projectRetainedOnly: true });
+  expect(dbMocks.deleteCascadeMock).not.toHaveBeenCalled();
+
+  await deleteMediaLibraryAsset(original.id, { projectRetainedOnly: true });
+  expect(dbMocks.deleteCascadeMock).toHaveBeenCalledExactlyOnceWith(
+    original.id,
+    [],
+    expect.any(Object),
+    true
+  );
+});
+
 it.each([
   { domain: 'image-workspace', payload: { aggregateId: 'missing' } },
   { domain: 'sync-replica', payload: { kind: 'image', input: { media: { id: 'missing' } } } },

@@ -8,6 +8,7 @@ import {
   runBusyAction,
 } from './test-support/index';
 import { createClosePreviewAction, createSaveMetadataAction, resetPreviewChanges } from './preview';
+import { createImageProjectItem } from '../test-support/items';
 import {
   createNavigatePreviewAction,
   createPreviewNavigationCoordinator,
@@ -45,6 +46,20 @@ vi.mock('../../../composition/persistence/scenario/store/project-records/exports
 beforeEach(() => {
   vi.clearAllMocks();
   renameExportMock.mockReset();
+});
+
+it('closes an image project preview without writing its original metadata', async () => {
+  const previewItem = createImageProjectItem();
+  const { controller } = createController({
+    previewItem,
+    filenameDraft: 'Unaccepted local input',
+    tagDrafts: ['not-an-original-tag'],
+  });
+
+  await createClosePreviewAction(controller)(runBusyAction);
+
+  expect(controller.state.preview.session.item).toBeNull();
+  expect(updateMediaLibraryEntrySafelyMock).not.toHaveBeenCalled();
 });
 
 it('saves only changed preview metadata fields for media items', async () => {

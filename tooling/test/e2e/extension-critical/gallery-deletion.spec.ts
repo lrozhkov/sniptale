@@ -1,6 +1,9 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../support/extension-fixture';
 import { translate } from '../support/catalog-fixture';
+import { createVideoProjectEntryWithMediaClip } from '../../../../apps/extension/src/composition/persistence/projects/index.test-support';
+import { projectRowReferenceKeys } from '../../../../apps/extension/src/composition/persistence/assets/retention-index-projection';
+import { withRowReferenceMetadata } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/row-index-contract';
 
 async function countMediaLibraryEntries(page: Page, assetId?: string): Promise<number> {
   return page.evaluate(async (id) => {
@@ -25,7 +28,8 @@ async function createDraft(
   page: Page,
   extensionId: string,
   locale: 'ru' | 'en',
-  theme: 'light' | 'dark'
+  theme: 'light' | 'dark',
+  linkedProjectName?: string
 ) {
   await page.goto(`chrome-extension://${extensionId}/apps/extension/src/gallery/index.html`);
   await page.evaluate(
@@ -39,71 +43,83 @@ async function createDraft(
   await page.reload();
   await expect(page.locator('[data-ui="gallery.page.root"]')).toBeVisible();
   // A native capture starts temporary. Opening a local file in the editor admits a retained project.
-  const assetId = await page.evaluate(async () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 160;
-    canvas.height = 90;
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('Screenshot fixture canvas unavailable');
-    context.fillStyle = '#2864c8';
-    context.fillRect(0, 0, 160, 90);
-    const blob = await new Promise<Blob>((resolve, reject) =>
-      canvas.toBlob(
-        (result) =>
-          result ? resolve(result) : reject(new Error('Screenshot fixture PNG unavailable')),
-        'image/png'
-      )
-    );
-    const id = crypto.randomUUID();
-    const now = Date.now();
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sniptale-db');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      const tx = db.transaction(['media_library', 'aggregate_presentations'], 'readwrite');
-      const done = new Promise<void>((resolve, reject) => {
-        tx.oncomplete = () => resolve();
-        tx.onabort = () => reject(tx.error);
-        tx.onerror = () => reject(tx.error);
+  const assetId = crypto.randomUUID();
+  const project = linkedProjectName
+    ? createVideoProjectEntryWithMediaClip({ name: linkedProjectName })
+    : null;
+  if (project) project.project.assets[0]!.source = { kind: 'library-asset', mediaId: assetId };
+  const projectRow = project
+    ? withRowReferenceMetadata(project, projectRowReferenceKeys('video_projects', project))
+    : null;
+  await page.evaluate(
+    async ({ id, projectRow }) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 160;
+      canvas.height = 90;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Screenshot fixture canvas unavailable');
+      context.fillStyle = '#2864c8';
+      context.fillRect(0, 0, 160, 90);
+      const blob = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob(
+          (result) =>
+            result ? resolve(result) : reject(new Error('Screenshot fixture PNG unavailable')),
+          'image/png'
+        )
+      );
+      const now = Date.now();
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('sniptale-db');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
       });
-      tx.objectStore('media_library').put({
-        id,
-        kind: 'screenshot',
-        source: { kind: 'screenshot' },
-        filename: 'deletion-draft.png',
-        originalFilename: 'deletion-draft.png',
-        createdAt: now,
-        updatedAt: now,
-        size: blob.size,
-        mimeType: 'image/png',
-        width: 160,
-        height: 90,
-        duration: null,
-        imageContentState: 'original',
-        workspaceRevision: 0,
-        sourceUrl: null,
-        sourceTitle: null,
-        sourceFavicon: null,
-        tags: [],
-        lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: now },
-        blob,
-      });
-      tx.objectStore('aggregate_presentations').put({
-        aggregateId: id,
-        aggregateKind: 'image',
-        presentationRevision: 0,
-        previewBlob: blob,
-        thumbnailBlob: blob,
-        updatedAt: now,
-      });
-      await done;
-    } finally {
-      db.close();
-    }
-    return id;
-  });
+      try {
+        const stores = ['media_library', 'aggregate_presentations'];
+        if (projectRow) stores.push('video_projects');
+        const tx = db.transaction(stores, 'readwrite');
+        const done = new Promise<void>((resolve, reject) => {
+          tx.oncomplete = () => resolve();
+          tx.onabort = () => reject(tx.error);
+          tx.onerror = () => reject(tx.error);
+        });
+        tx.objectStore('media_library').put({
+          id,
+          kind: 'screenshot',
+          source: { kind: 'screenshot' },
+          filename: 'deletion-draft.png',
+          originalFilename: 'deletion-draft.png',
+          createdAt: now,
+          updatedAt: now,
+          size: blob.size,
+          mimeType: 'image/png',
+          width: 160,
+          height: 90,
+          duration: null,
+          imageContentState: 'original',
+          workspaceRevision: 0,
+          sourceUrl: null,
+          sourceTitle: null,
+          sourceFavicon: null,
+          tags: [],
+          lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: now },
+          blob,
+        });
+        tx.objectStore('aggregate_presentations').put({
+          aggregateId: id,
+          aggregateKind: 'image',
+          presentationRevision: 0,
+          previewBlob: blob,
+          thumbnailBlob: blob,
+          updatedAt: now,
+        });
+        if (projectRow) tx.objectStore('video_projects').put(projectRow);
+        await done;
+      } finally {
+        db.close();
+      }
+    },
+    { id: assetId, projectRow }
+  );
   await expect.poll(() => countMediaLibraryEntries(page, assetId)).toBe(1);
   await page.evaluate(
     ({ locale, theme }) =>
@@ -188,6 +204,32 @@ async function verifyCompactSidebar(page: Page, locale: 'ru' | 'en') {
   expect(sidebarLeft).toBeGreaterThanOrEqual(contentLeft);
   return toggle;
 }
+
+test('keeps a file attached to an unselected project', async ({ page, extensionId }, info) => {
+  const assetId = await createDraft(page, extensionId, 'en', 'light', 'Project using the draft');
+  await page.reload();
+  const item = page
+    .locator(`[data-gallery-keyboard-id="${assetId}"]`)
+    .getByRole('button', { name: 'deletion-draft.png', exact: true })
+    .first();
+  await item.focus();
+  await page.keyboard.press('Enter');
+  await page
+    .locator('[data-ui="gallery.preview.lifecycle-actions"]')
+    .getByRole('button', { name: translate('common.actions.delete', 'en'), exact: true })
+    .click();
+  const menu = page.locator('[data-ui="gallery.deletion.menu"]');
+  await menu
+    .getByRole('menuitem', { name: translate('gallery.app.permanentDelete', 'en'), exact: true })
+    .click();
+  await expect(menu.getByRole('status')).toContainText('Project using the draft');
+  await expect(menu.getByRole('menuitem', { name: 'Delete permanently' })).toBeDisabled();
+  await expect(menu.getByText(translate('gallery.app.confirmPermanentDelete', 'en'))).toHaveCount(
+    0
+  );
+  await expect.poll(() => countMediaLibraryEntries(page, assetId)).toBe(1);
+  await page.screenshot({ path: info.outputPath('referenced-file.png'), fullPage: false });
+});
 
 for (const [locale, theme] of [
   ['ru', 'light'],

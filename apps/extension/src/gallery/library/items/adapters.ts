@@ -1,12 +1,14 @@
 import type { SyncRemoteCatalogCard } from '../../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import type { GalleryRemoteRootItem } from './types';
 import type { VideoWorkspaceSummary } from '../../../composition/persistence/review-workspaces/summaries';
+import type { ImageWorkspaceProjectSummary } from '../../../composition/persistence/image-workspaces/read';
 import type { MediaLibraryItem } from '../../../composition/persistence/media-library/contracts';
 import type { VideoProjectListItem } from '../../../features/media-hub/video-project-list-items';
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
 import type { ScenarioExportEntry } from '@sniptale/runtime-contracts/scenario/types/session';
 import type {
   GalleryItem,
+  GalleryImageProjectItem,
   GalleryQuickEditProjectItem,
   GalleryScenarioExportItem,
   GalleryScenarioItem,
@@ -146,6 +148,7 @@ export function createQuickEditProjectGalleryItem(
 
 export function createGalleryItems(args: {
   mediaItems: MediaLibraryItem[];
+  imageProjects?: ImageWorkspaceProjectSummary[];
   quickEditProjects?: VideoWorkspaceSummary[];
   presentations?: AggregatePresentationEntry[];
   scenarioExportsByProjectId: Map<string, ScenarioExportEntry[]>;
@@ -160,6 +163,37 @@ export function createGalleryItems(args: {
     ])
   );
   const recordingProjects = new Map<string, { id: string; name: string }>();
+  const originals = new Map(args.mediaItems.map((item) => [item.id, item]));
+  const imageProjectItems = (args.imageProjects ?? []).map((project): GalleryImageProjectItem => {
+    const original = originals.get(project.sourceMediaId);
+    const presentation = presentations.get(
+      serializeAggregateRef({ id: project.aggregateId, kind: 'image' })
+    );
+    return {
+      id: `image-project:${project.aggregateId}`,
+      entityId: project.aggregateId,
+      type: 'image-project',
+      kind: 'image',
+      project,
+      filename: project.name ?? original?.filename ?? project.aggregateId,
+      lifecycle: project.lifecycle,
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
+      workspaceRevision: project.revision,
+      presentationRevision: presentation?.presentationRevision ?? null,
+      hasThumbnail: Boolean(presentation),
+      size: 0,
+      sourceFavicon: null,
+      sourceTitle: original?.sourceTitle ?? null,
+      sourceUrl: original?.sourceUrl ?? null,
+      sourceAvailable: original?.kind === 'screenshot' || original?.kind === 'image',
+      tags: [],
+      width: project.width,
+      height: project.height,
+      duration: null,
+      mimeType: 'application/x-sniptale-image-project',
+    };
+  });
   args.videoProjects.forEach((project) => {
     (project.recordingIds ?? []).forEach((recordingId) => {
       if (!recordingProjects.has(recordingId)) {
@@ -171,11 +205,12 @@ export function createGalleryItems(args: {
     const item = createGalleryMediaItem(media);
     if (
       (media.kind !== 'image' && media.kind !== 'screenshot') ||
-      media.source.kind !== 'screenshot'
+      (media.source.kind !== 'screenshot' && media.source.kind !== 'stored-asset')
     ) {
       return item;
     }
     const presentation = presentations.get(serializeAggregateRef({ id: media.id, kind: 'image' }));
+    if (!presentation && media.source.kind === 'stored-asset') return item;
     return {
       ...item,
       hasThumbnail: Boolean(presentation),
@@ -242,6 +277,7 @@ export function createGalleryItems(args: {
 
   return [
     ...mediaItems,
+    ...imageProjectItems,
     ...videoProjectItems,
     ...(args.quickEditProjects ?? []).map(createQuickEditProjectGalleryItem),
     ...scenarioItems,

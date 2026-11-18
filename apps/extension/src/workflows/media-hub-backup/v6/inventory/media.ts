@@ -686,7 +686,7 @@ async function buildMediaRoot(args: {
         db: args.db,
       })
     : undefined;
-  const { blob: _blob, ...entryWithoutBlob } = entry;
+  const { blob: _blob, savedIndependently: _localClaim, ...entryWithoutBlob } = entry;
   const portableEntry =
     entry.source.kind === 'web-snapshot' && !args.options.includeSourceMetadata
       ? {

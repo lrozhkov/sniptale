@@ -23,6 +23,11 @@ vi.mock('../../../platform/i18n/format-bytes', async (importOriginal) => ({
   formatBytes: formatBytesMock,
 }));
 
+vi.mock('../../../composition/persistence/image-workspaces/read', async (original) => ({
+  ...(await original()),
+  listImageProjectsForEditing: async () => ({ canCreateIndependentProject: false, projects: [] }),
+}));
+
 vi.mock('../../video-review', () => ({
   VideoReview: (props: { aggregateId: string; onBack(): void }) => (
     <button data-test-review={props.aggregateId} onClick={props.onBack}>
@@ -496,7 +501,7 @@ it('hides destructive and reset actions for scenario exports without pending cha
   expect(exportMarkup).not.toContain('gallery.preview.download');
 });
 
-it('wires interactive preview actions and tag editing handlers', () => {
+it('wires interactive preview actions and tag editing handlers', async () => {
   const onAddTag = vi.fn();
   const onRemoveTag = vi.fn();
   const onTagDraftChange = vi.fn();
@@ -540,7 +545,7 @@ it('wires interactive preview actions and tag editing handlers', () => {
   if (!(updatedInput instanceof HTMLInputElement)) {
     throw new Error('Expected updated preview tag input');
   }
-  act(() => {
+  await act(async () => {
     updatedInput.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
     updatedButtons.forEach((button) => button.click());
   });

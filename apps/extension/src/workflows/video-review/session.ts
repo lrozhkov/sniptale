@@ -1112,7 +1112,7 @@ class VideoReviewSession {
     }
   }
 
-  /** Saves every captured field before replacing the source's default project. */
+  /** Saves every captured field before opening the new project. */
   private async createProject(commandId: string) {
     await this.coordinator.flushCaptured();
     let created: VideoWorkspaceProjectCreationAcknowledgement | undefined;
@@ -1121,7 +1121,7 @@ class VideoReviewSession {
       await saveExplicitReviewBuffer(this.state, this.persistBuffer.bind(this));
       const current = this.state.snapshot.workspace;
       const sourceMediaId = current.sourceMediaId ?? current.aggregateId;
-      const archiveId = `${sourceMediaId.split(':', 1)[0]}:quick-project:${commandId}`;
+      const newProjectId = `${sourceMediaId.split(':', 1)[0]}:quick-project:${commandId}`;
       try {
         created = await (
           this.deps.createVideoWorkspaceProject ??
@@ -1130,22 +1130,25 @@ class VideoReviewSession {
           aggregateId: current.aggregateId,
           expectedRevision: current.revision,
           expectedSourceAssetId: current.sourceAssetId,
-          archiveId,
+          expectedGeneration: current.generation,
+          newProjectId,
         });
         const acknowledged = created;
         const acceptsRoles =
           !this.disposed &&
-          acknowledged.workspace.aggregateId === sourceMediaId &&
+          acknowledged.workspace.aggregateId === newProjectId &&
+          acknowledged.workspace.sourceMediaId === sourceMediaId &&
           acknowledged.workspace.sourceAssetId === current.sourceAssetId;
-        const archive = parseSyncCheckpointReceipt(acknowledged.archiveCheckpointReceipt);
+        const newProject = parseSyncCheckpointReceipt(acknowledged.newProjectCheckpointReceipt);
         const retained = parseSyncCheckpointReceipt(acknowledged.retainedEditorCheckpointReceipt);
-        const archiveCheckpointReceipt =
-          acceptsRoles && archive?.rootKind === 'video-review' && archive.rootId === archiveId
-            ? archive
+        const newProjectCheckpointReceipt =
+          acceptsRoles &&
+          newProject?.rootKind === 'video-review' &&
+          newProject.rootId === newProjectId
+            ? newProject
             : null;
         const retainedEditorCheckpointReceipt =
           acceptsRoles &&
-          current.aggregateId !== sourceMediaId &&
           retained?.rootKind === 'video-review' &&
           retained.rootId === current.aggregateId &&
           retained.rootId === this.initial.workspace.aggregateId
@@ -1155,12 +1158,12 @@ class VideoReviewSession {
         created = {
           workspace: acknowledged.workspace,
           draft: acknowledged.draft,
-          ...(archiveCheckpointReceipt ? { archiveCheckpointReceipt } : {}),
+          ...(newProjectCheckpointReceipt ? { newProjectCheckpointReceipt } : {}),
           ...(retainedEditorCheckpointReceipt ? { retainedEditorCheckpointReceipt } : {}),
         };
         this.checkpointExit = undefined;
         if (
-          archiveCheckpointReceipt ||
+          newProjectCheckpointReceipt ||
           retainedEditorCheckpointReceipt ||
           (acceptsRoles &&
             generic?.rootKind === 'video-review' &&

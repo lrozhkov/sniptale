@@ -17,6 +17,7 @@ import { type EditorSessionAutosaveService } from '../session-autosave';
 interface EditorPageLocationState {
   assetId: string | null;
   bootstrapId: string | null;
+  originalId?: string;
 }
 
 interface EditorPageAssetRestoreSource {
@@ -24,6 +25,7 @@ interface EditorPageAssetRestoreSource {
   assetId: string;
   nativeRevision: number;
   sourceGeneration: string | null;
+  original?: { mediaId: string; generation: string | null };
   dataUrl: string;
   filename: string | null;
   sourceFaviconUrl: string | null;
@@ -77,6 +79,7 @@ function readEditorBootstrapId(search: string): string | null {
 function buildCurrentEditorAggregateUrl(aggregateId: string): string {
   const url = new URL(window.location.href);
   url.searchParams.set('assetId', aggregateId);
+  url.searchParams.delete('originalId');
   url.searchParams.delete('session');
   return `${url.pathname}${url.search}`;
 }
@@ -107,6 +110,7 @@ export function beginEditorPageLocalDraft(args: {
   const aggregateId = createAggregateId();
   const url = new URL(window.location.href);
   url.searchParams.set('assetId', aggregateId);
+  url.searchParams.delete('originalId');
   url.searchParams.delete(EDITOR_BOOTSTRAP_QUERY_PARAM);
   url.searchParams.delete('session');
   window.history.replaceState({}, '', `${url.pathname}${url.search}`);
@@ -124,6 +128,7 @@ export function beginEditorPageLocalDraft(args: {
 export function clearEditorPageSession(): void {
   const url = new URL(window.location.href);
   url.searchParams.delete('assetId');
+  url.searchParams.delete('originalId');
   url.searchParams.delete(EDITOR_BOOTSTRAP_QUERY_PARAM);
   url.searchParams.delete('session');
   window.history.replaceState({}, '', `${url.pathname}${url.search}`);
@@ -135,9 +140,14 @@ export function clearEditorPageSession(): void {
 export function readEditorPageLocationState(
   search = window.location.search
 ): EditorPageLocationState {
+  const assetId = readEditorAssetId(search);
+  const originalId = new URLSearchParams(search).get('originalId');
   return {
-    assetId: readEditorAssetId(search),
+    assetId,
     bootstrapId: readEditorBootstrapId(search),
+    ...(assetId && originalId && originalId !== assetId && originalId.length <= 256
+      ? { originalId }
+      : {}),
   };
 }
 
@@ -204,8 +214,8 @@ export async function resolveEditorPageRestoreSource(
   autosaveService: Pick<EditorSessionAutosaveService, 'restoreDraft'>,
   isCurrent?: () => boolean
 ): Promise<EditorPageRestoreSource> {
-  if (locationState.assetId)
-    await ensureNativeEditingRootAvailable({ rootKind: 'media', rootId: locationState.assetId });
+  const mediaId = locationState.originalId ?? locationState.assetId;
+  if (mediaId) await ensureNativeEditingRootAvailable({ rootKind: 'media', rootId: mediaId });
   let draftEntry: Awaited<ReturnType<EditorSessionAutosaveService['restoreDraft']>>;
   try {
     draftEntry = await autosaveService.restoreDraft(aggregateId, isCurrent);
@@ -224,6 +234,18 @@ export async function resolveEditorPageRestoreSource(
       kind: 'draft',
       entry: draftEntry,
       capturedAt: await resolveOriginalCaptureTime(aggregateId, draftEntry.createdAt ?? null),
+    };
+  }
+
+  if (locationState.originalId && locationState.assetId === aggregateId) {
+    const resolved = await resolveEditorAssetSource(locationState.originalId);
+    if (resolved.kind !== 'asset') throw new MissingEditorOriginalError();
+    return {
+      ...resolved,
+      assetId: aggregateId,
+      original: { mediaId: locationState.originalId, generation: resolved.sourceGeneration },
+      nativeRevision: 0,
+      sourceGeneration: null,
     };
   }
 

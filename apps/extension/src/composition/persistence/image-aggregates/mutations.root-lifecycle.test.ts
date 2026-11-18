@@ -1,7 +1,11 @@
 import { installTransaction, getImageMutationMocks, root } from './mutations.test-support';
 import { expect, it, vi } from 'vitest';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
-import { commitImageWorkspace, imageWorkspacePublicationAdapter } from './mutations';
+import {
+  commitImagePresentation,
+  commitImageWorkspace,
+  imageWorkspacePublicationAdapter,
+} from './mutations';
 
 it('does not recreate a purged original image on the first editor save', async () => {
   const puts = installTransaction({ sourceId: 'image-1' });
@@ -37,6 +41,80 @@ it('does not recreate a purged original image on the first editor save', async (
 });
 
 const mocks = getImageMutationMocks();
+
+it('saves two independent image projects over one original', async () => {
+  const media = {
+    ...root(0),
+    lifecycle: { storageClass: 'temporary' as const, savedAt: null, updatedAt: 2 },
+  };
+  const puts = installTransaction({ media });
+  const document = createEditorDocumentFixture();
+  const original = { mediaId: media.id, generation: null };
+  const first = await commitImageWorkspace({
+    aggregateId: 'first-project',
+    original,
+    document,
+    expectedRevision: 0,
+  });
+  const second = await commitImageWorkspace({
+    aggregateId: 'second-project',
+    original,
+    document,
+    expectedRevision: 0,
+  });
+  expect(second.sourceGeneration).not.toBe(first.sourceGeneration);
+  expect(puts.workspace).toHaveBeenNthCalledWith(
+    1,
+    expect.objectContaining({ aggregateId: 'first-project', sourceMediaId: media.id, revision: 1 })
+  );
+  expect(puts.workspace).toHaveBeenNthCalledWith(
+    2,
+    expect.objectContaining({ aggregateId: 'second-project', sourceMediaId: media.id, revision: 1 })
+  );
+  expect(puts.media).toHaveBeenCalledExactlyOnceWith({
+    ...media,
+    savedIndependently: false,
+    lifecycle: { storageClass: 'library', savedAt: 10, updatedAt: 10 },
+  });
+  const edited = await commitImageWorkspace({
+    aggregateId: 'first-project',
+    document,
+    expectedRevision: 1,
+    expectedGeneration: first.sourceGeneration ?? null,
+    requireExistingRoot: true,
+  });
+  expect(edited.revision).toBe(2);
+  const preview = new Blob(['project-preview']);
+  await commitImagePresentation({
+    aggregateId: 'first-project',
+    expectedWorkspaceRevision: 2,
+    expectedGeneration: first.sourceGeneration ?? null,
+    previewBlob: preview,
+    thumbnailBlob: preview,
+  });
+  expect(puts.presentation).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({
+      aggregateId: 'first-project',
+      presentationRevision: 2,
+    })
+  );
+  expect(puts.media).toHaveBeenCalledOnce();
+});
+
+it('refuses an image project after its observed original disappears', async () => {
+  const puts = installTransaction({});
+  await expect(
+    commitImageWorkspace({
+      aggregateId: 'new-project',
+      original: { mediaId: 'deleted-original', generation: null },
+      document: createEditorDocumentFixture(),
+      expectedRevision: 0,
+    })
+  ).rejects.toMatchObject({ name: 'ImageAggregateNotFoundError' });
+  expect(puts.workspace).not.toHaveBeenCalled();
+  expect(puts.media).not.toHaveBeenCalled();
+  expect(puts.presentation).not.toHaveBeenCalled();
+});
 
 it.each(['temporary', 'library'] as const)(
   'retains accepted local Image projects with the %s category configured',

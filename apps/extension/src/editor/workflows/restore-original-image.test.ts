@@ -5,7 +5,7 @@ import { useEditorStore } from '../state/useEditorStore';
 
 const persistence = vi.hoisted(() => ({
   commitPresentation: vi.fn(async () => undefined),
-  getBlob: vi.fn(async () => new Blob(['original'], { type: 'image/png' })),
+  getBlob: vi.fn(async (_aggregateId: string) => new Blob(['original'], { type: 'image/png' })),
   readOriginal: vi.fn(),
   thumbnail: vi.fn(async () => new Blob(['thumb'], { type: 'image/png' })),
 }));
@@ -13,8 +13,10 @@ vi.mock('../../composition/persistence/image-aggregates', () => ({
   commitImagePresentation: persistence.commitPresentation,
   readImageAggregateOriginalDocument: persistence.readOriginal,
 }));
-vi.mock('../../composition/persistence/media-library/index.library', () => ({
-  getMediaAssetBlob: persistence.getBlob,
+vi.mock('../../composition/persistence/image-workspaces/read', () => ({
+  readImageOriginalSource: async (aggregateId: string) => ({
+    blob: await persistence.getBlob(aggregateId),
+  }),
 }));
 vi.mock('../../platform/media-utils/image-thumbnail', () => ({
   createImageThumbnailBlob: persistence.thumbnail,

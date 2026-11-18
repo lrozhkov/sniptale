@@ -1,7 +1,11 @@
 import { readDeletionDependencyRows } from './deletion-index';
 import { readScenarioStorage } from '../scenario/storage';
 import type { IDBPTransaction } from 'idb';
-import { readIndexedProjectUsage } from './usage-index';
+import { linkedImageProjectUsage, readIndexedProjectUsage } from './usage-index';
+import {
+  ROW_REFERENCE_INDEX,
+  rowReferenceKey,
+} from '../infrastructure/indexed-db/row-index-contract';
 import { parseProjectAssetEntry, parseVideoProjectEntry } from '../projects/read-guards';
 import {
   mediaDependencyTarget,
@@ -13,6 +17,7 @@ import {
 import { parseScenarioAssetEntry, parseScenarioProjectEntry } from '../scenario/read-guards';
 import {
   initDB,
+  IMAGE_WORKSPACES_STORE,
   VIDEO_PROJECTS_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
@@ -152,6 +157,7 @@ export async function listMediaAssetProjectUsageBatch(
   const tx = db.transaction(
     [
       MEDIA_LIBRARY_STORE,
+      IMAGE_WORKSPACES_STORE,
       VIDEO_PROJECTS_STORE,
       PROJECT_ASSETS_STORE,
       SCENARIO_ASSETS_STORE,
@@ -167,7 +173,21 @@ export async function listMediaAssetProjectUsageBatch(
     const result = new Map<string, MediaAssetProjectUsage[]>();
     for (const id of ids) {
       const root = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(id));
-      result.set(id, root ? projectUsageFromSnapshot(id, await loadUsageSnapshot(tx, root)) : []);
+      if (!root) {
+        result.set(id, []);
+        continue;
+      }
+      const [snapshot, images] = await Promise.all([
+        loadUsageSnapshot(tx, root),
+        tx
+          .objectStore(IMAGE_WORKSPACES_STORE)
+          .index(ROW_REFERENCE_INDEX)
+          .getAll(rowReferenceKey('media', id)),
+      ]);
+      result.set(id, [
+        ...projectUsageFromSnapshot(id, snapshot),
+        ...linkedImageProjectUsage(root, images),
+      ]);
     }
     await tx.done;
     return result;

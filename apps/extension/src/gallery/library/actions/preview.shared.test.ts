@@ -11,6 +11,7 @@ import {
 } from './preview';
 import { createBusyActionRunner } from './shared';
 import { translate } from '../../../platform/i18n';
+import { createImageProjectItem } from '../test-support/items';
 import {
   createController,
   createMediaItem,
@@ -569,6 +570,17 @@ it('opens the saved quick-edit identity and refuses unavailable or trashed cards
   openInEditor({ ...item, unavailableReason: 'missing-source' as const });
   openInEditor({ ...item, lifecycle: { ...item.lifecycle!, trashedAt: 2 } });
   expect(openGalleryPageMock).toHaveBeenCalledTimes(1);
+});
+
+it('opens a saved image project by project ID and refuses unavailable or trashed cards', () => {
+  const item = createImageProjectItem();
+  openInEditor(item);
+  expect(buildEditorUrlMock).toHaveBeenCalledExactlyOnceWith({ assetId: item.entityId });
+  expect(browserTabsCreateMock).toHaveBeenCalledOnce();
+
+  openInEditor({ ...item, sourceAvailable: false });
+  openInEditor({ ...item, lifecycle: { ...item.project.lifecycle, trashedAt: 2 } });
+  expect(browserTabsCreateMock).toHaveBeenCalledOnce();
 });
 
 it('does not write unchanged quick-edit project metadata', async () => {

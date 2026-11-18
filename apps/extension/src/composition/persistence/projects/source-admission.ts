@@ -19,6 +19,7 @@ import {
 } from '../media-library/dependencies';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
 import { MediaAssetDeletionBlockedError } from '../media-library/deletion-errors';
+import { readImageSourceClaims } from '../media-library/deletion-index';
 
 import {
   PROJECT_ASSETS_STORE,
@@ -34,6 +35,9 @@ export async function assertStandaloneMediaSourceReplaceable(
   source: MediaDependencyTarget,
   tx: StandaloneSourceTransaction
 ): Promise<void> {
+  const images = await readImageSourceClaims(tx, source.id);
+  if (images.linked || images.unknown)
+    throw new MediaAssetDeletionBlockedError('source-unavailable');
   if ((await tx.objectStore(VIDEO_WORKSPACES_STORE).get(source.id)) !== undefined)
     throw new MediaAssetDeletionBlockedError('source-unavailable');
   await assertMediaSourceReplaceable(source, {

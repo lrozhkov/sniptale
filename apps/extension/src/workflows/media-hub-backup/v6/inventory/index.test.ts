@@ -32,6 +32,7 @@ vi.mock('../../../../composition/persistence/gallery-saved-views', async (import
 }));
 
 import {
+  IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
@@ -71,8 +72,54 @@ beforeEach(() => {
 });
 
 describe('media backup v6 dependency admission', () => {
+  it.each(['all', 'selected'] as const)(
+    'refuses a %s backup that would omit an independent image project',
+    async (scope) => {
+      mocks.db.getAll.mockImplementation(async (store: string) =>
+        store === IMAGE_WORKSPACES_STORE
+          ? [{ aggregateId: 'independent-project', sourceMediaId: 'original' }]
+          : []
+      );
+      await expect(
+        buildMediaHubBackupExportPlanFromLibraryV6(
+          createMediaHubBackupExportOptions({
+            scope,
+            selected: {
+              mediaAssetIds: ['independent-project'],
+              scenarioProjectIds: [],
+              videoProjectIds: [],
+            },
+          })
+        )
+      ).rejects.toThrow('cannot include independent image projects');
+      expect(mocks.buildMedia).not.toHaveBeenCalled();
+    }
+  );
+
+  it('refuses full backup when first image publication commits during inventory preparation', async () => {
+    const linked: unknown[] = [];
+    mocks.db.getAll.mockImplementation(async (store: string) =>
+      store === IMAGE_WORKSPACES_STORE ? [...linked] : []
+    );
+    mocks.buildMedia.mockImplementationOnce(async () => {
+      linked.push({ aggregateId: 'independent-project', sourceMediaId: 'promoted-original' });
+      return [];
+    });
+
+    await expect(
+      buildMediaHubBackupExportPlanFromLibraryV6(
+        createMediaHubBackupExportOptions({ scope: 'all', includeDrafts: false })
+      )
+    ).rejects.toThrow('cannot include independent image projects');
+    expect(mocks.buildMedia).toHaveBeenCalledOnce();
+    expect(mocks.buildEffects).not.toHaveBeenCalled();
+  });
   it('does not inspect unrelated effect bundles for an image-only selection', async () => {
-    mocks.db.getAll.mockResolvedValue([]);
+    mocks.db.getAll.mockImplementation(async (store: string) =>
+      store === IMAGE_WORKSPACES_STORE
+        ? [{ aggregateId: 'independent-project', sourceMediaId: 'image-one' }]
+        : []
+    );
     mocks.buildEffects.mockRejectedValue(new Error('Unrelated effect bundle is invalid'));
 
     await expect(

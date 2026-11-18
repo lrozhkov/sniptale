@@ -26,7 +26,9 @@ export interface VideoWorkspaceProject {
 /** Durable review history for one library media identity; the document is derived by replay. */
 export interface VideoWorkspace {
   aggregateId: string;
-  /** Archived projects retain their source independently of their workspace identity. */
+  /** Identifies this local lifetime. Older workspaces can omit it. */
+  generation?: string;
+  /** Independent projects retain their source separately from their workspace identity. */
   sourceMediaId?: string;
   formatVersion: 1 | 2 | 3 | 4;
   /** Formats 3 and 4 require permanent project metadata. Formats 1 and 2 are legacy. */
@@ -62,8 +64,8 @@ export interface VideoWorkspaceSnapshot {
   draft: VideoWorkspaceDraft | null;
 }
 
-/** Transient exit roles from one freshly committed archive-and-create command. */
+/** Transient checkpoint receipts from one freshly committed project creation. */
 export interface VideoWorkspaceProjectCreationAcknowledgement extends VideoWorkspaceSnapshot {
-  readonly archiveCheckpointReceipt?: SyncCheckpointReceipt;
+  readonly newProjectCheckpointReceipt?: SyncCheckpointReceipt;
   readonly retainedEditorCheckpointReceipt?: SyncCheckpointReceipt;
 }

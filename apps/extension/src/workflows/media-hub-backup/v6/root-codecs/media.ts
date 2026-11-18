@@ -156,6 +156,7 @@ export function parsePortableMediaMetadata(value: unknown): PortableMediaMetadat
     value.originalObjectId.length === 0 ||
     'assetId' in value.entry ||
     'blob' in value.entry ||
+    'savedIndependently' in value.entry ||
     !Array.isArray((value as { entry: { tags?: unknown } }).entry.tags)
   ) {
     throw new Error('Portable media root metadata is invalid.');
@@ -216,7 +217,9 @@ export function parsePortableMediaMetadata(value: unknown): PortableMediaMetadat
     if (
       !isRecord(metadata.workspace) ||
       Object.hasOwn(metadata.workspace, 'publicationId') ||
-      Object.hasOwn(metadata.workspace, 'sourceGeneration')
+      Object.hasOwn(metadata.workspace, 'sourceGeneration') ||
+      Object.hasOwn(metadata.workspace, 'sourceMediaId') ||
+      Object.hasOwn(metadata.workspace, 'lifecycle')
     )
       throw new Error('Portable image workspace is invalid.');
     assertPortableEditorDocument(metadata.workspace.document);

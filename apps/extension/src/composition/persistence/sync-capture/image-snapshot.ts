@@ -108,7 +108,9 @@ function parseImageRows(
     )
   )
     return null;
-  const media = parseMediaLibraryEntry(value['media']);
+  const entry = parseMediaLibraryEntry(value['media']);
+  if (!entry) return null;
+  const { savedIndependently: _localClaim, ...media } = entry;
   const originalRef =
     value['originalRef'] === undefined ? undefined : parseAssetRef(value['originalRef']);
   const projectAsset =
@@ -119,7 +121,6 @@ function parseImageRows(
     value['presentation'] === null ? null : parseAggregatePresentationEntry(value['presentation']);
   const rawRefs = value['refs'];
   if (
-    !media ||
     !isImageCaptureSource(media) ||
     (value['projectAsset'] !== undefined && !projectAsset) ||
     (media.source.kind === 'project-asset' ? !projectAsset : projectAsset !== undefined) ||
@@ -179,6 +180,7 @@ function parseImageRows(
   if (
     workspace &&
     (workspace.aggregateId !== media.id ||
+      workspace.sourceMediaId !== undefined ||
       workspace.revision !== media.workspaceRevision ||
       !Number.isSafeInteger(workspace.revision))
   )

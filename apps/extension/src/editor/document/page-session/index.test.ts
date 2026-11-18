@@ -377,6 +377,28 @@ it('does not resurrect a removed native asset from its obsolete bootstrap', asyn
   ).resolves.toEqual({ kind: 'empty' });
 });
 
+it('loads a new independent editor session from its original', async () => {
+  mocks.readAssetId.mockReturnValue('new-project');
+  mocks.restore.mockResolvedValue(undefined);
+  mocks.getBlob.mockResolvedValue(new Blob(['original'], { type: 'image/png' }));
+  mocks.getEntry.mockResolvedValue({ filename: 'original.png', workspaceRevision: 7 });
+  mocks.toDataUrl.mockResolvedValue('data:image/png;base64,b3JpZ2luYWw=');
+  const { readEditorPageLocationState, resolveEditorPageRestoreSource } = await import('./');
+  const location = readEditorPageLocationState('?assetId=new-project&originalId=original');
+  expect(location).toMatchObject({ assetId: 'new-project', originalId: 'original' });
+  await expect(
+    resolveEditorPageRestoreSource(location, 'new-project', { restoreDraft: mocks.restore })
+  ).resolves.toMatchObject({
+    kind: 'asset',
+    assetId: 'new-project',
+    nativeRevision: 0,
+    sourceGeneration: null,
+    original: { mediaId: 'original', generation: 'observed-generation' },
+  });
+  expect(mocks.restore).toHaveBeenCalledWith('new-project', undefined);
+  expect(mocks.bootstrap).not.toHaveBeenCalled();
+});
+
 it('refuses a missing native original instead of replacing it from bootstrap pixels', async () => {
   mocks.restore.mockResolvedValue(undefined);
   mocks.bootstrap.mockResolvedValue({ dataUrl: 'data:image/png;base64,b2xk' });

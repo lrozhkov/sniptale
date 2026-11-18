@@ -64,7 +64,8 @@ import {
   type IndexedDbWriteTransaction,
 } from '../infrastructure/indexed-db/core';
 import { buildPhysicalDeleteOperation, completePhysicalDeleteOperation } from '../assets';
-import { parseMediaLibraryEntry } from './read-guards';
+import { tryAssetResourceCleanup } from '../assets/resource-sessions';
+import { isCollectableProjectOriginal, parseMediaLibraryEntry } from './read-guards';
 import { parseVideoProjectEntry } from '../projects/read-guards';
 import { parseScenarioAssetEntry, parseScenarioProjectEntry } from '../scenario/read-guards';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
@@ -116,7 +117,8 @@ function assertExpectedUsage(
 export async function deleteMediaAssetWithProjectCascade(
   mediaId: string,
   expectedUsage: readonly MediaAssetProjectUsage[],
-  lifecyclePermit?: DurableAssetLifecyclePermit
+  lifecyclePermit?: DurableAssetLifecyclePermit,
+  projectRetainedOnly = false
 ): Promise<void> {
   const physicalDelete = buildPhysicalDeleteOperation([]);
   const scenarioIds = expectedUsage
@@ -124,9 +126,19 @@ export async function deleteMediaAssetWithProjectCascade(
     .map((usage) => usage.id)
     .sort();
   await withScenarioLocks(scenarioIds, () =>
-    runWithIndexedDbMutation((db) =>
-      commitCascadeTransaction(db, mediaId, expectedUsage, physicalDelete)
-    )
+    runWithIndexedDbMutation(async (db) => {
+      const commit = () =>
+        commitCascadeTransaction(
+          db,
+          mediaId,
+          expectedUsage,
+          physicalDelete,
+          undefined,
+          projectRetainedOnly
+        );
+      if (projectRetainedOnly) await tryAssetResourceCleanup(commit);
+      else await commit();
+    })
   );
   if (physicalDelete.assetIds.length > 0)
     await completePhysicalDeleteOperation(physicalDelete, lifecyclePermit);
@@ -336,7 +348,8 @@ async function commitCascadeTransaction(
   mediaId: string,
   expectedUsage: readonly MediaAssetProjectUsage[],
   physicalDelete: PhysicalDelete,
-  expectedSource?: MediaDependencyTarget
+  expectedSource?: MediaDependencyTarget,
+  projectRetainedOnly = false
 ): Promise<void> {
   const tx = createStrictRecordingTransaction(db, [
     SYNC_CAPTURE_STORE,
@@ -371,6 +384,15 @@ async function commitCascadeTransaction(
     ASSET_OPERATIONS_STORE,
   ]);
   try {
+    if (
+      projectRetainedOnly &&
+      !isCollectableProjectOriginal(
+        parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId))
+      )
+    ) {
+      await tx.done;
+      return;
+    }
     const graph = await loadCascadeGraph(tx, mediaId, expectedSource);
     const captureProfile = await readEnabledCaptureProfile(tx);
     const currentMedia = captureProfile

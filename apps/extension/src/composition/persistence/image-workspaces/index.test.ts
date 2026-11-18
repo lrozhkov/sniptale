@@ -1,6 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
 import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
+import { createMediaLibraryEntry } from '../projects/index.storage.test-support';
+import { listImageProjectsForEditing } from './read';
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
@@ -34,6 +36,7 @@ import {
   recoverAndGetImageWorkspace,
   recoverAndGetStoredImageWorkspace,
   recoverAndListImageWorkspaces,
+  readImageOriginalSource,
 } from '.';
 
 function createWorkspace(aggregateId: string, updatedAt: number) {
@@ -61,6 +64,9 @@ beforeEach(() => {
       objectStore: (name: string) => ({
         get: (key: IDBValidKey) =>
           name === 'image_workspace_identities' ? Promise.resolve(undefined) : mocks.get(name, key),
+        index: (index: string) => ({
+          getAll: (key: IDBValidKey) => mocks.getAll(name, index, key),
+        }),
       }),
     }),
   });
@@ -71,6 +77,39 @@ beforeEach(() => {
     release: vi.fn(),
   }));
   mocks.recover.mockResolvedValue(0);
+});
+
+it('lists the current original’s named works and the legacy edited work', async () => {
+  const original = createMediaLibraryEntry({ id: 'original', imageContentState: 'edited' });
+  const legacy = createWorkspace(original.id, 7);
+  const newest = createWorkspace('new-project', 13);
+  mocks.get.mockImplementation(async (store: string, key: string) =>
+    store === 'media_library' && key === original.id
+      ? original
+      : store === 'image_workspaces' && key === original.id
+        ? legacy
+        : undefined
+  );
+  mocks.getAll.mockResolvedValue([
+    {
+      ...newest,
+      sourceMediaId: original.id,
+      document: { ...newest.document, displayName: 'Latest edits' },
+    },
+    { ...createWorkspace('different', 30), sourceMediaId: 'other-original' },
+  ]);
+  await expect(listImageProjectsForEditing(original.id)).resolves.toEqual({
+    canCreateIndependentProject: true,
+    projects: [
+      { id: 'new-project', name: 'Latest edits', updatedAt: 13 },
+      { id: original.id, name: original.filename, updatedAt: 7 },
+    ],
+  });
+  expect(mocks.getAll).toHaveBeenCalledExactlyOnceWith(
+    'image_workspaces',
+    'retentionReferenceKeys',
+    'media:original'
+  );
 });
 
 it('returns a valid workspace and treats a missing row as absent without warning', async () => {
@@ -107,6 +146,43 @@ it('recovers before returning a stored workspace to transfer consumers', async (
 
   await expect(recoverAndGetStoredImageWorkspace('image-1')).resolves.toEqual(entry);
   expect(mocks.recover).toHaveBeenCalledOnce();
+});
+
+it('resolves two image project IDs to one source without copying the blob', async () => {
+  const blob = new Blob(['immutable image'], { type: 'image/png' });
+  const original = createMediaLibraryEntry({
+    id: 'original',
+    kind: 'screenshot',
+    source: { kind: 'screenshot' },
+    mimeType: blob.type,
+    size: blob.size,
+    blob,
+  });
+  mocks.get.mockImplementation(async (store: string, key: string) => {
+    if (store === 'media_library') return key === 'original' ? original : undefined;
+    if (store === 'image_workspaces')
+      return { ...createWorkspace(key, 10), sourceMediaId: 'original', revision: 3 };
+    return undefined;
+  });
+  for (const id of ['first-project', 'second-project']) {
+    const result = await readImageOriginalSource(id);
+    expect(result.asset).toMatchObject({ id, workspaceRevision: 3, imageContentState: 'edited' });
+    expect(result.blob).toBe(blob);
+  }
+  const source = await readImageOriginalSource('original');
+  expect(source.asset?.id).toBe('original');
+  expect(source.blob).toBe(blob);
+});
+
+it('refuses to open an independent image project after losing its original', async () => {
+  mocks.get.mockImplementation(async (store: string) =>
+    store === 'image_workspaces'
+      ? { ...createWorkspace('image-project', 10), sourceMediaId: 'missing-original' }
+      : undefined
+  );
+  await expect(readImageOriginalSource('image-project')).rejects.toMatchObject({
+    name: 'MissingAssetObjectError',
+  });
 });
 
 it('filters invalid rows and sorts valid workspaces by latest mutation', async () => {

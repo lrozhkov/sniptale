@@ -1,8 +1,10 @@
 import { getScenarioStoredProject } from '../scenario/storage';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { materializeWorkspaceHead } from '../review-workspaces/storage';
 import {
   initDB,
   MEDIA_LIBRARY_STORE,
+  IMAGE_WORKSPACES_STORE,
   VIDEO_PROJECTS_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
@@ -22,6 +24,10 @@ import {
 } from './dependencies';
 import { USAGE_INDEX_MARKER, USAGE_REFERENCE_INDEX, usageReferenceKey } from './usage-index-keys';
 import type { MediaAssetProjectUsage } from './contracts';
+import {
+  ROW_REFERENCE_INDEX,
+  rowReferenceKey,
+} from '../infrastructure/indexed-db/row-index-contract';
 
 type Database = Awaited<ReturnType<typeof initDB>>;
 
@@ -83,7 +89,7 @@ export async function readIndexedProjectUsage(mediaId: string): Promise<MediaAss
   for (const id of media.privateProjectAssetIds ?? [])
     keys.add(usageReferenceKey('project-asset', id));
   for (const id of childIds) keys.add(usageReferenceKey('scenario-asset', id));
-  const [videos, reviews, scenarios] = await Promise.all([
+  const [videos, reviews, scenarios, images] = await Promise.all([
     Promise.all(
       [...keys].map((key) => db.getAllFromIndex(VIDEO_PROJECTS_STORE, USAGE_REFERENCE_INDEX, key))
     ),
@@ -93,8 +99,13 @@ export async function readIndexedProjectUsage(mediaId: string): Promise<MediaAss
         getScenarioStoredProject(db, id)
       )
     ),
+    db.getAllFromIndex(
+      IMAGE_WORKSPACES_STORE,
+      ROW_REFERENCE_INDEX,
+      rowReferenceKey('media', mediaId)
+    ),
   ]);
-  return projectUsageFromMatches({
+  const usages = await projectUsageFromMatches({
     db,
     root,
     media,
@@ -103,6 +114,33 @@ export async function readIndexedProjectUsage(mediaId: string): Promise<MediaAss
     reviews,
     scenarios,
   });
+  return [...usages, ...linkedImageProjectUsage(root, images)];
+}
+
+/** Names from corrupt documents can fall back to the original without discarding the link. */
+export function linkedImageProjectUsage(
+  original: { id: string; filename: string },
+  rows: readonly unknown[]
+): MediaAssetProjectUsage[] {
+  const projects: MediaAssetProjectUsage[] = [];
+  for (const row of rows) {
+    if (
+      !isRecord(row) ||
+      row['sourceMediaId'] !== original.id ||
+      typeof row['aggregateId'] !== 'string' ||
+      !row['aggregateId'] ||
+      row['aggregateId'] === original.id
+    )
+      continue;
+    const name = isRecord(row['document']) ? row['document']['displayName'] : undefined;
+    projects.push({
+      id: row['aggregateId'],
+      kind: 'image',
+      name: (typeof name === 'string' && name.trim()) || original.filename,
+      primary: true,
+    });
+  }
+  return projects;
 }
 
 /** Admit only indexed candidates and project the same identity rules as the authoritative graph. */

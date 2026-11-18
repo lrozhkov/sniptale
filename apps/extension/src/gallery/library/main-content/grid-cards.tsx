@@ -155,7 +155,7 @@ function GalleryGridCardSelectionControl(props: {
   onToggleSelection: GalleryMainContentProps['onToggleSelection'];
   selected: boolean;
 }) {
-  const icon = <GalleryGridCardKindBadge kind={props.item.kind} />;
+  const icon = <GalleryGridCardKindBadge item={props.item} />;
   if (!isGallerySelectableItem(props.item)) return icon;
   return (
     <GallerySelectionButton
@@ -167,14 +167,20 @@ function GalleryGridCardSelectionControl(props: {
   );
 }
 
-function GalleryGridCardKindBadge(props: { kind: GalleryItem['kind'] }) {
-  const Icon = getKindIcon(props.kind);
+function getCardKindLabel(item: GalleryItem) {
+  return item.type === 'image-project'
+    ? translate('gallery.preview.imageProject')
+    : getGalleryItemKindLabel(item.kind);
+}
+
+function GalleryGridCardKindBadge({ item }: { item: GalleryItem }) {
+  const Icon = getKindIcon(item.kind);
 
   return (
     <span
       className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-[var(--sniptale-color-text-secondary)]"
       data-ui="gallery.card.kind"
-      title={getGalleryItemKindLabel(props.kind)}
+      title={getCardKindLabel(item)}
     >
       <Icon className="h-4 w-4" aria-hidden="true" />
     </span>
@@ -183,7 +189,7 @@ function GalleryGridCardKindBadge(props: { kind: GalleryItem['kind'] }) {
 
 function GalleryListKindCell({ item }: { item: GalleryItem }) {
   const Icon = getKindIcon(item.kind);
-  const label = getGalleryItemKindLabel(item.kind);
+  const label = getCardKindLabel(item);
 
   return (
     <div
@@ -463,7 +469,7 @@ const GalleryRecordingGroupGridCard = memo(
           {props.items.map((item) => {
             const role = isGalleryMediaItem(item)
               ? getRecordingGroupRoleLabel(item.recordingGroupView?.role ?? 'display')
-              : getGalleryItemKindLabel(item.kind);
+              : getCardKindLabel(item);
             const sourceLabel = isGalleryMediaItem(item)
               ? item.recordingGroupView?.sourceLabel
               : null;
@@ -499,7 +505,7 @@ const GalleryRecordingGroupGridCard = memo(
           leading={
             <GallerySelectionButton
               selected={allSelected}
-              idleIcon={<GalleryGridCardKindBadge kind={firstItem.kind} />}
+              idleIcon={<GalleryGridCardKindBadge item={firstItem} />}
               label={translate('gallery.app.selectRecordingGroup')}
               onClick={(event) => {
                 selectableItems.forEach((item) => {

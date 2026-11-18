@@ -18,9 +18,10 @@ function boundedMetadata(value: unknown): boolean {
 /** Admit the original-only Library mirror that the native project asset publisher owns. */
 export function parseCapturedMediaRows(value: unknown): CapturedMediaRows | null {
   if (!isRecord(value) || !boundedMetadata(value)) return null;
-  const media = parseMediaLibraryEntry(value['media']);
+  const entry = parseMediaLibraryEntry(value['media']);
   const ref = parseAssetRef(value['ref']);
-  if (!media || !ref) return null;
+  if (!entry || !ref) return null;
+  const { savedIndependently: _localClaim, ...media } = entry;
   if ('screenshotRef' in value && !('webSnapshot' in value)) return null;
   const sourceFields = ['projectAsset', 'projectExport', 'recording', 'webSnapshot'];
   if (sourceFields.filter((field) => field in value).length > 1) return null;

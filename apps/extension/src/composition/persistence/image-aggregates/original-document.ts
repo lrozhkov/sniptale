@@ -1,7 +1,7 @@
 import type { EditorDocument } from '../../../features/editor/document/types';
 import { blobToDataUrl } from '../../../platform/media-utils/data-url';
 import type { MediaLibraryEntry } from '../media-library/contracts';
-import { getMediaAssetBlob, getMediaLibraryEntry } from '../media-library/index.library';
+import { readImageOriginalSource } from '../image-workspaces/read';
 import { ImageAggregateNotFoundError } from './errors';
 
 export async function createOriginalImageDocument(
@@ -48,10 +48,7 @@ export async function createOriginalImageDocument(
 export async function readImageAggregateOriginalDocument(
   aggregateId: string
 ): Promise<EditorDocument | null> {
-  const [media, blob] = await Promise.all([
-    getMediaLibraryEntry(aggregateId),
-    getMediaAssetBlob(aggregateId),
-  ]);
+  const { asset: media, blob } = await readImageOriginalSource(aggregateId);
   if (!media || !blob || (media.kind !== 'image' && media.kind !== 'screenshot')) return null;
   return createOriginalImageDocument({ ...media, blob });
 }

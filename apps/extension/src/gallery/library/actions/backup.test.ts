@@ -628,6 +628,18 @@ it('maps a selected quick-edit and its source to one media root without montage 
   });
 });
 
+it('sends the independent image project ID for backup admission with its selected original', async () => {
+  const { createSelectedBackupExportOptions } = await import('./backup');
+  const { createImageProjectItem } = await import('../test-support/items');
+  const project = createImageProjectItem();
+  const original = createMediaItem({ id: project.project.sourceMediaId });
+
+  expect(createSelectedBackupExportOptions([project, original])?.selected?.mediaAssetIds).toEqual([
+    project.entityId,
+    original.id,
+  ]);
+});
+
 it('backs up a saved scenario export through its owning project and deduplicates targets', async () => {
   const { createSelectedBackupExportOptions } = await import('./backup');
   const artifact = createScenarioExportItem();

@@ -1,6 +1,7 @@
 import { readPersistedSyncCatalogCards } from '../../workflows/sync-transfer/catalog-view';
 import { createRemoteRootGalleryItem } from './items';
 import { listVideoWorkspaceSummaries } from '../../composition/persistence/review-workspaces/summaries';
+import { listImageWorkspaceProjectSummaries } from '../../composition/persistence/image-workspaces/read';
 import { runStorageStartupPhase } from '../../composition/persistence/infrastructure/startup-diagnostics';
 import {
   listMediaThumbnailIds,
@@ -54,6 +55,7 @@ export async function loadGalleryLibrarySnapshot(
     thumbnailIds,
     videoProjects,
     presentations,
+    imageProjects,
     quickEditProjects,
     remote,
   ] = await Promise.all([
@@ -62,6 +64,7 @@ export async function loadGalleryLibrarySnapshot(
     runStorageStartupPhase('gallery-thumbnail-list', listMediaThumbnailIds),
     runStorageStartupPhase('gallery-video-project-list', listVideoProjects),
     runStorageStartupPhase('gallery-presentations', listAggregatePresentations),
+    runStorageStartupPhase('gallery-image-project-list', listImageWorkspaceProjectSummaries),
     runStorageStartupPhase('gallery-quick-edit-project-list', listVideoWorkspaceSummaries),
     options.includeRemote === false
       ? { items: [], unavailable: false }
@@ -73,6 +76,7 @@ export async function loadGalleryLibrarySnapshot(
 
   const localItems = createGalleryItems({
     mediaItems,
+    imageProjects,
     quickEditProjects,
     presentations,
     scenarioExportsByProjectId: new Map(scenarioExportsByProject),

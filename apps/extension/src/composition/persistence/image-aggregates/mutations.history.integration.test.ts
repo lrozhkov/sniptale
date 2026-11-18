@@ -30,17 +30,22 @@ import {
   restoreImageAggregateOriginal,
   saveImageAggregateCopyFromDocument,
   copyImageAggregate,
+  deleteImageWorkspaceProject,
 } from './mutations';
+import { readImageAggregateOriginalDocument } from './original-document';
 import {
   readImageOriginalSource,
   readImageWorkspace,
   readStoredImageWorkspace,
 } from '../image-workspaces/read';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import { listCollectableProjectOriginalIds } from '../media-library/index.library';
 import { putImageWorkspaceBackupRestore } from '../image-workspaces/backup-restore';
 import { parseAssetRef } from '../assets/guards';
 import { imageWorkspaceAssetBindings } from '../image-workspaces/assets';
 import { parseSyncCaptureRecord } from '../sync-capture/guards';
+import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
+import { moveStoredItemsToTrash, restoreStoredItemsFromTrash } from '../library-lifecycle/trash';
 
 const io = vi.hoisted(() => ({
   db: null as IDBPDatabase | null,
@@ -50,6 +55,7 @@ const io = vi.hoisted(() => ({
   journals: new Map<string, AssetReadyJournal>(),
   beforePublish: null as ((journal: AssetReadyJournal) => Promise<void>) | null,
   loseAck: false,
+  completePhysicalDelete: vi.fn(async () => undefined),
   write: vi.fn(),
   read: vi.fn(),
 }));
@@ -85,7 +91,7 @@ vi.mock('../assets', async (original) => {
     readAssetFile: io.read,
     recoverStandaloneAssetPublications: async () => 0,
     releaseAssetReadyProtection: async () => undefined,
-    completePhysicalDeleteOperation: async () => undefined,
+    completePhysicalDeleteOperation: io.completePhysicalDelete,
     collectPreparedAssetCleanupFailures: async (ids: readonly string[]) => {
       for (const id of ids) io.files.delete(id);
       return [];
@@ -234,6 +240,18 @@ beforeEach(async () => {
       db.createObjectStore('asset_operations', { keyPath: 'operationId' });
       db.createObjectStore('asset_residency', { keyPath: 'id' });
       db.createObjectStore('sync_capture', { keyPath: 'key' });
+      for (const name of [
+        ...SCENARIO_CAPTURE_STORES,
+        'recording_telemetry',
+        'web_snapshots',
+        'video_workspace_drafts',
+        'thumbnails',
+        'video_workspaces',
+        'video_workspace_history',
+        'video_projects',
+      ]) {
+        if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
+      }
     },
   });
   io.db = withIndexedRowProjections(raw);
@@ -707,6 +725,30 @@ it('resumes a whole save after a lost acknowledgement with the same journal and 
   expect(await commit()).toBe(result);
 });
 
+it('refuses an old image acknowledgement after ordinary Trash restore without losing accepted bytes', async () => {
+  const commit = createImageWorkspaceCommit({
+    aggregateId: 'image',
+    document: document('First'),
+    history: history(),
+    expectedRevision: 0,
+    requireExistingRoot: true,
+  });
+  io.loseAck = true;
+  await expect(commit()).rejects.toThrow('Lost acknowledgement');
+  const journal = [...io.journals.values()][0]!;
+  const source = [{ kind: 'media', id: 'image' }] as const;
+  await moveStoredItemsToTrash(source, 10);
+  await restoreStoredItemsFromTrash(source, 20);
+  const restored = (await readStoredImageWorkspace('image'))!;
+
+  await expect(commit()).rejects.toMatchObject({ name: 'StaleImageWorkspaceError' });
+  await imageWorkspacePublicationAdapter.publish(journal);
+  expect(await readStoredImageWorkspace('image')).toEqual(restored);
+  expect(restored.revision).toBe(1);
+  expect(journal.assetRefs.every((ref) => io.files.has(ref.assetId))).toBe(true);
+  expect(io.journals.has(journal.journalId)).toBe(false);
+});
+
 it('shares parallel calls to one lazy save instead of staging duplicate history', async () => {
   const ready = gate(),
     resume = gate();
@@ -987,6 +1029,440 @@ it('replays its own first creation after a lost acknowledgement without issuing 
   expect((await readStoredImageWorkspace('image'))?.revision).toBe(1);
   expect(io.write).toHaveBeenCalledTimes(writes);
 });
+
+it('retains one original and two project links after replaying a lost acknowledgement', async () => {
+  const original = { mediaId: 'image', generation: null };
+  await commitImageWorkspace({
+    aggregateId: 'first-project',
+    original,
+    document: document('First project'),
+    history: history(),
+    expectedRevision: 0,
+  });
+  io.loseAck = true;
+  await expect(
+    commitImageWorkspace({
+      aggregateId: 'second-project',
+      original,
+      document: document('Second project'),
+      history: history(),
+      expectedRevision: 0,
+    })
+  ).rejects.toThrow('Lost acknowledgement');
+  const identity: unknown = await database().get('image_workspace_identities', 'second-project');
+  const journal = [...io.journals.values()][0]!;
+  const writes = io.write.mock.calls.length;
+  await imageWorkspacePublicationAdapter.publish(journal);
+
+  expect(await database().get('image_workspace_identities', 'second-project')).toEqual(identity);
+  expect(await database().getAllKeys('media_library')).toEqual(['image']);
+  expect(
+    await database().countFromIndex('image_workspaces', ROW_REFERENCE_INDEX, 'media:image')
+  ).toBe(2);
+  expect((await readImageOriginalSource('first-project')).blob).toBeDefined();
+  expect((await readStoredImageWorkspace('first-project'))?.document.displayName).toBe(
+    'First project'
+  );
+  expect((await readStoredImageWorkspace('second-project'))?.document.displayName).toBe(
+    'Second project'
+  );
+  expect(io.write).toHaveBeenCalledTimes(writes);
+});
+
+it('shares the original byte object between simultaneous first image projects', async () => {
+  const originalRow = parseMediaLibraryEntry(await database().get('media_library', 'image'))!;
+  const bytes = Uint8Array.from(atob(source.split(',')[1]!), (char) => char.charCodeAt(0));
+  const blob = new Blob([bytes], { type: 'image/png' });
+  await database().put('media_library', { ...originalRow, blob, size: blob.size });
+  const original = { mediaId: 'image', generation: null };
+  const save = (id: string) =>
+    commitImageWorkspace({
+      aggregateId: id,
+      original,
+      document: document(id),
+      expectedRevision: 0,
+    });
+  await Promise.all([save('first-project'), save('second-project')]);
+
+  const media = parseMediaLibraryEntry(await database().get('media_library', 'image'))!;
+  expect(media.blob).toBeUndefined();
+  expect(media.source.kind).toBe('stored-asset');
+  const first = (await readStoredImageWorkspace('first-project'))!;
+  const second = (await readStoredImageWorkspace('second-project'))!;
+  const assetId = first.document.sourceImage.assetId;
+  expect(media.source).toEqual({ kind: 'stored-asset', assetId });
+  expect(second.document.sourceImage.assetId).toBe(assetId);
+  expect(io.write).toHaveBeenCalledOnce();
+  expect(await database().get('asset_owners', ['media-library', 'image', 'source'])).toMatchObject({
+    assetId,
+  });
+  await deleteImageWorkspaceProject(first.aggregateId, first.revision, first.lifecycle!.updatedAt);
+  expect(await database().get('asset_refs', assetId)).toBeDefined();
+  expect((await readImageOriginalSource(second.aggregateId)).blob?.size).toBe(blob.size);
+  expect((await readImageAggregateOriginalDocument(second.aggregateId))?.canvasWidth).toBe(20);
+  await restoreImageAggregateOriginal(
+    second.aggregateId,
+    second.revision,
+    (await readImageOriginalSource(second.aggregateId)).sourceGeneration
+  );
+  expect((await readStoredImageWorkspace(second.aggregateId))?.document.sourceImage.assetId).toBe(
+    assetId
+  );
+  expect(io.write).toHaveBeenCalledOnce();
+});
+
+it.each([false, true])(
+  'clears a superseded shared-source journal after purge (independently saved: %s)',
+  async (savedIndependently) => {
+    const media = parseMediaLibraryEntry(await database().get('media_library', 'image'))!;
+    const bytes = Uint8Array.from(atob(source.split(',')[1]!), (char) => char.charCodeAt(0));
+    const blob = new Blob([bytes], { type: 'image/png' });
+    await database().put('media_library', {
+      ...media,
+      blob,
+      size: blob.size,
+      lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: 1 },
+    });
+    const aggregateId = 'purged-project';
+    io.loseAck = true;
+    await expect(
+      commitImageWorkspace({
+        aggregateId,
+        original: { mediaId: 'image', generation: null },
+        document: document('First project'),
+        expectedRevision: 0,
+      })
+    ).rejects.toThrow('Lost acknowledgement');
+    const journal = [...io.journals.values()][0]!;
+    const accepted = (await readStoredImageWorkspace(aggregateId))!;
+    const assetId = accepted.document.sourceImage.assetId;
+    const original = parseMediaLibraryEntry(await database().get('media_library', 'image'))!;
+    expect(original.source).toEqual({ kind: 'stored-asset', assetId });
+    expect(original.savedIndependently).toBe(false);
+    if (savedIndependently) {
+      await database().put('media_library', { ...original, savedIndependently: true });
+    }
+    await deleteImageWorkspaceProject(
+      aggregateId,
+      accepted.revision,
+      accepted.lifecycle!.updatedAt
+    );
+    expect(await readStoredImageWorkspace(aggregateId)).toBeUndefined();
+    expect(await database().get('asset_refs', assetId)).toBeDefined();
+    await imageWorkspacePublicationAdapter.publish(journal);
+    expect(io.journals.has(journal.journalId)).toBe(false);
+    expect(await readStoredImageWorkspace(aggregateId)).toBeUndefined();
+    expect(
+      await database().get('asset_owners', ['media-library', 'image', 'source'])
+    ).toMatchObject({
+      assetId,
+    });
+    expect(await (await readImageOriginalSource('image')).blob?.arrayBuffer()).toEqual(
+      await blob.arrayBuffer()
+    );
+    await expect(listCollectableProjectOriginalIds(new AbortController().signal)).resolves.toEqual(
+      savedIndependently ? [] : ['image']
+    );
+  }
+);
+
+it('starts a linked project from intact original bytes without reading a missing legacy work ref', async () => {
+  await commitImageWorkspace({
+    aggregateId: 'image',
+    document: document('Legacy edit'),
+    expectedRevision: 0,
+    requireExistingRoot: true,
+  });
+  const legacy = (await readStoredImageWorkspace('image'))!;
+  await database().delete('asset_refs', legacy.document.sourceImage.assetId);
+  const original = await readImageOriginalSource('image');
+  await expect(
+    commitImageWorkspace({
+      aggregateId: 'new-project',
+      original: { mediaId: 'image', generation: original.sourceGeneration },
+      document: document('New edit'),
+      expectedRevision: 0,
+    })
+  ).resolves.toMatchObject({ revision: 1 });
+  expect((await readStoredImageWorkspace('new-project'))?.sourceMediaId).toBe('image');
+  expect(await readStoredImageWorkspace('image')).toEqual(legacy);
+});
+
+it('explicitly saves an independent image project without saving its original separately', async () => {
+  const original = parseMediaLibraryEntry(await database().get('media_library', 'image'))!;
+  await database().put('media_library', {
+    ...original,
+    lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: 1 },
+  });
+  const aggregateId = 'independent-project';
+  const saved = await commitImageWorkspace({
+    aggregateId,
+    original: { mediaId: 'image', generation: null },
+    document: document('New work'),
+    expectedRevision: 0,
+  });
+  const expectedGeneration = saved.sourceGeneration!;
+  const previewBlob = new Blob(['preview']);
+  await commitImagePresentation({
+    aggregateId,
+    expectedGeneration,
+    expectedWorkspaceRevision: 1,
+    previewBlob,
+    thumbnailBlob: previewBlob,
+  });
+  await expect(promoteImageAggregate(aggregateId, 0, expectedGeneration)).rejects.toMatchObject({
+    name: 'StaleImageWorkspaceError',
+  });
+  await promoteImageAggregate(aggregateId, 1, expectedGeneration);
+  await promoteImageAggregate(aggregateId, 1, expectedGeneration);
+  expect(await database().getAllKeys('media_library')).toEqual(['image']);
+  expect(await database().get('media_library', 'image')).toMatchObject({
+    savedIndependently: false,
+  });
+  expect((await readStoredImageWorkspace(aggregateId))?.revision).toBe(1);
+});
+
+it('refuses to stage an independent image with active WebDAV and cancels a queued refusal', async () => {
+  const profile = {
+    version: 1,
+    kind: 'profile',
+    key: 'profile',
+    enabled: true,
+    spaceId: 'space',
+    createdAt: 10,
+    connectionGeneration: 1,
+  };
+  const input = {
+    aggregateId: 'new-project',
+    original: { mediaId: 'image', generation: null },
+    document: document('New work'),
+    expectedRevision: 0,
+  };
+  io.beforePublish = async () => {
+    await database().put('sync_capture', profile);
+  };
+  await expect(commitImageWorkspace(input)).rejects.toThrow('require an updated sync format');
+  const journal = [...io.journals.values()][0]!;
+  await expect(imageWorkspacePublicationAdapter.publish(journal)).resolves.toBeUndefined();
+  expect(io.journals.has(journal.journalId)).toBe(false);
+  expect(await readStoredImageWorkspace(input.aggregateId)).toBeUndefined();
+
+  io.write.mockClear();
+  await expect(commitImageWorkspace(input)).rejects.toThrow('require an updated sync format');
+  expect(io.write).not.toHaveBeenCalled();
+  expect(io.journals.size).toBe(0);
+  io.beforePublish = null;
+  await expect(
+    commitImageWorkspace({
+      aggregateId: 'image',
+      document: document('Compatible edit'),
+      expectedRevision: 0,
+      requireExistingRoot: true,
+    })
+  ).resolves.toMatchObject({ revision: 1 });
+});
+
+it('refuses document and presentation writes while an image project is in Trash', async () => {
+  const aggregateId = 'independent-project';
+  const saved = await commitImageWorkspace({
+    aggregateId,
+    original: { mediaId: 'image', generation: null },
+    document: document('Before Trash'),
+    expectedRevision: 0,
+  });
+  const project = (await readStoredImageWorkspace(aggregateId))!;
+  const trashed = {
+    ...project,
+    lifecycle: { ...project.lifecycle!, trashedAt: Date.now(), updatedAt: Date.now() },
+  };
+  await database().put('image_workspaces', trashed);
+  const expectedGeneration = saved.sourceGeneration!;
+  await expect(readImageWorkspace(aggregateId)).rejects.toThrow('Image workspace is unavailable.');
+  await expect(
+    commitImageWorkspace({
+      aggregateId,
+      document: document('Delayed write'),
+      expectedRevision: project.revision,
+      expectedGeneration,
+      requireExistingRoot: true,
+    })
+  ).rejects.toMatchObject({ name: 'StaleImageWorkspaceError' });
+  const previewBlob = new Blob(['delayed preview']);
+  await expect(
+    commitImagePresentation({
+      aggregateId,
+      expectedWorkspaceRevision: project.revision,
+      expectedGeneration,
+      previewBlob,
+      thumbnailBlob: previewBlob,
+    })
+  ).rejects.toMatchObject({ name: 'StaleImageWorkspaceError' });
+  expect(await readStoredImageWorkspace(aggregateId)).toEqual(trashed);
+  expect(await database().getAllKeys('media_library')).toEqual(['image']);
+  expect(
+    await database().countFromIndex('image_workspaces', ROW_REFERENCE_INDEX, 'media:image')
+  ).toBe(1);
+});
+
+it('purges only the selected image project and its presentation', async () => {
+  const original = { mediaId: 'image', generation: null };
+  const saveProject = async (aggregateId: string) => {
+    const saved = await commitImageWorkspace({
+      aggregateId,
+      original,
+      document: document(aggregateId),
+      history: history(),
+      expectedRevision: 0,
+    });
+    const sourceGeneration = saved.sourceGeneration!;
+    const preview = new Blob([aggregateId]);
+    await commitImagePresentation({
+      aggregateId,
+      expectedGeneration: sourceGeneration,
+      expectedWorkspaceRevision: saved.revision,
+      previewBlob: preview,
+      thumbnailBlob: preview,
+    });
+    return { ...saved, aggregateId, sourceGeneration };
+  };
+  const [removed, retained] = await Promise.all([
+    saveProject('removed-project'),
+    saveProject('retained-project'),
+  ]);
+  const removedProject = (await readStoredImageWorkspace(removed.aggregateId))!;
+  const originalRow: unknown = await database().get('media_library', 'image');
+  await deleteImageWorkspaceProject(
+    removed.aggregateId,
+    removed.revision,
+    removedProject.lifecycle!.updatedAt
+  );
+  expect(await database().get('media_library', 'image')).toEqual(originalRow);
+  expect(await readStoredImageWorkspace(removed.aggregateId)).toBeUndefined();
+  expect(
+    await database().get('aggregate_presentations', ['image', removed.aggregateId])
+  ).toBeUndefined();
+  expect(
+    await database().get('aggregate_presentations', ['image', retained.aggregateId])
+  ).toBeDefined();
+  expect((await readImageWorkspace(retained.aggregateId))?.history).toEqual(history());
+  expect(
+    await database().countFromIndex('image_workspaces', ROW_REFERENCE_INDEX, 'media:image')
+  ).toBe(1);
+  expect(
+    (await database().getAll('asset_owners')).every(
+      (owner: { ownerId: string }) => owner.ownerId !== removed.aggregateId
+    )
+  ).toBe(true);
+  await expect(
+    commitImageWorkspace({
+      aggregateId: removed.aggregateId,
+      expectedRevision: removed.revision,
+      expectedGeneration: removed.sourceGeneration,
+      document: document('Delayed autosave'),
+      requireExistingRoot: true,
+    })
+  ).rejects.toMatchObject({ name: 'StaleImageWorkspaceError' });
+});
+
+it('keeps the original discoverable for recovery after project bytes fail to delete', async () => {
+  const aggregateId = 'last-project';
+  const original = parseMediaLibraryEntry(await database().get('media_library', 'image'))!;
+  await database().put('media_library', {
+    ...original,
+    lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: 1 },
+  });
+  const saved = await commitImageWorkspace({
+    aggregateId,
+    original: { mediaId: 'image', generation: null },
+    document: document('Last work'),
+    expectedRevision: 0,
+  });
+  const project = (await readStoredImageWorkspace(aggregateId))!;
+  io.completePhysicalDelete.mockRejectedValueOnce(new Error('OPFS unavailable'));
+  await expect(
+    deleteImageWorkspaceProject(aggregateId, saved.revision, project.lifecycle!.updatedAt)
+  ).resolves.toBe('image');
+  expect(io.completePhysicalDelete).toHaveBeenCalledOnce();
+  expect(await readStoredImageWorkspace(aggregateId)).toBeUndefined();
+  expect(await database().getAllKeys('asset_operations')).toHaveLength(1);
+  const unrelated = database().transaction('media_library', 'readwrite');
+  await Promise.all(
+    Array.from({ length: 64 }, (_, index) =>
+      unrelated.store.put({ ...original, id: `earlier-${index}`, savedIndependently: true })
+    )
+  );
+  await unrelated.done;
+  await expect(listCollectableProjectOriginalIds(new AbortController().signal)).resolves.toEqual([
+    'image',
+  ]);
+});
+
+it.each(['unchanged', 'removed', 'trashed', 'restored', 'replaced'] as const)(
+  'recovers a prepared image project after its original is %s',
+  async (change) => {
+    io.beforePublish = async () => {
+      throw new Error('Interrupted before publication');
+    };
+    await expect(
+      commitImageWorkspace({
+        aggregateId: 'pending-project',
+        original: { mediaId: 'image', generation: null },
+        document: document('New work'),
+        history: history(),
+        expectedRevision: 0,
+      })
+    ).rejects.toThrow('Interrupted before publication');
+    const journal = [...io.journals.values()][0]!;
+    if (change === 'restored') {
+      const source = [{ kind: 'media', id: 'image' }] as const;
+      await moveStoredItemsToTrash(source, 10);
+      await restoreStoredItemsFromTrash(source, 20);
+      await imageWorkspacePublicationAdapter.publish(journal);
+      expect(await readStoredImageWorkspace('pending-project')).toBeUndefined();
+      expect(io.journals.has(journal.journalId)).toBe(false);
+      expect(journal.assetRefs.every((ref) => !io.files.has(ref.assetId))).toBe(true);
+      const restored = await readImageOriginalSource('image');
+      expect(restored?.sourceGeneration).toEqual(expect.any(String));
+      io.beforePublish = null;
+      await expect(
+        commitImageWorkspace({
+          aggregateId: 'fresh-project',
+          original: { mediaId: 'image', generation: restored!.sourceGeneration! },
+          document: document('Fresh work'),
+          expectedRevision: 0,
+        })
+      ).resolves.toMatchObject({ revision: 1 });
+      return;
+    }
+    const tx = database().transaction(['media_library', 'image_workspace_identities'], 'readwrite');
+    const mediaStore = tx.objectStore('media_library');
+    const original = parseMediaLibraryEntry(await mediaStore.get('image'))!;
+    if (change === 'trashed') {
+      await mediaStore.put({
+        ...original,
+        lifecycle: { ...original.lifecycle!, trashedAt: 5 },
+      });
+    } else if (change !== 'unchanged') {
+      await retireImageWorkspaceIdentity(tx, 'image');
+      await mediaStore.delete('image');
+      if (change === 'replaced') {
+        await restoreImageWorkspaceIdentity(tx, 'image');
+        await mediaStore.put(original);
+      }
+    }
+    await tx.done;
+
+    await expect(imageWorkspacePublicationAdapter.publish(journal)).resolves.toBeUndefined();
+    if (change === 'unchanged') {
+      expect((await readStoredImageWorkspace('pending-project'))?.sourceMediaId).toBe('image');
+      return;
+    }
+    expect(io.journals.has(journal.journalId)).toBe(false);
+    expect(journal.assetRefs.every((ref) => !io.files.has(ref.assetId))).toBe(true);
+    expect(await readStoredImageWorkspace('pending-project')).toBeUndefined();
+    expect(await database().get('image_workspace_identities', 'pending-project')).toBeUndefined();
+  }
+);
 
 it('requires the generation returned by its first creation for the next save', async () => {
   await database().delete('media_library', 'image');

@@ -801,9 +801,9 @@ it('saves buffered content before New and retries the same stable archive identi
     return structuredClone(stored);
   });
   const create = vi
-    .fn(async (args: { expectedRevision: number; archiveId: string }) => {
+    .fn(async (args: { expectedRevision: number; newProjectId: string }) => {
       expect(args.expectedRevision).toBe(2);
-      expect(args.archiveId).toBe('recording:quick-project:stable-command');
+      expect(args.newProjectId).toBe('recording:quick-project:stable-command');
       expect(stored.workspace.history[0]).toMatchObject({
         target: 'annotation',
         after: annotation,

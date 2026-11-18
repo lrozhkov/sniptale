@@ -5,6 +5,7 @@ import {
   collectReadyJournalMediaKeys,
   mediaHasPendingPublication,
   readyMediaTargetKeys,
+  UNKNOWN_READY_MEDIA,
 } from './ready-media-claims';
 
 it('retains the destination, current and historical sources of a prepared Montage workspace', () => {
@@ -142,6 +143,24 @@ it.each([null, {}, { aggregateId: '' }])(
     ).toBe(true);
   }
 );
+
+it('retains the project ID and the shared original during image publication', () => {
+  const journal = {
+    domain: 'image-workspace',
+    payload: { aggregateId: 'project', original: { mediaId: 'origin', generation: null } },
+  };
+  expect(collectReadyJournalMediaKeys(journal)).toEqual(['media:project', 'media:origin']);
+  expect(mediaHasPendingPublication(journal, { id: 'origin' })).toBe(true);
+  expect(mediaHasPendingPublication(journal, { id: 'unrelated' })).toBe(false);
+});
+
+it('retains originals when an image journal has an unknown original identity', () => {
+  const journal = {
+    domain: 'image-workspace',
+    payload: { aggregateId: 'project', original: {} },
+  };
+  expect(collectReadyJournalMediaKeys(journal)).toContain(UNKNOWN_READY_MEDIA);
+});
 
 it.each([
   ['project-assets', { entry: { id: '' } }, 'unknown:project-asset'],

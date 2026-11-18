@@ -201,6 +201,7 @@ function parseWorkspace(
       value['formatVersion'] !== 3 &&
       value['formatVersion'] !== 4) ||
     !aggregateId(value['aggregateId']) ||
+    (value['generation'] !== undefined && !aggregateId(value['generation'])) ||
     !aggregateId(value['sourceAssetId']) ||
     (value['sourceMediaId'] !== undefined && !aggregateId(value['sourceMediaId'])) ||
     !revision(value['revision']) ||
@@ -255,6 +256,7 @@ function parseWorkspace(
   }
   const workspace: VideoWorkspace = {
     aggregateId: value['aggregateId'],
+    ...(typeof value['generation'] === 'string' ? { generation: value['generation'] } : {}),
     ...(typeof value['sourceMediaId'] === 'string'
       ? { sourceMediaId: value['sourceMediaId'] }
       : {}),

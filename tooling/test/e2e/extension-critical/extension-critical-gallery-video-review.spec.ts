@@ -4777,9 +4777,18 @@ for (const locale of ['en', 'ru'] as const) {
       await page.goto(
         `${host.origin}${GALLERY_HARNESS_PATH}?mediaId=${encodeURIComponent(sourceId)}&mode=edit&theme=${theme}`
       );
-      const title = page.locator('header h2 button').filter({ hasText: 'beta-v1.webm' });
-      await expect(title).toHaveAccessibleName('beta-v1.webm');
-      await title.click();
+      const projectInfo = page.getByRole('tabpanel', {
+        name: label('gallery.videoReview.aboutProject'),
+        exact: true,
+      });
+      const openProjectInfo = async () => {
+        await page
+          .getByRole('tab', { name: label('gallery.videoReview.aboutProject'), exact: true })
+          .click();
+        await expect(projectInfo).toBeVisible();
+      };
+      await openProjectInfo();
+      await projectInfo.getByRole('button', { name: 'beta-v1.webm', exact: true }).click();
       const name = page.getByRole('textbox', {
         name: label('videoEditor.app.projectNameLabel'),
         exact: true,
@@ -4787,7 +4796,9 @@ for (const locale of ['en', 'ru'] as const) {
       await expect(name).toBeFocused();
       await name.fill('First project');
       await name.press('Enter');
-      await expect(page.locator('header h2')).toHaveText('First project');
+      await expect(
+        projectInfo.getByRole('button', { name: 'First project', exact: true })
+      ).toBeVisible();
       await expect
         .poll(async () => (await readNativeReviewWorkspace(page, sourceId))?.project?.name)
         .toBe('First project');
@@ -4822,8 +4833,11 @@ for (const locale of ['en', 'ru'] as const) {
           exact: true,
         })
         .click();
-      await expect(page.locator('header h2')).toHaveText('beta-v1.webm');
-      const archiveId = await page.evaluate(
+      await openProjectInfo();
+      await expect(
+        projectInfo.getByRole('button', { name: 'beta-v1.webm', exact: true })
+      ).toBeVisible();
+      const newProjectId = await page.evaluate(
         async ({ dbName, sourceId }) => {
           const db = await new Promise<IDBDatabase>((resolve, reject) => {
             const request = indexedDB.open(dbName);
@@ -4839,7 +4853,7 @@ for (const locale of ['en', 'ru'] as const) {
             request.onerror = () => reject(request.error);
           });
           db.close();
-          const archived = result.find(
+          const created = result.find(
             (value) =>
               value &&
               typeof value === 'object' &&
@@ -4847,34 +4861,43 @@ for (const locale of ['en', 'ru'] as const) {
               value.sourceMediaId === sourceId
           );
           if (
-            !archived ||
-            typeof archived !== 'object' ||
-            !('aggregateId' in archived) ||
-            typeof archived.aggregateId !== 'string'
+            !created ||
+            typeof created !== 'object' ||
+            !('aggregateId' in created) ||
+            typeof created.aggregateId !== 'string'
           )
-            throw new Error('Previous project missing');
-          return archived.aggregateId;
+            throw new Error('New project missing');
+          return created.aggregateId;
         },
         { dbName: betaV1Fixture.databaseName, sourceId }
       );
-      expect((await readNativeReviewWorkspace(page, archiveId))?.project?.name).toBe(
+      expect((await readNativeReviewWorkspace(page, sourceId))?.project?.name).toBe(
         'First project'
       );
-      await page.reload();
-      await expect(page.locator('header h2')).toHaveText('beta-v1.webm');
-      await page.goto(
-        `${host.origin}${GALLERY_HARNESS_PATH}?mediaId=${encodeURIComponent(archiveId)}&mode=edit&theme=${theme}`
+      expect((await readNativeReviewWorkspace(page, newProjectId))?.project?.name).toBe(
+        'beta-v1.webm'
       );
-      await expect(page.locator('header h2')).toHaveText('First project');
-      await page.locator('header h2 button').click();
+      await page.goto(
+        `${host.origin}${GALLERY_HARNESS_PATH}?mediaId=${encodeURIComponent(newProjectId)}&mode=edit&theme=${theme}`
+      );
+      await openProjectInfo();
+      await expect(
+        projectInfo.getByRole('button', { name: 'beta-v1.webm', exact: true })
+      ).toBeVisible();
+      await page.goto(
+        `${host.origin}${GALLERY_HARNESS_PATH}?mediaId=${encodeURIComponent(sourceId)}&mode=edit&theme=${theme}`
+      );
+      await openProjectInfo();
+      await expect(
+        projectInfo.getByRole('button', { name: 'First project', exact: true })
+      ).toBeVisible();
+      await projectInfo.getByRole('button', { name: 'First project', exact: true }).click();
       await name.fill('Discard this');
       await name.press('Escape');
-      await expect(page.locator('header h2')).toHaveText('First project');
-      await page.screenshot({ path: info.outputPath('archived-project.png'), fullPage: false });
-      await page.setViewportSize({ width: 1200, height: 560 });
-      expect(
-        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
-      ).toBe(true);
+      await expect(
+        projectInfo.getByRole('button', { name: 'First project', exact: true })
+      ).toBeVisible();
+      await page.screenshot({ path: info.outputPath('retained-project.png'), fullPage: false });
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

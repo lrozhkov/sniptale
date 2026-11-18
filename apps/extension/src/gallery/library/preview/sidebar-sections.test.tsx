@@ -17,6 +17,11 @@ import {
 } from './sidebar-sections';
 import type { PreviewPanelProps } from './types';
 
+vi.mock('../../../composition/persistence/image-workspaces/read', async (original) => ({
+  ...(await original()),
+  listImageProjectsForEditing: async () => ({ canCreateIndependentProject: false, projects: [] }),
+}));
+
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -365,6 +370,39 @@ it('keeps promotion unavailable for library items and without a promotion owner'
 
   await act(async () => root.render(<PreviewPromotionAction {...createProps()} />));
   expect(container.textContent).not.toContain('gallery.preview.saveToLibrary');
+  await act(async () => root.unmount());
+});
+
+it('can save a project-retained original independently', async () => {
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const onPromote = vi.fn(async () => undefined);
+  const item = {
+    ...createMediaItem({
+      lifecycle: { savedAt: 1, storageClass: 'library', updatedAt: 1 },
+    }),
+    savedIndependently: false,
+  };
+  await act(async () =>
+    root.render(<PreviewPromotionAction {...createProps(onPromote)} item={item} />)
+  );
+  const save = container.querySelector<HTMLButtonElement>(
+    'button[aria-label="gallery.preview.saveInOriginals"]'
+  );
+  expect(save).not.toBeNull();
+  await act(async () => save?.click());
+  expect(onPromote).toHaveBeenCalledOnce();
+
+  await act(async () =>
+    root.render(
+      <PreviewPromotionAction
+        {...createProps(onPromote)}
+        item={{ ...item, savedIndependently: true }}
+      />
+    )
+  );
+  expect(container.querySelector('button')).toBeNull();
   await act(async () => root.unmount());
 });
 

@@ -1,5 +1,7 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { canOpenGalleryProject } from '../items/types';
+import { browserTabs } from '@sniptale/platform/browser/tabs';
+import { buildEditorUrl } from '../../../platform/navigation/extension-pages/editor';
+import { canOpenGalleryProject, usesGalleryImagePresentation } from '../items/types';
 import { getGalleryProjectSummary } from '../ui/project-presentation';
 import { translate } from '../../../platform/i18n';
 import { getControlIconButtonClassName } from '@sniptale/ui/control-language';
@@ -36,6 +38,7 @@ import {
 import { PromotionAction } from './promotion-action';
 import type { PreviewPanelProps } from './types';
 import { ScenarioViewingActions } from './scenario-viewing-actions';
+import { ImageEditorActions } from './image-editor-actions';
 import {
   listPreviewMediaAssetProjectUsage,
   subscribeToPreviewProjectUsageInvalidation,
@@ -362,6 +365,8 @@ function PreviewProjectUsageDetails({
                     if (project.kind === 'scenario') void openScenarioEditorPage(project.id);
                     if (project.kind === 'review')
                       void openGalleryPage({ mediaId: project.id, quickEdit: true });
+                    if (project.kind === 'image')
+                      void browserTabs.create({ url: buildEditorUrl({ assetId: project.id }) });
                   }}
                 >
                   <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -542,6 +547,8 @@ function getPreviewPrimaryActionLabel(item: PreviewPanelProps['item']) {
 function PreviewPrimaryActions(props: PreviewPanelProps & { onReview?: () => void }) {
   const { item, onEdit, onReview } = props;
   const primaryLabel = getPreviewPrimaryActionLabel(item);
+  const imageId =
+    isGalleryMediaItem(item) && isImageKind(item.kind) ? (item.entityId ?? item.id) : null;
   return (
     <>
       {onReview || primaryLabel ? (
@@ -559,7 +566,9 @@ function PreviewPrimaryActions(props: PreviewPanelProps & { onReview?: () => voi
               {translate('gallery.videoReview.enter')}
             </ProductActionButton>
           ) : null}
-          {primaryLabel ? (
+          {imageId ? (
+            <ImageEditorActions key={imageId} mediaId={imageId} onOpenLegacy={onEdit} />
+          ) : primaryLabel ? (
             <ProductActionButton
               compact
               tone="secondary"
@@ -569,6 +578,18 @@ function PreviewPrimaryActions(props: PreviewPanelProps & { onReview?: () => voi
             >
               <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
               {translate(primaryLabel)}
+            </ProductActionButton>
+          ) : null}
+          {item.type === 'image-project' && item.sourceAvailable ? (
+            <ProductActionButton
+              compact
+              tone="secondary"
+              type="button"
+              onClick={() => void openGalleryPage({ mediaId: item.project.sourceMediaId })}
+              className={previewActionButtonClassName}
+            >
+              <Images className="h-4 w-4 shrink-0" aria-hidden="true" />
+              {translate('gallery.preview.openImageOriginal')}
             </ProductActionButton>
           ) : null}
         </div>
@@ -613,7 +634,8 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
   const canDownload =
     isGalleryMediaItem(item) || (isGalleryScenarioExportItem(item) && item.format === 'html');
   const canCopy = isGalleryMediaItem(item) && isImageKind(item.kind);
-  const canUseImageAggregateActions = canCopy && item.source.kind === 'screenshot';
+  const canUseImageAggregateActions =
+    isGalleryMediaItem(item) && usesGalleryImagePresentation(item);
   const hasEditedImageContent = canUseImageAggregateActions && item.imageContentState === 'edited';
   const canOpenWebSnapshot = isGalleryMediaItem(item) && item.kind === 'web-archive';
   const hasFileActions =
@@ -737,7 +759,12 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
 export function PreviewPromotionAction(
   props: Pick<PreviewPanelProps, 'item' | 'onPromote' | 'trashMode'>
 ) {
-  if (props.trashMode || props.item.lifecycle?.storageClass !== 'temporary' || !props.onPromote) {
+  const savesOriginal = isGalleryMediaItem(props.item) && props.item.savedIndependently === false;
+  if (
+    props.trashMode ||
+    (!savesOriginal && props.item.lifecycle?.storageClass !== 'temporary') ||
+    !props.onPromote
+  ) {
     return null;
   }
 
@@ -746,6 +773,7 @@ export function PreviewPromotionAction(
       key={props.item.id}
       className={`${getControlIconButtonClassName()} !h-8 !w-8 !rounded-[4px]`}
       onPromote={props.onPromote}
+      savesOriginal={savesOriginal}
       visible
     />
   );

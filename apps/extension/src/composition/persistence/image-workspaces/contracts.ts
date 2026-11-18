@@ -3,10 +3,14 @@ import type { PersistedEditorDocument } from '../document-assets/contracts';
 import type { AssetRef } from '../assets/contracts';
 import type { EditorImageHistoryCheckpoint } from '../../../features/editor-history/image-checkpoint';
 import type { PersistedImageHistory } from './history-contracts';
+import type { LibraryLifecycle } from '../library-lifecycle/contracts';
 
 /** Authoritative editable document for an image aggregate. */
 export interface ImageWorkspaceEntry {
   aggregateId: string;
+  /** Original Library media for a project with an independent ID. */
+  sourceMediaId?: string;
+  lifecycle?: LibraryLifecycle;
   createdAt: number;
   document: EditorDocument;
   history?: EditorImageHistoryCheckpoint;

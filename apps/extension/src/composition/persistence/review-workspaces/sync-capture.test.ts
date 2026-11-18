@@ -123,12 +123,13 @@ function commit(snapshot: VideoWorkspaceSnapshot, text = 'Saved') {
     },
   });
 }
-function create(snapshot: VideoWorkspaceSnapshot, archiveId: string) {
+function create(snapshot: VideoWorkspaceSnapshot, newProjectId: string) {
   return createVideoWorkspaceProject({
     aggregateId: snapshot.workspace.aggregateId,
     expectedRevision: snapshot.workspace.revision,
     expectedSourceAssetId: snapshot.workspace.sourceAssetId,
-    archiveId,
+    expectedGeneration: snapshot.workspace.generation,
+    newProjectId,
   });
 }
 
@@ -257,42 +258,42 @@ it('serializes parallel native writers and checkpoints only the admitted workspa
   });
 });
 
-it('marks New archive and default atomically and replays without changing native or pending state', async () => {
+it('captures independent creation and replays without changing either checkpoint', async () => {
   const saved = await commit(await openVideoWorkspace(id, source));
-  const archiveId = 'project-asset:quick-project:first';
-  const next = await create(saved, archiveId);
-  expect(current(archiveId).sourceMediaId).toBe(id);
-  expect(current(archiveId).history).toEqual(saved.workspace.history);
+  const newProjectId = 'project-asset:quick-project:first';
+  const next = await create(saved, newProjectId);
+  expect(current(newProjectId).sourceMediaId).toBe(id);
+  expect(current().history).toEqual(saved.workspace.history);
   expect(next.workspace.history).toEqual([]);
-  expect(table('media_library').has(archiveId)).toBe(false);
+  expect(table('media_library').has(newProjectId)).toBe(false);
   expect(captures()).toHaveLength(0);
   expect(pendingRecords()).toHaveLength(2);
   const beforeReplay = structuredClone(fixture.rows);
-  const replay = await create(saved, archiveId);
+  const replay = await create(saved, newProjectId);
   expect(replay.workspace).toEqual(next.workspace);
-  expect(replay).not.toHaveProperty('archiveCheckpointReceipt');
+  expect(replay).not.toHaveProperty('newProjectCheckpointReceipt');
   expect(replay).not.toHaveProperty('checkpointReceipt');
   expect(fixture.rows).toEqual(beforeReplay);
-  await checkpoint(archiveId);
+  await checkpoint(newProjectId);
   await checkpoint(id);
-  expect(captures(archiveId)).toHaveLength(1);
+  expect(captures(newProjectId)).toHaveLength(1);
   expect(captures(id)).toHaveLength(1);
 });
 
 it('rolls back New native rows and both pending roots after capture failure and retries the command', async () => {
   const opened = await openVideoWorkspace(id, source);
   const before = structuredClone(fixture.rows);
-  successfulCaptureWrites = 2;
-  const archiveId = 'project-asset:quick-project:retry';
-  await expect(create(opened, archiveId)).rejects.toThrow();
+  successfulCaptureWrites = 1;
+  const newProjectId = 'project-asset:quick-project:retry';
+  await expect(create(opened, newProjectId)).rejects.toThrow();
   expect(fixture.rows).toEqual(before);
   successfulCaptureWrites = undefined;
-  const created = await create(opened, archiveId);
-  expect(created.archiveCheckpointReceipt?.revision).toBe(pending(archiveId).revision);
+  const created = await create(opened, newProjectId);
+  expect(created.newProjectCheckpointReceipt?.revision).toBe(pending(newProjectId).revision);
   expect(pendingRecords()).toHaveLength(2);
   expect(captures()).toHaveLength(0);
-  await checkpoint(archiveId);
-  expect(captures(archiveId)).toHaveLength(1);
+  await checkpoint(newProjectId);
+  expect(captures(newProjectId)).toHaveLength(1);
 });
 
 it('defers rename and captures Trash transitions only for the selected independent archive root', async () => {
@@ -343,15 +344,15 @@ it('fences a delayed writer after purge and reopening the same default identity'
   expect(pending().revision).not.toBe(oldPending.revision);
 });
 
-it('refuses a New command retry after its archive was purged without resetting the newer default', async () => {
+it('refuses replay after the created project was purged', async () => {
   const opened = await openVideoWorkspace(id, source);
-  const archiveId = 'project-asset:quick-project:purged';
-  const next = await create(opened, archiveId);
-  await deleteVideoWorkspaceProject(archiveId, current(archiveId).revision);
+  const newProjectId = 'project-asset:quick-project:purged';
+  await create(opened, newProjectId);
+  await deleteVideoWorkspaceProject(newProjectId, current(newProjectId).revision);
   const before = structuredClone(fixture.rows);
-  await expect(create(next, archiveId)).rejects.toThrow();
+  await expect(create(opened, newProjectId)).rejects.toThrow();
   expect(fixture.rows).toEqual(before);
-  expect(current().revision).toBe(next.workspace.revision);
+  expect(current().revision).toBe(opened.workspace.revision + 1);
 });
 
 it('rolls back draft and metadata publication when their capture intent cannot commit', async () => {
@@ -433,7 +434,7 @@ it('admits only one parallel draft-only writer without advancing the document re
   });
 });
 
-it('keeps archived editor and reset default independent across New and explicit checkpoints', async () => {
+it('keeps three projects independent across creation and explicit checkpoints', async () => {
   const saved = await commit(await openVideoWorkspace(id, source));
   const firstId = 'project-asset:quick-project:from-default';
   await create(saved, firstId);
@@ -442,9 +443,12 @@ it('keeps archived editor and reset default independent across New and explicit 
   const firstBefore = structuredClone(first);
   const secondId = 'project-asset:quick-project:from-archive';
   await create(first, secondId);
-  expect(await readVideoWorkspace(firstId)).toEqual(firstBefore);
+  expect(await readVideoWorkspace(firstId)).toEqual({
+    ...firstBefore,
+    workspace: { ...firstBefore.workspace, revision: firstBefore.workspace.revision + 1 },
+  });
   expect(current(secondId).sourceMediaId).toBe(id);
-  expect(current().history).toEqual([]);
+  expect(current().history).toEqual(saved.workspace.history);
   expect(captures(firstId)).toHaveLength(0);
   expect(captures(secondId)).toHaveLength(0);
   expect(pendingRecords()).toHaveLength(3);
