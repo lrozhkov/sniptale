@@ -16,6 +16,19 @@ import {
   PreviewTagEditor,
 } from './sidebar-sections';
 import type { PreviewPanelProps } from './types';
+import { createImageProjectItem } from '../test-support/items';
+import { createQuickEditProjectGalleryItem } from '../items/adapters';
+import { openGalleryPage } from '../../../platform/navigation/extension-pages';
+import { listVideoProjectsForEditing } from '../../../composition/persistence/review-workspaces/summaries';
+
+vi.mock('../../../platform/navigation/extension-pages', async (original) => ({
+  ...(await original<typeof import('../../../platform/navigation/extension-pages')>()),
+  openGalleryPage: vi.fn(),
+}));
+
+vi.mock('../../../composition/persistence/review-workspaces/summaries', () => ({
+  listVideoProjectsForEditing: vi.fn(),
+}));
 
 vi.mock('../../../composition/persistence/image-workspaces/read', async (original) => ({
   ...(await original()),
@@ -659,7 +672,6 @@ it('uses the same navigation icon for image, recording and project editors', asy
 });
 
 it('resets unsaved quick-edit names without exposing media file commands', async () => {
-  const { createQuickEditProjectGalleryItem } = await import('../items/adapters');
   const item = createQuickEditProjectGalleryItem({
     aggregateId: 'source',
     name: 'Saved edit',
@@ -690,7 +702,6 @@ it('resets unsaved quick-edit names without exposing media file commands', async
 });
 
 it('keeps one backup command for each library item type and suppresses duplicate activation', async () => {
-  const { createQuickEditProjectGalleryItem } = await import('../items/adapters');
   const items = [
     createMediaItem(),
     createScenarioItem(),
@@ -737,4 +748,61 @@ it('keeps one backup command for each library item type and suppresses duplicate
   } finally {
     await act(async () => root.unmount());
   }
+});
+
+it('opens the original from image, linked Quick Edit, and legacy Quick Edit project cards', async () => {
+  const summary = {
+    aggregateId: 'legacy-or-project',
+    name: 'Saved edit',
+    createdAt: 1,
+    updatedAt: 1,
+    revision: 4,
+    lifecycle: { storageClass: 'library' as const, savedAt: 1, updatedAt: 1 },
+    source: null,
+    unavailableReason: null,
+  };
+  const image = createImageProjectItem();
+  const linked = createQuickEditProjectGalleryItem({ ...summary, sourceMediaId: 'linked' });
+  const legacy = createQuickEditProjectGalleryItem(summary);
+  const unavailable = createQuickEditProjectGalleryItem({
+    ...summary,
+    unavailableReason: 'missing-source',
+  });
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  vi.mocked(openGalleryPage).mockClear();
+  for (const item of [image, linked, legacy, unavailable]) {
+    await act(async () => root.render(<PreviewActions {...createProps()} item={item} />));
+    const open = [...container.querySelectorAll('button')].find(
+      (button) => button.textContent === 'gallery.preview.openImageOriginal'
+    );
+    if (item === unavailable) expect(open).toBeUndefined();
+    else {
+      expect(open).toBeDefined();
+      await act(async () => open?.click());
+    }
+  }
+  expect(vi.mocked(openGalleryPage).mock.calls).toEqual([
+    [{ mediaId: image.project.sourceMediaId }],
+    [{ mediaId: 'linked' }],
+    [{ mediaId: summary.aggregateId }],
+  ]);
+  await act(async () => root.unmount());
+});
+
+it('looks up projects by the selected video original and opens a new session when none exist', async () => {
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  const onReview = vi.fn();
+  const item = createMediaItem({ id: 'video-original', kind: 'video' });
+  vi.mocked(listVideoProjectsForEditing).mockResolvedValueOnce([]);
+  await act(async () =>
+    root.render(<PreviewActions {...createProps()} item={item} onReview={onReview} />)
+  );
+  const open = container.querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.enter"]');
+  expect(open).not.toBeNull();
+  await act(async () => open?.click());
+  expect(listVideoProjectsForEditing).toHaveBeenCalledWith(item.entityId ?? item.id);
+  expect(onReview.mock.calls).toEqual([[]]);
+  await act(async () => root.unmount());
 });

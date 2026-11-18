@@ -64,6 +64,18 @@ export interface VideoWorkspaceSnapshot {
   draft: VideoWorkspaceDraft | null;
 }
 
+export interface VideoReviewOriginalIdentity {
+  mediaId: string;
+  createdAt: number;
+  generation: string | null;
+}
+
+/** Source identity observed before the first accepted editor write. */
+export interface VideoWorkspaceOpening {
+  snapshot: VideoWorkspaceSnapshot;
+  original?: VideoReviewOriginalIdentity;
+}
+
 /** Transient checkpoint receipts from one freshly committed project creation. */
 export interface VideoWorkspaceProjectCreationAcknowledgement extends VideoWorkspaceSnapshot {
   readonly newProjectCheckpointReceipt?: SyncCheckpointReceipt;

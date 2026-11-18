@@ -8,6 +8,7 @@ import {
   SYNC_CAPTURE_STORE,
   SYNC_CONNECTION_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_REVIEW_IDENTITIES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
 } from '../infrastructure/indexed-db/core.stores';
@@ -36,12 +37,13 @@ type ProjectMutationDatabase = Awaited<ReturnType<typeof initDB>>;
 
 export function createProjectMutationStores(
   db: ProjectMutationDatabase,
-  options: { checkpointAdmission?: true } = {}
+  options: { checkpointAdmission?: true; reviewSourceAdmission?: boolean } = {}
 ) {
   const tx = db.transaction(
     [
       ...SCENARIO_CAPTURE_STORES,
       ...(options.checkpointAdmission ? [SYNC_CONNECTION_STORE] : []),
+      ...(options.reviewSourceAdmission ? [VIDEO_REVIEW_IDENTITIES_STORE] : []),
       VIDEO_PROJECT_REVISIONS_STORE,
       SYNC_CAPTURE_STORE,
       VIDEO_PROJECTS_STORE,

@@ -14,9 +14,11 @@ import { parseRecordingEntry } from '../recordings/index.guards';
 import { parseProjectAssetEntry, parseProjectExportEntry } from '../projects/read-guards';
 import { parseWorkspaceProject } from './project-metadata';
 import type { VideoWorkspaceProject } from './contracts';
+import { USAGE_REFERENCE_INDEX, usageReferenceKey } from '../media-library/usage-index-keys';
 
 export interface VideoWorkspaceSummary {
   aggregateId: string;
+  sourceMediaId?: string;
   name: string;
   lifecycle: VideoWorkspaceProject['lifecycle'];
   createdAt: number;
@@ -137,6 +139,7 @@ async function summarizeHead(tx: Transaction, raw: unknown): Promise<VideoWorksp
   const sourceRow = media ? await readSummarySource(tx, media.source) : null;
   return {
     aggregateId,
+    ...(typeof raw['sourceMediaId'] === 'string' ? { sourceMediaId: raw['sourceMediaId'] } : {}),
     name: project?.name ?? media?.filename ?? aggregateId,
     lifecycle: project?.lifecycle ?? { storageClass: 'library', savedAt: createdAt, updatedAt },
     createdAt,
@@ -171,4 +174,43 @@ export async function listVideoWorkspaceSummaries(): Promise<VideoWorkspaceSumma
   const summaries = await Promise.all(heads.map((head) => summarizeHead(tx, head)));
   await tx.done;
   return summaries.filter((summary) => summary !== null);
+}
+
+/** Finds saved, active projects whose main source is the original selected in Gallery. */
+export async function listVideoProjectsForEditing(
+  mediaId: string
+): Promise<VideoWorkspaceSummary[]> {
+  const db = await initDB();
+  const tx = db.transaction(
+    [
+      VIDEO_WORKSPACES_STORE,
+      MEDIA_LIBRARY_STORE,
+      STORE_NAME,
+      PROJECT_ASSETS_STORE,
+      PROJECT_EXPORTS_STORE,
+    ],
+    'readonly'
+  );
+  const workspaces = tx.objectStore(VIDEO_WORKSPACES_STORE);
+  const legacyRead: Promise<unknown> = workspaces.get(mediaId);
+  const linkedRead: Promise<unknown[]> = workspaces
+    .index(USAGE_REFERENCE_INDEX)
+    .getAll(usageReferenceKey('library-asset', mediaId));
+  const [legacy, linked] = await Promise.all([legacyRead, linkedRead]);
+  const primary = new Map<string, unknown>();
+  for (const row of [legacy, ...linked]) {
+    if (
+      isRecord(row) &&
+      typeof row['aggregateId'] === 'string' &&
+      (row['sourceMediaId'] ?? row['aggregateId']) === mediaId
+    )
+      primary.set(row['aggregateId'], row);
+  }
+  const summaries = await Promise.all([...primary.values()].map((row) => summarizeHead(tx, row)));
+  await tx.done;
+  return summaries
+    .filter((project): project is VideoWorkspaceSummary =>
+      Boolean(project && !project.unavailableReason && project.lifecycle.trashedAt === undefined)
+    )
+    .sort((first, second) => second.updatedAt - first.updatedAt);
 }

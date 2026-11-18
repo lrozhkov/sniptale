@@ -17,6 +17,7 @@ import {
   IMAGE_WORKSPACES_STORE,
   IMAGE_WORKSPACE_IDENTITIES_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_REVIEW_IDENTITIES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   MEDIA_LIBRARY_STORE,
@@ -116,13 +117,14 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 44,
+    schemaVersion: 45,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
       { storeName: IMAGE_WORKSPACES_STORE, dataClass: 'durable-authority' },
       { storeName: IMAGE_WORKSPACE_IDENTITIES_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_WORKSPACES_STORE, dataClass: 'durable-authority' },
+      { storeName: VIDEO_REVIEW_IDENTITIES_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_WORKSPACE_HISTORY_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_WORKSPACE_DRAFTS_STORE, dataClass: 'durable-authority' },
       { storeName: AGGREGATE_PRESENTATIONS_STORE, dataClass: 'derived-rebuildable' },

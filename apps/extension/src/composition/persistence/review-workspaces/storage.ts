@@ -60,9 +60,11 @@ export interface WorkspaceStorageRead {
 /** Reads source preflight metadata only; the write transaction still admits the full workspace. */
 export async function readWorkspaceEffectSnapshots(
   tx: { objectStore(name: string): { get(key: string | [string, number]): Promise<unknown> } },
-  aggregateId: string
+  aggregateId: string,
+  options?: { allowMissingHead: boolean }
 ): Promise<ReviewAnnotationEffectSnapshot[] | null> {
   const head = await tx.objectStore(VIDEO_WORKSPACES_STORE).get(aggregateId);
+  if (head === undefined && options?.allowMissingHead) return [];
   if (!isRecord(head) || head['aggregateId'] !== aggregateId) return null;
   let registry = head['effectSnapshots'];
   if ('historyLength' in head) {

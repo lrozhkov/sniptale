@@ -14,6 +14,7 @@ import { materializeVideoWorkspaceProject } from '../review-workspaces/project-m
 import { readWorkspaceStorage } from '../review-workspaces/storage';
 import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
 import { restoreImageWorkspaceIdentity } from '../image-workspaces/identity';
+import { fenceVideoReviewIdentity } from '../review-workspaces/identity';
 import { createScenarioProjectStore, getScenarioStoredProject } from '../scenario/storage';
 import { withVideoProjectUsage } from '../media-library/usage-index-keys';
 import {
@@ -32,6 +33,7 @@ import {
   AGGREGATE_PRESENTATIONS_STORE,
   MEDIA_LIBRARY_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_REVIEW_IDENTITIES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
@@ -172,6 +174,7 @@ async function mutateTrash(
           AGGREGATE_PRESENTATIONS_STORE,
           MEDIA_LIBRARY_STORE,
           VIDEO_WORKSPACES_STORE,
+          VIDEO_REVIEW_IDENTITIES_STORE,
           VIDEO_WORKSPACE_HISTORY_STORE,
           SCENARIO_PROJECTS_STORE,
           SCENARIO_PROJECT_HISTORY_STORE,
@@ -242,6 +245,9 @@ async function mutateTrash(
           if (restore) {
             const { trashedAt: _trashedAt, ...active } = lifecycle;
             const media = target.kind === 'media' ? parseMediaLibraryEntry(entry) : null;
+            if (media?.mimeType.startsWith('video/')) {
+              await fenceVideoReviewIdentity(tx, 'original', target.id);
+            }
             if (media && isImageCaptureSource(media)) {
               await restoreImageWorkspaceIdentity(tx, target.id);
               const workspaces = tx.objectStore(IMAGE_WORKSPACES_STORE);

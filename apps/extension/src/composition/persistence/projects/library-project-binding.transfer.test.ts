@@ -9,8 +9,12 @@ import {
   createVideoProjectEntryWithMediaClip,
 } from './index.test-support';
 import { prepareLibraryProjectBindingForCommit } from './library-project-binding';
-import { commitVideoProjectMutation } from './index-mutations';
-import { openVideoWorkspace, readVideoWorkspace } from '../review-workspaces/store';
+import { commitVideoProjectMutation, commitVideoProjectWorkspaceMutation } from './index-mutations';
+import {
+  createVideoWorkspaceProject,
+  openVideoWorkspace,
+  readVideoWorkspace,
+} from '../review-workspaces/store';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 
 const io = vi.hoisted(() => ({ database: vi.fn(), recover: vi.fn(), publish: vi.fn() }));
@@ -139,6 +143,98 @@ it('publishes a private binding and destination together without copying or cata
   expect(fixture.rows.get('asset_refs')).toEqual(before);
   expect(fixture.rows.get('asset_owners')!.size).toBe(2);
 });
+
+it('transfers a saved Quick Edit project through its linked original', async () => {
+  const fixture = await setup();
+  const sourceWorkspace = fixture.opened.workspace;
+  const saved = await createVideoWorkspaceProject({
+    aggregateId: mediaId,
+    expectedRevision: sourceWorkspace.revision,
+    expectedSourceAssetId: sourceWorkspace.sourceAssetId,
+    expectedGeneration: sourceWorkspace.generation,
+    newProjectId: 'export:quick-project:linked',
+  });
+  const destination = fixture.destination('from-linked');
+  await commitVideoProjectMutation(destination.project, {
+    ...destination.options,
+    expectedReviewWorkspace: saved.workspace,
+  });
+  expect(fixture.rows.get('project_assets')!.get('from-linked-binding')).toEqual(
+    destination.options.libraryBindings[0]!.entry
+  );
+  expect(fixture.rows.get('media_library')!.has('project-asset:from-linked-binding')).toBe(false);
+});
+
+it('refuses contradictory transfer witnesses and a binding to the wrong original', async () => {
+  const fixture = await setup();
+  const destination = fixture.destination('mismatched');
+  const media = fixture.rows.get('media_library')!.get(mediaId);
+  if (!isRecord(media) || typeof media['createdAt'] !== 'number')
+    throw new Error('Missing original');
+  const before = structuredClone(fixture.rows);
+  await expect(
+    commitVideoProjectWorkspaceMutation(destination.project, {
+      expectedProject: null,
+      expectedWorkspaceRevision: null,
+      expectedReviewWorkspace: fixture.opened.workspace,
+      expectedReviewOriginal: {
+        mediaId,
+        createdAt: media['createdAt'],
+        generation: null,
+        assetId: ref.assetId,
+      },
+      libraryBindings: destination.options.libraryBindings,
+    })
+  ).rejects.toThrow('Invalid review transfer source');
+  const binding = destination.options.libraryBindings[0]!;
+  await expect(
+    commitVideoProjectMutation(destination.project, {
+      ...destination.options,
+      libraryBindings: [{ ...binding, claim: { ...binding.claim, mediaId: 'other' } }],
+    })
+  ).rejects.toThrow('Invalid review destination source binding');
+  expect(fixture.rows).toEqual(before);
+});
+
+it.each(['same', 'restored'] as const)(
+  'rechecks a first Quick Edit original in the destination write when its lifetime is %s',
+  async (lifetime) => {
+    const fixture = await setup();
+    fixture.rows.get('video_workspaces')!.delete(mediaId);
+    const destination = fixture.destination('from-original');
+    const media = fixture.rows.get('media_library')!.get(mediaId);
+    if (!isRecord(media) || typeof media['createdAt'] !== 'number')
+      throw new Error('Missing original');
+    const gate = barrier();
+    const pending = commitVideoProjectWorkspaceMutation(destination.project, {
+      expectedProject: null,
+      expectedWorkspaceRevision: null,
+      expectedReviewOriginal: {
+        mediaId,
+        createdAt: media['createdAt'],
+        generation: null,
+        assetId: ref.assetId,
+      },
+      libraryBindings: destination.options.libraryBindings,
+    });
+    await gate.started;
+    if (lifetime === 'restored') {
+      const key = JSON.stringify(['original', mediaId]);
+      fixture.rows.get('video_review_identities')!.set(key, { key, generation: 'replacement' });
+    }
+    gate.release();
+    if (lifetime === 'restored') {
+      await expect(pending).rejects.toMatchObject({ code: 'conflict' });
+      expect(fixture.rows.get('video_projects')?.has('from-original')).toBe(false);
+      expect(fixture.rows.get('project_assets')!.size).toBe(0);
+    } else {
+      await pending;
+      expect(fixture.rows.get('video_projects')?.has('from-original')).toBe(true);
+      expect(fixture.rows.get('project_assets')!.get('from-original-binding')).toBeDefined();
+    }
+    expect(fixture.rows.get('video_workspaces')?.size).toBe(0);
+  }
+);
 
 it('aborts private ownership after a destination write fails and retries without leaking identities', async () => {
   const fixture = await setup();

@@ -72,12 +72,14 @@ import {
   ASSET_OWNERS_STORE,
   IMAGE_WORKSPACES_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_REVIEW_IDENTITIES_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   THUMBNAILS_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
   WEB_SNAPSHOTS_STORE,
 } from '../infrastructure/indexed-db/core.stores';
+import { fenceVideoReviewIdentity } from '../review-workspaces/identity';
 import {
   publishPreparedMediaSourceInTransaction,
   publishPreparedMediaProjectChildInTransaction,
@@ -477,21 +479,29 @@ export async function loadMediaReplicaPredecessorRef(input: {
 async function publishReplica(
   tx: ApplyTransaction,
   input: ApplyPreparedMediaReplicaInput,
-  identity: ReplicaIdentity
+  identity: ReplicaIdentity,
+  previous: CapturedMediaRows | null
 ): Promise<void> {
   const { rows } = input;
-  const prepared = {
-    media: rows.media,
-    original: { ref: rows.ref },
-    ...('projectAsset' in rows ? { projectAsset: rows.projectAsset } : {}),
-    ...('projectExport' in rows ? { projectExport: rows.projectExport } : {}),
-  };
   const stores = {
     media: tx.objectStore(MEDIA_LIBRARY_STORE),
     refs: tx.objectStore(ASSET_REFS_STORE),
     owners: tx.objectStore(ASSET_OWNERS_STORE),
     projectAssets: tx.objectStore(PROJECT_ASSETS_STORE),
     projectExports: tx.objectStore(PROJECT_EXPORTS_STORE),
+  };
+  const native =
+    previous?.ref.assetId === rows.ref.assetId && previous.media.createdAt === rows.media.createdAt
+      ? parseMediaLibraryEntry(await stores.media.get(rows.media.id))
+      : null;
+  const prepared = {
+    media:
+      native?.savedIndependently === undefined
+        ? rows.media
+        : { ...rows.media, savedIndependently: native.savedIndependently },
+    original: { ref: rows.ref },
+    ...('projectAsset' in rows ? { projectAsset: rows.projectAsset } : {}),
+    ...('projectExport' in rows ? { projectExport: rows.projectExport } : {}),
   };
   const createdAt = Date.now();
   const state: SyncCaptureRootState = {
@@ -520,6 +530,15 @@ async function publishReplica(
   };
   if (!parseSyncCaptureRecord(state) || !parseSyncCaptureRecord(receipt))
     throw new MediaReplicaConflictError('invalid-input');
+  const restoresOriginal = previous
+    ? previous.media.lifecycle?.trashedAt !== undefined
+    : input.expectedLocalGeneration > 0;
+  if (
+    restoresOriginal &&
+    rows.media.mimeType.startsWith('video/') &&
+    rows.media.lifecycle?.trashedAt === undefined
+  )
+    await fenceVideoReviewIdentity(tx, 'original', rows.media.id);
   await publishPreparedMediaSourceInTransaction(prepared, stores);
   await publishPreparedMediaProjectChildInTransaction(prepared, stores);
   if ('webSnapshot' in rows)
@@ -677,6 +696,7 @@ export async function applyPreparedMediaReplica(
           ASSET_OWNERS_STORE,
           IMAGE_WORKSPACES_STORE,
           VIDEO_WORKSPACES_STORE,
+          VIDEO_REVIEW_IDENTITIES_STORE,
           VIDEO_WORKSPACE_DRAFTS_STORE,
           VIDEO_WORKSPACE_HISTORY_STORE,
           THUMBNAILS_STORE,
@@ -714,6 +734,7 @@ export async function applyPreparedMediaReplica(
           })
         )
           throw new MediaReplicaConflictError('source-changed');
+        let previous: CapturedMediaRows | null = null;
         if (candidate.expectedLocalGeneration === 0) {
           const retained =
             'projectExport' in candidate.rows && candidate.rows.ref.sha256 !== null
@@ -731,7 +752,7 @@ export async function applyPreparedMediaReplica(
               throw new MediaReplicaConflictError('source-changed');
           } else await assertAbsentSource(tx, candidate, identity);
         } else {
-          const previous = await assertExistingSource(tx, candidate, identity);
+          previous = await assertExistingSource(tx, candidate, identity);
           if (
             previous &&
             (previous.ref.assetId !== candidate.rows.ref.assetId ||
@@ -751,7 +772,7 @@ export async function applyPreparedMediaReplica(
               retainRecordingRecovery: true,
             });
         }
-        await publishReplica(tx, candidate, identity);
+        await publishReplica(tx, candidate, identity, previous);
         if (cursorStage && cursorDescriptor && cursorSnapshot && 'recording' in candidate.rows) {
           await retireRecordingCursorTrajectoriesInTransaction(tx, candidate.rows.recording.id);
           const published = await publishStagedCursorTrajectoryInTransaction({

@@ -9,7 +9,10 @@ import { replaceEditorDocumentAssetOwnership } from '../document-assets/ownershi
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { captureVideoProjectInTransaction } from '../sync-capture/capture';
 import { publishLibraryProjectBindingInTransaction } from './known-library-source';
-import { assertVideoWorkspaceUnchanged } from '../review-workspaces/store';
+import {
+  assertVideoReviewOriginalCurrent,
+  assertVideoWorkspaceUnchanged,
+} from '../review-workspaces/store';
 import { withVideoProjectUsage } from '../media-library/usage-index-keys';
 import {
   parseProjectAssetSpeechClaim,
@@ -131,6 +134,9 @@ export async function saveVideoProject(
     ...(options.expectedReviewWorkspace
       ? { expectedReviewWorkspace: structuredClone(options.expectedReviewWorkspace) }
       : {}),
+    ...(options.expectedReviewOriginal
+      ? { expectedReviewOriginal: structuredClone(options.expectedReviewOriginal) }
+      : {}),
     libraryBindings: structuredClone(options.libraryBindings ?? []),
   };
   const candidate = await prepareVideoProjectSave(project);
@@ -222,10 +228,13 @@ async function persistVideoProjectSave(
   }
 ): Promise<VideoProjectSaveResult> {
   const expectedReviewWorkspace = options.expectedReviewWorkspace;
+  const expectedReviewOriginal = options.expectedReviewOriginal;
   const libraryBindings = options.libraryBindings ?? [];
   const physicalDelete = buildPhysicalDeleteOperation([]);
   const saved = await runWithIndexedDbMutation(async (db) => {
-    const stores = createProjectMutationStores(db);
+    const stores = createProjectMutationStores(db, {
+      reviewSourceAdmission: expectedReviewOriginal !== undefined,
+    });
     const { assetOperationStore, mediaLibraryStore, projectStore, recordingStore, tx } = stores;
     try {
       const rawExisting: unknown = await projectStore.get(candidate.id);
@@ -252,6 +261,14 @@ async function persistVideoProjectSave(
         await assertPreparedHistoryReferences(stores, existing, prepared.input, prepared.journal);
       }
       if (expectedReviewWorkspace) await assertVideoWorkspaceUnchanged(tx, expectedReviewWorkspace);
+      if (expectedReviewOriginal) {
+        if (existing || expectedReviewWorkspace) throw new Error('Invalid review transfer source.');
+        await assertVideoReviewOriginalCurrent(
+          tx,
+          expectedReviewOriginal,
+          expectedReviewOriginal.assetId
+        );
+      }
       let guardedSave: ReturnType<typeof guardStaleVideoProjectSave>;
       try {
         guardedSave = guardStaleVideoProjectSave({
@@ -265,11 +282,14 @@ async function persistVideoProjectSave(
           throw new SupersededAssetPublicationError();
         throw error;
       }
+      const expectedReviewMediaId =
+        expectedReviewOriginal?.mediaId ??
+        expectedReviewWorkspace?.sourceMediaId ??
+        expectedReviewWorkspace?.aggregateId;
       for (const binding of libraryBindings) {
         if (
           existing ||
-          !expectedReviewWorkspace ||
-          binding.claim.mediaId !== expectedReviewWorkspace.aggregateId ||
+          binding.claim.mediaId !== expectedReviewMediaId ||
           !guardedSave.project.assets.some(
             (asset) =>
               asset.source.kind === 'project-asset' &&

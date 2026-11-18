@@ -63,7 +63,13 @@ function buildCameraRecorderPageUrl(params: {
 function buildVideoEditorProjectUrl(
   projectId?: string | null,
   recordingId?: string | null,
-  review?: { aggregateId: string; revision: number; createdAt: number; sourceAssetId: string }
+  review?: {
+    aggregateId: string;
+    revision: number;
+    createdAt: number;
+    sourceAssetId: string;
+    original?: { mediaId: string; createdAt: number; generation: string | null };
+  }
 ): string {
   const url = new URL(buildVideoEditorPageUrl());
 
@@ -80,6 +86,11 @@ function buildVideoEditorProjectUrl(
     url.searchParams.set('reviewRevision', String(review.revision));
     url.searchParams.set('reviewCreatedAt', String(review.createdAt));
     url.searchParams.set('reviewSourceAssetId', review.sourceAssetId);
+    if (review.original) {
+      url.searchParams.set('reviewOriginalId', review.original.mediaId);
+      url.searchParams.set('reviewOriginalCreatedAt', String(review.original.createdAt));
+      url.searchParams.set('reviewOriginalGeneration', review.original.generation ?? '');
+    }
   }
 
   return url.toString();

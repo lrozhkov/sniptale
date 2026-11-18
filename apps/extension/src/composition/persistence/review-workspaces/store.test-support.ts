@@ -7,6 +7,7 @@ import {
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { betaV1Fixture } from '../infrastructure/indexed-db/fixtures/beta-v1';
 import { materializeWorkspaceStorage } from './storage-format';
+import { USAGE_REFERENCE_INDEX } from '../media-library/usage-index-keys';
 
 /** Intentional legacy/corrupt fixture replacement clears only that fixture's physical rows. */
 export function replaceLegacyWorkspaceFixture(
@@ -107,6 +108,7 @@ function createWorkspaceFixtureRows(id: string): Map<string, Map<string, unknown
       'scenario_assets',
       'image_workspaces',
       'image_workspace_identities',
+      'video_review_identities',
       'aggregate_presentations',
       'thumbnails',
       'editor_vector_library',
@@ -145,6 +147,7 @@ const fixtureKeyFields = new Map<string, string | readonly string[]>([
 ]);
 
 function fixtureWriteKey(name: string, value: Record<string, unknown>): unknown {
+  if (name === 'video_review_identities') return value['key'];
   const fields = fixtureKeyFields.get(name);
   if (typeof fields === 'string') return value[fields];
   if (fields) return JSON.stringify(fields.map((field) => value[field]));
@@ -182,7 +185,11 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
                 ? fixtureReferenceKeys(pending, name, value).includes(
                     typeof key === 'string' ? key : ''
                   )
-                : isRecord(value) && value[indexName] === key
+                : indexName === USAGE_REFERENCE_INDEX
+                  ? isRecord(value) &&
+                    Array.isArray(value[indexName]) &&
+                    value[indexName].includes(key)
+                  : isRecord(value) && value[indexName] === key
             );
           const write = async (value: unknown, add: boolean) => {
             if (failure(name)) throw new DOMException('No space', 'QuotaExceededError');
@@ -207,6 +214,7 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
             index: (indexName: string) => {
               if (
                 indexName !== ROW_REFERENCE_INDEX &&
+                indexName !== USAGE_REFERENCE_INDEX &&
                 indexName !== 'recoveryId' &&
                 indexName !== 'aggregateId' &&
                 indexName !== 'assetId' &&

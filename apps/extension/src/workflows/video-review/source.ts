@@ -1,5 +1,4 @@
 import { createReviewRecordingHistoryProject } from './recording-review';
-import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
 import { projectRecordingObservationClock } from '../../features/video/project/observation-clock';
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
 import { getMediaLibraryEntry } from '../../composition/persistence/media-library';
@@ -9,8 +8,8 @@ import { getProjectAsset } from '../../composition/persistence/projects';
 import { getProjectExport } from '../../composition/persistence/projects/index.exports';
 import type { VideoWorkspaceDiagnostic } from '../../composition/persistence/review-workspaces/parser';
 import {
-  openVideoWorkspace,
   readVideoWorkspace,
+  readVideoWorkspaceOpening,
   VideoWorkspaceError,
 } from '../../composition/persistence/review-workspaces/store';
 import { parseReviewSource } from '../../features/video/review/validation';
@@ -137,13 +136,19 @@ export async function inspectReviewVideo(file: File, signal: AbortSignal) {
   }
 }
 
-/** Loads immutable original bytes and opens the session only for that same source object. */
-export async function loadVideoReviewSource(aggregateId: string, signal: AbortSignal) {
+/** Loads the exact original bytes and prepares an editor without publishing a new project. */
+export async function loadVideoReviewSource(
+  aggregateId: string,
+  signal: AbortSignal,
+  newProjectSource?: string
+) {
   let stage: ReviewLoadStage = 'library';
   try {
     signal.throwIfAborted();
     const existing = await readVideoWorkspace(aggregateId);
-    const sourceMediaId = existing?.workspace.sourceMediaId ?? aggregateId;
+    const sourceMediaId = existing
+      ? (existing.workspace.sourceMediaId ?? aggregateId)
+      : (newProjectSource ?? aggregateId);
     const media = await getMediaLibraryEntry(sourceMediaId);
     if (!media?.mimeType.startsWith('video/'))
       throw new VideoReviewLoadError('library', 'unavailable');
@@ -167,15 +172,25 @@ export async function loadVideoReviewSource(aggregateId: string, signal: AbortSi
       : null;
     signal.throwIfAborted();
     stage = 'workspace';
-    const snapshot = await openVideoWorkspace(aggregateId, source, original.assetId);
-    publishMediaHubLibraryChanged('update', [aggregateId]);
+    const sourceKind = media.source.kind === 'project-export' ? 'export' : media.source.kind;
+    const id =
+      existing || newProjectSource
+        ? aggregateId
+        : `${sourceKind}:quick-project:${crypto.randomUUID()}`;
+    const opening = await readVideoWorkspaceOpening({
+      aggregateId: id,
+      ...(existing ? { requireExisting: true } : { sourceMediaId }),
+      ...(newProjectSource ? { sourceMediaId: newProjectSource } : {}),
+      source,
+      expectedSourceAssetId: original.assetId,
+    });
     signal.throwIfAborted();
     return {
       file: original.file,
-      filename: snapshot.workspace.project?.name ?? media.filename,
+      filename: opening.snapshot.workspace.project?.name ?? media.filename,
       source,
       ...(provenance ? { provenance } : {}),
-      snapshot,
+      ...opening,
       telemetry,
       ...(media.source.kind === 'recording' && !media.recordingMetadata
         ? {

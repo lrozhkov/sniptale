@@ -60,6 +60,7 @@ export function mediaEntry(): MediaLibraryEntry {
 }
 
 function keyOf(store: string, value: Record<string, unknown>): string {
+  if (store === 'video_review_identities') return String(value['key']);
   if (store === 'recording_events')
     return JSON.stringify([
       value['recordingId'],

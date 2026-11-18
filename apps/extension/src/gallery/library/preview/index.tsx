@@ -192,7 +192,7 @@ function PreviewFilenameField(
 }
 
 function PreviewPanelSidebar(
-  props: PreviewPanelProps & { onReview?: () => void; pending?: boolean }
+  props: PreviewPanelProps & { onReview?: (projectId?: string) => void; pending?: boolean }
 ) {
   if (isGalleryRemoteItem(props.item))
     return (
@@ -313,18 +313,22 @@ export function PreviewPanel(props: PreviewPanelProps) {
     props.initialMode === 'edit' &&
     ((isGalleryMediaItem(item) && item.mimeType.startsWith('video/')) ||
       (item.type === 'quick-edit-project' && !item.unavailableReason));
-  const [reviewState, setReviewState] = useState(() => ({
-    itemId: item.id,
-    active: initialReview,
-  }));
-  const review = reviewState.itemId === item.id ? reviewState.active : initialReview;
+  type ReviewTarget = { aggregateId: string; sourceMediaId?: string };
+  const initialAggregateId = item.type === 'quick-edit-project' ? item.entityId : item.id;
+  const initialTarget = initialReview ? { aggregateId: initialAggregateId } : null;
+  const [reviewState, setReviewState] = useState<{ itemId: string; target: ReviewTarget | null }>(
+    () => ({ itemId: item.id, target: initialTarget })
+  );
+  const review = reviewState.itemId === item.id ? reviewState.target : initialTarget;
   const opener = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setReviewState((current) =>
-      current.itemId === item.id ? current : { itemId: item.id, active: initialReview }
+      current.itemId === item.id
+        ? current
+        : { itemId: item.id, target: initialReview ? { aggregateId: initialAggregateId } : null }
     );
-  }, [initialReview, item.id]);
+  }, [initialAggregateId, initialReview, item.id]);
 
   useEffect(() => {
     if (review) return;
@@ -338,10 +342,10 @@ export function PreviewPanel(props: PreviewPanelProps) {
   if (review && !props.trashMode)
     return (
       <VideoReview
-        aggregateId={item.type === 'quick-edit-project' ? item.entityId : item.id}
+        {...review}
         onClose={onClose}
         onBack={() => {
-          setReviewState({ itemId: item.id, active: false });
+          setReviewState({ itemId: item.id, target: null });
           requestAnimationFrame(() => {
             const button = document.querySelector<HTMLButtonElement>(
               '[data-ui="gallery.videoReview.enter"]'
@@ -355,11 +359,22 @@ export function PreviewPanel(props: PreviewPanelProps) {
   return (
     <PreviewPanelSurface
       {...props}
-      onReview={() => {
+      onReview={(projectId) => {
         if (props.trashMode) return;
         opener.current =
           document.activeElement instanceof HTMLElement ? document.activeElement : null;
-        setReviewState({ itemId: item.id, active: true });
+        if (projectId) {
+          setReviewState({ itemId: item.id, target: { aggregateId: projectId } });
+        } else if (isGalleryMediaItem(item)) {
+          const kind = item.source.kind === 'project-export' ? 'export' : item.source.kind;
+          setReviewState({
+            itemId: item.id,
+            target: {
+              aggregateId: `${kind}:quick-project:${crypto.randomUUID()}`,
+              sourceMediaId: item.entityId ?? item.id,
+            },
+          });
+        }
       }}
     />
   );
@@ -403,7 +418,7 @@ function usePreviewVideoDuration(
 }
 
 /** Preview-only layout; the parent owns editor mode and keyboard/focus lifecycle. */
-function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
+function PreviewPanelSurface(props: PreviewPanelProps & { onReview(projectId?: string): void }) {
   const { onReview, ...panel } = props;
   const { item, previewUrl, onPresented } = panel;
   const inspectorCollapsed = !props.trashMode && props.inspectorCollapsed;

@@ -428,13 +428,13 @@ function useReviewWebcamAcquisition(
   const automatic = useRef({ session: args.session, attempted: false });
   if (automatic.current.session !== args.session)
     automatic.current = { session: args.session, attempted: false };
-  const aggregateId = args.session.getSnapshot().snapshot.workspace.aggregateId;
+  const { aggregateId, sourceMediaId } = args.session.getSnapshot().snapshot.workspace;
   useEffect(() => {
     const abort = new AbortController();
     setFailed(false);
     setCandidate(null);
     if (!assetId) {
-      void findReviewWebcam(aggregateId, abort.signal).then(
+      void findReviewWebcam(aggregateId, abort.signal, sourceMediaId).then(
         (value) => {
           if (!abort.signal.aborted) {
             discoveredSession.current = args.session;
@@ -447,7 +447,7 @@ function useReviewWebcamAcquisition(
       );
     }
     return () => abort.abort();
-  }, [args.session, aggregateId, assetId, attempt]);
+  }, [args.session, aggregateId, sourceMediaId, assetId, attempt]);
   useEffect(() => {
     setPending(false);
     return () => {
@@ -476,12 +476,19 @@ function useReviewWebcamAcquisition(
         throw new Error('Camera attachment target changed.');
     };
     try {
-      if (recoverAssetId) {
-        await recoverReviewWebcam(recoverAssetId, abort.signal);
+      let adoptedAssetId = recoverAssetId;
+      if (!adoptedAssetId && failed && args.session.hasPendingOriginal()) {
+        await args.session.saveBuffered();
+        assertCurrentTarget();
+        adoptedAssetId = args.session.getSnapshot().document.advancedContent.webcam?.assetId;
+      }
+      if (adoptedAssetId) {
+        await recoverReviewWebcam(adoptedAssetId, abort.signal);
         if (!abort.signal.aborted) retry((value) => value + 1);
       } else
         await attachReviewWebcam({
           aggregateId,
+          ...(sourceMediaId ? { sourceMediaId } : {}),
           mediaId: candidate!.id,
           signal: abort.signal,
           assertCurrentTarget,
@@ -546,6 +553,7 @@ function canAutomaticallyAttachWebcam(
   const { webcam, ui } = args.advanced.advanced;
   return (
     args.allowed() &&
+    !args.session.hasPendingOriginal() &&
     ui.mode === 'advanced' &&
     !ui.modeSelectionPending &&
     ui.tracks.webcam !== false &&

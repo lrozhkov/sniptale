@@ -92,6 +92,19 @@ function setup() {
   act(() => root.render(<Harness />));
   return { session, deps, Harness };
 }
+
+function refuseRecoveryPublication(deps: ReturnType<typeof setup>['deps'], historyOnly = false) {
+  const persist = deps.saveVideoWorkspaceSnapshot.getMockImplementation()!;
+  let blocked = true;
+  deps.saveVideoWorkspaceSnapshot.mockImplementation(async (request) => {
+    if (blocked && (!historyOnly || parseVideoWorkspace(request.workspace)?.history.length))
+      throw new Error('Quota');
+    return persist(request);
+  });
+  return () => {
+    blocked = false;
+  };
+}
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.useFakeTimers();
@@ -106,15 +119,15 @@ afterEach(async () => {
 });
 
 it('warns before closing for a local note draft before it reaches the review session', async () => {
-  const { session } = setup();
+  const { session, deps } = setup();
   const close = () => window.dispatchEvent(new Event('beforeunload', { cancelable: true }));
   expect(close()).toBe(true);
   act(() => composer.change(annotation, null));
   expect(session.getSnapshot().dirty).toBe(true);
   expect(close()).toBe(false);
   await act(async () => composer.flush());
-  expect(close()).toBe(false);
   await act(async () => session.flush());
+  expect((await deps.readVideoWorkspace()).draft?.annotation).toEqual(annotation);
   expect(close()).toBe(true);
 });
 
@@ -127,7 +140,7 @@ it('coalesces many field changes, restores recovery on reopen, and commits exact
   });
   expect(deps.saveVideoWorkspaceDraft).not.toHaveBeenCalled();
   await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
-  expect(deps.saveVideoWorkspaceSnapshot).not.toHaveBeenCalled();
+  expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledOnce();
   await act(async () => session.flush());
   expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledOnce();
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
@@ -142,7 +155,7 @@ it('coalesces many field changes, restores recovery on reopen, and commits exact
 
 it('retains text after failed commit and allows retry without duplicate history', async () => {
   const { session, deps } = setup();
-  deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(new Error('Quota'));
+  const allow = refuseRecoveryPublication(deps, true);
   act(() => composer.change(annotation, null));
   await act(async () => {
     await expect(composer.save({ durable: true })).rejects.toThrow('Quota');
@@ -150,13 +163,14 @@ it('retains text after failed commit and allows retry without duplicate history'
   expect(composer.annotation?.text).toBe(annotation.text);
   expect(session.getSnapshot().document.annotations).toEqual([annotation]);
   expect(composer.getCurrent().before).toEqual(annotation);
+  allow();
   await act(async () => composer.save({ durable: true }));
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
 });
 
 it('keeps a failed recovery buffer editable and retries its latest text without adding history', async () => {
   const { session, deps } = setup();
-  deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(new Error('Quota'));
+  const allow = refuseRecoveryPublication(deps);
   act(() => composer.change({ ...annotation, text: 'Keep this draft' }, null));
   await act(async () => {
     await composer.flush();
@@ -164,6 +178,7 @@ it('keeps a failed recovery buffer editable and retries its latest text without 
   });
   expect(session.getSnapshot().dirty).toBe(true);
   expect(composer.saving).toBe(false);
+  allow();
   act(() => composer.change(annotation));
   await act(async () => composer.flush());
   expect(session.getSnapshot().snapshot.draft?.annotation.text).toBe(annotation.text);
@@ -323,7 +338,7 @@ it('finishes whitespace without history and leaves existing edits explicit', asy
 
 it('retains an accepted note after failed durable completion while autosave is paused', async () => {
   const { session, deps } = setup();
-  deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(new Error('Quota'));
+  const allow = refuseRecoveryPublication(deps, true);
   act(() => composer.change(annotation, null));
   await act(async () => {
     await expect(composer.finishNew({ durable: true })).rejects.toThrow('Quota');
@@ -336,6 +351,7 @@ it('retains an accepted note after failed durable completion while autosave is p
   expect(session.getSnapshot().snapshot.draft).toBeNull();
   expect(session.getSnapshot().dirty).toBe(true);
   expect(deps.commitVideoWorkspace).not.toHaveBeenCalled();
+  allow();
   await act(async () => {
     session.setAutosaveEnabled(true);
     await session.flush();
@@ -346,13 +362,14 @@ it('retains an accepted note after failed durable completion while autosave is p
 
 it('keeps the accepted note as the before-state when text changes after a failed durable exit', async () => {
   const { session, deps } = setup();
-  deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(new Error('Quota'));
+  const allow = refuseRecoveryPublication(deps, true);
   act(() => composer.change(annotation, null));
   await act(async () => {
     await expect(composer.finishNew({ durable: true })).rejects.toThrow('Quota');
   });
   const edited = { ...annotation, text: 'Edited after the failure' };
   act(() => composer.change(edited));
+  allow();
   await act(async () => composer.save({ durable: true }));
   expect(composer.annotation).toBeNull();
   expect(session.getSnapshot().document.annotations).toEqual([edited]);

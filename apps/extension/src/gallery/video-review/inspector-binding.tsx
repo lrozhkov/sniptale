@@ -618,7 +618,12 @@ export function ReviewInspectorBinding({
         onHover={state.commands.setHovered}
         onOpenVideoEditor={() => {
           state.media.pause();
-          openReviewInspectorInVideoEditor(inspectorExit(state), canvasComments, isCurrent);
+          openReviewInspectorInVideoEditor(
+            inspectorExit(state),
+            canvasComments,
+            isCurrent,
+            resource
+          );
         }}
         {...reviewInspectorNoteActions(state, resource)}
       >
@@ -1345,7 +1350,8 @@ function reviewTextCutRange(editor: ReviewInspectorEditors['text'], ids: readonl
 function openReviewInspectorInVideoEditor(
   state: ReviewInspectorBuffers & Pick<ReviewInspectorExit, 'run' | 'session'>,
   canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>,
-  isCurrent: () => boolean
+  isCurrent: () => boolean,
+  resource: Pick<LoadedReview, 'original' | 'snapshot'>
 ) {
   void state.run(async () => {
     await flushReviewTextVoiceBuffers(state, canvasComments);
@@ -1353,11 +1359,16 @@ function openReviewInspectorInVideoEditor(
     if (!isCurrent() || !state.composer.endCheckpointEditAfterFlush()) return;
     const canLeave = await prepareReviewCheckpointExit(state.session, isCurrent, saved);
     if (!canLeave()) return;
+    const original =
+      resource.original && saved.workspace.revision === resource.snapshot.workspace.revision
+        ? resource.original
+        : undefined;
     await openVideoEditorPage(null, null, {
       aggregateId: saved.workspace.aggregateId,
       revision: saved.workspace.revision,
       createdAt: saved.workspace.createdAt,
       sourceAssetId: saved.workspace.sourceAssetId,
+      ...(original ? { original } : {}),
     });
   });
 }

@@ -1,23 +1,36 @@
-import { useEffect, useRef, useState } from 'react';
-import { ArrowUpRight, Plus } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ArrowUpRight, Clapperboard, Plus } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { createSecureRandomUuid } from '@sniptale/platform/security/secure-random-id';
 import { buildEditorUrl } from '../../../platform/navigation/extension-pages/editor';
 import { listImageProjectsForEditing } from '../../../composition/persistence/image-workspaces/read';
-import { translate } from '../../../platform/i18n';
+import { listVideoProjectsForEditing } from '../../../composition/persistence/review-workspaces/summaries';
+import { translate, type TranslationKey } from '../../../platform/i18n';
 import { formatDate } from '../ui';
 
-export function ImageEditorActions({
-  mediaId,
-  onOpenLegacy,
-}: {
-  mediaId: string;
-  onOpenLegacy: () => void;
+interface ProjectChoice {
+  id: string;
+  name: string;
+  updatedAt: number;
+}
+
+interface ProjectChoices {
+  projects: ProjectChoice[];
+  canCreateIndependentProject: boolean;
+}
+
+function ProjectActions(props: {
+  label: TranslationKey;
+  newLabel: TranslationKey;
+  icon: ReactNode;
+  dataUi?: string;
+  load: () => Promise<ProjectChoices>;
+  onOpenExisting: (id: string) => void | Promise<void>;
+  onOpenNew: () => void | Promise<void>;
+  onOpenLegacy?: () => void;
 }) {
-  const [choices, setChoices] = useState<Awaited<
-    ReturnType<typeof listImageProjectsForEditing>
-  > | null>(null);
+  const [choices, setChoices] = useState<ProjectChoices | null>(null);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const active = useRef(false);
@@ -29,7 +42,7 @@ export function ImageEditorActions({
     };
   }, []);
 
-  async function run(action: () => Promise<void>) {
+  async function run(action: () => void | Promise<void>) {
     if (running.current) return;
     running.current = true;
     setPending(true);
@@ -44,18 +57,12 @@ export function ImageEditorActions({
     }
   }
 
-  async function openNewProject() {
-    await browserTabs.create({
-      url: buildEditorUrl({ assetId: createSecureRandomUuid(), originalId: mediaId }),
-    });
-  }
-
   async function showProjects() {
-    const result = await listImageProjectsForEditing(mediaId);
+    const result = await props.load();
     if (!active.current) return;
     if (result.projects.length) setChoices(result);
-    else if (result.canCreateIndependentProject) await openNewProject();
-    else onOpenLegacy();
+    else if (result.canCreateIndependentProject) await props.onOpenNew();
+    else props.onOpenLegacy?.();
   }
 
   return (
@@ -64,14 +71,15 @@ export function ImageEditorActions({
         compact
         tone="secondary"
         type="button"
+        data-ui={props.dataUi}
         className="gallery-preview-action"
         disabled={pending}
         aria-expanded={choices !== null}
         aria-busy={pending}
         onClick={() => (choices ? setChoices(null) : void run(showProjects))}
       >
-        <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-        {translate('gallery.preview.openInEditor')}
+        {props.icon}
+        {translate(props.label)}
       </ProductActionButton>
       {choices?.projects.map((project) => (
         <ProductActionButton
@@ -82,11 +90,7 @@ export function ImageEditorActions({
           key={project.id}
           disabled={pending}
           title={project.name}
-          onClick={() =>
-            void run(async () => {
-              await browserTabs.create({ url: buildEditorUrl({ assetId: project.id }) });
-            })
-          }
+          onClick={() => void run(() => props.onOpenExisting(project.id))}
         >
           <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span className="min-w-0 truncate">{project.name}</span>
@@ -100,14 +104,67 @@ export function ImageEditorActions({
           type="button"
           className="gallery-preview-action"
           disabled={pending}
-          onClick={() => void run(openNewProject)}
+          onClick={() => void run(props.onOpenNew)}
         >
           <Plus className="h-4 w-4 shrink-0" aria-hidden="true" />
-          {translate('gallery.preview.newImageProject')}
+          {translate(props.newLabel)}
         </ProductActionButton>
       ) : null}
       {pending ? <p role="status">{translate('gallery.preview.projectsLoading')}</p> : null}
       {failed ? <p role="alert">{translate('gallery.preview.projectsUnavailable')}</p> : null}
     </>
+  );
+}
+
+export function ImageEditorActions({
+  mediaId,
+  onOpenLegacy,
+}: {
+  mediaId: string;
+  onOpenLegacy: () => void;
+}) {
+  return (
+    <ProjectActions
+      label="gallery.preview.openInEditor"
+      newLabel="gallery.preview.newImageProject"
+      icon={<ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />}
+      load={() => listImageProjectsForEditing(mediaId)}
+      onOpenLegacy={onOpenLegacy}
+      onOpenExisting={async (assetId) => {
+        await browserTabs.create({ url: buildEditorUrl({ assetId }) });
+      }}
+      onOpenNew={async () => {
+        await browserTabs.create({
+          url: buildEditorUrl({ assetId: createSecureRandomUuid(), originalId: mediaId }),
+        });
+      }}
+    />
+  );
+}
+
+export function VideoReviewActions({
+  mediaId,
+  onOpen,
+}: {
+  mediaId: string;
+  onOpen: (projectId?: string) => void;
+}) {
+  return (
+    <ProjectActions
+      label="gallery.videoReview.enter"
+      newLabel="videoEditor.app.newProjectAction"
+      dataUi="gallery.videoReview.enter"
+      icon={<Clapperboard className="h-4 w-4 shrink-0" aria-hidden="true" />}
+      load={async () => ({
+        projects: (await listVideoProjectsForEditing(mediaId)).map((project) => ({
+          id: project.aggregateId,
+          name: project.name,
+          updatedAt: project.updatedAt,
+        })),
+        canCreateIndependentProject: true,
+      })}
+      onOpenExisting={onOpen}
+      onOpenNew={() => onOpen()}
+    />
   );
 }

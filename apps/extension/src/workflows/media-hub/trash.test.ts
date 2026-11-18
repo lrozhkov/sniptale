@@ -92,6 +92,7 @@ beforeEach(() => {
   mocks.media.mockResolvedValue([]);
   mocks.collectableOriginals.mockResolvedValue([]);
   mocks.quickEdits.mockResolvedValue([]);
+  mocks.deleteQuickEdit.mockResolvedValue('source');
   mocks.videos.mockResolvedValue([]);
   mocks.scenarios.mockResolvedValue([]);
   mocks.exports.mockResolvedValue([]);
@@ -279,6 +280,9 @@ it('purges an expired quick-edit project through its owner before considering th
     2 * 86_400_000
   );
   expect(mocks.deleteQuickEdit).toHaveBeenCalledExactlyOnceWith('source', 4);
+  expect(mocks.deleteOriginal).toHaveBeenCalledExactlyOnceWith('source', {
+    projectRetainedOnly: true,
+  });
   expect(mocks.deleteMedia).not.toHaveBeenCalled();
   expect(mocks.deleteVideo).not.toHaveBeenCalled();
   expect(mocks.publish).toHaveBeenCalledWith('delete', ['source']);

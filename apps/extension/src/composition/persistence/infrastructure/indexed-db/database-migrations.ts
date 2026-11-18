@@ -32,6 +32,7 @@ import {
   ASSET_OWNERS_STORE,
   ASSET_RESIDENCY_STORE,
   VIDEO_WORKSPACES_STORE,
+  VIDEO_REVIEW_IDENTITIES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   MEDIA_LIBRARY_STORE,
@@ -1177,6 +1178,26 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
     ],
     diagnostic: 'Quick-edit workspace stores are unavailable.',
   }),
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 44, to: 45 }],
+    fromDatabaseVersion: 70,
+    toDatabaseVersion: 71,
+    risk: 'additive',
+    stores: [VIDEO_REVIEW_IDENTITIES_STORE],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    migrate(db) {
+      db.createObjectStore(VIDEO_REVIEW_IDENTITIES_STORE, { keyPath: 'key' });
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [VIDEO_REVIEW_IDENTITIES_STORE],
+        'Quick Edit lifetime store is unavailable.'
+      );
+    },
+  },
 ];
 
 function projectPrototypeAnimationPreferences(value: unknown) {

@@ -49,6 +49,7 @@ export type ReviewSessionPersistence = Pick<
   | 'saveVideoWorkspaceAdvanced'
   | 'saveVideoWorkspaceDraft'
 > & {
+  onFirstSave?: (snapshot: VideoWorkspaceSnapshot) => void;
   acquireSyncCheckpointEdit?: typeof acquireSyncCheckpointEdit;
   wakeCheckpoints?: () => Promise<Extract<SyncProductResult, { kind: 'checkpoint-woken' }>>;
   renameVideoWorkspaceProject?: typeof renameVideoWorkspaceProject;

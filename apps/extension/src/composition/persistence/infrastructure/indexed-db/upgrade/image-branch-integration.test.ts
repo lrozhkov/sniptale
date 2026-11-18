@@ -12,6 +12,7 @@ import {
 import { imageAppV54Fixture } from '../fixtures/image-app-v54';
 import { imageAppV55Fixture } from '../fixtures/image-app-v55';
 import { betaV69Fixture } from '../fixtures/beta-v69';
+import { betaV70Fixture } from '../fixtures/beta-v70';
 import { CURRENT_SCHEMA_CONTRACTS, DATABASE_MIGRATIONS } from '../schema-contracts';
 import { executeDatabaseUpgrade, handleDatabaseUpgrade } from './core';
 
@@ -27,9 +28,15 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-async function createImageSource(version: 54 | 55 | 69, corrupt = false) {
+async function createImageSource(version: 54 | 55 | 69 | 70, corrupt = false) {
   const fixture =
-    version === 69 ? betaV69Fixture : version === 54 ? imageAppV54Fixture : imageAppV55Fixture;
+    version === 70
+      ? betaV70Fixture
+      : version === 69
+        ? betaV69Fixture
+        : version === 54
+          ? imageAppV54Fixture
+          : imageAppV55Fixture;
   const stores: readonly string[] = fixture.stores;
   const indexes = new Map<string, readonly string[]>(Object.entries(fixture.indexes));
   const db = await openDB(DB_NAME, version, {
@@ -58,43 +65,47 @@ async function createImageSource(version: 54 | 55 | 69, corrupt = false) {
   return fixture;
 }
 
-it('keeps version 69 data after interruption and admits the unchanged retry', async () => {
-  const fixture = await createImageSource(69);
-  await expect(inspectDatabaseAdmission()).resolves.toEqual({
-    databaseVersion: DB_VERSION,
-    status: 'ready',
-  });
-  await expect(
-    openDB(DB_NAME, DB_VERSION, {
-      upgrade(db, oldVersion, newVersion, transaction) {
-        handleDatabaseUpgrade(db, oldVersion, newVersion, transaction);
-        transaction.abort();
-      },
-    })
-  ).rejects.toThrow();
-  const retained = await openDB(DB_NAME);
-  try {
-    expect(retained.version).toBe(69);
-    expect(await retained.get('schema_contracts', 'mediaLibrary')).toMatchObject({
-      domainId: 'mediaLibrary',
-      schemaVersion: 43,
+it.each([69, 70] as const)(
+  'keeps version %s data after interruption and admits the retry',
+  async (version) => {
+    const fixture = await createImageSource(version);
+    await expect(inspectDatabaseAdmission()).resolves.toEqual({
+      databaseVersion: DB_VERSION,
+      status: 'ready',
     });
-  } finally {
-    retained.close();
-  }
-  const updated = await openDB(DB_NAME, DB_VERSION, { upgrade: handleDatabaseUpgrade });
-  try {
-    for (const [name, rows] of Object.entries(fixture.records)) {
-      if (name !== 'schema_contracts') expect(await updated.getAll(name), name).toEqual(rows);
+    await expect(
+      openDB(DB_NAME, DB_VERSION, {
+        upgrade(db, oldVersion, newVersion, transaction) {
+          handleDatabaseUpgrade(db, oldVersion, newVersion, transaction);
+          transaction.abort();
+        },
+      })
+    ).rejects.toThrow();
+    const retained = await openDB(DB_NAME);
+    try {
+      expect(retained.version).toBe(version);
+      expect(await retained.get('schema_contracts', 'mediaLibrary')).toMatchObject({
+        domainId: 'mediaLibrary',
+        schemaVersion: fixture.domainVersions.mediaLibrary,
+      });
+    } finally {
+      retained.close();
     }
-    expect(await updated.get('schema_contracts', 'mediaLibrary')).toMatchObject({
-      domainId: 'mediaLibrary',
-      schemaVersion: 44,
-    });
-  } finally {
-    updated.close();
+    const updated = await openDB(DB_NAME, DB_VERSION, { upgrade: handleDatabaseUpgrade });
+    try {
+      for (const [name, rows] of Object.entries(fixture.records)) {
+        if (name !== 'schema_contracts') expect(await updated.getAll(name), name).toEqual(rows);
+      }
+      expect(await updated.get('schema_contracts', 'mediaLibrary')).toMatchObject({
+        domainId: 'mediaLibrary',
+        schemaVersion: 45,
+      });
+      expect(await updated.getAll('video_review_identities')).toEqual([]);
+    } finally {
+      updated.close();
+    }
   }
-});
+);
 
 it.each([54, 55] as const)(
   'admits image branch database %s and preserves all retained rows through integration',

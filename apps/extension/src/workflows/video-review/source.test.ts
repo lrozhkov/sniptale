@@ -41,7 +41,7 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (importOr
   ...(await importOriginal<
     typeof import('../../composition/persistence/review-workspaces/store')
   >()),
-  openVideoWorkspace: mocks.open,
+  readVideoWorkspaceOpening: mocks.open,
   readVideoWorkspace: mocks.read,
 }));
 vi.mock('../../features/media-hub/events', () => ({
@@ -82,13 +82,19 @@ beforeEach(() => {
   mocks.duration.mockResolvedValue(12);
   mocks.metadataDuration.mockResolvedValue(null);
   mocks.telemetry.mockResolvedValue(undefined);
-  mocks.open.mockResolvedValue({ workspace: {}, draft: null });
+  mocks.open.mockResolvedValue({ snapshot: { workspace: {}, draft: null } });
 });
 
 it('binds the decoded oriented source to the immutable file identity before opening', async () => {
   const result = await loadVideoReviewSource('recording:r', new AbortController().signal);
   expect(result.source).toMatchObject({ duration: 12, width: 360, height: 640, size: 5 });
-  expect(mocks.open).toHaveBeenCalledWith('recording:r', result.source, 'immutable-file');
+  expect(mocks.open).toHaveBeenCalledWith({
+    aggregateId: expect.stringMatching(/^recording:quick-project:/),
+    sourceMediaId: 'recording:r',
+    source: result.source,
+    expectedSourceAssetId: 'immutable-file',
+  });
+  expect(mocks.publish).not.toHaveBeenCalled();
   expect(mocks.dispose).toHaveBeenCalledOnce();
 });
 
@@ -269,17 +275,16 @@ it('carries structured workspace validation details without raw errors', async (
   ).rejects.toMatchObject({ stage: 'workspace', reason: 'invalid', diagnostic });
 });
 
-it('publishes project admission only after commit, including cancellation after commit', async () => {
+it('leaves Library notifications to the first save when a read-only opening is cancelled', async () => {
   const abort = new AbortController();
   mocks.open.mockImplementationOnce(async () => {
     expect(mocks.publish).not.toHaveBeenCalled();
     abort.abort();
-    return { workspace: {}, draft: null };
+    return { snapshot: { workspace: {}, draft: null } };
   });
   await expect(loadVideoReviewSource('recording:r', abort.signal)).rejects.toThrow();
-  expect(mocks.publish).toHaveBeenCalledWith('update', ['recording:r']);
-  mocks.publish.mockClear();
-  mocks.open.mockRejectedValueOnce(new Error('commit refused'));
+  expect(mocks.publish).not.toHaveBeenCalled();
+  mocks.open.mockRejectedValueOnce(new Error('read refused'));
   await expect(
     loadVideoReviewSource('recording:r', new AbortController().signal)
   ).rejects.toThrow();
@@ -288,17 +293,20 @@ it('publishes project admission only after commit, including cancellation after 
 
 it('opens an archived quick project from its original media without changing workspace identity', async () => {
   mocks.read.mockResolvedValue({ workspace: { sourceMediaId: 'recording:r' }, draft: null });
-  mocks.open.mockResolvedValue({ workspace: { project: { name: 'Previous edit' } }, draft: null });
+  mocks.open.mockResolvedValue({
+    snapshot: { workspace: { project: { name: 'Previous edit' } }, draft: null },
+  });
   const loaded = await loadVideoReviewSource(
     'quick-project:archived',
     new AbortController().signal
   );
   expect(mocks.media).toHaveBeenCalledWith('recording:r');
-  expect(mocks.open).toHaveBeenCalledWith(
-    'quick-project:archived',
-    loaded.source,
-    'immutable-file'
-  );
+  expect(mocks.open).toHaveBeenCalledWith({
+    aggregateId: 'quick-project:archived',
+    requireExisting: true,
+    source: loaded.source,
+    expectedSourceAssetId: 'immutable-file',
+  });
   expect(loaded.filename).toBe('Previous edit');
 });
 

@@ -1,4 +1,5 @@
 import { ensureNativeEditingRootAvailable } from '../../../workflows/sync-transfer/editing-admission';
+import { loadVideoReviewSource } from '../../../workflows/video-review/source';
 import type { LibraryProjectBinding } from '../../../composition/persistence/projects/known-library-source';
 import {
   reviewProjectBookendReferences,
@@ -7,7 +8,10 @@ import {
 import { verifyReviewAnnotationEffectSnapshot } from '../../../features/video/review/annotation-effects/validation';
 import type { ReviewAnnotationEffectSnapshot } from '../../../features/video/review/annotation-effects/types';
 import type { VideoProjectEffectSnapshot } from '../../../features/video/project/effect-instance/types';
-import type { VideoWorkspaceSnapshot } from '../../../composition/persistence/review-workspaces/contracts';
+import type {
+  VideoReviewOriginalIdentity,
+  VideoWorkspaceSnapshot,
+} from '../../../composition/persistence/review-workspaces/contracts';
 import {
   replayReviewHistory,
   reviewDocumentBaseline,
@@ -73,7 +77,7 @@ async function commitNewProject(
   project: VideoProject,
   options: Pick<
     Parameters<typeof commitVideoProjectWorkspaceMutation>[1],
-    'expectedReviewWorkspace' | 'libraryBindings'
+    'expectedReviewWorkspace' | 'expectedReviewOriginal' | 'libraryBindings'
   > = {}
 ): Promise<OpenedVideoProjectWorkspace> {
   const committed = await commitVideoProjectWorkspaceMutation(project, {
@@ -481,11 +485,33 @@ async function createProjectFromReview(
   aggregateId: string,
   revision: number,
   createdAt: number,
-  sourceAssetId: string
+  sourceAssetId: string,
+  original?: VideoReviewOriginalIdentity
 ): Promise<OpenedVideoProjectWorkspace> {
-  const snapshot = await readVideoWorkspace(aggregateId);
-  if (!matchesReviewSnapshot(snapshot, aggregateId, revision, createdAt, sourceAssetId))
-    throw new Error('Review project changed before transfer.');
+  let snapshot: VideoWorkspaceSnapshot;
+  if (original) {
+    await ensureNativeEditingRootAvailable({ rootKind: 'media', rootId: original.mediaId });
+    const loaded = await loadVideoReviewSource(
+      aggregateId,
+      new AbortController().signal,
+      original.mediaId
+    );
+    if (
+      loaded.original?.mediaId !== original.mediaId ||
+      loaded.original.createdAt !== original.createdAt ||
+      loaded.original.generation !== original.generation ||
+      loaded.snapshot.workspace.aggregateId !== aggregateId ||
+      loaded.snapshot.workspace.revision !== revision ||
+      loaded.snapshot.workspace.sourceAssetId !== sourceAssetId
+    )
+      throw new Error('Review original changed before transfer.');
+    snapshot = loaded.snapshot;
+  } else {
+    const saved = await readVideoWorkspace(aggregateId);
+    if (!matchesReviewSnapshot(saved, aggregateId, revision, createdAt, sourceAssetId))
+      throw new Error('Review project changed before transfer.');
+    snapshot = saved;
+  }
   const document = replayReviewHistory(
     snapshot.workspace.history,
     snapshot.workspace.cursor,
@@ -555,19 +581,15 @@ async function createProjectFromReview(
               : 'settings';
     throw new ReviewProjectTransferError(reason);
   }
-  const latest = await readVideoWorkspace(aggregateId);
-  if (
-    !matchesReviewSnapshot(
-      latest,
-      aggregateId,
-      revision,
-      createdAt,
-      snapshot.workspace.sourceAssetId
-    )
-  )
-    throw new Error('Review project changed before transfer.');
+  if (!original) {
+    const latest = await readVideoWorkspace(aggregateId);
+    if (!matchesReviewSnapshot(latest, aggregateId, revision, createdAt, sourceAssetId))
+      throw new Error('Review project changed before transfer.');
+  }
   return commitNewProject(result.project, {
-    expectedReviewWorkspace: snapshot.workspace,
+    ...(original
+      ? { expectedReviewOriginal: { ...original, assetId: sourceAssetId } }
+      : { expectedReviewWorkspace: snapshot.workspace }),
     ...(libraryBindings.length ? { libraryBindings } : {}),
   });
 }
@@ -617,7 +639,37 @@ export async function loadInitialProjectFromLocation(): Promise<{
       !Number.isSafeInteger(createdAt)
     )
       throw new Error('Review project transfer target is invalid.');
-    workspace = await createProjectFromReview(reviewId, revision, createdAt, sourceAssetId);
+    const originalId = params.get('reviewOriginalId');
+    const originalCreatedAtInput = params.get('reviewOriginalCreatedAt');
+    const originalGeneration = params.get('reviewOriginalGeneration');
+    let original: VideoReviewOriginalIdentity | undefined;
+    if (originalId !== null || originalCreatedAtInput !== null || originalGeneration !== null) {
+      const originalCreatedAt =
+        originalCreatedAtInput !== null && /^\d+$/.test(originalCreatedAtInput)
+          ? Number(originalCreatedAtInput)
+          : NaN;
+      if (
+        !originalId ||
+        originalId.length > 256 ||
+        originalId === reviewId ||
+        !Number.isSafeInteger(originalCreatedAt) ||
+        originalGeneration === null ||
+        originalGeneration.length > 200
+      )
+        throw new Error('Review original transfer target is invalid.');
+      original = {
+        mediaId: originalId,
+        createdAt: originalCreatedAt,
+        generation: originalGeneration || null,
+      };
+    }
+    workspace = await createProjectFromReview(
+      reviewId,
+      revision,
+      createdAt,
+      sourceAssetId,
+      original
+    );
     recordingId = workspace.project.baseRecordingId;
   }
 

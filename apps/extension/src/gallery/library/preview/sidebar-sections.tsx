@@ -8,7 +8,6 @@ import { getControlIconButtonClassName } from '@sniptale/ui/control-language';
 import {
   Archive,
   ArrowUpRight,
-  Clapperboard,
   CopyPlus,
   Copy,
   Check,
@@ -38,7 +37,7 @@ import {
 import { PromotionAction } from './promotion-action';
 import type { PreviewPanelProps } from './types';
 import { ScenarioViewingActions } from './scenario-viewing-actions';
-import { ImageEditorActions } from './image-editor-actions';
+import { ImageEditorActions, VideoReviewActions } from './image-editor-actions';
 import {
   listPreviewMediaAssetProjectUsage,
   subscribeToPreviewProjectUsageInvalidation,
@@ -544,27 +543,25 @@ function getPreviewPrimaryActionLabel(item: PreviewPanelProps['item']) {
   return canOpenGalleryProject(item) ? 'gallery.preview.openInEditor' : null;
 }
 
-function PreviewPrimaryActions(props: PreviewPanelProps & { onReview?: () => void }) {
+function PreviewPrimaryActions(
+  props: PreviewPanelProps & { onReview?: (projectId?: string) => void }
+) {
   const { item, onEdit, onReview } = props;
   const primaryLabel = getPreviewPrimaryActionLabel(item);
   const imageId =
     isGalleryMediaItem(item) && isImageKind(item.kind) ? (item.entityId ?? item.id) : null;
+  const originalId =
+    item.type === 'image-project' && item.sourceAvailable
+      ? item.project.sourceMediaId
+      : item.type === 'quick-edit-project' && !item.unavailableReason
+        ? (item.project.sourceMediaId ?? item.entityId)
+        : null;
   return (
     <>
       {onReview || primaryLabel ? (
         <div className="space-y-1">
-          {onReview ? (
-            <ProductActionButton
-              compact
-              tone="secondary"
-              type="button"
-              data-ui="gallery.videoReview.enter"
-              onClick={onReview}
-              className={previewActionButtonClassName}
-            >
-              <Clapperboard className="h-4 w-4 shrink-0" aria-hidden="true" />
-              {translate('gallery.videoReview.enter')}
-            </ProductActionButton>
+          {onReview && isGalleryMediaItem(item) ? (
+            <VideoReviewActions mediaId={item.entityId ?? item.id} onOpen={onReview} />
           ) : null}
           {imageId ? (
             <ImageEditorActions key={imageId} mediaId={imageId} onOpenLegacy={onEdit} />
@@ -580,12 +577,12 @@ function PreviewPrimaryActions(props: PreviewPanelProps & { onReview?: () => voi
               {translate(primaryLabel)}
             </ProductActionButton>
           ) : null}
-          {item.type === 'image-project' && item.sourceAvailable ? (
+          {originalId ? (
             <ProductActionButton
               compact
               tone="secondary"
               type="button"
-              onClick={() => void openGalleryPage({ mediaId: item.project.sourceMediaId })}
+              onClick={() => void openGalleryPage({ mediaId: originalId })}
               className={previewActionButtonClassName}
             >
               <Images className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -607,7 +604,9 @@ function PreviewPrimaryActions(props: PreviewPanelProps & { onReview?: () => voi
   );
 }
 
-export function PreviewActions(props: PreviewPanelProps & { onReview?: () => void }) {
+export function PreviewActions(
+  props: PreviewPanelProps & { onReview?: (projectId?: string) => void }
+) {
   if (props.trashMode)
     return (
       <>

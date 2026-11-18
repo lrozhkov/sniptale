@@ -40,6 +40,7 @@ export async function commitVideoProjectWorkspaceMutation(
     expectedWorkspaceRevision: number | null;
     expectedProject: VideoProject | null;
     expectedReviewWorkspace?: SaveVideoProjectOptions['expectedReviewWorkspace'];
+    expectedReviewOriginal?: SaveVideoProjectOptions['expectedReviewOriginal'];
     libraryBindings?: SaveVideoProjectOptions['libraryBindings'];
   }
 ): Promise<VideoProjectWorkspaceCommit> {
@@ -49,6 +50,9 @@ export async function commitVideoProjectWorkspaceMutation(
     ...(options.expectedReviewWorkspace === undefined
       ? {}
       : { expectedReviewWorkspace: options.expectedReviewWorkspace }),
+    ...(options.expectedReviewOriginal
+      ? { expectedReviewOriginal: options.expectedReviewOriginal }
+      : {}),
     ...(options.libraryBindings ? { libraryBindings: options.libraryBindings } : {}),
     storageClass: 'library',
   });

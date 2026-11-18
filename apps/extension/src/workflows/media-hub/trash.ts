@@ -116,7 +116,8 @@ async function deleteLibraryTarget(
       new Map([[target.id, expectedUsage ?? []]])
     );
   } else if (target.kind === 'quick-edit-project') {
-    await deleteVideoWorkspaceProject(target.id, target.expectedRevision);
+    const sourceId = await deleteVideoWorkspaceProject(target.id, target.expectedRevision);
+    if (releaseUnclaimedOriginal) await tryCollectProjectOriginal(sourceId);
   } else if (target.kind === 'image-project') {
     const sourceId = await deleteImageWorkspaceProject(
       target.id,

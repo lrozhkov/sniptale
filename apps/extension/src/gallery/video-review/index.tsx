@@ -96,7 +96,7 @@ type ReviewEditorProps = {
   resource: LoadedReview;
   onBack(): void;
   onClose(): void;
-  onProjectCreated(aggregateId: string): void;
+  onProjectCreated(aggregateId: string, sourceMediaId: string): void;
 };
 
 /** One immutable editor projection drives the disposable seam preview workflow. */
@@ -652,7 +652,12 @@ function ReviewEditor({
                     busy={busy || editing.exporter.phase !== 'idle'}
                     onClose={panelsEnabled ? leaveEditor : undefined}
                     onNewProject={projectCommands.newProject}
-                    onBackup={() => void state.run(() => backupReview(state, canvasComments))}
+                    onBackup={
+                      resource.original &&
+                      snapshot.snapshot.workspace.revision === resource.snapshot.workspace.revision
+                        ? undefined
+                        : () => void state.run(() => backupReview(state, canvasComments))
+                    }
                   />
                 }
                 editing={editing}
@@ -725,32 +730,54 @@ function ReviewEditor({
 /** Native modal owns focus/inert; Escape cancels drawing, header navigation exits after recovery flush. */
 export function VideoReview({
   aggregateId,
+  sourceMediaId,
   onBack,
   onClose = onBack,
   onJoinPreview,
 }: {
   onJoinPreview?: ((slot: 'intro' | 'outro', target?: 'fade' | 'join') => void) | undefined;
   aggregateId: string;
+  sourceMediaId?: string;
   onBack(): void;
   onClose?(): void;
 }) {
   useAppLocale();
-  const [activeId, setActiveId] = useState(aggregateId);
-  useEffect(() => setActiveId(aggregateId), [aggregateId]);
-  const { resource, failed, retry } = useLoadedReview(activeId);
+  const [active, setActive] = useState({ aggregateId, sourceMediaId });
+  useEffect(() => setActive({ aggregateId, sourceMediaId }), [aggregateId, sourceMediaId]);
+  const { resource, failed, retry } = useLoadedReview(active.aggregateId, active.sourceMediaId);
   useEffect(() => {
-    setGalleryQuickEditUrl(activeId);
-    return () => clearGalleryQuickEditUrl(activeId);
-  }, [activeId]);
+    let routeId: string | undefined;
+    const loaded =
+      resource &&
+      (resource.snapshot.workspace.aggregateId === active.aggregateId ||
+        (!active.sourceMediaId && resource.original?.mediaId === active.aggregateId));
+    const publishRoute = () => {
+      let proposed = active.sourceMediaId ?? active.aggregateId;
+      if (loaded) {
+        const workspace = resource.session.getSnapshot().snapshot.workspace;
+        if (!resource.original || workspace.revision > resource.snapshot.workspace.revision)
+          proposed = workspace.aggregateId;
+      }
+      if (proposed === routeId) return;
+      routeId = proposed;
+      setGalleryQuickEditUrl(routeId);
+    };
+    publishRoute();
+    const unsubscribe =
+      loaded && resource.original ? resource.session.subscribe(publishRoute) : null;
+    return () => {
+      unsubscribe?.();
+      if (routeId !== undefined) clearGalleryQuickEditUrl(routeId);
+    };
+  }, [active, resource]);
   return (
     <ReviewDialog>
       {resource ? (
         <ReviewEditor
           key={`${resource.snapshot.workspace.aggregateId}:${resource.snapshot.workspace.createdAt}`}
           resource={resource}
-          onProjectCreated={(id) => {
-            setActiveId(id);
-            retry();
+          onProjectCreated={(id, originalId) => {
+            setActive({ aggregateId: id, sourceMediaId: originalId });
           }}
           onBack={onBack}
           onClose={onClose}

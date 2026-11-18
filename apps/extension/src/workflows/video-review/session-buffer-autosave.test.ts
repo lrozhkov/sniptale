@@ -6,6 +6,15 @@ import { parseVideoWorkspace } from '../../composition/persistence/review-worksp
 import { createVideoReviewSession } from './session';
 import type { ReviewSessionPersistence } from './session-types';
 import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
+import { createReviewMusicAttachment } from './music-library';
+import { reviewSpeechPublicationBasis } from './speech-publication-state';
+import { importedAudioClip, prepareReviewAudio } from './audio-import';
+import { reviewWorkspaceHasAudioClip } from '../../composition/persistence/review-workspaces/asset-refs';
+
+vi.mock('./audio-import', async (original) => ({
+  ...(await original<typeof import('./audio-import')>()),
+  prepareReviewAudio: vi.fn(),
+}));
 
 function deferred() {
   let resolve!: () => void;
@@ -15,7 +24,7 @@ function deferred() {
   return { promise, resolve };
 }
 
-function fixture(holdFirst = true, seedText = false) {
+function fixture(holdFirst = true, seedText = false, firstProject = false) {
   let stored: VideoWorkspaceSnapshot = {
     workspace: {
       aggregateId: 'recording:buffer',
@@ -31,6 +40,11 @@ function fixture(holdFirst = true, seedText = false) {
     },
     draft: null,
   };
+  if (firstProject) {
+    stored.workspace.aggregateId = 'recording:quick-project:first';
+    stored.workspace.sourceMediaId = 'recording:buffer';
+    stored.workspace.generation = 'first-project-generation';
+  }
   if (seedText)
     stored.workspace.advanced.text = {
       version: 1,
@@ -57,6 +71,10 @@ function fixture(holdFirst = true, seedText = false) {
   let failNext = false;
   let loseNextAck = false;
   const writes: VideoWorkspaceSnapshot[] = [];
+  const original = firstProject
+    ? { mediaId: 'recording:buffer', createdAt: 1, generation: null }
+    : undefined;
+  const onFirstSave = vi.fn();
   const write = async (expectedRevision: number, raw: unknown, draft: unknown) => {
     calls++;
     active++;
@@ -87,12 +105,15 @@ function fixture(holdFirst = true, seedText = false) {
   const read = async () => structuredClone(stored);
   const deps: ReviewSessionPersistence = {
     acquireSyncCheckpointEdit: async () => ({ release: async () => undefined }),
-    readVideoWorkspace: read,
+    readVideoWorkspace: async () => (firstProject && !writes.length ? null : read()),
+    onFirstSave,
     moveVideoWorkspaceHistory: read,
     saveVideoWorkspaceAdvanced: read,
     saveVideoWorkspaceDraft: read,
-    saveVideoWorkspaceSnapshot: (request) =>
-      write(request.expectedRevision, request.workspace, request.draft),
+    saveVideoWorkspaceSnapshot: (request) => {
+      if (firstProject) expect(request.original).toEqual(writes.length ? undefined : original);
+      return write(request.expectedRevision, request.workspace, request.draft);
+    },
     commitVideoWorkspace: (request) =>
       write(
         request.expectedRevision,
@@ -108,7 +129,8 @@ function fixture(holdFirst = true, seedText = false) {
       ),
   };
   return {
-    session: createVideoReviewSession(stored, deps),
+    session: createVideoReviewSession(stored, deps, original),
+    onFirstSave,
     entered,
     release,
     read,
@@ -150,6 +172,179 @@ function note(id: string): ReviewOperation {
     after: { id, text: 'Synthetic note', anchor: { kind: 'point', time: 1 } },
   };
 }
+
+it.each(['failed', 'lost acknowledgement'] as const)(
+  'opens without a write and retries the first Quick Edit save after %s',
+  async (outcome) => {
+    const f = fixture(false, false, true);
+    const initial = f.session.getSnapshot().snapshot;
+    f.session.setAutosaveEnabled(false);
+    await f.session.saveAdvanced(initial.workspace.advanced);
+    await f.session.saveBuffered();
+    expect(f.calls()).toBe(0);
+    expect(f.onFirstSave).not.toHaveBeenCalled();
+
+    await f.session.commit(note('first-edit'));
+    if (outcome === 'failed') f.failNext();
+    else f.loseNextAck();
+    await expect(f.session.saveBuffered()).rejects.toThrow();
+    expect(f.onFirstSave).not.toHaveBeenCalled();
+    const saved = await f.session.saveBuffered();
+    expect(f.calls()).toBe(outcome === 'failed' ? 2 : 1);
+    expect(f.writes).toHaveLength(1);
+    expect(saved.workspace.history).toHaveLength(1);
+    expect(saved.workspace.sourceMediaId).toBe('recording:buffer');
+    expect(f.onFirstSave).toHaveBeenCalledExactlyOnceWith(saved);
+    await f.session.dispose();
+  }
+);
+
+it.each(['failed', 'lost acknowledgement'] as const)(
+  'reconciles the first explicit document operation after %s without repeating it',
+  async (outcome) => {
+    const f = fixture(false, false, true);
+    const operation = note('first-operation');
+    if (outcome === 'failed') f.failNext();
+    else f.loseNextAck();
+    await expect(f.session.commitDurable(operation)).rejects.toThrow();
+    await expect(f.session.recoverDurableOperation(operation, 1, { kind: 'text' })).resolves.toBe(
+      outcome === 'lost acknowledgement'
+    );
+    if (outcome === 'failed') await f.session.commitDurable(operation);
+    expect(f.calls()).toBe(outcome === 'failed' ? 2 : 1);
+    expect(f.writes).toHaveLength(1);
+    expect(f.session.getSnapshot().snapshot.workspace.history).toEqual([operation]);
+    expect(f.onFirstSave).toHaveBeenCalledOnce();
+    await f.session.dispose();
+  }
+);
+
+it.each(['refused', 'lost acknowledgement'] as const)(
+  'retries the first uploaded music attachment after %s',
+  async (outcome) => {
+    const f = fixture(false, false, true);
+    const asset = (name: string) => ({
+      assetId: `project-asset:${name}`,
+      duration: 1,
+      protect: vi.fn(async () => undefined),
+      publish: vi.fn(async () => undefined),
+      cancel: vi.fn(async () => undefined),
+      discard: vi.fn(async () => undefined),
+    });
+    const first = asset('first');
+    const replacement = asset('replacement');
+    const prepare = vi.mocked(prepareReviewAudio);
+    prepare.mockReset().mockResolvedValueOnce(first).mockResolvedValueOnce(replacement);
+    const clipId = 'music-add';
+    const operation = createReviewMusicAttachment({
+      selection: { kind: 'file', file: new File(['music'], 'one.wav', { type: 'audio/wav' }) },
+      aggregateId: f.session.getSnapshot().snapshot.workspace.aggregateId,
+      clipId,
+      signal: new AbortController().signal,
+      assertCurrentTarget() {},
+      async attach(assetId, duration) {
+        const before = f.session.getSnapshot().document.advancedContent;
+        const clip = { ...importedAudioClip(assetId, duration, 0, 2), id: clipId };
+        try {
+          await f.session.commitDurable({
+            id: `insert:${assetId}`,
+            at: 1,
+            target: 'advancedContent',
+            before,
+            after: { ...before, audio: { ...before.audio, music: [clip] } },
+          });
+        } catch (error) {
+          if (reviewWorkspaceHasAudioClip((await f.read()).workspace, clipId, assetId))
+            await f.session.reload();
+          throw error;
+        }
+      },
+      async hasDurableReference(assetId) {
+        return reviewWorkspaceHasAudioClip((await f.read()).workspace, clipId, assetId);
+      },
+    });
+
+    if (outcome === 'refused') f.failNext();
+    else f.loseNextAck();
+    await expect(operation.run()).rejects.toThrow();
+    if (outcome === 'refused') {
+      expect(first.cancel).toHaveBeenCalledOnce();
+      expect(f.session.getSnapshot().document.advancedContent.audio.music).toEqual([]);
+    } else {
+      expect(first.cancel).not.toHaveBeenCalled();
+      expect(f.onFirstSave).toHaveBeenCalledOnce();
+    }
+    const accepted = outcome === 'refused' ? replacement : first;
+    await expect(operation.run()).resolves.toMatchObject({ assetId: accepted.assetId });
+    expect(accepted.publish).toHaveBeenCalledOnce();
+    expect(f.session.getSnapshot().document.advancedContent.audio.music).toEqual([
+      expect.objectContaining({ assetId: accepted.assetId }),
+    ]);
+    expect(f.writes).toHaveLength(1);
+    await f.session.commitDurable(note('later-edit'));
+    expect(f.writes).toHaveLength(2);
+    expect(f.onFirstSave).toHaveBeenCalledOnce();
+    await f.session.dispose();
+  }
+);
+
+it('discards a refused first speech publication before admitting a new prepared attempt', async () => {
+  const f = fixture(false, false, true);
+  const state = f.session.getSnapshot();
+  const target = { kind: 'original' as const };
+  const changes = (text: string) => [
+    {
+      target,
+      ...reviewSpeechPublicationBasis(state.snapshot, state.document, target),
+      transcript: {
+        version: 1 as const,
+        replacements: [],
+        phrases: [
+          {
+            id: 'phrase',
+            start: 0,
+            end: 1,
+            text,
+            originalText: text,
+            revision: 0,
+            alignment: 'range' as const,
+          },
+        ],
+      },
+    },
+  ];
+  const receipt = f.session.createSpeechPublicationReceipt();
+  f.failNext();
+  await expect(f.session.publishSpeechTranscripts(changes('Refused.'), receipt)).rejects.toThrow();
+  expect(f.session.getSnapshot().snapshot.workspace.history).toEqual([]);
+  await expect(
+    f.session.recoverSpeechPublication(receipt, { discardUncommittedAttempt: true })
+  ).resolves.toBe(false);
+  await expect(f.session.flush()).resolves.toBeUndefined();
+  await f.session.reset();
+  expect(f.writes).toHaveLength(0);
+  await f.session.publishSpeechTranscripts(changes('Accepted.'), receipt);
+  expect(f.writes).toHaveLength(1);
+  expect(
+    f.session.getSnapshot().document.advancedContent.audio.originalSpeech?.transcript.phrases
+  ).toMatchObject([{ text: 'Accepted.' }]);
+  await f.session.dispose();
+});
+
+it('adopts an exact first-save receipt before accepting another local edit', async () => {
+  const f = fixture(false, false, true);
+  const first = note('first');
+  const later = note('later');
+  f.loseNextAck();
+  await expect(f.session.commitDurable(first)).rejects.toThrow('Acknowledgement lost');
+  expect(f.session.getSnapshot().snapshot.workspace.history).toEqual([]);
+  await f.session.commit(later);
+  const saved = await f.session.saveBuffered();
+  expect(saved.workspace.history).toEqual([first, later]);
+  expect(f.onFirstSave).toHaveBeenCalledOnce();
+  expect(f.writes).toHaveLength(2);
+  await f.session.dispose();
+});
 
 function stageContent(
   session: ReturnType<typeof createVideoReviewSession>,

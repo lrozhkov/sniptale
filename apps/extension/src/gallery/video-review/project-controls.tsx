@@ -5,16 +5,18 @@ import type { useReviewEditorState } from './use-editor-state';
 
 type EditorState = ReturnType<typeof useReviewEditorState>;
 type ProjectCommandState = Pick<EditorState, 'canStart' | 'setBusy' | 'beforeAction' | 'run'> & {
-  session: Pick<EditorState['session'], 'rename' | 'createProject' | 'getSnapshot'>;
+  session: Pick<
+    EditorState['session'],
+    'rename' | 'saveBuffered' | 'getCheckpointExitReceipt' | 'getSnapshot'
+  >;
 };
 
 /** Project metadata commands retain one receipt and use the mounted session writer. */
 export function useReviewProjectCommands(
   state: ProjectCommandState,
   flush: () => Promise<void>,
-  onCreated: ((aggregateId: string) => void) | undefined
+  onCreated: ((aggregateId: string, sourceMediaId: string) => void) | undefined
 ) {
-  const receipt = useRef<string | null>(null);
   const active = useRef(true);
   const latest = useRef({ state, onCreated });
   latest.current = { state, onCreated };
@@ -37,12 +39,10 @@ export function useReviewProjectCommands(
                   latest.current.state.session === session &&
                   Boolean(latest.current.onCreated);
                 if (!isCurrent()) return;
-                receipt.current ??= crypto.randomUUID();
-                const command = receipt.current;
-                const created = await session.createProject(command);
+                await session.saveBuffered();
                 const before = session.getSnapshot();
                 const canContinue = () => {
-                  if (!isCurrent() || receipt.current !== command) return false;
+                  if (!isCurrent()) return false;
                   const current = session.getSnapshot();
                   return (
                     !current.dirty &&
@@ -52,29 +52,23 @@ export function useReviewProjectCommands(
                   );
                 };
                 if (!canContinue()) return;
-                if (created.newProjectCheckpointReceipt) {
+                const retainedReceipt = session.getCheckpointExitReceipt();
+                if (retainedReceipt) {
                   try {
-                    await createSyncProductClient().requestCheckpointExit(
-                      created.newProjectCheckpointReceipt
-                    );
-                  } catch {
-                    /* Committed creation and its original pending deadline survive a missed advisory request. */
-                  }
-                  if (!canContinue()) return;
-                }
-                if (created.retainedEditorCheckpointReceipt) {
-                  try {
-                    await createSyncProductClient().requestCheckpointExit(
-                      created.retainedEditorCheckpointReceipt
-                    );
+                    await createSyncProductClient().requestCheckpointExit(retainedReceipt);
                   } catch {
                     /* Do not replace the selected receipt after a missed advisory request. */
                   }
                   if (!canContinue()) return;
                 }
                 if (!canContinue()) return;
-                latest.current.onCreated?.(created.workspace.aggregateId);
-                receipt.current = null;
+                const workspace = before.snapshot.workspace;
+                const sourceMediaId = workspace.sourceMediaId ?? workspace.aggregateId;
+                const kind = sourceMediaId.split(':', 1)[0];
+                latest.current.onCreated?.(
+                  `${kind}:quick-project:${crypto.randomUUID()}`,
+                  sourceMediaId
+                );
               })
           );
         }

@@ -249,8 +249,11 @@ beforeEach(async () => {
         'video_workspaces',
         'video_workspace_history',
         'video_projects',
+        'video_review_identities',
       ]) {
-        if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
+        if (!db.objectStoreNames.contains(name)) {
+          db.createObjectStore(name, name === 'video_review_identities' ? { keyPath: 'key' } : {});
+        }
       }
     },
   });

@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createReviewWorkspaceStoreFixture } from './store.test-support';
-import { listVideoWorkspaceSummaries } from './summaries';
+import { listVideoProjectsForEditing, listVideoWorkspaceSummaries } from './summaries';
+import { usageReferenceKey } from '../media-library/usage-index-keys';
 
 const mocks = vi.hoisted(() => ({ initDB: vi.fn() }));
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
@@ -112,4 +113,31 @@ it('rejects physical history offsets in a logical envelope', async () => {
   expect(await listVideoWorkspaceSummaries()).toEqual([
     expect.objectContaining({ unavailableReason: 'invalid-workspace' }),
   ]);
+});
+
+it('finds active projects by their primary original and includes its legacy project once', async () => {
+  const heads = fixture.rows.get('video_workspaces')!;
+  const indexed = { ...head, usageReferenceKeys: [usageReferenceKey('library-asset', id)] };
+  heads.set(id, indexed);
+  const linked = { ...indexed, sourceMediaId: id };
+  heads.set('older', { ...linked, aggregateId: 'older', updatedAt: 1 });
+  heads.set('newer', { ...linked, aggregateId: 'newer', updatedAt: 5 });
+  heads.set('auxiliary', { ...linked, aggregateId: 'auxiliary', sourceMediaId: 'other' });
+  heads.set('unavailable', { ...linked, aggregateId: 'unavailable', sourceAssetId: 'changed' });
+  heads.set('trashed', {
+    ...linked,
+    aggregateId: 'trashed',
+    project: {
+      ...head.project,
+      lifecycle: { ...head.project.lifecycle, updatedAt: 3, trashedAt: 3 },
+    },
+  });
+  heads.set('invalid', { ...linked, aggregateId: null });
+  const before = structuredClone(fixture.rows);
+
+  const projects = await listVideoProjectsForEditing(id);
+  expect(projects.map(({ aggregateId }) => aggregateId)).toEqual(['newer', id, 'older']);
+  expect(projects[0]?.sourceMediaId).toBe(id);
+  expect(await listVideoProjectsForEditing('unrelated')).toEqual([]);
+  expect(fixture.rows).toEqual(before);
 });

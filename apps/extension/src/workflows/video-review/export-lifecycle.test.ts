@@ -242,6 +242,34 @@ it('rejects a replaced source before admitting any staging bytes', async () => {
   expect(deps.createSeekableAssetObjectWriter).not.toHaveBeenCalled();
 });
 
+it.each(['same', 'restored'] as const)(
+  'checks an unpublished Quick Edit source before export when its lifetime is %s',
+  async (lifetime) => {
+    const { args, deps } = fixture();
+    const pendingOriginal = { mediaId: 'recording:original', createdAt: 1, generation: null };
+    deps.loadVideoReviewSource.mockResolvedValueOnce({
+      ...(await deps.loadVideoReviewSource()),
+      original: {
+        ...pendingOriginal,
+        generation: lifetime === 'same' ? null : 'new-generation',
+      },
+    });
+    const attempt = exportReviewedVideo({ ...args, pendingOriginal }, deps);
+    if (lifetime === 'same') {
+      await expect(attempt).resolves.toMatchObject({ receipt: { mediaId: expect.any(String) } });
+      expect(deps.saveRecordingsBatchSafely).toHaveBeenCalledOnce();
+    } else {
+      await expect(attempt).rejects.toThrow('changed');
+      expect(deps.createSeekableAssetObjectWriter).not.toHaveBeenCalled();
+    }
+    expect(deps.loadVideoReviewSource).toHaveBeenLastCalledWith(
+      args.snapshot.workspace.aggregateId,
+      args.signal,
+      pendingOriginal.mediaId
+    );
+  }
+);
+
 it('prepares a temporary download without publishing and releases it only when the downloader finishes', async () => {
   const { args, deps, writer } = fixture();
   const result = await exportReviewedVideo({ ...args, destination: 'download' }, deps);

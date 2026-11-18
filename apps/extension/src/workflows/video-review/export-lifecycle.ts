@@ -44,7 +44,10 @@ import {
   releaseAssetReadyProtection,
 } from '../../composition/persistence/assets';
 import { initDB } from '../../composition/persistence/infrastructure/indexed-db/core';
-import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
+import type {
+  VideoWorkspaceOpening,
+  VideoWorkspaceSnapshot,
+} from '../../composition/persistence/review-workspaces/contracts';
 import { replayReviewHistory, reviewDocumentBaseline } from '../../features/video/review/document';
 import {
   createReviewFragment,
@@ -270,6 +273,7 @@ function createReviewExportTiming(
 
 type ReviewExportInput = {
   snapshot: VideoWorkspaceSnapshot;
+  pendingOriginal?: NonNullable<VideoWorkspaceOpening['original']>;
   renderSettings?: ReviewRenderSettings;
   index: ReviewMediaIndex;
   signal: AbortSignal;
@@ -286,10 +290,16 @@ async function prepareReviewExport(args: ReviewExportInput, deps: typeof persist
   const snapshot = structuredClone(args.snapshot);
   const workspace = snapshot.workspace;
   signal.throwIfAborted();
-  const original = await deps.loadVideoReviewSource(workspace.aggregateId, signal);
+  const original = args.pendingOriginal
+    ? await deps.loadVideoReviewSource(workspace.aggregateId, signal, args.pendingOriginal.mediaId)
+    : await deps.loadVideoReviewSource(workspace.aggregateId, signal);
   if (
     original.snapshot.workspace.sourceAssetId !== workspace.sourceAssetId ||
     original.snapshot.workspace.revision !== workspace.revision ||
+    original.original?.mediaId !== args.pendingOriginal?.mediaId ||
+    original.original?.createdAt !== args.pendingOriginal?.createdAt ||
+    original.original?.generation !== args.pendingOriginal?.generation ||
+    (!args.pendingOriginal && original.snapshot.workspace.generation !== workspace.generation) ||
     original.source.duration !== index.duration
   )
     throw new Error('Review source or committed revision changed.');

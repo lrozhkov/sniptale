@@ -250,7 +250,12 @@ it('keeps unsaved text in the editor when Back cannot persist recovery, then ret
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
     await click('addComment');
     await fill('Keep this text');
-    integration.snapshot.mockRejectedValueOnce(new Error('Quota'));
+    const persist = integration.snapshot.getMockImplementation()!;
+    let blocked = true;
+    integration.snapshot.mockImplementation(async (...args: unknown[]) => {
+      if (blocked) throw new Error('Quota');
+      return persist(...args);
+    });
     await click('common.actions.close');
     expect(back).not.toHaveBeenCalled();
     expect(host.querySelector('textarea')?.value).toBe('Keep this text');
@@ -259,6 +264,7 @@ it('keeps unsaved text in the editor when Back cannot persist recovery, then ret
     expect(host.querySelector('[data-ui="gallery.videoReview.feedback"]')).toBeNull();
     expect(host.textContent).toContain('gallery.videoReview.saveFailed');
     expect(host.querySelector('textarea')?.value).toBe('Keep this text');
+    blocked = false;
     await click('common.actions.close');
     expect(back).toHaveBeenCalledOnce();
     expect(fixture.persistedSnapshot.draft).toBeNull();

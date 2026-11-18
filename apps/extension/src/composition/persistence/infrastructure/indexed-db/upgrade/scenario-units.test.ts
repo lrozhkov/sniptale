@@ -75,6 +75,7 @@ it('adds empty scenario units and DB48 reference indexes before publishing curre
     ['editor_vector_library', { keyPath: 'key' }],
     ['image_workspace_identities', { keyPath: 'aggregateId' }],
     ['scenario_project_revisions', { keyPath: 'projectId' }],
+    ['video_review_identities', { keyPath: 'key' }],
   ]);
   expect(createIndex.mock.calls).toEqual([
     ['projectId', 'projectId'],

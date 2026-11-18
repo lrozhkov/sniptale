@@ -61,6 +61,8 @@ function progress(f: ReturnType<typeof setup>) {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  // Cases that need contention install their own lock manager.
+  vi.stubGlobal('navigator', {});
   installReconciliationKeyRanges();
   const installed = globalThis.IDBKeyRange;
   vi.stubGlobal('IDBKeyRange', {

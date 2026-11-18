@@ -39,6 +39,12 @@ import type { ReviewSpeechTarget } from '../../contracts/ai/audio';
 export const reviewSessionPersistence = {
   acquireSyncCheckpointEdit,
   wakeCheckpoints: () => createSyncProductClient().wakeCheckpoints(),
+  onFirstSave({ workspace }: VideoWorkspaceSnapshot) {
+    publishMediaHubLibraryChanged('update', [
+      workspace.sourceMediaId ?? workspace.aggregateId,
+      workspace.aggregateId,
+    ]);
+  },
   async renameVideoWorkspaceProject(...args: Parameters<typeof renameVideoWorkspaceProject>) {
     await renameVideoWorkspaceProject(...args);
     publishMediaHubLibraryChanged('update', [args[0]]);

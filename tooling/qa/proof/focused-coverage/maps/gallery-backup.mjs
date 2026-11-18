@@ -1,5 +1,15 @@
 export const GALLERY_BACKUP_OWNER_MAPPINGS = [
   {
+    owner: 'gallery-library-preview-sections',
+    productionFile: 'apps/extension/src/gallery/library/preview/sidebar-sections.tsx',
+    reason: 'The inspector suites cover project navigation, source usage, and Trash actions.',
+    testFiles: [
+      'apps/extension/src/gallery/library/preview/sidebar-project-usage.test.tsx',
+      'apps/extension/src/gallery/library/preview/sidebar-sections.test.tsx',
+      'apps/extension/src/gallery/library/preview/views.test.tsx',
+    ],
+  },
+  {
     owner: 'gallery-backup-actions',
     productionFile: 'apps/extension/src/gallery/library/actions/backup.ts',
     reason: 'Backup export/import action behavior is covered by focused backup action tests.',

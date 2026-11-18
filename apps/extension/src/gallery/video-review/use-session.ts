@@ -34,7 +34,7 @@ export type LoadedReview = Awaited<ReturnType<typeof loadVideoReviewSource>> & {
 };
 
 /** Owns the source URL and rejects late loads from a previously opened video. */
-export function useLoadedReview(aggregateId: string) {
+export function useLoadedReview(aggregateId: string, sourceMediaId?: string) {
   const [resource, setResource] = useState<LoadedReview | null>(null);
   const [failed, setFailed] = useState<VideoReviewLoadError | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -96,13 +96,19 @@ export function useLoadedReview(aggregateId: string) {
     const loading = (async () => {
       reader = await acquireAssetResourceSession();
       if (controller.signal.aborted) return null;
-      await ensureNativeEditingRootAvailable({ rootKind: 'video-review', rootId: aggregateId });
+      await ensureNativeEditingRootAvailable(
+        sourceMediaId
+          ? { rootKind: 'media', rootId: sourceMediaId }
+          : { rootKind: 'video-review', rootId: aggregateId }
+      );
       if (controller.signal.aborted) return null;
-      return loadVideoReviewSource(aggregateId, controller.signal);
+      return sourceMediaId
+        ? loadVideoReviewSource(aggregateId, controller.signal, sourceMediaId)
+        : loadVideoReviewSource(aggregateId, controller.signal);
     })();
     const release = (): Promise<void> => {
       releasing ??= (async () => {
-        // Opening can still commit after abort; retain exclusion until that writer settles.
+        // Native media preparation can outlive cancellation of the view.
         await loading.catch(() => undefined);
         await refreshing;
         try {
@@ -118,7 +124,7 @@ export function useLoadedReview(aggregateId: string) {
       .then((loaded) => {
         if (!loaded || controller.signal.aborted) return;
         loadedSource = true;
-        const session = createVideoReviewSession(loaded.snapshot);
+        const session = createVideoReviewSession(loaded.snapshot, undefined, loaded.original);
         ownedSession = session;
         url = URL.createObjectURL(loaded.file);
         setResource({ ...loaded, url, session });
@@ -145,7 +151,7 @@ export function useLoadedReview(aggregateId: string) {
       void release().catch(() => logger.warn('video-review-resource-cleanup-deferred'));
       if (url) URL.revokeObjectURL(url);
     };
-  }, [aggregateId, attempt]);
+  }, [aggregateId, attempt, sourceMediaId]);
   return { resource, failed, retry: () => setAttempt((value) => value + 1) };
 }
 

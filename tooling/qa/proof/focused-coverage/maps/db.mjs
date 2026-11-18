@@ -224,6 +224,21 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'sync-native-media-replica',
+    productionFile: 'apps/extension/src/composition/persistence/sync-capture/apply-media.ts',
+    allowCrossOwner: true,
+    reason:
+      'Native replica suites cover original metadata and retention. ' +
+      'The portable trajectory suite covers the recording stream publication caller.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/sync-capture/apply-media.export.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-media.recording.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-media.snapshot.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-media.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/cursor-trajectory.test.ts',
+    ],
+  },
+  {
     owner: 'shared-db-media-source-retention',
     productionFile:
       'apps/extension/src/composition/persistence/media-library/delete-cascade.sources.ts',
@@ -512,11 +527,14 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   {
     owner: 'shared-db-video-project-persistence',
     productionFile: 'apps/extension/src/composition/persistence/projects/index.ts',
-    reason: 'Video project persistence writes are covered by focused project DB regression suites.',
+    reason:
+      'Video project persistence covers history publication, source transfer, and native writes.',
     testFiles: [
+      'apps/extension/src/composition/persistence/projects/history-publication.test.ts',
       'apps/extension/src/composition/persistence/projects/index.delete.test.ts',
       'apps/extension/src/composition/persistence/projects/index.test.ts',
       'apps/extension/src/composition/persistence/projects/index.stale-save.test.ts',
+      'apps/extension/src/composition/persistence/projects/library-project-binding.transfer.test.ts',
     ],
   },
   {

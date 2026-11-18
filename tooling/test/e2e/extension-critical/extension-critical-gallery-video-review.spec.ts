@@ -4787,7 +4787,18 @@ for (const locale of ['en', 'ru'] as const) {
           .click();
         await expect(projectInfo).toBeVisible();
       };
+      const review = page.locator('[data-ui="gallery.videoReview.dialog"]');
+      const projectId = () => new URL(page.url()).searchParams.get('mediaId');
+      const saveCut = async (start: number, end: number) => {
+        await review
+          .getByRole('button', { name: label('gallery.videoReview.cutMode'), exact: true })
+          .click();
+        await timelineGesture(page, start, end);
+        await expect.poll(projectId).toMatch(/^recording:quick-project:/);
+        return projectId()!;
+      };
       await openProjectInfo();
+      expect(await readNativeReviewWorkspace(page, sourceId)).toBeNull();
       await projectInfo.getByRole('button', { name: 'beta-v1.webm', exact: true }).click();
       const name = page.getByRole('textbox', {
         name: label('videoEditor.app.projectNameLabel'),
@@ -4799,11 +4810,13 @@ for (const locale of ['en', 'ru'] as const) {
       await expect(
         projectInfo.getByRole('button', { name: 'First project', exact: true })
       ).toBeVisible();
+      expect(projectId()).toBe(sourceId);
+      expect(await readNativeReviewWorkspace(page, sourceId)).toBeNull();
+      const firstId = await saveCut(2.1, 4.1);
       await expect
-        .poll(async () => (await readNativeReviewWorkspace(page, sourceId))?.project?.name)
+        .poll(async () => (await readNativeReviewWorkspace(page, firstId))?.project?.name)
         .toBe('First project');
       await page.screenshot({ path: info.outputPath('renamed-project.png'), fullPage: false });
-      const review = page.locator('[data-ui="gallery.videoReview.dialog"]');
       await expect(
         review.locator('header').getByRole('button', {
           name: label('videoEditor.app.newProjectAction'),
@@ -4837,46 +4850,18 @@ for (const locale of ['en', 'ru'] as const) {
       await expect(
         projectInfo.getByRole('button', { name: 'beta-v1.webm', exact: true })
       ).toBeVisible();
-      const newProjectId = await page.evaluate(
-        async ({ dbName, sourceId }) => {
-          const db = await new Promise<IDBDatabase>((resolve, reject) => {
-            const request = indexedDB.open(dbName);
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-          });
-          const result = await new Promise<unknown[]>((resolve, reject) => {
-            const request = db
-              .transaction('video_workspaces')
-              .objectStore('video_workspaces')
-              .getAll();
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-          });
-          db.close();
-          const created = result.find(
-            (value) =>
-              value &&
-              typeof value === 'object' &&
-              'sourceMediaId' in value &&
-              value.sourceMediaId === sourceId
-          );
-          if (
-            !created ||
-            typeof created !== 'object' ||
-            !('aggregateId' in created) ||
-            typeof created.aggregateId !== 'string'
-          )
-            throw new Error('New project missing');
-          return created.aggregateId;
-        },
-        { dbName: betaV1Fixture.databaseName, sourceId }
-      );
-      expect((await readNativeReviewWorkspace(page, sourceId))?.project?.name).toBe(
-        'First project'
-      );
-      expect((await readNativeReviewWorkspace(page, newProjectId))?.project?.name).toBe(
-        'beta-v1.webm'
-      );
+      expect(projectId()).toBe(sourceId);
+      expect(await readNativeReviewWorkspace(page, sourceId)).toBeNull();
+      const newProjectId = await saveCut(5.1, 7.1);
+      expect(newProjectId).not.toBe(firstId);
+      const first = (await readNativeReviewWorkspace(page, firstId))!;
+      const second = (await readNativeReviewWorkspace(page, newProjectId))!;
+      expect(first.project?.name).toBe('First project');
+      expect(second.project?.name).toBe('beta-v1.webm');
+      expect(first.sourceMediaId).toBe(sourceId);
+      expect(second.sourceMediaId).toBe(sourceId);
+      expect(first.sourceAssetId).toBe(second.sourceAssetId);
+      expect(first.history[0]?.after).not.toEqual(second.history[0]?.after);
       await page.goto(
         `${host.origin}${GALLERY_HARNESS_PATH}?mediaId=${encodeURIComponent(newProjectId)}&mode=edit&theme=${theme}`
       );
@@ -4885,8 +4870,15 @@ for (const locale of ['en', 'ru'] as const) {
         projectInfo.getByRole('button', { name: 'beta-v1.webm', exact: true })
       ).toBeVisible();
       await page.goto(
-        `${host.origin}${GALLERY_HARNESS_PATH}?mediaId=${encodeURIComponent(sourceId)}&mode=edit&theme=${theme}`
+        `${host.origin}${GALLERY_HARNESS_PATH}?mediaId=${encodeURIComponent(sourceId)}&theme=${theme}`
       );
+      const quickEdit = page.locator('[data-ui="gallery.videoReview.enter"]');
+      await quickEdit.click();
+      const inspector = page.locator('[data-ui="gallery.preview.inspector"]');
+      const firstChoice = inspector.getByTitle('First project');
+      await expect(firstChoice).toBeVisible();
+      await expect(inspector.getByTitle('beta-v1.webm')).toBeVisible();
+      await firstChoice.press('Enter');
       await openProjectInfo();
       await expect(
         projectInfo.getByRole('button', { name: 'First project', exact: true })

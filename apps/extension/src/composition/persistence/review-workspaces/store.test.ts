@@ -15,18 +15,16 @@ import {
 } from './store.test-support';
 import type { ReviewAnnotation, ReviewOperation } from '../../../features/video/review/types';
 import { inspectVideoWorkspace, parseVideoWorkspace } from './parser';
+import { moveStoredItemsToTrash, restoreStoredItemsFromTrash } from '../library-lifecycle/trash';
 
 const harness = vi.hoisted(() => ({
   database: vi.fn(),
   failure: false,
   writes: Promise.resolve<unknown>(undefined),
 }));
-vi.mock('../infrastructure/indexed-db/core', () => ({
+vi.mock('../infrastructure/indexed-db/core', async (original) => ({
+  ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
   initDB: harness.database,
-  MEDIA_LIBRARY_STORE: 'media_library',
-  VIDEO_WORKSPACES_STORE: 'video_workspaces',
-  VIDEO_WORKSPACE_HISTORY_STORE: 'video_workspace_history',
-  VIDEO_WORKSPACE_DRAFTS_STORE: 'video_workspace_drafts',
 }));
 vi.mock('../assets/opfs-store', async (original) => ({
   ...(await original<typeof import('../assets/opfs-store')>()),
@@ -47,6 +45,7 @@ import {
   moveVideoWorkspaceHistory,
   openVideoWorkspace,
   readVideoWorkspace,
+  readVideoWorkspaceOpening,
   saveVideoWorkspaceAdvanced,
   saveVideoWorkspaceDraft,
   saveVideoWorkspaceSnapshot,
@@ -733,6 +732,127 @@ it('rolls back primary promotion when initial workspace publication fails', asyn
   harness.failure = true;
   await expect(openVideoWorkspace(id, source)).rejects.toThrow();
   expect(rows).toEqual(before);
+});
+
+it('opens a new Quick Edit session without promoting a capture or publishing an empty head', async () => {
+  const media = betaV1Fixture.records.media_library[0]!;
+  const recording = betaV1Fixture.records.recordings[0]!;
+  rows
+    .get('media_library')!
+    .set(id, { ...media, lifecycle: createLibraryLifecycle('temporary', 1) });
+  rows
+    .get('recordings')!
+    .set(recording.id, { ...recording, lifecycle: createLibraryLifecycle('temporary', 1) });
+  const before = structuredClone(rows);
+  const projectId = 'recording:quick-project:first';
+  const opened = await readVideoWorkspaceOpening({
+    aggregateId: projectId,
+    sourceMediaId: id,
+    source,
+    expectedSourceAssetId: recording.assetId,
+  });
+  expect(opened).toMatchObject({
+    original: { mediaId: id, createdAt: media.createdAt },
+    snapshot: {
+      workspace: { aggregateId: projectId, sourceMediaId: id, history: [] },
+      draft: null,
+    },
+  });
+  expect(rows).toEqual(before);
+  expect(await readVideoWorkspace(projectId)).toBeNull();
+});
+
+it('publishes two first edits on one Quick Edit source without a partial write on failure', async () => {
+  const media = betaV1Fixture.records.media_library[0]!;
+  const recording = betaV1Fixture.records.recordings[0]!;
+  rows
+    .get('media_library')!
+    .set(id, { ...media, lifecycle: createLibraryLifecycle('temporary', 1) });
+  rows
+    .get('recordings')!
+    .set(recording.id, { ...recording, lifecycle: createLibraryLifecycle('temporary', 1) });
+  const createSave = async (aggregateId: string, text: string) => {
+    const opened = await readVideoWorkspaceOpening({
+      aggregateId,
+      sourceMediaId: id,
+      source,
+      expectedSourceAssetId: recording.assetId,
+    });
+    return {
+      aggregateId,
+      original: opened.original!,
+      expectedRevision: opened.snapshot.workspace.revision,
+      expectedDraftRevision: null,
+      expectedSourceAssetId: recording.assetId,
+      workspace: {
+        ...opened.snapshot.workspace,
+        history: [{ ...operation, after: { ...annotation, text } }],
+        cursor: 1,
+      },
+      draft: null,
+    };
+  };
+  const first = await createSave('recording:quick-project:first', 'First');
+  const second = await createSave('recording:quick-project:second', 'Second');
+  const before = structuredClone(rows);
+  harness.failure = true;
+  await expect(saveVideoWorkspaceSnapshot(first)).rejects.toThrow();
+  expect(rows).toEqual(before);
+  harness.failure = false;
+  await Promise.all([saveVideoWorkspaceSnapshot(first), saveVideoWorkspaceSnapshot(second)]);
+  for (const request of [first, second]) {
+    expect((await readVideoWorkspace(request.aggregateId))?.workspace).toMatchObject({
+      sourceMediaId: id,
+      sourceAssetId: recording.assetId,
+      generation: request.workspace.generation,
+      revision: 2,
+      history: request.workspace.history,
+    });
+  }
+  expect([...rows.get('media_library')!.keys()]).toEqual([id]);
+  expect(rows.get('media_library')!.get(id)).toMatchObject({
+    lifecycle: { storageClass: 'library' },
+    savedIndependently: false,
+  });
+  await expect(saveVideoWorkspaceSnapshot(first)).rejects.toMatchObject({ code: 'conflict' });
+  expect(rows.get('video_workspaces')?.size).toBe(2);
+});
+
+it('rejects first-save commands from before a source restore or project purge', async () => {
+  const recording = betaV1Fixture.records.recordings[0]!;
+  const aggregateId = 'recording:quick-project:original-lifetime';
+  const capture = async () => {
+    const opening = await readVideoWorkspaceOpening({
+      aggregateId,
+      sourceMediaId: id,
+      source,
+      expectedSourceAssetId: recording.assetId,
+    });
+    return {
+      aggregateId,
+      original: opening.original!,
+      expectedRevision: opening.snapshot.workspace.revision,
+      expectedDraftRevision: null,
+      expectedSourceAssetId: recording.assetId,
+      workspace: { ...opening.snapshot.workspace, history: [operation], cursor: 1 },
+      draft: null,
+    };
+  };
+  const beforeRestore = await capture();
+  const targets = [{ kind: 'media', id }] as const;
+  await moveStoredItemsToTrash(targets, 10);
+  await restoreStoredItemsFromTrash(targets, 20);
+  await expect(saveVideoWorkspaceSnapshot(beforeRestore)).rejects.toMatchObject({
+    code: 'conflict',
+  });
+  expect(await readVideoWorkspace(aggregateId)).toBeNull();
+
+  const current = await capture();
+  const accepted = await saveVideoWorkspaceSnapshot(current);
+  await deleteVideoWorkspaceProject(aggregateId, accepted.workspace.revision);
+  await expect(saveVideoWorkspaceSnapshot(current)).rejects.toMatchObject({ code: 'conflict' });
+  expect(await readVideoWorkspace(aggregateId)).toBeNull();
+  expect(rows.get('media_library')?.has(id)).toBe(true);
 });
 
 it.each([1, 2] as const)(

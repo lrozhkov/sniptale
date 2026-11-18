@@ -319,10 +319,16 @@ export function useReviewExport(resource: LoadedReview) {
     publishing.current = false;
     changePhase('exporting');
     try {
+      const { snapshot } = resource.session.getSnapshot();
+      const pendingOriginal =
+        resource.original && snapshot.workspace.revision === resource.snapshot.workspace.revision
+          ? resource.original
+          : undefined;
       const value = await exportReviewedVideo({
         diagnostics,
         renderSettings,
-        snapshot: resource.session.getSnapshot().snapshot,
+        snapshot,
+        ...(pendingOriginal ? { pendingOriginal } : {}),
         index,
         signal: controller.signal,
         destination,
