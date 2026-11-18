@@ -60,9 +60,10 @@ function setup() {
 it('admits a Library source with a real causal head and no outgoing echo', async () => {
   const f = setup();
   expect(await applyPreparedMediaReplica(f.input)).toEqual({ status: 'applied', generation: 1 });
-  expect(f.table('media_library').get(f.input.rows.media.id)).toEqual(
-    parseMediaLibraryEntry(f.input.rows.media)
-  );
+  expect(f.table('media_library').get(f.input.rows.media.id)).toEqual({
+    ...parseMediaLibraryEntry(f.input.rows.media),
+    originalSaveId: expect.any(String),
+  });
   expect(f.table('project_assets').get('source')).toEqual(f.input.rows.projectAsset);
   expect(f.table('asset_refs').get('local-body')).toEqual(f.input.rows.ref);
   expect(f.table('sync_capture').get(f.stateKey)).toMatchObject({
@@ -518,7 +519,12 @@ it.each(['soft Trash', 'permanent deletion'] as const)(
     input.rows.ref.mimeType = 'video/webm';
     await applyPreparedMediaReplica(input);
     const mediaId = input.rows.media.id;
-    f.table('media_library').set(mediaId, { ...input.rows.media, savedIndependently: false });
+    const originalSaveId = crypto.randomUUID();
+    f.table('media_library').set(mediaId, {
+      ...input.rows.media,
+      savedIndependently: false,
+      originalSaveId,
+    });
     const source = {
       duration: 2,
       width: 640,
@@ -556,7 +562,10 @@ it.each(['soft Trash', 'permanent deletion'] as const)(
     });
     const changed = next('rename', input.operationId, 1);
     await applyPreparedMediaReplica(changed);
-    expect(f.table('media_library').get(mediaId)).toMatchObject({ savedIndependently: false });
+    expect(f.table('media_library').get(mediaId)).toMatchObject({
+      savedIndependently: false,
+      originalSaveId,
+    });
     expect((await open()).original).toEqual(opening.original);
 
     const removalId = 'remote-removal';

@@ -89,15 +89,15 @@ export async function repairTemporaryProjectLifecycles(now = Date.now()): Promis
       for (const raw of await tx.objectStore(IMAGE_WORKSPACES_STORE).getAll()) {
         const workspace = parseImageWorkspaceEntry(raw);
         if (!workspace) continue;
-        const media = parseMediaLibraryEntry(
-          await stores.mediaLibraryStore.get(workspace.aggregateId)
-        );
+        const sourceMediaId = workspace.sourceMediaId ?? workspace.aggregateId;
+        const media = parseMediaLibraryEntry(await stores.mediaLibraryStore.get(sourceMediaId));
         if (media?.lifecycle?.storageClass === 'temporary') repaired += 1;
         await promoteReferencedMediaLifecycles({
-          mediaIds: new Set([workspace.aggregateId]),
+          mediaIds: new Set([sourceMediaId]),
           mediaStore: stores.mediaLibraryStore,
           recordingStore: stores.recordingStore,
           now,
+          preserveOriginalVisibility: workspace.sourceMediaId === undefined,
         });
       }
       const workspaces = createVideoWorkspaceStore(tx);
@@ -112,6 +112,7 @@ export async function repairTemporaryProjectLifecycles(now = Date.now()): Promis
           mediaStore: stores.mediaLibraryStore,
           recordingStore: stores.recordingStore,
           now,
+          preserveOriginalVisibility: workspace.sourceMediaId === undefined,
         });
         if (media && !workspace.project) {
           await workspaces.put({

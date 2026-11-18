@@ -34,6 +34,7 @@ export async function promoteReferencedMediaLifecycles(args: {
   mediaStore: LifecycleMutationStore;
   recordingStore: LifecycleMutationStore;
   now: number;
+  preserveOriginalVisibility?: boolean;
 }): Promise<void> {
   for (const mediaId of args.mediaIds) {
     const media = parseMediaLibraryEntry(await args.mediaStore.get(mediaId));
@@ -41,6 +42,9 @@ export async function promoteReferencedMediaLifecycles(args: {
     if (media.lifecycle?.storageClass === 'temporary') {
       await args.mediaStore.put!({
         ...media,
+        ...(args.preserveOriginalVisibility
+          ? {}
+          : { savedIndependently: media.savedIndependently ?? false }),
         lifecycle: promoteLibraryLifecycle(media.lifecycle, args.now),
       });
     }
@@ -201,6 +205,9 @@ async function promoteVideoProjectGraph(projectId: string): Promise<void> {
       if (linkedRecording || linkedProjectAsset) {
         await mediaStore.put({
           ...media,
+          ...(media.lifecycle?.storageClass === 'temporary'
+            ? { savedIndependently: media.savedIndependently ?? false }
+            : {}),
           lifecycle: promoteLibraryLifecycle(
             media.lifecycle ?? createLibraryLifecycle('library', media.updatedAt),
             promotedAt
@@ -236,7 +243,11 @@ async function promoteMediaAggregate(assetId: string): Promise<void> {
     const lifecycle = media.lifecycle ?? createLibraryLifecycle('library', media.updatedAt);
     if (lifecycle.storageClass === 'library') {
       if (media.savedIndependently === false && lifecycle.trashedAt === undefined) {
-        await mediaStore.put({ ...media, savedIndependently: true });
+        await mediaStore.put({
+          ...media,
+          savedIndependently: true,
+          originalSaveId: crypto.randomUUID(),
+        });
       }
       await tx.done;
       return;
@@ -285,6 +296,8 @@ async function promoteMediaAggregate(assetId: string): Promise<void> {
     }
     await mediaStore.put({
       ...media,
+      savedIndependently: true,
+      originalSaveId: crypto.randomUUID(),
       lifecycle: promoteLibraryLifecycle(lifecycle, promotedAt),
     });
     await tx.done;

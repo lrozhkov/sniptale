@@ -198,6 +198,7 @@ it('saves a linked recording and its library media when a video project uses it'
   expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
     expect.objectContaining({
       id: media.id,
+      savedIndependently: false,
       lifecycle: expect.objectContaining({ storageClass: 'library', savedAt: expect.any(Number) }),
     })
   );

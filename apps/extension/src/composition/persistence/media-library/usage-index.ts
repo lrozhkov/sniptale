@@ -20,6 +20,7 @@ import {
   mediaDependencyTarget,
   reviewWorkspaceUsesMedia,
   scenarioChildUsesMedia,
+  videoHistoryUsesMedia,
   videoSourceUsesMedia,
 } from './dependencies';
 import { USAGE_INDEX_MARKER, USAGE_REFERENCE_INDEX, usageReferenceKey } from './usage-index-keys';
@@ -160,7 +161,8 @@ async function projectUsageFromMatches(args: {
     const primary = isVideoPrimaryMediaSource(entry.project, media);
     if (
       primary ||
-      entry.project.assets.some((asset) => videoSourceUsesMedia(asset.source, media, childIds))
+      entry.project.assets.some((asset) => videoSourceUsesMedia(asset.source, media, childIds)) ||
+      videoHistoryUsesMedia(entry.history?.sources ?? [], media, childIds)
     )
       result.set(`video:${entry.id}`, {
         id: entry.id,

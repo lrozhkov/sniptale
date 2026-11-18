@@ -279,3 +279,31 @@ it('ignores a pending result after closing and loads fresh links on reopening', 
   expect(container.textContent).toContain('Fresh project');
   expect(mocks.usage).toHaveBeenCalledTimes(2);
 });
+
+it('offers removing an original only while the displayed source is independently saved and used', async () => {
+  const item = createMediaItem();
+  const remove = vi.fn(async () => undefined);
+  mocks.usage.mockResolvedValue([{ id: 'edit', name: 'Saved edit', kind: 'image', primary: true }]);
+  await act(async () =>
+    root.render(<PreviewProjectUsage item={item} onRemoveFromOriginals={remove} />)
+  );
+  await openUsage();
+  const removeButton = () =>
+    container.querySelector<HTMLButtonElement>(
+      '[aria-label="gallery.preview.removeFromOriginals"]'
+    );
+  expect(removeButton()).not.toBeNull();
+  await act(async () => removeButton()?.click());
+  expect(remove).toHaveBeenCalledOnce();
+
+  await act(async () =>
+    root.render(
+      <PreviewProjectUsage
+        item={{ ...item, savedIndependently: false }}
+        onRemoveFromOriginals={remove}
+      />
+    )
+  );
+  expect(removeButton()).toBeNull();
+  expect(container.textContent).toContain('Saved edit');
+});

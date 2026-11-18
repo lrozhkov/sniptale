@@ -31,6 +31,7 @@ const FOLDERS = new Set<GallerySavedViewFolder>([
   'audio',
   'scenario',
   'video-project',
+  'image-project',
   'export',
   'screenshot',
   'web-snapshot',

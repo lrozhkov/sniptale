@@ -3,7 +3,7 @@ import { parseRecordingEntry } from '../recordings/index.guards';
 import { parseRecordingTelemetryEntry } from '../recordings/telemetry.guards';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseAssetRef } from '../assets/guards';
-import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import { parseMediaLibraryEntry, withoutLocalOriginalClaim } from '../media-library/read-guards';
 import { parseProjectAssetEntry, parseProjectExportEntry } from '../projects/read-guards';
 import { parseStoredWebSnapshotRecord } from '../web-snapshots/guards';
 import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
@@ -21,7 +21,7 @@ export function parseCapturedMediaRows(value: unknown): CapturedMediaRows | null
   const entry = parseMediaLibraryEntry(value['media']);
   const ref = parseAssetRef(value['ref']);
   if (!entry || !ref) return null;
-  const { savedIndependently: _localClaim, ...media } = entry;
+  const media = withoutLocalOriginalClaim(entry);
   if ('screenshotRef' in value && !('webSnapshot' in value)) return null;
   const sourceFields = ['projectAsset', 'projectExport', 'recording', 'webSnapshot'];
   if (sourceFields.filter((field) => field in value).length > 1) return null;

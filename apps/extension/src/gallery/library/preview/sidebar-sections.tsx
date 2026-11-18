@@ -260,19 +260,35 @@ export function PreviewMetadataCards({ item }: Pick<PreviewPanelProps, 'item'>) 
 export function PreviewProjectUsage({
   item,
   trashMode,
-}: Pick<PreviewPanelProps, 'item' | 'trashMode'>) {
-  const mediaId = isGalleryMediaItem(item) ? (item.entityId ?? item.id) : null;
-  if (!mediaId) return null;
-  return <PreviewProjectUsageDetails key={mediaId} mediaId={mediaId} trashMode={trashMode} />;
+  onRemoveFromOriginals,
+}: Pick<PreviewPanelProps, 'item' | 'trashMode' | 'onRemoveFromOriginals'>) {
+  if (!isGalleryMediaItem(item)) return null;
+  const mediaId = item.entityId ?? item.id;
+  const canRemoveClaim =
+    !trashMode &&
+    item.lifecycle?.trashedAt === undefined &&
+    item.lifecycle?.storageClass !== 'temporary' &&
+    item.imageContentState !== 'edited' &&
+    item.savedIndependently !== false;
+  return (
+    <PreviewProjectUsageDetails
+      key={mediaId}
+      mediaId={mediaId}
+      trashMode={trashMode}
+      {...(canRemoveClaim && onRemoveFromOriginals ? { onRemoveFromOriginals } : {})}
+    />
+  );
 }
 
 /** Object identity resets disclosure and pending lookup before another source is shown. */
 function PreviewProjectUsageDetails({
   mediaId,
   trashMode,
+  onRemoveFromOriginals,
 }: {
   mediaId: string;
   trashMode?: boolean | undefined;
+  onRemoveFromOriginals?: () => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [usage, setUsage] = useState<MediaAssetProjectUsage[]>([]);
@@ -373,6 +389,11 @@ function PreviewProjectUsageDetails({
                 </ProductActionButton>
               )
             )}
+            {usage.length > 0 && onRemoveFromOriginals ? (
+              <PreviewActionButton icon={Archive} onClick={onRemoveFromOriginals}>
+                {translate('gallery.preview.removeFromOriginals')}
+              </PreviewActionButton>
+            ) : null}
           </div>
         ) : null}
       </div>

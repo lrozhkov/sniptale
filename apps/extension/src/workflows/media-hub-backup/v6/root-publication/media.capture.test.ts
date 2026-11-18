@@ -224,9 +224,11 @@ it('captures a duplicated restored original before a project borrows its accepte
     rootKind: 'media',
     change: { kind: 'image', rows: { media: { id: captured.rootId, workspaceRevision: 1 } } },
   });
-  expect(fixture.rows.get('media_library')!.get(captured.rootId)).toEqual(
-    captured.change.rows.media
-  );
+  expect(captured.change.rows.media).not.toHaveProperty('originalSaveId');
+  expect(fixture.rows.get('media_library')!.get(captured.rootId)).toEqual({
+    ...captured.change.rows.media,
+    originalSaveId: expect.any(String),
+  });
   expect(fixture.rows.get('media_library')!.get(entry.id)).toEqual(entry);
   expect(captured.change.rows.originalRef).toEqual(input.staged[0]!.ref);
   expect(captured.change.rows.projectAsset.id).toBe(
@@ -321,9 +323,11 @@ it('captures a restored project-asset image through its target-local revision an
       },
     },
   });
-  expect(fixture.rows.get('media_library')!.get(captured.rootId)).toEqual(
-    captured.change.rows.media
-  );
+  expect(captured.change.rows.media).not.toHaveProperty('originalSaveId');
+  expect(fixture.rows.get('media_library')!.get(captured.rootId)).toEqual({
+    ...captured.change.rows.media,
+    originalSaveId: expect.any(String),
+  });
   expect(fixture.rows.get('media_library')!.get(entry.id)).toEqual(entry);
 });
 

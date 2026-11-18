@@ -122,6 +122,7 @@ type GalleryPreviewOverlayProps = Pick<
   | 'onPreviewEdit'
   | 'onPreviewOpenSnapshotScreenshot'
   | 'onPreviewPromote'
+  | 'onPreviewRemoveFromOriginals'
   | 'onPreviewResetChanges'
   | 'onPreviewRestoreTrash'
   | 'onPreviewRestoreOriginal'
@@ -219,6 +220,9 @@ function renderPreviewOverlayPanel(
       onSaveCopy={async () => props.onPreviewSaveCopy()}
       {...(props.onPreviewPromote
         ? { onPromote: async () => props.onPreviewPromote?.(previewItem) }
+        : {})}
+      {...(props.onPreviewRemoveFromOriginals
+        ? { onRemoveFromOriginals: async () => props.onPreviewRemoveFromOriginals?.(previewItem) }
         : {})}
     />
   );

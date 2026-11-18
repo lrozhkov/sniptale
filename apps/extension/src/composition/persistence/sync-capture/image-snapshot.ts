@@ -12,7 +12,7 @@ import type { SyncCaptureRootState } from './contracts';
 import { parseAssetRef, parseAssetOwner } from '../assets/guards';
 import type { MediaLibraryEntry } from '../media-library/contracts';
 import { parseProjectAssetEntry } from '../projects/read-guards';
-import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import { parseMediaLibraryEntry, withoutLocalOriginalClaim } from '../media-library/read-guards';
 import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
 import { parseAggregatePresentationEntry } from '../aggregate-presentations/parser';
 import {
@@ -110,7 +110,7 @@ function parseImageRows(
     return null;
   const entry = parseMediaLibraryEntry(value['media']);
   if (!entry) return null;
-  const { savedIndependently: _localClaim, ...media } = entry;
+  const media = withoutLocalOriginalClaim(entry);
   const originalRef =
     value['originalRef'] === undefined ? undefined : parseAssetRef(value['originalRef']);
   const projectAsset =

@@ -13,9 +13,15 @@ import type { UseGalleryAppActionsResult } from '../../library/actions/useGaller
 import type { GalleryViewMode } from '../../state/types';
 import { createLocalBackupSummary } from './backup-export.test-support';
 
-const { layoutPropsMock, sendRuntimeMessageMock } = vi.hoisted(() => ({
+const { layoutPropsMock, sendRuntimeMessageMock, setOriginalClaimMock } = vi.hoisted(() => ({
   layoutPropsMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
+  setOriginalClaimMock: vi.fn(),
+}));
+
+vi.mock('../../../workflows/media-hub/store', async (original) => ({
+  ...(await original<typeof import('../../../workflows/media-hub/store')>()),
+  setMediaOriginalClaim: setOriginalClaimMock,
 }));
 
 vi.mock('./layout', () => ({
@@ -302,6 +308,26 @@ it('persists metadata before navigating to an adjacent preview item', async () =
   });
 
   expect(actions.preview.navigate).toHaveBeenCalledWith(nextItem);
+});
+
+it('saves the original directly while a project retains it', async () => {
+  const { controller, layoutProps } = renderBindings();
+  sendRuntimeMessageMock.mockResolvedValue({ result: 'promoted', success: true });
+  const item = { ...createMediaItem({ id: 'original' }), savedIndependently: false };
+
+  await act(async () => layoutProps.onPreviewPromote(item));
+
+  expect(setOriginalClaimMock).toHaveBeenCalledExactlyOnceWith(
+    {
+      id: 'original',
+      createdAt: item.createdAt,
+      lifecycleUpdatedAt: item.lifecycle?.updatedAt ?? item.updatedAt,
+      originalSaveId: null,
+    },
+    true
+  );
+  expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
+  expect(controller.actions.storage.refresh).toHaveBeenCalledOnce();
 });
 
 it('promotes each supported gallery owner and refreshes the active scope', async () => {

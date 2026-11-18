@@ -235,6 +235,7 @@ function areGalleryItemsUiEquivalent(left: GalleryItem, right: GalleryItem | und
     return (
       isGalleryMediaItem(right) &&
       left.savedIndependently === right.savedIndependently &&
+      left.originalSaveId === right.originalSaveId &&
       areMediaSourcesEqual(left.source, right.source) &&
       areRecordingGroupMembersEqual(left.recordingGroup, right.recordingGroup) &&
       areRecordingGroupViewsEqual(left.recordingGroupView, right.recordingGroupView)

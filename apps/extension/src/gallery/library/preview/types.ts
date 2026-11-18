@@ -46,6 +46,7 @@ export interface PreviewPanelProps {
   onOpenSnapshotScreenshot?: () => Promise<void>;
   onDelete: (opening?: GalleryDeletionOpening) => Promise<void>;
   onPromote?: () => Promise<void>;
+  onRemoveFromOriginals?: () => Promise<void>;
   onRestoreOriginal?: () => void;
   onSaveCopy?: () => Promise<boolean | void>;
 }

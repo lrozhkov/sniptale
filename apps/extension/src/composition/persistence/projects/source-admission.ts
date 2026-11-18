@@ -5,7 +5,7 @@ import {
 } from '../review-workspaces/storage';
 import type { AssetRef } from '../assets';
 import { parseAssetRef } from '../assets';
-import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import { parseMediaLibraryEntry, withoutLocalOriginalClaim } from '../media-library/read-guards';
 import type { ProjectAssetEntry } from './contracts';
 import type { MediaLibraryEntry } from '../media-library/contracts';
 import { parseProjectAssetEntry, parseProjectExportEntry } from './read-guards';
@@ -244,7 +244,8 @@ export async function assertPreparedLibrarySource(
     (current.lifecycle?.trashedAt !== undefined && !options.allowRetainedTrash) ||
     current.size !== expectedRef.size ||
     current.mimeType !== expectedRef.mimeType ||
-    JSON.stringify(current) !== JSON.stringify(expected)
+    JSON.stringify(withoutLocalOriginalClaim(current)) !==
+      JSON.stringify(withoutLocalOriginalClaim(expected))
   )
     return changedLibrarySource();
   const assetId = await readLibrarySourceAssetId(current, stores);

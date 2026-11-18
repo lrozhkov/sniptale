@@ -362,6 +362,7 @@ export async function promoteReviewPrimarySourceLifecycles(
     mediaStore: stores.media,
     recordingStore: stores.recordings,
     now,
+    preserveOriginalVisibility: true,
   });
 }
 

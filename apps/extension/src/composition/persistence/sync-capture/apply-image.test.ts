@@ -465,6 +465,14 @@ it('validates document closure and matches pending image publication by its nati
 it('updates shared image metadata only when original bytes match', async () => {
   const f = setup();
   await applyPreparedImageReplica(f.input);
+  const native = parseMediaLibraryEntry(f.table('media_library').get(f.input.media.id));
+  if (!native) throw new Error('Expected stored image.');
+  const originalSaveId = crypto.randomUUID();
+  f.table('media_library').set(f.input.media.id, {
+    ...native,
+    savedIndependently: false,
+    originalSaveId,
+  });
   const project = createVideoProjectEntryWithMediaClip({ id: 'dependent' });
   project.project.assets[0]!.source = { kind: 'library-asset', mediaId: f.input.media.id };
   f.table('video_projects').set(project.id, project);
@@ -490,6 +498,8 @@ it('updates shared image metadata only when original bytes match', async () => {
     filename: 'renamed.png',
     lifecycle: { trashedAt: 2 },
     workspaceRevision: 2,
+    savedIndependently: false,
+    originalSaveId,
   });
   expect(f.table('video_projects').get(project.id)).toEqual(project);
   const before = structuredClone(f.rows);

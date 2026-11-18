@@ -26,7 +26,8 @@ export async function publishPreparedMediaSourceInTransaction(
   prepared: PreparedMediaSourcePublication,
   stores: MediaSourcePublicationStores
 ): Promise<void> {
-  await stores.media.put(prepared.media);
+  const media = prepared.media;
+  await stores.media.put({ ...media, originalSaveId: media.originalSaveId ?? crypto.randomUUID() });
   if (prepared.media.source.kind !== 'stored-asset') return;
   await stores.refs.put(prepared.original.ref);
   await stores.owners.put({

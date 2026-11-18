@@ -64,7 +64,7 @@ function buildGalleryFolderIcon(folder: Exclude<(typeof SIDEBAR_FOLDERS)[number]
     return commandPaletteIcon(FileStack);
   }
 
-  const Icon = getKindIcon(folder);
+  const Icon = getKindIcon(folder === 'image-project' ? 'image' : folder);
   return commandPaletteIcon(Icon);
 }
 

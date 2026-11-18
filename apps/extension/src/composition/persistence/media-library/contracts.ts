@@ -49,6 +49,8 @@ export interface MediaLibraryEntry {
   lifecycle?: LibraryLifecycle;
   /** False when a project retains this source without a separate save in Originals. */
   savedIndependently?: boolean;
+  /** Local identity of the latest explicit save or admitted replacement. */
+  originalSaveId?: string;
   recordingGroup?: RecordingGroupMember;
   /** Monotonic editable-workspace revision. Restored original-only images can retain a nonzero revision. */
   /** Missing only on pre-v24 persisted rows; readers normalize it to revision 0. */

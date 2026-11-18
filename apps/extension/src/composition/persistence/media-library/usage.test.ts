@@ -4,6 +4,7 @@ import { createVideoProjectEntryWithMediaClip } from '../projects/index.test-sup
 import { createGuideProject } from '../../../features/scenario/project/public';
 import { createScenarioProjectEntry } from '../scenario/projects/entry';
 import type { MediaLibraryEntry } from './contracts';
+import { deleteMediaLibraryAsset, setMediaLibraryOriginalClaim } from './index.library';
 import type { VideoWorkspace } from '../review-workspaces/contracts';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 
@@ -397,4 +398,115 @@ it('includes the saved quick-edit workspace as its recording primary project', a
   expect(await listMediaAssetProjectUsage(media.id)).toEqual([
     { id: media.id, kind: 'review', name: media.filename, primary: true },
   ]);
+});
+
+it('removes only a retained original claim and confirms the same command after a lost response', async () => {
+  let refuseWrite = true;
+  const fixture = createReviewWorkspaceStoreFixture(
+    (store) => refuseWrite && store === 'media_library'
+  );
+  mocks.initDB.mockResolvedValue(fixture.database);
+  fixture.rows.get('media_library')!.set(media.id, media);
+  fixture.rows.get('video_projects')!.set(video.id, video);
+  const expected = {
+    id: media.id,
+    createdAt: media.createdAt,
+    lifecycleUpdatedAt: media.updatedAt,
+    originalSaveId: null,
+  };
+  const before = structuredClone(fixture.rows);
+
+  await expect(setMediaLibraryOriginalClaim(expected, false)).rejects.toThrow('No space');
+  expect(fixture.rows).toEqual(before);
+
+  refuseWrite = false;
+  await expect(setMediaLibraryOriginalClaim(expected, false)).resolves.toBe(true);
+  expect(await listMediaAssetProjectUsage(media.id)).toEqual([
+    expect.objectContaining({ id: video.id, kind: 'video' }),
+  ]);
+  before.get('media_library')!.set(media.id, { ...media, savedIndependently: false });
+  expect(fixture.rows).toEqual(before);
+  await expect(setMediaLibraryOriginalClaim(expected, false)).resolves.toBe(false);
+  expect(fixture.rows).toEqual(before);
+});
+
+it('refuses an original command after its last link disappears or its identity is replaced', async () => {
+  const fixture = createReviewWorkspaceStoreFixture(() => false);
+  mocks.initDB.mockResolvedValue(fixture.database);
+  const catalogue = fixture.rows.get('media_library')!;
+  catalogue.set(media.id, media);
+  const projects = fixture.rows.get('video_projects')!;
+  projects.set(video.id, video);
+  const expected = {
+    id: media.id,
+    createdAt: media.createdAt,
+    lifecycleUpdatedAt: media.updatedAt,
+    originalSaveId: null,
+  };
+  expect(await listMediaAssetProjectUsage(media.id)).toHaveLength(1);
+  projects.delete(video.id);
+  await expect(setMediaLibraryOriginalClaim(expected, false)).rejects.toThrow('No project retains');
+  expect(catalogue.get(media.id)).toEqual(media);
+
+  projects.set(video.id, video);
+  const replaced = { ...media, createdAt: media.createdAt + 1 };
+  catalogue.set(media.id, replaced);
+  await expect(setMediaLibraryOriginalClaim(expected, false)).rejects.toThrow('original changed');
+  expect(catalogue.get(media.id)).toEqual(replaced);
+});
+
+it('keeps a re-saved original after delayed removal and loss of its last link', async () => {
+  const fixture = createReviewWorkspaceStoreFixture(() => false);
+  mocks.initDB.mockResolvedValue(fixture.database);
+  const catalogue = fixture.rows.get('media_library')!;
+  catalogue.set(media.id, media);
+  const projects = fixture.rows.get('video_projects')!;
+  projects.set(video.id, video);
+  const expected = {
+    id: media.id,
+    createdAt: media.createdAt,
+    lifecycleUpdatedAt: media.updatedAt,
+    originalSaveId: null,
+  };
+
+  await expect(setMediaLibraryOriginalClaim(expected, false)).resolves.toBe(true);
+  await expect(setMediaLibraryOriginalClaim(expected, true)).resolves.toBe(true);
+  await expect(setMediaLibraryOriginalClaim(expected, true)).resolves.toBe(false);
+  await expect(setMediaLibraryOriginalClaim(expected, false)).rejects.toThrow('original changed');
+
+  fixture.rows.get('video_projects')!.delete(video.id);
+  await deleteMediaLibraryAsset(media.id, { projectRetainedOnly: true });
+  expect(fixture.rows.get('media_library')!.get(media.id)).toMatchObject({
+    savedIndependently: true,
+    originalSaveId: expect.any(String),
+  });
+});
+
+it('allows removing an original retained only by Montage history', async () => {
+  const fixture = createReviewWorkspaceStoreFixture(() => false);
+  mocks.initDB.mockResolvedValue(fixture.database);
+  fixture.rows.get('media_library')!.set(media.id, media);
+  fixture.rows.get('video_projects')!.set(video.id, {
+    ...video,
+    project: { ...video.project, assets: [], clips: [] },
+    history: {
+      version: 1,
+      epoch: 'history',
+      past: [{ assetId: 'change' }],
+      future: [],
+      sources: [{ kind: 'library-asset', id: media.id }],
+    },
+  });
+  expect(await listMediaAssetProjectUsage(media.id)).toEqual([]);
+  await expect(
+    setMediaLibraryOriginalClaim(
+      {
+        id: media.id,
+        createdAt: media.createdAt,
+        lifecycleUpdatedAt: media.updatedAt,
+        originalSaveId: null,
+      },
+      false
+    )
+  ).resolves.toBe(true);
 });

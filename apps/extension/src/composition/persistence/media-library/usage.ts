@@ -10,6 +10,7 @@ import { parseProjectAssetEntry, parseVideoProjectEntry } from '../projects/read
 import {
   mediaDependencyTarget,
   scenarioChildUsesMedia,
+  videoHistoryUsesMedia,
   videoSourceUsesMedia,
   isVideoPrimaryMediaSource,
   reviewWorkspaceUsesMedia,
@@ -36,6 +37,21 @@ import { subscribeToMediaHubEvents } from '../../../features/media-hub/events';
 
 export type { MediaAssetProjectUsage } from './contracts';
 
+export const MEDIA_PROJECT_USAGE_STORES = [
+  MEDIA_LIBRARY_STORE,
+  IMAGE_WORKSPACES_STORE,
+  VIDEO_PROJECTS_STORE,
+  PROJECT_ASSETS_STORE,
+  SCENARIO_ASSETS_STORE,
+  SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
+] as const;
+
+type UsageReadTransaction = IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>;
+
 interface UsageSnapshot {
   mediaById: Map<string, MediaLibraryEntry>;
   videoProjects: NonNullable<ReturnType<typeof parseVideoProjectEntry>>[];
@@ -46,7 +62,7 @@ interface UsageSnapshot {
 }
 
 async function loadUsageSnapshot(
-  tx: IDBPTransaction<unknown, string[], 'readonly'>,
+  tx: UsageReadTransaction,
   root: MediaLibraryEntry
 ): Promise<UsageSnapshot> {
   const matches = await readDeletionDependencyRows(tx, root);
@@ -91,7 +107,8 @@ async function loadUsageSnapshot(
 
 function projectUsageFromSnapshot(
   mediaId: string,
-  snapshot: UsageSnapshot
+  snapshot: UsageSnapshot,
+  includeHistory: boolean
 ): MediaAssetProjectUsage[] {
   const { mediaById, videoProjects, scenarioProjects, scenarioAssets, reviewWorkspaces } = snapshot;
   const root = mediaById.get(mediaId);
@@ -109,7 +126,10 @@ function projectUsageFromSnapshot(
     const attached = project.assets.some((asset) =>
       videoSourceUsesMedia(asset.source, media, scenarioChildIds)
     );
-    if (primary || attached) {
+    const retained =
+      includeHistory &&
+      videoHistoryUsesMedia(entry.history?.sources ?? [], media, scenarioChildIds);
+    if (primary || attached || retained) {
       usage.push({ id: project.id, kind: 'video', name: project.name, primary });
     }
   }
@@ -154,40 +174,12 @@ export async function listMediaAssetProjectUsageBatch(
   const ids = [...new Set(mediaIds)];
   if (!ids.length) return new Map();
   const db = await initDB();
-  const tx = db.transaction(
-    [
-      MEDIA_LIBRARY_STORE,
-      IMAGE_WORKSPACES_STORE,
-      VIDEO_PROJECTS_STORE,
-      PROJECT_ASSETS_STORE,
-      SCENARIO_ASSETS_STORE,
-      SCENARIO_PROJECTS_STORE,
-      SCENARIO_PROJECT_HISTORY_STORE,
-      SCENARIO_PROJECT_UNITS_STORE,
-      VIDEO_WORKSPACES_STORE,
-      VIDEO_WORKSPACE_HISTORY_STORE,
-    ],
-    'readonly'
-  );
+  const tx = db.transaction([...MEDIA_PROJECT_USAGE_STORES], 'readonly');
   try {
     const result = new Map<string, MediaAssetProjectUsage[]>();
     for (const id of ids) {
       const root = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(id));
-      if (!root) {
-        result.set(id, []);
-        continue;
-      }
-      const [snapshot, images] = await Promise.all([
-        loadUsageSnapshot(tx, root),
-        tx
-          .objectStore(IMAGE_WORKSPACES_STORE)
-          .index(ROW_REFERENCE_INDEX)
-          .getAll(rowReferenceKey('media', id)),
-      ]);
-      result.set(id, [
-        ...projectUsageFromSnapshot(id, snapshot),
-        ...linkedImageProjectUsage(root, images),
-      ]);
+      result.set(id, root ? await readMediaProjectUsageInTransaction(tx, root) : []);
     }
     await tx.done;
     return result;
@@ -200,6 +192,25 @@ export async function listMediaAssetProjectUsageBatch(
     await tx.done.catch(() => undefined);
     throw error;
   }
+}
+
+/** A visibility mutation can recheck the same links as the inspector in its write transaction. */
+export async function readMediaProjectUsageInTransaction(
+  tx: UsageReadTransaction,
+  root: MediaLibraryEntry,
+  options: { includeHistory: boolean } = { includeHistory: false }
+): Promise<MediaAssetProjectUsage[]> {
+  const [snapshot, images] = await Promise.all([
+    loadUsageSnapshot(tx, root),
+    tx
+      .objectStore(IMAGE_WORKSPACES_STORE)
+      .index(ROW_REFERENCE_INDEX)
+      .getAll(rowReferenceKey('media', root.id)),
+  ]);
+  return [
+    ...projectUsageFromSnapshot(root.id, snapshot, options.includeHistory),
+    ...linkedImageProjectUsage(root, images),
+  ];
 }
 
 /** Subscribe to advisory relationship changes with page-scoped listener cleanup. */

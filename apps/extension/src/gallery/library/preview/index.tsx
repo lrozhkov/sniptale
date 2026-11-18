@@ -70,7 +70,7 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' 
   const isDraft = props.item.lifecycle?.storageClass === 'temporary';
   const projectRetainsOriginal =
     isGalleryMediaItem(props.item) && props.item.savedIndependently === false;
-  const folder = getGalleryItemFolder(props.item.kind);
+  const folder = getGalleryItemFolder(props.item);
   const CategoryIcon = getGalleryFolderIcon(folder);
 
   return (
@@ -254,7 +254,13 @@ function PreviewPanelSidebar(
               <PreviewSourceField item={props.item} trashMode={Boolean(props.trashMode)} />
             </div>
           </details>
-          <PreviewProjectUsage item={props.item} trashMode={Boolean(props.trashMode)} />
+          <PreviewProjectUsage
+            item={props.item}
+            trashMode={Boolean(props.trashMode)}
+            {...(props.onRemoveFromOriginals
+              ? { onRemoveFromOriginals: props.onRemoveFromOriginals }
+              : {})}
+          />
           <PreviewTagEditor
             {...(props.allTags === undefined ? {} : { allTags: props.allTags })}
             item={props.item}

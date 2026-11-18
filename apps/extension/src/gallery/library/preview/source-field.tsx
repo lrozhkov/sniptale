@@ -88,7 +88,7 @@ export function PreviewSourceField({
           </a>
         ) : item.sourceUrl || !title ? (
           <p className="break-all">
-            {item.sourceUrl || translate('gallery.preview.sourceMissing')}
+            {item.sourceUrl || translate('gallery.preview.sourceUrlMissing')}
           </p>
         ) : null}
         {metadata.status === 'loading' ? (

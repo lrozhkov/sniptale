@@ -495,10 +495,13 @@ async function publishReplica(
       ? parseMediaLibraryEntry(await stores.media.get(rows.media.id))
       : null;
   const prepared = {
-    media:
-      native?.savedIndependently === undefined
-        ? rows.media
-        : { ...rows.media, savedIndependently: native.savedIndependently },
+    media: {
+      ...rows.media,
+      ...(native?.savedIndependently === undefined
+        ? {}
+        : { savedIndependently: native.savedIndependently }),
+      ...(native?.originalSaveId === undefined ? {} : { originalSaveId: native.originalSaveId }),
+    },
     original: { ref: rows.ref },
     ...('projectAsset' in rows ? { projectAsset: rows.projectAsset } : {}),
     ...('projectExport' in rows ? { projectExport: rows.projectExport } : {}),

@@ -224,6 +224,18 @@ it('admits the exact prepared live Library source without file reads or publicat
   expect(data.stores.exports.get).not.toHaveBeenCalled();
 });
 
+it('admits portable source metadata after an independent save changes local visibility', async () => {
+  const data = preparedLibraryFixture();
+  data.stores.media.get.mockResolvedValue({
+    ...data.media,
+    savedIndependently: true,
+    originalSaveId: crypto.randomUUID(),
+  });
+  await expect(
+    assertPreparedLibrarySource({ entry: data.media, ref }, data.stores)
+  ).resolves.toBeUndefined();
+});
+
 it.each(['missing', 'metadata', 'identity', 'size', 'ref'] as const)(
   'refuses a prepared Library source changed before consumer commit: %s',
   async (state) => {

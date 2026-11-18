@@ -1,4 +1,5 @@
 import { captureMediaInTransaction } from '../sync-capture/capture';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   STORE_NAME,
   RECORDING_TELEMETRY_STORE,
@@ -33,7 +34,11 @@ import {
   parseMediaThumbnailEntry,
 } from './read-guards';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
-import { listMediaAssetProjectUsage } from './usage';
+import {
+  listMediaAssetProjectUsage,
+  MEDIA_PROJECT_USAGE_STORES,
+  readMediaProjectUsageInTransaction,
+} from './usage';
 import type { MediaAssetProjectUsage } from './usage';
 import { deleteMediaAssetWithProjectCascade } from './delete-cascade';
 import { mediaHasPendingPublication } from './delete-cascade.sources';
@@ -231,6 +236,61 @@ export async function addMediaLibraryEntryTags(
     const nextTags = Array.from(new Set([...existing.tags, ...tagsToAdd]));
     if (nextTags.length === existing.tags.length) return existing;
     return { ...existing, tags: nextTags, updatedAt: Date.now() };
+  });
+}
+
+/** Change visibility on the accepted original without opening or saving a project. */
+export async function setMediaLibraryOriginalClaim(
+  expected: {
+    id: string;
+    createdAt: number;
+    lifecycleUpdatedAt: number;
+    originalSaveId: string | null;
+  },
+  savedIndependently: boolean
+): Promise<boolean> {
+  return runWithIndexedDbMutation(async (db) => {
+    const tx = db.transaction([...MEDIA_PROJECT_USAGE_STORES], 'readwrite');
+    try {
+      const store = tx.objectStore(MEDIA_LIBRARY_STORE);
+      const raw: unknown = await store.get(expected.id);
+      const original = parseMediaLibraryEntry(raw);
+      if (
+        !isRecord(raw) ||
+        !original ||
+        original.id !== expected.id ||
+        original.createdAt !== expected.createdAt ||
+        (original.lifecycle?.updatedAt ?? original.updatedAt) !== expected.lifecycleUpdatedAt
+      )
+        throw new Error('The original changed.');
+      if (!isCollectableProjectOriginal({ ...original, savedIndependently: false }))
+        throw new Error('The original is unavailable.');
+      const changed = (original.savedIndependently !== false) !== savedIndependently;
+      if (
+        (!savedIndependently || changed) &&
+        (original.originalSaveId ?? null) !== expected.originalSaveId
+      )
+        throw new Error('The original changed.');
+      if (!changed) {
+        await tx.done;
+        return false;
+      }
+      if (
+        !savedIndependently &&
+        !(await readMediaProjectUsageInTransaction(tx, original, { includeHistory: true })).length
+      )
+        throw new Error('No project retains this original.');
+      // The portable source is unchanged. Only local independent visibility changes.
+      await store.put({
+        ...raw,
+        savedIndependently,
+        ...(savedIndependently ? { originalSaveId: crypto.randomUUID() } : {}),
+      });
+      await tx.done;
+      return true;
+    } catch (error) {
+      return abortIndexedDbMutation(tx, error);
+    }
   });
 }
 

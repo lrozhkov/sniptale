@@ -36,7 +36,7 @@ import type { StoredProjectAssetEntry } from '../projects/contracts';
 import { parseProjectAssetEntry } from '../projects/read-guards';
 import { isImageCaptureSource } from './image-snapshot';
 import type { MediaLibraryEntry } from '../media-library/contracts';
-import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import { parseMediaLibraryEntry, withoutLocalOriginalClaim } from '../media-library/read-guards';
 import {
   publishPreparedMediaSourceInTransaction,
   publishPreparedMediaProjectChildInTransaction,
@@ -168,7 +168,7 @@ function parseImageReplicaIdentity(value: Record<string, unknown>): ImageReplica
 function parseImageReplicaSource(value: Record<string, unknown>) {
   const entry = parseMediaLibraryEntry(value['media']);
   if (!entry) return null;
-  const { savedIndependently: _localClaim, ...media } = entry;
+  const media = withoutLocalOriginalClaim(entry);
   const originalRef = parseAssetRef(value['originalRef']);
   const projectAsset =
     value['projectAsset'] === undefined ? undefined : parseProjectAssetEntry(value['projectAsset']);
@@ -632,7 +632,7 @@ async function publishImageReplicaNative(
   tx: ImageTransaction,
   input: ApplyPreparedImageReplicaInput,
   hydrated: HydratedImageReplica,
-  admission: { previous: CapturedImageRows | null; revision: number },
+  admission: { previous: CapturedImageRows | null; revision: number; originalUnchanged: boolean },
   operation: ImageDeleteOperation
 ): Promise<void> {
   if (
@@ -653,8 +653,15 @@ async function publishImageReplicaNative(
     });
   await tx.objectStore(IMAGE_WORKSPACES_STORE).delete(input.media.id);
   await tx.objectStore(AGGREGATE_PRESENTATIONS_STORE).delete(['image', input.media.id]);
+  const native = admission.originalUnchanged
+    ? parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(input.media.id))
+    : null;
   const media = {
     ...input.media,
+    ...(native?.savedIndependently === undefined
+      ? {}
+      : { savedIndependently: native.savedIndependently }),
+    ...(native?.originalSaveId === undefined ? {} : { originalSaveId: native.originalSaveId }),
     ...(input.media.source.kind === 'screenshot' ? { blob: hydrated.originalBlob } : {}),
     workspaceRevision: admission.revision,
   };
@@ -775,7 +782,17 @@ async function commitImageReplica(
     tx,
     assetResidencyCopyId({ kind: 'inline-image', mediaId: input.media.id })
   );
-  await publishImageReplicaNative(tx, input, hydrated, { previous, revision }, operation);
+  const originalUnchanged =
+    previous?.media.createdAt === input.media.createdAt &&
+    hydrated.unchangedOriginalDigest !== null &&
+    hydrated.unchangedOriginalDigest === state?.nativeDigest;
+  await publishImageReplicaNative(
+    tx,
+    input,
+    hydrated,
+    { previous, revision, originalUnchanged },
+    operation
+  );
   if (previousResidency) await retireAssetResidencyCopyInTransaction(tx, previousResidency, permit);
   await writeImageReplicaProvenance(tx, input, keys, revision, generation);
   if (operation.assetIds.length) await tx.objectStore(ASSET_OPERATIONS_STORE).put(operation);

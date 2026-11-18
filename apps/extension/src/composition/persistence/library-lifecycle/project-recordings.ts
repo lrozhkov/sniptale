@@ -43,6 +43,7 @@ export async function promoteLinkedRecordingLifecycles(args: {
     ) {
       await args.mediaStore.put({
         ...media,
+        savedIndependently: media.savedIndependently ?? false,
         lifecycle: promoteLibraryLifecycle(media.lifecycle, args.now),
       });
     }

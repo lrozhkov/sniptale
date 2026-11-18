@@ -53,7 +53,10 @@ import type {
   MediaLibraryItem,
   MediaThumbnailEntry,
 } from '../../../../composition/persistence/media-library/contracts';
-import { parseMediaLibraryEntry } from '../../../../composition/persistence/media-library/read-guards';
+import {
+  parseMediaLibraryEntry,
+  withoutLocalOriginalClaim,
+} from '../../../../composition/persistence/media-library/read-guards';
 import type { StoredRecordingEntry } from '../../../../composition/persistence/recordings/contracts';
 import { parseRecordingEntry } from '../../../../composition/persistence/recordings/index.guards';
 import { parseRecordingTelemetryEntry } from '../../../../composition/persistence/recordings/telemetry.guards';
@@ -686,7 +689,7 @@ async function buildMediaRoot(args: {
         db: args.db,
       })
     : undefined;
-  const { blob: _blob, savedIndependently: _localClaim, ...entryWithoutBlob } = entry;
+  const { blob: _blob, ...entryWithoutBlob } = withoutLocalOriginalClaim(entry);
   const portableEntry =
     entry.source.kind === 'web-snapshot' && !args.options.includeSourceMetadata
       ? {

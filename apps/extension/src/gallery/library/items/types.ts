@@ -40,6 +40,7 @@ interface GalleryItemBase {
 export interface GalleryMediaItem extends GalleryItemBase {
   recordingMetadata?: RecordingMetadata;
   savedIndependently?: MediaLibraryItem['savedIndependently'];
+  originalSaveId?: MediaLibraryItem['originalSaveId'];
   duration: number | null;
   entityId?: string;
   height: number | null;

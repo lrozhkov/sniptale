@@ -179,6 +179,9 @@ export function parseMediaLibraryEntry(value: unknown): MediaLibraryEntry | null
   if (lifecycle === null) return null;
   const savedIndependently = value['savedIndependently'];
   if (savedIndependently !== undefined && typeof savedIndependently !== 'boolean') return null;
+  const originalSaveId = value['originalSaveId'];
+  if (originalSaveId !== undefined && (!isString(originalSaveId) || originalSaveId.length !== 36))
+    return null;
   const recordingGroup =
     value['recordingGroup'] === undefined
       ? undefined
@@ -203,6 +206,7 @@ export function parseMediaLibraryEntry(value: unknown): MediaLibraryEntry | null
     tags: value['tags'],
     ...(lifecycle === undefined ? {} : { lifecycle }),
     ...(savedIndependently === undefined ? {} : { savedIndependently }),
+    ...(originalSaveId === undefined ? {} : { originalSaveId }),
     ...(recordingGroup === undefined ? {} : { recordingGroup }),
     updatedAt: value['updatedAt'],
     width: value['width'],
@@ -236,6 +240,12 @@ export function parseMediaThumbnailEntry(value: unknown): MediaThumbnailEntry | 
     updatedAt: value['updatedAt'],
     width: value['width'],
   };
+}
+
+/** Keep local visibility and its witness out of portable source metadata. */
+export function withoutLocalOriginalClaim<T extends MediaLibraryEntry>(entry: T) {
+  const { savedIndependently: _localClaim, originalSaveId: _localSave, ...portable } = entry;
+  return portable;
 }
 
 export function isCollectableProjectOriginal(entry: MediaLibraryEntry | null): boolean {

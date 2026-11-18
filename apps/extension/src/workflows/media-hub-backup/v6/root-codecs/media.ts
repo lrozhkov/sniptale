@@ -157,6 +157,7 @@ export function parsePortableMediaMetadata(value: unknown): PortableMediaMetadat
     'assetId' in value.entry ||
     'blob' in value.entry ||
     'savedIndependently' in value.entry ||
+    'originalSaveId' in value.entry ||
     !Array.isArray((value as { entry: { tags?: unknown } }).entry.tags)
   ) {
     throw new Error('Portable media root metadata is invalid.');

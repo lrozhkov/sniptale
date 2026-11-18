@@ -240,7 +240,11 @@ describe('aggregate lifecycle promotion replay', () => {
       installTransaction({ media_library: { get: async () => row, put } });
       await promoteStoredItem(target);
     }
-    expect(put).toHaveBeenCalledExactlyOnceWith({ ...media, savedIndependently: true });
+    expect(put).toHaveBeenCalledExactlyOnceWith({
+      ...media,
+      savedIndependently: true,
+      originalSaveId: expect.any(String),
+    });
   });
 
   it('requires an image presentation at the same revision and keeps the aggregate id', async () => {
@@ -267,6 +271,7 @@ describe('aggregate lifecycle promotion replay', () => {
     expect(put).toHaveBeenCalledWith(
       expect.objectContaining({
         id: media.id,
+        savedIndependently: true,
         lifecycle: expect.objectContaining({ storageClass: 'library' }),
       })
     );

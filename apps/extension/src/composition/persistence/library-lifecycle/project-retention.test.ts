@@ -286,6 +286,7 @@ it.each(['current', 'history'] as const)('retains scenario source used in %s', a
   );
   await repairTemporaryProjectLifecycles(100);
   expect(persisted.get('media_library')!.get('origin')).toMatchObject({
+    savedIndependently: false,
     lifecycle: { storageClass: 'library', savedAt: 100 },
   });
 });

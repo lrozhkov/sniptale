@@ -75,6 +75,7 @@ export interface GalleryAppLayoutProps {
   onPreviewOpenSnapshotScreenshot: () => void;
   onPreviewDelete: (item: GalleryItem, opening?: GalleryDeletionOpening) => void;
   onPreviewPromote?: (item: GalleryItem) => Promise<void>;
+  onPreviewRemoveFromOriginals?: (item: GalleryItem) => Promise<void>;
   onPreviewRestoreOriginal: () => void;
   onPreviewSaveCopy: () => Promise<boolean>;
   onScenarioPreviewClose?: () => void;
