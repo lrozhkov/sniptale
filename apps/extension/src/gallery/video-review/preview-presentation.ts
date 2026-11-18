@@ -22,6 +22,7 @@ interface ReviewPresentationRequest<Scene> {
   generation: string;
   quality: 'selected' | 'detailed';
   time: number;
+  deadlineSlots?: 3 | 4;
 }
 
 type ReviewPresentationTickPhase = 'after-paint' | 'prepared-playing-frame';
@@ -29,13 +30,17 @@ type ReviewPresentationTickPhase = 'after-paint' | 'prepared-playing-frame';
 interface Dependencies<Scene, Prepared, Captured, Completed> {
   /** Only opted-in owners can admit a published playing generation on its animation frame. */
   allowPreparedPlayingFrames?: boolean;
-  maximumInFlight?(scene: Scene): 1 | 2;
+  maximumInFlight?(scene: Scene): 1 | 2 | 3 | 4;
   /** Opt in only when preparation and capture retain one immutable gesture frame packet. */
   canCoalesceInteraction?(previous: Scene, next: Scene): boolean;
   requestTick(callback: () => void, phase?: ReviewPresentationTickPhase): number;
   cancelTick(id: number): void;
   now(): number;
-  sampleTime(): number;
+  sampleTime(request?: ReviewPresentationRequest<Scene>): number;
+  fillPlaybackDeadlines?(): boolean | 3 | 4 | undefined;
+  canCapture?(request: ReviewPresentationRequest<Scene>): boolean;
+  /** A defined value uses the source clock instead of the ordinary display cadence. */
+  publicationReady?(request: ReviewPresentationRequest<Scene>): boolean | undefined;
   prepare(
     request: ReviewPresentationRequest<Scene>,
     signal: AbortSignal
@@ -51,7 +56,7 @@ interface Dependencies<Scene, Prepared, Captured, Completed> {
     request: ReviewPresentationRequest<Scene>,
     signal: AbortSignal
   ): ReviewPresentationLease<Completed> | Promise<ReviewPresentationLease<Completed>>;
-  publish(completed: Completed, request: ReviewPresentationRequest<Scene>): void;
+  publish(completed: Completed, request: ReviewPresentationRequest<Scene>): void | false;
   onError(error: unknown): void;
 }
 
@@ -128,7 +133,7 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
       () => {
         tick = null;
         if (!state?.visible || failed || disposed) return;
-        if (publication && due(lastPublished)) publication();
+        publication?.();
         if (state.playing) pending = state;
         // A paused request is one-shot: wait until it can publish before consuming it.
         const admissionClock = state.playing || state.interacting ? lastAdmitted : lastPublished;
@@ -137,10 +142,14 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
             ? (dependencies.maximumInFlight?.(state.scene) ?? 1)
             : 1;
         const draining = [...active.values()].some((version) => version !== epoch);
-        if (!draining && active.size < capacity && pending && due(admissionClock)) {
-          const next = pending;
-          pending = null;
-          void present(next);
+        if (!draining && active.size < capacity && pending) {
+          const clocked =
+            state.playing && !state.interacting && !!dependencies.fillPlaybackDeadlines?.();
+          if (clocked || due(admissionClock)) {
+            const next = pending;
+            pending = null;
+            void present(next, clocked, capacity);
+          }
         }
         schedule();
       },
@@ -152,7 +161,11 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
         : 'after-paint'
     );
   };
-  const present = async (description: ReviewPresentationState<Scene>) => {
+  const present = async (
+    description: ReviewPresentationState<Scene>,
+    clocked: boolean,
+    capacity: 1 | 2 | 3 | 4
+  ) => {
     const version = epoch;
     const controller = new AbortController();
     active.set(controller, version);
@@ -162,7 +175,8 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
       finishPublicationOrder = resolve;
     });
     publicationTail = ordering;
-    lastAdmitted = advanceClock(lastAdmitted);
+    // Deadline intake can run every display tick. Its cadence must not advance the ordinary phase.
+    lastAdmitted = clocked ? dependencies.now() : advanceClock(lastAdmitted);
     const request: ReviewPresentationRequest<Scene> = {
       scene: description.scene,
       generation: description.generation,
@@ -171,16 +185,20 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
           ? 'detailed'
           : 'selected',
       time: description.pausedTime,
+      ...(capacity === 3 || capacity === 4 ? { deadlineSlots: capacity } : {}),
     };
     let prepared: ReviewPresentationLease<Prepared> | undefined;
     let captured: ReviewPresentationLease<Captured> | undefined;
     let completed: ReviewPresentationLease<Completed> | undefined;
+    let predecessorReady = false;
     try {
       prepared = await dependencies.prepare(request, controller.signal);
       if (!current(version)) return;
-      request.time = description.playing ? dependencies.sampleTime() : description.pausedTime;
+      request.time = description.playing
+        ? dependencies.sampleTime(request)
+        : description.pausedTime;
       if (!Number.isFinite(request.time)) throw new Error('Invalid presentation time');
-      if (!current(version)) return;
+      if (!current(version) || dependencies.canCapture?.(request) === false) return;
       const capture = dependencies.capture(prepared.value, request.time, controller.signal);
       captured = capture instanceof Promise ? await capture : capture;
       if (!current(version)) return;
@@ -191,8 +209,11 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
         controller.signal
       );
       if (predecessor) await predecessor;
+      predecessorReady = true;
       if (!current(version)) return;
-      if (!due(lastPublished)) {
+      const ready = dependencies.publicationReady?.(request);
+      const publicationDue = () => dependencies.publicationReady?.(request) ?? due(lastPublished);
+      if (!(ready ?? due(lastPublished))) {
         if (!description.playing && !description.interacting) {
           pending = state;
           return;
@@ -200,18 +221,21 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
         // Keep the sole completed lease until its publication slot instead of rerendering it.
         await new Promise<void>((resolve) => {
           const finish = () => {
-            if (publication === finish) publication = null;
+            if (publication === wake) publication = null;
             controller.signal.removeEventListener('abort', finish);
             resolve();
           };
-          publication = finish;
+          const wake = () => {
+            if (publicationDue()) finish();
+          };
+          publication = wake;
           controller.signal.addEventListener('abort', finish, { once: true });
         });
         if (!current(version)) return;
       }
-      dependencies.publish(completed.value, request);
+      if (dependencies.publish(completed.value, request) === false) return;
       if (current(version)) {
-        lastPublished = advanceClock(lastPublished);
+        lastPublished = ready === undefined ? advanceClock(lastPublished) : dependencies.now();
         const firstPublication = publishedEpoch !== version;
         publishedEpoch = version;
         if (
@@ -241,8 +265,13 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
             prepared?.release();
           } finally {
             active.delete(controller);
-            finishPublicationOrder();
-            if (publicationTail === ordering) publicationTail = null;
+            const finishOrder = () => {
+              finishPublicationOrder();
+              if (publicationTail === ordering) publicationTail = null;
+            };
+            // A skipped intake cannot remove an earlier, ready frame from the chain.
+            if (predecessor && !predecessorReady) void predecessor.then(finishOrder);
+            else finishOrder();
             schedule();
           }
         }

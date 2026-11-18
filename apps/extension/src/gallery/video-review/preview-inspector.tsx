@@ -14,7 +14,7 @@ import {
   QUICK_PREVIEW_FRAME_RATES,
   type QuickPreviewPreferences,
 } from '../../features/video/preview/quick-preferences';
-import { useReviewPreviewPreferences } from './use-preview-preferences';
+import type { useReviewPreviewPreferences } from './use-preview-preferences';
 import { ReviewButton, reviewSelectFieldClassName } from './controls';
 
 /** Runtime supplies actual dimensions; this panel owns no rendering or persisted project state. */
@@ -211,25 +211,16 @@ function ReviewPreviewSettingsBinding(props: {
 
 /** Owns the transient renderer reports shown by local preview preferences. */
 export function useReviewPreviewInspector(props: {
+  preferences: ReturnType<typeof useReviewPreviewPreferences>;
+  rendererStatus: PreviewRendererStatus | null;
   workspaceColor: ReturnType<typeof useReviewWorkspaceColor>;
   projectFailed: boolean;
   retryProject(): Promise<unknown>;
 }) {
-  const preferences = useReviewPreviewPreferences();
-  const [rendererStatus, setRendererStatus] = useState<PreviewRendererStatus | null>(null);
   const [raster, setRaster] = useState<{ width: number; height: number } | null>(null);
   return {
-    preferences,
-    setRendererStatus,
     setRaster,
     raster,
-    inspector: (
-      <ReviewPreviewSettingsBinding
-        {...props}
-        preferences={preferences}
-        actualRaster={raster}
-        rendererStatus={rendererStatus}
-      />
-    ),
+    inspector: <ReviewPreviewSettingsBinding {...props} actualRaster={raster} />,
   };
 }

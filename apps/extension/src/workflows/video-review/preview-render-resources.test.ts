@@ -352,6 +352,21 @@ describe('contextless GPU presentation resources', () => {
     next.release();
     f.resources.dispose();
   });
+  it('allows the dissolve reserve while keeping a fixed backend cap', () => {
+    const f = setup(10000, 5);
+    const resources = createPreviewRenderResources({
+      maximumManagedBytes: 10000,
+      maximumCanvases: 6,
+      createCanvas: f.createCanvas,
+      maximumPresentationSurfaces: 5,
+    });
+    const g = renderer(resources);
+    const frames = Array.from({ length: 5 }, () => resources.presentationCanvas(size, g.backend));
+    expect(new Set(frames.map((frame) => frame.canvas)).size).toBe(5);
+    expect(() => resources.presentationCanvas(size, g.backend)).toThrow(PreviewRenderResourceError);
+    frames.forEach((frame) => frame.release());
+    resources.dispose();
+  });
   it('bounds three GPU output slots per backend and global canvas capacity', () => {
     const f = setup(10000, 5),
       g = renderer(f.resources);

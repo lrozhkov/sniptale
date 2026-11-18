@@ -31,6 +31,12 @@ import {
   createPreviewHtmlSourceProvider,
   type PreparedPreviewSourceLease,
 } from '../../workflows/video/preview-html-source';
+import { buildReviewTimeMap, reviewSegmentSourceTime } from '../../features/video/review/timeline';
+import {
+  buildReviewPreviewBoundaries,
+  nearestReviewCut,
+  nextReviewCutDeadline,
+} from './preview-boundaries';
 import { createPresentationAdmission } from './preview-presentation-admission';
 import {
   createReviewExportDiagnostics,
@@ -52,6 +58,24 @@ type PresentationSnapshot = {
   cut: ReturnType<typeof useReviewCutTransitionProvider>;
   placement: QuickEditWebcamPlacement | null;
 };
+type Position = ReturnType<NonNullable<PresentationInput['readPosition']>>;
+type Boundaries = ReturnType<typeof buildReviewPreviewBoundaries>;
+type PreparedSourcePosition = {
+  boundary: Boundaries[number];
+  provider: PreviewSourceProvider;
+  controller: AbortController;
+  mapRevision: number;
+  epoch: number;
+  seekRevision: number | undefined;
+  ready: boolean;
+};
+const SOURCE_PREPARATION_LEAD = 1;
+const SOURCE_HANDOFF_WINDOW = 0.25;
+const CUT_DEADLINE_WINDOW = 0.9;
+const CUT_RENDER_LEAD = 0.126;
+const TRANSITION_RENDER_LEAD = 0.175;
+// Millisecond-quantized PTS can round 30 FPS source times up by half a tick.
+const SOURCE_TIMESTAMP_TOLERANCE = 0.0005;
 type CameraSource = ReturnType<typeof createReviewWebcamPreviewSource>;
 const logger = createLogger({ namespace: 'video-review.preview' });
 class PendingPresentation extends Error {
@@ -81,6 +105,7 @@ class ManualPresentationSession {
     object,
     ReturnType<NonNullable<PresentationInput['readPosition']>>
   >();
+  private readonly cameraCaptionScenes = new WeakMap<Description['scene'], Description['scene']>();
   private requestGeneration = 0;
   private movementBase: Description | null = null;
   private movementInstance: ReviewAnnotationEffect | null = null;
@@ -105,11 +130,29 @@ class ManualPresentationSession {
   private readonly admission: ReturnType<typeof createPresentationAdmission>;
   private contextLost = false;
   private sourceProvider: PreviewSourceProvider | null = null;
+  private readonly sourceReads = new WeakMap<PreviewSourceProvider, Promise<void>>();
+  private readonly borrowedSources = new Map<PreviewSourceProvider, number>();
+  private readonly retiringSources = new Set<PreviewSourceProvider>();
   private htmlSourceProvider: ReturnType<typeof createPreviewHtmlSourceProvider> | null = null;
+  private boundaryPlan: {
+    edits: NonNullable<PresentationInput['cut']>['edits'];
+    duration: number;
+    regions: Description['scene']['zoomRegions'];
+    transitions: PresentationSnapshot['cut']['plans'];
+    mapRevision: number;
+    boundaries: Boundaries;
+    segments: Readonly<ReturnType<typeof buildReviewTimeMap>>;
+  } | null = null;
+  private preparedSource: PreparedSourcePosition | null = null;
+  private deadlineSample: Position | null = null;
+  private readonly deadlineRequests = new WeakSet<object>();
+  private readonly skippedRequests = new WeakSet<object>();
+  private warmedBoundaries = new WeakSet<Boundaries[number]>();
   private sourceReady = false;
   private sourceUnsupported = false;
   private sourceDiscontinuity = true;
-  private clockSample: { sourceTime: number; resultTime: number } | null = null;
+  private clockSample: { sourceTime: number; resultTime: number; position?: Position } | null =
+    null;
   private sourceFrameCallback: number | null = null;
   private renderer: Renderer;
   private rendererPreference: VideoPreviewRenderer;
@@ -130,7 +173,7 @@ class ManualPresentationSession {
       () => this.current,
       () => this.resultTime,
       () => this.front,
-      (scene) => this.renderer?.maximumInFlight(scene) ?? 1
+      this.maximumInFlight
     );
     this.rendererPreference = this.latest().input.preferences.renderer ?? 'gpu';
     this.renderer = this.createRenderer();
@@ -139,9 +182,12 @@ class ManualPresentationSession {
       allowPreparedPlayingFrames: true,
       canCoalesceInteraction: canCoalescePresentationInteraction,
       maximumInFlight: (description) =>
-        description.renderer === 'legacy' ? 1 : this.renderer.maximumInFlight(description.scene),
+        description.renderer === 'legacy' ? 1 : this.maximumInFlight(description.scene),
       now: () => performance.now(),
       sampleTime: this.sampleTime,
+      fillPlaybackDeadlines: this.fillPlaybackDeadlines,
+      canCapture: (request) => !this.skippedRequests.has(request),
+      publicationReady: this.publicationReady,
       prepare: this.prepare,
       capture: this.capture,
       render: this.render,
@@ -170,7 +216,18 @@ class ManualPresentationSession {
       first = this.publications[0];
     this.report({
       phase,
-      ...(this.front?.renderer ? { renderer: this.front.renderer } : {}),
+      ...(this.front?.renderer
+        ? {
+            renderer: {
+              ...this.front.renderer,
+              ...(this.front.renderer.backend === 'gpu' &&
+              this.sourceReady &&
+              !this.sourceUnsupported
+                ? { decodedSourceIdentity: this.sourceIdentity }
+                : {}),
+            },
+          }
+        : {}),
       captionConflicts: this.front?.captionConflicts ?? [],
       nativeVideoFPS: null,
       actualRaster: this.front
@@ -183,6 +240,31 @@ class ManualPresentationSession {
     });
   }
 
+  private maximumInFlight = (scene: Description['scene']): 1 | 2 | 3 | 4 => {
+    const deadlineSlots = this.fillPlaybackDeadlines();
+    if (deadlineSlots) return deadlineSlots;
+    if (
+      scene.webcam?.enabled &&
+      (!this.sourceReady ||
+        this.sourceUnsupported ||
+        !this.cameraSource?.canOverlapCapture ||
+        this.front?.outputKind !== 'gpu-surface')
+    )
+      return 1;
+    return this.renderer?.maximumInFlight(this.rendererScene(scene)) ?? 1;
+  };
+
+  private rendererScene(scene: Description['scene']): Description['scene'] {
+    if (!scene.captions || !scene.webcam) return scene;
+    const webcamDuration =
+      this.cameraState.phase === 'ready' ? this.cameraState.duration : undefined;
+    const cached = this.cameraCaptionScenes.get(scene);
+    if (cached && cached.webcamDuration === webcamDuration) return cached;
+    const prepared = { ...scene, webcamDuration };
+    this.cameraCaptionScenes.set(scene, prepared);
+    return prepared;
+  }
+
   private createRenderer() {
     const { resources, graph } = this.admission;
     const readAsset = this.latest().input.readAsset;
@@ -190,6 +272,8 @@ class ManualPresentationSession {
       resources,
       renderer: this.rendererPreference,
       maximumInFlight: this.rendererPreference === 'gpu' ? 2 : 1,
+      allowCameraCaptureOverlap: true,
+      allowBoundaryStaging: this.rendererPreference === 'gpu',
       annotationExecutor: () =>
         createEffectRuntimeSandboxExecutor(
           this.rendererPreference === 'gpu' ? { compositionBackend: 'gpu-scene' } : {}
@@ -220,12 +304,23 @@ class ManualPresentationSession {
     });
   }
 
-  private sampleTime = () => {
-    const position = this.latest().input.readPosition?.();
+  private sampleTime = (request?: object) => {
+    let position = this.latest().input.readPosition?.();
     if (position) {
       if (!position.source || position.resultTime === null) throw new PendingPresentation();
-      this.clockSample = { sourceTime: position.source.mediaTime, resultTime: position.resultTime };
-      return position.resultTime;
+      const liveResult = position.resultTime;
+      this.prepareIncomingSource(position);
+      if (request) {
+        position = this.sampleCutDeadline(request, position, liveResult);
+        this.requestPositions.set(request, position);
+      }
+      const resultTime = position.resultTime ?? liveResult;
+      this.clockSample = {
+        sourceTime: position.source!.mediaTime,
+        resultTime,
+        position,
+      };
+      return resultTime;
     }
     const node = this.latest().input.video.current;
     const sourceTime = node?.currentTime;
@@ -234,6 +329,88 @@ class ManualPresentationSession {
     this.clockSample = { sourceTime, resultTime: time };
     return time;
   };
+
+  private publicationReady = (request: { time: number }) => {
+    if (!this.deadlineRequests.has(request)) return;
+    const live = this.latest().input.readPosition?.();
+    const sampled = this.requestPositions.get(request);
+    if (
+      !live ||
+      !sampled ||
+      live.epoch !== sampled.epoch ||
+      live.mapRevision !== sampled.mapRevision ||
+      live.resultTime === null
+    )
+      return true;
+    return live.resultTime >= request.time;
+  };
+
+  private deadlineCut(resultTime: number) {
+    if (
+      this.front?.outputKind !== 'gpu-surface' ||
+      this.rendererPreference !== 'gpu' ||
+      this.current?.scene.webcam?.enabled ||
+      this.sourceUnsupported
+    )
+      return;
+    const plan = this.boundaryPlan;
+    if (plan) return nearestReviewCut(plan.boundaries, resultTime, CUT_DEADLINE_WINDOW);
+  }
+
+  private fillPlaybackDeadlines = (): 3 | 4 | undefined => {
+    if (!this.boundaryPlan || this.front?.outputKind !== 'gpu-surface') return;
+    const time = this.latest().input.readPosition?.().resultTime;
+    const cut = time == null ? undefined : this.deadlineCut(time);
+    if (cut) return cut.kind === 'cut' ? 3 : 4;
+  };
+
+  private sampleCutDeadline(request: object, live: Position, resultTime: number): Position {
+    const last = this.deadlineSample;
+    const validLast =
+      last?.epoch === live.epoch && last.mapRevision === live.mapRevision ? last.resultTime : null;
+    const plan = this.boundaryPlan;
+    const cut = this.deadlineCut(resultTime);
+    if (plan?.mapRevision === live.mapRevision && cut) {
+      this.deadlineRequests.add(request);
+      const fps = this.current?.fps ?? 30;
+      const lead = cut.kind === 'cut' ? CUT_RENDER_LEAD : TRANSITION_RENDER_LEAD;
+      const time = nextReviewCutDeadline(resultTime, cut.time, fps, lead, validLast);
+      if (time === null) {
+        this.skippedRequests.add(request);
+        return live;
+      }
+      const index = plan.segments.findIndex(
+        (segment) =>
+          segment.kind !== 'cut' && segment.resultStart <= time && time < segment.resultEnd
+      );
+      const segment = plan.segments[index];
+      const blend = this.latest().cut.read(time, false);
+      if (segment && segment.kind !== 'freeze' && (!blend || blend.frames)) {
+        const segmentId = `video:${index}`;
+        if (
+          segmentId === live.source?.segmentId ||
+          (this.preparedSource?.ready &&
+            this.preparedSource.boundary.incoming?.segmentId === segmentId)
+        ) {
+          const sourceTime = reviewSegmentSourceTime(segment, time);
+          const mediaTime =
+            sourceTime + SOURCE_TIMESTAMP_TOLERANCE < segment.sourceEnd
+              ? sourceTime + SOURCE_TIMESTAMP_TOLERANCE
+              : sourceTime;
+          const sampled: Position = {
+            ...live,
+            resultTime: time,
+            source: { kind: 'video', sourceTime, mediaTime, segmentId },
+          };
+          this.deadlineSample = sampled;
+          return sampled;
+        }
+      }
+    }
+    if (validLast !== null && resultTime <= validLast) this.skippedRequests.add(request);
+    else this.deadlineSample = null;
+    return live;
+  }
 
   private prepare = async (
     request: { scene: Description; generation: string; time: number },
@@ -312,17 +489,7 @@ class ManualPresentationSession {
     const prepared =
       retained ??
       (await reviewExportPhase(signal, 'prepare', () =>
-        this.renderer.prepare(
-          current.scene.captions && current.scene.webcam
-            ? {
-                ...current.scene,
-                webcamDuration:
-                  this.cameraState.phase === 'ready' ? this.cameraState.duration : undefined,
-              }
-            : current.scene,
-          current.dimensions,
-          signal
-        )
+        this.renderer.prepare(this.rendererScene(current.scene), current.dimensions, signal)
       ));
     this.admission.replaceAssets(prepared.allocationAssets);
     return { value: prepared, release: () => prepared.release() };
@@ -330,29 +497,67 @@ class ManualPresentationSession {
 
   private capture = (prepared: Prepared, time: number, signal: AbortSignal) => {
     const video = this.video;
+    const description = this.current;
     if (
-      !this.current ||
+      !description ||
       !video ||
       (video.seeking && !this.canDecodeSource()) ||
       video.readyState < (this.canDecodeSource() ? 1 : 2)
     )
       throw new PendingPresentation();
     this.resultTime = time;
-    const transition = this.latest().cut.read(time);
+    const cut = this.latest().cut;
+    const liveResult = this.latest().input.readPosition?.().resultTime;
+    if (liveResult != null && liveResult < time) cut.read(liveResult);
+    const transition = cut.read(time, liveResult == null || liveResult >= time);
     if (transition?.failed) throw new Error('Transition preview unavailable');
     if (transition && (!transition.frames || !transition.lease?.active))
       throw new PendingPresentation();
+    const borrow = transition?.lease?.retain();
+    if (!borrow) return this.captureFrame(description, video, prepared, time, transition, signal);
+    const attach = (frame: { value: RenderFrame; release(): void }) => ({
+      value: frame.value,
+      release() {
+        try {
+          frame.release();
+        } finally {
+          borrow();
+        }
+      },
+    });
+    try {
+      const captured = this.captureFrame(description, video, prepared, time, transition, signal);
+      return captured instanceof Promise
+        ? captured.then(attach, (error: unknown) => {
+            borrow();
+            throw error;
+          })
+        : attach(captured);
+    } catch (error) {
+      borrow();
+      throw error;
+    }
+  };
+
+  private captureFrame(
+    description: Description,
+    video: HTMLVideoElement,
+    prepared: Prepared,
+    time: number,
+    transition: Parameters<typeof captureReviewPreviewFrame>[0]['transition'],
+    signal: AbortSignal
+  ) {
     const sourceTime = this.latest().input.playing
       ? this.clockSample?.resultTime === time
         ? this.clockSample.sourceTime
         : video.currentTime
-      : this.current.sourceTime;
+      : description.sourceTime;
     const snapshot = this.latest();
     const cameraSource = this.cameraSource;
     const cameraState = this.cameraState;
     const args = {
       video,
-      description: this.current,
+      description,
       sequence: this.sequence,
       time,
       transition,
@@ -417,20 +622,144 @@ class ManualPresentationSession {
         captured?.release();
       }
     })();
-  };
+  }
+
+  private releasePreparedSource() {
+    const prepared = this.preparedSource;
+    this.preparedSource = null;
+    prepared?.controller.abort();
+    prepared?.provider.dispose();
+  }
+
+  private matchesPreparation(prepared: PreparedSourcePosition, position: Position) {
+    return (
+      position.epoch === prepared.epoch &&
+      position.mapRevision === prepared.mapRevision &&
+      this.latest().input.seekRevision === prepared.seekRevision
+    );
+  }
+
+  private prepareIncomingSource(position: Position) {
+    const { input, cut } = this.latest();
+    const binding = input.cut;
+    const now = position.resultTime;
+    if (
+      !input.playing ||
+      !binding ||
+      now === null ||
+      !this.sourceReady ||
+      this.sourceUnsupported ||
+      this.rendererPreference !== 'gpu'
+    )
+      return;
+    const acceptedMap = binding.readTimeMap?.();
+    if (acceptedMap && acceptedMap.mapRevision !== position.mapRevision) {
+      this.boundaryPlan = null;
+      this.releasePreparedSource();
+      return;
+    }
+    const edits = acceptedMap?.edits ?? binding.edits;
+    const duration = acceptedMap?.duration ?? binding.duration;
+    const regions = this.current?.scene.zoomRegions ?? input.scene.zoomRegions;
+    if (
+      !this.boundaryPlan ||
+      this.boundaryPlan.mapRevision !== position.mapRevision ||
+      this.boundaryPlan.edits !== edits ||
+      this.boundaryPlan.duration !== duration ||
+      this.boundaryPlan.regions !== regions ||
+      this.boundaryPlan.transitions !== cut.plans
+    ) {
+      this.warmedBoundaries = new WeakSet();
+      const segments = acceptedMap?.segments ?? buildReviewTimeMap(duration, edits);
+      this.boundaryPlan = {
+        segments,
+        mapRevision: position.mapRevision,
+        edits,
+        duration,
+        regions,
+        transitions: cut.plans,
+        boundaries: buildReviewPreviewBoundaries(segments, cut.plans, regions),
+      };
+    }
+    const prepared = this.preparedSource;
+    if (
+      prepared &&
+      this.matchesPreparation(prepared, position) &&
+      now <= prepared.boundary.time + SOURCE_HANDOFF_WINDOW
+    )
+      return;
+    this.releasePreparedSource();
+    const boundary = this.boundaryPlan?.boundaries.find(
+      (item) => item.incoming && item.time > now && item.time <= now + SOURCE_PREPARATION_LEAD
+    );
+    if (!boundary?.incoming) return;
+    const owner: PreparedSourcePosition = {
+      boundary,
+      provider: createPreviewSourceProvider(),
+      controller: new AbortController(),
+      mapRevision: position.mapRevision,
+      epoch: position.epoch,
+      seekRevision: input.seekRevision,
+      ready: false,
+    };
+    this.preparedSource = owner;
+    void owner.provider
+      .acquire([this.sourceDemand(boundary.incoming.time)], owner.controller.signal)
+      .then(
+        (lease) => {
+          if (this.preparedSource === owner) owner.ready = lease !== null;
+          lease?.release();
+        },
+        () => {
+          // A speculative decoder failure leaves the current decoder responsible for capture.
+        }
+      );
+  }
+
+  private promotePreparedSource(time: number) {
+    const prepared = this.preparedSource;
+    if (!prepared?.ready) return;
+    const position = this.clockSample?.position;
+    const current = this.latest().input.readPosition?.();
+    const incoming = prepared.boundary.incoming;
+    if (
+      !position ||
+      !current ||
+      !incoming ||
+      current.source?.segmentId !== incoming.segmentId ||
+      !this.matchesPreparation(prepared, current) ||
+      !this.matchesPreparation(prepared, position) ||
+      position.source?.segmentId !== incoming.segmentId ||
+      position.source.mediaTime !== time ||
+      time < incoming.time ||
+      !this.latest().input.playing
+    )
+      return;
+    this.preparedSource = null;
+    const previous = this.sourceProvider;
+    this.sourceProvider = prepared.provider;
+    this.sourceDiscontinuity = false;
+    if (previous && this.borrowedSources.has(previous)) this.retiringSources.add(previous);
+    else previous?.dispose();
+  }
 
   private canDecodeSource() {
     return typeof VideoDecoder !== 'undefined' && typeof VideoFrame !== 'undefined';
   }
 
   private resetSource() {
+    this.releasePreparedSource();
+    this.warmedBoundaries = new WeakSet();
     this.sourceProvider?.dispose();
+    for (const provider of this.retiringSources) provider.dispose();
+    this.retiringSources.clear();
     this.sourceProvider = null;
     this.htmlSourceProvider?.dispose();
     this.htmlSourceProvider = null;
     this.sourceReady = this.sourceUnsupported = false;
     this.sourceDiscontinuity = true;
     this.clockSample = null;
+    this.deadlineSample = null;
   }
 
   private sourceDemand(time: number): PreviewSourceDemand {
@@ -484,14 +813,36 @@ class ManualPresentationSession {
     sourceTime: number,
     signal: AbortSignal
   ) {
-    const provider = this.sourceProvider;
+    this.promotePreparedSource(sourceTime);
+    const incoming = this.preparedSource;
+    const sampled = this.clockSample?.position;
+    const futureProvider =
+      incoming?.ready &&
+      sampled?.source?.mediaTime === sourceTime &&
+      sampled.resultTime === args.time &&
+      sampled.source.segmentId === incoming.boundary.incoming?.segmentId &&
+      this.matchesPreparation(incoming, sampled)
+        ? incoming.provider
+        : null;
+    const provider = futureProvider ?? this.sourceProvider;
     if (!provider) throw new PendingPresentation();
     signal.throwIfAborted();
     let lease: PreparedPreviewSourceLease | null = null;
     const html = this.htmlSourceProvider;
-    const discontinuity = this.sourceDiscontinuity || !this.latest().input.playing;
+    const discontinuity =
+      !futureProvider && (this.sourceDiscontinuity || !this.latest().input.playing);
     this.sourceDiscontinuity = false;
+    const predecessor = this.sourceReads.get(provider);
+    let finishRead!: () => void;
+    const reading = new Promise<void>((resolve) => {
+      finishRead = resolve;
+    });
+    this.sourceReads.set(provider, reading);
+    this.borrowedSources.set(provider, (this.borrowedSources.get(provider) ?? 0) + 1);
     try {
+      // The provider replaces queued interest. Give each admitted frame its turn to decode.
+      if (predecessor) await predecessor;
+      signal.throwIfAborted();
       if (this.sourceUnsupported) {
         if (!html) throw new PendingPresentation();
         lease = await html.acquire([this.sourceDemand(sourceTime)], signal);
@@ -500,7 +851,9 @@ class ManualPresentationSession {
       signal.throwIfAborted();
       if (
         this.disposed ||
-        this.sourceProvider !== provider ||
+        (this.sourceProvider !== provider &&
+          this.preparedSource?.provider !== provider &&
+          !this.retiringSources.has(provider)) ||
         (this.sourceUnsupported && this.htmlSourceProvider !== html)
       )
         throw new PendingPresentation();
@@ -517,7 +870,15 @@ class ManualPresentationSession {
       this.cancelSourceFrameCallback();
       return captured;
     } finally {
+      finishRead();
+      if (this.sourceReads.get(provider) === reading) this.sourceReads.delete(provider);
       lease?.release();
+      const borrowed = this.borrowedSources.get(provider)! - 1;
+      if (borrowed) this.borrowedSources.set(provider, borrowed);
+      else {
+        this.borrowedSources.delete(provider);
+        if (this.retiringSources.delete(provider)) provider.dispose();
+      }
     }
   }
 
@@ -527,14 +888,47 @@ class ManualPresentationSession {
     this.sourceFrameCallback = null;
   }
 
+  private upcomingGpuBoundary(frame: RenderFrame) {
+    if (!this.playing || !this.boundaryPlan) return;
+    if (this.current?.scene.annotationEffects?.lane.enabled) return;
+    const period = 1 / (frame.fps ?? 30);
+    const candidate = this.boundaryPlan.boundaries.find(
+      (boundary) =>
+        boundary.time >= frame.resultTime + period * 2 &&
+        boundary.time <= frame.resultTime + SOURCE_PREPARATION_LEAD &&
+        !this.warmedBoundaries.has(boundary)
+    );
+    if (!candidate) return;
+    const resultTime = candidate.time + period / 2;
+    const transition = this.latest().cut.read(resultTime, false);
+    if (transition && (!transition.frames || !transition.lease?.active)) return;
+    this.warmedBoundaries.add(candidate);
+    return {
+      value: {
+        resultTime,
+        ...(transition?.frames
+          ? { transition: { blend: transition.blend, frames: transition.frames } }
+          : {}),
+      },
+      release: transition?.lease?.retain(),
+    };
+  }
+
   private render = async (
     prepared: Prepared,
     frame: RenderFrame,
-    request: object,
+    request: { deadlineSlots?: 3 | 4 },
     signal: AbortSignal
   ) => {
+    const boundary = this.upcomingGpuBoundary(frame);
+    const presentationFrame = {
+      ...frame,
+      playback: this.playing,
+      ...(request.deadlineSlots ? { deadlineSlots: request.deadlineSlots } : {}),
+      ...(boundary ? { boundary: boundary.value } : {}),
+    };
     const completed = await reviewExportPhase(signal, 'compose', () =>
-      this.renderer.renderPresentation(prepared, frame, signal, (size, backend) => {
+      this.renderer.renderPresentation(prepared, presentationFrame, signal, (size, backend) => {
         const host = this.latest().input.host.current;
         if (!host || this.disposed) throw new PendingPresentation();
         const output = this.admission.resources.presentationCanvas(size, backend);
@@ -548,7 +942,7 @@ class ManualPresentationSession {
           throw error;
         }
       })
-    );
+    ).finally(() => boundary?.release?.());
     let transferred = false;
     return {
       value: {
@@ -584,8 +978,9 @@ class ManualPresentationSession {
       previous.canvas.style.opacity = '0';
       previous.canvas.dataset['previewFront'] = 'false';
     }
-    // Two GPU requests and the retained front rotate through three publication buffers.
-    const maximumHidden = this.rendererPreference === 'gpu' ? 2 : 1;
+    // The deadline queue can retain one output beyond the two ordinary WebGPU requests.
+    const ordinaryHidden = this.rendererPreference === 'gpu' ? 2 : 1;
+    const maximumHidden = this.fillPlaybackDeadlines() ?? ordinaryHidden;
     let hidden = 0;
     for (const child of [...host.children])
       if (
@@ -610,6 +1005,13 @@ class ManualPresentationSession {
         value.position.mapRevision !== position.mapRevision)
     )
       throw new PendingPresentation();
+    if (
+      this.playing &&
+      this.rendererPreference === 'gpu' &&
+      value.position?.source &&
+      value.position.source.segmentId !== position?.source?.segmentId
+    )
+      return false as const;
     const host = this.latest().input.host.current;
     if (!host) throw new PendingPresentation();
     this.publishCanvas(host, value);
@@ -682,6 +1084,26 @@ class ManualPresentationSession {
   };
 
   private seeking = () => {
+    const position = this.latest().input.readPosition?.();
+    const captured = this.clockSample?.position;
+    // The decoded preview follows the transport. Correcting its native audio element cannot
+    // invalidate a frame request from the same transport command and map.
+    if (
+      this.playing &&
+      this.rendererPreference === 'gpu' &&
+      !this.video?.paused &&
+      this.sourceReady &&
+      !this.sourceUnsupported &&
+      position?.source &&
+      captured?.epoch === position.epoch &&
+      captured.mapRevision === position.mapRevision
+    )
+      return;
+    if (
+      this.preparedSource &&
+      (!position || !this.matchesPreparation(this.preparedSource, position))
+    )
+      this.releasePreparedSource();
     this.sourceDiscontinuity = true;
     this.renderer.cancelWarmAnnotations?.();
     this.publications.length = 0;
@@ -837,6 +1259,11 @@ class ManualPresentationSession {
       this.current &&
       canCoalescePresentationInteraction(this.current, description);
     if (!coalescing) {
+      if (this.current !== description) {
+        this.releasePreparedSource();
+        this.boundaryPlan = null;
+        this.deadlineSample = null;
+      }
       this.current = description;
       this.sequence = generation;
     }
@@ -844,6 +1271,19 @@ class ManualPresentationSession {
     const deferFrames = !input.playing && !!input.deferFrames;
     if (this.playing !== input.playing || !active) this.publications.length = 0;
     this.playing = active && input.playing;
+    if (!this.playing) {
+      this.warmedBoundaries = new WeakSet();
+      this.deadlineSample = null;
+    }
+    const position = this.preparedSource && input.readPosition?.();
+    if (
+      this.preparedSource &&
+      (!this.playing ||
+        description.renderer === 'legacy' ||
+        !position ||
+        !this.matchesPreparation(this.preparedSource, position))
+    )
+      this.releasePreparedSource();
     this.reportClock(this.playing && !this.waiting && !this.diagnosed && !this.contextLost);
     this.scheduler.update({
       scene: description,

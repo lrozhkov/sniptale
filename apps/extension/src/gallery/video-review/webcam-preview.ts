@@ -115,6 +115,7 @@ function createWebcamSource(
     !hybridView && typeof VideoDecoder !== 'undefined' && typeof VideoFrame !== 'undefined';
   const nativeCompatibility = !hybridView && typeof VideoFrame !== 'undefined';
   let unsupported = false;
+  let decodedCameraReady = false;
   let provider: PreviewSourceProvider | undefined;
   const abort = new AbortController();
   let metadata = { duration: 0, frameDuration: 1 / 30 };
@@ -349,6 +350,9 @@ function createWebcamSource(
   };
 
   return {
+    get canOverlapCapture() {
+      return decodedCameraReady && !unsupported && !disposed;
+    },
     captureAccepted: capture.captureAccepted,
     async captureFrame(
       request: CaptureRequest & { sourceTime: number; settings: QuickEditWebcam },
@@ -414,6 +418,7 @@ function createWebcamSource(
           mapped,
           resources
         );
+        decodedCameraReady = true;
         events.ready(true);
         return { status: 'ready', frame: admitted };
       } catch (error) {

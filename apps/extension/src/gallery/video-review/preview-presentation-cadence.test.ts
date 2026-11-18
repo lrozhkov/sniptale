@@ -56,7 +56,9 @@ it('keeps capped publication paced after switching from Current during an unfini
         queue(now + delay, () => resolve(lease(now)));
       });
     },
-    publish: (ready) => publications.push({ at: now, ready }),
+    publish: (ready) => {
+      publications.push({ at: now, ready });
+    },
     onError,
   });
   const state: ReviewPresentationState<number> = {

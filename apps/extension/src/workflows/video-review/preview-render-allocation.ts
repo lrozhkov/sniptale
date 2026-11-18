@@ -46,7 +46,7 @@ export interface PreviewRenderAllocationInput {
   publication: {
     backing: Size;
     previousFront: Size | null;
-    maximumInFlight?: 1 | 2;
+    maximumInFlight?: 1 | 2 | 3 | 4;
     outputKind?: PreviewPublicationOutputKind;
     previousFrontKind?: PreviewPublicationOutputKind;
     /** Total retired GPU provider storage, including its front; zero excludes the current provider. */
@@ -461,7 +461,7 @@ export interface PreviewRuntimeAllocationInput {
   resultTime: number;
   sourceTime: number;
   cameraTransform?: QuickEditCameraTransform;
-  maximumInFlight?: 1 | 2;
+  maximumInFlight?: 1 | 2 | 3 | 4;
   sourceAllocationBytes: number | null;
   sourceBacking: Size;
   camera: { retainedBytes: number | null; activeBytes: number | null };

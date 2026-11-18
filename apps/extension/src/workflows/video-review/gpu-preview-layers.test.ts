@@ -113,6 +113,36 @@ it('composes split screen and borrowed camera pixels with a silhouette mask on t
   expect(f.release).toHaveBeenCalled();
 });
 
+it('fuses the unmirrored camera mask into its draw and omits an inactive shadow', () => {
+  const f = fixture();
+  const webcam = createQuickEditWebcam('camera', size, size);
+  const frame = {} as VideoFrame;
+  const layers = reviewGpuFinishLayers({
+    scene: { ...scene, webcam },
+    dimensions,
+    main: f.main,
+    camera: {
+      source: size,
+      placement: webcam.placement,
+      drawable: { videoFrame: () => frame },
+    },
+    sourceTime: 2,
+    resultTime: 2,
+    primitives: f.primitives,
+    watermark: null,
+  });
+  expect(layers).toHaveLength(2);
+  expect(layers[1]).toMatchObject({
+    source: frame,
+    alphaMask: { source: size, rect: { x: 0, y: 0, ...size } },
+  });
+  expect(f.resources.canvas).not.toHaveBeenCalledWith(
+    'preview-gpu-camera-shadow',
+    expect.anything()
+  );
+  f.primitives.dispose();
+});
+
 it('keeps watermark before captions and both final fades after captions', () => {
   const f = fixture();
   const draw = vi.fn();

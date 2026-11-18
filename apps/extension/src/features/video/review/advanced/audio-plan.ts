@@ -70,14 +70,16 @@ export function buildQuickEditAudioPlan(args: {
   );
 }
 
-/** Original DSP retains each whole visible source interval, independent of the requested seek. */
+/** Original audio retains each visible source interval for processing or clocked preview. */
 export function buildQuickEditOriginalAudioPlan(args: {
   original: QuickEditOriginalAudio;
   segments: readonly ReviewTimeSegment[];
   edits: readonly ReviewEdit[];
   sourceId: string;
+  includeDry?: boolean;
 }): QuickEditAudioPlanEntry[] {
-  if (!args.original.audioProcessing) return [];
+  const processing = args.original.audioProcessing;
+  if (!processing && !args.includeDry) return [];
   return args.segments
     .filter((segment) => segment.kind !== 'cut' && segment.kind !== 'freeze')
     .map((segment) => ({
@@ -101,7 +103,7 @@ export function buildQuickEditOriginalAudioPlan(args: {
           : args.original.volume,
       fadeIn: 0,
       fadeOut: 0,
-      audioProcessing: structuredClone(args.original.audioProcessing!),
+      ...(processing ? { audioProcessing: structuredClone(processing) } : {}),
       ...(args.original.ranges
         ? {
             sourceGainRanges: args.original.ranges.map(({ start, end, volume }) => ({

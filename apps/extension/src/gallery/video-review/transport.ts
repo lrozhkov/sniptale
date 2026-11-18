@@ -332,6 +332,18 @@ class ReviewTransportController {
     this.pauseAt(this.readPosition());
   };
 
+  /** Align the native original before restoring its gain on the still-running graph. */
+  alignNativeOriginal = (): boolean => {
+    const observation = this.observe();
+    const clock = this.readAudioClock();
+    const reference = this.reference;
+    if (!observation || !clock || !reference || reference.drain || this.mode !== 'playing')
+      return false;
+    const revision = this.intentRevision;
+    this.tickReference(observation, this.dependencies.now(), clock, true);
+    return this.mode === 'playing' && this.current(revision, observation.sourceId);
+  };
+
   /** Commands can stop at their single activation snapshot without sampling a second clock. */
   pauseAt = (position: ReviewTransportPosition): boolean => {
     if (this.disposed || position.epoch !== this.epoch || position.mapRevision !== this.mapRevision)
@@ -806,7 +818,8 @@ class ReviewTransportController {
   private tickReference(
     observation: ReviewTransportMediaObservation,
     now: number,
-    audioClock: ReviewTransportAudioClock | null
+    audioClock: ReviewTransportAudioClock | null,
+    alignNativeOriginal = false
   ) {
     const graphResult = this.referenceTime(now, audioClock);
     const position = this.positionAtResult(graphResult, observation);
@@ -843,12 +856,10 @@ class ReviewTransportController {
       this.hold = null;
       const part = this.segments.find((_item, index) => `video:${index}` === source.segmentId)!;
       const sameSegment = observation.time >= part.sourceStart && observation.time < part.sourceEnd;
+      const tolerance = alignNativeOriginal ? NATIVE_RECEIPT_SECONDS : NATIVE_DRIFT_SECONDS;
       if (
-        !observation.seeking &&
-        !this.nativePlay &&
-        (leavingHold ||
-          !sameSegment ||
-          Math.abs(observation.time - source.mediaTime) > NATIVE_DRIFT_SECONDS)
+        (alignNativeOriginal || (!observation.seeking && !this.nativePlay)) &&
+        (leavingHold || !sameSegment || Math.abs(observation.time - source.mediaTime) > tolerance)
       )
         this.dependencies.media.seek(source.mediaTime);
       this.applySource(source.sourceTime, false);

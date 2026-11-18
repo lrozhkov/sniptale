@@ -40,6 +40,7 @@ export function useReviewTransport(args: {
   onActionAudioRecovered?(): void;
   onInvalidRange?(): void;
   silent?: boolean;
+  mappedOriginal?: boolean;
 }) {
   const { session, source } = args.resource;
   const playbackAudio = useRef<ReturnType<typeof useReviewEditorAudioRuntime> | null>(null);
@@ -166,10 +167,12 @@ export function useReviewTransport(args: {
   const recordingActionSource =
     recordingAudio?.request === recordingAudioRequest ? recordingAudio?.source : null;
   const actionSoundPreview = useReviewEditorAudioRuntime({
+    mappedOriginal: args.mappedOriginal === true,
     transportControl: {
       readPosition,
       readSchedulingPosition: playback.transport.readSchedulingPosition,
       readTimeMap: playback.transport.getTimeMapSnapshot,
+      alignNativeOriginal: playback.transport.alignNativeOriginal,
     },
     video,
     playbackClock: playheadClock,

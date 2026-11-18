@@ -479,21 +479,25 @@ function webcamLayers(
     appearance
   );
   const full = { x: 0, y: 0, ...output };
-  const shadow = primitives.raster('preview-gpu-camera-shadow', output, (context) => {
-    if (!webcam.shadow?.intensity) return;
-    drawMediaFrameShadow(
-      context,
-      webcam.shadow.intensity,
-      undefined,
-      rect,
-      Math.min(output.width, output.height) / 720,
-      appearance,
-      true,
-      webcam.shadow.color,
-      0,
-      resolveCameraShadowVector(webcam.shadowDirection, rect, output)
+  const layers: GpuPreviewLayer[] = [];
+  const shadow = webcam.shadow;
+  if (shadow?.intensity) {
+    const artwork = primitives.raster('preview-gpu-camera-shadow', output, (context) =>
+      drawMediaFrameShadow(
+        context,
+        shadow.intensity,
+        undefined,
+        rect,
+        Math.min(output.width, output.height) / 720,
+        appearance,
+        true,
+        shadow.color,
+        0,
+        resolveCameraShadowVector(webcam.shadowDirection, rect, output)
+      )
     );
-  });
+    layers.push(texture(artwork, full));
+  }
   const mask = primitives.raster('preview-gpu-camera-mask', output, (context) => {
     context.fillStyle = '#ffffff';
     traceCameraShape(context, rect, appearance);
@@ -508,8 +512,12 @@ function webcamLayers(
     rect: { x: rect.x + crop.x, y: rect.y + crop.y, width: crop.width, height: crop.height },
     inverse,
   };
-  const masked = group([video, { ...texture(mask, full), blend: 'mask' }], dimensions);
-  return [texture(shadow, full), { source: masked, rect: full, inverse: identity }];
+  if (webcam.mirrored) {
+    // Mirroring affects video coordinates; the silhouette stays in the destination plane.
+    const masked = group([video, { ...texture(mask, full), blend: 'mask' }], dimensions);
+    layers.push({ source: masked, rect: full, inverse: identity });
+  } else layers.push({ ...video, alphaMask: { source: mask, rect: full } });
+  return layers;
 }
 
 /** Screen-pane composition precedes camera, keys, watermark, captions and the final fades. */

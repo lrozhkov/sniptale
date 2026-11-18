@@ -119,6 +119,12 @@ type Drawable = Pick<VideoCompositionFrameSource, 'orientation'> & {
   ): void;
 };
 type Frame = {
+  /** Deadline requests may wait in the bounded output queue while GPU work keeps its own limit. */
+  deadlineSlots?: 3 | 4;
+  /** A nearby composition sample for pipeline compilation with the captured source borrow. */
+  boundary?: { resultTime: number; transition?: Frame['transition'] };
+  /** Set by the mounted Gallery session during playback. */
+  playback?: boolean;
   exportEnhancer?: ExportEnhancer;
   recordingHistory?: ReviewRecordingRenderSource;
   fps?: number;
@@ -571,8 +577,27 @@ async function drawPreparedFrame(
       signal,
     };
     if (acquireOutput) {
-      const output = await assets.gpu.renderPresentation({ ...input, acquireOutput });
-      if (output) return { output, geometry, renderer: { backend: 'gpu' } };
+      const output = await assets.gpu.renderPresentation({
+        ...input,
+        acquireOutput,
+        playback: frame.playback === true,
+      });
+      if (output) {
+        const boundary = frame.boundary;
+        if (boundary && !signal.aborted) {
+          const future = reviewPresentedGeometry(scene, dimensions, boundary.resultTime);
+          const { transition: _transition, ...source } = input;
+          // Resource or decode contention here cannot cancel foreground publication.
+          await assets.gpu
+            .prepareBoundaryPipelines({
+              ...source,
+              geometry: future,
+              ...(boundary.transition ? { transition: boundary.transition } : {}),
+            })
+            .catch(() => {});
+        }
+        return { output, geometry, renderer: { backend: 'gpu' } };
+      }
     } else {
       const output = canvasOutput();
       const rendered = await assets.gpu.render({ ...input, context: output.context });
@@ -887,12 +912,16 @@ function admitRender(
   );
   const input = allocation.describe();
   const previousCache = assets.painter.retainedCacheSize;
+  const queued = input.publication.maximumInFlight;
+  const staging = frame?.deadlineSlots;
+  const maximumInFlight: 1 | 2 | 3 | 4 =
+    queued === 4 || staging === 4 ? 4 : queued === 3 || staging === 3 ? 3 : assets.maximumInFlight;
   const base = {
     ...input,
     publication: {
       ...input.publication,
       backing: prepared.dimensions.backing,
-      maximumInFlight: assets.maximumInFlight,
+      maximumInFlight,
     },
     assets: assets.allocation,
     background: input.background ? { ...input.background, previousCache } : null,
@@ -1044,6 +1073,9 @@ const needsSpatialRenderer = (scene: Scene) =>
 /** Owns prepared scenes and one session GPU; callers retain capture and publication. */
 export function createReviewPreviewRenderer(args: {
   maximumInFlight?: 1 | 2;
+  /** Mounted Gallery may queue a second camera request; GPU executions remain exclusive. */
+  allowCameraCaptureOverlap?: boolean;
+  allowBoundaryStaging?: boolean;
   renderer?: VideoPreviewRenderer;
   resources: RenderResources;
   exportEnhancer?: ExportEnhancer;
@@ -1103,11 +1135,16 @@ export function createReviewPreviewRenderer(args: {
       current?.assets.renderer === 'gpu' &&
       reviewGpuPreviewConcurrency(
         current.prepared.scene,
-        current.assets.annotations?.maximumInFlight
+        current.assets.annotations?.maximumInFlight,
+        args.allowCameraCaptureOverlap &&
+          !!acquireOutput &&
+          !frame.exportEnhancer &&
+          !args.exportEnhancer
       ) === 2
         ? (args.maximumInFlight ?? 1)
         : 1;
-    if (rendering >= capacity) throw new Error('Preview frame is already admitted.');
+    const queued = args.allowBoundaryStaging && acquireOutput ? frame.deadlineSlots : undefined;
+    if (rendering >= (queued ?? capacity)) throw new Error('Preview frame is already admitted.');
     if (disposed || !leases.has(prepared) || current?.prepared.generation !== prepared.generation)
       throw new Error('Preview scene is stale.');
     if (
@@ -1132,9 +1169,12 @@ export function createReviewPreviewRenderer(args: {
       capacity === 1 ||
       !!frame.recordingHistory ||
       !!frame.exportEnhancer ||
+      !!captured.prepared.scene.webcam?.enabled ||
       !!frame.camera ||
       !!frame.cameraTransform ||
-      !!frame.transition;
+      // Transition pipeline preparation uses an exclusive slot in the GPU owner.
+      (!!acquireOutput && !!frame.boundary?.transition) ||
+      (!!frame.transition && (!queued || !!captured.assets.annotations));
     captured.assets.borrowers++;
     rendering++;
     let releaseExecution: (() => void) | undefined;
@@ -1240,7 +1280,11 @@ export function createReviewPreviewRenderer(args: {
       return scene === preparedSource &&
         current?.assets.renderer === 'gpu' &&
         args.maximumInFlight === 2
-        ? reviewGpuPreviewConcurrency(scene, current.assets.annotations?.maximumInFlight)
+        ? reviewGpuPreviewConcurrency(
+            scene,
+            current.assets.annotations?.maximumInFlight,
+            args.allowCameraCaptureOverlap && !args.exportEnhancer
+          )
         : 1;
     },
     async prepare(
@@ -1339,6 +1383,7 @@ export function createReviewPreviewRenderer(args: {
           resources: args.resources,
           reserve: (bytes) => args.resources.bytes('preview-gpu', bytes),
           maximumInFlight: args.maximumInFlight ?? 1,
+          ...(args.allowBoundaryStaging ? { maximumPresentationSurfaces: 5 } : {}),
         });
       const assets: Assets = {
         borrowers: 0,

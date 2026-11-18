@@ -5,7 +5,11 @@ import { createQuickEditWebcam } from '../../features/video/review/advanced/webc
 import { afterEach, expect, it, vi } from 'vitest';
 import { VideoSample } from 'mediabunny';
 import { createManualPresentationOwner } from './preview-presentation-session';
-import type { PresentationInput, Description } from './preview-presentation-state';
+import type {
+  PresentationInput,
+  Description,
+  ReviewPreviewPresentationStatus,
+} from './preview-presentation-state';
 import { DEFAULT_QUICK_PREVIEW_PREFERENCES } from '../../features/video/preview/quick-preferences';
 import type {
   PreviewSourceProvider,
@@ -26,6 +30,7 @@ const io = vi.hoisted(() => ({
   decoded: vi.fn<typeof import('./preview-presentation-frame').captureDecodedReviewPreviewFrame>(),
   legacy: vi.fn<typeof import('./preview-presentation-frame').captureReviewPreviewFrame>(),
   disposeRenderer: vi.fn(),
+  prepareRenderer: vi.fn<(scene: Description['scene']) => void>(),
 }));
 vi.mock('../../workflows/video/preview-source', async (original) => ({
   ...(await original<typeof import('../../workflows/video/preview-source')>()),
@@ -47,17 +52,20 @@ vi.mock('../../workflows/video-review/render-preview', () => ({
   createReviewPreviewRenderer: () => ({
     maximumInFlight: () => 2,
     dispose: io.disposeRenderer,
-    prepare: async () => ({
-      generation: 1,
-      watermarkBounds: null,
-      allocationAssets: {
-        headerBitmap: null,
-        backgroundBitmap: null,
-        watermark: null,
-        previousWatermarkCache: null,
-      },
-      release: vi.fn(),
-    }),
+    prepare: async (scene: Description['scene']) => {
+      io.prepareRenderer(scene);
+      return {
+        generation: 1,
+        watermarkBounds: null,
+        allocationAssets: {
+          headerBitmap: null,
+          backgroundBitmap: null,
+          watermark: null,
+          previousWatermarkCache: null,
+        },
+        release: vi.fn(),
+      };
+    },
   }),
 }));
 
@@ -145,13 +153,14 @@ function sourceSession(
     cameraTransform: undefined,
     sourceTime: 1.25,
   };
+  const report = vi.fn<(status: ReviewPreviewPresentationStatus) => void>();
   const session = createManualPresentationOwner(
     () => ({
       input,
       cut: { plans: [], blend: null, read: () => null, retry: vi.fn(), current: null },
       placement: null,
     }),
-    vi.fn(),
+    report,
     vi.fn(),
     vi.fn()
   );
@@ -162,6 +171,7 @@ function sourceSession(
     hooks.prepare({ scene: description, generation: '1', quality: 'selected', time: 1 }, signal);
   return {
     session,
+    report,
     hooks,
     input,
     description,
@@ -179,6 +189,146 @@ function sourceSession(
     prepare,
   };
 }
+
+it('warms a separate incoming decoder and adopts it only at the mapped source jump', async () => {
+  const f = sourceSession();
+  const speculative = vi.fn<PreviewSourceProvider['acquire']>().mockResolvedValue(f.lease);
+  const incoming = {
+    acquire: speculative,
+    dispose: vi.fn(),
+    retainSources: vi.fn(),
+  };
+  io.provider.mockReturnValueOnce(f.provider).mockReturnValueOnce(incoming);
+  f.input.cut = {
+    file: new File([], 'clip.webm'),
+    duration: 20,
+    edits: [{ kind: 'cut', id: 'skip', start: 6, end: 10, requestedStart: 6, requestedEnd: 10 }],
+    time: 0,
+  };
+  let time = 5.5;
+  f.input.readPosition = () => ({
+    epoch: 2,
+    mapRevision: 3,
+    resultTime: time,
+    source: {
+      kind: 'video',
+      mediaTime: time < 6 ? time : time + 4,
+      sourceTime: time < 6 ? time : time + 4,
+      segmentId: time < 6 ? 'video:0' : 'video:2',
+    },
+    media: null,
+  });
+  const prepared = await f.prepare();
+  await f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal);
+  expect(f.acquire.mock.lastCall?.[0][0]?.time).toBe(5.5);
+  expect(speculative.mock.lastCall?.[0][0]?.time).toBe(10);
+  expect(f.provider.dispose).not.toHaveBeenCalled();
+  let finishOutgoing!: (lease: PreviewSourceLease) => void;
+  f.acquire.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishOutgoing = resolve;
+      })
+  );
+  const outgoing = f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal);
+  await vi.waitFor(() => expect(f.acquire).toHaveBeenCalledTimes(3));
+  time = 6;
+  const firstIncoming = await f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal);
+  expect(speculative.mock.lastCall?.[0][0]?.time).toBe(10);
+  expect(speculative).toHaveBeenCalledTimes(2);
+  expect(f.provider.dispose).not.toHaveBeenCalled();
+  finishOutgoing(f.lease);
+  (await outgoing).release();
+  expect(f.provider.dispose).toHaveBeenCalledOnce();
+  firstIncoming.release();
+});
+
+it('cancels and releases an incoming read after replacing the playing scene', async () => {
+  const f = sourceSession();
+  let resolve!: (lease: PreviewSourceLease) => void;
+  const read = vi.fn<PreviewSourceProvider['acquire']>(
+    () =>
+      new Promise((done) => {
+        resolve = done;
+      })
+  );
+  const incoming = { acquire: read, dispose: vi.fn(), retainSources: vi.fn() };
+  io.provider.mockReturnValueOnce(f.provider).mockReturnValueOnce(incoming);
+  f.input.cut = {
+    file: new File([], 'clip.webm'),
+    duration: 20,
+    edits: [{ kind: 'cut', id: 'skip', start: 6, end: 10, requestedStart: 6, requestedEnd: 10 }],
+    time: 5.5,
+  };
+  f.input.readPosition = () => ({
+    epoch: 2,
+    mapRevision: 3,
+    resultTime: 5.5,
+    source: { kind: 'video', sourceTime: 5.5, mediaTime: 5.5, segmentId: 'video:0' },
+    media: null,
+  });
+  f.session.update(f.description, 1, false);
+  await f.prepare();
+  f.hooks.sampleTime();
+  expect(read).toHaveBeenCalledOnce();
+  const signal = read.mock.calls[0]![1];
+  f.session.update(
+    {
+      ...f.description,
+      dimensions: { ...f.description.dimensions, backing: { width: 120, height: 60 } },
+    },
+    2,
+    false
+  );
+  expect(signal.aborted).toBe(true);
+  expect(incoming.dispose).toHaveBeenCalledOnce();
+  expect(f.provider.dispose).not.toHaveBeenCalled();
+  const release = vi.fn();
+  resolve({ ...f.lease, release });
+  await vi.waitFor(() => expect(release).toHaveBeenCalledOnce());
+});
+
+it('preserves three admitted frames without superseding a queued read on the same decoder', async () => {
+  const f = sourceSession();
+  const prepared = await f.prepare();
+  let finish!: (lease: PreviewSourceLease) => void;
+  f.acquire.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  const time = f.hooks.sampleTime();
+  const captures = Array.from({ length: 3 }, () => f.hooks.capture(prepared.value, time, f.signal));
+  await vi.waitFor(() => expect(f.acquire).toHaveBeenCalledTimes(2));
+  finish(f.lease);
+  const frames = await Promise.all(captures);
+  expect(f.acquire).toHaveBeenCalledTimes(4);
+  for (const frame of frames) frame.release();
+});
+
+it('keeps decoded playback live through native correction and cancels on a transport seek', async () => {
+  const f = sourceSession();
+  let epoch = 2;
+  Object.defineProperty(f.video, 'paused', { configurable: true, value: false });
+  f.input.readPosition = () => ({
+    epoch,
+    mapRevision: 3,
+    resultTime: 1,
+    source: { kind: 'video', sourceTime: 1.25, mediaTime: 1.25, segmentId: 'video:0' },
+    media: { sourceId: f.input.sourceIdentity, time: 1.25 },
+  });
+  f.session.update(f.description, 1, false);
+  await f.prepare();
+  f.hooks.sampleTime();
+  const invalidate = io.scheduler.mock.results[0]!.value.invalidate;
+  vi.mocked(invalidate).mockClear();
+  f.video.dispatchEvent(new Event('seeking'));
+  expect(invalidate).not.toHaveBeenCalled();
+  epoch++;
+  f.video.dispatchEvent(new Event('seeking'));
+  expect(invalidate).toHaveBeenCalledOnce();
+});
 
 it.each([false, true])(
   'captures the atomic decoded target while main native seek is pending (initial seek: %s)',
@@ -267,6 +417,32 @@ it('uses the independent HTML provider at metadata when precise decoding is unsu
   expect(io.decoded).toHaveBeenCalledOnce();
   expect(io.legacy).not.toHaveBeenCalled();
 });
+
+it.each([true, false])(
+  'publishes decoded boundary capability only when independent decoding is supported (%s)',
+  async (supported) => {
+    const f = sourceSession();
+    if (!supported) f.acquire.mockResolvedValue(null);
+    const prepared = await f.prepare();
+    const captured = await f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal);
+    const canvas = document.createElement('canvas');
+    f.hooks.publish(
+      {
+        completed: { canvas, renderer: { backend: 'gpu' }, release: vi.fn() },
+        prepared: prepared.value,
+        retain: vi.fn(),
+      },
+      { scene: f.description, generation: '1', quality: 'selected', time: 1 }
+    );
+    expect(canvas.dataset['previewFront']).toBe('true');
+    expect(f.report.mock.lastCall?.[0].renderer).toEqual({
+      backend: 'gpu',
+      ...(supported ? { decodedSourceIdentity: f.input.sourceIdentity } : {}),
+    });
+    expect(f.htmlAcquire).toHaveBeenCalledTimes(supported ? 0 : 2);
+    captured.release();
+  }
+);
 
 it('freezes the source/result clock pair before decoded acquisition and reuses the session provider', async () => {
   const f = sourceSession();
@@ -582,6 +758,7 @@ it('keeps primary decoding strict and independent of pending camera acquisition'
     .fn<ReturnType<typeof cameraSources.createReviewWebcamPreviewSource>['captureFrame']>()
     .mockResolvedValue({ status: 'unavailable' });
   const cameraFactory = vi.spyOn(cameraSources, 'createReviewWebcamPreviewSource').mockReturnValue({
+    canOverlapCapture: false,
     captureFrame,
     captureAccepted: vi.fn(),
     subscribeAdmission: () => () => {},
@@ -603,7 +780,18 @@ it('keeps primary decoding strict and independent of pending camera acquisition'
     },
   });
   cameraFactory.mock.lastCall![3].loaded(10);
+  f.description.scene = {
+    ...f.description.scene,
+    webcam: settings,
+    captions: { document: { version: 1, fragments: [] }, settings: undefined, segments: [] },
+  };
+  expect(f.hooks.maximumInFlight?.(f.description)).toBe(1);
   const prepared = await f.prepare();
+  const captions = io.prepareRenderer.mock.lastCall?.[0];
+  expect(captions?.webcamDuration).toBe(10);
+  (await f.prepare()).release();
+  expect(io.prepareRenderer.mock.lastCall?.[0]).toBe(captions);
+
   await expect(f.hooks.capture(prepared.value, 1, f.signal)).rejects.toThrow();
   expect(io.provider).toHaveBeenCalledOnce();
   expect(io.legacy).not.toHaveBeenCalled();
@@ -616,6 +804,10 @@ it('keeps primary decoding strict and independent of pending camera acquisition'
   expect(camera.release).toHaveBeenCalledOnce();
   expect(io.legacy).not.toHaveBeenCalled();
   expect(io.provider).toHaveBeenCalledOnce();
+  cameraFactory.mock.lastCall![3].loaded(11);
+  (await f.prepare()).release();
+  expect(io.prepareRenderer.mock.lastCall?.[0]).not.toBe(captions);
+  expect(io.prepareRenderer.mock.lastCall?.[0].webcamDuration).toBe(11);
 });
 
 it.each(['gpu', 'legacy'] as const)(

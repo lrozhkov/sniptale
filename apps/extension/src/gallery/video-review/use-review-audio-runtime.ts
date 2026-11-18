@@ -63,11 +63,13 @@ interface ReviewAudioTransportControl {
   readPosition(): ReviewTransportPosition;
   readSchedulingPosition?(): ReviewTransportPosition;
   readTimeMap?(): ReviewTransportTimeMapSnapshot;
+  alignNativeOriginal?(): boolean;
 }
 interface ReviewAudioRuntimeProps {
   /** Gallery commands own playback; React updates only supply the accepted audio plan. */
   transportControl?: ReviewAudioTransportControl;
   originalSource?: OriginalAudioSource;
+  mappedOriginal?: boolean;
   video: RefObject<HTMLVideoElement | null>;
   playing: boolean;
   silent?: boolean;
@@ -185,6 +187,7 @@ export function useReviewEditorAudioRuntime(args: ReviewEditorAudioRuntimeProps)
     seekRevision: args.seekRevision,
     original: args.originalAudio,
     ...(args.originalSource ? { originalSource: args.originalSource } : {}),
+    ...(args.mappedOriginal ? { mappedOriginal: true } : {}),
     voiceover: args.voiceover,
     music: args.music,
     ...(args.actionPlan ? { actionPlan: args.actionPlan } : {}),
@@ -213,6 +216,9 @@ class ReviewAudioPlaybackSession {
   private requestedProcessingKey = '';
   private stagedProcessingTime = 0;
   private stagedSourceFile: Blob | undefined;
+  private mappedOriginalFile: Blob | undefined;
+  private mappedOriginalReady = false;
+  private unavailableMappedOriginals = new WeakSet<Blob>();
   private actionBuffers = new Map<ActionSoundSampleId, ReviewAudioClipBuffer>();
   private planKey = '';
   private generation = 0;
@@ -252,6 +258,8 @@ class ReviewAudioPlaybackSession {
     this.auditionActive = false;
     this.preparation?.abort();
     this.stagedProcessingKey = '';
+    this.mappedOriginalFile = undefined;
+    this.mappedOriginalReady = false;
     if (this.processedTimer !== null) clearTimeout(this.processedTimer);
     this.processedTimer = null;
     for (const value of this.processed.values())
@@ -317,10 +325,14 @@ class ReviewAudioPlaybackSession {
         entry.timelineStart + entry.duration > current.outputTime
     );
     let processedEntries: readonly QuickEditAudioPlanEntry[];
+    const probeGeneration = this.generation;
     try {
+      // Renderer readiness is sampled for this command, independently of authored audio.
+      if (!(await this.admitMappedOriginal(current, request, signal))) return false;
       processedEntries = this.processingEntries(current);
     } catch {
-      current.onFailure();
+      if (!signal?.aborted && this.generation === probeGeneration && this.accepts(request))
+        current.onFailure();
       return false;
     }
     if (
@@ -384,18 +396,18 @@ class ReviewAudioPlaybackSession {
         if (!engine) throw new Error('Processed audio preview is unavailable.');
         this.configureOriginal(engine, current);
         await engine.resume();
-        for (const entry of processedEntries) {
-          if (!valid()) return false;
-          if (entry.timelineStart <= current.outputTime + 2)
-            await this.prepareProcessed(
-              entry,
-              current,
-              engine,
-              controller.signal,
-              current.outputTime
-            );
-        }
+        await this.primePlaybackProcessing(
+          processedEntries,
+          current,
+          engine,
+          controller.signal,
+          valid
+        );
         if (!valid()) return false;
+        if (this.mapsOriginal(current)) {
+          this.mappedOriginalReady = true;
+          this.configureOriginal(engine, current);
+        }
         this.stagedProcessingKey = this.processingKey(current);
         this.stagedProcessingTime = current.outputTime;
         this.stagedSourceFile = current.originalSource?.file;
@@ -676,8 +688,96 @@ class ReviewAudioPlaybackSession {
     this.prepared.set(key, prepared);
     return prepared;
   }
+  private async admitMappedOriginal(
+    current: ReviewAudioRuntimeProps,
+    request: ReviewTransportAudioRequest | undefined,
+    signal: AbortSignal | undefined
+  ) {
+    const source = current.originalSource;
+    if (
+      !current.mappedOriginal ||
+      !request ||
+      !signal ||
+      current.silent ||
+      current.original.muted ||
+      current.original.volume <= 0 ||
+      !source?.segments.some((segment) => segment.kind === 'cut') ||
+      this.unavailableMappedOriginals.has(source.file) ||
+      hasReviewAudioProcessing(current.original.audioProcessing)
+    )
+      return true;
+    const generation = this.generation;
+    const supported = await this.engines.get()?.supportsMappedOriginal?.(source.file, signal);
+    if (
+      signal.aborted ||
+      generation !== this.generation ||
+      !this.accepts(request) ||
+      this.latest.current.originalSource?.file !== source.file
+    )
+      return false;
+    if (supported) this.mappedOriginalFile = source.file;
+    return true;
+  }
+  private async primePlaybackProcessing(
+    entries: readonly QuickEditAudioPlanEntry[],
+    current: ReviewAudioRuntimeProps,
+    engine: ReviewAudioEngine,
+    signal: AbortSignal,
+    valid: () => boolean
+  ) {
+    const mapped = this.mapsOriginal(current);
+    for (const entry of entries) {
+      if (!valid()) return;
+      if (entry.timelineStart > current.outputTime + 2) continue;
+      const dryOriginal = mapped && entry.lane === 'original';
+      if (dryOriginal && !this.mapsOriginal(current)) continue;
+      try {
+        await this.prepareProcessed(entry, current, engine, signal, current.outputTime);
+      } catch (error) {
+        if (!dryOriginal || !valid()) throw error;
+        this.discardMappedOriginal();
+      }
+    }
+  }
+
+  private recoverNativeOriginal(current: ReviewAudioRuntimeProps, engine: ReviewAudioEngine) {
+    const source = current.originalSource?.file;
+    if (!source) return false;
+    if (this.unavailableMappedOriginals.has(source)) return true;
+    if (!this.latest.current.transportControl?.alignNativeOriginal?.()) return false;
+    this.unavailableMappedOriginals.add(source);
+    this.discardMappedOriginal();
+    this.configureOriginal(engine, this.latest.current);
+    return true;
+  }
+
+  private discardMappedOriginal() {
+    this.mappedOriginalFile = undefined;
+    this.mappedOriginalReady = false;
+    for (const [id, owned] of this.processed) {
+      if (owned.entry.lane !== 'original') continue;
+      this.processed.delete(id);
+      void owned.pending.then(
+        (clip) => clip.dispose(),
+        () => {}
+      );
+    }
+  }
+
+  private mapsOriginal(current: ReviewAudioRuntimeProps) {
+    return (
+      this.mappedOriginalFile !== undefined &&
+      this.mappedOriginalFile === current.originalSource?.file
+    );
+  }
+  usesOriginalProcessing(current: ReviewAudioRuntimeProps) {
+    return (
+      (this.mappedOriginalReady && this.mapsOriginal(current)) ||
+      hasReviewAudioProcessing(current.original.audioProcessing)
+    );
+  }
   private configureOriginal(engine: ReviewAudioEngine, current: ReviewAudioRuntimeProps) {
-    const active = hasReviewAudioProcessing(current.original.audioProcessing);
+    const active = this.usesOriginalProcessing(current);
     if (active && !engine.setOriginalProcessing)
       throw new Error('Original audio processing is unavailable.');
     engine.setOriginalProcessing?.(active);
@@ -685,7 +785,8 @@ class ReviewAudioPlaybackSession {
   private processingEntries(current: ReviewAudioRuntimeProps) {
     if (current.silent) return [];
     let original: QuickEditAudioPlanEntry[] = [];
-    if (hasReviewAudioProcessing(current.original.audioProcessing)) {
+    const mapped = this.mapsOriginal(current);
+    if (mapped || this.usesOriginalProcessing(current)) {
       if (!current.originalSource)
         throw new Error('Processed original audio source is unavailable.');
       original = buildQuickEditOriginalAudioPlan({
@@ -693,13 +794,14 @@ class ReviewAudioPlaybackSession {
         segments: current.originalSource.segments,
         edits: current.originalSource.edits,
         sourceId: current.sessionKey,
+        includeDry: mapped,
       });
     }
     return [...original, ...buildQuickEditAudioPlan(current)].filter(
       (entry) =>
         entry.volume > 0 &&
         entry.timelineStart + entry.duration > current.outputTime &&
-        hasReviewAudioProcessing(entry.audioProcessing)
+        ((entry.lane === 'original' && mapped) || hasReviewAudioProcessing(entry.audioProcessing))
     );
   }
   private processingKey(current: ReviewAudioRuntimeProps) {
@@ -723,6 +825,7 @@ class ReviewAudioPlaybackSession {
   ) {
     const cached = this.processed.get(entry.clipId);
     if (cached) return cached.pending;
+    const dryOriginal = entry.lane === 'original' && this.mapsOriginal(current);
     const pending = (async () => {
       if (entry.source.kind !== 'project' || !engine.prepareProcessedClip)
         throw new Error('Processed audio preview is unavailable.');
@@ -739,6 +842,7 @@ class ReviewAudioPlaybackSession {
         signal,
         () => {
           if (!signal.aborted && this.preparation?.signal === signal) {
+            if (dryOriginal && this.recoverNativeOriginal(current, engine)) return;
             this.stop();
             current.onFailure();
           }
@@ -760,6 +864,9 @@ class ReviewAudioPlaybackSession {
   private async startProcessed(job: PlaybackJob) {
     const entries = this.processingEntries(job.current);
     if (!entries.length) return;
+    const mapped = this.mapsOriginal(job.current);
+    const remainsMapped = (entry: QuickEditAudioPlanEntry) =>
+      !mapped || entry.lane !== 'original' || this.mapsOriginal(job.current);
     const pump = async () => {
       if (!this.active(job) || !this.anchor) return;
       const outputTime = this.anchor.outputTime + job.engine.now() - this.anchor.audioNow;
@@ -775,34 +882,50 @@ class ReviewAudioPlaybackSession {
       for (const entry of entries) {
         if (!this.active(job) || !this.anchor) return;
         if (
+          !remainsMapped(entry) ||
           entry.timelineStart > outputTime + 2 ||
           entry.timelineStart + entry.duration <= outputTime ||
           this.processed.get(entry.clipId)?.scheduled
         )
           continue;
-        const clip = await this.prepareProcessed(
-          entry,
-          job.current,
-          job.engine,
-          job.signal,
-          outputTime
-        );
-        if (!this.active(job) || !this.anchor) return;
-        const now = job.engine.now();
-        const schedule = planQuickEditClipPlayback({
-          entry,
-          audioNow: now,
-          outputTime: this.anchor.outputTime + now - this.anchor.audioNow,
-        });
-        if (schedule) {
-          clip.schedule(schedule);
-          const owned = this.processed.get(entry.clipId);
-          if (owned) owned.scheduled = true;
+        try {
+          const clip = await this.prepareProcessed(
+            entry,
+            job.current,
+            job.engine,
+            job.signal,
+            outputTime
+          );
+          if (!this.active(job) || !this.anchor) return;
+          if (!remainsMapped(entry)) continue;
+          const now = job.engine.now();
+          const schedule = planQuickEditClipPlayback({
+            entry,
+            audioNow: now,
+            outputTime: this.anchor.outputTime + now - this.anchor.audioNow,
+          });
+          if (schedule) {
+            clip.schedule(schedule);
+            const owned = this.processed.get(entry.clipId);
+            if (owned) owned.scheduled = true;
+          }
+        } catch (error) {
+          if (!this.active(job)) return;
+          if (
+            !(
+              mapped &&
+              entry.lane === 'original' &&
+              this.recoverNativeOriginal(job.current, job.engine)
+            )
+          )
+            throw error;
         }
       }
       if (
         this.active(job) &&
-        entries.some((entry) => entry.timelineStart + entry.duration > outputTime)
+        entries.some(
+          (entry) => remainsMapped(entry) && entry.timelineStart + entry.duration > outputTime
+        )
       )
         this.processedTimer = setTimeout(() => {
           void pump().catch((error: unknown) => this.fail(job, error));
@@ -1000,7 +1123,8 @@ export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
     if (!latest.current.transportControl && session.current?.needsSeek())
       session.current.schedule(planKey, false, sourceClockMapped);
     peek()?.setOriginalProcessing?.(
-      hasReviewAudioProcessing(latest.current.original.audioProcessing)
+      session.current?.usesOriginalProcessing(latest.current) ??
+        hasReviewAudioProcessing(latest.current.original.audioProcessing)
     );
     peek()?.setOriginalGain(
       latest.current.silent

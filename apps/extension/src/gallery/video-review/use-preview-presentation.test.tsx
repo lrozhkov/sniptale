@@ -787,11 +787,25 @@ it('rolls back source and endpoint admission refusal before an explicit retry', 
   });
   expect(() => admit([100, 200])).toThrow('No endpoint capacity');
   const pair = admit([100, 200]);
-  expect(() => admit([100, 200])).toThrow('Preview endpoint admission unavailable');
-  pair.release();
+  io.bytes.mockImplementationOnce(() => {
+    throw new Error('No replacement endpoint capacity');
+  });
+  expect(() => admit([300, 400])).toThrow('No replacement endpoint capacity');
   act(() => result.retry());
   await step(50);
   expect(result.status.phase).toBe('ready');
+  expect(io.graph.mock.lastCall![0].transitionBytes).toEqual([100, 200]);
+
+  const replacement = admit([300, 400]);
+  props = { ...props, pausedResultTime: 1.1 };
+  await render();
+  await step(100);
+  expect(io.graph.mock.lastCall![0].transitionBytes).toEqual([400, 600]);
+  pair.release();
+  replacement.release();
+  props = { ...props, pausedResultTime: 1.2 };
+  await render();
+  await step(150);
   expect(io.graph.mock.lastCall![0].transitionBytes).toBeNull();
 });
 

@@ -432,15 +432,20 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
       start: 0,
       end: 1,
     });
-    await click('play');
-    expect(video.currentTime).toBe(1);
-    expect(video.paused).toBe(false);
-    await act(async () => {
-      video.currentTime = 0.5;
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    });
-    expect(video.currentTime).toBe(1);
-    await act(async () => video.dispatchEvent(new Event('pause')));
+    const playbackClock = vi.spyOn(performance, 'now').mockReturnValue(0);
+    try {
+      await click('play');
+      expect(video.currentTime).toBe(1);
+      expect(video.paused).toBe(false);
+      await act(async () => {
+        video.currentTime = 0.5;
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      });
+      expect(video.currentTime).toBe(1);
+      await act(async () => video.dispatchEvent(new Event('pause')));
+    } finally {
+      playbackClock.mockRestore();
+    }
     await click('undo');
     await click('redo');
     const cut = host.querySelector<HTMLButtonElement>(

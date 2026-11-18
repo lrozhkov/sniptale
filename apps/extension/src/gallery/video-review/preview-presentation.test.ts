@@ -18,7 +18,14 @@ const flush = async () => {
   await Promise.resolve();
   await Promise.resolve();
 };
-function fixture(allowPreparedPlayingFrames = false, maximumInFlight: 1 | 2 = 1, coalesce = false) {
+function fixture(
+  allowPreparedPlayingFrames = false,
+  maximumInFlight: 1 | 2 | 3 = 1,
+  coalesce = false,
+  publicationReady?: () => boolean,
+  fillPlaybackDeadlines?: () => boolean,
+  canCapture?: (request: { time: number }) => boolean
+) {
   let time = 0;
   let id = 0;
   const ticks = new Map<number, () => void>();
@@ -41,6 +48,9 @@ function fixture(allowPreparedPlayingFrames = false, maximumInFlight: 1 | 2 = 1,
         }
       : {}),
     allowPreparedPlayingFrames,
+    ...(publicationReady ? { publicationReady } : {}),
+    ...(fillPlaybackDeadlines ? { fillPlaybackDeadlines } : {}),
+    ...(canCapture ? { canCapture } : {}),
     maximumInFlight: () => maximumInFlight,
     requestTick: (callback: () => void) => {
       ticks.set(++id, callback);
@@ -795,3 +805,68 @@ it.each(['seek', 'end', 'scene'] as const)(
     f.scheduler.dispose();
   }
 );
+
+it('retains a ready frame until the result clock reaches its deadline and cancels it on seek', async () => {
+  let due = false;
+  const f = fixture(true, 1, false, () => due);
+  f.scheduler.update(f.state);
+  await f.step(0);
+  expect(f.dependencies.render).toHaveBeenCalledOnce();
+  await f.step(40);
+  expect(f.dependencies.publish).not.toHaveBeenCalled();
+  expect(f.completed.release).not.toHaveBeenCalled();
+  due = true;
+  await f.step(56);
+  expect(f.dependencies.publish).toHaveBeenCalledOnce();
+  due = false;
+  await f.step(96);
+  f.scheduler.invalidate();
+  await f.step(113);
+  expect(f.dependencies.publish).toHaveBeenCalledOnce();
+  expect(f.completed.release).toHaveBeenCalledTimes(2);
+  f.scheduler.dispose();
+});
+
+it('returns to the ordinary cadence without delay after eagerly filling the deadline queue', async () => {
+  let filling = false;
+  const f = fixture(
+    true,
+    1,
+    false,
+    () => true,
+    () => filling
+  );
+  f.scheduler.update(f.state);
+  await f.step(0);
+  filling = true;
+  for (let tick = 16; tick <= 160; tick += 16) await f.step(tick);
+  filling = false;
+  const count = f.dependencies.publish.mock.calls.length;
+  await f.step(194);
+  expect(f.dependencies.publish).toHaveBeenCalledTimes(count + 1);
+  f.scheduler.dispose();
+});
+
+it('retains publication order when an intake tick skips a frame between two ready results', async () => {
+  let due = true;
+  const f = fixture(
+    true,
+    3,
+    false,
+    () => due,
+    () => true,
+    ({ time }) => time !== 0.032
+  );
+  f.scheduler.update(f.state);
+  await f.step(0);
+  due = false;
+  await f.step(16);
+  await f.step(32);
+  await f.step(48);
+  due = true;
+  await f.step(64);
+  for (let turn = 0; turn < 12; turn++) await flush();
+  expect(f.dependencies.render).toHaveBeenCalledTimes(4);
+  expect(f.dependencies.publish).toHaveBeenCalledTimes(4);
+  f.scheduler.dispose();
+});

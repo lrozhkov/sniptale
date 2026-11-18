@@ -27,6 +27,7 @@ import { ReviewButton } from './controls';
 
 /** Preview-only media input; persistent edits and the native playback clock remain caller-owned. */
 export interface ReviewCutPreviewBinding {
+  readTimeMap?: (() => import('./transport').ReviewTransportTimeMapSnapshot) | undefined;
   file: File;
   duration: number;
   edits: readonly ReviewEdit[];
@@ -220,12 +221,12 @@ export function useReviewCutTransitionProvider(
     blend,
     current,
     retry,
-    read(time: number) {
+    read(time: number, advance = true) {
       const value = latest.current;
       const sampled = reviewCutTransitionAt(time, value.plans);
       const next = sampled?.plan ?? value.plans.find((plan) => plan.seam + plan.after > time);
       // Only a change of endpoint pair reaches React; frame time remains transport-owned.
-      if (value.managed && next !== value.next) {
+      if (advance && value.managed && next !== value.next) {
         value.next = next;
         setRequested({ plans: value.plans, bindingTime: value.bindingTime, next });
       }
@@ -244,6 +245,11 @@ export function useReviewCutTransitionProvider(
   };
 }
 
+type TransitionEndpointLease = {
+  active: boolean;
+  retain(): (() => void) | undefined;
+};
+
 /** Owns endpoint decoding and invalidates every published pair before disposing it. */
 function useTransitionEndpoints(
   file: File | undefined,
@@ -259,15 +265,38 @@ function useTransitionEndpoints(
     frames: ReviewTransitionFrames | null;
     allocationBytes: readonly [number, number] | null;
     failed: boolean;
-    lease: { active: boolean };
+    lease: TransitionEndpointLease;
   } | null>(null);
   useEffect(() => {
     if (!file || !next) return;
     const controller = new AbortController();
-    const lease = { active: true };
     const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
     let owner: ReturnType<typeof createReviewTransitionFrames> | null = null;
     let reservation: { release(): void } | undefined;
+    let borrowers = 0;
+    let disposed = false;
+    const disposeRetired = () => {
+      if (lease.active || borrowers || disposed) return;
+      disposed = true;
+      owner?.dispose();
+      reservation?.release();
+      reservation = undefined;
+      input.dispose();
+    };
+    const lease: TransitionEndpointLease = {
+      active: true,
+      retain() {
+        if (!lease.active) return;
+        borrowers++;
+        let released = false;
+        return () => {
+          if (released) return;
+          released = true;
+          borrowers--;
+          disposeRetired();
+        };
+      },
+    };
     setLoaded(null);
     void (async () => {
       try {
@@ -298,10 +327,7 @@ function useTransitionEndpoints(
     return () => {
       lease.active = false;
       controller.abort();
-      owner?.dispose();
-      reservation?.release();
-      reservation = undefined;
-      input.dispose();
+      disposeRetired();
     };
   }, [file, next, key, attempt, managed, admit]);
   const current =

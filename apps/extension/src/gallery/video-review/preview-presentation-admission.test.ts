@@ -79,6 +79,20 @@ it('accounts for both captured frames and releases only the frame whose lease se
   };
   const first = admission.reserveSource(16, assets);
   const second = admission.reserveSource(24, assets);
+  const firstCamera = admission.cameraResources.bytes('webcam.active', 32);
+  const secondCamera = admission.cameraResources.bytes('webcam.active', 48);
+  expect(admission.graph().admission.camera.active).toEqual({
+    kind: 'video-frame',
+    allocationBytes: 80,
+  });
+  firstCamera.release();
+  firstCamera.release();
+  expect(admission.graph().admission.camera.active).toEqual({
+    kind: 'video-frame',
+    allocationBytes: 48,
+  });
+  secondCamera.release();
+  expect(admission.graph().admission.camera.active).toBeNull();
   expect(admission.graph().admission.source).toEqual({ kind: 'video-frame', allocationBytes: 40 });
   first.release();
   expect(admission.graph().admission.source).toEqual({ kind: 'video-frame', allocationBytes: 24 });

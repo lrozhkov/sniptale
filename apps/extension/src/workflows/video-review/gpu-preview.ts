@@ -81,9 +81,16 @@ interface ReviewGpuRenderInput {
   };
 }
 type ReviewGpuSceneInput = Omit<ReviewGpuRenderInput, 'context'>;
-type ReviewGpuPresentationInput = ReviewGpuSceneInput & { acquireOutput: PreviewGpuCanvasFactory };
+type ReviewGpuPresentationInput = ReviewGpuSceneInput & {
+  acquireOutput: PreviewGpuCanvasFactory;
+  playback?: boolean;
+};
 type BitmapOutput = { kind: 'bitmap'; context: CanvasRenderingContext2D };
-type PresentationOutput = { kind: 'presentation'; acquireOutput: PreviewGpuCanvasFactory };
+type PresentationOutput = {
+  kind: 'presentation';
+  acquireOutput: PreviewGpuCanvasFactory;
+  playback: boolean;
+};
 
 /** Completed pixels retain their backend until publication releases this receipt. */
 export interface ReviewGpuPresentedFrame {
@@ -101,10 +108,11 @@ type Dimensions = PreviewSceneDimensions;
 /** Request-owned artwork permits authored camera and overlay motion between pending frames. */
 export function reviewGpuPreviewConcurrency(
   scene: PreviewScene,
-  annotationMaximumInFlight: 1 | 2 = 1
+  annotationMaximumInFlight: 1 | 2 = 1,
+  allowCameraCaptureOverlap = false
 ): 1 | 2 {
   const plan = scene.outerFadePlan;
-  return scene.webcam?.enabled ||
+  return (scene.webcam?.enabled && !allowCameraCaptureOverlap) ||
     (annotationMaximumInFlight !== 2 &&
       scene.annotationEffects?.lane.enabled &&
       scene.annotationEffects.lane.instances.some((instance) => instance.enabled)) ||
@@ -122,6 +130,7 @@ export function createReviewGpuPreview(args: {
   resources: RenderResources;
   reserve(bytes: number): { release(): void };
   maximumInFlight?: 1 | 2;
+  maximumPresentationSurfaces?: 5;
 }) {
   let renderer: GpuPreviewRenderer | null = null;
   let initialization: Promise<GpuPreviewRenderer | null> | null = null;
@@ -250,14 +259,17 @@ export function createReviewGpuPreview(args: {
       // Preparation is advisory; foreground publication already succeeded.
     }
   };
-  function execute(input: ReviewGpuSceneInput, output: BitmapOutput): Promise<boolean>;
+  function execute(
+    input: ReviewGpuSceneInput,
+    output: BitmapOutput | { kind: 'pipelines' }
+  ): Promise<boolean>;
   function execute(
     input: ReviewGpuSceneInput,
     output: PresentationOutput
   ): Promise<false | ReviewGpuPresentedFrame>;
   async function execute(
     input: ReviewGpuSceneInput,
-    output: BitmapOutput | PresentationOutput
+    output: BitmapOutput | PresentationOutput | { kind: 'pipelines' }
   ): Promise<boolean | ReviewGpuPresentedFrame> {
     if (disabled || disposed) return false;
     const { scene, dimensions, geometry } = input;
@@ -265,7 +277,7 @@ export function createReviewGpuPreview(args: {
     const safe =
       reviewGpuPreviewConcurrency(scene, input.annotations?.maximumInFlight) === 2 &&
       !input.camera &&
-      !input.transition &&
+      (!input.transition || (output.kind === 'presentation' && !input.annotations)) &&
       !input.cameraOverride &&
       (!input.annotations || input.annotations.maximumInFlight === 2);
     if (
@@ -324,6 +336,9 @@ export function createReviewGpuPreview(args: {
       initialization ??= createGpuPreviewRenderer({
         reserve: args.reserve,
         maximumInFlight: args.maximumInFlight ?? 1,
+        ...(args.maximumPresentationSurfaces
+          ? { maximumPresentationSurfaces: args.maximumPresentationSurfaces }
+          : {}),
       });
       try {
         renderer = await initialization;
@@ -464,6 +479,7 @@ export function createReviewGpuPreview(args: {
           : undefined;
       const sceneInputs = {
         dimensions,
+        playback: output.kind === 'presentation' && output.playback && !input.exportEnhancer,
         base,
         radius,
         header: input.header,
@@ -717,6 +733,12 @@ export function createReviewGpuPreview(args: {
           },
         };
       }
+      if (output.kind === 'pipelines') {
+        if (!renderer.preparePipelines) return false;
+        // The device builds immutable variants from the descriptors before any texture borrow ends.
+        void renderer.preparePipelines(request).catch(() => {});
+        return true;
+      }
       const bitmap = await renderer.render(request);
       try {
         signal.throwIfAborted();
@@ -783,9 +805,17 @@ export function createReviewGpuPreview(args: {
     render(input: ReviewGpuRenderInput) {
       return execute(input, { kind: 'bitmap', context: input.context });
     },
+    /** Compile the sampled graph against the live device without acquiring a presentation surface. */
+    prepareBoundaryPipelines(input: ReviewGpuSceneInput) {
+      return execute(input, { kind: 'pipelines' });
+    },
     /** The caller attaches each nonfront destination before the GPU writes its completed image. */
     renderPresentation(input: ReviewGpuPresentationInput) {
-      return execute(input, { kind: 'presentation', acquireOutput: input.acquireOutput });
+      return execute(input, {
+        kind: 'presentation',
+        acquireOutput: input.acquireOutput,
+        playback: input.playback === true,
+      });
     },
     releaseScene() {
       sceneLifetime.abort();

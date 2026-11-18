@@ -1,4 +1,4 @@
-import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
+import type { ReviewPreviewRendererStatus } from './preview-presentation-state';
 import type { ReviewWatermarkEditingAvailability } from './watermark-overlay';
 import { useReviewZoomPreview, type useReviewZoomEditor } from './zoom-editor';
 import { startTransition, useLayoutEffect, useRef, type ReactNode } from 'react';
@@ -57,6 +57,7 @@ interface ReviewPreviewRequest {
   video: StageProps['video'];
   clock: ReviewPlaybackPresentationClock;
   readPosition(): ReviewTransportPosition;
+  readTimeMap?: (() => import('./transport').ReviewTransportTimeMapSnapshot) | undefined;
   timeMap: ReturnType<typeof createReviewTimeMap>;
   resultDuration: number;
   seekRevision: number;
@@ -145,7 +146,7 @@ type PreviewProps = ReviewPreviewInputs & {
   annotationMagnetEnabled?: boolean | undefined;
   previewOverlay?: ReactNode;
   previewPreferences?: QuickPreviewPreferences | undefined;
-  onPreviewRendererStatus?: ((status: PreviewRendererStatus | null) => void) | undefined;
+  onPreviewRendererStatus?: ((status: ReviewPreviewRendererStatus | null) => void) | undefined;
   onPresentedTime?: ((identity: string, resultTime: number) => void) | undefined;
   onPreviewRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
   onOpenPreviewSettings?: ((trigger: HTMLButtonElement) => void) | undefined;
@@ -360,6 +361,7 @@ function ReviewPreviewStage(
           : undefined
       }
       cutPreview={{
+        readTimeMap: request.readTimeMap,
         file: request.file,
         duration: scene.source.duration,
         edits: scene.edits,

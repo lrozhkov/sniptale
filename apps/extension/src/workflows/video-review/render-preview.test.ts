@@ -1963,6 +1963,70 @@ it('does not enter the annotation producer when all instances are disabled durin
   }
 });
 
+it('queues two captured camera-scene requests with one exclusive GPU execution', async () => {
+  const { resources } = setup();
+  const { createQuickEditWebcam } = await import('../../features/video/review/advanced/webcam');
+  const input = scene();
+  const sceneWithCamera = {
+    ...input,
+    webcam: createQuickEditWebcam('camera', input.source, input.source),
+  };
+  const entered = Promise.withResolvers<void>();
+  const fence = Promise.withResolvers<void>();
+  const output = {
+    canvas: { ...dimensions.backing } as HTMLCanvasElement,
+    release: vi.fn(),
+    outputKind: 'gpu-surface' as const,
+    retainedProviderBytes: () => 0,
+    isRetiredProvider: () => false,
+  };
+  const gpu = {
+    allocatedBytes: 0,
+    render: vi.fn(),
+    renderPresentation: vi.fn(async () => {
+      entered.resolve();
+      await fence.promise;
+      return output;
+    }),
+    releaseScene: vi.fn(),
+    dispose: vi.fn(),
+  };
+  io.gpu.mockReturnValue(gpu);
+  vi.stubGlobal('navigator', { gpu: {} });
+  const renderer = createReviewPreviewRenderer({
+    resources,
+    maximumInFlight: 2,
+    allowCameraCaptureOverlap: true,
+  });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(sceneWithCamera, dimensions, signal);
+  expect(renderer.maximumInFlight(sceneWithCamera)).toBe(2);
+  const source = { ...frame().source, videoFrame: () => ({}) as VideoFrame };
+  const request = { ...frame(), source };
+  const first = renderer.renderPresentation(prepared, request, signal, vi.fn());
+  await entered.promise;
+  const next = renderer.renderPresentation(
+    prepared,
+    { ...request, sourceTime: 2, resultTime: 3 },
+    signal,
+    vi.fn()
+  );
+  try {
+    await expect(renderer.renderPresentation(prepared, request, signal, vi.fn())).rejects.toThrow(
+      'already admitted'
+    );
+    expect(gpu.renderPresentation).toHaveBeenCalledOnce();
+  } finally {
+    fence.resolve();
+    const results = await Promise.allSettled([first, next]);
+    for (const result of results) if (result.status === 'fulfilled') result.value.release();
+    renderer.dispose();
+  }
+  expect((await first).sourceTime).toBe(request.sourceTime);
+  expect((await next).sourceTime).toBe(2);
+  expect(gpu.renderPresentation).toHaveBeenCalledTimes(2);
+});
+
 it('publishes a completed GPU surface without acquiring a Canvas2D publication lease', async () => {
   const { resources } = setup();
   const output = {
@@ -2424,6 +2488,57 @@ it.each(['normal-to-transition', 'transition-to-normal'] as const)(
     }
   }
 );
+
+it('queues the next foreground frame while an upcoming transition warms', async () => {
+  const f = await cutExecutionFixture();
+  const warming = Promise.withResolvers<void>();
+  const ready = Promise.withResolvers<void>();
+  const output = () => ({
+    canvas: { ...dimensions.backing } as HTMLCanvasElement,
+    outputKind: 'gpu-surface' as const,
+    retainedProviderBytes: () => 0,
+    isRetiredProvider: () => false,
+    release: vi.fn(),
+  });
+  let activeWarmup = false;
+  const renderPresentation = vi.fn(async () => {
+    if (activeWarmup) throw new Error('GPU preview overlap is unavailable.');
+    return output();
+  });
+  const prepareBoundaryPipelines = vi.fn(async () => {
+    activeWarmup = true;
+    warming.resolve();
+    await ready.promise;
+    activeWarmup = false;
+    return true;
+  });
+  Object.assign(f.gpu, { renderPresentation, prepareBoundaryPipelines });
+  const signal = new AbortController().signal;
+  const first = f.renderer.renderPresentation(
+    f.prepared,
+    { ...f.input(), boundary: { resultTime: 2, transition: f.transition().transition } },
+    signal,
+    vi.fn()
+  );
+  await warming.promise;
+  const next = f.renderer.renderPresentation(
+    f.prepared,
+    { ...f.input(), sourceTime: 3, resultTime: 3 },
+    signal,
+    vi.fn()
+  );
+  const completed = Promise.allSettled([first, next]);
+  try {
+    await flushCutExecution();
+    expect(renderPresentation).toHaveBeenCalledOnce();
+  } finally {
+    ready.resolve();
+    for (const result of await completed) if (result.status === 'fulfilled') result.value.release();
+    await f.close();
+  }
+  expect((await completed).map((result) => result.status)).toEqual(['fulfilled', 'fulfilled']);
+  expect(renderPresentation).toHaveBeenCalledTimes(2);
+});
 
 it('resumes two independent normal GPU frames after the exclusive transition drains', async () => {
   const f = await cutExecutionFixture();

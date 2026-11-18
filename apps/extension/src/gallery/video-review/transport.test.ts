@@ -351,6 +351,28 @@ describe('Gallery active audio reference', () => {
     expect(f.dependencies.audio.prepare).toHaveBeenCalledOnce();
   });
 
+  it('aligns the native original before reopening its gate without restarting audio', async () => {
+    const f = fixture({
+      edits: [{ kind: 'cut', id: 'skip', start: 4, end: 7, requestedStart: 4, requestedEnd: 7 }],
+    });
+    f.controller.seekSource(3.9, false);
+    f.audioTime(100);
+    await f.controller.play();
+    f.advance(100);
+    f.audioTime(100.101);
+    f.media.time = 4.001;
+    f.media.seeking = true;
+    expect(f.controller.alignNativeOriginal()).toBe(true);
+    expect(f.media.time).toBeCloseTo(7.001, 8);
+    expect(f.dependencies.media.configure).toHaveBeenLastCalledWith(
+      expect.objectContaining({ muted: false })
+    );
+    expect(f.dependencies.audio.prepare).toHaveBeenCalledOnce();
+    expect(f.dependencies.audio.start).toHaveBeenCalledOnce();
+    f.audioTime(null);
+    expect(f.controller.alignNativeOriginal()).toBe(false);
+  });
+
   it('freezes a command activation snapshot even if the audio and native clocks advance before Pause', async () => {
     const f = fixture();
     f.controller.seekSource(2, false);

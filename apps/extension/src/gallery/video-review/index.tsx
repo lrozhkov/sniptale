@@ -32,10 +32,11 @@ import { usePresentationPreview } from './use-presentation-preview';
 import { ReviewEditorPresentationDialog } from './presentation-preview-dialog';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
 import { resolveOverlayComments } from '../../features/video/review/comments';
+import type { ReviewPreviewRendererStatus } from './preview-presentation-state';
 import { useReviewPreviewInspector } from './preview-inspector';
 import {
   ReviewPreviewRendererContext,
-  type useReviewPreviewPreferences,
+  useReviewPreviewPreferences,
 } from './use-preview-preferences';
 import { useReviewMusicImport } from './music-import';
 import { AudioLibraryPicker } from '../../composition/audio-library/picker';
@@ -155,7 +156,14 @@ function ReviewEditor({
   onJoinPreview,
   onProjectCreated,
 }: ReviewEditorProps) {
-  const state = useReviewEditorState(resource);
+  const previewPreferences = useReviewPreviewPreferences();
+  const [previewRendererStatus, setPreviewRendererStatus] =
+    useState<ReviewPreviewRendererStatus | null>(null);
+  const state = useReviewEditorState(
+    resource,
+    previewPreferences.preferences.renderer === 'gpu' &&
+      previewRendererStatus?.decodedSourceIdentity === resource.url
+  );
   const interruptParameterPlayback = (target: EventTarget | null) => {
     if (
       !(target instanceof Element) ||
@@ -186,11 +194,12 @@ function ReviewEditor({
     editorReady
   );
   const previewSettings = useReviewPreviewInspector({
+    preferences: previewPreferences,
+    rendererStatus: previewRendererStatus,
     workspaceColor,
     projectFailed: state.advancedFailed,
     retryProject: state.retryAdvanced,
   });
-  const previewPreferences = previewSettings.preferences;
   const annotationMagnetEnabled = state.advanced.ui.annotationMagnetEnabled !== false;
   const liveSeek = useReviewLiveSeek(
     resource,
@@ -397,7 +406,7 @@ function ReviewEditor({
                 onOpenPreviewSettings={navigation.openPreview}
                 previewPreferences={previewPreferences.preferences}
                 onPreviewRaster={previewSettings.setRaster}
-                onPreviewRendererStatus={previewSettings.setRendererStatus}
+                onPreviewRendererStatus={setPreviewRendererStatus}
                 {...previewInputs}
                 onPresentedTime={onLiveSeekPresented}
                 sceneActive={
@@ -877,6 +886,7 @@ type PreviewEditorInput = Pick<
   | 'onMediaError'
   | 'recovering'
 > & {
+  transport?: EditorState['transport'];
   onMediaReady?: EditorState['onMediaReady'];
   preparingPlayback?: EditorState['preparingPlayback'];
   cursorMotion?: EditorState['cursorMotion'];
@@ -1124,6 +1134,7 @@ export function useReviewPreviewInputs(
       video: state.video,
       clock: state.playheadClock,
       readPosition: state.readPosition,
+      readTimeMap: state.transport?.getTimeMapSnapshot,
       timeMap: state.timeline.timeMap,
       resultDuration: state.timeline.resultDuration,
       seekRevision: state.seekRevision,
@@ -1141,6 +1152,7 @@ export function useReviewPreviewInputs(
       state.video,
       state.playheadClock,
       state.readPosition,
+      state.transport,
       state.timeline.timeMap,
       state.timeline.resultDuration,
       state.seekRevision,

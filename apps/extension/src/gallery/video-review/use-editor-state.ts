@@ -56,8 +56,8 @@ import { useReviewWebcamEditor } from './webcam-editor';
 import { computeQuickEditSceneSize } from '../../features/video/review/advanced/scene';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 
-export function useReviewEditorState(resource: LoadedReview) {
-  const core = useReviewEditorCore(resource);
+export function useReviewEditorState(resource: LoadedReview, mappedOriginal = false) {
+  const core = useReviewEditorCore(resource, mappedOriginal);
   const {
     session,
     source,
@@ -231,9 +231,9 @@ export function useReviewEditorState(resource: LoadedReview) {
 }
 
 /** Combines session state with the timeline transport and editing controls. */
-function useReviewEditorCore(resource: LoadedReview) {
+function useReviewEditorCore(resource: LoadedReview, mappedOriginal: boolean) {
   const base = useReviewEditorBase(resource);
-  const timeline = useReviewEditorTimeline(resource, base);
+  const timeline = useReviewEditorTimeline(resource, base, mappedOriginal);
   const commands = base.commands;
   const insertionProjection = useMemo(
     () => createTrackProjection(resource.source.duration, base.snapshot.document.edits),
@@ -671,7 +671,8 @@ function useReviewEditorBase(resource: LoadedReview) {
 /** Coordinates playback and edit controls from the same time map. */
 function useReviewEditorTimeline(
   resource: LoadedReview,
-  base: ReturnType<typeof useReviewEditorBase>
+  base: ReturnType<typeof useReviewEditorBase>,
+  mappedOriginal: boolean
 ) {
   const {
     session,
@@ -755,6 +756,7 @@ function useReviewEditorTimeline(
       ),
     onInvalidRange: () => setMessage(translate('gallery.videoReview.emptyPlaybackRange')),
     silent: voiceoverSilent,
+    mappedOriginal,
   });
   base.commandRuntime.current = {
     readPosition,

@@ -65,9 +65,14 @@ export interface PresentationInput {
 }
 
 /** Requested FPS counts completed manual publications; native transport statistics are separate. */
+export type ReviewPreviewRendererStatus = PreviewRendererStatus & {
+  /** Present only for an output backed by the mounted independent video decoder. */
+  decodedSourceIdentity?: string;
+};
+
 export interface ReviewPreviewPresentationStatus {
   captionConflicts?: Prepared['captionConflicts'];
-  renderer?: PreviewRendererStatus;
+  renderer?: ReviewPreviewRendererStatus;
   phase: 'inactive' | 'pending' | 'ready' | 'failed';
   actualRaster: Size | null;
   presentedFPS: number | null;
@@ -266,6 +271,7 @@ function samePresentationMetadata(
     left.phase === right.phase &&
     left.renderer?.backend === right.renderer?.backend &&
     left.renderer?.fallback === right.renderer?.fallback &&
+    left.renderer?.decodedSourceIdentity === right.renderer?.decodedSourceIdentity &&
     left.actualRaster?.width === right.actualRaster?.width &&
     left.actualRaster?.height === right.actualRaster?.height &&
     JSON.stringify(left.captionConflicts ?? []) === JSON.stringify(right.captionConflicts ?? [])

@@ -51,6 +51,7 @@ export async function buildReviewGpuScene(args: {
   sourceTime: number;
   orientation?: GpuPreviewLayer['orientation'];
   dimensions: PreviewSceneDimensions;
+  playback?: boolean;
   base: ReviewPresentedGeometry['layout'];
   radius: number;
   header: ImageBitmap | null;
@@ -235,6 +236,13 @@ export async function buildReviewGpuScene(args: {
         output: dimensions.canonical,
       });
   const exposure: GpuPreviewLayer[] = [];
+  const motionRaster =
+    args.playback && samples.length > 1
+      ? {
+          width: Math.min(dimensions.backing.width, dimensions.canonical.width),
+          height: Math.min(dimensions.backing.height, dimensions.canonical.height),
+        }
+      : dimensions.canonical;
   const singleExposure = samples.length === 1 && samples[0]!.alpha === 1;
   for (const [exposureIndex, sample] of samples.entries()) {
     const pose = reviewPresentedGeometry(
@@ -278,7 +286,11 @@ export async function buildReviewGpuScene(args: {
     });
     for (const layer of planeLayers)
       if (layer.source === source) sourceExposures.set(layer, exposureIndex);
-    const planeSource: GpuPreviewGroup = { ...original, layers: planeLayers };
+    const planeSource: GpuPreviewGroup = {
+      ...original,
+      output: focus ? motionRaster : original.output,
+      layers: planeLayers,
+    };
     if (focus || samples.length > 1)
       exposure.push({
         source: planeSource,

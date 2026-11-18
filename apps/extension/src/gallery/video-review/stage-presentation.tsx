@@ -1,6 +1,6 @@
 import { LoaderCircle } from 'lucide-react';
 import type { ReviewAnnotationEditing } from './annotation-effects-overlay';
-import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
+import type { ReviewPreviewRendererStatus } from './preview-presentation-state';
 import { DelayedLoadingFallback } from '@sniptale/ui/loading-delay';
 import {
   useEffect,
@@ -61,7 +61,7 @@ type PresentationProps = {
         sourceToResult: PreviewInput['sourceToResult'];
         readPosition?: PreviewInput['readPosition'];
         seekRevision?: number | undefined;
-        onRendererStatus?: ((status: PreviewRendererStatus | null) => void) | undefined;
+        onRendererStatus?: ((status: ReviewPreviewRendererStatus | null) => void) | undefined;
         onRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
         sourceFrameRate?: number | undefined;
       }
@@ -186,13 +186,18 @@ export function useStagePresentation(
   const onRendererStatus = props.preview?.onRendererStatus;
   const rendererBackend = presentation.status.renderer?.backend;
   const rendererFallback = presentation.status.renderer?.fallback;
+  const decodedSourceIdentity = presentation.status.renderer?.decodedSourceIdentity;
   useEffect(() => {
     onRendererStatus?.(
       rendererBackend
-        ? { backend: rendererBackend, ...(rendererFallback ? { fallback: rendererFallback } : {}) }
+        ? {
+            backend: rendererBackend,
+            ...(rendererFallback ? { fallback: rendererFallback } : {}),
+            ...(decodedSourceIdentity ? { decodedSourceIdentity } : {}),
+          }
         : null
     );
-  }, [onRendererStatus, rendererBackend, rendererFallback]);
+  }, [onRendererStatus, rendererBackend, rendererFallback, decodedSourceIdentity]);
   const onRaster = props.preview?.onRaster;
   const rasterWidth = presentation.status.actualRaster?.width;
   const rasterHeight = presentation.status.actualRaster?.height;

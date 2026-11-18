@@ -370,6 +370,31 @@ it('provides result-clock endpoints without creating hybrid canvases or requesti
   expect(state.dispose).toHaveBeenCalledOnce();
 });
 
+it('keeps retired endpoints until an admitted frame releases its borrow', async () => {
+  const left = { ...sample(1.9), allocationSize: () => 16 };
+  const right = { ...sample(4.1), allocationSize: () => 16 };
+  state.sample.mockResolvedValue(left);
+  state.right.mockReturnValue(right);
+  const releaseBytes = vi.fn();
+  const view = mountProvider(true, () => ({ release: releaseBytes }));
+  await view.render(view.binding);
+  const current = view.provider.read(1.75)!;
+  expect(current.frames).toEqual({ left, right });
+  const lease = current.lease!;
+  const release = lease.retain()!;
+  await view.render(undefined);
+  expect(lease.active).toBe(false);
+  expect(view.provider.read(1.75)).toBeNull();
+  expect(left.close).not.toHaveBeenCalled();
+  expect(right.close).not.toHaveBeenCalled();
+  expect(releaseBytes).not.toHaveBeenCalled();
+  release();
+  release();
+  expect(left.close).toHaveBeenCalledOnce();
+  expect(right.close).toHaveBeenCalledOnce();
+  expect(releaseBytes).toHaveBeenCalledOnce();
+});
+
 it('rejects obsolete endpoint reads during replacement render before effect cleanup', async () => {
   const left = sample(1.9);
   state.sample.mockResolvedValueOnce(left).mockResolvedValue(sample(1.8));

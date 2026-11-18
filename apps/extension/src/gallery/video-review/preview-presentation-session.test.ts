@@ -147,11 +147,13 @@ it('keeps GPU targets hidden until pixels and geometry are ready', async () => {
   io.renderer.mockReturnValue(
     Object.assign({ dispose: vi.fn(), maximumInFlight: () => 2 }, { renderPresentation })
   );
+  let playing = false;
   const latest = () => ({
     input: {
       video: { current: null },
       host: { current: host },
       sourceIdentity: 'source',
+      playing,
       preferences: { renderer: 'gpu' },
       onGeometry,
     },
@@ -172,6 +174,7 @@ it('keeps GPU targets hidden until pixels and geometry are ready', async () => {
   const rendered = Promise.resolve(
     hooks.render({ watermarkBounds: null }, {}, request, new AbortController().signal)
   );
+  expect(renderPresentation.mock.lastCall?.[1]).toMatchObject({ playback: false });
   await Promise.resolve();
   expect(host.querySelector('[data-preview-front="true"]')).toBeNull();
   expect(onGeometry).not.toHaveBeenCalled();
@@ -181,10 +184,13 @@ it('keeps GPU targets hidden until pixels and geometry are ready', async () => {
   expect(host.querySelector('[data-preview-front="true"]')).not.toBeNull();
   expect(onGeometry).toHaveBeenCalledWith(null, 1, 'source');
   completed.release();
+  playing = true;
+  owner.update({} as Parameters<typeof owner.update>[0], 1, true);
   const next = await Promise.all([
     hooks.render({ watermarkBounds: null }, {}, request, new AbortController().signal),
     hooks.render({ watermarkBounds: null }, {}, request, new AbortController().signal),
   ]);
+  expect(renderPresentation.mock.lastCall?.[1]).toMatchObject({ playback: true });
   expect(host.children).toHaveLength(3);
   for (const frame of next) {
     hooks.publish(frame.value, request);

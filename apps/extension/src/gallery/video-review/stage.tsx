@@ -1,5 +1,5 @@
 import { ReviewCursorMotionOverlay } from './cursor-motion-overlay';
-import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
+import type { ReviewPreviewRendererStatus } from './preview-presentation-state';
 import {
   reviewPresentedStageProjection,
   type ReviewPresentedGeometry,
@@ -124,7 +124,7 @@ type ReviewStageProps = {
           Parameters<typeof useStagePresentation>[0]['preview']
         >['readPosition'];
         seekRevision?: number | undefined;
-        onRendererStatus?: ((status: PreviewRendererStatus | null) => void) | undefined;
+        onRendererStatus?: ((status: ReviewPreviewRendererStatus | null) => void) | undefined;
         onRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
         sourceFrameRate?: number | undefined;
         waitingReason?: string | undefined;

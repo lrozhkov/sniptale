@@ -1,3 +1,4 @@
+import type { AudioProcessing } from '@sniptale/runtime-contracts/audio-effects';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { createAudioProcessingWorklet } from '../../features/video/audio/effects/worklet-node';
 import {
@@ -12,6 +13,7 @@ import type {
   QuickEditClipSchedule,
 } from '../../features/video/review/advanced/audio-plan';
 
+const dryProcessing: AudioProcessing = { version: 1, bypassed: true, effects: [] };
 const audioLogger = createLogger({ namespace: 'video-review.audio-processing' });
 function reportAudioProcessingFailure(
   stage: 'resume' | 'decode' | 'source' | 'worklet' | 'prime' | 'start' | 'stream',
@@ -95,6 +97,8 @@ export interface ReviewAudioEngine {
     entry: QuickEditAudioPlanEntry,
     signal: AbortSignal
   ): Promise<ReviewAudioClipBuffer>;
+  /** Test source and graph support before suppressing native original audio. */
+  supportsMappedOriginal?(source: Blob, signal: AbortSignal): Promise<boolean>;
   /** Primes bounded processed PCM before transport start; the graph owns the decoder and node. */
   prepareProcessedClip?(
     source: Blob,
@@ -303,6 +307,7 @@ export function createReviewAudioEngine(
   output.connect(context.destination);
   const handles = new Set<OwnedAudioHandle>();
   const decoding = new AbortController();
+  const mappedSupport = new WeakMap<Blob, boolean>();
   let disposed = false;
   let originalProcessing = false;
   const stopAll = () => {
@@ -325,12 +330,39 @@ export function createReviewAudioEngine(
       signal.throwIfAborted();
       return new BrowserReviewAudioBuffer(prepared);
     },
+    async supportsMappedOriginal(blob, requestSignal) {
+      const signal = AbortSignal.any([decoding.signal, requestSignal]);
+      signal.throwIfAborted();
+      if (!originalSource || !context.audioWorklet || context.sampleRate !== 48000) return false;
+      const cached = mappedSupport.get(blob);
+      if (cached !== undefined) return cached;
+      let source: Awaited<ReturnType<typeof openReviewAudioClipSource>> | undefined;
+      try {
+        source = await (dependencies.openSource ?? openReviewAudioClipSource)(blob, signal);
+        signal.throwIfAborted();
+      } catch {
+        signal.throwIfAborted();
+        mappedSupport.set(blob, false);
+        return false;
+      } finally {
+        source?.dispose();
+      }
+      mappedSupport.set(blob, true);
+      return true;
+    },
     prepareProcessedClip: async (blob, entry, elapsed, requestSignal, onError) => {
       requestSignal.throwIfAborted();
-      if (entry.lane === 'original' && (!originalProcessing || !originalGain))
+      const processing = hasReviewAudioProcessing(entry.audioProcessing)
+        ? entry.audioProcessing!
+        : entry.lane === 'original' && mappedSupport.get(blob)
+          ? dryProcessing
+          : undefined;
+      if (!processing) throw new Error('Processed audio settings are inactive.');
+      if (
+        entry.lane === 'original' &&
+        (!originalGain || (processing !== dryProcessing && !originalProcessing))
+      )
         throw new Error('Processed original audio route is unavailable.');
-      if (!hasReviewAudioProcessing(entry.audioProcessing))
-        throw new Error('Processed audio settings are inactive.');
       const controller = new AbortController();
       const signal = controller.signal;
       let decoder: Awaited<ReturnType<typeof openReviewAudioClipSource>> | undefined;
@@ -407,7 +439,7 @@ export function createReviewAudioEngine(
             read: reader.read,
             dispose: releaseSource,
           },
-          processing: entry.audioProcessing!,
+          processing,
           rate,
           durationFrames,
           generation: 1,
