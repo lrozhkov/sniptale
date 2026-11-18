@@ -20,6 +20,8 @@ function ProjectActions(props: {
   newLabel: TranslationKey;
   icon: ReactNode;
   dataUi?: string;
+  request?: string | undefined;
+  onRequested?: ((request: string) => void) | undefined;
   load: () => Promise<ProjectChoice[]>;
   onOpenExisting: (id: string) => void | Promise<void>;
   onOpenNew: () => void | Promise<void>;
@@ -29,6 +31,7 @@ function ProjectActions(props: {
   const [failed, setFailed] = useState(false);
   const active = useRef(false);
   const running = useRef(false);
+  const consumedRequest = useRef<string | undefined>(undefined);
   useEffect(() => {
     active.current = true;
     return () => {
@@ -57,6 +60,13 @@ function ProjectActions(props: {
     if (result.length) setChoices(result);
     else await props.onOpenNew();
   }
+
+  useEffect(() => {
+    if (!props.request || consumedRequest.current === props.request) return;
+    consumedRequest.current = props.request;
+    props.onRequested?.(props.request);
+    void run(showProjects);
+  });
 
   return (
     <>
@@ -109,12 +119,22 @@ function ProjectActions(props: {
   );
 }
 
-export function ImageEditorActions({ mediaId }: { mediaId: string }) {
+export function ImageEditorActions({
+  mediaId,
+  request,
+  onRequested,
+}: {
+  mediaId: string;
+  request?: string | undefined;
+  onRequested?: ((request: string) => void) | undefined;
+}) {
   return (
     <ProjectActions
       label="gallery.preview.openInEditor"
       newLabel="gallery.preview.newImageProject"
       icon={<ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />}
+      request={request}
+      onRequested={onRequested}
       load={() => listImageProjectsForEditing(mediaId)}
       onOpenExisting={async (assetId) => {
         await browserTabs.create({ url: buildEditorUrl({ assetId }) });

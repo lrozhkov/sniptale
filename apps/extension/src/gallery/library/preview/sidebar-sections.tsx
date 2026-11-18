@@ -585,7 +585,12 @@ function PreviewPrimaryActions(
             <VideoReviewActions mediaId={item.entityId ?? item.id} onOpen={onReview} />
           ) : null}
           {imageId ? (
-            <ImageEditorActions key={imageId} mediaId={imageId} />
+            <ImageEditorActions
+              key={imageId}
+              mediaId={imageId}
+              request={props.imageProjectPickerRequest}
+              onRequested={props.onImageProjectPickerRequested}
+            />
           ) : primaryLabel ? (
             <ProductActionButton
               compact

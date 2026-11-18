@@ -64,6 +64,7 @@ export interface GalleryGridMetrics {
 }
 
 export interface GalleryPreviewSessionState {
+  imageProjectPickerRequest?: string | undefined;
   requestRevision?: number | undefined;
   initialMode?: 'edit';
   inspectorCollapsed: boolean;

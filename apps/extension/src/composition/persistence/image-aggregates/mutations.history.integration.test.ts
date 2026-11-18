@@ -2021,3 +2021,126 @@ it('refuses a delayed original reset when the same project revision enters a new
     history: row.history,
   });
 });
+
+it.each([false, true])(
+  'publishes a local file with its exact hidden original, source changed=%s',
+  async (changed) => {
+    const sourceImageData = changed ? 'data:image/png;base64,Y2hhbmdlZA==' : source;
+    const input = {
+      aggregateId: 'local-project',
+      newOriginal: {
+        mediaId: 'local-original',
+        filename: 'input.png',
+        width: 20,
+        height: 20,
+        dataUrl: source,
+      },
+      document: { ...document('First edit'), sourceImageData },
+      expectedRevision: 0,
+      requireMissingRoot: true,
+    };
+    expect(await database().get('media_library', input.newOriginal.mediaId)).toBeUndefined();
+    io.loseAck = true;
+    const save = createImageWorkspaceCommit(input);
+    await expect(save()).rejects.toThrow('Lost acknowledgement');
+    const saved = await save();
+    expect(saved.revision).toBe(1);
+    const original = parseMediaLibraryEntry(
+      await database().get('media_library', input.newOriginal.mediaId)
+    );
+    expect(original).toMatchObject({
+      filename: 'input.png',
+      originalFilename: 'input.png',
+      savedIndependently: false,
+      imageContentState: 'original',
+      lifecycle: { storageClass: 'library' },
+    });
+    if (original?.source.kind !== 'stored-asset') throw new Error('Missing local file reference.');
+    const expected = Uint8Array.from(atob(source.split(',')[1]!), (char) => char.charCodeAt(0));
+    expect(await io.files.get(original.source.assetId)?.arrayBuffer()).toEqual(expected.buffer);
+    const workspace = await readStoredImageWorkspace(input.aggregateId);
+    expect(workspace).toMatchObject({ revision: 1, sourceMediaId: original.id });
+    expect(workspace?.document.sourceImage.assetId === original.source.assetId).toBe(!changed);
+    expect(io.write).toHaveBeenCalledTimes(changed ? 2 : 1);
+    expect(
+      await database().countFromIndex(
+        'image_workspaces',
+        ROW_REFERENCE_INDEX,
+        'media:local-original'
+      )
+    ).toBe(1);
+  }
+);
+
+it('rolls back local original and project ownership together after the first workspace put', async () => {
+  const input = {
+    aggregateId: 'local-project',
+    newOriginal: {
+      mediaId: 'local-original',
+      filename: 'input.png',
+      width: 20,
+      height: 20,
+      dataUrl: source,
+    },
+    document: document('First edit'),
+    expectedRevision: 0,
+    requireMissingRoot: true,
+  };
+  const save = createImageWorkspaceCommit(input);
+  const put = IDBObjectStore.prototype.put;
+  const abort = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+    this: IDBObjectStore,
+    value: unknown,
+    key?: IDBValidKey
+  ) {
+    const request = put.call(this, value, key);
+    if (this.name === 'image_workspaces')
+      request.addEventListener('success', () => this.transaction.abort(), { once: true });
+    return request;
+  });
+  try {
+    await expect(save()).rejects.toMatchObject({ name: 'TransactionInactiveError' });
+  } finally {
+    abort.mockRestore();
+  }
+  expect(await database().get('media_library', 'local-original')).toBeUndefined();
+  expect(await database().get('image_workspaces', 'local-project')).toBeUndefined();
+  expect(await database().getAll('asset_owners')).toEqual([]);
+  expect(await database().getAll('asset_refs')).toEqual([]);
+  expect(await database().getAll('image_workspace_identities')).toEqual([]);
+  expect(await save()).toMatchObject({ revision: 1 });
+  expect(io.write).toHaveBeenCalledOnce();
+});
+
+it('preserves the existing original when delayed local publication collides', async () => {
+  const input = {
+    aggregateId: 'local-project',
+    newOriginal: {
+      mediaId: 'local-original',
+      filename: 'input.png',
+      width: 20,
+      height: 20,
+      dataUrl: source,
+    },
+    document: document('First edit'),
+    expectedRevision: 0,
+    requireMissingRoot: true,
+  };
+  const existing = await database().get('media_library', 'image');
+  io.beforePublish = async () => {
+    await database().put('media_library', { ...existing, id: input.newOriginal.mediaId });
+  };
+  await expect(commitImageWorkspace(input)).rejects.toMatchObject({
+    name: 'ImageAggregateCollisionError',
+    aggregateId: input.newOriginal.mediaId,
+  });
+  io.beforePublish = null;
+  const [journal] = io.journals.values();
+  if (!journal) throw new Error('The delayed publication journal is missing.');
+
+  await expect(imageWorkspacePublicationAdapter.publish(journal)).resolves.toBeUndefined();
+  expect(await database().get('image_workspaces', input.aggregateId)).toBeUndefined();
+  const original = await readImageOriginalSource(input.newOriginal.mediaId);
+  expect(await original.blob?.text()).toBe('original');
+  for (const ref of journal.assetRefs) expect(io.files.has(ref.assetId)).toBe(false);
+});

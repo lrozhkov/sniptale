@@ -114,22 +114,24 @@ export function replaceEditorPageImageLocation(aggregateId: string): () => void 
   };
 }
 
-/** Starts a fresh standalone draft for a local image opened in the current editor tab. */
+/** Opens a local original in memory until the first accepted project publication. */
 export function beginEditorPageLocalDraft(args: {
   autosaveService: Pick<EditorSessionAutosaveService, 'activate'>;
   renderPresentation: (signal?: AbortSignal) => Promise<string> | string;
   sourceTitle: string;
+  source: { dataUrl: string; width: number; height: number };
 }): string {
   const aggregateId = createAggregateId();
-  const url = new URL(window.location.href);
-  url.searchParams.set('assetId', aggregateId);
-  url.searchParams.delete('originalId');
-  url.searchParams.delete(EDITOR_BOOTSTRAP_QUERY_PARAM);
-  url.searchParams.delete('session');
-  window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+  const mediaId = createAggregateId();
+  clearEditorPageSession();
+  const openingLocation = window.location.href;
   args.autosaveService.activate({
     aggregateId,
     durableRevision: 0,
+    newOriginal: { ...args.source, mediaId, filename: args.sourceTitle },
+    onFirstPublication: () => {
+      if (window.location.href === openingLocation) replaceEditorPageAggregateId(aggregateId);
+    },
     renderPresentation: args.renderPresentation,
     sourceTitle: args.sourceTitle,
     sourceUrl: '',

@@ -87,3 +87,24 @@ it('does not open a tab when the original preview closes during lookup', async (
   await act(async () => result.resolve([]));
   expect(mocks.createTab).not.toHaveBeenCalled();
 });
+
+it('shows choices once for a request from another Gallery entry point', async () => {
+  mocks.list.mockResolvedValue([{ id: 'saved', name: 'Saved composition', updatedAt: 100 }]);
+  const acknowledge = vi.fn();
+  const view = (
+    <ImageEditorActions mediaId="original" request="command" onRequested={acknowledge} />
+  );
+  await act(async () => root.render(view));
+  expect(acknowledge).toHaveBeenCalledExactlyOnceWith('command');
+  expect(mocks.list).toHaveBeenCalledExactlyOnceWith('original');
+  expect(host.textContent).toContain('Saved composition');
+  expect(mocks.createTab).not.toHaveBeenCalled();
+  await act(async () =>
+    root.render(
+      <ImageEditorActions mediaId="original" request="command" onRequested={acknowledge} />
+    )
+  );
+  expect(mocks.list).toHaveBeenCalledTimes(1);
+  await click('Saved composition');
+  expect(mocks.editorUrl).toHaveBeenCalledExactlyOnceWith({ assetId: 'saved' });
+});

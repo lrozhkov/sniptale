@@ -25,6 +25,8 @@ export interface ActiveEditorSessionContext {
   durableRevision: number;
   sourceGeneration?: string | null;
   original?: CommitImageWorkspaceInput['original'];
+  newOriginal?: CommitImageWorkspaceInput['newOriginal'];
+  onFirstPublication?: () => void;
   requireExistingRoot?: boolean;
   sourceUrl: string | null;
   sourceTitle: string | null;

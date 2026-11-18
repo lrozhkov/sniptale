@@ -131,6 +131,13 @@ function buildGalleryPreviewHandlers(
         : actions.preview.downloadOriginal(),
     onPreviewCopy: () =>
       isReadOnlyTrashPreview(controller) ? Promise.resolve(false) : actions.preview.copy(),
+    onImageProjectPickerRequested: (request: string) => {
+      controller.actions.preview.setPreview((current) =>
+        current.imageProjectPickerRequest === request
+          ? { ...current, imageProjectPickerRequest: undefined }
+          : current
+      );
+    },
     onPreviewEdit: (item: GalleryItem) => {
       if (isGalleryRemoteItem(item)) {
         if (!isReadOnlyTrashPreview(controller)) openRemotePreview(actions, controller, item);

@@ -347,8 +347,43 @@ it('collects an unclaimed project original and retains a manual save or another 
   );
 });
 
+it('retains the last project original until its first publication journal clears', async () => {
+  const original = {
+    ...createMediaEntry({ id: 'local-original', kind: 'image', source: { kind: 'screenshot' } }),
+    savedIndependently: false,
+  };
+  const journal = {
+    domain: 'image-workspace',
+    payload: { aggregateId: 'local-project', newOriginal: { mediaId: original.id } },
+  };
+  dbMocks.getMock.mockResolvedValue(original);
+  dbMocks.readClaimsMock.mockResolvedValueOnce({
+    valid: true,
+    pending: false,
+    journals: [journal],
+  });
+  const options = { projectRetainedOnly: true };
+
+  await expect(deleteMediaLibraryAsset(original.id, options)).rejects.toMatchObject({
+    cause: expect.objectContaining({ reason: 'pending-publication' }),
+  });
+  expect(dbMocks.deleteCascadeMock).not.toHaveBeenCalled();
+  dbMocks.readClaimsMock.mockResolvedValueOnce({ valid: true, pending: false, journals: [] });
+  await deleteMediaLibraryAsset(original.id, options);
+  expect(dbMocks.deleteCascadeMock).toHaveBeenCalledExactlyOnceWith(
+    original.id,
+    [],
+    expect.any(Object),
+    true
+  );
+});
+
 it.each([
   { domain: 'image-workspace', payload: { aggregateId: 'missing' } },
+  {
+    domain: 'image-workspace',
+    payload: { aggregateId: 'local-project', newOriginal: { mediaId: 'missing' } },
+  },
   { domain: 'sync-replica', payload: { kind: 'image', input: { media: { id: 'missing' } } } },
 ])('checks selected pending $domain claims when the Library root is missing', async (journal) => {
   dbMocks.getMock.mockResolvedValueOnce(undefined);

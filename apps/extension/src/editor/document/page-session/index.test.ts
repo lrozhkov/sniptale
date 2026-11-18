@@ -112,33 +112,41 @@ describe('stable editor aggregate identity', () => {
     expect(window.location.search).toBe('?theme=dark');
   });
 
-  it('starts a fresh local draft, replaces restore params, and activates autosave', async () => {
+  it('assigns a local project URL only after publication is acknowledged', async () => {
     window.history.replaceState(
       {},
       '',
       '/apps/extension/src/editor/index.html?assetId=library-1&bootstrap=boot-1&session=legacy&theme=dark'
     );
-    mocks.createId.mockReturnValue('draft-new');
-    const activate = vi.fn();
+    mocks.createId.mockReturnValueOnce('local-project').mockReturnValueOnce('local-original');
     const renderPresentation = vi.fn();
+    let onFirstPublication: (() => void) | undefined;
+    const activate = vi.fn((value: { onFirstPublication?: () => void }) => {
+      onFirstPublication = value.onFirstPublication;
+    });
+    const source = { dataUrl: 'data:image/png;base64,YQ==', width: 1, height: 1 };
     const { beginEditorPageLocalDraft } = await import('./');
-
     expect(
       beginEditorPageLocalDraft({
         autosaveService: { activate },
         renderPresentation,
         sourceTitle: 'local.png',
+        source,
       })
-    ).toBe('draft-new');
-
-    expect(window.location.search).toBe('?assetId=draft-new&theme=dark');
+    ).toBe('local-project');
+    expect(window.location.search).toBe('?theme=dark');
     expect(activate).toHaveBeenCalledWith({
-      aggregateId: 'draft-new',
+      aggregateId: 'local-project',
+      newOriginal: { ...source, mediaId: 'local-original', filename: 'local.png' },
+      onFirstPublication: expect.any(Function),
       durableRevision: 0,
       renderPresentation,
       sourceTitle: 'local.png',
       sourceUrl: '',
     });
+    onFirstPublication?.();
+    expect(new URLSearchParams(window.location.search).get('assetId')).toBe('local-project');
+    expect(new URLSearchParams(window.location.search).get('theme')).toBe('dark');
   });
 });
 

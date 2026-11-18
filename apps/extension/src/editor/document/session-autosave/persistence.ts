@@ -73,8 +73,12 @@ function adoptWorkspaceAcknowledgement(
   state.activeContext.durableRevision = result.revision;
   state.activeContext.sourceGeneration = result.sourceGeneration ?? null;
   state.activeContext.requireExistingRoot = true;
-  const original = state.activeContext.original;
+  const originalId =
+    state.activeContext.original?.mediaId ?? state.activeContext.newOriginal?.mediaId;
+  const onFirstPublication = state.activeContext.onFirstPublication;
   delete state.activeContext.original;
+  delete state.activeContext.newOriginal;
+  delete state.activeContext.onFirstPublication;
   state.documentAssetsByRuntimeUrl = result.documentAssetsByRuntimeUrl;
   if (result.historyAssetsByValue) state.historyAssetsByValue = result.historyAssetsByValue;
   // A later insertion can publish a definition while this older document awaits its ACK.
@@ -82,8 +86,9 @@ function adoptWorkspaceAcknowledgement(
     ...result.documentAssetsByVectorDefinitionId,
     ...state.documentAssetsByVectorDefinitionId,
   ]);
-  if (original)
-    publishMediaHubLibraryChanged('update', [original.mediaId, state.activeContext.aggregateId]);
+  if (originalId)
+    publishMediaHubLibraryChanged('update', [originalId, state.activeContext.aggregateId]);
+  onFirstPublication?.();
   return true;
 }
 
@@ -134,6 +139,9 @@ async function persistEditorSessionDocument(
           expectedRevision: args.context.durableRevision,
           expectedGeneration: args.context.sourceGeneration ?? null,
           ...(args.context.original ? { original: args.context.original } : {}),
+          ...(args.context.newOriginal
+            ? { newOriginal: args.context.newOriginal, requireMissingRoot: true }
+            : {}),
           ...(args.context.requireExistingRoot ? { requireExistingRoot: true } : {}),
           sourceUrl: args.context.sourceUrl,
           sourceTitle: args.document.displayName ?? args.context.sourceTitle,

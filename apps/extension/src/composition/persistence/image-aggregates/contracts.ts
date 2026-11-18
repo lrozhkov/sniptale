@@ -4,6 +4,14 @@ import type { ImageContentState } from '../media-library/contracts';
 import type { SyncCheckpointReceipt } from '../sync-capture/contracts';
 import type { EditorImageHistoryCheckpoint } from '../../../features/editor-history/image-checkpoint';
 
+export interface NewImageOriginal {
+  mediaId: string;
+  filename: string;
+  width: number;
+  height: number;
+  dataUrl: string;
+}
+
 export interface CommitImageWorkspaceInput {
   aggregateId: string;
   captureTime?: number;
@@ -20,6 +28,8 @@ export interface CommitImageWorkspaceInput {
   sourceFavicon?: string | null;
   /** Supplies the observed original on the first save of an independent project. */
   original?: { mediaId: string; generation: string | null };
+  /** First publication of a local-file project and its private original. */
+  newOriginal?: NewImageOriginal;
   sourceGuard?: {
     aggregateId: string;
     presentationRevision?: number;

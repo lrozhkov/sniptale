@@ -8,12 +8,7 @@ import type { EditorDocument } from '../../features/editor/document/types';
 interface LocalImageDraftController extends EditorDocumentOpenPort {
   autosaveService: Pick<
     EditorSessionAutosaveService,
-    | 'activate'
-    | 'flushAutosave'
-    | 'prepareCheckpointExit'
-    | 'saveNow'
-    | 'beginHydration'
-    | 'persistSnapshot'
+    'activate' | 'flushAutosave' | 'prepareCheckpointExit' | 'beginHydration' | 'persistSnapshot'
   > | null;
   exportDocument(): EditorDocument;
   isDocumentReadyForExport(): boolean;
@@ -23,7 +18,7 @@ interface LocalImageDraftController extends EditorDocumentOpenPort {
   ): Promise<string> | string;
 }
 
-/** Opens a local image as a new durable standalone draft with its own page URL. */
+/** Opens a local image without writing until the session accepts an edit. */
 export function openLocalImageAsEditorDraft(
   controller: LocalImageDraftController,
   file: File | undefined,
@@ -44,9 +39,10 @@ export function openLocalImageAsEditorDraft(
           throw new Error('Editor document changed during exit.');
       }
     },
-    onOpened: async (saveInitial) => {
+    onOpened: () => {
       const autosaveService = controller.autosaveService;
       if (!autosaveService) return;
+      const initial = controller.exportDocument();
       beginEditorPageLocalDraft({
         autosaveService,
         renderPresentation: (signal) =>
@@ -55,9 +51,12 @@ export function openLocalImageAsEditorDraft(
             'committed'
           ),
         sourceTitle: file.name,
+        source: {
+          dataUrl: initial.sourceImageData,
+          width: initial.sourceWidth,
+          height: initial.sourceHeight,
+        },
       });
-      const initialDocument = controller.exportDocument();
-      await (saveInitial ?? autosaveService.saveNow)(() => initialDocument);
     },
   });
 }

@@ -60,6 +60,44 @@ it('passes the original binding only on the first save of an image project', asy
   autosave.dispose();
 });
 
+it('acknowledges the local-file binding only after its first durable write', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  const newOriginal = {
+    mediaId: 'original',
+    filename: 'input.png',
+    width: 20,
+    height: 20,
+    dataUrl: 'data:image/png;base64,YQ==',
+  };
+  const onFirstPublication = vi.fn();
+  autosave.updateContext({ newOriginal, onFirstPublication });
+  const first = Promise.withResolvers<ReturnType<typeof createWorkspaceCommitResult>>();
+  commitWorkspaceMock.mockReturnValueOnce(first.promise);
+  const saving = autosave.persistSnapshot(() => createDocument('initial edit'));
+  expect(onFirstPublication).not.toHaveBeenCalled();
+  first.resolve(createWorkspaceCommitResult(1));
+  await saving;
+  await autosave.persistSnapshot(() => createDocument('following edit'));
+
+  expect(commitWorkspaceMock).toHaveBeenNthCalledWith(
+    1,
+    expect.objectContaining({ newOriginal, expectedRevision: 0, requireMissingRoot: true })
+  );
+  expect(commitWorkspaceMock).toHaveBeenNthCalledWith(
+    2,
+    expect.objectContaining({ expectedRevision: 1, requireExistingRoot: true })
+  );
+  expect(commitWorkspaceMock.mock.calls[1]?.[0]).not.toHaveProperty('newOriginal');
+  expect(onFirstPublication).toHaveBeenCalledOnce();
+  expect(publishLibraryChangedMock).toHaveBeenCalledExactlyOnceWith('update', [
+    'original',
+    'image-1',
+  ]);
+  autosave.dispose();
+});
+
 it('coalesces expired uncaptured autosaves behind an acquired workspace write', async () => {
   const { createEditorSessionAutosaveService } = await import('./');
   const autosave = createEditorSessionAutosaveService();

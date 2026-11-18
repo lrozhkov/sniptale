@@ -144,23 +144,29 @@ it.each([null, {}, { aggregateId: '' }])(
   }
 );
 
-it('retains the project ID and the shared original during image publication', () => {
-  const journal = {
-    domain: 'image-workspace',
-    payload: { aggregateId: 'project', original: { mediaId: 'origin', generation: null } },
-  };
-  expect(collectReadyJournalMediaKeys(journal)).toEqual(['media:project', 'media:origin']);
-  expect(mediaHasPendingPublication(journal, { id: 'origin' })).toBe(true);
-  expect(mediaHasPendingPublication(journal, { id: 'unrelated' })).toBe(false);
-});
+it.each(['original', 'newOriginal'] as const)(
+  'retains the project ID and its %s source during image publication',
+  (field) => {
+    const journal = {
+      domain: 'image-workspace',
+      payload: { aggregateId: 'project', [field]: { mediaId: 'origin' } },
+    };
+    expect(collectReadyJournalMediaKeys(journal)).toEqual(['media:project', 'media:origin']);
+    expect(mediaHasPendingPublication(journal, { id: 'origin' })).toBe(true);
+    expect(mediaHasPendingPublication(journal, { id: 'unrelated' })).toBe(false);
+  }
+);
 
-it('retains originals when an image journal has an unknown original identity', () => {
-  const journal = {
-    domain: 'image-workspace',
-    payload: { aggregateId: 'project', original: {} },
-  };
-  expect(collectReadyJournalMediaKeys(journal)).toContain(UNKNOWN_READY_MEDIA);
-});
+it.each(['original', 'newOriginal'] as const)(
+  'retains originals when an image journal has an unknown %s identity',
+  (field) => {
+    const journal = {
+      domain: 'image-workspace',
+      payload: { aggregateId: 'project', [field]: {} },
+    };
+    expect(collectReadyJournalMediaKeys(journal)).toContain(UNKNOWN_READY_MEDIA);
+  }
+);
 
 it.each([
   ['project-assets', { entry: { id: '' } }, 'unknown:project-asset'],

@@ -129,8 +129,9 @@ export function collectReadyJournalMediaKeys(
       return workspacePublicationKeys(payload);
     case 'image-workspace': {
       const keys = [identityKey('media', recordIdentity(payload, 'aggregateId'))];
-      if (payload['original'] !== undefined) {
-        keys.push(identityKey('media', recordIdentity(payload['original'], 'mediaId')));
+      for (const original of [payload['original'], payload['newOriginal']]) {
+        if (original !== undefined)
+          keys.push(identityKey('media', recordIdentity(original, 'mediaId')));
       }
       return [...new Set(keys)];
     }
