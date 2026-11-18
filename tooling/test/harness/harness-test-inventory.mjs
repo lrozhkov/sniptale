@@ -18,6 +18,9 @@ const FORK_COMPATIBILITY_FILES = new Set([
   'tooling/test/harness/i18n-catalogs.test.ts',
   'tooling/test/harness/i18n-catalog-build.test.ts',
   'tooling/test/harness/vite-build-shims.test.ts',
+  // Playwright rejects a second import in a shared VM worker.
+  // Remove when Playwright can reload across isolated VM contexts.
+  'tooling/test/e2e/live/configuration.test.ts',
   // This 5000-fact integration test times out in the VM CI partition.
   // Forks complete the unchanged test within its 15-second deadline.
   // Remove when repeated VM CI runs meet the same deadline.
