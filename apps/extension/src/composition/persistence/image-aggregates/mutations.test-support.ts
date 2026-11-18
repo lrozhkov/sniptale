@@ -220,10 +220,12 @@ export function installTransaction(args: ImageTransactionFixture) {
       put: puts.media,
     },
     asset_refs: {
+      get: vi.fn(async () => undefined),
       delete: vi.fn(),
       put: vi.fn(),
     },
     asset_owners: {
+      get: vi.fn(async () => undefined),
       delete: vi.fn(),
       index: vi.fn(() => ({ count: vi.fn(async () => 0) })),
       put: vi.fn(),

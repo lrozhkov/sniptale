@@ -210,7 +210,12 @@ export function createGalleryItems(args: {
       return item;
     }
     const presentation = presentations.get(serializeAggregateRef({ id: media.id, kind: 'image' }));
-    if (!presentation && media.source.kind === 'stored-asset') return item;
+    if (
+      !presentation &&
+      media.source.kind === 'stored-asset' &&
+      item.imageContentState !== 'original'
+    )
+      return item;
     return {
       ...item,
       hasThumbnail: Boolean(presentation) || item.imageContentState === 'original',

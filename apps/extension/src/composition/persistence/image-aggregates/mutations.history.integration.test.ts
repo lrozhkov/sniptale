@@ -531,6 +531,16 @@ it('keeps working-copy history readable after deleting the source and saving the
       previewBlob: new Blob(['preview'], { type: 'image/png' }),
       thumbnailBlob: new Blob(['thumb'], { type: 'image/png' }),
     });
+    const linkedCopy = await readStoredImageWorkspace(copy.aggregateId);
+    if (!linkedCopy?.sourceMediaId) throw new Error('Saved Image copy is missing its original.');
+    expect(linkedCopy.sourceMediaId).not.toBe(copy.aggregateId);
+    expect(await database().get('media_library', copy.aggregateId)).toBeUndefined();
+    const original = await readImageOriginalSource(linkedCopy.sourceMediaId);
+    expect(original.asset).toMatchObject({
+      savedIndependently: false,
+      imageContentState: 'original',
+    });
+    expect(await original.blob?.text()).toBe(atob(source.document.sourceImageData.split(',')[1]!));
     const initialCopy = await readImageWorkspace(copy.aggregateId);
     try {
       expect(initialCopy?.history).toEqual(checkpoint);
@@ -1830,22 +1840,63 @@ it.each([
   }
 );
 
-it('saves a Gallery copy of an inline original without an aggregate presentation', async () => {
+it('reuses one original object for successive Gallery copies without a presentation', async () => {
   const original = await database().get('media_library', 'image');
   await database().put('media_library', { ...original, imageContentState: 'original' });
 
-  await expect(
-    copyImageAggregate({
-      aggregateId: 'image',
-      expectedWorkspaceRevision: 0,
-      targetAggregateId: 'original-copy',
-    })
-  ).resolves.toBe('original-copy');
+  for (const id of ['original-copy', 'second-copy']) {
+    await expect(
+      copyImageAggregate({
+        aggregateId: 'image',
+        expectedWorkspaceRevision: 0,
+        targetAggregateId: id,
+      })
+    ).resolves.toBe(id);
+    const copy = await database().get('aggregate_presentations', ['image', id]);
+    expect(await copy?.previewBlob.text()).toBe('original');
+    expect(await database().get('media_library', id)).toBeUndefined();
+  }
 
-  const copy = await database().get('aggregate_presentations', ['image', 'original-copy']);
-  expect(await copy?.previewBlob.text()).toBe('original');
+  const stored = parseMediaLibraryEntry(await database().get('media_library', 'image'));
+  if (stored?.source.kind !== 'stored-asset') throw new Error('Missing shared original object.');
+  for (const id of ['original-copy', 'second-copy']) {
+    expect(await readStoredImageWorkspace(id)).toMatchObject({
+      sourceMediaId: 'image',
+      document: { sourceImage: { assetId: stored.source.assetId } },
+    });
+  }
+  expect(io.write).toHaveBeenCalledOnce();
   expect(await database().get('image_workspaces', 'image')).toBeUndefined();
   expect(await database().get('aggregate_presentations', ['image', 'image'])).toBeUndefined();
+});
+
+it('preserves imported geometry and uses a fallback for a blank conflict copy filename', async () => {
+  const imported = {
+    ...document('Imported'),
+    sourceName: '',
+    sourceWidth: 10.5,
+    sourceHeight: 9.5,
+  };
+  await saveImageAggregateCopyFromDocument({
+    targetAggregateId: 'imported-copy',
+    document: imported,
+    previewBlob: new Blob(['preview'], { type: 'image/png' }),
+    thumbnailBlob: new Blob(['thumb'], { type: 'image/png' }),
+  });
+
+  const workspace = await readStoredImageWorkspace('imported-copy');
+  if (!workspace?.sourceMediaId) throw new Error('Missing private Image original.');
+  expect(workspace.document).toMatchObject({
+    sourceName: '',
+    sourceWidth: 10.5,
+    sourceHeight: 9.5,
+  });
+  expect(await database().get('media_library', workspace.sourceMediaId)).toMatchObject({
+    filename: 'Image copy',
+    width: 10.5,
+    height: 9.5,
+    savedIndependently: false,
+  });
 });
 
 it.each(['pending', 'source replaced', 'lost acknowledgement'] as const)(
@@ -1869,10 +1920,17 @@ it.each(['pending', 'source replaced', 'lost acknowledgement'] as const)(
         throw new Error('Copy stopped after staging');
       };
     await expect(
-      copyImageAggregate({
-        aggregateId: 'image',
-        expectedWorkspaceRevision: first.revision,
-        targetAggregateId: 'copied',
+      commitImageWorkspace({
+        aggregateId: 'copied',
+        document: document('Copy source'),
+        expectedRevision: 0,
+        requireMissingRoot: true,
+        sourceGuard: {
+          aggregateId: 'image',
+          presentationRevision: first.revision,
+          workspaceRevision: first.revision,
+          sourceGeneration: first.sourceGeneration ?? null,
+        },
       })
     ).rejects.toThrow(/Lost acknowledgement|Copy stopped after staging/);
     const [journal] = io.journals.values();

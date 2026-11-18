@@ -71,7 +71,7 @@ export interface CommitImagePresentationInput {
 export interface SaveImageAggregateCopyFromDocumentInput {
   document: EditorDocument;
   history?: EditorImageHistoryCheckpoint;
-  imageContentState?: ImageContentState;
+  original?: CommitImageWorkspaceInput['original'];
   previewBlob: Blob;
   sourceFavicon?: string | null;
   sourceTitle?: string | null;

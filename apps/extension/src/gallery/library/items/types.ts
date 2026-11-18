@@ -156,7 +156,8 @@ export function usesGalleryImagePresentation(item: GalleryMediaItem): boolean {
   return (
     (item.kind === 'image' || item.kind === 'screenshot') &&
     (item.source.kind === 'screenshot' ||
-      (item.source.kind === 'stored-asset' && typeof item.presentationRevision === 'number'))
+      (item.source.kind === 'stored-asset' &&
+        (typeof item.presentationRevision === 'number' || item.imageContentState === 'original')))
   );
 }
 

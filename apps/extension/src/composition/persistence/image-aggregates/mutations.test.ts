@@ -2,6 +2,7 @@ import { getImageMutationMocks, root, installTransaction } from './mutations.tes
 import { expect, it } from 'vitest';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
+import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import {
   commitImagePresentation,
   commitImageWorkspace,
@@ -420,17 +421,15 @@ it('saves a complete library copy under a new aggregate id', async () => {
       targetAggregateId: 'image-copy',
     })
   ).resolves.toBe('image-copy');
-  expect(puts.media).toHaveBeenCalledWith(
+  expect(puts.media).toHaveBeenCalledExactlyOnceWith(
     expect.objectContaining({
-      blob: expect.any(Blob),
-      id: 'image-copy',
-      imageContentState: 'edited',
+      ...media,
+      savedIndependently: false,
       lifecycle: expect.objectContaining({ storageClass: 'library' }),
-      workspaceRevision: 1,
     })
   );
   expect(puts.workspace).toHaveBeenCalledWith(
-    expect.objectContaining({ aggregateId: 'image-copy', revision: 1 })
+    expect.objectContaining({ aggregateId: 'image-copy', sourceMediaId: media.id, revision: 1 })
   );
   expect(puts.presentation).toHaveBeenCalledWith(
     expect.objectContaining({ aggregateId: 'image-copy', presentationRevision: 1 })
@@ -465,12 +464,17 @@ it('copies an original-only aggregate by synthesizing its first workspace', asyn
   expect(puts.workspace).toHaveBeenCalledWith(
     expect.objectContaining({
       aggregateId: 'image-copy',
+      sourceMediaId: media.id,
       document: expect.any(Object),
       revision: 1,
     })
   );
-  expect(puts.media).toHaveBeenCalledWith(
-    expect.objectContaining({ id: 'image-copy', imageContentState: 'original' })
+  expect(puts.media).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({
+      id: media.id,
+      imageContentState: 'original',
+      savedIndependently: false,
+    })
   );
 });
 
@@ -600,20 +604,22 @@ it('atomically saves unsaved editor state as a revision-one library copy', async
     sourceGeneration: expect.any(String),
     documentAssetsByRuntimeUrl: expect.any(Map),
   });
-  expect(puts.media).toHaveBeenCalledWith(
-    expect.objectContaining({
-      id: 'stale-tab-copy',
-      imageContentState: 'edited',
-      lifecycle: expect.objectContaining({ storageClass: 'library' }),
-      sourceUrl: 'https://example.test/private',
-      workspaceRevision: 1,
-    })
-  );
+  expect(puts.media).toHaveBeenCalledOnce();
+  const original = parseMediaLibraryEntry(puts.media.mock.calls[0]?.[0]);
+  expect(original?.id).not.toBe('stale-tab-copy');
+  expect(original).toMatchObject({
+    imageContentState: 'original',
+    lifecycle: { storageClass: 'library' },
+    savedIndependently: false,
+    workspaceRevision: 0,
+  });
   expect(puts.workspace).toHaveBeenCalledWith(
     expect.objectContaining({
       aggregateId: 'stale-tab-copy',
       document: expect.objectContaining({ version: 3 }),
       revision: 1,
+      sourceMediaId: original?.id,
+      sourceUrl: 'https://example.test/private',
     })
   );
   expect(puts.presentation).toHaveBeenCalledWith(

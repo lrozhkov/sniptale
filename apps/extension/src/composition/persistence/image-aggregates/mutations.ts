@@ -628,7 +628,7 @@ async function prepareOriginalReuse(
   input: CommitImageWorkspaceInput
 ): Promise<Pick<PreparedImageWorkspaceInput, 'originalWitness' | 'inlineOriginalCreatedAt'>> {
   if (
-    input.requireMissingRoot ||
+    (input.requireMissingRoot && !input.original) ||
     !input.document.sourceImageData.startsWith('data:') ||
     input.reusableAssetsByRuntimeUrl?.has(input.document.sourceImageData)
   )
@@ -850,11 +850,9 @@ function parsePreparedNewImageOriginal(
     !isString(filename) ||
     !filename.length ||
     !isNumber(width) ||
-    !Number.isSafeInteger(width) ||
-    width < 1 ||
+    width <= 0 ||
     !isNumber(height) ||
-    !Number.isSafeInteger(height) ||
-    height < 1 ||
+    height <= 0 ||
     !ref ||
     !ref.mimeType.startsWith('image/') ||
     !refs.some((candidate) => candidate && sameLibrarySourceRef(candidate, ref))
@@ -1695,11 +1693,13 @@ export async function copyImageAggregate(input: {
       sourceWorkspace?.document ?? createOriginalImageDocument(sourceMedia),
       sourcePresentation?.thumbnailBlob ?? createImageThumbnailBlob(sourceMedia.blob),
     ]);
+    const retainedOriginalId = original.sourceMediaId ?? input.aggregateId;
+    const retainedOriginal = original.sourceMediaId
+      ? await readImageOriginalSource(retainedOriginalId, { includeBlob: false })
+      : original;
     const copy = await saveImageAggregateCopyFromDocument({
       document,
-      ...(sourceMedia.imageContentState === undefined
-        ? {}
-        : { imageContentState: sourceMedia.imageContentState }),
+      original: { mediaId: retainedOriginalId, generation: retainedOriginal.sourceGeneration },
       previewBlob: sourcePresentation?.previewBlob ?? sourceMedia.blob,
       sourceFavicon: sourceMedia.sourceFavicon,
       sourceTitle: sourceWorkspace?.sourceTitle ?? sourceMedia.sourceTitle,
@@ -1729,9 +1729,17 @@ export async function saveImageAggregateCopyFromDocument(
     document: input.document,
     ...(input.history ? { history: input.history } : {}),
     expectedRevision: 0,
-    ...(input.imageContentState === undefined
-      ? {}
-      : { imageContentState: input.imageContentState }),
+    ...(input.original
+      ? { original: input.original }
+      : {
+          newOriginal: {
+            mediaId: crypto.randomUUID(),
+            filename: input.document.sourceName?.trim() || 'Image copy',
+            width: input.document.sourceWidth,
+            height: input.document.sourceHeight,
+            dataUrl: input.document.sourceImageData,
+          },
+        }),
     requireMissingRoot: true,
     ...(input.sourceFavicon === undefined ? {} : { sourceFavicon: input.sourceFavicon }),
     ...(input.sourceTitle === undefined ? {} : { sourceTitle: input.sourceTitle }),
@@ -1745,10 +1753,5 @@ export async function saveImageAggregateCopyFromDocument(
     previewBlob: input.previewBlob,
     thumbnailBlob: input.thumbnailBlob,
   });
-  await promoteImageAggregate(
-    input.targetAggregateId,
-    result.revision,
-    result.sourceGeneration ?? null
-  );
   return { ...result, aggregateId: input.targetAggregateId };
 }
