@@ -429,12 +429,7 @@ class ReviewTransportController {
   seekResult = (requested: number): void => {
     if (this.disposed || !Number.isFinite(requested)) return;
     const time = Math.max(0, Math.min(this.resultDuration(), requested));
-    const part = this.segments.find(
-      (segment) => segment.kind !== 'cut' && time >= segment.resultStart && time < segment.resultEnd
-    );
-    const source = part
-      ? part.sourceStart + (time - part.resultStart) * part.rate
-      : this.configuration.duration;
+    const { part, source } = this.resolveResultSeek(time);
     if (
       this.range &&
       (this.range.result
@@ -1090,6 +1085,26 @@ class ReviewTransportController {
     this.dependencies.media.seek(segment.frameTime!);
   }
 
+  /** Refresh media positions before audio starts. A loop or end takes over this attempt. */
+  private prepareNativePlaybackPosition(): boolean {
+    if (this.hold) return true;
+    const observation = this.observe();
+    if (!observation) return true;
+    const sample = this.applySource(observation.time, true);
+    if (sample.looped) {
+      this.restartRange();
+      return false;
+    }
+    const pending = this.pendingHold(sample.time);
+    this.previousSource = sample.time;
+    if (pending) this.stageHold(pending);
+    else if (sample.time >= this.configuration.duration) {
+      this.ended();
+      return false;
+    }
+    return true;
+  }
+
   private async startPlayback() {
     this.cancelWork();
     this.reference = null;
@@ -1101,23 +1116,7 @@ class ReviewTransportController {
     this.mode = 'preparing';
     let failureKind: 'audio' | 'play' = 'audio';
     try {
-      if (!this.hold) {
-        const observation = this.observe();
-        if (observation) {
-          const sample = this.applySource(observation.time, true);
-          if (sample.looped) {
-            this.restartRange();
-            return;
-          }
-          const pending = this.pendingHold(sample.time);
-          this.previousSource = sample.time;
-          if (pending) this.stageHold(pending);
-          else if (sample.time >= this.configuration.duration) {
-            this.ended();
-            return;
-          }
-        }
-      }
+      if (!this.prepareNativePlaybackPosition()) return;
       this.publishStatus();
       const preparation =
         this.configuration.silent ||
@@ -1138,23 +1137,7 @@ class ReviewTransportController {
       if (!this.hold) await this.resumeNative();
       if (!this.current(revision, sourceId)) return;
       // Native play readiness can advance media, cross a cut or reach a hold.
-      if (!this.hold) {
-        const observation = this.observe();
-        if (observation) {
-          const sample = this.applySource(observation.time, true);
-          if (sample.looped) {
-            this.restartRange();
-            return;
-          }
-          const pending = this.pendingHold(sample.time);
-          this.previousSource = sample.time;
-          if (pending) this.stageHold(pending);
-          else if (sample.time >= this.configuration.duration) {
-            this.ended();
-            return;
-          }
-        }
-      }
+      if (!this.prepareNativePlaybackPosition()) return;
       this.preparation = null;
       if (this.hold) this.hold.started = null;
       const start = this.readPosition();
@@ -1234,18 +1217,22 @@ class ReviewTransportController {
     }
   }
 
+  private resolveResultSeek(time: number) {
+    const part = this.segments.find(
+      (segment) => segment.kind !== 'cut' && time >= segment.resultStart && time < segment.resultEnd
+    );
+    const source = part
+      ? part.sourceStart + (time - part.resultStart) * part.rate
+      : this.configuration.duration;
+    return { part, source };
+  }
+
   private restartRange() {
     const range = this.range;
     if (!range) return;
     if (range.result) {
       const time = range.result.start;
-      const part = this.segments.find(
-        (segment) =>
-          segment.kind !== 'cut' && time >= segment.resultStart && time < segment.resultEnd
-      );
-      const source = part
-        ? part.sourceStart + (time - part.resultStart) * part.rate
-        : this.configuration.duration;
+      const { part, source } = this.resolveResultSeek(time);
       this.commitSeek(
         source,
         time,

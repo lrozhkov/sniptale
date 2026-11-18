@@ -1,14 +1,12 @@
 import { isFinalObservationBatch } from './observation-batches';
+import { isRecordingObservationHeader } from './observation-header';
 import {
   hasExactKeys,
   isStringMember,
   isNumber,
   isPlainRecord,
 } from '@sniptale/runtime-contracts/validation/primitives';
-import {
-  isCursorTrajectoryClock,
-  isTrajectoryInteger,
-} from '../../features/video/project/cursor-trajectory/records';
+import { isTrajectoryInteger } from '../../features/video/project/cursor-trajectory/records';
 import type {
   CursorTrajectoryBoundaryReason,
   CursorTrajectorySample,
@@ -140,50 +138,9 @@ export function isRecordingCursorObservation(value: unknown): value is Recording
 export function isRecordingCursorObservationPacket(
   value: unknown
 ): value is RecordingCursorObservationPacket {
-  if (
-    !isPlainRecord(value) ||
-    !hasExactKeys(value, [
-      'version',
-      'recordingId',
-      'batchSequence',
-      'sourceClockId',
-      'clockRevision',
-      'clock',
-      'viewport',
-      'records',
-      ...(Object.hasOwn(value, 'sourceInstanceId') ? ['sourceInstanceId'] : []),
-    ])
-  )
-    return false;
-  const viewport = value['viewport'];
+  if (!isRecordingObservationHeader(value)) return false;
   const records = value['records'];
   const shape =
-    value['version'] === 1 &&
-    typeof value['recordingId'] === 'string' &&
-    /^[A-Za-z0-9._:-]{1,128}$/.test(value['recordingId']) &&
-    typeof value['sourceClockId'] === 'string' &&
-    /^[A-Za-z0-9._:-]{1,128}$/.test(value['sourceClockId']) &&
-    (!Object.hasOwn(value, 'sourceInstanceId') ||
-      (typeof value['sourceInstanceId'] === 'string' &&
-        /^[A-Za-z0-9._:-]{1,128}$/.test(value['sourceInstanceId']))) &&
-    isTrajectoryInteger(value['batchSequence']) &&
-    isTrajectoryInteger(value['clockRevision']) &&
-    isCursorTrajectoryClock(value['clock']) &&
-    value['clock'].source === 'dom-event-time' &&
-    isPlainRecord(viewport) &&
-    hasExactKeys(viewport, [
-      'width',
-      'height',
-      'devicePixelRatio',
-      'visualViewportScale',
-      'visualViewportOffsetX',
-      'visualViewportOffsetY',
-    ]) &&
-    ['width', 'height', 'devicePixelRatio', 'visualViewportScale'].every(
-      (key) => isNumber(viewport[key]) && viewport[key] > 0
-    ) &&
-    isNumber(viewport['visualViewportOffsetX']) &&
-    isNumber(viewport['visualViewportOffsetY']) &&
     Array.isArray(records) &&
     records.length > 0 &&
     records.length <= RECORDING_CURSOR_PACKET_MAX_RECORDS &&

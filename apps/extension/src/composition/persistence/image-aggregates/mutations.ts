@@ -87,6 +87,7 @@ import {
   type AssetReadyJournal,
   type AssetRef,
 } from '../assets';
+import { throwAssetPreparationError } from '../assets/opfs-store';
 import {
   parsePersistedEditorDocument,
   preparePersistedEditorDocument,
@@ -753,7 +754,6 @@ async function prepareImageWorkspaceCommit(
     ...serializableInput
   } = input;
   const preparedObjects = [...preparedDocument.objects];
-  let journalCreated = false;
   try {
     const preparedHistory = input.history
       ? await preparePersistedImageHistory(input.history, {
@@ -800,7 +800,6 @@ async function prepareImageWorkspaceCommit(
       domain: IMAGE_WORKSPACE_PUBLICATION_DOMAIN,
       payload: preparedInput,
     });
-    journalCreated = true;
     return async () => {
       let result: ImageWorkspacePublicationResult | undefined;
       await publishReadyJournalWithRetry(journal, async (ready, permit) => {
@@ -820,17 +819,10 @@ async function prepareImageWorkspaceCommit(
       };
     };
   } catch (error) {
-    if (!journalCreated) {
-      const failures = await collectPreparedAssetCleanupFailures(
-        preparedObjects.map(({ ref }) => ref.assetId)
-      );
-      if (failures.length > 0) {
-        throw new AggregateError([error, ...failures], 'Image workspace save cleanup failed.', {
-          cause: error,
-        });
-      }
-    }
-    throw error;
+    const failures = await collectPreparedAssetCleanupFailures(
+      preparedObjects.map(({ ref }) => ref.assetId)
+    );
+    throwAssetPreparationError(error, failures, 'Image workspace save cleanup failed.');
   }
 }
 

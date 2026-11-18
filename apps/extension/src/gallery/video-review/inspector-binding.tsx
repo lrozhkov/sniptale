@@ -340,6 +340,40 @@ export function ReviewInspectorBinding({
     state.media.pause();
     leaveReviewInspector(inspectorExit(state), canvasComments, done, isCurrent);
   };
+  const renderTrackItems = (key: string) => (
+    <ReviewTrackItemsInspector
+      key={key}
+      track={inspectorTrack}
+      document={state.model.document}
+      advanced={state.model.advanced}
+      selection={state.model.activeSelection}
+      snapshots={state.model.workspace.effectSnapshots}
+      busy={
+        state.model.busy ||
+        state.output.phase !== 'idle' ||
+        state.editors.annotationEffects.pending ||
+        !!state.editors.annotationEffects.gestureId
+      }
+      commands={{
+        session: state.session,
+        open: (selection, done) => {
+          const context = state.commands.activation.capture();
+          if (!context) return;
+          state.commands.activation.admit(context, (captured) => {
+            state.commands.setActiveSelection(selection, captured);
+            done();
+          });
+        },
+        canStart: state.commands.canStart,
+        run: state.commands.run,
+        flushAnnotations: state.editors.annotationEffects.flush,
+        flushAdvanced: state.commands.flushAdvanced,
+      }}
+      resource={resource}
+      audio={audio}
+      navigation={navigation}
+    />
+  );
   const trackList =
     inspectorTrack === 'text' ? (
       reviewInspectorTextDocument(state, canvasComments)
@@ -355,38 +389,7 @@ export function ReviewInspectorBinding({
         }}
       />
     ) : (
-      <ReviewTrackItemsInspector
-        key={inspectorTrack}
-        track={inspectorTrack}
-        document={state.model.document}
-        advanced={state.model.advanced}
-        selection={state.model.activeSelection}
-        snapshots={state.model.workspace.effectSnapshots}
-        busy={
-          state.model.busy ||
-          state.output.phase !== 'idle' ||
-          state.editors.annotationEffects.pending ||
-          !!state.editors.annotationEffects.gestureId
-        }
-        commands={{
-          session: state.session,
-          open: (selection, done) => {
-            const context = state.commands.activation.capture();
-            if (!context) return;
-            state.commands.activation.admit(context, (captured) => {
-              state.commands.setActiveSelection(selection, captured);
-              done();
-            });
-          },
-          canStart: state.commands.canStart,
-          run: state.commands.run,
-          flushAnnotations: state.editors.annotationEffects.flush,
-          flushAdvanced: state.commands.flushAdvanced,
-        }}
-        resource={resource}
-        audio={audio}
-        navigation={navigation}
-      />
+      renderTrackItems(inspectorTrack)
     );
   const workspace = (sections: readonly ReviewInspectorSection[]) => (
     <ReviewTrackWorkspace
@@ -410,6 +413,44 @@ export function ReviewInspectorBinding({
       }
     />
   );
+  const renderSpeech = (
+    renderSections?: (sections: readonly ReviewInspectorSection[]) => ReactNode
+  ) => (
+    <ReviewSourceSpeechBinding
+      resource={resource}
+      originalAudio={state.model.advanced.audio.original}
+      recognitionEnabled={state.model.advanced.ui.mode === 'advanced'}
+      disabled={state.model.busy}
+      sourceAssetId={state.model.workspace.sourceAssetId}
+      sourceAudioAvailable={!!state.output.index?.audioCodec}
+      selection={
+        state.model.playbackRange ??
+        (state.model.selection.kind === 'range' ? state.model.selection : undefined)
+      }
+      beforeAction={state.commands.beforeAction}
+      registerSpeechFlush={state.commands.registerSpeechFlush}
+      onEnableAdvanced={
+        state.model.advanced.ui.mode === 'basic'
+          ? () => state.commands.setMode('advanced')
+          : undefined
+      }
+      media={state.media}
+      onOriginalChange={audio.setOriginal}
+      flush={() => flushReviewTextVoiceBuffers(inspectorBuffers(state), canvasComments)}
+      renderInspectorSections={renderSections}
+    />
+  );
+  const timelineSelectionProps = {
+    busy: state.model.busy || state.output.phase !== 'idle',
+    commands: {
+      session: state.session,
+      run: state.commands.run,
+      flushAdvanced: state.commands.flushAdvanced,
+      canStart: state.commands.canStart,
+      setMessage: state.commands.setMessage,
+    },
+    duration: resource.source.duration,
+  };
   return (
     <ReviewIntervalMap.Provider value={state.model.segments}>
       <ReviewInspector
@@ -419,29 +460,7 @@ export function ReviewInspectorBinding({
           !hasTrackSettings ? (
             workspace([])
           ) : inspectorTrack === 'originalAudio' ? (
-            <ReviewSourceSpeechBinding
-              resource={resource}
-              originalAudio={state.model.advanced.audio.original}
-              recognitionEnabled={state.model.advanced.ui.mode === 'advanced'}
-              disabled={state.model.busy}
-              sourceAssetId={state.model.workspace.sourceAssetId}
-              sourceAudioAvailable={!!state.output.index?.audioCodec}
-              selection={
-                state.model.playbackRange ??
-                (state.model.selection.kind === 'range' ? state.model.selection : undefined)
-              }
-              beforeAction={state.commands.beforeAction}
-              registerSpeechFlush={state.commands.registerSpeechFlush}
-              onEnableAdvanced={
-                state.model.advanced.ui.mode === 'basic'
-                  ? () => state.commands.setMode('advanced')
-                  : undefined
-              }
-              media={state.media}
-              onOriginalChange={audio.setOriginal}
-              flush={() => flushReviewTextVoiceBuffers(inspectorBuffers(state), canvasComments)}
-              renderInspectorSections={workspace}
-            />
+            renderSpeech(workspace)
           ) : inspectorTrack === 'webcam' ? (
             state.editors.webcam.camera ? (
               <ReviewWebcamInspector editor={state.editors.webcam} renderSections={workspace} />
@@ -469,40 +488,9 @@ export function ReviewInspectorBinding({
             : undefined
         }
         trackItems={
-          inspectorTrack !== 'text' && inspectorTrack !== 'actions' ? (
-            <ReviewTrackItemsInspector
-              key={`${resource.filename}:${inspectorTrack}`}
-              track={inspectorTrack}
-              document={state.model.document}
-              advanced={state.model.advanced}
-              selection={state.model.activeSelection}
-              snapshots={state.model.workspace.effectSnapshots}
-              busy={
-                state.model.busy ||
-                state.output.phase !== 'idle' ||
-                state.editors.annotationEffects.pending ||
-                !!state.editors.annotationEffects.gestureId
-              }
-              commands={{
-                session: state.session,
-                open: (selection, done) => {
-                  const context = state.commands.activation.capture();
-                  if (!context) return;
-                  state.commands.activation.admit(context, (captured) => {
-                    state.commands.setActiveSelection(selection, captured);
-                    done();
-                  });
-                },
-                canStart: state.commands.canStart,
-                run: state.commands.run,
-                flushAnnotations: state.editors.annotationEffects.flush,
-                flushAdvanced: state.commands.flushAdvanced,
-              }}
-              resource={resource}
-              audio={audio}
-              navigation={navigation}
-            />
-          ) : undefined
+          inspectorTrack !== 'text' && inspectorTrack !== 'actions'
+            ? renderTrackItems(`${resource.filename}:${inspectorTrack}`)
+            : undefined
         }
         onProject={() => {
           multiSelection?.clear();
@@ -511,30 +499,7 @@ export function ReviewInspectorBinding({
         backLabel={backLabel}
         project={projectInfo}
         textDocument={reviewInspectorTextDocument(state, canvasComments)}
-        speech={
-          <ReviewSourceSpeechBinding
-            resource={resource}
-            originalAudio={state.model.advanced.audio.original}
-            recognitionEnabled={state.model.advanced.ui.mode === 'advanced'}
-            disabled={state.model.busy}
-            sourceAssetId={state.model.workspace.sourceAssetId}
-            sourceAudioAvailable={!!state.output.index?.audioCodec}
-            selection={
-              state.model.playbackRange ??
-              (state.model.selection.kind === 'range' ? state.model.selection : undefined)
-            }
-            beforeAction={state.commands.beforeAction}
-            registerSpeechFlush={state.commands.registerSpeechFlush}
-            onEnableAdvanced={
-              state.model.advanced.ui.mode === 'basic'
-                ? () => state.commands.setMode('advanced')
-                : undefined
-            }
-            media={state.media}
-            onOriginalChange={audio.setOriginal}
-            flush={() => flushReviewTextVoiceBuffers(inspectorBuffers(state), canvasComments)}
-          />
-        }
+        speech={renderSpeech()}
         preview={preview}
         beforeAction={state.commands.beforeAction}
         fullHeight={fullHeight}
@@ -641,30 +606,14 @@ export function ReviewInspectorBinding({
               markers={state.model.projected.markers}
               cursorFocusPath={state.model.cursorFocusPath}
               cursorFocusKeys={state.model.cursorFocusKeys}
-              busy={state.model.busy || state.output.phase !== 'idle'}
-              commands={{
-                session: state.session,
-                run: state.commands.run,
-                flushAdvanced: state.commands.flushAdvanced,
-                canStart: state.commands.canStart,
-                setMessage: state.commands.setMessage,
-              }}
-              duration={resource.source.duration}
+              {...timelineSelectionProps}
             />
           ) : (
             <ReviewTimelineCloneScope
               document={state.model.document}
               advanced={state.model.advanced}
               selection={state.model.activeSelection}
-              busy={state.model.busy || state.output.phase !== 'idle'}
-              commands={{
-                session: state.session,
-                run: state.commands.run,
-                flushAdvanced: state.commands.flushAdvanced,
-                canStart: state.commands.canStart,
-                setMessage: state.commands.setMessage,
-              }}
-              duration={resource.source.duration}
+              {...timelineSelectionProps}
             >
               <ReviewSelectionBinding
                 onBackToHistory={

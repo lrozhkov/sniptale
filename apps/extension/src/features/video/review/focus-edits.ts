@@ -55,27 +55,11 @@ export function reconcileReviewFocus(args: {
       if (region.dormant) return region;
       const anchor = region.sourceAnchor ?? reviewFocusSourceRange(region, previous);
       if (!anchor) return { ...region, dormant: true };
-      const visible = next.flatMap((part) => {
-        if (part.kind === 'cut') return [];
-        if (part.kind === 'freeze')
-          return anchor.start <= part.sourceStart && part.sourceStart < anchor.end
-            ? [{ start: part.resultStart, end: part.resultEnd }]
-            : [];
-        const start = Math.max(anchor.start, part.sourceStart);
-        const end = Math.min(anchor.end, part.sourceEnd);
-        return end > start
-          ? [
-              {
-                start: part.resultStart + (start - part.sourceStart) / part.rate,
-                end: part.resultStart + (end - part.sourceStart) / part.rate,
-              },
-            ]
-          : [];
-      });
+      const visible = projectReviewVisualRange(anchor, next);
       return {
         ...region,
         sourceAnchor: anchor,
-        ...(visible.length ? { start: visible[0]!.start, end: visible.at(-1)!.end } : {}),
+        ...(visible ?? {}),
       };
     });
   }

@@ -1,3 +1,4 @@
+import { createObservationDelivery } from './delivery';
 import { createClosingObservationDrain } from './closing-batch';
 import {
   RECORDING_CURSOR_INPUT_QUEUE_CAPACITY,
@@ -35,8 +36,6 @@ export function createCursorObservationSource(options: {
   const queue: PendingRecord[] = [];
   let loss: PendingRecord | null = null;
   let terminal: PendingRecord | null = null;
-  let retry: RecordingCursorObservationPacket | null = null;
-  let running: Promise<boolean> | null = null;
   let barrier: Promise<void> = Promise.resolve();
   let batchSequence = 0;
   let localSequence = 0;
@@ -131,31 +130,12 @@ export function createCursorObservationSource(options: {
       records,
     };
   }
-  function pump(): Promise<boolean> {
-    if (running) return running;
-    const work = (async () => {
-      await barrier;
-      try {
-        for (;;) {
-          retry ??= packet();
-          if (!retry) return true;
-          // A transport refusal retains the exact packet and sequence for the next attempt.
-          await options.send(structuredClone(retry));
-          retry = null;
-        }
-      } catch {
-        return false;
-      }
-    })();
-    const completion = work.then((drained) => {
-      if (running !== completion) return drained;
-      running = null;
-      // Flush includes input accepted after the empty-queue check, including the final Stop.
-      return drained && (queue.length || loss || terminal) ? pump() : drained;
-    });
-    running = completion;
-    return completion;
-  }
+  const { pump, inFlight } = createObservationDelivery({
+    takeNext: packet,
+    send: (value) => options.send(value),
+    hasPending: () => !!(queue.length || loss || terminal),
+    beforeDrain: () => barrier,
+  });
   function append(input: PendingRecord) {
     if (closed) return;
     refill();
@@ -165,7 +145,7 @@ export function createCursorObservationSource(options: {
   }
   const flushClosing = options.sendFinal
     ? createClosingObservationDrain({
-        inFlight: () => retry,
+        inFlight,
         takeNext: packet,
         isValid: isFinalRecordingCursorPackets,
         send: options.sendFinal,

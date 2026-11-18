@@ -88,7 +88,7 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts',
     exclusive: true,
     reason:
-      'Migration fixtures and branch integration prove additive admission, retained records and malformed prototype refusal.',
+      'Migration fixtures and branch integration prove admission, retained records and malformed prototype refusal.',
     testFiles: [
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.test.ts',
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.fixture.test.ts',

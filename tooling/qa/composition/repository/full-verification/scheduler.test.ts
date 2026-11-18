@@ -102,10 +102,10 @@ it('keeps release result order while running the pre-build lanes concurrently', 
   );
   expect(scheduledTasks?.find(({ id }) => id === 'light')).toMatchObject({
     dependencies: ['lint', 'typecheck'],
-    memoryMiB: 3072,
+    memoryMiB: 5120,
   });
   expect(workerRunner).toHaveBeenCalledWith(
-    expect.objectContaining({ lane: 'light', memoryMiB: 3072 })
+    expect.objectContaining({ lane: 'light', memoryMiB: 5120 })
   );
   expect(workerRunner).toHaveBeenCalledWith(
     expect.objectContaining({ lane: 'lint', oxlintThreadCount: 6 })

@@ -137,7 +137,9 @@ for (const [loadingResource, stopDuringNavigation] of [
         globalThis.earlyRuntimeReadinessFailed = false;
         const original = console.warn.bind(console);
         console.warn = (...values) => {
-          if (values.some(value => value instanceof Error && value.message === 'Content runtime did not become ready after injection.')) globalThis.earlyRuntimeReadinessFailed = true;
+          const isReadinessFailure = (value) =>
+            value instanceof Error && value.message === 'Content runtime did not become ready after injection.';
+          if (values.some(isReadinessFailure)) globalThis.earlyRuntimeReadinessFailed = true;
           original(...values);
         };
         return true;
@@ -388,9 +390,14 @@ for (const [loadingResource, stopDuringNavigation] of [
       await stoppingNavigation;
       const gallery = await context.newPage();
       await gallery.setViewportSize({ width: 1280, height: 560 });
-      await gallery.goto(
-        `chrome-extension://${extensionId}/apps/extension/src/gallery/index.html?recordingId=${encodeURIComponent(String(active.recordingId))}&mode=edit`
+      const galleryUrl = new URL(
+        `chrome-extension://${extensionId}/apps/extension/src/gallery/index.html`
       );
+      galleryUrl.search = new URLSearchParams({
+        recordingId: String(active.recordingId),
+        mode: 'edit',
+      }).toString();
+      await gallery.goto(galleryUrl.href);
       await expect(gallery.locator('[data-ui="gallery.videoReview.dialog"]')).toBeVisible();
       await gallery.getByRole('button', { name: 'Advanced editing', exact: true }).click();
       await expect

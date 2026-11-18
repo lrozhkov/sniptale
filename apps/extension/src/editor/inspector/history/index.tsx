@@ -1,15 +1,11 @@
 import { ArrowRight, Check, RotateCcw } from 'lucide-react';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { EditorHistoryEntry } from '../../../features/editor-history/action';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import { useEditorController } from '../../application/controller-context';
 import { runAndReportEditorAction } from '../../runtime/async-actions';
 import { useEditorStore } from '../../state/useEditorStore';
-import {
-  EditorHistoryResetPopover,
-  type EditorHistoryResetMode,
-} from '../../workspace/floating/history-reset-popover';
 import './history.css';
 
 function groupEntries(entries: EditorHistoryEntry[]): EditorHistoryEntry[][] {
@@ -35,17 +31,23 @@ export function EditorInspectorHistory({
   hasImage,
   initialScrollOffset = 0,
   onScrollOffsetChange,
+  renderRestoreConfirmation,
 }: {
   hasImage: boolean;
   initialScrollOffset?: number;
   onScrollOffsetChange?: (offset: number) => void;
+  renderRestoreConfirmation: (
+    anchorEl: HTMLElement | null,
+    historyIndex: number,
+    onClose: () => void
+  ) => ReactNode;
 }) {
   useAppLocale();
   const controller = useEditorController();
   const history = useEditorStore((state) => state.history);
   const entries = controller.getHistoryEntries();
   const [busy, setBusy] = useState(false);
-  const [resetMode, setResetMode] = useState<EditorHistoryResetMode>('closed');
+  const [restoreOpen, setRestoreOpen] = useState(false);
   const resetRef = useRef<HTMLButtonElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -74,8 +76,8 @@ export function EditorInspectorHistory({
           title={translate('editor.toolbar.restoreOriginal')}
           disabled={!hasImage || busy}
           aria-haspopup="dialog"
-          aria-expanded={resetMode !== 'closed'}
-          onClick={() => setResetMode('confirm')}
+          aria-expanded={restoreOpen}
+          onClick={() => setRestoreOpen(true)}
           className="!h-auto !w-full !justify-start !gap-2 !px-2 !py-2 !text-[13px]"
           dataUi="editor.inspector.history.restore"
         >
@@ -178,13 +180,9 @@ export function EditorInspectorHistory({
           <p className="editor-history-hint">{translate('editor.history.empty')}</p>
         ) : null}
       </div>
-      <EditorHistoryResetPopover
-        anchorEl={resetRef.current}
-        historyIndex={history.index}
-        mode={resetMode}
-        onBeforeSelectionAwareAction={() => undefined}
-        setMode={(mode) => setResetMode(mode === 'choose' ? 'closed' : mode)}
-      />
+      {restoreOpen
+        ? renderRestoreConfirmation(resetRef.current, history.index, () => setRestoreOpen(false))
+        : null}
     </div>
   );
 }

@@ -1,6 +1,7 @@
+// @vitest-environment jsdom
+
 import { useZoomPreviewSource } from './use-zoom-preview-source';
 import { createReviewTransportController } from './transport';
-// @vitest-environment jsdom
 import type { ReviewTextDocumentPanel } from './text-panel';
 import type { ReviewTextFragment } from '../../features/video/review/text-types';
 import {

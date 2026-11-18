@@ -29,6 +29,7 @@ import {
   type AssetRef,
   type PreparedAssetObject,
 } from '../assets';
+import { throwAssetPreparationError } from '../assets/opfs-store';
 import {
   parsePersistedVideoProjectHistory,
   videoProjectHistoryAssetBindings,
@@ -148,11 +149,7 @@ export async function preparePersistedVideoProjectHistory(
     const failures = await collectPreparedAssetCleanupFailures(
       objects.map(({ ref }) => ref.assetId)
     );
-    if (failures.length)
-      throw new AggregateError([error, ...failures], 'Video history preparation cleanup failed.', {
-        cause: error,
-      });
-    throw error;
+    throwAssetPreparationError(error, failures, 'Video history preparation cleanup failed.');
   }
 }
 

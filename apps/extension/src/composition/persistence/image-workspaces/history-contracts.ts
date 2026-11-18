@@ -1,7 +1,8 @@
 import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
 import {
-  parseEditorHistoryAction,
+  isEditorHistoryCursor,
+  parseEditorHistoryActions,
   type EditorHistoryAction,
 } from '../../../features/editor-history/action';
 import {
@@ -93,10 +94,7 @@ export function parsePersistedImageHistory(
     !Array.isArray(value['snapshots']) ||
     !value['snapshots'].length ||
     value['snapshots'].length > limits.maxActions + 1 ||
-    typeof value['cursor'] !== 'number' ||
-    !Number.isSafeInteger(value['cursor']) ||
-    value['cursor'] < 0 ||
-    value['cursor'] >= value['snapshots'].length ||
+    !isEditorHistoryCursor(value['cursor'], value['snapshots'].length) ||
     !Array.isArray(value['actions']) ||
     value['actions'].length !== value['snapshots'].length ||
     !Array.isArray(value['values']) ||
@@ -117,12 +115,8 @@ export function parsePersistedImageHistory(
     ids.add(parsed.id);
     values.push(parsed);
   }
-  const actions: (EditorHistoryAction | null)[] = [];
-  for (const [index, raw] of value['actions'].entries()) {
-    const action = parseEditorHistoryAction(raw);
-    if (action === undefined || (index === 0 ? action !== null : action === null)) return null;
-    actions.push(action);
-  }
+  const actions = parseEditorHistoryActions(value['actions']);
+  if (!actions) return null;
   if (value['version'] === 2) {
     const id = snapshots[0]!.assetId;
     if (

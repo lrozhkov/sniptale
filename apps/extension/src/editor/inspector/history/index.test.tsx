@@ -18,22 +18,18 @@ vi.mock('../../application/controller-context', () => ({
 vi.mock('../../runtime/async-actions', () => ({
   runAndReportEditorAction: (_label: string, action: () => Promise<void>) => action(),
 }));
-vi.mock('../../workspace/floating/history-reset-popover', () => ({
-  EditorHistoryResetPopover: ({
-    mode,
-    setMode,
-  }: {
-    mode: string;
-    setMode: (mode: string) => void;
-  }) =>
-    mode === 'confirm' ? (
-      <div role="dialog">
-        <button onClick={() => setMode('choose')}>Cancel</button>
-      </div>
-    ) : null,
-}));
-
 import { EditorInspectorHistory } from './index';
+
+const historyPanel = (
+  <EditorInspectorHistory
+    hasImage
+    renderRestoreConfirmation={(_anchorEl, _historyIndex, onClose) => (
+      <div role="dialog">
+        <button onClick={onClose}>Cancel</button>
+      </div>
+    )}
+  />
+);
 
 let host: HTMLDivElement;
 let root: Root;
@@ -66,7 +62,7 @@ afterEach(() => {
 });
 
 it('selects only the current leaf and keeps visual groups passive and future states distinct', async () => {
-  act(() => root.render(<EditorInspectorHistory hasImage />));
+  act(() => root.render(historyPanel));
   const rows = host.querySelectorAll<HTMLButtonElement>(
     '[data-ui="editor.inspector.history.entry"]'
   );
@@ -92,7 +88,7 @@ it('limits duplicate jump requests and permits retry after a failed apply', asyn
       reject = fail;
     })
   );
-  act(() => root.render(<EditorInspectorHistory hasImage />));
+  act(() => root.render(historyPanel));
   const row = host.querySelector<HTMLButtonElement>('[data-index="0"]')!;
   act(() => row.click());
   expect(row.disabled).toBe(true);
@@ -105,7 +101,7 @@ it('limits duplicate jump requests and permits retry after a failed apply', asyn
 });
 
 it('opens the existing restore confirmation and closes it on cancellation', () => {
-  act(() => root.render(<EditorInspectorHistory hasImage />));
+  act(() => root.render(historyPanel));
   act(() =>
     host.querySelector<HTMLButtonElement>('[data-ui="editor.inspector.history.restore"]')?.click()
   );
@@ -128,7 +124,7 @@ it('shows the operation without an empty color comparison for gradients', () => 
       pending: false,
     },
   ];
-  act(() => root.render(<EditorInspectorHistory hasImage />));
+  act(() => root.render(historyPanel));
   expect(host.textContent).toContain(translate('editor.history.operations.fill'));
   expect(
     host.querySelector(`[aria-label="${translate('editor.history.colorChange')}"]`)

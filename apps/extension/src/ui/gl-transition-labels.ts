@@ -6,13 +6,13 @@ import {
 import { translate, type AppLocale, type TranslationDictionary } from '../platform/i18n';
 
 type Labels = TranslationDictionary['videoEditor']['glTransitions'];
-const names = new Set(GL_TRANSITIONS.map((transition) => transition.name));
-const parameters = new Set(GL_TRANSITIONS.flatMap((transition) => Object.keys(transition.params)));
+const names: readonly string[] = GL_TRANSITIONS.map((transition) => transition.name);
+const parameters = GL_TRANSITIONS.flatMap((transition) => Object.keys(transition.params));
 function isBuiltinName(name: string): name is keyof Labels['names'] {
-  return names.has(name);
+  return names.includes(name);
 }
 function isBuiltinParameter(id: string): id is keyof Labels['parameters'] {
-  return parameters.has(id);
+  return parameters.includes(id);
 }
 
 /** Translate pinned built-in identities only; imported display names belong to their source. */

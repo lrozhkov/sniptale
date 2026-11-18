@@ -7,7 +7,7 @@ import type { GallerySidebarProps } from './types';
 import { GallerySavedViewRows } from './saved-views';
 import { getRenderedGalleryFolders, isGalleryFolderAvailable } from './folder-visibility';
 
-const PROJECT_FOLDERS = new Set<FolderFilter>(['image-project', 'video-project', 'scenario']);
+const PROJECT_FOLDERS: readonly FolderFilter[] = ['image-project', 'video-project', 'scenario'];
 
 type FolderListProps = Pick<
   GallerySidebarProps,
@@ -130,8 +130,10 @@ export function GalleryFolderList(props: FolderListProps) {
         folderFilter: props.folderFilter,
       })
     : (['all'] as FolderFilter[]);
-  const projects = folders.filter((folder) => PROJECT_FOLDERS.has(folder));
-  const originals = folders.filter((folder) => folder !== 'all' && !PROJECT_FOLDERS.has(folder));
+  const projects = folders.filter((folder) => PROJECT_FOLDERS.includes(folder));
+  const originals = folders.filter(
+    (folder) => folder !== 'all' && !PROJECT_FOLDERS.includes(folder)
+  );
   const hiddenSavedViewFolders =
     props.countsKnown && props.savedViewsLoaded
       ? SIDEBAR_FOLDERS.filter(

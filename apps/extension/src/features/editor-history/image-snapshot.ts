@@ -12,19 +12,19 @@ type EditorImageHistoryValueReader = (
 type EditorImageHistoryObjectVisitor = (token: string, object: Record<string, unknown>) => void;
 export const IMAGE_HISTORY_VALUE_INLINE_LIMIT = 4_096;
 export const IMAGE_HISTORY_VALUE_TOKEN_PREFIX = 'sniptale-history-asset:';
-const CANVAS_POOLED_FIELDS = new Set([
+const CANVAS_POOLED_FIELDS: readonly string[] = [
   ...EDITOR_RASTER_BINARY_FIELDS,
   'src',
   'sniptaleBackgroundImageData',
   'sniptaleSimplifySourceData',
   'sniptaleBlurSourceData',
   'sniptaleDrawingJson',
-]);
-const DOCUMENT_POOLED_FIELDS = new Set([
+];
+const DOCUMENT_POOLED_FIELDS: readonly string[] = [
   'sourceImageData',
   'backgroundImageData',
   'faviconDataUrl',
-]);
+];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -54,7 +54,7 @@ function encodeSharedValue(
     typeof value !== 'string' ||
     value.length < IMAGE_HISTORY_VALUE_INLINE_LIMIT ||
     (key !== 'sniptaleDrawingJson' && !value.startsWith('data:')) ||
-    !(DOCUMENT_POOLED_FIELDS.has(key) || CANVAS_POOLED_FIELDS.has(key))
+    !(DOCUMENT_POOLED_FIELDS.includes(key) || CANVAS_POOLED_FIELDS.includes(key))
   )
     return value;
   return encoding.intern(value, value.startsWith('data:') ? 'image' : 'json');
@@ -165,7 +165,7 @@ function restoreObjectVersions(objects: unknown[], decoding: Decoding): unknown[
 
 function restoreSharedFields(
   root: unknown,
-  fieldNames: ReadonlySet<string>,
+  fieldNames: readonly string[],
   decoding: Decoding,
   restoreObjects: boolean
 ): void {
@@ -187,7 +187,11 @@ function restoreSharedFields(
         const objects = restoreObjectVersions(child, decoding);
         current[key] = objects;
         pending.push({ value: objects, depth: depth + 1 });
-      } else if (typeof child === 'string' && fieldNames.has(key) && !isCanvasSvgSource(key, child))
+      } else if (
+        typeof child === 'string' &&
+        fieldNames.includes(key) &&
+        !isCanvasSvgSource(key, child)
+      )
         current[key] =
           (key === 'sniptaleDrawingJson'
             ? readObjectMetadata(child, decoding)

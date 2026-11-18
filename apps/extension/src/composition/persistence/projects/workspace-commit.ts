@@ -5,11 +5,7 @@ import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 import type { VideoProjectHistoryCapture } from '../../../features/video/project/history-capture';
 import { isHydratableVideoProject } from '../../../features/video/project/validation';
 import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../features/video/project/effect-instance';
-import {
-  initDB,
-  VIDEO_PROJECTS_STORE,
-  VIDEO_PROJECT_REVISIONS_STORE,
-} from '../infrastructure/indexed-db/core';
+import { initDB } from '../infrastructure/indexed-db/core';
 import {
   collectPreparedAssetCleanupFailures,
   createAssetPublicationJournal,
@@ -22,14 +18,14 @@ import {
   recoverStandaloneAssetPublications,
   SupersededAssetPublicationError,
 } from '../assets';
+import { throwAssetPreparationError } from '../assets/opfs-store';
 import {
   commitPreparedVideoProjectWorkspace,
   readVideoProjectWorkspacePublicationStatus,
   type VideoProjectSaveResult,
 } from './index';
 import { guardStaleVideoProjectSave } from './index.save-guard';
-import { parseVideoProjectEntry } from './read-guards';
-import { readRetainedVideoProjectRevisionInTransaction } from './revisions';
+import { readVideoProjectRevisionSnapshot } from './revisions';
 import {
   preparePersistedVideoProjectHistory,
   hydratePersistedVideoProjectHistory,
@@ -109,16 +105,10 @@ async function prepareWorkspaceCommit(
   assertHistoryWireBudget(input);
   await verifyVideoProjectEffectSnapshotIntegrity(input.project);
   await recoverProjectMediaPublications();
-  const tx = db.transaction([VIDEO_PROJECTS_STORE, VIDEO_PROJECT_REVISIONS_STORE], 'readonly');
-  const raw: unknown = await tx.objectStore(VIDEO_PROJECTS_STORE).get(input.project.id);
-  const existing = parseVideoProjectEntry(raw);
-  if (raw !== undefined && !existing) throw new Error('Stored video project is invalid.');
-  const expectedRetainedRevision = await readRetainedVideoProjectRevisionInTransaction(
-    tx,
-    input.project.id,
-    existing?.workspaceRevision ?? 0
+  const { existing, retained: expectedRetainedRevision } = await readVideoProjectRevisionSnapshot(
+    db,
+    input.project.id
   );
-  await tx.done;
   guardStaleVideoProjectSave({
     existing: existing ?? undefined,
     options: {
@@ -132,7 +122,6 @@ async function prepareWorkspaceCommit(
     input.history,
     input.reusableHistoryAssetsByValue
   );
-  let journalCreated = false;
   try {
     const payload: PreparedVideoProjectWorkspaceWrite = {
       project: input.project,
@@ -147,7 +136,6 @@ async function prepareWorkspaceCommit(
       payload,
       assetRefs: prepared.objects.map(({ ref }) => ref),
     });
-    journalCreated = true;
     let acknowledged: VideoProjectSaveResult | undefined;
     return async () => {
       await publishReadyJournalWithRetry(journal, async (ready, permit) => {
@@ -159,16 +147,10 @@ async function prepareWorkspaceCommit(
       return { ...acknowledged, historyAssetsByValue: prepared.assetsByValue };
     };
   } catch (error) {
-    if (!journalCreated) {
-      const failures = await collectPreparedAssetCleanupFailures(
-        prepared.objects.map(({ ref }) => ref.assetId)
-      );
-      if (failures.length)
-        throw new AggregateError([error, ...failures], 'Video project save cleanup failed.', {
-          cause: error,
-        });
-    }
-    throw error;
+    const failures = await collectPreparedAssetCleanupFailures(
+      prepared.objects.map(({ ref }) => ref.assetId)
+    );
+    throwAssetPreparationError(error, failures, 'Video project save cleanup failed.');
   }
 }
 

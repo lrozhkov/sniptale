@@ -2,7 +2,11 @@ import { isWindowHeaderFavicon } from '@sniptale/runtime-contracts/window-header
 import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
 import { isEditorDocument } from '../editor/document/public';
-import { parseEditorHistoryAction, type EditorHistoryAction } from './action';
+import {
+  isEditorHistoryCursor,
+  parseEditorHistoryActions,
+  type EditorHistoryAction,
+} from './action';
 import {
   IMAGE_EDITOR_HISTORY_LIMITS,
   IMAGE_HISTORY_MAX_VALUES,
@@ -120,22 +124,15 @@ export function parseEditorImageHistoryCheckpoint(
       !value['snapshots'].every(
         (snapshot: unknown): snapshot is string => typeof snapshot === 'string'
       ) ||
-      typeof value['cursor'] !== 'number' ||
-      !Number.isSafeInteger(value['cursor']) ||
-      value['cursor'] < 0 ||
-      value['cursor'] >= value['snapshots'].length ||
+      !isEditorHistoryCursor(value['cursor'], value['snapshots'].length) ||
       !Array.isArray(value['actions']) ||
       value['actions'].length !== value['snapshots'].length
     )
       return null;
     const parsed = parseValues(value['values']);
     if (!parsed) return null;
-    const actions: (EditorHistoryAction | null)[] = [];
-    for (const [index, raw] of value['actions'].entries()) {
-      const action = parseEditorHistoryAction(raw);
-      if (action === undefined || (index === 0 ? action !== null : action === null)) return null;
-      actions.push(action);
-    }
+    const actions = parseEditorHistoryActions(value['actions']);
+    if (!actions) return null;
     const units = new Map(parsed.values.map((unit) => [unit.id, unit]));
     const tokensBySnapshot: Set<string>[] = [];
     const privateFaviconsBySnapshot: (string | undefined)[] = [];

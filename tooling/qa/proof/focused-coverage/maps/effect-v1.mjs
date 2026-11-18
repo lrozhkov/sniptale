@@ -409,5 +409,14 @@ export const EFFECT_V1_OWNER_MAPPINGS = [
       'Pure catalogue projection preserves pinned selections and refuses unavailable new choices.',
     testFiles: ['apps/extension/src/ui/gl-transition-choices.test.ts'],
   },
+  {
+    owner: 'gl-transition-labels',
+    productionFile: 'apps/extension/src/ui/gl-transition-labels.ts',
+    reason: 'Localized built-in labels and literal imported names have direct catalog proof.',
+    testFiles: [
+      'apps/extension/src/ui/gl-transition-choices.test.ts',
+      'apps/extension/src/ui/gl-transition-fields.test.tsx',
+    ],
+  },
   ...EFFECT_V1_INTEGRATION_OWNER_MAPPINGS,
 ];

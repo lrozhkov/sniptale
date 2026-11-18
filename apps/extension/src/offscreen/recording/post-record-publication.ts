@@ -1,4 +1,3 @@
-// policyStateId: video-post-record-results - the in-memory publisher mirrors the durable completion outbox authority.
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
 import { readVideoRecordingCompletionOutbox } from '../../composition/persistence/recordings/completion-outbox';
@@ -11,15 +10,25 @@ type PendingPublication = {
   result: VideoPostRecordResult;
 };
 
-let pendingPublication: PendingPublication | null = null;
-const historyDrains = new Map<string, { completion: Promise<void> }>();
+type PublicationAuthority = {
+  policyStateId: 'video-post-record-results';
+  pending: PendingPublication | null;
+  historyDrains: Map<string, { completion: Promise<void> }>;
+};
+
+/** Publication in this document is subordinate to the durable completion outbox. */
+const publication: PublicationAuthority = {
+  policyStateId: 'video-post-record-results',
+  pending: null,
+  historyDrains: new Map(),
+};
 
 /** Retains media publication until the bound Stop owner settles its browser histories. */
 export function delayPostRecordPublication(
   recordingId: string,
   drain: Promise<unknown>
 ): () => void {
-  if (historyDrains.has(recordingId))
+  if (publication.historyDrains.has(recordingId))
     throw new Error('Recording history publication already has a drain owner.');
   const owner = {
     completion: drain.then(
@@ -27,9 +36,10 @@ export function delayPostRecordPublication(
       () => undefined
     ),
   };
-  historyDrains.set(recordingId, owner);
+  publication.historyDrains.set(recordingId, owner);
   return () => {
-    if (historyDrains.get(recordingId) === owner) historyDrains.delete(recordingId);
+    if (publication.historyDrains.get(recordingId) === owner)
+      publication.historyDrains.delete(recordingId);
   };
 }
 
@@ -90,7 +100,7 @@ async function publishPersistedResult(
   result: VideoPostRecordResult,
   messaging: PostRecordMessaging
 ): Promise<void> {
-  await historyDrains.get(result.recordingId)?.completion;
+  await publication.historyDrains.get(result.recordingId)?.completion;
   if (!(await readExactPersistedResult(result))) {
     return;
   }
@@ -111,11 +121,11 @@ async function publishPending(
   pending.operation = operation;
   try {
     await operation;
-    if (pendingPublication === pending) {
-      pendingPublication = null;
+    if (publication.pending === pending) {
+      publication.pending = null;
     }
   } finally {
-    if (pendingPublication === pending) {
+    if (publication.pending === pending) {
       pending.operation = null;
     }
   }
@@ -125,28 +135,28 @@ export function stageAndPublishPostRecordResult(
   result: VideoPostRecordResult,
   messaging: PostRecordMessaging
 ): Promise<void> {
-  if (pendingPublication && !isSameResult(pendingPublication.result, result)) {
+  if (publication.pending && !isSameResult(publication.pending.result, result)) {
     throw new Error('Another post-record result is awaiting background persistence.');
   }
-  pendingPublication ??= { operation: null, result };
-  return publishPending(pendingPublication, messaging);
+  publication.pending ??= { operation: null, result };
+  return publishPending(publication.pending, messaging);
 }
 
 export async function retryPendingPostRecordResult(
   recordingId: string,
   messaging: PostRecordMessaging
 ): Promise<boolean> {
-  if (!pendingPublication) {
+  if (!publication.pending) {
     const persisted = await readVideoRecordingCompletionOutbox();
     if (!persisted || persisted.recordingId !== recordingId) {
       return false;
     }
-    pendingPublication = { operation: null, result: persisted };
+    publication.pending = { operation: null, result: persisted };
   }
-  if (pendingPublication.result.recordingId !== recordingId) {
+  if (publication.pending.result.recordingId !== recordingId) {
     return false;
   }
-  await publishPending(pendingPublication, messaging);
+  await publishPending(publication.pending, messaging);
   return true;
 }
 
@@ -162,13 +172,13 @@ export async function reconcileRecordingCompletionOutbox(
 }
 
 export function discardPendingPostRecordResult(recordingId: string): boolean {
-  if (!pendingPublication || pendingPublication.result.recordingId !== recordingId) {
+  if (!publication.pending || publication.pending.result.recordingId !== recordingId) {
     return false;
   }
-  pendingPublication = null;
+  publication.pending = null;
   return true;
 }
 
 export function hasPendingPostRecordResult(recordingId: string): boolean {
-  return pendingPublication?.result.recordingId === recordingId;
+  return publication.pending?.result.recordingId === recordingId;
 }

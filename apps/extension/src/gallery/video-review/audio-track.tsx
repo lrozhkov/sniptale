@@ -5,7 +5,12 @@ import { reviewTrackMetrics, ReviewTrackRow, ReviewTrackCuts } from './track-row
 import { useReviewGestureCancellation } from './timeline-drag';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { retimeReviewVoiceover } from '../../features/video/review/voiceover-timing';
-import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
+import {
+  deferReviewGesture,
+  runReviewBeforeAction,
+  useCommittedReviewAudioCommands,
+  type ReviewBeforeAction,
+} from './note-transitions';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { ReviewOriginalAudioTrack } from './original-audio-track';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
@@ -18,7 +23,6 @@ import {
 } from '../../features/video/review/voiceover-edits';
 import {
   memo,
-  useLayoutEffect,
   useCallback,
   useMemo,
   useEffect,
@@ -640,17 +644,11 @@ function ReviewClipLanes(props: ReviewClipLanesProps) {
     onMuteLane: props.onMuteLane,
     snapTimes: props.snapTimes,
   };
-  const committed = useRef(receivers);
-  useLayoutEffect(() => {
-    committed.current = receivers;
-  });
+  const committed = useCommittedReviewAudioCommands(receivers);
   const commands = useMemo(
     () => ({
-      beforeAction: ((action) => {
-        const before = committed.current.beforeAction;
-        if (before) before(action);
-        else action();
-      }) satisfies ReviewBeforeAction,
+      beforeAction: ((action) =>
+        runReviewBeforeAction(committed.current.beforeAction, action)) satisfies ReviewBeforeAction,
       onSelect: (id: string | null) => committed.current.onSelect(id),
       onMoveClip: (...args: Parameters<ReviewAudioTimelineProps['onMoveClip']>) =>
         committed.current.onMoveClip(...args),
@@ -661,7 +659,7 @@ function ReviewClipLanes(props: ReviewClipLanesProps) {
       onMuteLane: (lane: ReviewAudioLane) => committed.current.onMuteLane?.(lane),
       getSnapTimes: () => committed.current.snapTimes ?? [],
     }),
-    []
+    [committed]
   );
   return (
     <ReviewClipLanesPresentation

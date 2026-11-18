@@ -171,6 +171,17 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
       (current) =>
         JSON.stringify(current.advanced.webcam) === JSON.stringify(context.advanced.webcam)
     );
+  const admitInsertion = (
+    run: (current: NonNullable<ReturnType<typeof insertion>>, context: ReviewCommandContext) => void
+  ) => {
+    const context = args.commands.capture();
+    if (!context) return;
+    args.commands.admit(context, (accepted) => {
+      if (!compatible(accepted)) return;
+      const current = insertion(accepted);
+      if (current) run(current, accepted);
+    });
+  };
   const seekInsertion = (camera: QuickEditWebcam, time: number) =>
     (camera.timeDomain === 'result'
       ? (args.seekResult ?? args.seek)
@@ -214,12 +225,7 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
     hideRange: insertionRange(),
     addHidden: () => {
       if (!latest.current.allowed() || acquisition.busy()) return;
-      const context = args.commands.capture();
-      if (!context) return;
-      args.commands.admit(context, (accepted) => {
-        if (!compatible(accepted)) return;
-        const current = insertion(accepted);
-        if (!current) return;
+      admitInsertion((current, accepted) => {
         const hideRange = reviewInsertionRange({
           ...current.placement,
           seconds: 2,
@@ -309,12 +315,7 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
       mutate((current) => setReviewWebcamSplit(current, selectedPosition?.id, split)),
     addPosition: () => {
       if (!latest.current.allowed()) return;
-      const context = args.commands.capture();
-      if (!context) return;
-      args.commands.admit(context, (accepted) => {
-        if (!compatible(accepted)) return;
-        const current = insertion(accepted);
-        if (!current) return;
+      admitInsertion((current, accepted) => {
         const camera = current.camera;
         const time =
           Math.round(

@@ -1,3 +1,4 @@
+import { createObservationDelivery } from './delivery';
 import { createClosingObservationDrain } from './closing-batch';
 import {
   RECORDING_EVENTS_INPUT_QUEUE_CAPACITY,
@@ -64,8 +65,6 @@ export function createRecordingEventSource(options: {
   let pendingProtected: Pending | null = null;
   let loss: Pending | null = null;
   let terminal: Pending | null = null;
-  let retry: RecordingEventObservationPacket | null = null;
-  let running: Promise<boolean> | null = null;
   let barrier: Promise<void> = Promise.resolve();
   let sequence = 0;
   let batch = 0;
@@ -260,36 +259,15 @@ export function createRecordingEventSource(options: {
     batch++;
     return result;
   }
-  function pump(): Promise<boolean> {
-    if (running) return running;
-    const work = (async () => {
-      try {
-        for (;;) {
-          let waited: Promise<void>;
-          do {
-            waited = barrier;
-            await waited;
-          } while (waited !== barrier);
-          retry ??= packet();
-          if (!retry) return true;
-          await options.send(structuredClone(retry));
-          retry = null;
-        }
-      } catch {
-        return false;
-      }
-    })();
-    const completion = work.then((drained) => {
-      if (running !== completion) return drained;
-      running = null;
-      return drained && (queue.length || loss || terminal) ? pump() : drained;
-    });
-    running = completion;
-    return completion;
-  }
+  const { pump, inFlight } = createObservationDelivery({
+    takeNext: packet,
+    send: (value) => options.send(value),
+    hasPending: () => !!(queue.length || loss || terminal),
+    packetBarrier: () => barrier,
+  });
   const flushClosing = options.sendFinal
     ? createClosingObservationDrain({
-        inFlight: () => retry,
+        inFlight,
         takeNext: packet,
         isValid: isFinalRecordingEventPackets,
         send: options.sendFinal,

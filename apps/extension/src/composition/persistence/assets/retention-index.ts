@@ -11,8 +11,7 @@ import {
   parseArchiveRestoreSession,
   parseBackupAssetOperation,
 } from './guards';
-import type { AssetOwner } from './contracts';
-import type { collectDurableAssetSnapshot } from './retention-authority';
+import type { AssetOwner, AssetRetentionSnapshot } from './contracts';
 
 const CLAIM_STORES = [
   'editor_vector_library',
@@ -31,7 +30,6 @@ const CLAIM_STORES = [
 ] as const;
 const HISTORY_STORES = ['recording_cursor_trajectories', 'recording_events'] as const;
 const SNAPSHOT_STORES = ['asset_refs', 'asset_owners', ...CLAIM_STORES, ...HISTORY_STORES];
-type Snapshot = Awaited<ReturnType<typeof collectDurableAssetSnapshot>>;
 const ownerKey = (owner: AssetOwner) =>
   `${owner.ownerKind}\u0000${owner.ownerId}\u0000${owner.role}`;
 
@@ -58,7 +56,7 @@ interface SourceBatch {
   rows: unknown[];
 }
 
-function emptySnapshot(): Snapshot {
+function emptySnapshot(): AssetRetentionSnapshot {
   return {
     authorityValid: true,
     archiveSessions: [],
@@ -75,7 +73,7 @@ function emptySnapshot(): Snapshot {
 }
 
 function admitActualOwner(
-  snapshot: Snapshot,
+  snapshot: AssetRetentionSnapshot,
   owners: Map<string, AssetOwner>,
   row: unknown,
   assetId?: string
@@ -87,7 +85,7 @@ function admitActualOwner(
 }
 
 function admitSourceBatch(
-  snapshot: Snapshot,
+  snapshot: AssetRetentionSnapshot,
   expected: Map<string, AssetOwner>,
   batch: SourceBatch
 ): void {
@@ -130,7 +128,7 @@ async function readAssetEvidence(tx: SnapshotTransaction, id: string) {
   return { ref, owners, batches };
 }
 
-function admitRef(snapshot: Snapshot, row: unknown, id: string): void {
+function admitRef(snapshot: AssetRetentionSnapshot, row: unknown, id: string): void {
   if (row === undefined) return;
   const ref = parseAssetRef(row);
   if (!ref || ref.assetId !== id) snapshot.authorityValid = false;
@@ -139,7 +137,7 @@ function admitRef(snapshot: Snapshot, row: unknown, id: string): void {
 
 async function admitPublishedSources(
   tx: SnapshotTransaction,
-  snapshot: Snapshot,
+  snapshot: AssetRetentionSnapshot,
   expected: AssetOwner
 ): Promise<void> {
   if (expected.ownerKind !== 'project-asset') return;
@@ -157,7 +155,7 @@ async function admitPublishedSources(
 
 async function resolveProjectedBindings(
   tx: SnapshotTransaction,
-  snapshot: Snapshot,
+  snapshot: AssetRetentionSnapshot,
   expected: Map<string, AssetOwner>,
   actual: Map<string, AssetOwner>
 ): Promise<void> {
@@ -175,7 +173,7 @@ export async function collectTargetAssetSnapshotInTransaction(
   tx: SnapshotTransaction,
   assetIds: Iterable<string>,
   signal?: AbortSignal
-): Promise<Snapshot> {
+): Promise<AssetRetentionSnapshot> {
   const ids = [...new Set(assetIds)];
   const snapshot = emptySnapshot();
   if (!ids.length) return snapshot;
@@ -208,7 +206,7 @@ export async function collectTargetAssetSnapshot(
   db: AssetSnapshotDatabase,
   assetIds: Iterable<string>,
   signal?: AbortSignal
-): Promise<Snapshot> {
+): Promise<AssetRetentionSnapshot> {
   const ids = [...new Set(assetIds)];
   if (!ids.length) return emptySnapshot();
   signal?.throwIfAborted();

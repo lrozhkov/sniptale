@@ -1,13 +1,5 @@
 import { isFinalObservationBatch } from './observation-batches';
-import {
-  hasExactKeys,
-  isNumber,
-  isPlainRecord,
-} from '@sniptale/runtime-contracts/validation/primitives';
-import {
-  isCursorTrajectoryClock,
-  isTrajectoryInteger,
-} from '../../features/video/project/cursor-trajectory/records';
+import { isRecordingObservationHeader } from './observation-header';
 import { isRecordingEventRecord } from '../../features/video/project/recording-events/records';
 import type { RecordingEventRecord } from '../../features/video/project/recording-events/types';
 import type { CursorTrajectorySegment } from '../../features/video/project/cursor-trajectory/types';
@@ -34,53 +26,13 @@ export interface RecordingEventObservationPacket {
   viewport: RecordingViewportGeometry;
   records: RecordingEventRecord[];
 }
-const identifier = (value: unknown) =>
-  typeof value === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(value);
-
 /** Closed packet admission precedes any sender binding or durable source processing. */
 export function isRecordingEventObservationPacket(
   value: unknown
 ): value is RecordingEventObservationPacket {
-  if (
-    !isPlainRecord(value) ||
-    !hasExactKeys(value, [
-      'version',
-      'recordingId',
-      'batchSequence',
-      'sourceClockId',
-      'clockRevision',
-      'clock',
-      'viewport',
-      'records',
-      ...(Object.hasOwn(value, 'sourceInstanceId') ? ['sourceInstanceId'] : []),
-    ])
-  )
-    return false;
-  const viewport = value['viewport'];
+  if (!isRecordingObservationHeader(value)) return false;
   const records = value['records'];
   if (
-    value['version'] !== 1 ||
-    !identifier(value['recordingId']) ||
-    !identifier(value['sourceClockId']) ||
-    (Object.hasOwn(value, 'sourceInstanceId') && !identifier(value['sourceInstanceId'])) ||
-    !isTrajectoryInteger(value['batchSequence']) ||
-    !isTrajectoryInteger(value['clockRevision']) ||
-    !isCursorTrajectoryClock(value['clock']) ||
-    value['clock'].source !== 'dom-event-time' ||
-    !isPlainRecord(viewport) ||
-    !hasExactKeys(viewport, [
-      'width',
-      'height',
-      'devicePixelRatio',
-      'visualViewportScale',
-      'visualViewportOffsetX',
-      'visualViewportOffsetY',
-    ]) ||
-    !['width', 'height', 'devicePixelRatio', 'visualViewportScale'].every(
-      (key) => isNumber(viewport[key]) && viewport[key] > 0
-    ) ||
-    !isNumber(viewport['visualViewportOffsetX']) ||
-    !isNumber(viewport['visualViewportOffsetY']) ||
     !Array.isArray(records) ||
     records.length < 1 ||
     records.length > RECORDING_EVENTS_PACKET_MAX_RECORDS ||

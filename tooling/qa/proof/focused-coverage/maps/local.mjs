@@ -435,6 +435,19 @@ purged-root refusal and recovery validation.`,
     ],
   },
   {
+    owner: 'image-aggregate-mutation',
+    productionFile: 'apps/extension/src/composition/persistence/image-aggregates/mutations.ts',
+    reason:
+      'Image aggregate tests prove source reuse, staged cleanup, publication retry and deletion.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.history.integration.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.reused-assets.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.root-lifecycle.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.vector-assets.test.ts',
+    ],
+  },
+  {
     owner: 'review-text-source-placement',
     productionFile: 'apps/extension/src/gallery/video-review/use-review-text.ts',
     reason:

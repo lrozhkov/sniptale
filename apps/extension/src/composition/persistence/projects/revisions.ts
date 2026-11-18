@@ -1,6 +1,10 @@
 import type { IDBPTransaction } from 'idb';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import { VIDEO_PROJECT_REVISIONS_STORE } from '../infrastructure/indexed-db/core.stores';
+import {
+  VIDEO_PROJECT_REVISIONS_STORE,
+  VIDEO_PROJECTS_STORE,
+} from '../infrastructure/indexed-db/core.stores';
+import { parseVideoProjectEntry } from './read-guards';
 
 type ProjectRevisionTransaction = IDBPTransaction<unknown, string[], 'readwrite'>;
 
@@ -33,6 +37,26 @@ export async function readRetainedVideoProjectRevisionInTransaction(
   )
     throw new Error('Invalid retained video project revision.');
   return Math.max(currentRevision, raw['revision']);
+}
+
+/** Read the current project and its retained admission token from one transaction. */
+export async function readVideoProjectRevisionSnapshot(
+  db: {
+    transaction(stores: string[], mode: 'readonly'): IDBPTransaction<unknown, string[], 'readonly'>;
+  },
+  projectId: string
+) {
+  const tx = db.transaction([VIDEO_PROJECTS_STORE, VIDEO_PROJECT_REVISIONS_STORE], 'readonly');
+  const raw: unknown = await tx.objectStore(VIDEO_PROJECTS_STORE).get(projectId);
+  const existing = parseVideoProjectEntry(raw);
+  if (raw !== undefined && !existing) throw new Error('Stored video project is invalid.');
+  const retained = await readRetainedVideoProjectRevisionInTransaction(
+    tx,
+    projectId,
+    existing?.workspaceRevision ?? 0
+  );
+  await tx.done;
+  return { existing, retained };
 }
 
 /** Allocate a fresh local token with the caller's accepted native mutation. */

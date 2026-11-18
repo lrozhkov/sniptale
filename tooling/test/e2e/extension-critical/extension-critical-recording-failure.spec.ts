@@ -43,10 +43,12 @@ for (const locale of ['ru', 'en'] as const) {
           : 'Injected native encoder failure';
       const reopened = locale === 'ru';
       if (reopened) await recorder.close();
+      const encoder = locale === 'ru' ? 'AudioEncoder' : 'VideoEncoder';
+      const throwOnEncode = `function () { throw new Error(${JSON.stringify(failure)}); }`;
       await evaluateInTarget(
         context,
         offscreenId,
-        `${locale === 'ru' ? 'AudioEncoder' : 'VideoEncoder'}.prototype.encode = function () { throw new Error(${JSON.stringify(failure)}); }; true`
+        `${encoder}.prototype.encode = ${throwOnEncode}; true`
       );
       await expect
         .poll(() => context.pages().some((page) => new URL(page.url()).pathname === CAMERA_ROUTE))

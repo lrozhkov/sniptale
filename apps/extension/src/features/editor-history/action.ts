@@ -33,7 +33,7 @@ export interface EditorHistoryEntry {
 }
 
 /** Parses shared history metadata without tool-specific registration or localized labels. */
-export function parseEditorHistoryAction(value: unknown): EditorHistoryAction | null | undefined {
+function parseEditorHistoryAction(value: unknown): EditorHistoryAction | null | undefined {
   if (value === null) return null;
   if (
     !isPlainRecord(value) ||
@@ -65,4 +65,27 @@ export function parseEditorHistoryAction(value: unknown): EditorHistoryAction | 
   )
     return undefined;
   return { operation, target, color: { before: rawColor['before'], after: rawColor['after'] } };
+}
+
+/** A retained history cursor identifies one state within the admitted trail. */
+export function isEditorHistoryCursor(cursor: unknown, snapshotCount: number): cursor is number {
+  return (
+    typeof cursor === 'number' &&
+    Number.isSafeInteger(cursor) &&
+    cursor >= 0 &&
+    cursor < snapshotCount
+  );
+}
+
+/** The baseline has no action. Every later state has one admitted editor operation. */
+export function parseEditorHistoryActions(
+  rawActions: readonly unknown[]
+): (EditorHistoryAction | null)[] | null {
+  const actions: (EditorHistoryAction | null)[] = [];
+  for (const [index, raw] of rawActions.entries()) {
+    const action = parseEditorHistoryAction(raw);
+    if (action === undefined || (index === 0 ? action !== null : action === null)) return null;
+    actions.push(action);
+  }
+  return actions;
 }

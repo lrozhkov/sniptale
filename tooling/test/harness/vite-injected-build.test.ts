@@ -252,10 +252,8 @@ it('uses the same compact catalog and UTF-8 in page bundles', async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'sniptale-color-catalog-'));
   try {
     const entry = path.join(directory, 'entry.js');
-    fs.writeFileSync(
-      entry,
-      `export { colornames } from ${JSON.stringify(path.resolve('node_modules/color-name-list/dist/colornames.esm.js'))};`
-    );
+    const colorNamesModule = path.resolve('node_modules/color-name-list/dist/colornames.esm.js');
+    fs.writeFileSync(entry, `export { colornames } from ${JSON.stringify(colorNamesModule)};`);
     const result = await buildVite({
       configFile: false,
       logLevel: 'silent',

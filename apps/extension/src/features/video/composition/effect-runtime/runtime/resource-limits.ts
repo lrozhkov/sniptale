@@ -4,7 +4,7 @@ import {
 } from '../../../../../contracts/effect-runtime/bitmap-lifetime';
 import { isRecord } from '../../../../../contracts/effect-runtime/identity';
 
-const MAX_QUEUE_DEPTH = 2;
+const MAX_ADMITTED_FRAMES = 2;
 const MEDIA_DECODE_TIMEOUT_MS = 3_000;
 const RENDER_TIMEOUT_MS = 1_500;
 const WORKER_STARTUP_TIMEOUT_MS = 3_000;
@@ -22,7 +22,7 @@ export const EFFECT_RUNTIME_RESOURCE_LIMITS = {
   maxInputFrames: 2,
   maxLiveCanvases: 8,
   maxOutputPixels: 3840 * 2160,
-  maxQueueDepth: MAX_QUEUE_DEPTH,
+  maxQueueDepth: MAX_ADMITTED_FRAMES,
   mediaDecodeTimeoutMs: MEDIA_DECODE_TIMEOUT_MS,
   renderTimeoutMs: RENDER_TIMEOUT_MS,
   // Cold startup includes loading the sandbox bundle and completing the readiness handshake.
@@ -30,7 +30,7 @@ export const EFFECT_RUNTIME_RESOURCE_LIMITS = {
   // Admitted frames run serially. Each can need a fresh worker after retirement.
   sandboxRequestTimeoutMs:
     MEDIA_DECODE_TIMEOUT_MS +
-    MAX_QUEUE_DEPTH * (WORKER_STARTUP_TIMEOUT_MS + RENDER_TIMEOUT_MS) +
+    MAX_ADMITTED_FRAMES * (WORKER_STARTUP_TIMEOUT_MS + RENDER_TIMEOUT_MS) +
     SANDBOX_MESSAGE_MARGIN_MS,
   workerStartupTimeoutMs: WORKER_STARTUP_TIMEOUT_MS,
 } as const;

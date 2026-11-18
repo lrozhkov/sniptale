@@ -19,6 +19,7 @@ import {
   type AssetRef,
   type PreparedAssetObject,
 } from '../assets';
+import { throwAssetPreparationError } from '../assets/opfs-store';
 import {
   parsePersistedImageHistory,
   encodeImageHistoryMetadata,
@@ -143,11 +144,7 @@ export async function preparePersistedImageHistory(
     const failures = await collectPreparedAssetCleanupFailures(
       objects.map(({ ref }) => ref.assetId)
     );
-    if (failures.length)
-      throw new AggregateError([error, ...failures], 'Image history preparation cleanup failed.', {
-        cause: error,
-      });
-    throw error;
+    throwAssetPreparationError(error, failures, 'Image history preparation cleanup failed.');
   }
 }
 

@@ -1,5 +1,6 @@
-import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 // @vitest-environment jsdom
+
+import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import {
   loadScenarioCatalogFixture,
   prepareScenarioTranslations,

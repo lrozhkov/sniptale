@@ -160,31 +160,20 @@ function useElementAudioEngine(latest: { current: ReviewAudioRuntimeProps }) {
   return { peek, get };
 }
 
+type ReviewEditorAudioRuntimeProps = Omit<
+  ReviewAudioRuntimeProps,
+  'original' | 'resolveAsset' | 'createActionSource' | 'createEngine' | 'onActionAudioRecovered'
+> & {
+  originalAudio: QuickEditOriginalAudio;
+  onActionAudioRecovered?: (() => void) | undefined;
+};
+
 /**
  * One preview playback owner: the source element keeps cuts and speed rules while
  * external voiceover and music clips are scheduled on the audio clock from the
  * effective configuration. Stale decodes and switched resources never connect.
  */
-export function useReviewEditorAudioRuntime(args: {
-  transportControl?: ReviewAudioTransportControl;
-  originalSource?: OriginalAudioSource;
-  video: RefObject<HTMLVideoElement | null>;
-  playing: boolean;
-  silent?: boolean;
-  outputTime: number;
-  playbackClock?: ReviewPlaybackPresentationClock | undefined;
-  /** Reads the media clock in result time when React commits a delayed transport sample. */
-  sourceToResult?: ((sourceTime: number) => number | null) | undefined;
-  seekRevision?: number | undefined;
-  originalAudio: QuickEditOriginalAudio;
-  voiceover: readonly QuickEditAudioClip[];
-  music: readonly QuickEditAudioClip[];
-  actionPlan?: ReviewActionAudioPlan;
-  recordingActionSource?: RecordingProjectActionAudioSource | null;
-  sessionKey: string;
-  onFailure(reason?: ReviewActionAudioUnavailable['reason']): void;
-  onActionAudioRecovered?: (() => void) | undefined;
-}) {
+export function useReviewEditorAudioRuntime(args: ReviewEditorAudioRuntimeProps) {
   return useReviewAudioRuntime({
     ...(args.transportControl ? { transportControl: args.transportControl } : {}),
     video: args.video,

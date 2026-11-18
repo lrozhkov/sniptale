@@ -76,7 +76,7 @@
       }
     },
     {
-      "id": "03384ca77ad22b3dcd60f02cbf0f31ab9a4160433838f4727a86184cfae6bce9",
+      "id": "2090eb0a42acbcbb21dfdf8a76c5b84079a3ca25683a1256e2d55e0ad64fa06c",
       "classification": "tool-noise",
       "owner": "composition/persistence/infrastructure/indexed-db",
       "reason": "These ranges import canonical store identifiers for separate schema-description and native-upgrade consumers. The match contains no duplicate executable algorithm or store definition.",
@@ -85,16 +85,16 @@
       "firstFile": {
         "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.ts",
         "start": 4,
-        "end": 39
+        "end": 42
       },
       "secondFile": {
         "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
         "start": 6,
-        "end": 41
+        "end": 44
       }
     },
     {
-      "id": "040e6f429046f6d602c55395dcb0f69a289c277293073f6bfc149300a283b685",
+      "id": "9cf48fca99c4906d47033e5129d4111a45fed2bf57b72149b8be220a12dcb79e",
       "classification": "tool-noise",
       "owner": "apps/extension/src/gallery/library/sidebar/folder-list.tsx",
       "reason": "Existing saved-view row calls belong to visible-folder and hidden-folder eligibility/layout branches.",
@@ -102,13 +102,13 @@
       "reviewBy": "2027-09-01",
       "firstFile": {
         "path": "apps/extension/src/gallery/library/sidebar/folder-list.tsx",
-        "start": 206,
-        "end": 215
+        "start": 208,
+        "end": 217
       },
       "secondFile": {
         "path": "apps/extension/src/gallery/library/sidebar/folder-list.tsx",
-        "start": 94,
-        "end": 99
+        "start": 96,
+        "end": 101
       }
     },
     {
@@ -526,7 +526,7 @@
       }
     },
     {
-      "id": "24a489c2cf4fc442750fe5c8e92e990611531914e509ee1d179c648bce615d2c",
+      "id": "57e36042f3045c6ae4b79f857834f7f5084dc47a6d9f1cbb321d47c5451298a2",
       "classification": "tool-noise",
       "owner": "Gallery and Native camera appearance controls",
       "reason": "The four camera shape labels are shared enum metadata. Gallery performs its own shape admission/update while Native calls its camera appearance patch owner and applies disabled policy. Both reuse their existing select control; shape geometry is not copied.",
@@ -534,8 +534,8 @@
       "reviewBy": "2027-04-15",
       "firstFile": {
         "path": "apps/extension/src/gallery/video-review/webcam-inspector.tsx",
-        "start": 407,
-        "end": 414
+        "start": 426,
+        "end": 433
       },
       "secondFile": {
         "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-appearance.tsx",
@@ -1048,7 +1048,7 @@
       }
     },
     {
-      "id": "4541b6b1f6cdc75b370720f206119e97a7fa64ce027cc282f475595f214071fa",
+      "id": "54a4bdb3b6bed78fed798048e058150343d220ad65f9a50cd9f3158deed4a390",
       "classification": "tool-noise",
       "owner": "ui/compact-inspector-controls switch presentation",
       "reason": "Checked-state selector repetition colors the switch track pseudo-element in one rule and translates its thumb descendant 16px in the other. These rules target different boxes and properties.",
@@ -1056,13 +1056,13 @@
       "reviewBy": "2027-04-15",
       "firstFile": {
         "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-        "start": 633,
-        "end": 640
+        "start": 638,
+        "end": 645
       },
       "secondFile": {
         "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-        "start": 660,
-        "end": 668
+        "start": 665,
+        "end": 673
       }
     },
     {
@@ -1161,16 +1161,16 @@
       "reason": "Existing card calls belong to absolute virtual rows and grouped members with distinct layout identities.",
       "removalCondition": "Remove when rendering branches converge or exact pair disappears.",
       "reviewBy": "2027-09-01",
-      "id": "4e417d31652d88b3a51dace75828f9228aed74f915befacfde7b982454ffe3f0",
+      "id": "4fb771d7d3501ebba7d9667994203b014113224bffc744414a9c69f63456163d",
       "firstFile": {
         "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-        "start": 580,
-        "end": 585
+        "start": 586,
+        "end": 591
       },
       "secondFile": {
         "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-        "start": 656,
-        "end": 661
+        "start": 662,
+        "end": 667
       }
     },
     {
@@ -1192,7 +1192,7 @@
       }
     },
     {
-      "id": "504cb2c1d4e0438ffe0734a3e88ff1679025bc2b5939137406fa178a150c7533",
+      "id": "8d23b8ea60f0f70d0a95ca207d83ea821a4e5621d3d707d695da66b74568ffeb",
       "classification": "tool-noise",
       "owner": "content/public/preparation-surface scrollbar effects",
       "reason": "The repeated surface list targets the scrollbar box in one rule and its thumb in the other. Width/height 8px differ from thumb background, border, radius, and hover paint. The match crosses a previous declaration tail.",
@@ -1200,13 +1200,13 @@
       "reviewBy": "2027-04-15",
       "firstFile": {
         "path": "apps/extension/src/content/public/preparation-surface/effects.css",
-        "start": 112,
-        "end": 125
+        "start": 180,
+        "end": 193
       },
       "secondFile": {
         "path": "apps/extension/src/content/public/preparation-surface/effects.css",
-        "start": 127,
-        "end": 140
+        "start": 195,
+        "end": 208
       }
     },
     {
@@ -1696,7 +1696,7 @@
       }
     },
     {
-      "id": "7240eb169a5514078b5b97a3882b4d8684cfcf47104a3bf17e065bf5e2996a2b",
+      "id": "825e7f3dd099f9352cfc7bdc193cf5c3a310ecf076a4ebe8fb9d2e0857930c90",
       "classification": "tool-noise",
       "owner": "project and review camera adapters",
       "reason": "The fragment publishes a success result and bounds a four-entry cache. Project and review adapters own different conflict records, keys, contexts, and observation inputs. A shared cache wrapper would not unify those contracts.",
@@ -1704,8 +1704,8 @@
       "reviewBy": "2026-12-09",
       "firstFile": {
         "path": "apps/extension/src/features/video/composition/motion/project-follow.ts",
-        "start": 704,
-        "end": 711
+        "start": 712,
+        "end": 719
       },
       "secondFile": {
         "path": "apps/extension/src/features/video/review/advanced/scene.ts",
@@ -1773,11 +1773,11 @@
       "reason": "The exact match destructures feedback from the single useSyncCacheFeedback owner and declares caller-local observation references. Shared cancellation and feedback rendering now have one implementation. Gallery retains root-bound status revision and an operation-kind ticket. Settings retains budget input and a trim request ID. This match is consumer wiring, not another cancellation or cache state machine.",
       "removalCondition": "Remove when either caller wiring changes or when both observation contracts converge.",
       "reviewBy": "2027-04-15",
-      "id": "77a9f8690bd4ebc3a315349e6f3ae6b0c798fb9cb05b44a3b995b96f6ba643d2",
+      "id": "90d485978dab0fd4751aff8dd73d24bc4c3de91766439a54ec016ac6e04544db",
       "firstFile": {
         "path": "apps/extension/src/gallery/library/preview/native-cache-actions.tsx",
-        "start": 37,
-        "end": 55
+        "start": 38,
+        "end": 56
       },
       "secondFile": {
         "path": "apps/extension/src/settings/sections/capture/saving/sync-cache.tsx",
@@ -2182,7 +2182,7 @@
       }
     },
     {
-      "id": "955fe69b61ce2b8c1920ff1e2639165c9b7eda6bea2c9b51245678883126e22f",
+      "id": "813f48804da3d2868cc69f29f6b1b7b597ebb9aa819ffd824d3ec9cecba5f042",
       "classification": "tool-noise",
       "owner": "video composition mip renderer <-> video composition scene renderer",
       "reason": "The match contains WebGPU pipeline and bind-group setup. Mip rendering binds its input level. Scene composition additionally binds optional masks and operation clips, then applies scissor and blend policy. The shared syntax does not define one render operation.",
@@ -2434,7 +2434,7 @@
       }
     },
     {
-      "id": "9d93032ecb1b694a17f6fec76126abc1ab12eb0d340a32b33449cc21c236f3db",
+      "id": "02182fb20a7856a80cca3c84abe450ebd35eae01eb7c75be34073421ee63c57d",
       "classification": "tool-noise",
       "owner": "Gallery and Native camera layout controls",
       "reason": "The optional legacy item and shrink/shift/overlay choices project the same compatibility contract. Gallery writes editor.setScreenBehavior; Native issues an exact clip camera-position edit. They retain different mutation authorities.",
@@ -2442,13 +2442,13 @@
       "reviewBy": "2027-04-15",
       "firstFile": {
         "path": "apps/extension/src/gallery/video-review/webcam-inspector.tsx",
-        "start": 230,
-        "end": 243
+        "start": 249,
+        "end": 262
       },
       "secondFile": {
         "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-layout.tsx",
-        "start": 178,
-        "end": 191
+        "start": 183,
+        "end": 196
       }
     },
     {
@@ -2596,7 +2596,7 @@
       }
     },
     {
-      "id": "a7333f1fa6c41e8505f8dc5ea969d3cb98e8b2aeeab5aa316d4040d13118dc72",
+      "id": "dc9609fe50783d439077048c508751237a7087104c60f870fb05a24f9bae3c0b",
       "classification": "tool-noise",
       "owner": "apps/extension/src/gallery/video-review/use-recognition.ts",
       "reason": "Recognition owns Apply state and one accepted transcript. Speech owns multiple takes, completion and propagation. Equal controller setup does not define one publication lifetime.",
@@ -2609,8 +2609,8 @@
       },
       "secondFile": {
         "path": "apps/extension/src/gallery/video-review/use-text-voice.ts",
-        "start": 130,
-        "end": 140
+        "start": 135,
+        "end": 145
       }
     },
     {
@@ -2866,7 +2866,7 @@
       }
     },
     {
-      "id": "b7c8f983df2973de4ad1b99ba731a500a20e3d9b2ce9bffb87fd5e158b9d0b04",
+      "id": "6b053befd97b073f1b9c8559bd9d983cbfd8079f1f0c37f68638e5642ca94f28",
       "classification": "tool-noise",
       "owner": "Gallery and Native camera appearance controls",
       "reason": "The classic/angle/center/nearest-edge labels and icons are declarative enum metadata for the camera shadow contract. Gallery writes camera state; Native adds disabled policy and writes clip edits. No shadow direction calculation or rendering is duplicated.",
@@ -2874,8 +2874,8 @@
       "reviewBy": "2027-04-15",
       "firstFile": {
         "path": "apps/extension/src/gallery/video-review/webcam-inspector.tsx",
-        "start": 447,
-        "end": 460
+        "start": 466,
+        "end": 479
       },
       "secondFile": {
         "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-appearance.tsx",
@@ -2884,7 +2884,7 @@
       }
     },
     {
-      "id": "b88fd738889e0922ada54808460d21f8073ea0d4989a0b108e6c9bc5aaab006c",
+      "id": "b06d1d4ae26983ad4ba033294ddf466b698c83a1c8683729ff8fe470a75c0c48",
       "classification": "tool-noise",
       "owner": "apps/extension/src/gallery/library/sidebar/types.ts",
       "reason": "Sidebar and shell callback ports differ in required and optional facets and surrounding responsibilities. The narrow matching declarations do not establish a shared state owner.",
@@ -2897,8 +2897,8 @@
       },
       "secondFile": {
         "path": "apps/extension/src/gallery/shell/app-shell/types.ts",
-        "start": 84,
-        "end": 89
+        "start": 86,
+        "end": 91
       }
     },
     {
@@ -2920,7 +2920,7 @@
       }
     },
     {
-      "id": "b9d1cd1cf46261a9f3d21e47a897306e2cf10188d8e74d5d315260c8f5479046",
+      "id": "77822120cbe23cb5e3668c87b85b93313b10f6940a7414c88a3c79dbd0aaab84",
       "classification": "tool-noise",
       "owner": "content/public/preparation-surface scrollbar effects",
       "reason": "The root surface selector receives standard scrollbar-color/width. The repeated surface selector targets ::-webkit-scrollbar dimensions. Native engine-specific pseudo-element declarations differ from standards properties on the scroll owner.",
@@ -2928,13 +2928,13 @@
       "reviewBy": "2027-04-15",
       "firstFile": {
         "path": "apps/extension/src/content/public/preparation-surface/effects.css",
-        "start": 101,
-        "end": 110
+        "start": 169,
+        "end": 178
       },
       "secondFile": {
         "path": "apps/extension/src/content/public/preparation-surface/effects.css",
-        "start": 115,
-        "end": 124
+        "start": 183,
+        "end": 192
       }
     },
     {
@@ -3064,7 +3064,7 @@
       }
     },
     {
-      "id": "c258dc8584be44dc5a4473cdf7e2f41d4a8a3f34c70b066760dc7e993dd7aeb4",
+      "id": "c9611737577d6d831e1416854264928f3e591fb9002916e1512a5bc967af568c",
       "classification": "tool-noise",
       "owner": "Gallery and Native camera-follow inspectors",
       "reason": "The matched field names, ranges, and conversions describe CameraFollowSettings. Both hosts use DraftNumericRow for zone size. Gallery resets through onReset. Native clears inherited values through onChange(undefined). The fragment adds no rendering or source authority.",
@@ -3072,8 +3072,8 @@
       "reviewBy": "2027-04-15",
       "firstFile": {
         "path": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
-        "start": 438,
-        "end": 460
+        "start": 427,
+        "end": 449
       },
       "secondFile": {
         "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
@@ -3082,7 +3082,7 @@
       }
     },
     {
-      "id": "c4c4ff40ba53c47cbf1fb57e14f99788ee5105b3c16e21cee481e974a25f1c77",
+      "id": "1d8ed41766752c546a43d569b94ed17cc8a59cc52315dfa835cb9576e3c81d33",
       "classification": "tool-noise",
       "owner": "Gallery and Native camera-follow inspectors",
       "reason": "The matched fields describe CameraFollowSettings and its scalar conversions. Both hosts use DraftNumericRow. Gallery sets explicit precision and resets through onReset. Native clears inherited values through onChange(undefined). Zone and movement interactions already share their control owners.",
@@ -3090,8 +3090,8 @@
       "reviewBy": "2027-04-15",
       "firstFile": {
         "path": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
-        "start": 370,
-        "end": 389
+        "start": 359,
+        "end": 378
       },
       "secondFile": {
         "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
@@ -3226,7 +3226,7 @@
       }
     },
     {
-      "id": "cc4f2cc520c2a9b75f344001fea60b821010e4515de6ab47bea356a448e3d2b8",
+      "id": "293d4141acd6ab99b0dcd00ac58f48d2d91721bfc5a2364630d9789fefc407d1",
       "classification": "tool-noise",
       "owner": "Gallery and Native camera-follow inspectors",
       "reason": "The matched fields project CameraFollowSettings into host adapters. Numeric edits use the shared DraftNumericRow owner. Gallery supplies explicit precision and a value-based toggle. Native uses a checked-based toggle. Reset and inheritance policies remain local.",
@@ -3234,8 +3234,8 @@
       "reviewBy": "2027-04-15",
       "firstFile": {
         "path": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
-        "start": 396,
-        "end": 408
+        "start": 385,
+        "end": 397
       },
       "secondFile": {
         "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
@@ -3388,7 +3388,7 @@
       }
     },
     {
-      "id": "d71f648769b5e4f611b81703e4adbf3298920e817f0c0ecfd1f2d27a0cbc2c65",
+      "id": "a7fe001d1001e7113c1336c9a641aa26f51f477899954c4197f314451192447d",
       "classification": "tool-noise",
       "owner": "ui/compact-inspector-controls switch accessibility",
       "reason": "The base thumb rule positions and animates thumbs. The same thumb selector inside prefers-reduced-motion disables transition. Sharing selector tokens does not duplicate a motion policy.",
@@ -3396,13 +3396,13 @@
       "reviewBy": "2027-04-15",
       "firstFile": {
         "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-        "start": 643,
-        "end": 649
+        "start": 648,
+        "end": 654
       },
       "secondFile": {
         "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-        "start": 672,
-        "end": 678
+        "start": 677,
+        "end": 683
       }
     },
     {
@@ -3514,7 +3514,7 @@
       }
     },
     {
-      "id": "e2f834666b384c5f438036ee9e1beeee796785811afda6158d573f7966ec2550",
+      "id": "92b126d9b1d17270de082876163246f14b0e21729e75d4ce03d7d4d2145ee991",
       "classification": "tool-noise",
       "owner": "packages/ui/src/product-glass-controls/buttons.tsx",
       "reason": "Existing command-press hook serves switch thumb/on semantics versus bold-button property activation/content wrapping.",
@@ -3522,13 +3522,13 @@
       "reviewBy": "2027-09-01",
       "firstFile": {
         "path": "packages/ui/src/product-glass-controls/buttons.tsx",
-        "start": 167,
-        "end": 176
+        "start": 100,
+        "end": 109
       },
       "secondFile": {
         "path": "packages/ui/src/product-glass-controls/buttons.tsx",
-        "start": 99,
-        "end": 108
+        "start": 173,
+        "end": 182
       }
     },
     {
@@ -3694,7 +3694,7 @@
       }
     },
     {
-      "id": "fb547832c3a3059adc68a61251eeea97ca9889bdf54e18e81cc0a316ff80983f",
+      "id": "2072387373a0a3d7ddf2bebb87d350b01380c7eb9d0ffa9f33caff61b0581346",
       "classification": "tool-noise",
       "owner": "workflows/video-review freeze frame timing <-> source metadata inspection",
       "reason": "The match contains six lines that open a decoder and attach abort disposal. Freeze reads and validates an original frame interval. Source inspection validates metadata and provenance. Each operation closes its own input in finally. Shared setup syntax does not unify decoder work or admission.",
@@ -3707,12 +3707,12 @@
       },
       "secondFile": {
         "path": "apps/extension/src/workflows/video-review/source.ts",
-        "start": 80,
-        "end": 85
+        "start": 108,
+        "end": 113
       }
     },
     {
-      "id": "fb6d54e22ebe81aabbc03379ba65a0e20d006d58c4a125ba2867a1b87af51fb9",
+      "id": "4ccbce8490d0b5b29aa9bdda6eb082b87746d5d82e8f6ba7853e7a18a40735ca",
       "classification": "tool-noise",
       "owner": "apps/extension/src/gallery/video-review/speech-panel.tsx",
       "reason": "Gallery uses SelectField and its recognition command. Montage uses OptionButtonsField and inspector callbacks. Shared option literals do not unify field controls.",
@@ -3720,8 +3720,8 @@
       "reviewBy": "2027-04-28",
       "firstFile": {
         "path": "apps/extension/src/gallery/video-review/speech-panel.tsx",
-        "start": 578,
-        "end": 585
+        "start": 612,
+        "end": 619
       },
       "secondFile": {
         "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.tsx",
@@ -3730,7 +3730,7 @@
       }
     },
     {
-      "id": "fb8a16b5bd745074e51ea5580c4c3825db10c8497db8441793d464e79d230901",
+      "id": "02b4bcb754d3fb4ddb842a718abf2877bbaf674af1d90cdded482dfa055a276f",
       "classification": "tool-noise",
       "owner": "features/video/project/motion and features/video/review/advanced",
       "reason": "The endpoints return a rectangle record after different validators. Project crop permits positive values viazero check; review webcam requires Number.EPSILON and owns its own boundary. Both check normalized extents.",
@@ -3743,8 +3743,8 @@
       },
       "secondFile": {
         "path": "apps/extension/src/features/video/review/advanced/webcam.ts",
-        "start": 82,
-        "end": 88
+        "start": 84,
+        "end": 90
       }
     },
     {

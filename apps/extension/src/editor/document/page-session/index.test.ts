@@ -1,6 +1,7 @@
+// @vitest-environment jsdom
+
 import { legacyImageProjectId } from '../../../composition/persistence/media-library/legacy-projects';
 import { MissingAssetObjectError } from '../../../composition/persistence/assets';
-// @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEditorDocumentFixture } from './document.test-support';

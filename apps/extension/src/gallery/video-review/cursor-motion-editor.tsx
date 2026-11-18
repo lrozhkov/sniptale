@@ -82,21 +82,23 @@ export function useReviewCursorMotions(args: {
     args.select({ kind: 'cursor-motion', id });
     if (selected?.id !== id) setPointId(m.points[0]?.id);
   };
-  const add = () => {
-    if (!args.canStart()) return;
+  const admitCurrentMotions = (run: (context: ReviewCommandContext) => void) => {
     const context = args.commands.capture();
     if (!context) return;
     args.commands.admit(context, (accepted) => {
-      if (
-        !args.commands.isCurrent(
-          accepted,
-          'temporal',
-          (current) =>
-            JSON.stringify(current.advanced.cursorMotions) ===
-            JSON.stringify(accepted.advanced.cursorMotions)
-        )
-      )
-        return;
+      const unchanged = args.commands.isCurrent(
+        accepted,
+        'temporal',
+        (current) =>
+          JSON.stringify(current.advanced.cursorMotions) ===
+          JSON.stringify(accepted.advanced.cursorMotions)
+      );
+      if (unchanged) run(accepted);
+    });
+  };
+  const add = () => {
+    if (!args.canStart()) return;
+    admitCurrentMotions((accepted) => {
       const insertion = reviewCommandInsertion(accepted, 'result');
       if (!insertion) return;
       const currentMotions =
@@ -196,19 +198,7 @@ export function useReviewCursorMotions(args: {
     args.seek(selected ? Math.min(time, selected.end - 0.000001) : time, false);
   };
   const addPoint = () => {
-    const context = args.commands.capture();
-    if (!context) return;
-    args.commands.admit(context, (accepted) => {
-      if (
-        !args.commands.isCurrent(
-          accepted,
-          'temporal',
-          (current) =>
-            JSON.stringify(current.advanced.cursorMotions) ===
-            JSON.stringify(accepted.advanced.cursorMotions)
-        )
-      )
-        return;
+    admitCurrentMotions((accepted) => {
       const currentMotions =
         projectReviewCursorMotions(
           accepted.advanced.cursorMotions,

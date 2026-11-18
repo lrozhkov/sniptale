@@ -3,6 +3,7 @@ import type { SyncCheckpointReceipt } from '../sync-capture/contracts';
 import {
   allocateVideoProjectRevisionInTransaction,
   readRetainedVideoProjectRevisionInTransaction,
+  readVideoProjectRevisionSnapshot,
 } from './revisions';
 import { createVideoProjectHistoryChange } from '../../../features/video/project/history-change';
 import { replaceEditorDocumentAssetOwnership } from '../document-assets/ownership';
@@ -36,7 +37,6 @@ import {
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   VIDEO_PROJECTS_STORE,
-  VIDEO_PROJECT_REVISIONS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { deleteMediaAssetWithProjectCascade } from '../media-library/delete-cascade';
@@ -189,16 +189,7 @@ export async function readVideoProjectWorkspacePublicationStatus(
   journalId: string
 ): Promise<'acknowledged' | 'superseded' | 'ready'> {
   const db = await initDB();
-  const tx = db.transaction([VIDEO_PROJECTS_STORE, VIDEO_PROJECT_REVISIONS_STORE], 'readonly');
-  const raw: unknown = await tx.objectStore(VIDEO_PROJECTS_STORE).get(input.project.id);
-  const existing = parseVideoProjectEntry(raw);
-  if (raw !== undefined && !existing) throw new Error('Stored video project is invalid.');
-  const retained = await readRetainedVideoProjectRevisionInTransaction(
-    tx,
-    input.project.id,
-    existing?.workspaceRevision ?? 0
-  );
-  await tx.done;
+  const { existing, retained } = await readVideoProjectRevisionSnapshot(db, input.project.id);
   const status = workspacePublicationStatus(existing, retained, input, journalId);
   if (status !== 'ready') return status;
   try {

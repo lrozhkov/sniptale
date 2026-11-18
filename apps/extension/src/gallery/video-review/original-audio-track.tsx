@@ -5,7 +5,12 @@ import { SNAP_THRESHOLD_PX, snapTimelineTime } from '../../features/video/review
 import { reviewTrackMetrics, ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { useReviewGestureCancellation } from './timeline-drag';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
-import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
+import {
+  deferReviewGesture,
+  runReviewBeforeAction,
+  useCommittedReviewAudioCommands,
+  type ReviewBeforeAction,
+} from './note-transitions';
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import {
@@ -92,17 +97,11 @@ export function ReviewOriginalAudioTrack(props: ReviewOriginalAudioTrackProps) {
     patchOriginal: props.editor?.patchOriginal,
     addOriginal: props.editor?.addOriginal,
   };
-  const committed = useRef(receivers);
-  useLayoutEffect(() => {
-    committed.current = receivers;
-  });
+  const committed = useCommittedReviewAudioCommands(receivers);
   const commands = useMemo(
     () => ({
-      beforeAction: ((action) => {
-        const before = committed.current.beforeAction;
-        if (before) before(action);
-        else action();
-      }) satisfies ReviewBeforeAction,
+      beforeAction: ((action) =>
+        runReviewBeforeAction(committed.current.beforeAction, action)) satisfies ReviewBeforeAction,
       onOriginal: (patch: Partial<QuickEditOriginalAudio>) => committed.current.onOriginal(patch),
       onRange: (range: ReviewAnchor) => committed.current.onRange?.(range),
       onSelectSpeed: (edit: ReviewEdit) => committed.current.onSelectSpeed?.(edit),
@@ -113,7 +112,7 @@ export function ReviewOriginalAudioTrack(props: ReviewOriginalAudioTrackProps) {
       addOriginal: (...args: Parameters<OriginalAudioEditor['addOriginal']>) =>
         committed.current.addOriginal?.(...args) ?? false,
     }),
-    []
+    [committed]
   );
   const ranges = props.editor?.originalRanges;
   const playback = props.editor?.originalPlayback;

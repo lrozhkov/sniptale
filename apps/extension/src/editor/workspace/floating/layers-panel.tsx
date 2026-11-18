@@ -26,6 +26,7 @@ import {
   type EditorLayersPanelMode,
 } from './layers-panel-navigation';
 
+import { EditorHistoryResetPopover } from './history-reset-popover';
 import { EditorFloatingLayerEffectsPanel } from './layer-effects-panel';
 import { LAYERS_PANEL_DEFAULT_HEIGHT, useResizableLayersPanelHeight } from './layers-panel-height';
 
@@ -117,6 +118,15 @@ function EditorFloatingLayersPanelBody(props: {
         hasImage={props.hasImage}
         initialScrollOffset={props.scrollPositions.get('history') ?? 0}
         onScrollOffsetChange={(offset) => props.scrollPositions.set('history', offset)}
+        renderRestoreConfirmation={(anchorEl, historyIndex, onClose) => (
+          <EditorHistoryResetPopover
+            anchorEl={anchorEl}
+            historyIndex={historyIndex}
+            mode="confirm"
+            onBeforeSelectionAwareAction={() => undefined}
+            setMode={onClose}
+          />
+        )}
       />
     );
   if (props.documentController.inspector === 'layer-effects') {
