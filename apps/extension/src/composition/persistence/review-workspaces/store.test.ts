@@ -7,7 +7,7 @@ import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 import { reviewAdvancedContentBaseline } from '../../../features/video/review/document';
 
 import { createQuickEditZoomRegion } from '../../../features/video/review/advanced/zoom';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { betaV1Fixture } from '../infrastructure/indexed-db/fixtures/beta-v1';
 import {
   createReviewWorkspaceStoreFixture,
@@ -70,12 +70,23 @@ const operation: ReviewOperation = {
 let rows: Map<string, Map<string, unknown>>;
 
 beforeEach(() => {
+  const locks = navigator.locks;
+  const namespace = crypto.randomUUID();
+  // Every fixture owns a separate database and must also own a separate lock namespace.
+  vi.stubGlobal('navigator', {
+    locks: {
+      request: <T>(name: string, options: LockOptions, action: LockGrantedCallback<T>) =>
+        locks.request(`${namespace}:${name}`, options, action),
+    },
+  });
   harness.failure = false;
   harness.writes = Promise.resolve();
   const fixture = createReviewWorkspaceStoreFixture(() => harness.failure);
   rows = fixture.rows;
   harness.database.mockResolvedValue(fixture.database);
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 it('preserves lane membership and locks through durable history and retry', async () => {
   const opened = await openVideoWorkspace(id, source);

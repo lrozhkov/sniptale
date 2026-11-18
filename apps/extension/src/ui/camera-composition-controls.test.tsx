@@ -133,7 +133,7 @@ it('adapts composition choices without changing retained camera settings', async
   expect(change).toHaveBeenCalledExactlyOnceWith({ ...value, mode: 'left' });
   value = { ...value, mode: 'left' };
   render();
-  resize(100);
+  await resize(100);
   expect(group()).toBeNull();
   expect(change).toHaveBeenCalledTimes(1);
   const trigger = host.querySelector<HTMLButtonElement>(
@@ -152,7 +152,7 @@ it('adapts composition choices without changing retained camera settings', async
   act(() =>
     (document.activeElement instanceof window.HTMLElement ? document.activeElement : null)?.blur()
   );
-  resize(2000);
+  await resize(2000);
   expect(
     group()!
       .querySelector('[title="editor.scene.cameraCompositionOff"]')
@@ -193,8 +193,11 @@ function mockChoiceWidth() {
       }
     }
   );
-  return (next: number) => {
+  return async (next: number) => {
     width = next;
-    act(() => callbacks.forEach((callback) => callback()));
+    await act(async () => {
+      callbacks.forEach((callback) => callback());
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+    });
   };
 }

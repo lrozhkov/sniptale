@@ -79,7 +79,7 @@ function setup(initial = createQuickEditAdvancedState()) {
       id: 'remote-content',
       at: 2,
       target: 'advancedContent',
-      before: session.getSnapshot().document.advancedContent,
+      before: reviewAdvancedContentBaseline(workspaceAdvanced),
       after: reviewAdvancedContentBaseline(next),
     });
     workspaceAdvanced = { ...workspaceAdvanced, ui: structuredClone(next.ui) };
@@ -127,16 +127,18 @@ it.each(['basic', 'advanced'] as const)(
 it('retains an initial choice after a failed save and retries it', async () => {
   const initial = createQuickEditAdvancedState();
   initial.ui.modeSelectionPending = true;
-  const { session, deps } = setup(initial);
-  deps.saveVideoWorkspaceAdvanced.mockRejectedValueOnce(new Error('Storage unavailable'));
+  const { session, deps, build } = setup(initial);
+  session.setAutosaveEnabled(false);
+  deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(new Error('Storage unavailable'));
   act(() => advanced.setMode('basic'));
   await act(async () => {
-    await expect(advanced.flush()).rejects.toThrow('Storage unavailable');
+    await advanced.flush();
+    await expect(session.saveBuffered()).rejects.toThrow('Storage unavailable');
   });
-  expect(advanced.saveFailed).toBe(true);
+  expect(session.getSnapshot().error).toBe('storage');
   expect(advanced.advanced.ui.modeSelectionPending).toBe(false);
-  expect(session.getSnapshot().snapshot.workspace.advanced.ui.modeSelectionPending).toBe(true);
-  await act(async () => advanced.retry());
+  expect(build().workspace.advanced.ui.modeSelectionPending).toBe(true);
+  await act(async () => session.saveBuffered());
   expect(session.getSnapshot().snapshot.workspace.advanced.ui.modeSelectionPending).toBe(false);
   expect(advanced.saveFailed).toBe(false);
 });
@@ -287,10 +289,12 @@ it.each(['cut', 'speed', 'freeze'] as const)(
 
 it('rebuilds writes from reloaded persisted content after a conflict recovery', async () => {
   const { session, deps, saveFromOtherTab } = setup();
-  deps.saveVideoWorkspaceAdvanced.mockRejectedValueOnce(new Error('Revision conflict'));
+  deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(
+    Object.assign(new Error('Revision conflict'), { code: 'conflict' })
+  );
   act(() => advanced.setMode('advanced'));
-  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
-  expect(deps.saveVideoWorkspaceAdvanced).toHaveBeenCalledTimes(1);
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay + 1));
+  expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledTimes(1);
   expect(advanced.advanced.ui.mode).toBe('advanced');
 
   // Another tab saved zoom content; the stale tab reloads to recover from the conflict.
@@ -317,33 +321,31 @@ it('rebuilds writes from reloaded persisted content after a conflict recovery', 
 
   expect(advanced.advanced.zoom.regions).toHaveLength(1);
   act(() => advanced.setMode('basic'));
-  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
-  const write = deps.saveVideoWorkspaceAdvanced.mock.lastCall?.[0] as {
-    advanced: QuickEditAdvancedState;
-  };
-  expect(write.advanced.ui.mode).toBe('basic');
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay + 1));
+  const write = parseVideoWorkspace(deps.saveVideoWorkspaceSnapshot.mock.lastCall?.[0].workspace);
+  expect(write!.advanced.ui.mode).toBe('basic');
   expect(session.getSnapshot().document.advancedContent.zoom.regions).toHaveLength(1);
 });
 
-it('composes two commands staged before the next render (S1)', async () => {
+it('composes two UI commands staged before the next render', async () => {
   const { deps } = setup();
   act(() => {
-    advanced.setMode('advanced');
-    advanced.setTrackVisibility('zoom', true);
+    advanced.setOverlaysVisible(false);
+    advanced.setWorkspaceColor('light', '#abcdefff');
   });
-  expect(advanced.advanced.ui.mode).toBe('advanced');
-  expect(advanced.advanced.ui.tracks.zoom).toBe(true);
-  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
-  expect(deps.saveVideoWorkspaceAdvanced).toHaveBeenCalledTimes(1);
-  const write = deps.saveVideoWorkspaceAdvanced.mock.lastCall?.[0] as {
-    advanced: QuickEditAdvancedState;
-  };
-  expect(write.advanced.ui.mode).toBe('advanced');
-  expect(write.advanced.ui.tracks.zoom).toBe(true);
+  expect(advanced.advanced.ui.overlaysVisible).toBe(false);
+  expect(advanced.advanced.ui.workspaceColors).toEqual({ light: '#abcdefff' });
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay + 1));
+  expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledTimes(1);
+  const write = parseVideoWorkspace(deps.saveVideoWorkspaceSnapshot.mock.lastCall?.[0].workspace);
+  expect(write?.advanced.ui).toMatchObject({
+    overlaysVisible: false,
+    workspaceColors: { light: '#abcdefff' },
+  });
 });
 
-it('stages ui commands through the whole-state writer and content through history ops', async () => {
-  const { deps, session } = setup();
+it('publishes a collapsed content operation inside one workspace snapshot', async () => {
+  const { deps } = setup();
   act(() => advanced.setZoom((zoom) => ({ ...zoom, enabled: true })));
   act(() =>
     advanced.setBackground((background) => ({
@@ -356,10 +358,12 @@ it('stages ui commands through the whole-state writer and content through histor
   );
   expect(advanced.advanced.zoom.enabled).toBe(true);
   expect(advanced.advanced.background.enabled).toBe(true);
-  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
-  // One collapsed content operation; the whole-state writer stays untouched.
-  expect(deps.commitVideoWorkspace).toHaveBeenCalledTimes(1);
-  const op = deps.commitVideoWorkspace.mock.lastCall?.[0].operation as {
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay + 1));
+  // One collapsed content operation is published with the workspace.
+  expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledTimes(1);
+  const op = parseVideoWorkspace(
+    deps.saveVideoWorkspaceSnapshot.mock.lastCall?.[0].workspace
+  )?.history.at(-1) as {
     target: string;
     after: { zoom: { enabled: boolean }; background: { enabled: boolean } };
   };
@@ -367,20 +371,20 @@ it('stages ui commands through the whole-state writer and content through histor
   expect(op.after.zoom.enabled).toBe(true);
   expect(op.after.background.enabled).toBe(true);
   expect(deps.saveVideoWorkspaceAdvanced).not.toHaveBeenCalled();
-  act(() => session.getSnapshot());
 });
 
 it('keeps the newest local revision when an older write acknowledges (S2)', async () => {
-  const { deps, build } = setup();
+  const { deps } = setup();
+  const save = deps.saveVideoWorkspaceSnapshot.getMockImplementation()!;
   let releaseA!: () => void;
-  deps.commitVideoWorkspace.mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        releaseA = () => resolve(build() as never);
-      })
-  );
+  deps.saveVideoWorkspaceSnapshot.mockImplementationOnce(async (args) => {
+    await new Promise<void>((resolve) => {
+      releaseA = resolve;
+    });
+    return save(args);
+  });
   act(() => advanced.setZoom((zoom) => ({ ...zoom, enabled: true })));
-  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay + 1));
   act(() =>
     advanced.setBackground((background) => ({
       ...background,
@@ -395,39 +399,44 @@ it('keeps the newest local revision when an older write acknowledges (S2)', asyn
     await Promise.resolve();
   });
   expect(advanced.advanced.background.enabled).toBe(true);
-  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
-  expect(deps.commitVideoWorkspace).toHaveBeenCalledTimes(2);
-  const op = deps.commitVideoWorkspace.mock.lastCall?.[0].operation as {
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay + 1));
+  expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledTimes(2);
+  const op = parseVideoWorkspace(
+    deps.saveVideoWorkspaceSnapshot.mock.lastCall?.[0].workspace
+  )?.history.at(-1) as {
     after: { zoom: { enabled: boolean }; background: { enabled: boolean } };
   };
   expect(op.after.zoom.enabled).toBe(true);
   expect(op.after.background.enabled).toBe(true);
 });
 
-it('keeps the pending edit after a save failure, rejects flush, and retries (S3)', async () => {
-  const { deps } = setup();
-  deps.saveVideoWorkspaceAdvanced
+it('keeps the pending edit after a save failure and retries publication', async () => {
+  const { deps, session } = setup();
+  deps.saveVideoWorkspaceSnapshot
     .mockRejectedValueOnce(new Error('storage'))
     .mockRejectedValueOnce(new Error('storage'));
   act(() => {
     advanced.setWorkspaceColor('light', '#abcdefff');
     advanced.setWorkspaceColor('dark', '#123456ff');
   });
-  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
-  expect(advanced.saveFailed).toBe(true);
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay + 1));
+  expect(session.getSnapshot().error).toBe('storage');
   expect(advanced.advanced.ui.workspaceColors).toEqual({ light: '#abcdefff', dark: '#123456ff' });
-  await expect(advanced.flush()).rejects.toThrow();
-  expect(deps.saveVideoWorkspaceAdvanced).toHaveBeenCalledTimes(2);
+  await act(async () => {
+    await expect(session.saveBuffered()).rejects.toThrow('storage');
+  });
+  expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledTimes(2);
   expect(advanced.advanced.ui.workspaceColors).toEqual({ light: '#abcdefff', dark: '#123456ff' });
-  await act(async () => advanced.retry());
-  expect(advanced.saveFailed).toBe(false);
+  await act(async () => session.saveBuffered());
+  expect(session.getSnapshot().error).toBeNull();
   expect(advanced.advanced.ui.workspaceColors).toEqual({ light: '#abcdefff', dark: '#123456ff' });
-  const write = deps.saveVideoWorkspaceAdvanced.mock.lastCall?.[0] as {
-    advanced: QuickEditAdvancedState;
-  };
-  expect(write.advanced.ui.workspaceColors).toEqual({ light: '#abcdefff', dark: '#123456ff' });
+  const write = parseVideoWorkspace(deps.saveVideoWorkspaceSnapshot.mock.lastCall?.[0].workspace);
+  expect(write!.advanced.ui.workspaceColors).toEqual({ light: '#abcdefff', dark: '#123456ff' });
   act(() => advanced.setWorkspaceColor('light', null));
-  await act(async () => advanced.flush());
+  await act(async () => {
+    await advanced.flush();
+    await session.saveBuffered();
+  });
   expect(advanced.advanced.ui.workspaceColors).toEqual({ dark: '#123456ff' });
   expect(deps.commitVideoWorkspace).not.toHaveBeenCalled();
 });
@@ -470,7 +479,10 @@ it('flushes a remove/reconnect burst without committing a canonical no-op', asyn
       ],
     }))
   );
-  await act(async () => advanced.flush());
+  await act(async () => {
+    await advanced.flush();
+    await session.saveBuffered();
+  });
   const saved = session.getSnapshot().document.advancedContent;
   act(() => {
     advanced.setZoom((zoom) => ({
@@ -484,8 +496,9 @@ it('flushes a remove/reconnect burst without committing a canonical no-op', asyn
   });
   await act(async () => {
     await expect(advanced.flush()).resolves.toBeUndefined();
+    await session.saveBuffered();
   });
-  expect(deps.commitVideoWorkspace).toHaveBeenCalledTimes(1);
+  expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledTimes(1);
   expect(session.getSnapshot().document.advancedContent).toEqual(saved);
   expect(advanced.saveFailed).toBe(false);
 });
@@ -618,20 +631,18 @@ it('persists and removes a browser header through the existing content history',
 });
 
 it('persists one bulk click patch through history and keeps failed drafts retryable', async () => {
-  const { session, deps } = setup();
-  deps.commitVideoWorkspace.mockRejectedValueOnce(new Error('write failed'));
+  const { session, deps, build } = setup();
+  deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(new Error('write failed'));
   act(() =>
     advanced.setClickAnimations((current) =>
       patchReviewClicks(current, ['one', 'two'], { effect: 'ripple' })
     )
   );
-  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
-  expect(advanced.saveFailed).toBe(true);
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay + 1));
+  expect(session.getSnapshot().error).toBe('storage');
   expect(advanced.advanced.clickAnimations).toHaveLength(2);
-  expect(session.getSnapshot().document.advancedContent.clickAnimations).toBeUndefined();
-  await act(async () => {
-    await advanced.retry();
-  });
+  expect(build().workspace.history).toHaveLength(0);
+  await act(async () => session.saveBuffered());
   expect(advanced.saveFailed).toBe(false);
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
   expect(session.getSnapshot().document.advancedContent.clickAnimations).toHaveLength(2);
@@ -717,7 +728,7 @@ it('does not resurrect removed presentation from persisted baseline during anoth
 });
 
 it('shows watermark and presentation immediately, coalesces rapid edits and retries a failed save', async () => {
-  const { deps } = setup();
+  const { deps, session } = setup();
   const mark = { ...createQuickEditWatermark('Author'), mode: 'text' as const };
   const presentation = { ...createNeutralPresentationSettings(), audioFade: true };
   act(() => {
@@ -727,42 +738,48 @@ it('shows watermark and presentation immediately, coalesces rapid edits and retr
   });
   expect(advanced.advanced.watermark?.text.italic).toBe(true);
   expect(advanced.advanced.presentation?.audioFade).toBe(true);
-  expect(deps.commitVideoWorkspace).not.toHaveBeenCalled();
-  deps.commitVideoWorkspace.mockRejectedValueOnce(new Error('write failed'));
-  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
-  expect(advanced.saveFailed).toBe(true);
+  expect(deps.saveVideoWorkspaceSnapshot).not.toHaveBeenCalled();
+  deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(new Error('write failed'));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay + 1));
+  expect(session.getSnapshot().error).toBe('storage');
   expect(advanced.advanced.watermark?.text.italic).toBe(true);
-  await act(async () => {
-    await advanced.flush();
-  });
-  expect(advanced.saveFailed).toBe(false);
-  expect(deps.commitVideoWorkspace).toHaveBeenCalledTimes(2);
-  const operation = parseReviewOperation(deps.commitVideoWorkspace.mock.lastCall![0].operation, 4)!;
+  await act(async () => session.saveBuffered());
+  expect(session.getSnapshot().error).toBeNull();
+  expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledTimes(2);
+  const operation = parseVideoWorkspace(
+    deps.saveVideoWorkspaceSnapshot.mock.lastCall?.[0].workspace
+  )!.history.at(-1)!;
   expect(operation.target === 'advancedContent' && operation.after.watermark?.text.italic).toBe(
     true
   );
 });
 
 it('retains later presentation settings while an earlier watermark write is in flight', async () => {
-  const { deps, build } = setup();
+  const { deps, session } = setup();
+  const save = deps.saveVideoWorkspaceSnapshot.getMockImplementation()!;
   let release!: () => void;
-  deps.commitVideoWorkspace.mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        release = () => resolve(build() as never);
-      })
-  );
+  deps.saveVideoWorkspaceSnapshot.mockImplementationOnce(async (args) => {
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return save(args);
+  });
   const mark = { ...createQuickEditWatermark('Author'), mode: 'text' as const };
   act(() => advanced.setWatermark(mark));
-  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay + 1));
   act(() => advanced.setPresentation({ ...createNeutralPresentationSettings(), audioFade: true }));
   await act(async () => {
     release();
     await Promise.resolve();
   });
-  await act(async () => advanced.flush());
-  expect(deps.commitVideoWorkspace).toHaveBeenCalledTimes(2);
-  const operation = parseReviewOperation(deps.commitVideoWorkspace.mock.lastCall![0].operation, 4)!;
+  await act(async () => {
+    await advanced.flush();
+    await session.saveBuffered();
+  });
+  expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledTimes(2);
+  const operation = parseVideoWorkspace(
+    deps.saveVideoWorkspaceSnapshot.mock.lastCall?.[0].workspace
+  )!.history.at(-1)!;
   expect(operation.target === 'advancedContent' && operation.after.watermark?.text.value).toBe(
     'Author'
   );
@@ -776,7 +793,7 @@ it('does not enter the save queue for an unchanged authored proposal', async () 
   act(() => advanced.setZoom((zoom) => ({ ...zoom, regions: [...zoom.regions] })));
   expect(advanced.pending).toBe(false);
   await act(async () => vi.advanceTimersByTimeAsync(300));
-  expect(deps.saveVideoWorkspaceAdvanced).not.toHaveBeenCalled();
+  expect(deps.saveVideoWorkspaceSnapshot).not.toHaveBeenCalled();
 });
 
 it('does not resurrect a removed optional annotation baseline after content replay', async () => {
@@ -805,8 +822,12 @@ it('drains accepted edits before a control, retries atomically, and ignores reta
   const initial = createQuickEditAdvancedState();
   initial.ui.lockedTracks = { actions: true };
   const { session, deps } = setup(initial);
+  session.setAutosaveEnabled(false);
   act(() => advanced.setMode('advanced'));
-  await act(async () => advanced.flush());
+  await act(async () => {
+    await advanced.flush();
+    await session.saveBuffered();
+  });
   const stale = structuredClone(session.getSnapshot().snapshot.workspace.advanced);
   act(() =>
     advanced.setClickAnimations(() => patchReviewClicks([], ['click'], { effect: 'ripple' }))
@@ -814,13 +835,15 @@ it('drains accepted edits before a control, retries atomically, and ignores reta
   deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(
     new DOMException('Retry save', 'QuotaExceededError')
   );
-  await act(async () => advanced.setTrackVisibility('actions', false));
-  expect(advanced.saveFailed).toBe(true);
-  await expect(advanced.flush()).rejects.toThrow('Retry save');
+  await act(async () => {
+    await advanced.setTrackVisibility('actions', false);
+    await expect(session.saveBuffered()).rejects.toThrow('Retry save');
+  });
+  expect(session.getSnapshot().error).toBe('storage');
   expect(session.getSnapshot().document.advancedContent.clickAnimations).toHaveLength(1);
   const historyLength = session.getSnapshot().snapshot.workspace.history.length;
-  await act(async () => advanced.retry());
-  expect(advanced.saveFailed).toBe(false);
+  await act(async () => session.saveBuffered());
+  expect(session.getSnapshot().error).toBeNull();
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(historyLength);
   expect(advanced.advanced.ui.tracks.actions).toBe(false);
   await act(async () => session.saveAdvanced(stale));
@@ -837,8 +860,11 @@ it('drains accepted edits before a control, retries atomically, and ignores reta
 it('discards a failed control on Reload and permits flush without replaying it', async () => {
   const { session, deps } = setup();
   deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(new Error('Control save failed'));
-  await act(async () => advanced.setTrackVisibility('actions', false));
-  expect(advanced.saveFailed).toBe(true);
+  await act(async () => {
+    await advanced.setTrackVisibility('actions', false);
+    await expect(session.saveBuffered()).rejects.toThrow('Control save failed');
+  });
+  expect(session.getSnapshot().error).toBe('storage');
   await act(async () => {
     await session.reload();
     advanced.reset();
@@ -852,6 +878,7 @@ it('discards a failed control on Reload and permits flush without replaying it',
 
 it('persists source filters and retries a failed capture without losing the stack', async () => {
   const { session, deps, build } = setup();
+  session.setAutosaveEnabled(false);
   const stack = {
     version: 1 as const,
     filters: [
@@ -859,20 +886,24 @@ it('persists source filters and retries a failed capture without losing the stac
       { ...createSourceImageFilter('blur', 'blur'), enabled: false },
     ],
   };
-  deps.commitVideoWorkspace.mockRejectedValueOnce(new Error('Storage unavailable'));
+  deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(new Error('Storage unavailable'));
   act(() => advanced.setSourceFilters(stack));
   expect(advanced.advanced.sourceFilters).toEqual(stack);
   await act(async () => {
-    await expect(advanced.flush()).rejects.toThrow('Storage unavailable');
+    await advanced.flush();
+    await expect(session.saveBuffered()).rejects.toThrow('Storage unavailable');
   });
   expect(advanced.advanced.sourceFilters).toEqual(stack);
-  await act(async () => advanced.retry());
+  await act(async () => session.saveBuffered());
   expect(session.getSnapshot().document.advancedContent.sourceFilters).toEqual(stack);
   expect(
     createVideoReviewSession(build(), deps).getSnapshot().document.advancedContent.sourceFilters
   ).toEqual(stack);
   act(() => advanced.setSourceFilters(undefined));
-  await act(async () => advanced.flush());
+  await act(async () => {
+    await advanced.flush();
+    await session.saveBuffered();
+  });
   expect(session.getSnapshot().document.advancedContent.sourceFilters).toBeUndefined();
   expect(advanced.advanced.sourceFilters).toBeUndefined();
 });

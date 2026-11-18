@@ -343,7 +343,10 @@ it('runtime failure closes earlier successes and releases all frame reservations
   }));
   const renderer = await createReviewAnnotationRenderer(f.scene, f.deps);
   const held = f.managed();
-  await expect(renderer.render(6, density, 30, f.deps.signal)).rejects.toThrow('timeout');
+  await expect(renderer.render(6, density, 30, f.deps.signal)).rejects.toMatchObject({
+    name: 'EffectRuntimeFrameError',
+    code: 'timeout',
+  });
   expect(f.bitmaps[0]!.close).toHaveBeenCalledOnce();
   expect(renderer.counters().liveRasterResources).toBe(0);
   expect(f.managed()).toBe(held);

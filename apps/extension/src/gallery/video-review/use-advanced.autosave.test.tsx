@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
-import { loadQuickEditAdvancedState } from '../../features/video/review/advanced/validation';
+import { parseVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import { useReviewAdvanced } from './use-advanced';
 
@@ -31,22 +31,19 @@ function setup() {
   const save = vi.fn(
     async (
       args: Parameters<
-        NonNullable<Parameters<typeof createVideoReviewSession>[1]>['saveVideoWorkspaceAdvanced']
+        NonNullable<Parameters<typeof createVideoReviewSession>[1]>['saveVideoWorkspaceSnapshot']
       >[0]
     ) => {
-      const advanced = loadQuickEditAdvancedState(args.advanced);
-      if (!advanced) throw new Error('Invalid fixture advanced state.');
-      stored = {
-        ...stored,
-        workspace: { ...stored.workspace, advanced, revision: stored.workspace.revision + 1 },
-      };
+      const workspace = parseVideoWorkspace(args.workspace);
+      if (!workspace) throw new Error('Invalid fixture workspace.');
+      stored = { ...stored, workspace: { ...workspace, revision: args.expectedRevision + 1 } };
       return structuredClone(stored);
     }
   );
   const session = createVideoReviewSession(stored, {
-    saveVideoWorkspaceAdvanced: save,
+    saveVideoWorkspaceAdvanced: read,
     readVideoWorkspace: read,
-    saveVideoWorkspaceSnapshot: read,
+    saveVideoWorkspaceSnapshot: save,
     saveVideoWorkspaceDraft: read,
     commitVideoWorkspace: read,
     moveVideoWorkspaceHistory: read,
@@ -80,7 +77,7 @@ it('shows edits made during a write and preserves the new UI debounce after its 
     return implementation(args);
   });
   act(() => writer.setOverlaysVisible(false));
-  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay + 1));
   act(() => writer.setOverlaysVisible(true));
   expect(writer.advanced.ui.overlaysVisible).toBe(true);
   await act(async () => {
@@ -104,7 +101,10 @@ it('does not transfer content acknowledgement through a UI-only barrier', async 
     writer.setOverlaysVisible(false);
   });
   await act(async () => session.flushAutosave(['advanced']));
-  expect(save).toHaveBeenCalledTimes(1);
+  expect(save).toHaveBeenCalledOnce();
+  const published = parseVideoWorkspace(save.mock.lastCall?.[0].workspace);
+  expect(published?.history).toHaveLength(0);
+  expect(published?.advanced.ui.overlaysVisible).toBe(false);
   expect(writer.pending).toBe(true);
   expect(session.getSnapshot().document.advancedContent).toEqual(initialContent);
   act(() => writer.reset());

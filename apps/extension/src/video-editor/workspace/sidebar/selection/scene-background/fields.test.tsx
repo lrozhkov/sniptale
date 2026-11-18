@@ -382,7 +382,7 @@ it('adapts background motion choices and preserves the image through Off and res
     ...props.sceneBackground,
     motion: { mode: 'glow', speed: 35, intensity: 80 },
   });
-  resize(100);
+  await resize(100);
   expect(group()).toBeNull();
   expect(props.onSetSceneBackground).toHaveBeenCalledTimes(1);
   const trigger = container!.querySelector<HTMLButtonElement>(
@@ -402,7 +402,7 @@ it('adapts background motion choices and preserves the image through Off and res
   act(() =>
     (document.activeElement instanceof window.HTMLElement ? document.activeElement : null)?.blur()
   );
-  resize(2000);
+  await resize(2000);
   expect(
     group()!
       .querySelector('[title="editor.scene.backgroundMotionNone"]')
@@ -451,8 +451,11 @@ function mockChoiceWidth() {
       }
     }
   );
-  return (next: number) => {
+  return async (next: number) => {
     width = next;
-    act(() => callbacks.forEach((callback) => callback()));
+    await act(async () => {
+      callbacks.forEach((callback) => callback());
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+    });
   };
 }

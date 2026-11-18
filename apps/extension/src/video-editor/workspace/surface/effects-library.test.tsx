@@ -8,6 +8,7 @@ import { createEmptyVideoProject } from '../../../features/video/project/factori
 import { createTextClip } from '../../../features/video/project/factories/overlay-clip';
 import { buildProjectTransitionSegments } from '../../../features/video/project/transition/project';
 import { VideoTransitionEasing } from '../../../features/video/project/types';
+import { glTransitionLabel } from '../../../ui/gl-transition-labels';
 import { translate } from '../../../platform/i18n';
 import { VideoEditorCompositionProvider } from '../../runtime/controller/composition/provider';
 import { WorkspacePreferencesProvider } from '../../runtime/controller/workspace-preferences';
@@ -178,7 +179,9 @@ it('keeps actual effect controls current across open, closed, reopened and trans
       const previousCalls = apply.mock.calls.length;
       await act(async () => select!.click());
       const option = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
-        (button) => button.textContent?.trim() === 'CrossZoom'
+        (button) =>
+          button.textContent?.trim() ===
+          glTransitionLabel(createGlTransitionSelection('CrossZoom')!)
       );
       expect(option).toBeDefined();
       await act(async () => option!.click());
@@ -321,7 +324,8 @@ it('edits GL selection from the Transitions library without changing join timing
     expect(select).toBeDefined();
     await act(async () => select!.click());
     const choice = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
-      (button) => button.textContent?.trim() === 'CrossZoom'
+      (button) =>
+        button.textContent?.trim() === glTransitionLabel(createGlTransitionSelection('CrossZoom')!)
     );
     expect(choice).toBeDefined();
     await act(async () => choice!.click());

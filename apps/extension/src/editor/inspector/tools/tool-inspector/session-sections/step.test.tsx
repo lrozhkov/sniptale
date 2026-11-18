@@ -1,3 +1,4 @@
+import { readStepValueControlProps } from '../../step-value-input.test-support';
 import { describe, expect, it } from 'vitest';
 import type React from 'react';
 
@@ -6,7 +7,7 @@ import { createInspectorCommandParams } from '../../../../../../../../tooling/te
 
 function getStepValueInputProps(command: ReturnType<typeof buildStepCompactCommands>[number]) {
   const input = (command.content as any).props.children as React.ReactElement<any>;
-  return (input.type as any)(input.props).props;
+  return readStepValueControlProps(input);
 }
 
 function getCommand(
@@ -47,7 +48,9 @@ function registerNumberStepCommandTest() {
     expect(typeComponent.name).toBe('SelectField');
 
     typeControl.props.onChange('letter');
-    getStepValueInputProps(commands[1] as never).onChange({ currentTarget: { value: '42x' } });
+    getStepValueInputProps(commands[1] as never).onChange!({
+      currentTarget: { value: '42x' },
+    } as never);
     getCommandChild(commands, 'step-size').props.onPreviewValue(20);
     getCommandChild(commands, 'step-opacity').props.onPreviewValue(45);
     getCommandChild(commands, 'step-stroke-width').props.onPreviewValue(6);
@@ -95,7 +98,9 @@ function registerLetterStepCommandTest() {
     ]);
     expect(typeComponent.name).toBe('SelectField');
 
-    getStepValueInputProps(commands[1] as never).onChange({ currentTarget: { value: 'ж' } });
+    getStepValueInputProps(commands[1] as never).onChange!({
+      currentTarget: { value: 'ж' },
+    } as never);
     ((commands[2]!.content as any).props.children as React.ReactElement<any>).props.onChange(
       'cyrillic'
     );
@@ -133,7 +138,9 @@ function registerManualStepCommandTest() {
       'step-stroke-opacity',
     ]);
 
-    getStepValueInputProps(commands[1] as never).onChange({ currentTarget: { value: 'ABCD' } });
+    getStepValueInputProps(commands[1] as never).onChange!({
+      currentTarget: { value: 'ABCD' },
+    } as never);
 
     expect(params.previewStepPatch).toHaveBeenCalledWith({ value: 'ABC' });
   });

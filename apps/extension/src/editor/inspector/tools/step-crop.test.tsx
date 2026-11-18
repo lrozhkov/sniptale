@@ -1,3 +1,4 @@
+import { readStepValueControlProps } from './step-value-input.test-support';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -30,13 +31,11 @@ it('routes segmented step type changes through the normalized patch helper', () 
   const textSections = getGroupSections(groups[0] as React.ReactElement<any>);
   const typeSection = textSections[0] as React.ReactElement<any>;
   const valueSection = textSections[1] as React.ReactElement<any>;
-  const valueInput = valueSection.props.children.type(
-    valueSection.props.children.props
-  ) as React.ReactElement<any>;
+  const valueInput = readStepValueControlProps(valueSection.props.children);
 
   typeSection.props.onChange('letter');
-  valueInput.props.onChange({ currentTarget: { value: '2' } });
-  valueInput.props.onValueCommit();
+  valueInput.onChange!({ currentTarget: { value: '2' } } as never);
+  valueInput.onValueCommit?.('2');
 
   expect((typeSection.type as { name?: string }).name).toBe('SelectField');
   expect(valueSection.props.children.type.name).toBe('StepValueInput');

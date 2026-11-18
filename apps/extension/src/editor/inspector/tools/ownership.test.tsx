@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { readStepValueControlProps } from './step-value-input.test-support';
 import React from 'react';
 import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -211,9 +212,10 @@ describe('inspector tool panels', () => {
     const textSections = getStepGroupSections(stepGroups[0] as React.ReactElement<any>);
     const shapeSections = getStepGroupSections(stepGroups[1] as React.ReactElement<any>);
     getControlProps(getRequiredValue(textSections[0], 'step type panel')).onChange('letter');
-    getWrappedControlProps(getRequiredValue(textSections[1], 'step value panel')).onChange({
+    readStepValueControlProps(getRequiredValue(textSections[1], 'step value panel').props.children)
+      .onChange!({
       currentTarget: { value: '8' },
-    });
+    } as never);
     expect(stepGroups).toHaveLength(3);
 
     const letterStepProps = createToolsPanelProps({

@@ -55,6 +55,7 @@ function registerRuntimeSyncTests() {
     const selectedObject = { sniptaleId: 'rect-1' };
     const canvas = { getActiveObjects: () => [selectedObject] };
     const history = {
+      getRevision: () => 3,
       getState: () => ({ canRedo: true, canUndo: true, index: 2, size: 4 }),
     };
 
@@ -77,7 +78,7 @@ function registerRuntimeSyncTests() {
     expect(mocks.syncRuntimeMock).toHaveBeenCalledWith(
       expect.objectContaining({
         cropReady: true,
-        history: { canRedo: true, canUndo: true, index: 2, size: 4 },
+        history: { canRedo: true, canUndo: true, index: 2, size: 4, revision: 3 },
         layers: [{ id: 'layer-1' }],
         selection: expect.objectContaining({ selectedObjectId: 'rect-1' }),
       })

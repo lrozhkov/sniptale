@@ -478,8 +478,9 @@ it.each(['Escape', 'Undo', 'pointercancel', 'blur', 'unmount', 'boundary'])(
       open = false;
       return true;
     });
+    if (ending === 'boundary') value.instance.transform.rotation = -2 * Math.PI;
     render(value);
-    const startLabel = translate('gallery.videoReview.annotationStart');
+    const startLabel = translate('gallery.videoReview.annotationRotation');
     const start = input(startLabel);
     const step = (label: string, direction: string) => {
       const button = [...host.querySelectorAll('button')].find(
@@ -510,11 +511,11 @@ it.each(['Escape', 'Undo', 'pointercancel', 'blur', 'unmount', 'boundary'])(
     expect(value.editor.commitGesture).not.toHaveBeenCalled();
     act(() => window.dispatchEvent(new MouseEvent('pointerup')));
     if (ending === 'unmount') render(value);
-    const endLabel = translate('gallery.videoReview.annotationEnd');
+    const endLabel = translate('gallery.videoReview.annotationY');
     act(() => input(endLabel).focus());
     step(endLabel, 'decrease');
     expect(value.editor.previewGesture).toHaveBeenLastCalledWith(
-      expect.objectContaining({ end: expect.any(Number) })
+      expect.objectContaining({ transform: expect.objectContaining({ y: expect.any(Number) }) })
     );
     act(() => window.dispatchEvent(new MouseEvent('pointerup')));
     expect(value.editor.commitGesture).toHaveBeenCalledOnce();

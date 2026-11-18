@@ -17,7 +17,7 @@ import { sanitizeEditorComparableSettings, sanitizeEditorPresetSettings } from '
 
 describe('editor preset display labels', () => {
   it('projects a generic system label for editor-owned UI only when the preset is system-owned', () => {
-    expect(getEditorSystemPresetDisplayName()).toBe('shared.defaults.defaultEditorPresetName');
+    expect(getEditorSystemPresetDisplayName('ru')).toBe('shared.defaults.defaultEditorPresetName');
     expect(
       getEditorPresetDisplayName({
         isSystemDefault: true,
@@ -30,7 +30,7 @@ describe('editor preset display labels', () => {
         name: 'Rectangle from editor 1',
       })
     ).toBe('Rectangle from editor 1');
-    expect(translateMock).toHaveBeenCalledWith('shared.defaults.defaultEditorPresetName');
+    expect(translateMock).toHaveBeenCalledWith('shared.defaults.defaultEditorPresetName', 'ru');
   });
 });
 

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { parseVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
 import { createReviewCommandFixture } from './editor-fixture.test-support';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -74,7 +75,7 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
   };
   reviewDocument.canvasComments.push(createCanvasComment({ id: 'canvas-a', at: 1 }));
   const annotationEffects = { remove: vi.fn() };
-  const session = { flush: vi.fn(), history: vi.fn(), commit: vi.fn() };
+  const session = { flush: vi.fn(), flushAutosave: vi.fn(), history: vi.fn(), commit: vi.fn() };
   const advancedState = { flush: vi.fn(), setAudio: vi.fn() };
   const setActiveSelection = vi.fn();
   const setTimelineSelection = vi.fn();
@@ -209,7 +210,7 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
     expect(cancelAnnotationTool).toHaveBeenCalledTimes(3);
     expect(advancedState.flush).toHaveBeenCalledTimes(2);
     expect(canvas.flushTexts).toHaveBeenCalledTimes(2);
-    expect(session.flush).toHaveBeenCalledTimes(2);
+    expect(session.flushAutosave).toHaveBeenCalledTimes(2);
     expect(session.history.mock.calls.map(([direction]) => direction)).toEqual(['undo', 'redo']);
     expect(setTimelineSelection).toHaveBeenCalledWith({ kind: 'point', time: 1 });
     expect(comments.add).toHaveBeenCalledWith();
@@ -239,15 +240,18 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
       },
       draft: null,
     };
-    const persist = vi.fn(async () => ({
-      ...initial,
-      workspace: { ...initial.workspace, cursor: 0, revision: 3 },
-    }));
+    const persist = vi.fn<
+      NonNullable<Parameters<typeof createVideoReviewSession>[1]>['saveVideoWorkspaceSnapshot']
+    >(async ({ workspace: input, expectedRevision }) => {
+      const workspace = parseVideoWorkspace(input);
+      if (!workspace) throw new Error('Invalid fixture workspace.');
+      return { workspace: { ...workspace, revision: expectedRevision + 1 }, draft: null };
+    });
     persist.mockRejectedValueOnce(new Error('Quota'));
     args.session = createVideoReviewSession(initial, {
-      moveVideoWorkspaceHistory: persist,
-      readVideoWorkspace: vi.fn(),
-      saveVideoWorkspaceSnapshot: vi.fn(),
+      moveVideoWorkspaceHistory: vi.fn(),
+      readVideoWorkspace: vi.fn(async () => structuredClone(initial)),
+      saveVideoWorkspaceSnapshot: persist,
       saveVideoWorkspaceDraft: vi.fn(),
       saveVideoWorkspaceAdvanced: vi.fn(),
       commitVideoWorkspace: vi.fn(),
@@ -260,11 +264,13 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
       }
     };
     await act(async () => root.render(<Harness />));
-    expect(await result.moveHistory('start')).toBe(false);
-    expect(args.session.getSnapshot().document.annotations).toHaveLength(1);
     expect(await result.moveHistory('start')).toBe(true);
-    expect(persist).toHaveBeenCalledTimes(2);
     expect(args.session.getSnapshot().document.annotations).toHaveLength(0);
+    await expect(args.session.saveBuffered()).rejects.toThrow('Quota');
+    expect(args.session.getSnapshot()).toMatchObject({ dirty: true, error: 'storage' });
+    await args.session.saveBuffered();
+    expect(persist).toHaveBeenCalledTimes(2);
+    expect(args.session.getSnapshot()).toMatchObject({ dirty: false, error: null });
     advancedState.flush.mockRejectedValueOnce(new Error('Staged content'));
     expect(await result.moveHistory('start')).toBe(false);
     expect(persist).toHaveBeenCalledTimes(2);

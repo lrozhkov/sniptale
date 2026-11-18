@@ -134,7 +134,11 @@ it('persists the current blur and focus effects when creating or overwriting a t
 it('wires the focus blur control into creation settings', async () => {
   const anchor = document.createElement('button');
   document.body.append(anchor);
-  settings = { ...settings, effectMode: 'focus' };
+  settings = {
+    ...settings,
+    effectMode: 'focus',
+    focusSettings: { ...settings.focusSettings, blurAmount: 0 },
+  };
 
   await act(async () =>
     root?.render(
@@ -153,7 +157,7 @@ it('wires the focus blur control into creation settings', async () => {
   );
 
   expect(increase).not.toBeNull();
-  act(() => increase?.dispatchEvent(new Event('pointerdown', { bubbles: true })));
+  act(() => increase?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
   expect(onChange).toHaveBeenLastCalledWith(
     expect.objectContaining({
       focusSettings: expect.objectContaining({ blurAmount: 1 }),
@@ -168,7 +172,7 @@ it('wires the focus blur control into creation settings', async () => {
     `button[aria-label="${translate('content.overlayControls.showBorderTitle')}"]`
   );
   act(() => {
-    dimmingIncrease?.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    dimmingIncrease?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
     decorationToggle?.click();
   });
 

@@ -867,7 +867,8 @@ it('replays freeze duration, deletion and Undo without rewriting cursor keys or 
     const inserted = cursor === 1 ? 2 : cursor === 2 ? 3 : 0;
     expect(map.at(-1)!.resultEnd).toBe(12 + inserted);
     expect(slices.reduce((total, slice) => total + slice.duration, 0)).toBe(4);
-    expect(slices.at(-1)!.timelineStart + slices.at(-1)!.duration).toBe(7 + inserted);
+    expect(slices[0]!.sourceOffset).toBe(2);
+    expect(slices.at(-1)!.timelineStart + slices.at(-1)!.duration).toBe(7);
   }
   expect(baseline).toEqual(before);
 });

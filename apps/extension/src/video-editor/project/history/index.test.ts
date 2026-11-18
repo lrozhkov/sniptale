@@ -29,7 +29,7 @@ afterEach(() => {
 });
 
 describe('video editor project history', () => {
-  it('retains exactly the latest 50 undoable actions and evicts the oldest snapshot', () => {
+  it('retains the configured number of undoable actions and evicts the oldest snapshot', () => {
     let project = createEmptyVideoProject('Edit 0');
     let history = resetVideoEditorProjectHistory(project.id);
 
@@ -218,7 +218,7 @@ it('admits an exclusive typing lease only while history is idle', () => {
 });
 
 it('does not clone a snapshot discarded by the existing history byte budget', () => {
-  const project = createEmptyVideoProject('x'.repeat(9 * 1024 * 1024));
+  const project = createEmptyVideoProject('x'.repeat(EDITOR_HISTORY_LIMITS.maxBytes + 1));
   const next = { ...project, name: 'Small replacement', updatedAt: project.updatedAt + 1 };
   const clone = vi.spyOn(globalThis, 'structuredClone');
   try {
@@ -310,7 +310,7 @@ it('retains a small edit and both navigation directions when captured facts exce
 });
 
 it('counts UTF8 operation metadata across both history directions without retaining current content', () => {
-  const label = '界'.repeat(1_500_000);
+  const label = '界'.repeat(Math.floor(EDITOR_HISTORY_LIMITS.maxBytes / 5));
   let project = createEmptyVideoProject(`First ${label}`);
   let history = resetVideoEditorProjectHistory(project.id);
   for (const prefix of ['Second', 'Third']) {
@@ -320,7 +320,7 @@ it('counts UTF8 operation metadata across both history directions without retain
   }
   expect(history.past).toHaveLength(1);
   expect(new TextEncoder().encode(JSON.stringify(history)).byteLength).toBeLessThanOrEqual(
-    8 * 1024 * 1024
+    EDITOR_HISTORY_LIMITS.maxBytes
   );
   const undo = undoVideoEditorProjectHistory(history, project);
   expect(undo?.status).toBe('applied');
@@ -328,7 +328,7 @@ it('counts UTF8 operation metadata across both history directions without retain
   expect(undo.project.name).toBe(`Second ${label}`);
   expect(undo.history.future).toHaveLength(1);
   expect(new TextEncoder().encode(JSON.stringify(undo.history)).byteLength).toBeLessThanOrEqual(
-    8 * 1024 * 1024
+    EDITOR_HISTORY_LIMITS.maxBytes
   );
 });
 
@@ -649,7 +649,7 @@ it('preserves the original Redo branch when an active gesture returns to its ini
 it('counts draft recovery within the action cap and keeps an oversized current draft independent', () => {
   let project = createEmptyVideoProject('Initial');
   let history = resetVideoEditorProjectHistory(project.id);
-  for (let index = 0; index < 50; index++) {
+  for (let index = 0; index < EDITOR_HISTORY_LIMITS.maxActions; index++) {
     const next = { ...project, name: `Edit ${index}` };
     history = recordVideoEditorProjectHistory(history, project, next);
     project = next;
@@ -661,10 +661,10 @@ it('counts draft recovery within the action cap and keeps an oversized current d
     draft
   );
   const captured = captureVideoEditorProjectHistory(active, draft)!;
-  expect(captured.past).toHaveLength(49);
+  expect(captured.past).toHaveLength(EDITOR_HISTORY_LIMITS.maxActions - 1);
   expect(captured.recovery).toBeDefined();
-  expect(active.past).toHaveLength(50);
-  const large = createEmptyVideoProject('x'.repeat(9 * 1024 * 1024));
+  expect(active.past).toHaveLength(EDITOR_HISTORY_LIMITS.maxActions);
+  const large = createEmptyVideoProject('x'.repeat(EDITOR_HISTORY_LIMITS.maxBytes + 1));
   const small = { ...large, name: 'Small draft' };
   const hugeInverse = recordVideoEditorProjectHistory(
     beginVideoEditorProjectHistoryTransaction(resetVideoEditorProjectHistory(large.id), large),

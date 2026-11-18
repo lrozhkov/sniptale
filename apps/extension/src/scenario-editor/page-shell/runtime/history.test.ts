@@ -9,6 +9,7 @@ import {
   applyGuideStructureOperation,
 } from '../../../features/scenario/project/public';
 import { createGuideHistoryReducer, reduceGuideHistory, type GuideHistory } from './history';
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 
 function initial(): GuideHistory {
   return { present: createGuideProject('Original', 'guide', 1), past: [], future: [], group: null };
@@ -207,18 +208,21 @@ it('resets history across project lifecycle and ignores a foreign commit', () =>
 });
 
 it('bounds retained undo entries and does not mutate previous history values', () => {
-  const original = initial();
-  let state = original;
-  for (let index = 1; index <= 60; index += 1) {
-    state = reduceGuideHistory(state, {
-      kind: 'edit',
-      project: { ...state.present!, name: String(index) },
-      group: null,
-    });
-  }
-  expect(state.past).toHaveLength(50);
-  expect(state.past[0]?.name).toBe('10');
-  expect(original.past).toHaveLength(0);
+  const project = initial().present!;
+  const past = Array.from({ length: EDITOR_HISTORY_LIMITS.maxActions }, (_, index) => ({
+    ...project,
+    name: String(index),
+  }));
+  const original = { ...initial(), past };
+  const state = reduceGuideHistory(original, {
+    kind: 'edit',
+    project: { ...project, name: 'Newest' },
+    group: null,
+  });
+  expect(state.past).toHaveLength(EDITOR_HISTORY_LIMITS.maxActions);
+  expect(state.past[0]?.name).toBe('1');
+  expect(original.past[0]?.name).toBe('0');
+  expect(original.past).toHaveLength(EDITOR_HISTORY_LIMITS.maxActions);
   expect(original.present?.name).toBe('Original');
 });
 
@@ -246,16 +250,17 @@ it('acknowledges an older autosave without replacing later text or splitting its
 
 it('hydrates bounded project history in chronological order and resets redo', () => {
   const project = createGuideProject('Current', 'guide', 100);
-  const past = Array.from({ length: 55 }, (_, index) => ({ ...project, name: String(index) }));
+  const length = EDITOR_HISTORY_LIMITS.maxActions + 5;
+  const past = Array.from({ length }, (_, index) => ({ ...project, name: String(index) }));
   let state = reduceGuideHistory(initial(), {
     kind: 'reset',
     project,
     past: [...past, createGuideProject('Other', 'other', 1)],
   });
-  expect(state.past).toHaveLength(50);
+  expect(state.past).toHaveLength(EDITOR_HISTORY_LIMITS.maxActions);
   expect(state.past[0]?.name).toBe('5');
   state = reduceGuideHistory(state, { kind: 'undo' });
-  expect(state.present?.name).toBe('54');
+  expect(state.present?.name).toBe(String(length - 1));
   state = reduceGuideHistory(state, { kind: 'redo' });
   expect(state.present).toBe(project);
   expect(reduceGuideHistory(state, { kind: 'reset', project: null }).past).toEqual([]);
@@ -378,19 +383,21 @@ it('admits only this project in both restored branches and clears them when the 
 
 it('bounds a restored timeline around the current cursor and branches on the next edit', () => {
   const project = createGuideProject('Current', 'guide', 100);
-  const past = Array.from({ length: 60 }, (_, index) => ({ ...project, name: `Past ${index}` }));
-  const future = Array.from({ length: 60 }, (_, index) => ({
+  const half = EDITOR_HISTORY_LIMITS.maxActions / 2;
+  const length = half + 35;
+  const past = Array.from({ length }, (_, index) => ({ ...project, name: `Past ${index}` }));
+  const future = Array.from({ length }, (_, index) => ({
     ...project,
     name: `Future ${index}`,
   }));
   let state = reduceGuideHistory(initial(), { kind: 'reset', project, past, future });
   expect(state.present).toBe(project);
-  expect(state.past).toHaveLength(25);
-  expect(state.future).toHaveLength(25);
-  expect(state.past.at(-1)?.name).toBe('Past 59');
+  expect(state.past).toHaveLength(half);
+  expect(state.future).toHaveLength(half);
+  expect(state.past.at(-1)?.name).toBe(`Past ${length - 1}`);
   expect(state.future[0]?.name).toBe('Future 0');
-  expect(past).toHaveLength(60);
-  expect(future).toHaveLength(60);
+  expect(past).toHaveLength(length);
+  expect(future).toHaveLength(length);
   state = reduceGuideHistory(state, {
     kind: 'edit',
     project: { ...project, name: 'Branch' },
