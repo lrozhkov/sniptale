@@ -457,7 +457,7 @@ async function commitCascadeTransaction(
     physicalDelete.assetIds = [...new Set(physicalDelete.assetIds)];
     if (physicalDelete.assetIds.length > 0)
       await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
-    if (captureProfile) {
+    if (captureProfile && !projectRetainedOnly) {
       for (const entry of affectedVideos) await captureVideoProjectInTransaction(tx, entry.id);
       await captureDeletionInTransaction(tx, 'media', mediaId, 'local-edit', imageNativeRevision);
     }

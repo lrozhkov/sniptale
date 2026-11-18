@@ -53,7 +53,10 @@ describe('deletePersistedProject', () => {
   });
 
   it('deletes export artifacts and project thumbnails before removing the project record', async () => {
-    deleteVideoProject.mockResolvedValue(['asset-1']);
+    deleteVideoProject.mockResolvedValue({
+      deletedProjectAssetIds: ['asset-1'],
+      originalMediaIds: [],
+    });
     listProjectExports.mockResolvedValue([{ id: 'export-1' }, { id: 'export-2' }]);
     listVideoProjects.mockResolvedValue([{ id: 'remaining-project' }]);
 
@@ -71,7 +74,7 @@ describe('deletePersistedProject', () => {
   });
 
   it('preserves project asset thumbnails when the database keeps shared assets', async () => {
-    deleteVideoProject.mockResolvedValue([]);
+    deleteVideoProject.mockResolvedValue({ deletedProjectAssetIds: [], originalMediaIds: [] });
     listProjectExports.mockResolvedValue([]);
     listVideoProjects.mockResolvedValue([]);
 

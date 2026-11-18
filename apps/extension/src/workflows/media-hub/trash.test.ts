@@ -69,7 +69,7 @@ vi.mock('../../composition/persistence/media-library/usage', () => ({
   listMediaAssetProjectUsage: mocks.usage,
 }));
 vi.mock('./store', () => ({ deleteMediaLibraryAssetsBatchSafely: mocks.deleteMedia }));
-vi.mock('./video-projects', () => ({ deletePersistedVideoProject: mocks.deleteVideo }));
+vi.mock('./video-projects', () => ({ purgePersistedVideoProject: mocks.deleteVideo }));
 vi.mock('../../features/media-hub/events', () => ({
   publishMediaHubLibraryChanged: mocks.publish,
 }));
@@ -95,6 +95,7 @@ beforeEach(() => {
   mocks.deleteQuickEdit.mockResolvedValue('source');
   mocks.videos.mockResolvedValue([]);
   mocks.scenarios.mockResolvedValue([]);
+  mocks.deleteScenario.mockResolvedValue([]);
   mocks.exports.mockResolvedValue([]);
   mocks.usage.mockResolvedValue([]);
   mocks.guard.mockImplementation(async (_target, _timestamp, action: () => Promise<void>) =>
@@ -190,7 +191,10 @@ it('always preserves independent exports during manual or automatic parent purge
     target: { kind: 'video-project', id: 'parent' },
     trashedAt: 1,
   });
-  expect(mocks.deleteVideo).toHaveBeenCalledWith('parent', { preserveExports: true });
+  expect(mocks.deleteVideo).toHaveBeenCalledWith('parent', {
+    preserveExports: true,
+    releaseUnclaimedOriginal: true,
+  });
 });
 
 it('deletes confirmed active roots through their canonical owners without a trash transition', async () => {
@@ -199,11 +203,27 @@ it('deletes confirmed active roots through their canonical owners without a tras
   await permanentlyDeleteLibraryItem({ target: { kind: 'video-project', id: 'v' }, lifecycle });
   await permanentlyDeleteLibraryItem({ target: { kind: 'media', id: 'm' }, lifecycle }, []);
   expect(mocks.deleteScenario).toHaveBeenCalledExactlyOnceWith('s');
-  expect(mocks.deleteVideo).toHaveBeenCalledExactlyOnceWith('v', { preserveExports: true });
+  expect(mocks.deleteVideo).toHaveBeenCalledExactlyOnceWith('v', {
+    preserveExports: true,
+    releaseUnclaimedOriginal: true,
+  });
   expect(mocks.deleteMedia).toHaveBeenCalledExactlyOnceWith(['m'], new Map([['m', []]]));
   expect(mocks.lifecycleGuard).toHaveBeenCalledTimes(3);
   expect(mocks.guard).not.toHaveBeenCalled();
   expect(mocks.publish).toHaveBeenCalledTimes(3);
+});
+
+it('attempts collection only for committed scenario sources', async () => {
+  const target = { kind: 'scenario-project' as const, id: 's' };
+  mocks.deleteScenario.mockResolvedValueOnce(['released-original']);
+
+  await permanentlyDeleteTrashItem({ target, trashedAt: 10 });
+
+  expect(mocks.deleteOriginal).toHaveBeenCalledExactlyOnceWith('released-original', {
+    projectRetainedOnly: true,
+  });
+  expect(mocks.deleteScenario).toHaveBeenCalledBefore(mocks.deleteOriginal);
+  expect(mocks.collectableOriginals).not.toHaveBeenCalled();
 });
 
 it('rejects stale active confirmation before any resource release or deletion publication', async () => {

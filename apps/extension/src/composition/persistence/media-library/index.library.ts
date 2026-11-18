@@ -64,7 +64,9 @@ export class MediaLibraryDeleteError extends Error {
   }
 }
 
-export async function listMediaLibrary(): Promise<MediaLibraryItem[]> {
+export async function listMediaLibrary(
+  options: { includeProjectRetained?: boolean } = {}
+): Promise<MediaLibraryItem[]> {
   const db = await initDB();
   const [rawEntries, thumbnails] = await Promise.all([
     db.getAll(MEDIA_LIBRARY_STORE),
@@ -74,6 +76,7 @@ export async function listMediaLibrary(): Promise<MediaLibraryItem[]> {
   const thumbnailIds = new Set(thumbnails);
 
   return entries
+    .filter((entry) => options.includeProjectRetained || entry.savedIndependently !== false)
     .map(({ blob: _blob, ...entry }) => ({
       ...entry,
       hasThumbnail: thumbnailIds.has(entry.id),

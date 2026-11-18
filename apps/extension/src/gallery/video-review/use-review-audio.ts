@@ -294,7 +294,7 @@ function useReviewAudioAssets() {
   const [assets, setAssets] = useState<ReadonlyMap<string, ReviewAudioAsset>>(new Map());
   useEffect(() => {
     let active = true;
-    void listMediaLibrary()
+    void listMediaLibrary({ includeProjectRetained: true })
       .then((items) => {
         if (!active) return;
         setAssets((current) => {

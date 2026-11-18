@@ -1,4 +1,5 @@
 import { readCheckpointInTransaction } from './checkpoints';
+import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import type { IDBPTransaction } from 'idb';
 import { capturePreparedDatabase } from '../infrastructure/indexed-db/core';
 import {
@@ -199,7 +200,10 @@ async function captureDiscoveredRoot(
     await admission(tx, scope, authorization);
     // Deletion between discovery and capture must not become a resurrection.
     const exists: unknown = await tx.objectStore(source.store).get(key);
-    if (exists === undefined) {
+    if (
+      exists === undefined ||
+      (source.kind === 'media' && parseMediaLibraryEntry(exists)?.savedIndependently === false)
+    ) {
       await tx.done;
       return 'existing';
     }

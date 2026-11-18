@@ -41,7 +41,7 @@ export async function getLibraryStorageUsage(
   };
   const [media, videoProjects, scenarioProjects, imageWorkspaces, presentations, assetAuthority] =
     await Promise.all([
-      listMediaLibrary(),
+      listMediaLibrary({ includeProjectRetained: true }),
       listVideoProjectEntries(),
       listScenarioProjectEntries(),
       options.recoverImageWorkspaces === false

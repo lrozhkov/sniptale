@@ -78,6 +78,6 @@ export async function listScenarioProjectEntries(): Promise<ScenarioProjectEntry
   );
 }
 
-export async function deleteScenarioProject(id: string): Promise<void> {
-  await deleteScenarioAggregate(id);
+export function deleteScenarioProject(id: string): Promise<string[]> {
+  return deleteScenarioAggregate(id);
 }

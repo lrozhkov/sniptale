@@ -355,14 +355,16 @@ export async function importProjectAsset(
   options: ProjectAssetPublicationOptions = {}
 ): Promise<VideoProjectAsset> {
   await assertImportableProjectAssetFile(file, assetType);
+  const publication: ProjectAssetPublicationOptions =
+    options.publishToLibrary === undefined ? { ...options, projectRetained: true } : options;
 
   if (assetType === VideoProjectAssetType.AUDIO) {
-    return buildImportedAudioAsset(file, options);
+    return buildImportedAudioAsset(file, publication);
   }
 
   if (assetType === VideoProjectAssetType.IMAGE) {
-    return buildImportedImageAsset(file, options);
+    return buildImportedImageAsset(file, publication);
   }
 
-  return buildImportedVideoAsset(file, options);
+  return buildImportedVideoAsset(file, publication);
 }

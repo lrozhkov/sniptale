@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { createSha256Digest, createSha256BytesDigest } from '@sniptale/platform/security/digest';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 import {
   createEmptyVideoProject,
   createVideoProjectTrack,
@@ -144,7 +145,7 @@ it('refuses malformed inline values and detached file claims before replay', asy
 
 it('counts both inline directions against the logical byte budget without file IO', async () => {
   const { capture } = fixture();
-  const value = JSON.stringify({ value: 'x'.repeat(4 * 1024 * 1024) });
+  const value = JSON.stringify({ value: 'x'.repeat(EDITOR_HISTORY_LIMITS.maxBytes / 2) });
   const oversized = { value, bytes: new TextEncoder().encode(value).byteLength, sources: [] };
   await expect(
     prepareCurrentVideoProjectHistory({
@@ -250,7 +251,7 @@ it('counts recovery as one bounded transition before preparing files', async () 
   await expect(
     preparePersistedVideoProjectHistory({
       ...capture,
-      past: Array.from({ length: 50 }, () => capture.past[0]!),
+      past: Array.from({ length: EDITOR_HISTORY_LIMITS.maxActions }, () => capture.past[0]!),
       future: [],
       recovery: capture.past[0]!,
     })
@@ -377,7 +378,7 @@ it.each([
 it('refuses an excessive declared history before reading any immutable file', async () => {
   const { capture, current } = fixture();
   const prepared = await preparePersistedVideoProjectHistory(capture);
-  const refs = prepared.refs.map((ref) => ({ ...ref, size: 8 * 1024 * 1024 }));
+  const refs = prepared.refs.map((ref) => ({ ...ref, size: EDITOR_HISTORY_LIMITS.maxBytes + 1 }));
   await expect(
     hydratePersistedVideoProjectHistory({ history: prepared.history, refs, current })
   ).rejects.toThrow('budget');

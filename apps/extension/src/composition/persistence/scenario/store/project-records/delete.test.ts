@@ -35,7 +35,7 @@ import { createScenarioStoreProjectFixture } from '../test.helpers.ts';
 beforeEach(() => {
   vi.clearAllMocks();
   listScenarioExportsMock.mockResolvedValue([]);
-  deleteScenarioProjectMock.mockResolvedValue(undefined);
+  deleteScenarioProjectMock.mockResolvedValue([]);
   deleteMediaThumbnailMock.mockResolvedValue(undefined);
 });
 
@@ -43,7 +43,8 @@ async function verifyCascadeDeletionLifecycle() {
   const project = createScenarioStoreProjectFixture();
   listScenarioExportsMock.mockResolvedValue([{ id: 'export-1', projectId: project.id }]);
 
-  await deleteScenarioProjectRecord(project.id);
+  deleteScenarioProjectMock.mockResolvedValue(['original']);
+  await expect(deleteScenarioProjectRecord(project.id)).resolves.toEqual(['original']);
 
   expect(deleteMediaThumbnailMock).toHaveBeenCalledWith(`scenario:${project.id}`);
   expect(deleteMediaThumbnailMock).toHaveBeenCalledWith('scenario-export:export-1');

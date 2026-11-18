@@ -95,7 +95,7 @@ it('owns selection, bounded clip mutations, and the original audio gate', async 
 it('bounds trims to library-known asset durations and keeps moves duration-stable', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const { listMediaLibrary } = await import('../../composition/persistence/media-library');
-  vi.mocked(listMediaLibrary).mockResolvedValue([
+  const media = [
     {
       id: 'item:2',
       entityId: '2',
@@ -118,10 +118,14 @@ it('bounds trims to library-known asset durations and keeps moves duration-stabl
       sourceTitle: null,
       sourceFavicon: null,
       tags: [],
+      savedIndependently: false,
       lifecycle: 'ready',
       source: { kind: 'project-asset', projectAssetId: '2' },
     },
-  ] as never);
+  ] as never;
+  vi.mocked(listMediaLibrary).mockImplementationOnce(async (options) =>
+    options?.includeProjectRetained ? media : []
+  );
   const clipA = createQuickEditAudioClip({
     id: 'a2',
     assetId: 'project-asset:2',
@@ -149,6 +153,7 @@ it('bounds trims to library-known asset durations and keeps moves duration-stabl
       await Promise.resolve();
       await Promise.resolve();
     });
+    expect(listMediaLibrary).toHaveBeenCalledWith({ includeProjectRetained: true });
     act(() => hook.trimClip('music', 'a2', 'start', 0));
     expect(audioState.music[0]!.timelineStart).toBe(5);
     expect(audioState.music[0]!.duration).toBe(2);

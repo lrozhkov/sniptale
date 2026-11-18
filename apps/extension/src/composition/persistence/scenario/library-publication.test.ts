@@ -78,6 +78,7 @@ it('publishes an existing scenario child into the library once while preserving 
   ).toMatchObject({
     id: 'scenario-asset:old-image',
     source: { kind: 'stored-asset', assetId: 'physical-image' },
+    savedIndependently: false,
   });
   expect(
     io.rows

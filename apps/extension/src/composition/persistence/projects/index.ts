@@ -686,6 +686,17 @@ export async function prepareProjectAsset(
   if (rawPrevious !== undefined && (!previous || previous.id !== entryId))
     throw new Error('Invalid existing project asset.');
   const expectedAssetId = previous?.assetId ?? null;
+  if (
+    options.projectRetained &&
+    (expectedAssetId !== null ||
+      options.publishToLibrary === false ||
+      options.originMediaId !== undefined ||
+      requiredReview !== undefined ||
+      options.requiredReviewSpeech !== undefined ||
+      options.requiredReviewResource !== undefined ||
+      options.requiredReviewAnnotationEffect !== undefined)
+  )
+    throw new Error('Project-retained publication requires a new import.');
   if (options.requiredReviewAnnotationEffect && expectedAssetId !== null)
     throw new Error('Private annotation publication requires a new immutable identity.');
   await assertAssetWriteAdmission(blob.size);
@@ -713,6 +724,7 @@ export async function prepareProjectAsset(
       ? { requiredReviewResource: options.requiredReviewResource }
       : {}),
     ...(options.publishToLibrary === false ? { publishToLibrary: false } : {}),
+    ...(options.projectRetained ? { projectRetained: true } : {}),
   });
 }
 
@@ -914,7 +926,12 @@ export async function deleteProjectAsset(id: string): Promise<void> {
           media.source.projectAssetId !== id
         )
           throw new MediaAssetDeletionBlockedError('source-unavailable');
-        await deleteMediaAssetWithProjectCascade(mediaId, [], lifecyclePermit);
+        await deleteMediaAssetWithProjectCascade(
+          mediaId,
+          [],
+          lifecyclePermit,
+          media.savedIndependently === false
+        );
         return;
       }
       const physicalDelete = buildPhysicalDeleteOperation([]);

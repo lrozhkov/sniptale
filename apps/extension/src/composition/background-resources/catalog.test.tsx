@@ -77,6 +77,13 @@ it('localizes built-ins, tracks availability and persists additions through one 
   await act(async () => io.mediaChanged({ type: 'library-changed' }));
   expect(io.load).toHaveBeenCalledTimes(5);
 });
+it('resolves a saved background still retained after removal from Originals', async () => {
+  io.list.mockImplementationOnce(async (options?: { includeProjectRetained?: boolean }) =>
+    options?.includeProjectRetained ? [{ id: 'a', kind: 'image', savedIndependently: false }] : []
+  );
+  await act(async () => root.render(<Harness />));
+  expect(value.presets.find((row) => row.id === 'user:a')?.available).toBe(true);
+});
 it('reports failed reads and does not publish an older refresh over a newer result', async () => {
   io.load.mockRejectedValueOnce(new Error('offline'));
   await act(async () => root.render(<Harness />));

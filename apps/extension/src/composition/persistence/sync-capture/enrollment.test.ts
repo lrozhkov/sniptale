@@ -144,6 +144,35 @@ it('captures a saved native root that predates enrollment through the real captu
   expect(fetch).not.toHaveBeenCalled();
 });
 
+it('enrolls a retained source through its project rather than independent discovery', async () => {
+  const f = setup();
+  const media = betaV1Fixture.records.media_library[0];
+  f.table('media_library').set(mediaId, { ...media, savedIndependently: false });
+  const project = createVideoProjectEntry({
+    id: 'with-source',
+    baseRecordingId: 'beta-v1-recording',
+    source: { kind: 'recording', recordingId: 'beta-v1-recording' },
+  });
+  f.table('video_projects').set(project.id, project);
+
+  expect(await discoverInitialSyncRoots(scope, authorization)).toMatchObject({
+    captured: 0,
+    existing: 1,
+    refused: 0,
+  });
+  expect(captures(f)).toEqual([]);
+
+  expect(await discoverInitialSyncRoots(scope, authorization)).toMatchObject({
+    captured: 1,
+    refused: 0,
+  });
+  expect(
+    captures(f)
+      .map((op) => op.rootId)
+      .sort()
+  ).toEqual([mediaId, project.id].sort());
+});
+
 it('resumes bounded native pages after a worker restart and completes empty source families once', async () => {
   const f = setup();
   f.table('media_library').clear();

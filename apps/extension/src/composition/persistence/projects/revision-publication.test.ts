@@ -203,7 +203,10 @@ it('publishes accepted project and prepared assets without changing independent 
   ]);
   expect(
     fixture.rows.get('video_workspaces')!.get(published.videoReview!.workspace.aggregateId)
-  ).toEqual(withReviewWorkspaceUsage(published.videoReview!.workspace));
+  ).toEqual({
+    ...withReviewWorkspaceUsage(published.videoReview!.workspace),
+    generation: expect.any(String),
+  });
   expect(
     fixture.rows.get('video_workspace_drafts')!.has(published.videoReview!.workspace.aggregateId)
   ).toBe(false);

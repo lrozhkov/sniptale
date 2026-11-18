@@ -5,10 +5,10 @@ import { publishMediaHubLibraryChanged } from '../../../../../features/media-hub
 /**
  * Deletes a scenario project and all project-local artifacts.
  */
-export async function deleteScenarioProjectRecord(projectId: string): Promise<void> {
+export async function deleteScenarioProjectRecord(projectId: string): Promise<string[]> {
   const exports = await listScenarioExports(projectId);
 
-  await deleteScenarioProject(projectId);
+  const originalMediaIds = await deleteScenarioProject(projectId);
   await Promise.all([
     deleteMediaThumbnail(`scenario:${projectId}`),
     ...exports.map((entry) => deleteMediaThumbnail(`scenario-export:${entry.id}`)),
@@ -17,4 +17,5 @@ export async function deleteScenarioProjectRecord(projectId: string): Promise<vo
     `scenario:${projectId}`,
     ...exports.map((entry) => `scenario-export:${entry.id}`),
   ]);
+  return originalMediaIds;
 }

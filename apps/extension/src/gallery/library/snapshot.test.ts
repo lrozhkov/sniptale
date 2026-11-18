@@ -260,7 +260,7 @@ describe('loadGalleryLibrarySnapshot', () => {
     createGalleryItemsMock.mockReturnValue(nextItems);
 
     await expect(loadGalleryLibrarySnapshot()).resolves.toMatchObject({ nextItems });
-    expect(listMediaLibraryMock).toHaveBeenCalledWith();
+    expect(listMediaLibraryMock).toHaveBeenCalledWith({ includeProjectRetained: true });
   });
 });
 

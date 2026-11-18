@@ -645,7 +645,11 @@ export async function applyScenarioAssetMutations(
       });
     }
     if (!asset.borrowedMediaId || asset.independentLibraryIdentity)
-      await publishScenarioAssetToLibrary(tx, storedAsset);
+      await publishScenarioAssetToLibrary(
+        tx,
+        storedAsset,
+        asset.independentLibraryIdentity === true
+      );
   }
   for (const assetId of children?.assetDeletes ?? []) {
     const rawAsset: unknown = await assetStore.get!(assetId);

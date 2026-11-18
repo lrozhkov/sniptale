@@ -242,7 +242,7 @@ it.each(['guide', 'tour'] as const)(
     });
     const entry = retainHtml(project.id, mode);
     getStore('scenario_exports').set('legacy', { ...entry, id: 'legacy', html: undefined });
-    await deleteScenarioAggregate(project.id);
+    await expect(deleteScenarioAggregate(project.id)).resolves.toEqual(['scenario-asset:asset-1']);
     expect(getStore('scenario_projects').size).toBe(0);
     expect(getStore('scenario_exports').size).toBe(0);
     expect(getStore('scenario_step_editor_documents').size).toBe(0);
@@ -269,6 +269,29 @@ it('uses confirmed HTML graph ownership even when legacy export metadata is inco
   expect(getStore('scenario_assets').size).toBe(0);
   expect(getStore('scenario_step_editor_documents').size).toBe(0);
   expect(getStore('asset_operations').get('delete-1')).toMatchObject({ assetIds: ['html-body'] });
+});
+
+it('returns the shared original when deleting a Scenario that borrowed its exact bytes', async () => {
+  const owner = createGuideProject('Original owner');
+  const original = createAsset(owner.id, 'shared');
+  await commitScenarioAggregateMutation(owner, { children: { assetPuts: [original] } });
+  const borrower = createGuideProject('Borrower');
+  await commitScenarioAggregateMutation(borrower, {
+    children: {
+      assetPuts: [
+        {
+          ...original,
+          id: 'borrowed',
+          projectId: borrower.id,
+          borrowedMediaId: 'scenario-asset:shared',
+          galleryAssetId: 'scenario-asset:shared',
+        },
+      ],
+    },
+  });
+  await expect(deleteScenarioAggregate(borrower.id)).resolves.toEqual(['scenario-asset:shared']);
+  expect(getStore('scenario_projects').has(owner.id)).toBe(true);
+  expect(getStore('asset_refs').get(original.assetId)).toEqual(original.assetRef);
 });
 
 it('keeps a body referenced by another catalogue owner after deleting its source root', async () => {
@@ -339,7 +362,7 @@ it('keeps durable deletion authority when physical HTML removal temporarily fail
   vi.mocked(completePhysicalDeleteOperation).mockRejectedValueOnce(
     new Error('OPFS temporarily busy')
   );
-  await expect(deleteScenarioAggregate(project.id)).resolves.toBeUndefined();
+  await expect(deleteScenarioAggregate(project.id)).resolves.toEqual([]);
   expect(getStore('scenario_projects').size).toBe(0);
   expect(getStore('scenario_exports').size).toBe(0);
   expect(getStore('asset_operations').get('delete-1')).toMatchObject({
@@ -395,7 +418,7 @@ it.each(
       video.historyPublicationId = 'old-publication';
     }
     getStore('video_projects').set(video.id, video);
-    await deleteScenarioAggregate(project.id);
+    await expect(deleteScenarioAggregate(project.id)).resolves.toEqual(['original-image']);
     const saved = getStore('video_projects').get(video.id) as typeof video;
     if (emptyHistory) {
       expect(saved.history).toEqual(video.history);

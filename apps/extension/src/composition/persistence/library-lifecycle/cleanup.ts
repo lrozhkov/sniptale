@@ -91,7 +91,10 @@ export async function cleanupDrafts(args: {
   if (args.signal?.aborted || (!args.includeUnexpired && !args.policy.cleanupEnabled)) return empty;
   const ordinaryRetention = getDraftRetentionMs(args.policy, 'ordinary');
   const videoRetention = getDraftRetentionMs(args.policy, 'video');
-  const [media, videoProjects] = await Promise.all([listMediaLibrary(), listVideoProjectEntries()]);
+  const [media, videoProjects] = await Promise.all([
+    listMediaLibrary({ includeProjectRetained: true }),
+    listVideoProjectEntries(),
+  ]);
   const movedIds: string[] = [];
   let retainedCount = 0;
   const result = (): DraftCleanupResult => ({

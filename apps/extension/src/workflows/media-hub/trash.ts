@@ -32,7 +32,6 @@ import {
   deleteScenarioExport,
 } from '../../composition/persistence/scenario/projects';
 import {
-  deleteMediaLibraryAsset,
   deleteMediaThumbnail,
   listCollectableProjectOriginalIds,
 } from '../../composition/persistence/media-library/index.library.ts';
@@ -42,7 +41,8 @@ import {
   type MediaAssetProjectUsage,
 } from '../../composition/persistence/media-library/usage';
 import { deleteMediaLibraryAssetsBatchSafely } from './store';
-import { deletePersistedVideoProject } from './video-projects';
+import { purgePersistedVideoProject } from './video-projects';
+import { tryCollectProjectOriginal } from './project-original-cleanup';
 import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
 
 const maintenanceLog = createMaintenanceLog();
@@ -126,20 +126,17 @@ async function deleteLibraryTarget(
     );
     if (releaseUnclaimedOriginal) await tryCollectProjectOriginal(sourceId);
   } else if (target.kind === 'scenario-project') {
-    await deleteScenarioProjectRecord(target.id);
+    const sourceIds = await deleteScenarioProjectRecord(target.id);
+    if (releaseUnclaimedOriginal)
+      for (const sourceId of sourceIds) await tryCollectProjectOriginal(sourceId);
   } else if (target.kind === 'video-project') {
-    await deletePersistedVideoProject(target.id, { preserveExports: true });
+    await purgePersistedVideoProject(target.id, {
+      preserveExports: true,
+      releaseUnclaimedOriginal,
+    });
   } else {
     await deleteScenarioExport(target.id);
     await deleteMediaThumbnail(`scenario-export:${target.id}`);
-  }
-}
-
-async function tryCollectProjectOriginal(id: string): Promise<void> {
-  try {
-    await deleteMediaLibraryAsset(id, { projectRetainedOnly: true });
-  } catch {
-    void maintenanceLog.append({ operation: 'trash', code: 'conflict', counts: { retained: 1 } });
   }
 }
 
@@ -176,7 +173,7 @@ export async function cleanupLibraryTrash(
   if (signal?.aborted || !policy.trashCleanupEnabled) return { failedCount: 0 };
   const cutoff = now - (policy.trashRetentionDays ?? 30) * 86_400_000;
   const [media, videos, scenarios, quickEdits, images] = await Promise.all([
-    listMediaLibrary(),
+    listMediaLibrary({ includeProjectRetained: true }),
     listVideoProjectEntries(),
     listScenarioProjectEntries(),
     listVideoWorkspaceSummaries(),

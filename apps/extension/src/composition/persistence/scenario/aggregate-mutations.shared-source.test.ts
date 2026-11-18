@@ -38,6 +38,10 @@ it('publishes an independent Library identity while reusing an existing physical
   expect(getStore('asset_refs').size).toBe(1);
   expect(getStore('media_library').get('scenario-asset:clone')).toMatchObject({
     source: { kind: 'stored-asset', assetId: original.assetId },
+    savedIndependently: true,
+  });
+  expect(getStore('media_library').get('scenario-asset:original')).toMatchObject({
+    savedIndependently: false,
   });
   expect(getStore('scenario_assets').get('clone')).not.toHaveProperty('borrowedMediaId');
   expect(

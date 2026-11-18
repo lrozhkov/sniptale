@@ -72,13 +72,15 @@ export async function assertNewProjectSources(
   }
 }
 
-/** Called only by an accepted parent commit, never by source preparation. */
-export async function promoteProjectSourceLifecycles(
+/** Resolve Library origins for only this workspace and its retained history. */
+export async function readProjectSourceIds(
   project: VideoProject,
-  stores: Omit<Parameters<typeof assertNewProjectSources>[2], 'scenarioProjectStore'>,
-  now: number,
+  stores: Pick<
+    ReturnType<typeof createProjectMutationStores>,
+    'mediaLibraryStore' | 'projectAssetStore' | 'scenarioAssetStore'
+  >,
   history?: PersistedVideoProjectHistory
-): Promise<void> {
+) {
   const mediaIds = new Set<string>();
   const recordingIds = new Set<string>();
   for (const locator of locators(project, history)) {
@@ -99,6 +101,17 @@ export async function promoteProjectSourceLifecycles(
         mediaIds.add(asset.borrowedMediaId ?? asset.galleryAssetId ?? `scenario-asset:${asset.id}`);
     }
   }
+  return { mediaIds, recordingIds };
+}
+
+/** Called only by an accepted parent commit, never by source preparation. */
+export async function promoteProjectSourceLifecycles(
+  project: VideoProject,
+  stores: Omit<Parameters<typeof assertNewProjectSources>[2], 'scenarioProjectStore'>,
+  now: number,
+  history?: PersistedVideoProjectHistory
+): Promise<void> {
+  const { mediaIds, recordingIds } = await readProjectSourceIds(project, stores, history);
   await promoteLinkedRecordingLifecycles({
     recordingIds,
     mediaStore: stores.mediaLibraryStore,

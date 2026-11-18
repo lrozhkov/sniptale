@@ -74,7 +74,7 @@ async function loadStorageCleanupInventory(): Promise<StorageCleanupInventory> {
 export async function collectStorageCleanupReport(topN = 10): Promise<StorageCleanupReport> {
   const [mediaItems, recordings, projectExports, projectAssets, projectDetails, rawInventory] =
     await Promise.all([
-      listMediaLibrary(),
+      listMediaLibrary({ includeProjectRetained: true }),
       listRecordings(),
       listAllProjectExports(),
       listProjectAssets(),

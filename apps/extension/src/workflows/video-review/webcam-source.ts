@@ -40,7 +40,7 @@ export async function findReviewWebcam(
   );
   if (root?.recordingGroup?.role !== 'display') return null;
   const groupId = root.recordingGroup.groupId;
-  const siblings = await listMediaLibrary();
+  const siblings = await listMediaLibrary({ includeProjectRetained: true });
   signal.throwIfAborted();
   return (
     siblings

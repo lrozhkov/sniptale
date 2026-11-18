@@ -406,6 +406,28 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'scenario-native-aggregate-cleanup',
+    productionFile: 'apps/extension/src/composition/persistence/scenario/aggregate-cleanup.ts',
+    reason: 'Native cleanup and replica tombstones prove retained resource and rollback paths.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/scenario/aggregate-cleanup.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-history-storage.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-deletion.test.ts',
+    ],
+  },
+  {
+    owner: 'scenario-library-source-publication',
+    productionFile: 'apps/extension/src/composition/persistence/scenario/library-publication.ts',
+    allowCrossOwner: true,
+    reason: 'Native and archive tests exercise source visibility, borrowed bytes and replacement.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/scenario/library-publication.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.shared-source.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/media.review-asset-retention.test.ts',
+    ],
+  },
+  {
     owner: 'scenario-pooled-editing-checkpoint',
     productionFile: 'apps/extension/src/composition/persistence/scenario/editing-history.ts',
     exclusive: true,
@@ -477,13 +499,16 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   {
     owner: 'shared-db-media-library-provenance',
     productionFile: 'apps/extension/src/composition/persistence/media-library/index.library.ts',
-    reason: 'Media library provenance patch writes are covered by focused provenance tests.',
+    reason:
+      'Focused tests cover provenance, original visibility and synchronized source retention.',
     testFiles: [
       'apps/extension/src/composition/persistence/media-library/index.library.mutations.test.ts',
       'apps/extension/src/composition/persistence/media-library/index.library.provenance.test.ts',
       'apps/extension/src/composition/persistence/media-library/index.library.tags.test.ts',
       'apps/extension/src/composition/persistence/media-library/index.library.test.ts',
       'apps/extension/src/composition/persistence/media-library/index.library.web-snapshot-provenance.test.ts',
+      'apps/extension/src/composition/persistence/media-library/usage.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-media.test.ts',
     ],
   },
   {

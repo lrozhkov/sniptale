@@ -621,7 +621,7 @@ async function verifyImageImport() {
     'image/png',
     'image.png',
     undefined,
-    {}
+    { projectRetained: true }
   );
   expect(asset).toEqual(
     expect.objectContaining({
@@ -657,7 +657,7 @@ async function verifyMediaImports() {
     'video/webm',
     'clip.webm',
     undefined,
-    {}
+    { projectRetained: true }
   );
   expect(saveProjectAssetSafelyMock).toHaveBeenCalledWith(
     projectAssetId,
@@ -665,7 +665,7 @@ async function verifyMediaImports() {
     'audio/mpeg',
     'sound.mp3',
     undefined,
-    {}
+    { projectRetained: true }
   );
   expect(saveProjectAssetSafelyMock).toHaveBeenCalledWith(
     projectAssetId,
@@ -673,7 +673,7 @@ async function verifyMediaImports() {
     'audio/mpeg',
     'voice.webm',
     undefined,
-    {}
+    { projectRetained: true }
   );
   expect(avifAsset.type).toBe(VideoProjectAssetType.IMAGE);
   expect(videoAsset.type).toBe(VideoProjectAssetType.VIDEO);

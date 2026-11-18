@@ -187,6 +187,7 @@ it('promotes the canonical mirror of an accepted project asset', async () => {
     ...media,
     workspaceRevision: 0,
     imageContentState: 'original',
+    savedIndependently: false,
     lifecycle: { storageClass: 'library', savedAt: 50, updatedAt: 50 },
   });
 });

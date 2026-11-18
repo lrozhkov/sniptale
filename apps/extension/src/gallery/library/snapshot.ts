@@ -59,7 +59,9 @@ export async function loadGalleryLibrarySnapshot(
     quickEditProjects,
     remote,
   ] = await Promise.all([
-    runStorageStartupPhase('gallery-media-list', listMediaLibrary),
+    runStorageStartupPhase('gallery-media-list', () =>
+      listMediaLibrary({ includeProjectRetained: true })
+    ),
     runStorageStartupPhase('gallery-scenario-list', listScenarioProjectSummaries),
     runStorageStartupPhase('gallery-thumbnail-list', listMediaThumbnailIds),
     runStorageStartupPhase('gallery-video-project-list', listVideoProjects),
