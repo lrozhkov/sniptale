@@ -6,6 +6,29 @@
   "excludes": ["full production portals", "physical eyedropper proof"],
   "cases": [
     {
+      "id": "layers.inspector-fields",
+      "title": "Поля инспектора",
+      "states": [
+        "range-drag",
+        "stepper",
+        "exact-input",
+        "dropdown",
+        "segments",
+        "text-input",
+        "textarea",
+        "clear",
+        "dictation-accessory",
+        "hex",
+        "copy",
+        "paste",
+        "alpha",
+        "gradient",
+        "apply",
+        "cancel"
+      ],
+      "proof": "The inspector fields share a neutral frame. Digits stay in place during editing. Picker previews update before Apply."
+    },
+    {
       "id": "layers.commands",
       "title": "Меню команд",
       "states": ["open", "disabled", "keyboard", "dismissed"],

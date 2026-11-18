@@ -8,7 +8,7 @@ Editable nonempty text fields have a trailing 24px clear target inside the field
 
 Clear changes the draft and returns focus to the input. It does not submit a form or silently change its accepted value. Keep existing Enter, blur, Escape, Save, and Cancel contracts.
 
-Show Clear only while the pointer hovers over the actual input or Clear target, or focus remains within the field. Label hover does not reveal Clear. Keep a focused Clear visible.
+Show Clear only while the pointer hovers over the actual input or Clear target, or focus remains within the field. Label hover does not reveal Clear. Keep a focused Clear visible. In the inspector example, hide single-line Clear while the text input has focus.
 
 Hide clear when empty, read-only, or disabled. Synchronize it after input and programmatic value/state changes. A multiline clear target sits at the upper trailing edge, not the vertical center.
 
@@ -23,6 +23,6 @@ Reserve usable text space separately from Clear, voice, and submit targets in co
 
 For a field with Clear and dictation, keep their target positions stable while either action is visible. A single-line title can reclaim hidden accessory space at rest. Removing an empty-field Clear must not move the microphone or change text wrapping. Keep a usable text budget before collapsing other header commands. A multiline AI prompt can retain separate upper Clear and lower dictation actions. Preserve that composition instead of forcing both actions onto one line.
 
-Idle dictation uses a quiet icon that brightens on hover. Keep active, stopping, and error feedback visible outside hover and focus. Derive document editing icons from the local paper and ink, including Clear hover. Do not use a dark shell's bright foreground on light document content. Clearing a dictated draft stops its insertion owner before accepting the empty value. Reject late speech for that cleared placement while preserving a new deliberate recording.
+Idle dictation uses a quiet icon that brightens on hover. Show it only when the user enables voice input. In the inspector example, only the multiline field has dictation. Show its icon on field hover or focus. The button inserts sample text without opening the microphone. Keep active, stopping, and error feedback visible outside hover and focus. Derive document editing icons from the local paper and ink, including Clear hover. Do not use a dark shell's bright foreground on light document content. Clearing a dictated draft stops its insertion owner before accepting the empty value. Reject late speech for that cleared placement while preserving a new deliberate recording.
 
 Integration references: [Guide voice fields](../../apps/extension/src/scenario-editor/page-shell/voice-field.tsx) and [review composer](../../apps/extension/src/gallery/video-review/composer.tsx). Their existing native scenarios cover real field composition. The field specimen does not replace browser speech acquisition or permission handling.

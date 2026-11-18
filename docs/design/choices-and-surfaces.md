@@ -17,19 +17,21 @@ Follow [layout adaptation](responsive.md#compaction-order) for intrinsic fit, st
 | Associated content panels | [Tabs](navigation.md) |
 | Exclusive drawing tool | Radio tools under [Buttons](buttons.md) |
 
-Choose by label length, comparison, and width. Search filters existing values without accepting arbitrary new values. Preserve accepted values across representation changes and defer changes during gestures. Segments use a neutral selected surface without an inner frame. Light-theme selection must remain distinct from both idle and hover surfaces. Selected labels retain their normal weight.
+Choose by label length, comparison, and width. Search filters existing values without accepting arbitrary new values. Preserve accepted values across representation changes and defer changes during gestures. Segments use a neutral selected surface without an inner frame. Light-theme selection must remain distinct from both idle and hover surfaces. Use regular weight for selected labels.
 
-Dropdown selection uses the shared orange vector check, separate from the neutral active-row highlight. Do not use orange option frames, underlines, generic repeated instructions, or bold selected labels.
+Mark dropdown selection with a vector check. Use orange in the product and neutral ink in the sandbox. Keep the active row neutral. Omit option frames, underlines, repeated instructions, and bold selection labels.
 
 ## Width, material, and scrolling
 
-Stacked fields keep 8px between fields and 4px between name and value. Keep the next label outside the trigger-to-menu gap. Inline inspector rows retain a 4px gap. The owner defines a stable value column independent of selected text and search queries. When space permits, menus match trigger width and expand for complete options.
+Use a stable value column. Allow 8px between stacked fields and 4px between labels and values or inspector rows. Keep the next label clear of the menu gap. Match trigger width where possible. Expand for complete options.
 
-Measure labels, descriptions, icons, check column, padding, and an actual scrollbar. Clamp to the viewport and wrap long values. In a narrow inspector, an explicit section boundary defines menu width and horizontal position across name and value columns. The surface declares content-fit or full-column placement. A full-column menu covers the group’s name/value region. A content-fit menu can align to the trailing field edge. Neither mode can cover the inspector scrollbar or adjacent category rail.
+Sandbox triggers have a light gray surface and border. Hover darkens the surface and border. An open trigger keeps the hover surface and shows one focus border. Keep geometry constant.
+
+Measure labels, descriptions, icons, checks, padding, and any visible scrollbar. Clamp to the viewport and wrap long values. In a narrow inspector, section bounds define the menu width and horizontal position. The surface declares content-fit or full-column placement. A full-column menu covers the group’s name/value region. A content-fit menu can align to the trailing field edge. Neither mode can cover the inspector scrollbar or adjacent category rail.
 
 Measure the content box after actual padding, borders, and scrollbar width. Do not create per-parameter width exceptions. Use 5px shell padding, 8px option padding, a 32px minimum row, and the shared 4px radius. Use light glass with the [shared fallbacks](foundations.md). Long lists scroll inside the menu. Use a narrow neutral scrollbar separated from highlighting.
 
-Reserve scrollbar space only when overflow exists. Necessary check columns remain stable.
+Reserve scrollbar space only for overflow. Keep check columns stable.
 
 Searchable catalogs keep the search field visible while their results scroll. Bound the surface to the viewport and its clipping ancestors. Long user-defined names must not expand the host layout. Follow [full-text access](localization.md#full-text-access) for truncated names. Keep text behind the surface from showing through its input and option labels.
 

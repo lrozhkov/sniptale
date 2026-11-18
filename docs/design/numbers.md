@@ -4,11 +4,11 @@
 
 ## Choose the editor
 
-Numeric fields provide exact values, units, bounds, and meaningful precision. Ranges support bounded continuous comparison, never arbitrary named modes. Ordinary sliders stay visible. Contextual sliders supplement inspector values on hover/range focus. Repeat steppers belong to numeric owners, not ordinary command buttons.
+[Numeric fields](../../tooling/design-reference/examples/layers/index.html) specify values, units, bounds, and precision. Use ranges for continuous values. Keep ordinary sliders visible. Use contextual sliders and repeating steppers with inspector values.
 
 Preserve the product mapping, units, precision, snapping, valid boundaries, and accepted off-step values.
 
-Focused, hovered numeric inputs accept vertical wheel steps through existing owners, consuming handled wheel events.
+Focused, hovered numeric inputs consume vertical wheel events they handle through existing owners. In Layers, the active value frame also accepts Alt or Option with the wheel. Support Up and Down. Unmodified wheel scrolls.
 
 ## Row geometry and hierarchy
 
@@ -26,7 +26,7 @@ Invalid blur retains the invalid draft and error without changing the accepted v
 
 Reveal the contextual slider during row hover, range focus, or dragging. Hide it during direct numeric editing, even while the pointer stays over the row. Restore it after editing ends only when hover or range focus requires it. Forward Tab after a valid edit can reach the sample range. Shift+Tab returns to the value.
 
-Provide an equivalent keyboard route in the actual product owner. Use the same theme accent for ordinary and contextual fills and thumbs. Keep the retained thin neutral unfilled track. Do not restore the rejected heavy contrast track. Its final contrast decision remains open. Keep position and fill synchronized during keyboard and pointer changes.
+Support equivalent keyboard input in the product. Use the same theme accent for ordinary and contextual fills and thumbs. Keep the retained thin neutral unfilled track. Do not restore the rejected heavy contrast track. Its final contrast decision remains open. Keep position and fill synchronized during keyboard and pointer changes.
 
 ## Hold, interruption, and recovery
 
@@ -40,7 +40,7 @@ Errors remain visible and copyable, associated with the field, and do not hide n
 
 NumericField accepts separate scrubMin/scrubMax and typed min/max bounds. A valid value outside the scrub range remains accepted. Show the out-of-scale caption and omit an exact-position thumb. Focusing and leaving the range without editing must not clamp that value. A deliberate range edit selects within scrub bounds. Text arrows retain the wider typed domain.
 
-Use editable=false for a range-only setting. Its value remains read-only while the range supports pointer and keyboard input.
+Set `editable=false` for range-only settings. Keep the value read-only and support pointer and keyboard range input.
 
 Units stay visible outside editable text during focus/draft changes. Editors expand toward the leading edge, retaining the trailing unit edge. Editing starts at 5ch minimum, retaining leading inner space for longer drafts. Avoid digit-tight or oversized fixed widths. Use the same light neutral 1px boundary and input surface as inline text and HEX editors. On initial focus in an editable numeric field, select the complete value. Support pointer and keyboard activation of the input. A later click inside the focused field can place the caret.
 

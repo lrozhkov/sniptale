@@ -1,0 +1,46 @@
+.theme {
+  --reference-field-error-color: #be123c;
+  --reference-field-error-font: 400 14px/20px var(--font-ui);
+  --reference-field-error-gap: 6px;
+  --reference-field-idle: var(--sniptale-color-surface-input);
+  --reference-field-hover: var(--sniptale-color-surface-hover);
+  --reference-field-border: var(--sniptale-color-border-soft);
+  --reference-field-hover-border: var(--sniptale-color-border-strong);
+  --reference-field-focus: color-mix(
+    in srgb,
+    var(--sniptale-color-text-muted-strong) 62%,
+    var(--sniptale-color-surface-canvas)
+  );
+}
+
+.theme[data-theme='light'] {
+  --reference-field-focus: color-mix(
+    in srgb,
+    var(--sniptale-color-text-muted-strong) 70%,
+    var(--sniptale-color-surface-base)
+  );
+  --reference-field-idle: color-mix(
+    in srgb,
+    var(--sniptale-color-text-primary) 5.5%,
+    var(--sniptale-color-surface-base)
+  );
+  --reference-field-hover: color-mix(
+    in srgb,
+    var(--sniptale-color-text-primary) 7.5%,
+    var(--sniptale-color-surface-base)
+  );
+  --reference-field-border: color-mix(
+    in srgb,
+    var(--sniptale-color-text-primary) 11%,
+    var(--sniptale-color-surface-base)
+  );
+  --reference-field-hover-border: color-mix(
+    in srgb,
+    var(--sniptale-color-text-primary) 18%,
+    var(--sniptale-color-surface-base)
+  );
+}
+
+.theme[data-theme='dark'] {
+  --reference-field-error-color: #fda4af;
+}

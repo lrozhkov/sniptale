@@ -2,21 +2,17 @@
   --muted: var(--secondary);
   --hover: var(--surface-hover);
   --selected: #d3cdc4;
-  --active-row: #e6e0d8;
-  --hover-border: #c6beb4;
-  --soft-border: #ded8d0;
+  --active-row: var(--reference-field-hover);
   --choice-radius: var(--radius);
   --choice-mark: #9a3412;
   --menu-scroll-thumb: #66616c;
   --keyboard-marker: #747987;
-  --shadow: 0 8px 28px #43281825;
+  --shadow: 0 8px 28px #24242b25;
   --choice-column-width: 100%;
 }
 .theme[data-theme='dark'] {
   --selected: #3b3b43;
   --active-row: #393940;
-  --hover-border: #56565f;
-  --soft-border: #3b3b42;
   --choice-mark: #fdba74;
   --menu-scroll-thumb: #bebec8;
   --keyboard-marker: #bdbdc8;
@@ -50,29 +46,92 @@
   gap: 12px;
   width: 100%;
   min-height: var(--control-height);
-  border: 1px solid transparent;
+  border: 1px solid var(--reference-field-border);
   border-radius: var(--radius);
   padding: var(--control-padding-block) var(--control-padding-inline);
-  background: transparent;
+  background: var(--reference-field-idle);
   color: var(--text);
   text-align: left;
   transition: none;
   box-shadow: none;
+}
+.choice-field[slot='inspector-dropdown'] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--reference-inspector-value-width, 52%));
+  gap: 8px;
+  align-items: start;
+  min-width: 0;
+}
+.choice-field[slot='inspector-dropdown'] > .control {
+  gap: 6px;
+  padding-block: 0;
+  padding-inline-end: 0;
+}
+.choice-field[slot='inspector-dropdown'] .chevron {
+  width: var(--reference-inspector-action-width, 30px);
+  height: var(--reference-inspector-action-width, 30px);
+  flex-basis: var(--reference-inspector-action-width, 30px);
+  color: var(--reference-inspector-icon-ink);
+}
+.choice-field[slot='inspector-dropdown'] .chevron path {
+  vector-effect: non-scaling-stroke;
+  stroke-width: var(--reference-inspector-icon-stroke);
+}
+.choice-field[slot='inspector-dropdown'] > .field-label {
+  margin: 0;
+  padding-block: 7px;
+  overflow-wrap: anywhere;
+  line-height: var(--font-control-line);
+}
+[slot='inspector-segments'] {
+  --hover: var(--reference-field-hover);
+  --selected: color-mix(in srgb, var(--reference-field-focus) 34%, var(--reference-field-idle));
+}
+[slot='inspector-segments'] .parameter-row:not([data-fit='stacked'], [data-label-fit='stacked']) {
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--reference-inspector-value-width, 52%));
+}
+[slot='inspector-segments'] .property-options[data-presentation='segments'] {
+  min-height: var(--control-height);
+  background: var(--reference-field-idle);
+  box-shadow: inset 0 0 0 1px var(--reference-field-border);
+  gap: 3px;
+  padding: 3px;
+}
+[slot='inspector-segments'] .property-options[data-presentation='segments'] .property-face {
+  padding-inline: 4px;
+}
+[slot='inspector-segments'] .property-pill {
+  display: none;
+}
+[slot='inspector-segments'] .property-option input:checked + .property-face {
+  background-color: var(--selected);
+}
+@media (prefers-reduced-motion: no-preference) {
+  [slot='inspector-segments'] .property-option input:checked + .property-face {
+    transition: background-color 110ms ease-out;
+  }
+}
+@media (forced-colors: active) {
+  [slot='inspector-segments'] {
+    --selected: Highlight;
+  }
+}
+[slot='inspector-segments'] .property-option:hover input:not(:checked, :disabled) + .property-face {
+  background: var(--reference-field-hover);
 }
 .control .value {
   min-width: 0;
   overflow-wrap: anywhere;
   line-height: var(--font-control-line);
 }
-.field.choice-field > .control:hover:not(:disabled),
-.field.choice-field > .search:hover:not(:disabled) {
-  border-color: var(--hover-border);
-  background: var(--hover);
+.choice-field > :is(.control, .search):hover:not(:disabled, [aria-expanded='true']) {
+  border-color: var(--reference-field-hover-border);
+  background: var(--reference-field-hover);
 }
-.control[aria-expanded='true'],
-.search[aria-expanded='true'] {
-  background: var(--hover);
-  border-color: var(--soft-border);
+.choice-field > :is(.control, .search)[aria-expanded='true']:not(:disabled) {
+  background: var(--reference-field-hover);
+  border-color: var(--reference-field-focus);
+  outline: 0;
 }
 .control:disabled {
   opacity: 0.5;
@@ -96,11 +155,11 @@
   color: var(--secondary);
 }
 .chevron svg {
-  width: 16px;
-  height: 16px;
+  width: 13px;
+  height: 13px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.5;
+  stroke-width: 1.75;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -112,6 +171,7 @@
   d: path('M3 10 L8 6 L13 10');
 }
 .popup {
+  --choice-mark: var(--sniptale-color-text-muted-strong);
   position: fixed;
   z-index: 50;
   padding: 5px;
