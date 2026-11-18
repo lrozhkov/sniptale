@@ -176,13 +176,20 @@ export function getGalleryFacets(
   ];
 }
 
+function isImageProject(item: GalleryItem): boolean {
+  return (
+    item.type === 'image-project' ||
+    (item.type === 'remote-root' && item.remote.selection.rootKind === 'image-project')
+  );
+}
+
 function matchesGalleryFolderFilter(folderFilter: FolderFilter, item: GalleryItem): boolean {
   if (folderFilter === 'all') {
     return true;
   }
 
-  if (folderFilter === 'image-project' || item.type === 'image-project') {
-    return folderFilter === 'image-project' && item.type === 'image-project';
+  if (folderFilter === 'image-project' || isImageProject(item)) {
+    return folderFilter === 'image-project' && isImageProject(item);
   }
 
   if (folderFilter === 'scenario') {
@@ -209,7 +216,7 @@ export function getGalleryCounts(
 
   for (const item of items) {
     next.all += 1;
-    if (item.type === 'image-project') {
+    if (isImageProject(item)) {
       next['image-project'] = (next['image-project'] ?? 0) + 1;
       continue;
     }

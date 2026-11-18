@@ -1,9 +1,4 @@
 import { retireJournalRecordingEventStages } from '../../../composition/persistence/recordings/recording-events/staging';
-import {
-  initDB,
-  SYNC_CAPTURE_STORE,
-} from '../../../composition/persistence/infrastructure/indexed-db/core';
-import { readEnabledCaptureProfile } from '../../../composition/persistence/sync-capture/capture';
 import type { DurableAssetLifecyclePermit } from '../../../composition/persistence/infrastructure/mutation-barrier';
 import { runWithDurableAssetLifecycleLock } from '../../../composition/persistence/infrastructure/mutation-barrier';
 import { retireJournalCursorTrajectoryStages } from '../../../composition/persistence/recordings/cursor-trajectory/staging';
@@ -270,13 +265,6 @@ export async function restoreMediaHubBackupV6(args: {
       operationId: args.operationId,
       permit,
     });
-    if ([...(inspection.linkedProjectKinds?.values() ?? [])].includes('image')) {
-      const db = await initDB();
-      const tx = db.transaction([SYNC_CAPTURE_STORE], 'readonly');
-      const profile = await readEnabledCaptureProfile(tx);
-      await tx.done;
-      if (profile) throw new Error('Linked Image restore requires a compatible WebDAV profile.');
-    }
     const publishers = new Map(args.publishers.map((publisher) => [publisher.profile, publisher]));
     const reader = await openArchiveReader(args.file);
     try {

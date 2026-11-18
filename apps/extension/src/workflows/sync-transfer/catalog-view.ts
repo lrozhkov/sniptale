@@ -109,24 +109,32 @@ export async function readPersistedSyncCatalogCards(): Promise<SyncRemoteCatalog
         };
       } else {
         const entry = parsed.metadata.entry;
+        if (
+          !root.conflict &&
+          ((root.rootKind === 'media' && parsed.metadata.savedIndependently === false) ||
+            (root.rootKind === 'image-project' && entry.lifecycle?.trashedAt !== undefined))
+        )
+          continue;
         card = {
           ...card,
-          label: entry.filename,
+          label: parsed.metadata.workspace?.document.displayName?.trim() || entry.filename,
           tags: [...entry.tags],
           kind:
-            parsed.kind === 'video-review'
-              ? 'video-review'
-              : entry.kind === 'audio' || entry.mimeType.startsWith('audio/')
-                ? 'audio'
-                : entry.kind === 'image' ||
-                    entry.kind === 'screenshot' ||
-                    entry.mimeType.startsWith('image/')
-                  ? 'image'
-                  : 'video',
+            root.rootKind === 'image-project'
+              ? 'image-project'
+              : parsed.kind === 'video-review'
+                ? 'video-review'
+                : entry.kind === 'audio' || entry.mimeType.startsWith('audio/')
+                  ? 'audio'
+                  : entry.kind === 'image' ||
+                      entry.kind === 'screenshot' ||
+                      entry.mimeType.startsWith('image/')
+                    ? 'image'
+                    : 'video',
           mimeType: entry.mimeType,
           size: entry.size,
-          createdAt: entry.createdAt,
-          updatedAt: entry.updatedAt,
+          createdAt: parsed.metadata.workspace?.createdAt ?? entry.createdAt,
+          updatedAt: parsed.metadata.workspace?.updatedAt ?? entry.updatedAt,
         };
       }
     }
@@ -146,7 +154,8 @@ export async function readPersistedSyncCatalogCards(): Promise<SyncRemoteCatalog
               ? portable.entry.project.name
               : portable.kind === 'scenario-project'
                 ? portable.name
-                : portable.metadata.entry.filename;
+                : portable.metadata.workspace?.document.displayName?.trim() ||
+                  portable.metadata.entry.filename;
         }
         versions.push({
           selection: {

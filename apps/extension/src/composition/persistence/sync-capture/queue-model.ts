@@ -1,4 +1,5 @@
 import { sha256 } from '@noble/hashes/sha2.js';
+import { isCaptureRootKind, type CaptureRootKind } from './checkpoint-contracts';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   parseSyncConnectionIdentity,
@@ -92,7 +93,7 @@ export interface SyncQueueCaptureProgress {
 export interface SyncQueueEnrollmentProgress {
   authorization: SyncConnectionIdentity;
   revision: number;
-  source: 'media' | 'video-project' | 'video-review' | 'scenario-project' | 'complete';
+  source: CaptureRootKind | 'complete';
   afterKey: IDBValidKey | null;
 }
 export interface SyncQueueConnection extends SyncQueueScope, QueueHistory {
@@ -313,12 +314,10 @@ function parseCaptureProgress(value: unknown): SyncQueueCaptureProgress | null {
 function parseEnrollmentProgress(value: unknown): SyncQueueEnrollmentProgress | null {
   if (!isRecord(value)) return null;
   const authorization = parseSyncConnectionIdentity(value['authorization']);
-  const source = (
-    ['media', 'video-project', 'video-review', 'scenario-project', 'complete'] as const
-  ).find((candidate) => candidate === value['source']);
+  const source = value['source'];
   if (
     !authorization ||
-    !source ||
+    (source !== 'complete' && !isCaptureRootKind(source)) ||
     !queueOrdinal(value['revision']) ||
     value['revision'] < 1 ||
     !(value['afterKey'] === null || queueNativeCursorKey(value['afterKey'])) ||

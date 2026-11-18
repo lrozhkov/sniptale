@@ -1303,3 +1303,106 @@ it('transports an admitted drawing larger than the general metadata envelope in 
   const prepared = await prepareCapturedOutgoing(io.canonical);
   expect((await parseSyncOperationText(prepared.recordText)).version).toBe(3);
 });
+
+it('applies independent image projects against one committed original and rejects a stale source basis', async () => {
+  const fixture = createScenarioReplicaFixture();
+  const media = () => fixture.fixture.rows.get('media_library')!;
+  const workspaces = () => fixture.fixture.rows.get('image_workspaces')!;
+  media().clear();
+  io.live.mockResolvedValue(fixture.database);
+  const files = new Map<string, Blob>();
+  io.read.mockImplementation(
+    async (ref: AssetRef, filename: string) =>
+      new File([files.get(ref.assetId) ?? 'document'], filename, { type: ref.mimeType })
+  );
+
+  async function prepare(rows: CapturedImageRows, operationId: string) {
+    const encoded = await encodeCapturedImageRoot(rows);
+    const verifiedObjects = new Map<string, AssetRef>();
+    for (const object of encoded.objects) {
+      const blob = await readArchiveRootObjectSource(object);
+      const assetId = `${operationId}-${object.ref.objectId}`;
+      files.set(assetId, blob);
+      verifiedObjects.set(object.ref.objectId, {
+        assetId,
+        createdAt: 1,
+        size: blob.size,
+        mimeType: blob.type,
+        location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+        sha256: null,
+      });
+    }
+    const sourceId = rows.workspace?.sourceMediaId;
+    const imageOriginal = sourceId
+      ? { mediaId: sourceId, generation: 1, basis: ['shared-original'] }
+      : undefined;
+    expect(syncOperationVersionForRoot(encoded.envelope)).toBe(4);
+    const payload = await preparePortableReplica({
+      envelope: encoded.envelope,
+      verifiedObjects,
+      senderDependencies: imageOriginal ? [imageOriginal] : [],
+      admission: {
+        spaceId: 'space',
+        profileCreatedAt: 1,
+        connectionGeneration: 1,
+        operationId,
+        sourceDigest: hashSyncText(operationId),
+        expectedLocalGeneration: 0,
+        expectedBasis: [],
+        expectedWorkspaceRevision: null,
+        dependencies: [],
+        ...(imageOriginal ? { imageOriginal } : {}),
+      },
+    });
+    if (payload.kind !== 'image') throw new Error('Expected image replica.');
+    return payload.input;
+  }
+
+  const rows = imageRows();
+  const original = await prepare(
+    {
+      ...rows,
+      media: { ...rows.media, workspaceRevision: 0 },
+      workspace: null,
+      presentation: null,
+      refs: [],
+      savedIndependently: false,
+    },
+    'shared-original'
+  );
+  await expect(applyPreparedImageReplica(original)).resolves.toMatchObject({ status: 'applied' });
+  const acceptedOriginal = structuredClone(media().get(rows.media.id));
+
+  for (const aggregateId of ['first-project', 'second-project']) {
+    const input = await prepare(
+      {
+        ...rows,
+        workspace: {
+          ...rows.workspace!,
+          aggregateId,
+          sourceMediaId: rows.media.id,
+          lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+          document: { ...rows.workspace!.document, displayName: aggregateId },
+        },
+        presentation: { ...rows.presentation!, aggregateId },
+      },
+      aggregateId
+    );
+    await expect(
+      applyPreparedImageReplica({
+        ...input,
+        linkedOriginal: { ...input.linkedOriginal!, generation: 2 },
+      })
+    ).rejects.toThrow('Image replica predecessor changed');
+    expect(workspaces().has(aggregateId)).toBe(false);
+    await expect(applyPreparedImageReplica(input)).resolves.toMatchObject({ status: 'applied' });
+    await expect(applyPreparedImageReplica(input)).resolves.toMatchObject({ status: 'duplicate' });
+    expect(workspaces().get(aggregateId)).toMatchObject({
+      sourceMediaId: rows.media.id,
+      document: { displayName: aggregateId },
+    });
+  }
+
+  expect([...media().keys()]).toEqual([rows.media.id]);
+  expect(media().get(rows.media.id)).toEqual(acceptedOriginal);
+});

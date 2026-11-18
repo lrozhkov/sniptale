@@ -22,6 +22,13 @@ export function parseCapturedMediaRows(value: unknown): CapturedMediaRows | null
   const ref = parseAssetRef(value['ref']);
   if (!entry || !ref) return null;
   const media = withoutLocalOriginalClaim(entry);
+  const savedIndependently = value['savedIndependently'];
+  if (
+    savedIndependently !== undefined &&
+    (typeof savedIndependently !== 'boolean' || media.lifecycle?.storageClass !== 'library')
+  )
+    return null;
+  const claim = savedIndependently === undefined ? {} : { savedIndependently };
   if ('screenshotRef' in value && !('webSnapshot' in value)) return null;
   const sourceFields = ['projectAsset', 'projectExport', 'recording', 'webSnapshot'];
   if (sourceFields.filter((field) => field in value).length > 1) return null;
@@ -36,7 +43,7 @@ export function parseCapturedMediaRows(value: unknown): CapturedMediaRows | null
       media.source.assetId === ref.assetId &&
       media.size === ref.size &&
       media.mimeType === ref.mimeType
-      ? { media, ref }
+      ? { media, ref, ...claim }
       : null;
   }
   if ('projectExport' in value) {
@@ -61,7 +68,7 @@ export function parseCapturedMediaRows(value: unknown): CapturedMediaRows | null
       'screenshotRef' in value
     )
       return null;
-    return { media, projectExport, ref };
+    return { media, projectExport, ref, ...claim };
   }
   if ('webSnapshot' in value) {
     const webSnapshot = parseStoredWebSnapshotRecord(value['webSnapshot']);
@@ -85,7 +92,7 @@ export function parseCapturedMediaRows(value: unknown): CapturedMediaRows | null
       'telemetry' in value
     )
       return null;
-    return { media, webSnapshot, ref, screenshotRef };
+    return { media, webSnapshot, ref, screenshotRef, ...claim };
   }
   if ('recording' in value) {
     if ('projectAsset' in value) return null;
@@ -111,12 +118,12 @@ export function parseCapturedMediaRows(value: unknown): CapturedMediaRows | null
       (telemetry !== null && telemetry.recordingId !== recording.id)
     )
       return null;
-    return { media, recording, ref, telemetry };
+    return { media, recording, ref, telemetry, ...claim };
   }
   if ('telemetry' in value) return null;
   const projectAsset = parseProjectAssetEntry(value['projectAsset']);
   if (!media || !projectAsset || !ref) return null;
-  const rows = { media, projectAsset, ref };
+  const rows = { media, projectAsset, ref, ...claim };
   return isOriginalOnlyCapturedMedia(media) && hasExactMediaSourceBinding(rows) ? rows : null;
 }
 

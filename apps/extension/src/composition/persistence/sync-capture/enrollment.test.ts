@@ -202,7 +202,7 @@ it('resumes bounded native pages after a worker restart and completes empty sour
   });
   expect(captures(replacement)).toHaveLength(70);
   for (const row of accepted) expect(replacement.table('sync_capture').get(row.key)).toEqual(row);
-  for (let index = 0; index < 3; index++) await discoverInitialSyncRoots(scope, authorization);
+  for (let index = 0; index < 4; index++) await discoverInitialSyncRoots(scope, authorization);
   expect(progress(replacement)).toMatchObject({ source: 'complete', afterKey: null });
   const complete = structuredClone(replacement.rows);
   expect(await discoverInitialSyncRoots(scope, authorization)).toEqual({
@@ -521,3 +521,68 @@ it.each([false, true])(
     expect(fetch).not.toHaveBeenCalled();
   }
 );
+
+it('enrolls a linked image project with a hidden original and no extra native media row', async () => {
+  const f = setup();
+  f.table('media_library').clear();
+  const source = createMediaLibraryEntry({
+    id: 'hidden-original',
+    kind: 'screenshot',
+    source: { kind: 'screenshot' },
+    blob: new Blob(['original'], { type: 'image/png' }),
+    size: 8,
+    workspaceRevision: 0,
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+    savedIndependently: false,
+  });
+  const ref = {
+    assetId: 'image-bitmap',
+    createdAt: 1,
+    location: { kind: 'opfs' as const, objectKey: 'objects/image-bitmap' },
+    mimeType: 'image/png',
+    size: 8,
+    sha256: null,
+  };
+  const workspace = {
+    aggregateId: 'linked-project',
+    sourceMediaId: source.id,
+    revision: 1,
+    createdAt: 1,
+    updatedAt: 2,
+    sourceTitle: null,
+    sourceUrl: null,
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 2 },
+    document: createPersistedEditorDocumentFixture(createEditorDocumentFixture(), ref.assetId),
+  };
+  f.table('media_library').set(source.id, source);
+  f.table('image_workspaces').set(workspace.aggregateId, workspace);
+  f.table('asset_refs').set(ref.assetId, ref);
+
+  for (let index = 0; index < 4; index++) {
+    await expect(discoverInitialSyncRoots(scope, authorization)).resolves.toMatchObject({
+      captured: 0,
+      refused: 0,
+    });
+  }
+  expect(captures(f)).toEqual([]);
+  await expect(discoverInitialSyncRoots(scope, authorization)).resolves.toMatchObject({
+    captured: 1,
+    refused: 0,
+    remaining: false,
+  });
+  const operations = captures(f);
+  const original = operations.find((item) => item.rootKind === 'media');
+  expect(original).toMatchObject({
+    rootId: source.id,
+    change: { kind: 'image', rows: { savedIndependently: false } },
+  });
+  expect(operations.find((item) => item.rootKind === 'image-project')).toMatchObject({
+    rootId: workspace.aggregateId,
+    change: {
+      kind: 'image',
+      rows: { workspace },
+      mediaDependencies: [{ mediaId: source.id, generation: 1, basis: [original!.operationId] }],
+    },
+  });
+  expect([...f.table('media_library').keys()]).toEqual([source.id]);
+});

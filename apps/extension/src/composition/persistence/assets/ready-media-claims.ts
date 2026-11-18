@@ -179,10 +179,12 @@ function replicaMediaKeys(payload: unknown): string[] {
   if (!isRecord(payload) || !isRecord(payload['input'])) return [UNKNOWN_READY_MEDIA];
   const input = payload['input'];
   if (payload['kind'] === 'image') {
-    const media = input['media'];
-    return isRecord(media) && typeof media['id'] === 'string' && media['id']
-      ? [reference('media', media['id'])]
-      : [UNKNOWN_READY_MEDIA];
+    const mediaId = recordIdentity(input['media'], 'id');
+    if (!mediaId) return [UNKNOWN_READY_MEDIA];
+    const keys = [reference('media', mediaId)];
+    if (input['linkedOriginal'] !== undefined)
+      keys.push(identityKey('media', recordIdentity(input['workspace'], 'aggregateId')));
+    return keys;
   }
   if (payload['kind'] === 'media') {
     const rows = parseCapturedMediaRows(input['rows']);

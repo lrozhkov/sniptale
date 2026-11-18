@@ -222,7 +222,7 @@ export type RuntimeSyncConnectionResponseByType = {
 
 /** Exact version selected from a remote card; contains no native admission authority. */
 export interface SyncRemoteSelection {
-  rootKind: 'media' | 'video-project' | 'video-review' | 'scenario-project';
+  rootKind: 'media' | 'image-project' | 'video-project' | 'video-review' | 'scenario-project';
   rootId: string;
   operationId: string;
   sourceDigest: string;
@@ -236,7 +236,14 @@ export interface SyncRemoteCatalogCard {
   selection: SyncRemoteSelection;
   label: string;
   tags: string[];
-  kind: 'image' | 'video' | 'audio' | 'video-project' | 'video-review' | 'scenario';
+  kind:
+    | 'image'
+    | 'image-project'
+    | 'video'
+    | 'audio'
+    | 'video-project'
+    | 'video-review'
+    | 'scenario';
   mimeType: string | null;
   size: number;
   createdAt: number;

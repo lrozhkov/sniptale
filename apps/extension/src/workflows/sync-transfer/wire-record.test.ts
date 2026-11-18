@@ -142,6 +142,22 @@ it('preserves original wire fields and accepts review deletion without source bi
   expect(await parseSyncOperationText(JSON.stringify(deleted))).toEqual(deleted);
 });
 
+it('admits an explicit original claim only under the versioned media wire contract', async () => {
+  const original = operation();
+  const envelope = original.envelope!;
+  if (!isRecord(envelope.metadata)) throw new Error('Missing original metadata.');
+  const linked = {
+    ...original,
+    version: 4,
+    envelope: { ...envelope, metadata: { ...envelope.metadata, savedIndependently: false } },
+  };
+  expect(await parseSyncOperationText(JSON.stringify(linked))).toEqual(linked);
+  await expect(parseSyncOperationText(JSON.stringify({ ...linked, version: 1 }))).rejects.toThrow();
+  await expect(
+    parseSyncOperationText(JSON.stringify({ ...original, version: 4 }))
+  ).rejects.toThrow();
+});
+
 it.each([
   [
     'missing binding',

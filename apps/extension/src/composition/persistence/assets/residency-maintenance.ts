@@ -210,7 +210,9 @@ async function commitIntent(
               ? stores.VIDEO_PROJECTS_STORE
               : root.rootKind === 'scenario-project'
                 ? stores.SCENARIO_PROJECTS_STORE
-                : stores.VIDEO_WORKSPACES_STORE;
+                : root.rootKind === 'image-project'
+                  ? stores.IMAGE_WORKSPACES_STORE
+                  : stores.VIDEO_WORKSPACES_STORE;
         const present =
           (await tx.objectStore(rootStore).get(root.rootId)) !== undefined ||
           (root.rootKind === 'video-review' &&

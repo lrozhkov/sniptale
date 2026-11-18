@@ -98,13 +98,11 @@ it('lists the current original’s named works and the legacy edited work', asyn
     },
     { ...createWorkspace('different', 30), sourceMediaId: 'other-original' },
   ]);
-  await expect(listImageProjectsForEditing(original.id)).resolves.toEqual({
-    canCreateIndependentProject: true,
-    projects: [
-      { id: 'new-project', name: 'Latest edits', updatedAt: 13 },
-      { id: original.id, name: original.filename, updatedAt: 7 },
-    ],
-  });
+  await expect(listImageProjectsForEditing(original.id)).resolves.toEqual([
+    { id: 'new-project', name: 'Latest edits', updatedAt: 13 },
+    { id: original.id, name: original.filename, updatedAt: 7 },
+  ]);
+  expect(mocks.get).not.toHaveBeenCalledWith('sync_capture', 'profile');
   expect(mocks.getAll).toHaveBeenCalledExactlyOnceWith(
     'image_workspaces',
     'retentionReferenceKeys',

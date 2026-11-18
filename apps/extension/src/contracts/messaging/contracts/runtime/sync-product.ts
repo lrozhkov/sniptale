@@ -90,6 +90,7 @@ export function parseSyncRemoteSelection(value: unknown): SyncRemoteSelection | 
     !isRecord(value) ||
     !exact(value, ['rootKind', 'rootId', 'operationId', 'sourceDigest']) ||
     (value['rootKind'] !== 'media' &&
+      value['rootKind'] !== 'image-project' &&
       value['rootKind'] !== 'video-project' &&
       value['rootKind'] !== 'video-review' &&
       value['rootKind'] !== 'scenario-project') ||
@@ -111,6 +112,7 @@ function nativeRoot(value: unknown): SyncNativeEditingRoot | null {
   const kind = value['rootKind'];
   if (
     (kind !== 'media' &&
+      kind !== 'image-project' &&
       kind !== 'video-project' &&
       kind !== 'video-review' &&
       kind !== 'scenario-project') ||

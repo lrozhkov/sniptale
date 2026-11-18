@@ -49,6 +49,9 @@ import { readCompatibleImageReplicaPredecessorInTransaction } from './freeze';
 import { digestCapturedMediaRows } from './freeze';
 import { freezeMediaInTransaction } from './freeze';
 import type { ApplyPreparedVideoProjectRevisionInput } from './apply-video-project';
+import { isCaptureRootKind } from './checkpoint-contracts';
+import type { CapturedMediaDependency } from './contracts';
+import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
 
 type ReadTransaction = IDBPTransaction<unknown, string[], 'readonly'>;
 
@@ -59,6 +62,7 @@ interface CatalogReplicaAdmission extends SyncConnectionScope {
   expectedLocalGeneration: number;
   expectedWorkspaceRevision: number | null;
   dependencies: ApplyPreparedVideoProjectRevisionInput['dependencies'];
+  imageOriginal?: CapturedMediaDependency;
   rootDependencies?: ApplyPreparedVideoProjectRevisionInput['rootDependencies'];
 }
 
@@ -85,6 +89,13 @@ async function workspaceRevision(
   rootId: string,
   state: SyncCaptureRootState | null
 ) {
+  if (rootKind === 'image-project') {
+    const raw: unknown = await tx.objectStore(IMAGE_WORKSPACES_STORE).get(rootId);
+    if (raw === undefined) return null;
+    const workspace = parseImageWorkspaceEntry(raw);
+    if (!workspace?.sourceMediaId || workspace.aggregateId !== rootId) refuse();
+    return workspace.revision;
+  }
   if (rootKind === 'scenario-project') {
     const raw = (await readScenarioStorage(tx, rootId)).logical;
     if (raw === undefined) return null;
@@ -127,7 +138,8 @@ export async function loadCatalogReplicaAdmission(args: {
   const authorization = parseSyncConnectionIdentity(selected.authorization);
   if (
     !authorization ||
-    !['media', 'video-review', 'video-project', 'scenario-project'].includes(selected.rootKind) ||
+    !isCaptureRootKind(selected.rootKind) ||
+    (selected.rootKind === 'image-project' && selected.dependencyMediaIds.length > 1) ||
     !selected.rootId ||
     selected.rootId.length > 256 ||
     selected.dependencyMediaIds.length > captureProfileBounds(selected.rootKind).rows ||
@@ -167,6 +179,7 @@ export async function loadCatalogReplicaAdmission(args: {
   const state = await rootState(tx, selected.scope.spaceId, selected.rootKind, selected.rootId);
   const revision = await workspaceRevision(tx, selected.rootKind, selected.rootId, state);
   const dependencies: ApplyPreparedVideoProjectRevisionInput['dependencies'][number][] = [];
+  let imageOriginal: CapturedMediaDependency | undefined;
   const rootDependencies = await readScenarioProjectDependenciesInTransaction(
     tx,
     selected.scope.spaceId,
@@ -190,6 +203,15 @@ export async function loadCatalogReplicaAdmission(args: {
       (await freezeMediaInTransaction(tx, mediaId, { allowIndependentReview: true }));
     const ref = 'ref' in rows ? rows.ref : rows.originalRef;
     const digest = image?.digest ?? ('ref' in rows ? digestCapturedMediaRows(rows) : null);
+    if (selected.rootKind === 'image-project') {
+      if (!image || image.unloadedCopy || dependencyState.nativeDigest !== digest) refuse();
+      imageOriginal = {
+        mediaId,
+        generation: dependencyState.generation,
+        basis: dependencyState.basis,
+      };
+      continue;
+    }
     if (!ref || dependencyState.nativeDigest !== digest) refuse();
     dependencies.push({
       entry: rows.media,
@@ -206,6 +228,7 @@ export async function loadCatalogReplicaAdmission(args: {
     expectedLocalGeneration: state?.generation ?? 0,
     expectedWorkspaceRevision: revision,
     dependencies,
+    ...(imageOriginal ? { imageOriginal } : {}),
     ...(rootDependencies.length ? { rootDependencies } : {}),
   });
 }
@@ -226,7 +249,7 @@ export async function loadCatalogReplicaResidentCandidates(args: {
   const authorization = parseSyncConnectionIdentity(selected.authorization);
   if (
     !authorization ||
-    !['media', 'video-review', 'video-project', 'scenario-project'].includes(selected.rootKind) ||
+    !isCaptureRootKind(selected.rootKind) ||
     !selected.rootId ||
     selected.rootId.length > 256 ||
     !Number.isSafeInteger(selected.expectedLocalGeneration) ||
@@ -347,9 +370,7 @@ export async function loadMaterializedCatalogSelections(args: {
     selected.selections.length > 10_000 ||
     selected.selections.some(
       (selection) =>
-        !['media', 'video-review', 'video-project', 'scenario-project'].includes(
-          selection.rootKind
-        ) ||
+        !isCaptureRootKind(selection.rootKind) ||
         !selection.rootId ||
         selection.rootId.length > 256 ||
         !selection.operationId ||
@@ -437,10 +458,7 @@ export async function loadCatalogNativeBases(args: {
     !authorization ||
     selected.roots.length > 10_000 ||
     selected.roots.some(
-      (root) =>
-        !['media', 'video-project', 'video-review', 'scenario-project'].includes(root.rootKind) ||
-        !root.rootId ||
-        root.rootId.length > 256
+      (root) => !isCaptureRootKind(root.rootKind) || !root.rootId || root.rootId.length > 256
     ) ||
     new Set(selected.roots.map((root) => JSON.stringify([root.rootKind, root.rootId]))).size !==
       selected.roots.length

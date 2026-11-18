@@ -35,6 +35,7 @@ interface Candidate {
 }
 const ROOT_STORES = {
   media: stores.MEDIA_LIBRARY_STORE,
+  'image-project': stores.IMAGE_WORKSPACES_STORE,
   'video-project': stores.VIDEO_PROJECTS_STORE,
   'video-review': stores.VIDEO_WORKSPACES_STORE,
   'scenario-project': stores.SCENARIO_PROJECTS_STORE,

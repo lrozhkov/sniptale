@@ -1,3 +1,4 @@
+import { isCaptureRootKind } from './checkpoint-contracts';
 import type { AssetOpfsOptions } from '../assets/opfs-store';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -171,7 +172,7 @@ export function parsePrepared(value: unknown): PreparedOutgoingOperation | null 
     root.length !== 3 ||
     root[0] !== identity.spaceId ||
     typeof root[1] !== 'string' ||
-    !['media', 'video-review', 'video-project', 'scenario-project'].includes(root[1]) ||
+    !isCaptureRootKind(root[1]) ||
     !boundedString(root[2], 256) ||
     JSON.stringify(root) !== identity.rootKey
   )

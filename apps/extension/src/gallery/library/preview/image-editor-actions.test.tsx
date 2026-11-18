@@ -23,7 +23,6 @@ vi.mock('../../../platform/i18n', async (original) => ({
 
 let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
-const onOpenLegacy = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -40,9 +39,7 @@ afterEach(async () => {
 });
 
 async function mount() {
-  await act(async () =>
-    root.render(<ImageEditorActions mediaId="original" onOpenLegacy={onOpenLegacy} />)
-  );
+  await act(async () => root.render(<ImageEditorActions mediaId="original" />));
 }
 
 async function click(label: string) {
@@ -54,7 +51,7 @@ async function click(label: string) {
 }
 
 it('opens a new project on an unused original', async () => {
-  mocks.list.mockResolvedValue({ canCreateIndependentProject: true, projects: [] });
+  mocks.list.mockResolvedValue([]);
   await mount();
   await click('gallery.preview.openInEditor');
   expect(mocks.editorUrl).toHaveBeenCalledExactlyOnceWith({
@@ -64,24 +61,29 @@ it('opens a new project on an unused original', async () => {
 });
 
 it('offers existing projects and opens the selected project by its own ID', async () => {
-  mocks.list.mockResolvedValue({
-    canCreateIndependentProject: true,
-    projects: [{ id: 'stored-project', name: 'Saved composition', updatedAt: 100 }],
-  });
+  mocks.list.mockResolvedValue([
+    { id: 'stored-project', name: 'Saved composition', updatedAt: 100 },
+  ]);
   await mount();
   await click('gallery.preview.openInEditor');
   expect(mocks.createTab).not.toHaveBeenCalled();
   expect(host.textContent).toContain('gallery.preview.newImageProject');
   await click('Saved composition');
   expect(mocks.editorUrl).toHaveBeenCalledExactlyOnceWith({ assetId: 'stored-project' });
+  mocks.editorUrl.mockClear();
+  await click('gallery.preview.newImageProject');
+  expect(mocks.editorUrl).toHaveBeenCalledExactlyOnceWith({
+    assetId: 'allocated-project',
+    originalId: 'original',
+  });
 });
 
 it('does not open a tab when the original preview closes during lookup', async () => {
-  const result = Promise.withResolvers<{ canCreateIndependentProject: boolean; projects: [] }>();
+  const result = Promise.withResolvers<[]>();
   mocks.list.mockReturnValue(result.promise);
   await mount();
   await click('gallery.preview.openInEditor');
   await act(async () => root.render(null));
-  await act(async () => result.resolve({ canCreateIndependentProject: true, projects: [] }));
+  await act(async () => result.resolve([]));
   expect(mocks.createTab).not.toHaveBeenCalled();
 });

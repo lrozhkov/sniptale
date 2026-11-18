@@ -294,6 +294,7 @@ async function scenarioDeletion(
   );
   if (!state || state.kind !== 'root-state') throw new Error('Missing published Scenario state');
   return {
+    ...(f.input.authorization ? { authorization: f.input.authorization } : {}),
     spaceId: f.input.spaceId,
     profileCreatedAt: f.input.profileCreatedAt,
     connectionGeneration: f.input.connectionGeneration,

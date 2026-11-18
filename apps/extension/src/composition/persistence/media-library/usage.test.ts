@@ -1,3 +1,4 @@
+import { parseSyncCaptureRecord } from '../sync-capture/guards';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createVideoProjectEntryWithMediaClip } from '../projects/index.test-support';
@@ -509,4 +510,58 @@ it('allows removing an original retained only by Montage history', async () => {
       false
     )
   ).resolves.toBe(true);
+});
+
+it('commits original visibility and the WebDAV capture together across refusal and retry', async () => {
+  let refuseCapture = true;
+  const fixture = createReviewWorkspaceStoreFixture(
+    (store) => refuseCapture && store === 'sync_capture'
+  );
+  mocks.initDB.mockResolvedValue(fixture.database);
+  const original: MediaLibraryEntry = {
+    ...media,
+    id: 'capture',
+    source: { kind: 'screenshot' },
+    blob: new Blob(['body'], { type: 'image/png' }),
+    workspaceRevision: 0,
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+    savedIndependently: false,
+  };
+  fixture.rows.get('media_library')!.set(original.id, original);
+  const captures = () => fixture.rows.get('sync_capture')!;
+  captures().set('profile', {
+    kind: 'profile',
+    version: 1,
+    key: 'profile',
+    spaceId: 'space',
+    createdAt: 1,
+    connectionGeneration: 1,
+    enabled: true,
+  });
+  const expected = {
+    id: original.id,
+    createdAt: original.createdAt,
+    lifecycleUpdatedAt: 1,
+    originalSaveId: null,
+  };
+  const before = structuredClone(fixture.rows);
+  await expect(setMediaLibraryOriginalClaim(expected, true)).rejects.toThrow('No space');
+  expect(fixture.rows).toEqual(before);
+
+  refuseCapture = false;
+  await expect(setMediaLibraryOriginalClaim(expected, true)).resolves.toBe(true);
+  await expect(setMediaLibraryOriginalClaim(expected, true)).resolves.toBe(false);
+  const operations = [...captures().values()]
+    .map(parseSyncCaptureRecord)
+    .filter((record) => record?.kind === 'sync-operation');
+  expect(operations).toHaveLength(1);
+  expect(operations[0]).toMatchObject({
+    rootKind: 'media',
+    rootId: original.id,
+    change: { kind: 'image', rows: { savedIndependently: true } },
+  });
+  expect(fixture.rows.get('media_library')!.get(original.id)).toMatchObject({
+    savedIndependently: true,
+    originalSaveId: expect.any(String),
+  });
 });

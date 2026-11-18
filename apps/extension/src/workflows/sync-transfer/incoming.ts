@@ -1,3 +1,4 @@
+import { readImageOriginalSource } from '../../composition/persistence/image-workspaces/read';
 import type { SyncDownloadAllowance } from './native-residency';
 import { encodePortableScenarioProjectEntry } from '../media-hub-backup/v6/root-codecs/projects';
 import { projectScenarioPrivacy } from '../media-hub-backup/v6/privacy';
@@ -208,7 +209,12 @@ async function selectReplicaPreparation(args: {
   );
   check(
     JSON.stringify([...dependencySources.keys()].sort()) ===
-      JSON.stringify(admission.dependencies.map((dependency) => dependency.entry.id).sort())
+      JSON.stringify(
+        [
+          ...admission.dependencies.map((dependency) => dependency.entry.id),
+          ...(admission.imageOriginal ? [admission.imageOriginal.mediaId] : []),
+        ].sort()
+      )
   );
   args.signal.throwIfAborted();
   const operation = await parseSyncOperationText(selected.operationText);
@@ -364,7 +370,8 @@ async function retainScenarioPredecessors(
 
 async function checkReplicaDependencies(
   args: ReplicaPreparationInput,
-  preparation: ReplicaPreparation
+  preparation: ReplicaPreparation,
+  localObjects: Map<string, Blob>
 ) {
   const { dependencySources, admission, operation } = preparation;
   const checkedDependencies = new Map<string, { ref: AssetRef; sha256: string }>();
@@ -372,6 +379,42 @@ async function checkReplicaDependencies(
     const dependency = admission.dependencies.find((item) => item.entry.id === mediaId);
     const mediaOperation = await parseSyncOperationText(source.operationText);
     const declared = operation.dependencies.find((item) => item.mediaId === mediaId);
+    if (admission.imageOriginal?.mediaId === mediaId) {
+      const actual = admission.imageOriginal;
+      check(declared && mediaOperation.envelope && mediaOperation.rootId === mediaId);
+      check(
+        resolveSyncMediaDependency(args.catalog.operations, mediaId, declared.basis, actual.basis)
+      );
+      check(
+        resolveSyncMediaDependency(args.catalog.operations, mediaId, actual.basis, [
+          mediaOperation.operationId,
+        ])
+      );
+      const media = await parsePortableSyncRoot(mediaOperation.envelope);
+      const projectMetadata =
+        preparation.parsed.kind === 'image' ? preparation.parsed.metadata : null;
+      check((media.kind === 'media' || media.kind === 'image') && projectMetadata);
+      const original = mediaOperation.objects.find(
+        (item) => item.objectId === media.metadata.originalObjectId
+      );
+      const project = operation.objects.find(
+        (item) => item.objectId === projectMetadata.originalObjectId
+      );
+      check(original && project && original.sha256 === project.sha256);
+      const descriptor = preparation.parsed.envelope.objects.find(
+        (object) => object.objectId === project.objectId
+      );
+      const native = await readImageOriginalSource(mediaId);
+      check(
+        descriptor &&
+          native.asset?.id === mediaId &&
+          native.blob &&
+          native.blob.size === descriptor.size &&
+          native.asset.mimeType.split(';', 1)[0]!.trim().toLowerCase() === descriptor.mimeType
+      );
+      localObjects.set(project.objectId, native.blob);
+      continue;
+    }
     check(dependency && declared && mediaOperation.envelope && mediaOperation.rootId === mediaId);
     check(
       resolveSyncMediaDependency(
@@ -492,21 +535,23 @@ function retainProjectDependencyObjects(
 
 async function collectReplicaOriginalRefs(
   args: ReplicaPreparationInput,
-  preparation: ReplicaPreparation
+  preparation: ReplicaPreparation,
+  localObjects: Map<string, Blob>
 ) {
   const { parsed, operation, admission } = preparation;
   const borrowedRefs = new Map<string, AssetRef>();
   if (
-    parsed.kind === 'media' ||
-    (parsed.kind === 'image' &&
-      (parsed.metadata.entry.source.kind === 'stored-asset' ||
-        parsed.metadata.entry.source.kind === 'project-asset'))
+    !admission.imageOriginal &&
+    (parsed.kind === 'media' ||
+      (parsed.kind === 'image' &&
+        (parsed.metadata.entry.source.kind === 'stored-asset' ||
+          parsed.metadata.entry.source.kind === 'project-asset')))
   ) {
     const original = await checkedPredecessorOriginal(parsed, operation, admission, args.signal);
     if (original) borrowedRefs.set(...original);
   }
   await retainScenarioPredecessors(args, preparation, borrowedRefs);
-  const dependencies = await checkReplicaDependencies(args, preparation);
+  const dependencies = await checkReplicaDependencies(args, preparation, localObjects);
   retainReviewDependencyObjects(preparation, dependencies, borrowedRefs);
   retainProjectDependencyObjects(preparation, dependencies, borrowedRefs);
   return borrowedRefs;
@@ -515,10 +560,10 @@ async function collectReplicaOriginalRefs(
 async function collectResidentObjects(
   args: ReplicaPreparationInput,
   preparation: ReplicaPreparation,
-  refs: Map<string, AssetRef>
-): Promise<Map<string, Blob>> {
-  const localObjects = new Map<string, Blob>();
-  if (args.binaryAdmission !== 'resident') return localObjects;
+  refs: Map<string, AssetRef>,
+  localObjects: Map<string, Blob>
+): Promise<void> {
+  if (args.binaryAdmission !== 'resident') return;
   const { admission, editing, operation } = preparation;
   if (!admission.authorization || admission.expectedLocalGeneration < 1)
     throw new Error('On-demand incoming requires local verified objects.');
@@ -616,7 +661,6 @@ async function collectResidentObjects(
     if (!localObjects.has(object.objectId))
       throw new Error('On-demand incoming requires local verified objects.');
   }
-  return localObjects;
 }
 
 type RetainedReplicaExport = Pick<
@@ -748,6 +792,8 @@ async function prepareStagedReplica(
     envelope: parsed.envelope,
     verifiedObjects: refs,
     senderDependencies: operation.dependencies.map((dependency) => {
+      if (admission.imageOriginal?.mediaId === dependency.mediaId)
+        return { mediaId: dependency.mediaId, basis: [...admission.imageOriginal.basis] };
       const actual = admission.dependencies.find((item) => item.entry.id === dependency.mediaId);
       check(actual);
       return { mediaId: dependency.mediaId, basis: [...actual.expectedBasis] };
@@ -783,6 +829,7 @@ async function retainRestoredOriginal(
   const { parsed, operation, admission } = preparation;
   const originals = await scenarioPredecessorOriginals(args, preparation);
   if (
+    !admission.imageOriginal &&
     (admission.expectedLocalGeneration > 0 ||
       (parsed.kind === 'media' && parsed.metadata.projectExport)) &&
     (parsed.kind === 'media' ||
@@ -923,8 +970,9 @@ export async function prepareCatalogReplica(args: ReplicaPreparationInput) {
           (await hasUnloadedNativeEditingRoot({ rootKind: args.rootKind, rootId: args.rootId }))
         )
           throw new Error('Background incoming requires resident editing resources.');
-        const refs = await collectReplicaOriginalRefs(args, preparation);
-        const localObjects = await collectResidentObjects(args, preparation, refs);
+        const localObjects = new Map<string, Blob>();
+        const refs = await collectReplicaOriginalRefs(args, preparation, localObjects);
+        await collectResidentObjects(args, preparation, refs, localObjects);
         return stageReplicaAttempts(args, preparation, refs, localObjects, transition);
       })
     )

@@ -43,6 +43,7 @@ import { listCollectableProjectOriginalIds } from '../media-library/index.librar
 import { putImageWorkspaceBackupRestore } from '../image-workspaces/backup-restore';
 import { parseAssetRef } from '../assets/guards';
 import { imageWorkspaceAssetBindings } from '../image-workspaces/assets';
+import { captureRootCheckpointInTransaction } from '../sync-capture/capture';
 import { parseSyncCaptureRecord } from '../sync-capture/guards';
 import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
 import { moveStoredItemsToTrash, restoreStoredItemsFromTrash } from '../library-lifecycle/trash';
@@ -1225,7 +1226,12 @@ it('explicitly saves an independent image project without saving its original se
   expect((await readStoredImageWorkspace(aggregateId))?.revision).toBe(1);
 });
 
-it('refuses to stage an independent image with active WebDAV and cancels a queued refusal', async () => {
+it('captures two independent images against one original when WebDAV activates before publication', async () => {
+  const media = parseMediaLibraryEntry(await database().get('media_library', 'image'))!;
+  await database().put('media_library', {
+    ...media,
+    lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: 1 },
+  });
   const profile = {
     version: 1,
     kind: 'profile',
@@ -1235,34 +1241,52 @@ it('refuses to stage an independent image with active WebDAV and cancels a queue
     createdAt: 10,
     connectionGeneration: 1,
   };
-  const input = {
-    aggregateId: 'new-project',
-    original: { mediaId: 'image', generation: null },
-    document: document('New work'),
-    expectedRevision: 0,
-  };
   io.beforePublish = async () => {
     await database().put('sync_capture', profile);
   };
-  await expect(commitImageWorkspace(input)).rejects.toThrow('require an updated sync format');
-  const journal = [...io.journals.values()][0]!;
-  await expect(imageWorkspacePublicationAdapter.publish(journal)).resolves.toBeUndefined();
-  expect(io.journals.has(journal.journalId)).toBe(false);
-  expect(await readStoredImageWorkspace(input.aggregateId)).toBeUndefined();
+  for (const id of ['first-project', 'second-project']) {
+    await expect(
+      commitImageWorkspace({
+        aggregateId: id,
+        original: { mediaId: 'image', generation: null },
+        document: document(id),
+        expectedRevision: 0,
+      })
+    ).resolves.toMatchObject({ revision: 1 });
+    io.beforePublish = null;
+  }
 
-  io.write.mockClear();
-  await expect(commitImageWorkspace(input)).rejects.toThrow('require an updated sync format');
-  expect(io.write).not.toHaveBeenCalled();
+  const before: unknown[] = await database().getAll('sync_capture');
+  const pending = before
+    .map(parseSyncCaptureRecord)
+    .filter((record) => record?.kind === 'pending-checkpoint');
+  expect(pending).toHaveLength(2);
+  for (const checkpoint of pending) {
+    const tx = database().transaction(Array.from(database().objectStoreNames), 'readwrite');
+    await expect(
+      captureRootCheckpointInTransaction(tx, checkpoint, { force: true })
+    ).resolves.toMatchObject({ rootKind: 'image-project', rootId: checkpoint.rootId });
+    await tx.done;
+  }
+  const raw: unknown[] = await database().getAll('sync_capture');
+  const captures = raw
+    .map(parseSyncCaptureRecord)
+    .filter((record) => record?.kind === 'sync-operation' && record.phase === 'native');
+  const originals = captures.filter((item) => item.rootKind === 'media');
+  const projects = captures.filter((item) => item.rootKind === 'image-project');
+  expect(originals).toHaveLength(1);
+  expect(originals[0]).toMatchObject({
+    rootId: 'image',
+    change: { kind: 'image', rows: { savedIndependently: false } },
+  });
+  expect(projects.map((item) => item.rootId).sort()).toEqual(['first-project', 'second-project']);
+  for (const project of projects)
+    expect(project.change).toMatchObject({
+      kind: 'image',
+      mediaDependencies: [{ mediaId: 'image', generation: 1, basis: [originals[0]!.operationId] }],
+    });
+  expect(await database().getAllKeys('media_library')).toEqual(['image']);
   expect(io.journals.size).toBe(0);
-  io.beforePublish = null;
-  await expect(
-    commitImageWorkspace({
-      aggregateId: 'image',
-      document: document('Compatible edit'),
-      expectedRevision: 0,
-      requireExistingRoot: true,
-    })
-  ).resolves.toMatchObject({ revision: 1 });
 });
 
 it('refuses document and presentation writes while an image project is in Trash', async () => {

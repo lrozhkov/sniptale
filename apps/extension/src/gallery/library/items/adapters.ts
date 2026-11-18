@@ -299,7 +299,12 @@ export function createRemoteRootGalleryItem(remote: SyncRemoteCatalogCard): Gall
       remote.selection.operationId,
       remote.selection.sourceDigest,
     ]),
-    kind: remote.kind === 'video-review' ? 'video-project' : remote.kind,
+    kind:
+      remote.kind === 'video-review'
+        ? 'video-project'
+        : remote.kind === 'image-project'
+          ? 'image'
+          : remote.kind,
     filename: remote.label,
     createdAt: remote.createdAt,
     updatedAt: remote.updatedAt,

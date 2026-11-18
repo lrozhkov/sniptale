@@ -11,7 +11,7 @@ export interface SyncCacheStatus {
 /** A current native root projection; physical commands repeat all authority checks. */
 export interface SyncCacheRootStatus {
   root: {
-    rootKind: 'media' | 'video-project' | 'video-review' | 'scenario-project';
+    rootKind: 'media' | 'image-project' | 'video-project' | 'video-review' | 'scenario-project';
     rootId: string;
   };
   configured: boolean;

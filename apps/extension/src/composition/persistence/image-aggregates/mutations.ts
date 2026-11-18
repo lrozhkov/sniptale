@@ -15,10 +15,10 @@ import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction
 import {
   captureImageInTransaction,
   captureMediaInTransaction,
-  readEnabledCaptureProfile,
+  captureDeletionInTransaction,
   readImageRevisionFence,
 } from '../sync-capture/capture';
-import { SYNC_CAPTURE_STORE } from '../infrastructure/indexed-db/core.stores';
+import { SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE } from '../infrastructure/indexed-db/core.stores';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import { createImageThumbnailBlob } from '../../../platform/media-utils/image-thumbnail';
@@ -94,7 +94,6 @@ import { isNumber, isRecord, isString } from '@sniptale/runtime-contracts/valida
 
 const IMAGE_WORKSPACE_PUBLICATION_DOMAIN = 'image-workspace';
 const IMAGE_WORKSPACE_OWNER_KIND = 'image-workspace';
-const INDEPENDENT_IMAGE_SYNC_ERROR = 'Independent image projects require an updated sync format.';
 const IMAGE_SNAPSHOT_STORES = [
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
@@ -104,6 +103,8 @@ const IMAGE_SNAPSHOT_STORES = [
   ASSET_REFS_STORE,
   ASSET_OWNERS_STORE,
   SYNC_CAPTURE_STORE,
+  SYNC_OUTBOX_STORE,
+  ASSET_RESIDENCY_STORE,
 ];
 
 interface PreparedImageWorkspaceInput extends Omit<
@@ -304,7 +305,15 @@ async function commitImageWorkspaceMutation(
       (!rootWasMissing && (identity?.generation ?? null) !== (input.expectedGeneration ?? null))
     )
       throw new StaleImageWorkspaceError(input.aggregateId);
-    if (rootWasMissing && (await readImageRevisionFence(tx, input.aggregateId)) !== null)
+    if (
+      rootWasMissing &&
+      (await readImageRevisionFence(
+        tx,
+        input.aggregateId,
+        false,
+        sourceMediaId === undefined ? 'media' : 'image-project'
+      )) !== null
+    )
       throw new ImageAggregateCollisionError(input.aggregateId);
     let media: MediaLibraryEntry;
     if (sourceMediaId !== undefined) {
@@ -321,7 +330,6 @@ async function commitImageWorkspaceMutation(
         )) !== undefined
       )
         throw new ImageAggregateCollisionError(input.aggregateId);
-      if (await readEnabledCaptureProfile(tx)) throw new Error(INDEPENDENT_IMAGE_SYNC_ERROR);
       media = original;
     } else {
       media = await persistImageAggregateRootIfMissing({
@@ -458,19 +466,22 @@ async function commitImageWorkspaceMutation(
       sourceMediaId === undefined
         ? parseMediaLibraryEntry(await mediaStore.get(input.aggregateId))
         : null;
+    const captureOptions =
+      input.publicationId === undefined ? {} : { publicationId: input.publicationId };
     const checkpointReceipt =
-      acceptedRoot && isImageCaptureSource(acceptedRoot)
+      sourceMediaId !== undefined
         ? await captureCheckpointReceiptInTransaction(
             tx,
-            { rootKind: 'media', rootId: input.aggregateId },
-            () =>
-              captureMediaInTransaction(
-                tx,
-                input.aggregateId,
-                input.publicationId === undefined ? {} : { publicationId: input.publicationId }
-              )
+            { rootKind: 'image-project', rootId: input.aggregateId },
+            () => captureImageInTransaction(tx, input.aggregateId, captureOptions)
           )
-        : null;
+        : acceptedRoot && isImageCaptureSource(acceptedRoot)
+          ? await captureCheckpointReceiptInTransaction(
+              tx,
+              { rootKind: 'media', rootId: input.aggregateId },
+              () => captureMediaInTransaction(tx, input.aggregateId, captureOptions)
+            )
+          : null;
     await tx.done;
     if (physicalDelete.assetIds.length > 0) {
       await completePhysicalDeleteOperation(physicalDelete, lifecyclePermit).catch(() => undefined);
@@ -628,16 +639,6 @@ async function prepareImageWorkspaceCommit(
   // Cold database admission reserves the exclusive transition gate; it must settle before
   // staged assets hold shared transition leases or admission could queue behind them.
   const db = await initDB();
-  const admission = db.transaction([IMAGE_WORKSPACES_STORE, SYNC_CAPTURE_STORE], 'readonly');
-  const syncProfile = await readEnabledCaptureProfile(admission);
-  const isLinked =
-    input.original !== undefined ||
-    (syncProfile &&
-      parseImageWorkspaceEntry(
-        await admission.objectStore(IMAGE_WORKSPACES_STORE).get(input.aggregateId)
-      )?.sourceMediaId !== undefined);
-  await admission.done;
-  if (syncProfile && isLinked) throw new Error(INDEPENDENT_IMAGE_SYNC_ERROR);
   await recoverImageWorkspacePublications();
   const originalReuse = await prepareOriginalReuse(db, input);
   const { originalWitness } = originalReuse;
@@ -978,7 +979,6 @@ async function readImageWorkspacePublicationStatus(
       IMAGE_WORKSPACES_STORE,
       AGGREGATE_PRESENTATIONS_STORE,
       IMAGE_WORKSPACE_IDENTITIES_STORE,
-      SYNC_CAPTURE_STORE,
     ],
     'readonly'
   );
@@ -1006,8 +1006,6 @@ async function readImageWorkspacePublicationStatus(
     ]);
   const existing = parseImageWorkspaceEntry(rawWorkspace);
   const linked = existing?.sourceMediaId !== undefined;
-  const incompatibleProfile =
-    (linked || original !== undefined) && Boolean(await readEnabledCaptureProfile(snapshot));
   await snapshot.done;
   const hasRoot = rawMedia !== undefined || linked;
   const sameGeneration =
@@ -1061,7 +1059,6 @@ async function readImageWorkspacePublicationStatus(
       (originalIdentity?.generation ?? null) !== original.generation);
   const permanentlySuperseded =
     originalIsUnavailable ||
-    incompatibleProfile ||
     (input.requireMissingRoot
       ? hasRoot || occupiedSidecar || !sameGeneration
       : !sameGeneration ||
@@ -1167,7 +1164,7 @@ export function recoverImageWorkspacePublications(): Promise<number> {
 
 export async function commitImagePresentation(input: CommitImagePresentationInput): Promise<void> {
   await runWithIndexedDbMutation(async (db, permit) => {
-    const tx = db.transaction([...IMAGE_SNAPSHOT_STORES, ASSET_RESIDENCY_STORE], 'readwrite');
+    const tx = db.transaction(IMAGE_SNAPSHOT_STORES, 'readwrite');
     try {
       await assertImageGeneration(tx, input.aggregateId, input.expectedGeneration);
       const media = parseMediaLibraryEntry(
@@ -1193,7 +1190,9 @@ export async function commitImagePresentation(input: CommitImagePresentationInpu
         thumbnailBlob: input.thumbnailBlob,
         updatedAt: Date.now(),
       };
-      if (media && isImageCaptureSource(media)) {
+      if (linked) {
+        await commitImagePresentationCacheInTransaction(tx, entry, permit, 'image-project');
+      } else if (media && isImageCaptureSource(media)) {
         await commitImagePresentationCacheInTransaction(tx, entry, permit);
       } else {
         await tx.objectStore(AGGREGATE_PRESENTATIONS_STORE).put(entry);
@@ -1264,6 +1263,7 @@ export async function deleteImageWorkspaceProject(
         ASSET_REFS_STORE,
         ASSET_OWNERS_STORE,
         ASSET_OPERATIONS_STORE,
+        SYNC_CAPTURE_STORE,
       ],
       'readwrite'
     );
@@ -1290,6 +1290,13 @@ export async function deleteImageWorkspaceProject(
         },
       });
       await store.delete(aggregateId);
+      await captureDeletionInTransaction(
+        tx,
+        'image-project',
+        aggregateId,
+        'local-edit',
+        project.revision
+      );
       await tx
         .objectStore(AGGREGATE_PRESENTATIONS_STORE)
         .delete(createAggregatePresentationKey({ id: aggregateId, kind: 'image' }));

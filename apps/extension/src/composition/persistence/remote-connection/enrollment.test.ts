@@ -485,25 +485,16 @@ it('refuses delayed enrollment after source abandonment', async () => {
   expect(f.rows).toEqual(before);
 });
 
-it('refuses enrollment after an independent image project is published during preparation', async () => {
+it('keeps a concurrently published independent image when enabling sync enrollment', async () => {
   const f = setup();
   const held = holdEncryption();
   const pending = enrollSyncWorkspaceConnection(f.source, authentication, policy);
   await held.entered;
-  f.table('image_workspaces').set('project', {
-    aggregateId: 'project',
-    sourceMediaId: 'original',
-  });
-  const before = structuredClone(f.rows);
+  const project = { aggregateId: 'project', sourceMediaId: 'original' };
+  f.table('image_workspaces').set('project', project);
   held.release();
-  await expect(pending).rejects.toThrow('Sync connection admission refused');
-  expect(f.rows).toEqual(before);
-  f.table('image_workspaces').delete('project');
-  await expect(
-    enrollSyncWorkspaceConnection(f.source, authentication, policy)
-  ).resolves.toMatchObject({
-    phase: 'active',
-  });
+  await expect(pending).resolves.toMatchObject({ phase: 'active' });
+  expect(f.table('image_workspaces').get('project')).toEqual(project);
 });
 it('cannot reopen erased and recreated storage after crypto', async () => {
   const f = setup();

@@ -15,6 +15,8 @@ import { captureRootKey, type SyncCaptureProfile, type SyncCaptureRootState } fr
 import { readCaptureRootState } from './guards';
 import {
   digestCapturedImageRows,
+  digestImageProjectSnapshot,
+  readImageProjectSnapshot,
   digestUnloadedImageReplicaRows,
   readImageReplicaPredecessorInTransaction,
 } from './image-snapshot';
@@ -25,7 +27,7 @@ type Transaction = IDBPTransaction<unknown, string[], 'readwrite'>;
 async function baseline(
   tx: Transaction,
   entry: AggregatePresentationEntry,
-  rootKind: 'media' | 'scenario-project'
+  rootKind: 'media' | 'image-project' | 'scenario-project'
 ): Promise<{ profile: SyncCaptureProfile; state: SyncCaptureRootState } | null> {
   const profile = await readEnabledCaptureProfile(tx);
   if (!profile) return null;
@@ -87,10 +89,23 @@ function matchesInlineBaseline(
 export async function commitImagePresentationCacheInTransaction(
   tx: Transaction,
   entry: AggregatePresentationEntry,
-  permit: PersistenceMutationPermit
+  permit: PersistenceMutationPermit,
+  rootKind: 'media' | 'image-project' = 'media'
 ): Promise<void> {
-  const accepted = await baseline(tx, entry, 'media');
+  const accepted = await baseline(tx, entry, rootKind);
   if (!accepted) return writePresentation(tx, entry);
+  if (rootKind === 'image-project') {
+    const project = await readImageProjectSnapshot(tx, entry.aggregateId);
+    const clean = digestImageProjectSnapshot(project) === accepted.state.nativeDigest;
+    await writePresentation(tx, entry);
+    if (clean) {
+      await tx.objectStore(SYNC_CAPTURE_STORE).put({
+        ...accepted.state,
+        nativeDigest: digestImageProjectSnapshot({ ...project, presentation: entry }),
+      });
+    }
+    return;
+  }
   const before = await readImageReplicaPredecessorInTransaction(
     tx,
     entry.aggregateId,

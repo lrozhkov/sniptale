@@ -1,3 +1,4 @@
+import { isCaptureRootKind } from './checkpoint-contracts';
 import { readCheckpointInTransaction } from './checkpoints';
 import type { IDBPTransaction } from 'idb';
 import { capturePreparedDatabase } from '../infrastructure/indexed-db/core';
@@ -44,7 +45,7 @@ function checkedSelection(input: Selection): Selection {
     !authorization ||
     !queueUuid(selected.operationId) ||
     !queueIdentity(selected.rootId) ||
-    !['media', 'video-review', 'video-project', 'scenario-project'].includes(selected.rootKind)
+    !isCaptureRootKind(selected.rootKind)
   )
     throw new Error('Invalid conflict resolution selection.');
   return { ...selected, scope, authorization };

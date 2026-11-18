@@ -3,6 +3,7 @@ import {
   captureMediaInTransaction,
   captureVideoProjectInTransaction,
   captureScenarioProjectInTransaction,
+  captureImageInTransaction,
 } from '../sync-capture/capture';
 import { isImageCaptureSource } from '../sync-capture/image-snapshot';
 import {
@@ -21,6 +22,8 @@ import {
   STORE_NAME,
   RECORDING_TELEMETRY_STORE,
   SYNC_CAPTURE_STORE,
+  SYNC_OUTBOX_STORE,
+  ASSET_RESIDENCY_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
   WEB_SNAPSHOTS_STORE,
@@ -162,6 +165,8 @@ async function mutateTrash(
           STORE_NAME,
           RECORDING_TELEMETRY_STORE,
           SYNC_CAPTURE_STORE,
+          SYNC_OUTBOX_STORE,
+          ASSET_RESIDENCY_STORE,
           PROJECT_ASSETS_STORE,
           PROJECT_EXPORTS_STORE,
           WEB_SNAPSHOTS_STORE,
@@ -209,6 +214,7 @@ async function mutateTrash(
               ...(!restore && publicationId ? { publicationId } : {}),
               lifecycle: { ...active, updatedAt, ...(restore ? {} : { trashedAt: updatedAt }) },
             });
+            changed.push(target);
             continue;
           }
           if (target.kind === 'quick-edit-project') {
@@ -285,6 +291,8 @@ async function mutateTrash(
           }
         }
         for (const target of changed) {
+          if (target.kind === 'image-project')
+            await captureImageInTransaction(tx, target.id, { checkpoint: 'lifecycle' });
           if (target.kind === 'video-project')
             await captureVideoProjectInTransaction(tx, target.id, { checkpoint: 'lifecycle' });
           if (target.kind === 'scenario-project')

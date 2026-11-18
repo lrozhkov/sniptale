@@ -113,7 +113,9 @@ function frozenNativeRow<T>(value: unknown, admit: (value: unknown) => value is 
 export function digestCapturedMediaRows(rows: CapturedMediaRows): string {
   const normalized = parseCapturedMediaRows(rows);
   requireSupported(normalized !== null);
-  const digest = sha256(new TextEncoder().encode(JSON.stringify(normalized)));
+  // Visibility is published under the same causal head, separate from native source evidence.
+  const { savedIndependently: _claim, ...original } = normalized;
+  const digest = sha256(new TextEncoder().encode(JSON.stringify(original)));
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
@@ -289,7 +291,12 @@ export async function freezeMediaInTransaction(
     thumbnails: 'recording' in rows ? new Set([...reviews, mediaId]) : reviews,
     presentation: null,
   });
-  return structuredClone(rows);
+  return structuredClone({
+    ...rows,
+    ...(media.savedIndependently === undefined
+      ? {}
+      : { savedIndependently: media.savedIndependently }),
+  });
 }
 
 async function requireSourceOwner(

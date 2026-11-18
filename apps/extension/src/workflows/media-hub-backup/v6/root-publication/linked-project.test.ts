@@ -1,3 +1,6 @@
+import { captureRootKey } from '../../../../composition/persistence/sync-capture/contracts';
+import { parseSyncCaptureRecord } from '../../../../composition/persistence/sync-capture/guards';
+import { deleteImageWorkspaceProject } from '../../../../composition/persistence/image-aggregates/mutations';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createLibraryLifecycle } from '../../../../composition/persistence/library-lifecycle/contracts';
 import { createPersistedEditorDocumentFixture } from '../../../../composition/persistence/document-assets/test-support';
@@ -66,12 +69,20 @@ function fixture(bytes = 'image') {
   const objectStore = (name: string) => {
     const records = tables.get(name) ?? new Map<string, unknown>();
     tables.set(name, records);
+    const put = async (value: {
+      key?: string;
+      id?: string;
+      aggregateId?: string;
+      assetId?: string;
+    }) => {
+      writes(name, value);
+      records.set(value.key ?? value.id ?? value.aggregateId ?? value.assetId ?? '', value);
+    };
     return {
       get: async (id: string) => records.get(id),
-      put: async (value: { id?: string; aggregateId?: string; assetId?: string }) => {
-        writes(name, value);
-        records.set(value.id ?? value.aggregateId ?? value.assetId ?? '', value);
-      },
+      getAll: async () => [...records.values()],
+      add: put,
+      put,
       delete: async (id: string) => records.delete(id),
       index: () => ({
         getAll: async (key: string) =>
@@ -148,7 +159,7 @@ function fixture(bytes = 'image') {
     },
   };
   const publish = () => mediaLibraryRootPublisher.publish(publication);
-  const replaceOriginal = () =>
+  const replaceOriginal = (savedIndependently?: boolean) =>
     mediaLibraryRootPublisher.publish({
       ...publication,
       envelope: {
@@ -157,6 +168,7 @@ function fixture(bytes = 'image') {
         metadata: portableJson({
           entry: { ...entry, id: original.id },
           originalObjectId: 'original',
+          ...(savedIndependently === undefined ? {} : { savedIndependently }),
         }),
       },
       staged: staged.slice(0, 1),
@@ -440,3 +452,79 @@ it('replaces a Quick Edit project and releases its former private auxiliary afte
     undefined
   );
 });
+
+function enableSync(tables: ReturnType<typeof fixture>['tables']) {
+  const sync = new Map<string, unknown>();
+  sync.set('profile', {
+    kind: 'profile',
+    version: 1,
+    key: 'profile',
+    spaceId: 'space',
+    createdAt: 1,
+    connectionGeneration: 1,
+    enabled: true,
+  });
+  tables.set('sync_capture', sync);
+  return sync;
+}
+
+it('captures a hidden ZIP replacement of an enrolled original before its project', async () => {
+  const { tables, original, replaceOriginal, publish } = fixture();
+  const sync = enableSync(tables);
+  await expect(replaceOriginal(true)).resolves.toMatchObject({ imported: true });
+  await expect(replaceOriginal(false)).resolves.toMatchObject({ imported: true });
+  await expect(publish()).resolves.toMatchObject({ imported: true });
+  const captures = [...sync.values()]
+    .map(parseSyncCaptureRecord)
+    .filter((item) => item?.kind === 'sync-operation' && item.phase === 'native');
+  const replacement = captures.find((item) => item.rootKind === 'media' && item.generation === 2);
+  expect(replacement?.change).toMatchObject({ kind: 'image', rows: { savedIndependently: false } });
+  expect(captures.find((item) => item.rootKind === 'image-project')?.change).toMatchObject({
+    mediaDependencies: [{ mediaId: original.id, generation: 2, basis: [replacement!.operationId] }],
+  });
+});
+
+it.each([false, true])(
+  'fences stale purges across linked ZIP Replace or recreation, tombstone=%s',
+  async (tombstone) => {
+    const { tables, publication, publish } = fixture();
+    const sync = enableSync(tables);
+    const rootId = publication.envelope.descriptor.rootId;
+    const metadata = publication.envelope.metadata;
+    if (!isRecord(metadata) || !isRecord(metadata['entry']))
+      throw new Error('Expected image metadata.');
+    metadata['entry']['lifecycle'] = {
+      storageClass: 'library',
+      savedAt: 1,
+      updatedAt: 2,
+      trashedAt: 2,
+    };
+    await expect(publish()).resolves.toMatchObject({ imported: true });
+    const rootKey = captureRootKey('space', 'image-project', rootId);
+    const stateKey = JSON.stringify(['root-state', rootKey]);
+    const workspace = tables.get('image_workspaces')?.get(rootId);
+    const state = parseSyncCaptureRecord(sync.get(stateKey));
+    if (!isRecord(workspace) || state?.kind !== 'root-state')
+      throw new Error('Expected a saved project.');
+    const oldRevision = tombstone ? 7 : 1;
+    if (tombstone) {
+      const { nativeDigest: _digest, ...previous } = state;
+      sync.set(stateKey, { ...previous, nativeRevision: oldRevision, deleted: true });
+      tables.get('image_workspaces')?.delete(rootId);
+    }
+    await expect(
+      mediaLibraryRootPublisher.publish({
+        ...publication,
+        session: { ...publication.session, strategy: 'replace' },
+      })
+    ).resolves.toMatchObject({ imported: true });
+    expect(tables.get('image_workspaces')?.get(rootId)).toMatchObject({
+      revision: oldRevision + 1,
+      lifecycle: { trashedAt: 2, updatedAt: 2 },
+    });
+    await expect(deleteImageWorkspaceProject(rootId, oldRevision, 2)).rejects.toMatchObject({
+      name: 'StaleImageWorkspaceError',
+    });
+    expect(tables.get('image_workspaces')?.has(rootId)).toBe(true);
+  }
+);

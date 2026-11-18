@@ -57,6 +57,33 @@ function setup() {
   return fixture;
 }
 
+it('applies explicit visibility once and renews the independent-save fence', async () => {
+  const f = setup();
+  const input = { ...f.input, rows: { ...f.input.rows, savedIndependently: false } };
+  const mediaId = input.rows.media.id;
+  await applyPreparedMediaReplica(input);
+  const initial = parseMediaLibraryEntry(f.table('media_library').get(mediaId));
+  expect(initial).toMatchObject({ savedIndependently: false, originalSaveId: expect.any(String) });
+  const next = {
+    ...input,
+    operationId: 'save-independent',
+    sourceDigest: 'b'.repeat(64),
+    expectedLocalGeneration: 1,
+    expectedBasis: [input.operationId],
+    rows: { ...input.rows, savedIndependently: true },
+  };
+  expect(await applyPreparedMediaReplica(next)).toEqual({ status: 'applied', generation: 2 });
+  const saved = parseMediaLibraryEntry(f.table('media_library').get(mediaId));
+  expect(saved).toMatchObject({ savedIndependently: true, originalSaveId: expect.any(String) });
+  expect(saved?.originalSaveId).not.toBe(initial?.originalSaveId);
+  expect(await applyPreparedMediaReplica(next)).toEqual({ status: 'duplicate', generation: 2 });
+  expect(f.table('media_library').get(mediaId)).toEqual(saved);
+  await expect(
+    applyPreparedMediaReplica({ ...next, operationId: 'stale-hide', rows: input.rows })
+  ).rejects.toThrow('source-changed');
+  expect(f.table('media_library').get(mediaId)).toEqual(saved);
+});
+
 it('admits a Library source with a real causal head and no outgoing echo', async () => {
   const f = setup();
   expect(await applyPreparedMediaReplica(f.input)).toEqual({ status: 'applied', generation: 1 });

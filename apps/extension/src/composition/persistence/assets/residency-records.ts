@@ -76,6 +76,7 @@ function digest(value: unknown): value is string {
 function rootKind(value: unknown): value is CaptureRootKind {
   return (
     value === 'media' ||
+    value === 'image-project' ||
     value === 'video-project' ||
     value === 'video-review' ||
     value === 'scenario-project'

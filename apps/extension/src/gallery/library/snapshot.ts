@@ -107,9 +107,11 @@ export async function loadGalleryLibrarySnapshot(
           ? 'video-project'
           : item.type === 'quick-edit-project'
             ? 'video-review'
-            : isGalleryMediaItem(item)
-              ? 'media'
-              : null;
+            : item.type === 'image-project'
+              ? 'image-project'
+              : isGalleryMediaItem(item)
+                ? 'media'
+                : null;
       return kind ? [JSON.stringify([kind, item.entityId ?? item.id])] : [];
     })
   );

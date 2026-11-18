@@ -21,6 +21,20 @@ interface MediaSourcePublicationStores {
   projectExports: PublicationStore<StoredProjectExportEntry>;
 }
 
+/** Retain local visibility for legacy replicas and fence every explicit independent save. */
+export function replicaOriginalClaim(
+  previous: MediaLibraryEntry | null,
+  savedIndependently: boolean | undefined
+): Pick<MediaLibraryEntry, 'savedIndependently' | 'originalSaveId'> {
+  const claim = savedIndependently ?? previous?.savedIndependently;
+  return {
+    ...(claim === undefined ? {} : { savedIndependently: claim }),
+    ...(savedIndependently === true || previous?.originalSaveId === undefined
+      ? {}
+      : { originalSaveId: previous.originalSaveId }),
+  };
+}
+
 /** Publish accepted Library source rows inside the caller's transaction. */
 export async function publishPreparedMediaSourceInTransaction(
   prepared: PreparedMediaSourcePublication,

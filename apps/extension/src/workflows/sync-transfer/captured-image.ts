@@ -30,6 +30,7 @@ import {
 import { parsePortableMediaMetadata } from '../media-hub-backup/v6/root-codecs/media';
 import type { AssetRef } from '../../composition/persistence/assets';
 import { createMediaHubBackupExportOptions } from '../media-hub-backup/v6/options';
+import { imageCaptureIdentity } from '../../composition/persistence/sync-capture/image-snapshot';
 
 /** Feed only the accepted image after-image to the existing backup inventory. */
 export async function encodeCapturedImageRoot(
@@ -39,22 +40,29 @@ export async function encodeCapturedImageRoot(
   const parsed = parseCapturedImageRows(value);
   if (!parsed) throw new Error('Invalid frozen image source.');
   const rows = structuredClone(parsed);
+  const { rootId } = imageCaptureIdentity(rows);
+  const media = {
+    ...rows.media,
+    ...(rows.savedIndependently === undefined
+      ? {}
+      : { savedIndependently: rows.savedIndependently }),
+  };
   const refs = new Map(
     [...rows.refs, ...(rows.originalRef ? [rows.originalRef] : [])].map((ref) => [ref.assetId, ref])
   );
   const deferred = createCapturedAssetInventory([...refs.values()], copies);
   const db = {
     async get(store: string, key: unknown): Promise<unknown> {
-      if (store === MEDIA_LIBRARY_STORE && key === rows.media.id) return rows.media;
+      if (store === MEDIA_LIBRARY_STORE && key === media.id) return media;
       if (store === PROJECT_ASSETS_STORE && rows.projectAsset && key === rows.projectAsset.id)
         return rows.projectAsset;
-      if (store === IMAGE_WORKSPACES_STORE && key === rows.media.id) return rows.workspace;
+      if (store === IMAGE_WORKSPACES_STORE && key === rootId) return rows.workspace;
       if (
         store === AGGREGATE_PRESENTATIONS_STORE &&
         Array.isArray(key) &&
         key.length === 2 &&
         key[0] === 'image' &&
-        key[1] === rows.media.id
+        key[1] === rootId
       )
         return rows.presentation;
       if (store === ASSET_REFS_STORE && typeof key === 'string' && refs.has(key))
@@ -67,21 +75,27 @@ export async function encodeCapturedImageRoot(
   };
   const roots = await buildMediaRootInventory({
     db,
-    items: [{ ...rows.media, hasThumbnail: rows.presentation !== null }],
+    items: [{ ...media, hasThumbnail: rows.presentation !== null }],
+    ...(rows.workspace?.sourceMediaId ? { imageProjects: [rows.workspace] } : {}),
+    includeLibraryRelationships: true,
     options: createMediaHubBackupExportOptions({
       includeDrafts: false,
       includeSourceMetadata: true,
       includeTelemetry: false,
       includeWebSnapshots: false,
+      scope: 'selected',
+      selected: { mediaAssetIds: [rootId], videoProjectIds: [], scenarioProjectIds: [] },
     }),
     paths: createArchivePathAllocator(),
     deferredAssets: deferred.port,
   });
-  if (roots.length !== 1 || roots[0]!.descriptor.rootId !== rows.media.id)
+  if (roots.length !== 1 || roots[0]!.descriptor.rootId !== rootId)
     throw new Error('Frozen image inventory differs from its root.');
   deferred.assertUsed();
   const inventory = await loadCapturedInventory(roots[0]!);
-  const portable = parsePortableMediaMetadata(inventory.metadata);
+  const portable = parsePortableMediaMetadata(inventory.metadata, {
+    allowLibraryRelationships: true,
+  });
   const canonicalIds = new Map<string, string>();
   const identities = new Map<string, string>();
   const nativeIdentities = new Map<string, string>();

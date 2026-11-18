@@ -6,6 +6,7 @@ import {
 import { initDB } from '../../composition/persistence/infrastructure/indexed-db/core';
 import {
   ASSET_RESIDENCY_STORE,
+  IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   VIDEO_PROJECTS_STORE,
   SCENARIO_PROJECTS_STORE,
@@ -192,7 +193,9 @@ export async function needsNativeEditingPreparation(
         ? VIDEO_PROJECTS_STORE
         : root.rootKind === 'scenario-project'
           ? SCENARIO_PROJECTS_STORE
-          : VIDEO_WORKSPACES_STORE;
+          : root.rootKind === 'image-project'
+            ? IMAGE_WORKSPACES_STORE
+            : VIDEO_WORKSPACES_STORE;
   const tx = db.transaction([...new Set([store, MEDIA_LIBRARY_STORE])], 'readonly');
   let present = (await tx.objectStore(store).get(root.rootId)) !== undefined;
   if (!present && root.rootKind === 'video-review')

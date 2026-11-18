@@ -28,7 +28,6 @@ import {
 import { readReadySyncWorkspaceJoin, type SyncWorkspaceJoin } from './workspace-join';
 import {
   SYNC_CAPTURE_STORE,
-  IMAGE_WORKSPACES_STORE,
   SYNC_OUTBOX_STORE,
   SYNC_CONNECTION_STORE,
   SECRET_PROTECTION_STORE,
@@ -616,13 +615,7 @@ export async function enrollSyncWorkspaceConnection(
       return await withSyncConnectionAdmissionLock(() =>
         runWithPersistenceMutationPermit(async () => {
           const tx = db.transaction(
-            [
-              SYNC_CAPTURE_STORE,
-              SYNC_CONNECTION_STORE,
-              SYNC_OUTBOX_STORE,
-              SECRET_PROTECTION_STORE,
-              IMAGE_WORKSPACES_STORE,
-            ],
+            [SYNC_CAPTURE_STORE, SYNC_CONNECTION_STORE, SYNC_OUTBOX_STORE, SECRET_PROTECTION_STORE],
             'readwrite'
           );
           try {
@@ -632,14 +625,6 @@ export async function enrollSyncWorkspaceConnection(
             if (current.connection) {
               await tx.done;
               return current.connection;
-            }
-            const imageWorkspaces: unknown[] = await tx
-              .objectStore(IMAGE_WORKSPACES_STORE)
-              .getAll();
-            if (
-              imageWorkspaces.some((row) => isRecord(row) && row['sourceMediaId'] !== undefined)
-            ) {
-              throw new Error('WebDAV enrollment cannot include independent image projects.');
             }
             await tx.objectStore(SYNC_CAPTURE_STORE).put(profile);
             const rows = tx.objectStore(SYNC_CONNECTION_STORE);

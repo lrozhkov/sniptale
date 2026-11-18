@@ -3,10 +3,15 @@ import { SYNC_CAPTURE_STORE } from '../infrastructure/indexed-db/core.stores';
 import { parseCapturedScenarioRows } from './scenario-snapshot';
 import { parseCapturedMediaRows } from './media-snapshot';
 export { parseCapturedMediaRows } from './media-snapshot';
-import { parseCapturedVideoReviewRows, type CapturedVideoReviewRows } from './review-snapshot';
+import { parseCapturedVideoReviewRows } from './review-snapshot';
+import { isCaptureRootKind } from './checkpoint-contracts';
 import { parseCapturedVideoProjectRows } from './project-snapshot';
 export { isSupportedCaptureProject, parseCapturedVideoProjectRows } from './project-snapshot';
-import { describeImageMetadata, parseCapturedImageRows } from './image-snapshot';
+import {
+  describeImageMetadata,
+  imageCaptureIdentity,
+  parseCapturedImageRows,
+} from './image-snapshot';
 export { parseCapturedImageRows } from './image-snapshot';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -49,12 +54,12 @@ export function ordinal(value: unknown): value is number {
 }
 
 /** Bind every retained published source to its accepted causal head. */
-function parseReviewDependencies(
+function parseRequiredMediaDependencies(
   value: unknown,
-  rows: CapturedVideoReviewRows
+  mediaIds: readonly string[]
 ): CapturedMediaDependency[] | null {
   if (!Array.isArray(value) || value.length === 0 || value.length > MAX_CAPTURE_ROWS) return null;
-  const required = new Set([rows.source.media.id, ...rows.media.map((entry) => entry.id)]);
+  const required = new Set(mediaIds);
   const dependencies: CapturedMediaDependency[] = [];
   for (const raw of value) {
     if (
@@ -113,13 +118,7 @@ export function parseSyncCheckpointReceipt(value: unknown): SyncCheckpointReceip
   )
     return null;
   const rootKind = value['rootKind'];
-  if (
-    rootKind !== 'media' &&
-    rootKind !== 'video-project' &&
-    rootKind !== 'video-review' &&
-    rootKind !== 'scenario-project'
-  )
-    return null;
+  if (!isCaptureRootKind(rootKind)) return null;
   return { rootKind, rootId: value['rootId'], revision: value['revision'] };
 }
 
@@ -136,10 +135,7 @@ function parsePendingCheckpoint(
   const rootId = value['rootId'];
   const rootKey = value['rootKey'];
   if (
-    (rootKind !== 'media' &&
-      rootKind !== 'video-project' &&
-      rootKind !== 'video-review' &&
-      rootKind !== 'scenario-project') ||
+    !isCaptureRootKind(rootKind) ||
     !identity(rootId) ||
     !storageKey(rootKey) ||
     rootKey !== captureRootKey(header.spaceId, rootKind, rootId) ||
@@ -226,10 +222,7 @@ function parseCaptureRoot(
     !storageKey(value['rootKey']) ||
     !ordinal(value['generation']) ||
     value['generation'] === 0 ||
-    (value['rootKind'] !== 'video-project' &&
-      value['rootKind'] !== 'media' &&
-      value['rootKind'] !== 'video-review' &&
-      value['rootKind'] !== 'scenario-project') ||
+    !isCaptureRootKind(value['rootKind']) ||
     !identity(value['rootId']) ||
     captureRootKey(header.spaceId, value['rootKind'], value['rootId']) !== value['rootKey'] ||
     !Array.isArray(value['basis']) ||
@@ -265,7 +258,7 @@ export function fingerprintNativeCapture(value: Omit<CapturedChange, 'sourceSha2
     change.kind === 'media'
       ? { kind: change.kind, rows: parseCapturedMediaRows(change.rows) ?? change.rows }
       : change.kind === 'image'
-        ? { kind: change.kind, rows: parseCapturedImageRows(change.rows) ?? change.rows }
+        ? { ...change, rows: parseCapturedImageRows(change.rows) ?? change.rows }
         : change.kind === 'video-project'
           ? { kind: change.kind, rows: parseCapturedVideoProjectRows(change.rows) ?? change.rows }
           : change;
@@ -441,7 +434,10 @@ function parseNativeOperation(
     reviewRows.review.workspace.aggregateId === root.rootId &&
     root.rootKind === 'video-review'
   ) {
-    const mediaDependencies = parseReviewDependencies(change['mediaDependencies'], reviewRows);
+    const mediaDependencies = parseRequiredMediaDependencies(change['mediaDependencies'], [
+      reviewRows.source.media.id,
+      ...reviewRows.media.map((entry) => entry.id),
+    ]);
     if (!mediaDependencies) return null;
     parsedChange = { kind: 'video-review', rows: reviewRows, mediaDependencies };
   } else if (
@@ -454,9 +450,20 @@ function parseNativeOperation(
     parsedChange = { kind: 'video-project', rows };
   else if (mediaRows && mediaRows.media.id === root.rootId && root.rootKind === 'media')
     parsedChange = { kind: 'media', rows: mediaRows };
-  else if (imageRows && imageRows.media.id === root.rootId && root.rootKind === 'media')
-    parsedChange = { kind: 'image', rows: imageRows };
-  else return null;
+  else if (imageRows) {
+    const image = imageCaptureIdentity(imageRows);
+    if (image.rootId !== root.rootId || image.rootKind !== root.rootKind) return null;
+    if (image.rootKind === 'image-project') {
+      const mediaDependencies = parseRequiredMediaDependencies(change['mediaDependencies'], [
+        imageRows.media.id,
+      ]);
+      if (!mediaDependencies) return null;
+      parsedChange = { kind: 'image', rows: imageRows, mediaDependencies };
+    } else {
+      if (change['mediaDependencies'] !== undefined) return null;
+      parsedChange = { kind: 'image', rows: imageRows };
+    }
+  } else return null;
   const native: CapturedChange = { ...stable, phase: 'native', change: parsedChange };
   return native.source.changeKind === parsedChange.kind &&
     fingerprintNativeCapture(native) === native.sourceSha256
@@ -562,6 +569,7 @@ function parseCaptureRootState(
     nativeRevision !== undefined &&
     (!ordinal(nativeRevision) ||
       (root.rootKind !== 'media' &&
+        root.rootKind !== 'image-project' &&
         root.rootKind !== 'video-review' &&
         root.rootKind !== 'scenario-project'))
   )
@@ -574,6 +582,7 @@ function parseCaptureRootState(
     (typeof nativeDigest !== 'string' ||
       !/^[a-f0-9]{64}$/u.test(nativeDigest) ||
       (root.rootKind !== 'media' &&
+        root.rootKind !== 'image-project' &&
         root.rootKind !== 'video-review' &&
         root.rootKind !== 'scenario-project'))
   )

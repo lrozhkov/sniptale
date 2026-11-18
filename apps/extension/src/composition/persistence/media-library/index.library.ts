@@ -51,6 +51,24 @@ import {
 
 export { syncLegacyMediaLibrary } from './index.legacy-sync.ts';
 
+const MEDIA_CAPTURE_STORES = [
+  MEDIA_LIBRARY_STORE,
+  STORE_NAME,
+  RECORDING_TELEMETRY_STORE,
+  ASSET_OWNERS_STORE,
+  IMAGE_WORKSPACES_STORE,
+  AGGREGATE_PRESENTATIONS_STORE,
+  ASSET_REFS_STORE,
+  SYNC_CAPTURE_STORE,
+  PROJECT_ASSETS_STORE,
+  PROJECT_EXPORTS_STORE,
+  WEB_SNAPSHOTS_STORE,
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
+  THUMBNAILS_STORE,
+] as const;
+
 type MediaLibraryDeleteFailureStage = 'linked-source-cleanup' | 'media-library-transaction';
 
 export class MediaLibraryDeleteError extends Error {
@@ -176,26 +194,7 @@ async function mutateMediaLibraryEntry(
   mutate: (entry: MediaLibraryEntry) => MediaLibraryEntry
 ): Promise<MediaLibraryEntry> {
   return runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction(
-      [
-        MEDIA_LIBRARY_STORE,
-        STORE_NAME,
-        RECORDING_TELEMETRY_STORE,
-        ASSET_OWNERS_STORE,
-        IMAGE_WORKSPACES_STORE,
-        AGGREGATE_PRESENTATIONS_STORE,
-        ASSET_REFS_STORE,
-        SYNC_CAPTURE_STORE,
-        PROJECT_ASSETS_STORE,
-        PROJECT_EXPORTS_STORE,
-        WEB_SNAPSHOTS_STORE,
-        VIDEO_WORKSPACES_STORE,
-        VIDEO_WORKSPACE_HISTORY_STORE,
-        VIDEO_WORKSPACE_DRAFTS_STORE,
-        THUMBNAILS_STORE,
-      ],
-      'readwrite'
-    );
+    const tx = db.transaction([...MEDIA_CAPTURE_STORES], 'readwrite');
     try {
       const store = tx.objectStore(MEDIA_LIBRARY_STORE);
       const existing = parseMediaLibraryEntry(await store.get(assetId));
@@ -253,7 +252,10 @@ export async function setMediaLibraryOriginalClaim(
   savedIndependently: boolean
 ): Promise<boolean> {
   return runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction([...MEDIA_PROJECT_USAGE_STORES], 'readwrite');
+    const tx = db.transaction(
+      [...new Set([...MEDIA_PROJECT_USAGE_STORES, ...MEDIA_CAPTURE_STORES])],
+      'readwrite'
+    );
     try {
       const store = tx.objectStore(MEDIA_LIBRARY_STORE);
       const raw: unknown = await store.get(expected.id);
@@ -283,12 +285,12 @@ export async function setMediaLibraryOriginalClaim(
         !(await readMediaProjectUsageInTransaction(tx, original, { includeHistory: true })).length
       )
         throw new Error('No project retains this original.');
-      // The portable source is unchanged. Only local independent visibility changes.
       await store.put({
         ...raw,
         savedIndependently,
         ...(savedIndependently ? { originalSaveId: crypto.randomUUID() } : {}),
       });
+      await captureMediaInTransaction(tx, original.id, { checkpoint: 'freeze' });
       await tx.done;
       return true;
     } catch (error) {

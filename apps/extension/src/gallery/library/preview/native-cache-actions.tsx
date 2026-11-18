@@ -10,6 +10,7 @@ import { isGalleryMediaItem, type GalleryItem } from '../items';
 
 function nativeRoot(item: GalleryItem): SyncNativeEditingRoot | null {
   if (item.lifecycle?.trashedAt !== undefined) return null;
+  if (item.type === 'image-project') return { rootKind: 'image-project', rootId: item.entityId };
   if (item.type === 'video-project') return { rootKind: 'video-project', rootId: item.entityId };
   if (item.type === 'quick-edit-project')
     return { rootKind: 'video-review', rootId: item.entityId };

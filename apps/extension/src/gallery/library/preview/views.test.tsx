@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -23,9 +24,17 @@ vi.mock('../../../platform/i18n/format-bytes', async (importOriginal) => ({
   formatBytes: formatBytesMock,
 }));
 
+vi.mock('@sniptale/platform/browser/tabs', async (original) => {
+  const actual = await original<typeof import('@sniptale/platform/browser/tabs')>();
+  return { ...actual, browserTabs: { ...actual.browserTabs, create: vi.fn() } };
+});
+vi.mock('../../../platform/navigation/extension-pages/editor', () => ({
+  buildEditorUrl: vi.fn(() => 'https://example.test/editor'),
+}));
+
 vi.mock('../../../composition/persistence/image-workspaces/read', async (original) => ({
   ...(await original()),
-  listImageProjectsForEditing: async () => ({ canCreateIndependentProject: false, projects: [] }),
+  listImageProjectsForEditing: async () => [],
 }));
 
 vi.mock('../../video-review', () => ({
@@ -553,7 +562,9 @@ it('wires interactive preview actions and tag editing handlers', async () => {
   expect(onTagDraftChange).toHaveBeenCalledWith('updated');
   expect(onRemoveTag).toHaveBeenCalledWith('alpha');
   expect(onAddTag).toHaveBeenCalledTimes(1);
-  expect(onEdit).toHaveBeenCalledTimes(1);
+  expect(browserTabs.create).toHaveBeenCalledExactlyOnceWith({
+    url: 'https://example.test/editor',
+  });
   expect(onResetChanges).toHaveBeenCalledTimes(1);
   expect(onDownload).toHaveBeenCalledTimes(1);
   expect(onCopy).toHaveBeenCalledTimes(1);

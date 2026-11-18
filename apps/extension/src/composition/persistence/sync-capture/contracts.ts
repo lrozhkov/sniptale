@@ -107,6 +107,7 @@ export interface CapturedVideoProjectRows {
 /** One immutable native screenshot aggregate, including inline source and presentation bytes. */
 export interface CapturedImageRows {
   media: MediaLibraryEntry;
+  savedIndependently?: boolean;
   projectAsset?: StoredProjectAssetEntry;
   originalRef?: AssetRef;
   workspace: StoredImageWorkspaceEntry | null;
@@ -114,7 +115,7 @@ export interface CapturedImageRows {
   refs: AssetRef[];
 }
 
-export type CapturedMediaRows =
+export type CapturedMediaRows = { savedIndependently?: boolean } & (
   | { media: Omit<MediaLibraryEntry, 'blob'>; ref: AssetRef }
   | {
       media: Omit<MediaLibraryEntry, 'blob'>;
@@ -137,7 +138,8 @@ export type CapturedMediaRows =
       recording: StoredRecordingEntry;
       ref: AssetRef;
       telemetry: RecordingTelemetryEntry | null;
-    };
+    }
+);
 
 /** A review owns its authored state; its real Library original remains a separate dependency. */
 export interface CapturedVideoReviewRows {
@@ -232,7 +234,7 @@ export interface CapturedChange extends CaptureOperationHeader {
         mediaDependencies: CapturedMediaDependency[];
       }
     | { kind: 'media'; rows: CapturedMediaRows }
-    | { kind: 'image'; rows: CapturedImageRows }
+    | { kind: 'image'; rows: CapturedImageRows; mediaDependencies?: CapturedMediaDependency[] }
     | { kind: 'tombstone' };
 }
 

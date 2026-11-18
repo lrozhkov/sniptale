@@ -80,7 +80,7 @@ export function isSyncProductSenderAllowed(
   if (command.kind === 'checkpoint-exit') {
     if (sender.frameId !== 0) return false;
     const kind = command.receipt.rootKind;
-    if (isImageEditorSenderUrl(sender.url)) return kind === 'media';
+    if (isImageEditorSenderUrl(sender.url)) return kind === 'media' || kind === 'image-project';
     if (isScenarioEditorSenderUrl(sender.url)) return kind === 'scenario-project';
     if (isOwnedExtensionPagePath(sender.url, 'apps/extension/src/video-editor/index.html'))
       return kind === 'video-project';

@@ -1,5 +1,6 @@
 import { runWithAssetResourceRead } from '../../composition/persistence/assets/resource-sessions';
 import { createLogger } from '@sniptale/platform/observability/logger';
+import { readStoredImageWorkspace } from '../../composition/persistence/image-workspaces/read';
 import { touchNativeCacheRoot } from './native-cache';
 import { createSyncProductClient } from '../../platform/runtime-messaging/sync-product-client';
 import type { SyncNativeEditingRoot } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
@@ -38,7 +39,14 @@ async function withPreparationCancellation<T>(
 }
 
 /** The caller retains its existing reader lease through preparation and editor use. */
-export async function ensureNativeEditingRootAvailable(root: SyncNativeEditingRoot): Promise<void> {
+export async function ensureNativeEditingRootAvailable(
+  target: SyncNativeEditingRoot
+): Promise<void> {
+  // Image editor links identify the aggregate by ID. Older links and unopened projects may name original media.
+  const root =
+    target.rootKind === 'media' && (await readStoredImageWorkspace(target.rootId))?.sourceMediaId
+      ? { rootKind: 'image-project' as const, rootId: target.rootId }
+      : target;
   if (!(await needsNativeEditingPreparation(root))) {
     await used(root);
     return;

@@ -86,7 +86,7 @@ function preparationDraft(
 ) {
   const recordText = JSON.stringify({
     format: 'sniptale-sync-operation',
-    version: syncOperationVersionForRoot(portable?.envelope ?? null),
+    version: syncOperationVersionForRoot(portable?.envelope ?? null, capture.rootKind),
     spaceId: capture.spaceId,
     operationId: capture.operationId,
     rootKind: capture.rootKind,

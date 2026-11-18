@@ -37,7 +37,11 @@ import {
   allocateRestoredImageRevision,
   readEnabledCaptureProfile,
 } from '../../../../composition/persistence/sync-capture/capture';
-import { parseCapturedMediaRows } from '../../../../composition/persistence/sync-capture/guards';
+import { captureRootKey } from '../../../../composition/persistence/sync-capture/contracts';
+import {
+  readCaptureRootState,
+  parseCapturedMediaRows,
+} from '../../../../composition/persistence/sync-capture/guards';
 import {
   publishPreparedMediaSourceInTransaction,
   publishPreparedMediaProjectChildInTransaction,
@@ -619,11 +623,21 @@ async function captureRestoredMedia(
   const id = prepared.media.id;
   const options = { origin: 'local-restore' } as const;
   if (prepared.linkedSource) {
-    if (prepared.videoReview) await captureVideoReviewInTransaction(tx, id, options);
+    if (prepared.workspace) await captureImageInTransaction(tx, id, options);
+    else if (prepared.videoReview) await captureVideoReviewInTransaction(tx, id, options);
     return;
   }
-  // An accepted project captures its retained dependency when that root commits.
-  if (prepared.media.savedIndependently === false) return;
+  // New hidden sources wait for their project. Existing causal roots must record the replacement.
+  if (prepared.media.savedIndependently === false) {
+    const profile = await readEnabledCaptureProfile(tx);
+    if (
+      !profile ||
+      !(await readCaptureRootState(tx, captureRootKey(profile.spaceId, 'media', id), () => {
+        throw new Error('Restored original has an invalid sync predecessor.');
+      }))
+    )
+      return;
+  }
   if (isCaptureImage(prepared.media)) await captureImageInTransaction(tx, id, options);
   else if (isCaptureReview(prepared)) await captureVideoReviewInTransaction(tx, id, options);
   else if (isCaptureOriginal(prepared)) await captureMediaInTransaction(tx, id, options);
@@ -665,6 +679,7 @@ async function detectMediaConflicts(stores: MediaRestoreStores, prepared: Prepar
   return {
     conflict: Boolean(current || relatedConflict || sidecarConflict),
     current,
+    currentRevision: current?.workspaceRevision ?? 0,
     relatedConflict,
     sidecarConflict,
   };
@@ -683,8 +698,8 @@ async function detectLinkedProjectConflicts(
     stores.videoDrafts.get(id),
   ]);
   if (media !== undefined) throw new Error('A linked project cannot replace a Library original.');
-  const sameImage =
-    prepared.workspace && parseImageWorkspaceEntry(rawImage)?.sourceMediaId === source.media.id;
+  const image = prepared.workspace ? parseImageWorkspaceEntry(rawImage) : null;
+  const sameImage = image?.sourceMediaId === source.media.id;
   const sameReview =
     prepared.videoReview && parseVideoWorkspace(rawReview)?.sourceMediaId === source.media.id;
   if (
@@ -697,6 +712,7 @@ async function detectLinkedProjectConflicts(
   return {
     conflict: Boolean(sameImage || sameReview),
     current: null,
+    currentRevision: sameImage ? image.revision : 0,
     relatedConflict: false,
     sidecarConflict: false,
   };
@@ -834,11 +850,7 @@ async function commitPreparedMediaRoot(args: {
     }
     try {
       const linked = args.prepared.linkedSource;
-      if (linked) {
-        await assertLinkedProjectSourceCurrent(tx, linked);
-        if (args.prepared.workspace && (await readEnabledCaptureProfile(tx)))
-          throw new Error('Linked Image restore requires a compatible WebDAV profile.');
-      }
+      if (linked) await assertLinkedProjectSourceCurrent(tx, linked);
       if (args.prepared.protectedOriginal) {
         await assertLinkedProjectSourceCurrent(tx, args.prepared.protectedOriginal);
         return await checkpointSkippedRoot();
@@ -867,7 +879,8 @@ async function commitPreparedMediaRoot(args: {
         const revision = await allocateRestoredImageRevision(
           tx,
           args.prepared.media.id,
-          conflict.current?.workspaceRevision ?? 0
+          conflict.currentRevision,
+          linked && args.prepared.workspace ? 'image-project' : 'media'
         );
         if (revision !== null) {
           const sourceRevision = args.prepared.media.workspaceRevision ?? 0;

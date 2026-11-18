@@ -666,8 +666,8 @@ async function buildMediaRoot(args: {
   rootIndex: number;
 }): Promise<MediaHubBackupRootInventoryItem> {
   await args.prepareRoot?.({
-    rootKind: args.sourceMediaId && !args.linkedImage ? 'video-review' : 'media',
-    rootId: args.linkedImage?.sourceMediaId ?? args.item.id,
+    rootKind: args.linkedImage ? 'image-project' : args.sourceMediaId ? 'video-review' : 'media',
+    rootId: args.item.id,
   });
   const sourceEntry = parseMediaLibraryEntry(
     await args.db.get(MEDIA_LIBRARY_STORE, args.sourceMediaId ?? args.item.id)

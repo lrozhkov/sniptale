@@ -91,7 +91,9 @@ export async function parsePortableSyncRoot(value: unknown, reviewSourceMediaId?
     envelope.descriptor.rootKind === 'media' &&
     envelope.descriptor.mediaSubtype === 'library-item'
   ) {
-    const metadata = parsePortableMediaMetadata(envelope.metadata);
+    const metadata = parsePortableMediaMetadata(envelope.metadata, {
+      allowLibraryRelationships: true,
+    });
     if (reviewSourceMediaId !== undefined) {
       const raw = envelope.metadata;
       if (!isRecord(raw)) throw new Error('Invalid portable video review metadata.');
@@ -149,6 +151,8 @@ export async function parsePortableSyncRoot(value: unknown, reviewSourceMediaId?
       exactKeys(metadata, [
         'entry',
         'originalObjectId',
+        'savedIndependently',
+        'linkedSourceMediaId',
         'workspace',
         'presentation',
         ...(metadata.entry.source.kind === 'project-asset' ? ['projectAsset'] : []),
@@ -166,6 +170,7 @@ export async function parsePortableSyncRoot(value: unknown, reviewSourceMediaId?
       'recording',
       'webSnapshot',
       'originalObjectId',
+      'savedIndependently',
     ]);
     if (
       metadata.entry.id !== envelope.descriptor.rootId ||
@@ -284,6 +289,7 @@ export interface PortableReplicaAdmission {
   expectedLocalGeneration: number;
   expectedWorkspaceRevision: number | null;
   dependencies: ApplyPreparedVideoProjectRevisionInput['dependencies'];
+  imageOriginal?: CapturedMediaDependency;
   rootDependencies?: ApplyPreparedVideoProjectRevisionInput['rootDependencies'];
 }
 
@@ -426,8 +432,15 @@ function prepareMediaRows(
       : {}),
   });
   if (!media) throw new Error('Invalid portable media entry.');
+  const original = {
+    media,
+    ref,
+    ...(parsed.metadata.savedIndependently === undefined
+      ? {}
+      : { savedIndependently: parsed.metadata.savedIndependently }),
+  };
   if (media.source.kind === 'stored-asset') {
-    const rows = parseCapturedMediaRows({ media, ref });
+    const rows = parseCapturedMediaRows(original);
     if (!rows) throw new Error('Unsupported portable stored original.');
     return rows;
   }
@@ -436,7 +449,7 @@ function prepareMediaRows(
       ...parsed.metadata.projectExport,
       assetId: ref.assetId,
     });
-    const rows = parseCapturedMediaRows({ media, projectExport, ref });
+    const rows = parseCapturedMediaRows({ ...original, projectExport });
     if (!rows) throw new Error('Unsupported portable export original.');
     return rows;
   }
@@ -448,7 +461,7 @@ function prepareMediaRows(
       packageAssetId: ref.assetId,
       screenshotAssetId: screenshotRef.assetId,
     });
-    const rows = parseCapturedMediaRows({ media, webSnapshot, ref, screenshotRef });
+    const rows = parseCapturedMediaRows({ ...original, webSnapshot, screenshotRef });
     if (!rows || snapshot.packageObjectId !== parsed.metadata.originalObjectId)
       throw new Error('Unsupported portable web snapshot.');
     return rows;
@@ -478,8 +491,7 @@ function prepareMediaRows(
     )
       throw new Error('Portable recording events digest differs from its source.');
     const rows = parseCapturedMediaRows({
-      media,
-      ref,
+      ...original,
       recording: { ...parsed.metadata.recording.entry, assetId: ref.assetId },
       telemetry: parsed.metadata.recording.telemetry
         ? {
@@ -497,7 +509,7 @@ function prepareMediaRows(
     media,
     originalRef: ref,
   });
-  const rows = parseCapturedMediaRows({ media, projectAsset, ref });
+  const rows = parseCapturedMediaRows({ ...original, projectAsset });
   if (!rows) throw new Error('Unsupported portable media original.');
   return rows;
 }
@@ -542,7 +554,9 @@ export function portableSyncDependencyIds(
   parsed: ParsedPortableRoot,
   declaredDependencyIds?: readonly string[]
 ): string[] {
-  if (parsed.kind === 'media' || parsed.kind === 'image') return [];
+  if (parsed.kind === 'media') return [];
+  if (parsed.kind === 'image')
+    return parsed.metadata.linkedSourceMediaId ? [parsed.metadata.linkedSourceMediaId] : [];
   if (parsed.kind === 'scenario-project') {
     const required = new Set(
       parsed.metadata.assets.flatMap((asset) =>
@@ -919,13 +933,24 @@ export async function preparePortableReplica(args: {
     const rows = prepareMediaRows(parsed, refFor);
     payload = { kind: 'media', input: { ...identity, rows } };
   } else if (parsed.kind === 'image') {
-    if (sender.length || local.dependencies.length)
+    const sourceId = parsed.metadata.linkedSourceMediaId;
+    const original = local.imageOriginal;
+    if (
+      local.dependencies.length ||
+      (sourceId
+        ? original?.mediaId !== sourceId ||
+          sender.length !== 1 ||
+          sender[0]?.mediaId !== sourceId ||
+          JSON.stringify(sender[0].basis) !== JSON.stringify(original.basis)
+        : sender.length !== 0 || original !== undefined)
+    )
       throw new Error('Unsupported image replica dependencies.');
     payload = {
       kind: 'image',
       input: {
         ...identity,
         expectedNativeRevision: local.expectedWorkspaceRevision,
+        ...(original ? { linkedOriginal: original } : {}),
         ...preparePortableImageRows(parsed.metadata, refFor, args.omitPresentation),
       },
     };

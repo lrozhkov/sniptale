@@ -60,7 +60,10 @@ async function withTrashPublicationResources(
   await runWithAssetResourceRead(async () => {
     const roots: SyncNativeEditingRoot[] = [];
     for (const target of targets) {
-      if (target.kind === 'image-project') continue;
+      if (target.kind === 'image-project') {
+        roots.push({ rootKind: 'image-project', rootId: target.id });
+        continue;
+      }
       if (target.kind === 'scenario-export') {
         const db = await initDB();
         const entry = parseScenarioExportEntry(await db.get(SCENARIO_EXPORTS_STORE, target.id));

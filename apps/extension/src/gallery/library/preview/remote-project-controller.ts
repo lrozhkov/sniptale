@@ -229,6 +229,8 @@ class RemoteProjectController {
       if (candidate.entityId !== completion.selection.rootId) return false;
       if (completion.selection.rootKind === 'scenario-project')
         return candidate.type === 'scenario';
+      if (completion.selection.rootKind === 'image-project')
+        return candidate.type === 'image-project';
       if (completion.selection.rootKind === 'video-project')
         return candidate.type === 'video-project';
       if (completion.selection.rootKind === 'video-review')

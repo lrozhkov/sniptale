@@ -83,6 +83,7 @@ import { fenceVideoReviewIdentity } from '../review-workspaces/identity';
 import {
   publishPreparedMediaSourceInTransaction,
   publishPreparedMediaProjectChildInTransaction,
+  replicaOriginalClaim,
 } from '../media-library/source-publication';
 import { createAggregatePresentationKey } from '../aggregate-presentations/contracts';
 import { parseAssetRef, parseAssetOwner } from '../assets/guards';
@@ -497,10 +498,7 @@ async function publishReplica(
   const prepared = {
     media: {
       ...rows.media,
-      ...(native?.savedIndependently === undefined
-        ? {}
-        : { savedIndependently: native.savedIndependently }),
-      ...(native?.originalSaveId === undefined ? {} : { originalSaveId: native.originalSaveId }),
+      ...replicaOriginalClaim(native, rows.savedIndependently),
     },
     original: { ref: rows.ref },
     ...('projectAsset' in rows ? { projectAsset: rows.projectAsset } : {}),

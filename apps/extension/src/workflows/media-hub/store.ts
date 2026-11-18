@@ -188,7 +188,10 @@ export async function setMediaOriginalClaim(
 ): Promise<void> {
   const changed = await withMediaHubWriteGuard(
     translate('shared.mediaHub.updateMediaMetadataAction'),
-    () => setMediaLibraryOriginalClaim(expected, savedIndependently)
+    () =>
+      runWithNativePublicationResources([{ rootKind: 'media', rootId: expected.id }], () =>
+        setMediaLibraryOriginalClaim(expected, savedIndependently)
+      )
   );
   if (changed) publishMediaHubLibraryChanged('update', [expected.id]);
 }

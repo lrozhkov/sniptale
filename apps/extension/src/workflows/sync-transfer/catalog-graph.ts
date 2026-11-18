@@ -178,12 +178,82 @@ function hasUnresolvedDeletion(
   return unresolved.size > 0;
 }
 
+function immutableImageVersion(
+  operation: SyncOperation,
+  metadata: ReturnType<typeof parsePortableMediaMetadata>,
+  entry: NonNullable<ReturnType<typeof parseMediaLibraryEntry>>
+): string | null {
+  if (
+    entry.id !== operation.rootId ||
+    entry.lifecycle?.storageClass !== 'library' ||
+    (entry.kind !== 'image' && entry.kind !== 'screenshot') ||
+    !entry.mimeType.startsWith('image/') ||
+    metadata.linkedSourceMediaId !== undefined
+  )
+    return null;
+  const { source } = entry;
+  let child;
+  if (source.kind === 'project-asset') {
+    const asset = metadata.projectAsset;
+    if (
+      !asset ||
+      asset.originMediaId !== undefined ||
+      asset.id !== source.projectAssetId ||
+      entry.id !== `project-asset:${asset.id}` ||
+      asset.size !== entry.size ||
+      asset.mimeType !== entry.mimeType
+    )
+      return null;
+    child = { id: asset.id, createdAt: asset.createdAt };
+  } else if (source.kind !== 'screenshot' && source.kind !== 'stored-asset') {
+    return null;
+  }
+  const object = operation.envelope?.objects.find(
+    (item) => item.objectId === metadata.originalObjectId
+  );
+  const digest = operation.objects.find((item) => item.objectId === metadata.originalObjectId);
+  if (
+    !object ||
+    !digest ||
+    object.size !== entry.size ||
+    object.mimeType !== entry.mimeType.split(';', 1)[0]!.trim().toLowerCase()
+  )
+    return null;
+  return JSON.stringify({
+    id: entry.id,
+    kind: entry.kind,
+    sourceKind: source.kind,
+    createdAt: entry.createdAt,
+    mimeType: entry.mimeType,
+    size: entry.size,
+    width: entry.width,
+    height: entry.height,
+    duration: entry.duration,
+    child,
+    sha256: digest.sha256,
+  });
+}
+
 function immutableMediaVersion(operation: SyncOperation): string | null {
   if (operation.rootKind !== 'media' || operation.kind === 'delete' || !operation.envelope)
     return null;
   try {
-    const metadata = parsePortableMediaMetadata(operation.envelope.metadata);
-    const entry = parseMediaLibraryEntry(metadata.entry);
+    const metadata = parsePortableMediaMetadata(operation.envelope.metadata, {
+      allowLibraryRelationships: operation.version === 4,
+    });
+    const entry = parseMediaLibraryEntry(
+      metadata.entry.source?.kind === 'stored-asset'
+        ? { ...metadata.entry, source: { kind: 'stored-asset', assetId: 'portable' } }
+        : metadata.entry
+    );
+    if (
+      entry &&
+      (entry.kind === 'image' || entry.kind === 'screenshot') &&
+      (entry.source.kind === 'screenshot' ||
+        entry.source.kind === 'stored-asset' ||
+        entry.source.kind === 'project-asset')
+    )
+      return immutableImageVersion(operation, metadata, entry);
     const recording = metadata.recording?.entry;
     const asset = metadata.projectAsset;
     const sourceMatches =
@@ -207,7 +277,14 @@ function immutableMediaVersion(operation: SyncOperation): string | null {
       entry.imageContentState === 'edited' ||
       entry.lifecycle?.storageClass !== 'library' ||
       Object.keys(metadata).some(
-        (key) => !['entry', 'projectAsset', 'recording', 'originalObjectId'].includes(key)
+        (key) =>
+          ![
+            'entry',
+            'projectAsset',
+            'recording',
+            'originalObjectId',
+            'savedIndependently',
+          ].includes(key)
       )
     )
       return null;

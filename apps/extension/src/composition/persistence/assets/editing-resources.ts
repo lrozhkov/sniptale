@@ -58,7 +58,7 @@ interface NativeEditingResources {
   inlineMediaIds: string[];
 }
 export interface NativeEditingRoot {
-  rootKind: 'media' | 'video-review' | 'video-project' | 'scenario-project';
+  rootKind: 'media' | 'image-project' | 'video-review' | 'video-project' | 'scenario-project';
   rootId: string;
 }
 
@@ -76,6 +76,9 @@ export async function collectNativeEditingResources(
   switch (root.rootKind) {
     case 'media':
       await projection.media(root.rootId);
+      break;
+    case 'image-project':
+      await projection.imageProject(root.rootId);
       break;
     case 'video-review':
       await projection.review(root.rootId);
@@ -220,6 +223,16 @@ class EditingResourceProjection {
         workspace.aggregateId === media.id &&
         workspace.revision === media.workspaceRevision
     );
+    for (const asset of imageWorkspaceAssetBindings(workspace)) await this.ref(asset.assetId);
+  }
+
+  async imageProject(id: string): Promise<void> {
+    const workspace = parseImageWorkspaceEntry(
+      await this.tx.objectStore(stores.IMAGE_WORKSPACES_STORE).get(id)
+    );
+    requireResource(workspace?.sourceMediaId && workspace.aggregateId === id);
+    const original = await this.media(workspace.sourceMediaId);
+    requireResource(original.kind === 'image' || original.kind === 'screenshot');
     for (const asset of imageWorkspaceAssetBindings(workspace)) await this.ref(asset.assetId);
   }
 

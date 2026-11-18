@@ -19,12 +19,10 @@ import { parseAssetRef } from '../assets/guards';
 import { readAssetFile, MissingAssetObjectError } from '../assets';
 import type { MediaLibraryEntry } from '../media-library/contracts';
 import type { LibraryLifecycle } from '../library-lifecycle/contracts';
-import { SYNC_CAPTURE_STORE } from '../infrastructure/indexed-db/core.stores';
 import {
   ROW_REFERENCE_INDEX,
   rowReferenceKey,
 } from '../infrastructure/indexed-db/row-index-contract';
-import { readEnabledCaptureProfile } from '../sync-capture/capture';
 
 const logger = createLogger({ namespace: 'ImageWorkspacesDb' });
 
@@ -241,27 +239,18 @@ export async function listImageWorkspaceProjectSummaries(): Promise<
 }
 
 /** Read only projects bound to the selected original, with no hydration or publication. */
-export async function listImageProjectsForEditing(mediaId: string): Promise<{
-  canCreateIndependentProject: boolean;
-  projects: { id: string; name: string; updatedAt: number }[];
-}> {
+export async function listImageProjectsForEditing(
+  mediaId: string
+): Promise<{ id: string; name: string; updatedAt: number }[]> {
   const db = await initDB();
-  const tx = db.transaction(
-    [MEDIA_LIBRARY_STORE, IMAGE_WORKSPACES_STORE, SYNC_CAPTURE_STORE],
-    'readonly'
-  );
+  const tx = db.transaction([MEDIA_LIBRARY_STORE, IMAGE_WORKSPACES_STORE], 'readonly');
   const store = tx.objectStore(IMAGE_WORKSPACES_STORE);
   const originalRead: Promise<unknown> = tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId);
   const projectsRead: Promise<unknown[]> = store
     .index(ROW_REFERENCE_INDEX)
     .getAll(rowReferenceKey('media', mediaId));
   const legacyRead: Promise<unknown> = store.get(mediaId);
-  const [raw, rows, legacy, profile] = await Promise.all([
-    originalRead,
-    projectsRead,
-    legacyRead,
-    readEnabledCaptureProfile(tx),
-  ]);
+  const [raw, rows, legacy] = await Promise.all([originalRead, projectsRead, legacyRead]);
   await tx.done;
   const original = parseMediaLibraryEntry(raw);
   if (
@@ -293,10 +282,7 @@ export async function listImageProjectsForEditing(mediaId: string): Promise<{
       updatedAt: previous.updatedAt,
     });
   }
-  return {
-    canCreateIndependentProject: profile === null,
-    projects: projects.sort((left, right) => right.updatedAt - left.updatedAt),
-  };
+  return projects.sort((left, right) => right.updatedAt - left.updatedAt);
 }
 
 export async function hydrateImageWorkspaces(

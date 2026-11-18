@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -30,9 +31,17 @@ vi.mock('../../../composition/persistence/review-workspaces/summaries', () => ({
   listVideoProjectsForEditing: vi.fn(),
 }));
 
+vi.mock('@sniptale/platform/browser/tabs', async (original) => {
+  const actual = await original<typeof import('@sniptale/platform/browser/tabs')>();
+  return { ...actual, browserTabs: { ...actual.browserTabs, create: vi.fn() } };
+});
+vi.mock('../../../platform/navigation/extension-pages/editor', () => ({
+  buildEditorUrl: vi.fn(() => 'https://example.test/editor'),
+}));
+
 vi.mock('../../../composition/persistence/image-workspaces/read', async (original) => ({
   ...(await original()),
-  listImageProjectsForEditing: async () => ({ canCreateIndependentProject: false, projects: [] }),
+  listImageProjectsForEditing: async () => [],
 }));
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
@@ -649,6 +658,7 @@ it('omits redundant headings for one file action and distinguishes save-copy fro
 });
 
 it('uses the same navigation icon for image, recording and project editors', async () => {
+  vi.mocked(browserTabs.create).mockClear();
   const container = document.createElement('div');
   const root = createRoot(container);
   const props = createProps();
@@ -667,7 +677,10 @@ it('uses the same navigation icon for image, recording and project editors', asy
     expect(open?.querySelector('.lucide-arrow-up-right')).not.toBeNull();
     await act(async () => open?.click());
   }
-  expect(props.onEdit).toHaveBeenCalledTimes(3);
+  expect(props.onEdit).toHaveBeenCalledTimes(2);
+  expect(browserTabs.create).toHaveBeenCalledExactlyOnceWith({
+    url: 'https://example.test/editor',
+  });
   act(() => root.unmount());
 });
 

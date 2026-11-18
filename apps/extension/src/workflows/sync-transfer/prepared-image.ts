@@ -12,7 +12,13 @@ import { decodePortableEditorDocument } from '../media-hub-backup/v6/root-codecs
 
 type NativeImageRows = Pick<
   ApplyPreparedImageReplicaInput,
-  'media' | 'originalRef' | 'projectAsset' | 'workspace' | 'documentRefs' | 'presentation'
+  | 'media'
+  | 'savedIndependently'
+  | 'originalRef'
+  | 'projectAsset'
+  | 'workspace'
+  | 'documentRefs'
+  | 'presentation'
 >;
 
 /** Decode existing portable image fields into native JSON journal rows without reading bytes. */
@@ -22,8 +28,11 @@ export function preparePortableImageRows(
   omitPresentation = false
 ): NativeImageRows {
   const originalRef = refFor(metadata.originalObjectId);
+  const sourceMediaId = metadata.linkedSourceMediaId;
+  const projectId = metadata.entry.id;
   const media = parseMediaLibraryEntry({
     ...metadata.entry,
+    id: sourceMediaId ?? projectId,
     ...(metadata.entry.source.kind === 'stored-asset'
       ? { source: { kind: 'stored-asset', assetId: originalRef.assetId } }
       : {}),
@@ -40,7 +49,7 @@ export function preparePortableImageRows(
   const projectAsset = preparePortableMediaOriginal({ metadata, media, originalRef });
   if ((media.source.kind === 'project-asset') !== Boolean(projectAsset))
     throw new Error('Portable Image source child differs from its root.');
-  const revision = media.workspaceRevision ?? 0;
+  const revision = (sourceMediaId ? metadata.workspace?.revision : media.workspaceRevision) ?? 0;
   const assets = metadata.workspace?.document.assets ?? [];
   const history = metadata.workspace?.history;
   const ids = new Set([
@@ -60,6 +69,7 @@ export function preparePortableImageRows(
     metadata.workspace && document
       ? parseImageWorkspaceEntry({
           ...metadata.workspace,
+          ...(sourceMediaId ? { sourceMediaId, lifecycle: metadata.entry.lifecycle } : {}),
           document,
           ...(history
             ? { history: decodePortableImageHistory({ history, assetsByObjectId }) }
@@ -68,7 +78,7 @@ export function preparePortableImageRows(
       : null;
   if (
     metadata.workspace &&
-    (!workspace || workspace.aggregateId !== media.id || workspace.revision !== revision)
+    (!workspace || workspace.aggregateId !== projectId || workspace.revision !== revision)
   )
     throw new Error('Portable image workspace differs from its root.');
   let presentation: NativeImageRows['presentation'] = null;
@@ -80,7 +90,7 @@ export function preparePortableImageRows(
     });
     if (
       !parsed ||
-      parsed.aggregateId !== media.id ||
+      parsed.aggregateId !== projectId ||
       parsed.aggregateKind !== 'image' ||
       !Number.isSafeInteger(parsed.presentationRevision) ||
       parsed.presentationRevision > revision
@@ -98,6 +108,9 @@ export function preparePortableImageRows(
   const { blob: _blob, ...entry } = media;
   return {
     media: entry,
+    ...(metadata.savedIndependently === undefined
+      ? {}
+      : { savedIndependently: metadata.savedIndependently }),
     originalRef,
     ...(projectAsset ? { projectAsset } : {}),
     workspace,

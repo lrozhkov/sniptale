@@ -155,6 +155,6 @@ export interface ArchiveCentralDirectoryIdentity {
 
 /** Product archive preparation uses logical roots; inventory remains the selection authority. */
 export type MediaHubBackupRootPreparation = (root: {
-  rootKind: 'media' | 'video-review' | 'video-project' | 'scenario-project';
+  rootKind: 'media' | 'image-project' | 'video-review' | 'video-project' | 'scenario-project';
   rootId: string;
 }) => Promise<void>;
