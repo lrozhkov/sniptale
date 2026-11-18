@@ -1,3 +1,4 @@
+import { legacyQuickEditProjectId } from '../../composition/persistence/media-library/legacy-projects';
 import eventsFixture from '../../features/video/project/recording-events/fixtures.json';
 import { VideoWorkspaceError } from '../../composition/persistence/review-workspaces/store';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -10,10 +11,14 @@ const mocks = vi.hoisted(() => ({
   open: vi.fn(),
   read: vi.fn(),
   publish: vi.fn(),
+  prepare: vi.fn(),
   dispose: vi.fn(),
   duration: vi.fn(),
   metadataDuration: vi.fn(),
   metadata: vi.fn(),
+}));
+vi.mock('../sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: mocks.prepare,
 }));
 vi.mock('../../composition/persistence/media-library', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../composition/persistence/media-library')>()),
@@ -344,4 +349,25 @@ it('rejects a replacement recording before reading late history', async () => {
   expect(mocks.telemetry).not.toHaveBeenCalled();
   expect(mocks.open).not.toHaveBeenCalled();
   expect(mocks.dispose).not.toHaveBeenCalled();
+});
+
+it('resumes the migrated Quick Edit project when a legacy link still names its original', async () => {
+  const sourceMediaId = 'recording:r';
+  const id = legacyQuickEditProjectId({
+    id: sourceMediaId,
+    source: { kind: 'recording', recordingId: 'r' },
+  });
+  mocks.read.mockResolvedValueOnce(null).mockResolvedValueOnce({
+    workspace: { aggregateId: id, sourceMediaId },
+    draft: null,
+  });
+  const loaded = await loadVideoReviewSource(sourceMediaId, new AbortController().signal);
+  expect(mocks.prepare).toHaveBeenCalledExactlyOnceWith({ rootKind: 'video-review', rootId: id });
+  expect(mocks.open).toHaveBeenCalledExactlyOnceWith({
+    aggregateId: id,
+    requireExisting: true,
+    source: loaded.source,
+    expectedSourceAssetId: 'immutable-file',
+  });
+  expect(mocks.publish).not.toHaveBeenCalled();
 });

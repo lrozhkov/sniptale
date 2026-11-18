@@ -52,7 +52,7 @@ interface AssetSnapshotDatabase {
   };
 }
 
-type SnapshotTransaction = ReturnType<AssetSnapshotDatabase['transaction']>;
+type SnapshotTransaction = Pick<ReturnType<AssetSnapshotDatabase['transaction']>, 'objectStore'>;
 interface SourceBatch {
   name: string;
   rows: unknown[];
@@ -170,6 +170,39 @@ async function resolveProjectedBindings(
   }
 }
 
+/** Inspect the caller's native snapshot, including uncommitted changes to its metadata. */
+export async function collectTargetAssetSnapshotInTransaction(
+  tx: SnapshotTransaction,
+  assetIds: Iterable<string>,
+  signal?: AbortSignal
+): Promise<Snapshot> {
+  const ids = [...new Set(assetIds)];
+  const snapshot = emptySnapshot();
+  if (!ids.length) return snapshot;
+  const unknown = await Promise.all(
+    ['asset_refs', 'asset_owners', ...CLAIM_STORES].map((name) =>
+      tx.objectStore(name).index(ROW_REFERENCE_INDEX).getKey(UNKNOWN_ASSET_REFERENCES)
+    )
+  );
+  if (unknown.some((key) => key !== undefined)) snapshot.authorityValid = false;
+  const actual = new Map<string, AssetOwner>();
+  const expected = new Map<string, AssetOwner>();
+  for (const id of ids) {
+    signal?.throwIfAborted();
+    const evidence = await readAssetEvidence(tx, id);
+    admitRef(snapshot, evidence.ref, id);
+    for (const row of evidence.owners) admitActualOwner(snapshot, actual, row, id);
+    for (const batch of evidence.batches) admitSourceBatch(snapshot, expected, batch);
+  }
+  await resolveProjectedBindings(tx, snapshot, expected, actual);
+  snapshot.expectedOwners = [...expected.values()];
+  snapshot.expectedOwnerAssets = new Map(
+    snapshot.expectedOwners.map((owner) => [ownerKey(owner), owner.assetId])
+  );
+  snapshot.owners = [...actual.values()];
+  return snapshot;
+}
+
 /** Prepare only selected objects' durable evidence in one native snapshot. Missing coverage retains bytes. */
 export async function collectTargetAssetSnapshot(
   db: AssetSnapshotDatabase,
@@ -177,34 +210,12 @@ export async function collectTargetAssetSnapshot(
   signal?: AbortSignal
 ): Promise<Snapshot> {
   const ids = [...new Set(assetIds)];
-  const snapshot = emptySnapshot();
-  if (!ids.length) return snapshot;
+  if (!ids.length) return emptySnapshot();
   signal?.throwIfAborted();
   const tx = db.transaction(SNAPSHOT_STORES, 'readonly');
   void tx.done.catch(() => undefined);
   try {
-    // Canonical writes and migration stamp unknown reference evidence explicitly.
-    const unknown = await Promise.all(
-      ['asset_refs', 'asset_owners', ...CLAIM_STORES].map((name) =>
-        tx.objectStore(name).index(ROW_REFERENCE_INDEX).getKey(UNKNOWN_ASSET_REFERENCES)
-      )
-    );
-    if (unknown.some((key) => key !== undefined)) snapshot.authorityValid = false;
-    const actual = new Map<string, AssetOwner>();
-    const expected = new Map<string, AssetOwner>();
-    for (const id of ids) {
-      signal?.throwIfAborted();
-      const evidence = await readAssetEvidence(tx, id);
-      admitRef(snapshot, evidence.ref, id);
-      for (const row of evidence.owners) admitActualOwner(snapshot, actual, row, id);
-      for (const batch of evidence.batches) admitSourceBatch(snapshot, expected, batch);
-    }
-    await resolveProjectedBindings(tx, snapshot, expected, actual);
-    snapshot.expectedOwners = [...expected.values()];
-    snapshot.expectedOwnerAssets = new Map(
-      snapshot.expectedOwners.map((owner) => [ownerKey(owner), owner.assetId])
-    );
-    snapshot.owners = [...actual.values()];
+    const snapshot = await collectTargetAssetSnapshotInTransaction(tx, ids, signal);
     await tx.done;
     signal?.throwIfAborted();
     return snapshot;

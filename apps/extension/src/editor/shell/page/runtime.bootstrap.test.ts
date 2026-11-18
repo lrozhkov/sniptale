@@ -1,10 +1,15 @@
+import {
+  MissingEditorDraftAssetError,
+  type EditorImageRecovery,
+} from '../../document/page-session';
+import { legacyImageProjectId } from '../../../composition/persistence/media-library/legacy-projects';
+const replaceEditorPageAggregateIdMock = vi.hoisted(() => vi.fn());
 import { describe, expect, it, vi } from 'vitest';
 const {
   ensureEditorPageAggregateIdMock,
   readEditorPageLocationStateMock,
   resolveEditorPageRestoreSourceMock,
   waitForEditorControllerCanvasMock,
-  readImageOriginalSourceMock,
   restoreImageAggregateOriginalMock,
   getAggregatePresentationMock,
 } = vi.hoisted(() => ({
@@ -12,7 +17,6 @@ const {
   readEditorPageLocationStateMock: vi.fn(),
   resolveEditorPageRestoreSourceMock: vi.fn(),
   waitForEditorControllerCanvasMock: vi.fn(),
-  readImageOriginalSourceMock: vi.fn(),
   restoreImageAggregateOriginalMock: vi.fn(),
   getAggregatePresentationMock: vi.fn(),
 }));
@@ -22,13 +26,6 @@ vi.mock('../../../composition/persistence/aggregate-presentations', async (impor
     typeof import('../../../composition/persistence/aggregate-presentations')
   >()),
   getAggregatePresentation: getAggregatePresentationMock,
-}));
-
-vi.mock('../../../composition/persistence/image-workspaces/read', async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import('../../../composition/persistence/image-workspaces/read')
-  >()),
-  readImageOriginalSource: readImageOriginalSourceMock,
 }));
 
 vi.mock('../../../composition/persistence/image-aggregates', async (importOriginal) => ({
@@ -43,6 +40,7 @@ vi.mock('../../controller/canvas-ready', () => ({
 vi.mock('../../document/page-session', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../document/page-session')>()),
   ensureEditorPageAggregateId: ensureEditorPageAggregateIdMock,
+  replaceEditorPageAggregateId: replaceEditorPageAggregateIdMock,
   readEditorPageLocationState: readEditorPageLocationStateMock,
   resolveEditorPageRestoreSource: resolveEditorPageRestoreSourceMock,
 }));
@@ -199,6 +197,7 @@ async function verifiesDraftRestore() {
   resolveEditorPageRestoreSourceMock.mockResolvedValue({
     kind: 'draft',
     entry: {
+      aggregateId: 'session-1',
       document: { version: 2 },
       sourceTitle: 'Draft title',
       createdAt: 222,
@@ -231,7 +230,7 @@ async function verifiesDraftPreviewRetryAfterHydration() {
   getAggregatePresentationMock.mockResolvedValue({ presentationRevision: 3 });
   resolveEditorPageRestoreSourceMock.mockResolvedValue({
     kind: 'draft',
-    entry: { document: { version: 2 }, sourceTitle: 'Draft' },
+    entry: { aggregateId: 'session-1', document: { version: 2 }, sourceTitle: 'Draft' },
     capturedAt: 1,
   });
   await bootstrapEditorPageSession(runtime, { autosaveService, controller } as never);
@@ -302,23 +301,31 @@ async function verifiesAssetRestore() {
 
 async function verifiesExplicitRecovery() {
   readEditorPageLocationStateMock.mockReturnValue({ assetId: 'image-1', bootstrapId: null });
-  readImageOriginalSourceMock.mockResolvedValue({
-    asset: { id: 'image-1', workspaceRevision: 4 },
-    sourceGeneration: 'opened-generation',
-  });
   restoreImageAggregateOriginalMock.mockResolvedValue({ revision: 5 });
-
-  await recoverMissingEditorPageDocument();
-
-  expect(restoreImageAggregateOriginalMock).toHaveBeenCalledOnce();
-  expect(restoreImageAggregateOriginalMock).toHaveBeenCalledWith('image-1', 4, 'opened-generation');
+  await recoverMissingEditorPageDocument({
+    routeAssetId: 'image-1',
+    aggregateId: 'image-1',
+    revision: 4,
+    generation: 'opened-generation',
+  });
+  expect(restoreImageAggregateOriginalMock).toHaveBeenCalledExactlyOnceWith(
+    'image-1',
+    4,
+    'opened-generation',
+    undefined
+  );
 }
 
-async function verifiesRecoveryRequiresExistingLibraryEntry() {
-  readEditorPageLocationStateMock.mockReturnValue({ assetId: 'image-1', bootstrapId: null });
-  readImageOriginalSourceMock.mockResolvedValue({ asset: undefined, sourceGeneration: null });
-
-  await expect(recoverMissingEditorPageDocument()).rejects.toThrow();
+async function verifiesRecoveryRequiresSelectedLibraryEntry() {
+  readEditorPageLocationStateMock.mockReturnValue({ assetId: 'image-2', bootstrapId: null });
+  await expect(
+    recoverMissingEditorPageDocument({
+      routeAssetId: 'image-1',
+      aggregateId: 'image-1',
+      revision: 4,
+      generation: 'old-generation',
+    })
+  ).rejects.toThrow();
   expect(restoreImageAggregateOriginalMock).not.toHaveBeenCalled();
 }
 
@@ -407,7 +414,7 @@ describe('editor-page.runtime bootstrap flows', () => {
   );
   it(
     'preserves a damaged document when its library entry is absent',
-    verifiesRecoveryRequiresExistingLibraryEntry
+    verifiesRecoveryRequiresSelectedLibraryEntry
   );
 
   it(
@@ -497,4 +504,63 @@ it('attaches document autosave only to the standalone controller', () => {
   const standalone = createEditorPageServices();
   expect(standalone.controller.autosaveService).toBe(standalone.autosaveService);
   standalone.autosaveService.dispose();
+});
+
+it('recovers an old URL into its exact project and opens the reset document on the first retry', async () => {
+  vi.clearAllMocks();
+  const originalId = 'legacy-original';
+  const projectId = legacyImageProjectId(originalId);
+  const controller = createEditorPageController();
+  const autosaveService = createEditorPageAutosaveService();
+  const runtime = createEditorPageRuntime();
+  const services = {
+    autosaveService,
+    bootstrapRevision: 0,
+    controller,
+    recovery: undefined as EditorImageRecovery | undefined,
+  };
+  let currentId = originalId;
+  ensureEditorPageAggregateIdMock.mockImplementation(() => currentId);
+  readEditorPageLocationStateMock.mockImplementation(() => ({
+    assetId: currentId,
+    bootstrapId: null,
+  }));
+  replaceEditorPageAggregateIdMock.mockImplementationOnce((id) => {
+    currentId = id;
+  });
+  const recovery = {
+    routeAssetId: originalId,
+    aggregateId: projectId,
+    sourceMediaId: originalId,
+    revision: 5,
+    generation: 'observed-project-generation',
+  };
+  const missing = new MissingEditorDraftAssetError(recovery);
+  resolveEditorPageRestoreSourceMock.mockRejectedValueOnce(missing);
+  await expect(bootstrapEditorPageSession(runtime, services as never)).rejects.toBe(missing);
+  expect(services.recovery).toEqual(recovery);
+  restoreImageAggregateOriginalMock.mockResolvedValueOnce({ revision: 6 });
+  await recoverMissingEditorPageDocument(recovery);
+  expect(restoreImageAggregateOriginalMock).toHaveBeenCalledExactlyOnceWith(
+    projectId,
+    5,
+    'observed-project-generation',
+    originalId
+  );
+  expect(currentId).toBe(projectId);
+  const document = createEditorDocumentFixture();
+  resolveEditorPageRestoreSourceMock.mockResolvedValueOnce({
+    kind: 'draft',
+    capturedAt: 40,
+    entry: { aggregateId: projectId, document },
+  });
+  await bootstrapEditorPageSession(runtime, services as never);
+  expect(resolveEditorPageRestoreSourceMock).toHaveBeenLastCalledWith(
+    { assetId: projectId, bootstrapId: null },
+    projectId,
+    autosaveService,
+    expect.any(Function)
+  );
+  expect(controller.loadDocument).toHaveBeenCalledExactlyOnceWith(document);
+  expect(services.recovery).toBeUndefined();
 });

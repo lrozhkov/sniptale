@@ -79,6 +79,17 @@ it('presents two saved image projects and one original as independent cards', ()
   expect(items.every(isGallerySelectableItem)).toBe(true);
 });
 
+it('exposes a thumbnail for a migrated inline original without a presentation', () => {
+  const [item] = createGalleryItems({
+    mediaItems: [createMediaLibraryItem({ imageContentState: 'original' })],
+    scenarioProjects: [],
+    scenarioExportsByProjectId: new Map(),
+    thumbnailIds: new Set(),
+    videoProjects: [],
+  });
+  expect(item).toMatchObject({ id: 'asset-1', hasThumbnail: true, presentationRevision: null });
+});
+
 it('keeps stored scenario images on the media thumbnail path without an aggregate revision', () => {
   const [item] = createGalleryItems({
     mediaItems: [

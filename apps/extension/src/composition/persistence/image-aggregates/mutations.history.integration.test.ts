@@ -1,4 +1,10 @@
 import {
+  REFERENCE_INDEX_STORES,
+  ROW_REFERENCE_FIELD,
+} from '../infrastructure/indexed-db/row-index-contract';
+import { legacyImageProjectId } from '../media-library/legacy-projects';
+import { installLegacyLibraryProjectMigration } from '../infrastructure/indexed-db/legacy-library-projects-migration';
+import {
   retireImageWorkspaceIdentity,
   restoreImageWorkspaceIdentity,
 } from '../image-workspaces/identity';
@@ -1704,4 +1710,314 @@ it('retires legacy JSON ownership atomically when the next save publishes one bu
   );
   expect((await database().getAll('asset_operations')).length).toBeGreaterThan(0);
   expect((await readImageWorkspace('image'))?.history).toEqual(checkpoint);
+});
+
+async function upgradeLegacyImageFixture() {
+  raw.close();
+  raw = await openDB(databaseName, 2, {
+    upgrade(db, _oldVersion, _newVersion, tx) {
+      for (const name of [...REFERENCE_INDEX_STORES, 'editor_vector_library']) {
+        const store = db.objectStoreNames.contains(name)
+          ? tx.objectStore(name)
+          : db.createObjectStore(name);
+        if (!store.indexNames.contains(ROW_REFERENCE_INDEX))
+          store.createIndex(ROW_REFERENCE_INDEX, ROW_REFERENCE_FIELD, { multiEntry: true });
+      }
+      for (const name of ['recording_events', 'recording_cursor_trajectories']) {
+        const store = db.objectStoreNames.contains(name)
+          ? tx.objectStore(name)
+          : db.createObjectStore(name);
+        if (!store.indexNames.contains('snapshotAssetId'))
+          store.createIndex('snapshotAssetId', 'snapshotAssetId');
+      }
+      installLegacyLibraryProjectMigration(tx);
+    },
+  });
+  io.db = withIndexedRowProjections(raw);
+}
+
+it.each([
+  'pending edit',
+  'pending first edit',
+  'committed edit',
+  'committed new file',
+  'pending edit with source trashed',
+  'pending edit trashed before upgrade',
+  'superseded edit',
+  'discarded first open',
+] as const)(
+  'recovers a legacy Image %s through the native upgrade without rewriting the original',
+  async (interruption) => {
+    const firstIsEmpty = interruption === 'pending first edit';
+    const discarded = interruption === 'discarded first open';
+    const newFile = interruption === 'committed new file';
+    const committed = interruption === 'committed edit' || newFile || discarded;
+    if (newFile) await database().delete('media_library', 'image');
+    if (!committed)
+      await commitImageWorkspace({
+        aggregateId: 'image',
+        document: document(firstIsEmpty ? 'image.png' : 'Previous edit'),
+        expectedRevision: 0,
+        requireExistingRoot: true,
+        ...(firstIsEmpty ? { imageContentState: 'original' } : {}),
+      });
+    if (committed) io.loseAck = true;
+    else
+      io.beforePublish = async () => {
+        throw new Error('Interrupted before native publication');
+      };
+    await expect(
+      commitImageWorkspace({
+        aggregateId: 'image',
+        document: document(discarded ? 'image.png' : 'Recovered edit'),
+        expectedRevision: committed ? 0 : 1,
+        ...(newFile ? { requireMissingRoot: true } : { requireExistingRoot: true }),
+        ...(discarded ? { imageContentState: 'original' } : {}),
+      })
+    ).rejects.toThrow(/Lost acknowledgement|Interrupted/);
+    const [journal] = io.journals.values();
+    if (!journal) throw new Error('Ready journal was lost before upgrade.');
+    const inheritedTrash = interruption === 'pending edit trashed before upgrade';
+    if (inheritedTrash) await moveStoredItemsToTrash([{ kind: 'media', id: 'image' }], 10);
+    const previous = parseMediaLibraryEntry(await database().get('media_library', 'image'));
+    io.beforePublish = null;
+    await upgradeLegacyImageFixture();
+    const targetId = legacyImageProjectId('image');
+    const superseded = interruption === 'superseded edit';
+    if (superseded) {
+      const tx = database().transaction('image_workspace_identities', 'readwrite');
+      await restoreImageWorkspaceIdentity(tx, 'image');
+      await tx.done;
+    }
+    const trashSource = interruption === 'pending edit with source trashed';
+    if (trashSource) {
+      const original = parseMediaLibraryEntry(await database().get('media_library', 'image'));
+      if (!original) throw new Error('Migrated source was lost.');
+      await moveStoredItemsToTrash([{ kind: 'media', id: original.id }], 10);
+    }
+    const before = await readStoredImageWorkspace(targetId);
+    const beforeSource = parseMediaLibraryEntry(await database().get('media_library', 'image'));
+    if (trashSource || inheritedTrash)
+      expect(beforeSource?.lifecycle?.trashedAt).toEqual(expect.any(Number));
+    const result = await imageWorkspacePublicationAdapter.publish(journal);
+    expect(result).toBeUndefined();
+    const after = await readStoredImageWorkspace(targetId);
+    if (discarded || superseded) {
+      expect(after).toEqual(before);
+      for (const ref of journal.assetRefs) expect(io.files.has(ref.assetId)).toBe(discarded);
+      expect(await readStoredImageWorkspace('image')).toBeUndefined();
+      return;
+    }
+    expect(after).toMatchObject({
+      aggregateId: targetId,
+      sourceMediaId: 'image',
+      publicationId: journal.journalId,
+      revision: interruption === 'pending edit' || trashSource || inheritedTrash ? 2 : 1,
+      document: { displayName: 'Recovered edit' },
+    });
+    const blobs = new Map(io.files);
+    await imageWorkspacePublicationAdapter.publish(journal);
+    expect(await readStoredImageWorkspace(targetId)).toEqual(after);
+    expect(io.files).toEqual(blobs);
+    for (const ref of journal.assetRefs) expect(io.files.has(ref.assetId)).toBe(true);
+    expect(await readStoredImageWorkspace('image')).toBeUndefined();
+    const original = parseMediaLibraryEntry(await database().get('media_library', 'image'));
+    expect(original).toMatchObject({ imageContentState: 'original', workspaceRevision: 0 });
+    expect(await original?.blob?.text()).toBe(await previous?.blob?.text());
+    if (trashSource || inheritedTrash) expect(original?.lifecycle).toEqual(beforeSource?.lifecycle);
+    if (inheritedTrash)
+      expect(after?.lifecycle?.trashedAt).toBe(beforeSource?.lifecycle?.trashedAt);
+  }
+);
+
+it('saves a Gallery copy of an inline original without an aggregate presentation', async () => {
+  const original = await database().get('media_library', 'image');
+  await database().put('media_library', { ...original, imageContentState: 'original' });
+
+  await expect(
+    copyImageAggregate({
+      aggregateId: 'image',
+      expectedWorkspaceRevision: 0,
+      targetAggregateId: 'original-copy',
+    })
+  ).resolves.toBe('original-copy');
+
+  const copy = await database().get('aggregate_presentations', ['image', 'original-copy']);
+  expect(await copy?.previewBlob.text()).toBe('original');
+  expect(await database().get('image_workspaces', 'image')).toBeUndefined();
+  expect(await database().get('aggregate_presentations', ['image', 'image'])).toBeUndefined();
+});
+
+it.each(['pending', 'source replaced', 'lost acknowledgement'] as const)(
+  'recovers a legacy Gallery copy after %s',
+  async (state) => {
+    const first = await commitImageWorkspace({
+      aggregateId: 'image',
+      document: document('Copy source'),
+      expectedRevision: 0,
+      requireExistingRoot: true,
+    });
+    await commitImagePresentation({
+      aggregateId: 'image',
+      expectedWorkspaceRevision: first.revision,
+      previewBlob: new Blob(['preview'], { type: 'image/png' }),
+      thumbnailBlob: new Blob(['thumbnail'], { type: 'image/png' }),
+    });
+    if (state === 'lost acknowledgement') io.loseAck = true;
+    else
+      io.beforePublish = async () => {
+        throw new Error('Copy stopped after staging');
+      };
+    await expect(
+      copyImageAggregate({
+        aggregateId: 'image',
+        expectedWorkspaceRevision: first.revision,
+        targetAggregateId: 'copied',
+      })
+    ).rejects.toThrow(/Lost acknowledgement|Copy stopped after staging/);
+    const [journal] = io.journals.values();
+    if (!journal) throw new Error('Ready copy was lost.');
+    io.beforePublish = null;
+    await upgradeLegacyImageFixture();
+    if (state === 'source replaced') {
+      const target = legacyImageProjectId('image');
+      const tx = database().transaction('image_workspace_identities', 'readwrite');
+      await restoreImageWorkspaceIdentity(tx, target);
+      await tx.done;
+    }
+    const result = await imageWorkspacePublicationAdapter.publish(journal);
+    const copyId = state === 'lost acknowledgement' ? legacyImageProjectId('copied') : 'copied';
+    const copy = await readStoredImageWorkspace(copyId);
+    if (state === 'source replaced') {
+      expect(result).toBe('defer');
+      expect(copy).toBeUndefined();
+    } else {
+      expect(result).toBeUndefined();
+      expect(copy).toMatchObject({ document: { displayName: 'Copy source' } });
+    }
+    for (const ref of journal.assetRefs) expect(io.files.has(ref.assetId)).toBe(true);
+    expect(
+      await commitImageWorkspace({
+        aggregateId: 'unrelated',
+        document: document('Unrelated save'),
+        expectedRevision: 0,
+      })
+    ).toMatchObject({ revision: 1 });
+  }
+);
+
+it('resets a damaged migrated Image workspace to its original without changing the original', async () => {
+  await commitImageWorkspace({
+    aggregateId: 'image',
+    document: document('Damaged edit'),
+    history: history(),
+    expectedRevision: 0,
+    requireExistingRoot: true,
+  });
+  await upgradeLegacyImageFixture();
+  const id = legacyImageProjectId('image');
+  const stored = await readStoredImageWorkspace(id);
+  if (!stored?.history?.snapshots[0]) throw new Error('Expected native history evidence.');
+  io.files.delete(stored.history.snapshots[0].assetId);
+  await expect(readImageWorkspace(id)).rejects.toThrow();
+  const before = parseMediaLibraryEntry(await database().get('media_library', 'image'));
+  expect(
+    await restoreImageAggregateOriginal(id, stored.revision, undefined, 'image')
+  ).toMatchObject({ revision: stored.revision + 1 });
+  expect(await readImageWorkspace(id)).toMatchObject({
+    sourceMediaId: 'image',
+    revision: stored.revision + 1,
+    document: { sourceName: 'image.png' },
+  });
+  expect((await readImageWorkspace(id))?.history).toBeUndefined();
+  const after = parseMediaLibraryEntry(await database().get('media_library', 'image'));
+  expect(after).toEqual(before);
+  expect(await after?.blob?.text()).toBe(await before?.blob?.text());
+});
+
+it('refuses a delayed original reset when the same project revision enters a new lifetime', async () => {
+  await commitImageWorkspace({
+    aggregateId: 'image',
+    document: document('Preserve this edit'),
+    history: history(),
+    expectedRevision: 0,
+    requireExistingRoot: true,
+  });
+  await upgradeLegacyImageFixture();
+  const id = legacyImageProjectId('image');
+  const row = await readStoredImageWorkspace(id);
+  const original = parseMediaLibraryEntry(await database().get('media_library', 'image'));
+  if (!row?.lifecycle || !original?.blob) throw new Error('Missing migrated image fixture.');
+  const assetId = 'original-for-delayed-reset';
+  io.files.set(assetId, original.blob);
+  await database().put('asset_refs', {
+    assetId,
+    mimeType: original.mimeType,
+    size: original.size,
+    createdAt: 1,
+    sha256: null,
+    location: { kind: 'opfs', objectKey: 'objects/original-for-delayed-reset' },
+  });
+  await database().put('asset_owners', {
+    assetId,
+    ownerKind: 'media-library',
+    ownerId: original.id,
+    role: 'source',
+  });
+  const { blob: _inline, ...originalMetadata } = original;
+  await database().put('media_library', {
+    ...originalMetadata,
+    source: { kind: 'stored-asset', assetId },
+  });
+  const observed = await readImageOriginalSource(id, { includeBlob: false });
+  const entered = gate();
+  const resume = gate();
+  const readFile = io.read.getMockImplementation()!;
+  io.read.mockImplementationOnce(async (ref: AssetRef, filename: string) => {
+    entered.release();
+    await resume.promise;
+    return readFile(ref, filename);
+  });
+  const pending = restoreImageAggregateOriginal(id, row.revision, undefined, original.id);
+  const result = expect(pending).rejects.toMatchObject({ name: 'StaleImageWorkspaceError' });
+  try {
+    await entered.promise;
+    await moveStoredItemsToTrash(
+      [
+        {
+          kind: 'image-project',
+          id,
+          expectedRevision: row.revision,
+          expectedLifecycleUpdatedAt: row.lifecycle.updatedAt,
+        },
+      ],
+      10
+    );
+    const trashed = await readStoredImageWorkspace(id);
+    if (!trashed?.lifecycle) throw new Error('Project was not moved to Trash.');
+    await restoreStoredItemsFromTrash(
+      [
+        {
+          kind: 'image-project',
+          id,
+          expectedRevision: trashed.revision,
+          expectedLifecycleUpdatedAt: trashed.lifecycle.updatedAt,
+        },
+      ],
+      20
+    );
+  } finally {
+    resume.release();
+  }
+  await result;
+  io.read.mockClear();
+  await expect(
+    restoreImageAggregateOriginal(id, row.revision, observed.sourceGeneration, original.id)
+  ).rejects.toMatchObject({ name: 'StaleImageWorkspaceError' });
+  expect(io.read).not.toHaveBeenCalled();
+  expect(await readStoredImageWorkspace(id)).toMatchObject({
+    revision: row.revision,
+    document: row.document,
+    history: row.history,
+  });
 });

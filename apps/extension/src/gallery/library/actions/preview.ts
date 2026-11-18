@@ -1,3 +1,4 @@
+import { readGalleryImagePreview } from '../items/image-preview-source';
 import {
   runWithNativePublicationResources,
   ensureScenarioHtmlArtifactAvailable,
@@ -32,7 +33,6 @@ import {
   type GalleryBusyAction,
 } from './shared';
 import { updateMediaLibraryEntrySafely } from '../../../workflows/media-hub/store';
-import { getAggregatePreviewBlob } from '../../../composition/persistence/aggregate-presentations';
 import {
   copyImageAggregate,
   restoreImageAggregateOriginal,
@@ -143,7 +143,7 @@ async function withPreviewItemBlob(
     }
     const assetId = previewItem.entityId ?? previewItem.id;
     const blob = usesGalleryImagePresentation(previewItem)
-      ? await getAggregatePreviewBlob({ id: assetId, kind: 'image' })
+      ? await readGalleryImagePreview(previewItem)
       : await getMediaAssetBlob(assetId);
     if (!blob) {
       throw createMissingBlobError(previewItem.filename);

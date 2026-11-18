@@ -213,7 +213,7 @@ export function createGalleryItems(args: {
     if (!presentation && media.source.kind === 'stored-asset') return item;
     return {
       ...item,
-      hasThumbnail: Boolean(presentation),
+      hasThumbnail: Boolean(presentation) || item.imageContentState === 'original',
       presentationRevision: presentation?.presentationRevision ?? null,
       workspaceRevision: media.workspaceRevision ?? 0,
     };

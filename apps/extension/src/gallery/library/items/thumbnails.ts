@@ -54,7 +54,10 @@ export async function ensureGalleryItemThumbnail(
         }
       : undefined;
   }
-  return resolveEditableAggregateRef(item)
-    ? readAggregateThumbnail(item)
-    : ensureLegacyGalleryThumbnail(item);
+  if (resolveEditableAggregateRef(item)) {
+    const presentation = await readAggregateThumbnail(item);
+    if (presentation || item.type !== 'media' || item.imageContentState !== 'original')
+      return presentation;
+  }
+  return ensureLegacyGalleryThumbnail(item);
 }

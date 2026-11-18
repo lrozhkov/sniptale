@@ -10,6 +10,12 @@ import {
 import type { DatabaseMigrationSource, UpgradeTransaction } from './upgrade/types';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 
+const activeBackfills = new WeakMap<UpgradeTransaction, Promise<void>>();
+
+export function readPendingDeletionReferenceBackfill(transaction: UpgradeTransaction) {
+  return activeBackfills.get(transaction);
+}
+
 /** Enqueue the complete native backfill before versionchange can publish its schema. */
 export function installDeletionReferenceIndexes(transaction: UpgradeTransaction): undefined {
   for (const name of REFERENCE_INDEX_STORES) {
@@ -22,7 +28,9 @@ export function installDeletionReferenceIndexes(transaction: UpgradeTransaction)
   if (!recovery.createIndex) throw new Error('Recovery source index creation is unavailable.');
   if (!recovery.indexNames?.contains('recoveryId'))
     recovery.createIndex('recoveryId', 'recoveryId');
-  void backfill(transaction).catch(() => {
+  const pending = backfill(transaction);
+  activeBackfills.set(transaction, pending);
+  void pending.catch(() => {
     try {
       transaction.abort();
     } catch {

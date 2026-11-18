@@ -22,7 +22,7 @@ export interface CommitImageWorkspaceInput {
   original?: { mediaId: string; generation: string | null };
   sourceGuard?: {
     aggregateId: string;
-    presentationRevision: number;
+    presentationRevision?: number;
     workspaceRevision: number;
     sourceGeneration?: string | null;
   };

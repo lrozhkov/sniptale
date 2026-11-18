@@ -6,7 +6,6 @@ import {
 import { createRuntimeMessagingTransport } from '../../../platform/runtime-messaging';
 import { createSimplifyComputeClient } from '../../../workflows/simplify/compute-client';
 import type { EditorEmbedMode } from '../../../features/editor/contracts/embed';
-import { readImageOriginalSource } from '../../../composition/persistence/image-workspaces/read';
 import { getAggregatePresentation } from '../../../composition/persistence/aggregate-presentations';
 import { restoreImageAggregateOriginal } from '../../../composition/persistence/image-aggregates';
 import type { EditorBootstrapPayload } from '../../../workflows/editor/bootstrap';
@@ -23,7 +22,10 @@ import {
 } from '../../document/session-autosave';
 import {
   ensureEditorPageAggregateId,
+  MissingEditorDraftAssetError,
+  type EditorImageRecovery,
   readEditorPageLocationState,
+  replaceEditorPageAggregateId,
   resolveEditorPageRestoreSource,
 } from '../../document/page-session';
 export { loadEditorPageDefaults } from './defaults';
@@ -36,6 +38,7 @@ interface EditorPageSessionRuntime {
 export type EditorPageServices = {
   autosaveService: EditorSessionAutosaveService;
   bootstrapRevision: number;
+  recovery?: EditorImageRecovery | undefined;
   controller: ImageEditorController;
 };
 
@@ -140,18 +143,24 @@ export function resolveEditorPageSessionSeed() {
   };
 }
 
-/** Replaces a damaged workspace only in response to an explicit, confirmed recovery action. */
-export async function recoverMissingEditorPageDocument(): Promise<void> {
-  const aggregateId = readEditorPageLocationState().assetId;
-  if (!aggregateId) throw new Error('No library image is selected for recovery.');
-  const original = await readImageOriginalSource(aggregateId);
-  const media = original.asset;
-  if (!media) throw new Error('The library image is unavailable for recovery.');
+/** Reset only the exact document observed by the failed opening. */
+export async function recoverMissingEditorPageDocument(
+  recovery: EditorImageRecovery
+): Promise<void> {
+  const location = readEditorPageLocationState();
+  if (location.assetId !== recovery.routeAssetId || location.originalId)
+    throw new Error('The selected Image project changed before recovery.');
   await restoreImageAggregateOriginal(
-    aggregateId,
-    media.workspaceRevision ?? 0,
-    original.sourceGeneration
+    recovery.aggregateId,
+    recovery.revision,
+    recovery.generation,
+    recovery.sourceMediaId
   );
+  if (
+    recovery.aggregateId !== recovery.routeAssetId &&
+    readEditorPageLocationState().assetId === recovery.routeAssetId
+  )
+    replaceEditorPageAggregateId(recovery.aggregateId);
 }
 
 export function createEditorPageServices(
@@ -268,6 +277,7 @@ export async function bootstrapEditorPageSession(
   runtime: EditorPageSessionRuntime,
   services: EditorPageServices
 ): Promise<void> {
+  services.recovery = undefined;
   const hydration = beginEditorPageHydration(runtime, services);
   const isCurrent = hydration.isCurrent;
   try {
@@ -279,6 +289,8 @@ export async function bootstrapEditorPageSession(
     );
     hydration.lease.finish(ready && isCurrent());
   } catch (error) {
+    if (isCurrent() && error instanceof MissingEditorDraftAssetError)
+      services.recovery = error.recovery;
     hydration.lease.finish(false);
     throw error;
   }
@@ -328,7 +340,9 @@ async function restoreEditorPageSession(
   }
 
   if (restoreSource.kind === 'draft') {
-    await openRestoredEditorDraft(restoreSource, aggregateId, runtime, services, isCurrent);
+    const draftId = restoreSource.entry.aggregateId;
+    if (draftId !== aggregateId) replaceEditorPageAggregateId(draftId);
+    await openRestoredEditorDraft(restoreSource, draftId, runtime, services, isCurrent);
     return isCurrent();
   }
 

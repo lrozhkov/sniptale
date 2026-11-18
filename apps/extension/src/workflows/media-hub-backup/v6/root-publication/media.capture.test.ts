@@ -1,3 +1,4 @@
+import { legacyQuickEditProjectId } from '../../../../composition/persistence/media-library/legacy-projects';
 import {
   runWithPersistenceMutationPermit,
   type PersistenceMutationPermit,
@@ -59,6 +60,10 @@ import { isCaptureReview } from './media-review-assets';
 import { buildProjectExportMediaEntry } from '../../../../composition/persistence/media-library/entry-mapping';
 import { projectAssetReviewMetadata, portableJson } from './media.review-assets.test-support';
 import { fixtureWorkspaceValue } from '../../../../composition/persistence/review-workspaces/store.test-support';
+import {
+  workspaceStorageHead,
+  workspaceStorageRows,
+} from '../../../../composition/persistence/review-workspaces/storage-format';
 import { parseVideoWorkspace } from '../../../../composition/persistence/review-workspaces/parser';
 import { materializeVideoWorkspaceProject } from '../../../../composition/persistence/review-workspaces/project-metadata';
 import { createQuickEditAdvancedState } from '../../../../features/video/review/advanced/defaults';
@@ -382,10 +387,12 @@ async function restoredReviewFixture(enabled = true) {
   );
   const metadata = projectAssetReviewMetadata();
   const id = metadata.entry.id;
+  const projectId = legacyQuickEditProjectId(metadata.entry);
   const table = (name: string) => fixture.rows.get(name)!;
   const workspace = materializeVideoWorkspaceProject(
     {
-      aggregateId: id,
+      aggregateId: projectId,
+      sourceMediaId: id,
       sourceAssetId: 'old-review-bytes',
       formatVersion: 1,
       source: metadata.videoReview.workspace.source,
@@ -417,10 +424,10 @@ async function restoredReviewFixture(enabled = true) {
     ownerId: 'review-original',
     role: 'body',
   });
-  table('video_workspaces').set(id, workspace);
-  table('video_workspace_drafts').set(id, {
+  table('video_workspaces').set(projectId, workspace);
+  table('video_workspace_drafts').set(projectId, {
     ...metadata.videoReview.draft,
-    aggregateId: id,
+    aggregateId: projectId,
     revision: 30,
   });
   table('sync_capture').set('profile', {
@@ -472,7 +479,7 @@ async function restoredReviewFixture(enabled = true) {
     ],
   };
   const current = () => {
-    const value = parseVideoWorkspace(fixtureWorkspaceValue(fixture.rows, id));
+    const value = parseVideoWorkspace(fixtureWorkspaceValue(fixture.rows, projectId));
     if (!value) throw new Error('Missing review fixture');
     return value;
   };
@@ -485,6 +492,7 @@ async function restoredReviewFixture(enabled = true) {
     input,
     metadata,
     workspace,
+    projectId,
     table,
     current,
     captures,
@@ -501,7 +509,7 @@ it('rebases Replace review and recovery clocks above native and sender revisions
   data.input.staged[0]!.ref.location.objectKey = 'objects/old-review-bytes';
   await mediaLibraryRootPublisher.publish(data.input);
   expect(data.current().revision).toBeGreaterThan(20);
-  expect(data.table('video_workspace_drafts').get(data.metadata.entry.id)).toMatchObject({
+  expect(data.table('video_workspace_drafts').get(data.projectId)).toMatchObject({
     revision: 31,
   });
   expect(data.captures()).toEqual(
@@ -525,7 +533,7 @@ it('rebases Replace review and recovery clocks above native and sender revisions
   const before = structuredClone(data.fixture.rows);
   await expect(
     commitVideoWorkspace({
-      aggregateId: data.metadata.entry.id,
+      aggregateId: data.projectId,
       expectedRevision: 20,
       expectedSourceAssetId: 'old-review-bytes',
       operation: {
@@ -542,7 +550,7 @@ it('rebases Replace review and recovery clocks above native and sender revisions
 
 it('restores the same default identity above its native purge fence', async () => {
   const data = await restoredReviewFixture();
-  const id = data.metadata.entry.id;
+  const id = data.projectId;
   const reviewCaptures = () => data.captures().filter((row) => row?.rootKind === 'video-review');
   const rootState = () =>
     [...data.table('sync_capture').values()]
@@ -627,15 +635,107 @@ it('rolls back restored review, draft, source and archive receipt when capture c
   });
 });
 
-it('preserves imported review clocks when capture is disabled', async () => {
+it.each(['with a review', 'without a review'] as const)(
+  'leaves an enrolled combined Quick Edit workspace intact on ZIP Replace %s',
+  async (incoming) => {
+    const data = await restoredReviewFixture();
+    const id = data.metadata.entry.id;
+    if (incoming === 'without a review') {
+      const { videoReview: _review, ...original } = data.metadata;
+      data.input.envelope.metadata = portableJson(original);
+    }
+    const { sourceMediaId: _linkedSource, ...workspace } = data.workspace;
+    data.table('video_workspaces').delete(data.projectId);
+    data.table('video_workspace_drafts').delete(data.projectId);
+    const combinedWorkspace = { ...workspace, aggregateId: id };
+    data.table('video_workspaces').set(id, workspaceStorageHead(combinedWorkspace, []));
+    for (const row of workspaceStorageRows(combinedWorkspace))
+      data.table('video_workspace_history').set(JSON.stringify([id, row.ordinal]), row);
+    data.table('video_workspace_drafts').set(id, {
+      ...data.metadata.videoReview.draft,
+      aggregateId: id,
+      revision: 30,
+    });
+    await runWithIndexedDbMutation(async (db) => {
+      const tx = db.transaction([...data.fixture.rows.keys()], 'readwrite');
+      await captureVideoReviewInTransaction(tx, id, { checkpoint: 'defer' });
+      await tx.done;
+    });
+    const capture = new Map(data.table('sync_capture'));
+    expect(capture.size).toBeGreaterThan(1);
+    const original = data.table('media_library').get(id);
+    const combined = data.table('video_workspaces').get(id);
+    const recovery = data.table('video_workspace_drafts').get(id);
+    const history = new Map(data.table('video_workspace_history'));
+
+    await expect(mediaLibraryRootPublisher.publish(data.input)).resolves.toMatchObject({
+      imported: false,
+      conflicted: true,
+    });
+
+    expect(data.table('sync_capture')).toEqual(capture);
+    expect(data.table('media_library').get(id)).toEqual(original);
+    expect(data.table('video_workspaces').get(id)).toEqual(combined);
+    expect(data.table('video_workspace_drafts').get(id)).toEqual(recovery);
+    expect(data.table('video_workspace_history')).toEqual(history);
+    expect(data.table('video_workspaces').has(data.projectId)).toBe(false);
+  }
+);
+
+it('preserves newly imported review clocks when capture is disabled', async () => {
   const data = await restoredReviewFixture(false);
+  data.table('video_workspaces').delete(data.projectId);
+  data.table('video_workspace_drafts').delete(data.projectId);
   await mediaLibraryRootPublisher.publish(data.input);
   expect(data.current().revision).toBe(data.metadata.videoReview.workspace.revision);
-  expect(data.table('video_workspace_drafts').get(data.metadata.entry.id)).toMatchObject({
+  expect(data.table('video_workspace_drafts').get(data.projectId)).toMatchObject({
     revision: data.metadata.videoReview.draft?.revision,
   });
   expect(data.captures()).toEqual([]);
 });
+
+it.each([false, true])(
+  'fences offline Quick Edit ZIP Replace with a retained source, purge=%s',
+  async (purge) => {
+    const data = await restoredReviewFixture(false);
+    data.metadata.videoReview.workspace.revision = 20;
+    data.metadata.videoReview.draft.revision = 30;
+    data.input.envelope.metadata = portableJson(data.metadata);
+    const native = data.current();
+    data.table('video_workspaces').set(data.projectId, workspaceStorageHead(native, []));
+    for (const row of workspaceStorageRows(native)) {
+      data.table('video_workspace_history').set(JSON.stringify([data.projectId, row.ordinal]), row);
+    }
+    if (purge) {
+      const otherId = 'project-asset:quick-project:other';
+      data.table('video_workspaces').set(otherId, { ...data.current(), aggregateId: otherId });
+      await deleteVideoWorkspaceProject(data.projectId, 20);
+      expect(data.table('video_workspaces').has(data.projectId)).toBe(false);
+    }
+    await mediaLibraryRootPublisher.publish(data.input);
+    expect(data.current()).toMatchObject({ sourceAssetId: 'old-review-bytes', revision: 21 });
+    expect(data.table('video_workspace_drafts').get(data.projectId)).toMatchObject({
+      revision: 31,
+    });
+    const before = structuredClone(data.fixture.rows);
+    await expect(
+      commitVideoWorkspace({
+        aggregateId: data.projectId,
+        expectedRevision: 20,
+        expectedSourceAssetId: 'old-review-bytes',
+        operation: {
+          id: 'stale',
+          at: 1,
+          target: 'annotation',
+          before: null,
+          after: { id: 'note', text: 'Stale', anchor: { kind: 'point', time: 1 } },
+        },
+      })
+    ).rejects.toThrow();
+    expect(data.fixture.rows).toEqual(before);
+    expect(data.captures()).toEqual([]);
+  }
+);
 
 it('preserves later native edits when an already committed archive checkpoint refuses a publisher retry', async () => {
   const data = await restoredReviewFixture();
@@ -671,7 +771,7 @@ it('allocates restored clocks above higher sender workspace and recovery revisio
   data.input.envelope.metadata = portableJson(data.metadata);
   await mediaLibraryRootPublisher.publish(data.input);
   expect(data.current().revision).toBeGreaterThan(70);
-  expect(data.table('video_workspace_drafts').get(data.metadata.entry.id)).toMatchObject({
+  expect(data.table('video_workspace_drafts').get(data.projectId)).toMatchObject({
     revision: 81,
   });
 });

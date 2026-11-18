@@ -1,3 +1,5 @@
+import { legacyQuickEditProjectId } from '../../composition/persistence/media-library/legacy-projects';
+import { ensureNativeEditingRootAvailable } from '../sync-transfer/editing-admission';
 import { createReviewRecordingHistoryProject } from './recording-review';
 import { projectRecordingObservationClock } from '../../features/video/project/observation-clock';
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
@@ -145,13 +147,26 @@ export async function loadVideoReviewSource(
   let stage: ReviewLoadStage = 'library';
   try {
     signal.throwIfAborted();
-    const existing = await readVideoWorkspace(aggregateId);
+    let targetId = aggregateId;
+    let existing = await readVideoWorkspace(targetId);
     const sourceMediaId = existing
       ? (existing.workspace.sourceMediaId ?? aggregateId)
       : (newProjectSource ?? aggregateId);
     const media = await getMediaLibraryEntry(sourceMediaId);
     if (!media?.mimeType.startsWith('video/'))
       throw new VideoReviewLoadError('library', 'unavailable');
+    if (!existing && !newProjectSource) {
+      const migratedId = legacyQuickEditProjectId({ id: sourceMediaId, source: media.source });
+      const migrated = await readVideoWorkspace(migratedId);
+      if (
+        migrated?.workspace.aggregateId === migratedId &&
+        migrated.workspace.sourceMediaId === sourceMediaId
+      ) {
+        existing = migrated;
+        targetId = migratedId;
+        await ensureNativeEditingRootAvailable({ rootKind: 'video-review', rootId: targetId });
+      }
+    }
     stage = 'source';
     const original = await readReviewMediaOriginal(media.source);
     if (!original) throw new VideoReviewLoadError('source', 'unavailable');
@@ -175,7 +190,7 @@ export async function loadVideoReviewSource(
     const sourceKind = media.source.kind === 'project-export' ? 'export' : media.source.kind;
     const id =
       existing || newProjectSource
-        ? aggregateId
+        ? targetId
         : `${sourceKind}:quick-project:${crypto.randomUUID()}`;
     const opening = await readVideoWorkspaceOpening({
       aggregateId: id,

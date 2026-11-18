@@ -1,3 +1,4 @@
+import { legacyQuickEditProjectId } from '../../../../composition/persistence/media-library/legacy-projects';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ checkpoint: vi.fn(), runMutation: vi.fn(), write: vi.fn() }));
@@ -183,11 +184,18 @@ it.each(
     expect(result.imported).toBe(strategy !== 'skip');
     if (strategy === 'skip') return;
 
-    const workspace = logicalReviewValues(tables).find((value) =>
-      strategy === 'replace'
-        ? value.aggregateId === metadata.entry.id
-        : value.aggregateId !== metadata.entry.id
-    );
+    const workspace = logicalReviewValues(tables).find((value) => {
+      const sourceId = value.sourceMediaId;
+      if (!sourceId) return false;
+      return (
+        value.aggregateId ===
+          legacyQuickEditProjectId({
+            id: sourceId,
+            source: { ...metadata.entry.source, kind: 'project-export' },
+          }) &&
+        (strategy === 'replace' ? sourceId === metadata.entry.id : sourceId !== metadata.entry.id)
+      );
+    });
     if (!workspace) throw new Error('Missing restored workspace');
     const refs = [
       workspace.advanced.background.enabled && workspace.advanced.background.type === 'image'

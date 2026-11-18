@@ -110,6 +110,22 @@ it('reads the image project thumbnail without reaching for the original file', a
   expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
 });
 
+it('builds the thumbnail of an inline original without a presentation', async () => {
+  const item = createMediaItem({
+    kind: 'screenshot',
+    source: { kind: 'screenshot' },
+    imageContentState: 'original',
+  });
+  const source = new Blob(['original'], { type: 'image/png' });
+  const thumbnail = new Blob(['thumbnail'], { type: 'image/png' });
+  getMediaThumbnailMock.mockResolvedValueOnce(undefined);
+  getMediaAssetBlobMock.mockResolvedValueOnce(source);
+  createImageThumbnailBlobMock.mockResolvedValueOnce(thumbnail);
+
+  await expect(ensureGalleryItemThumbnail(item)).resolves.toMatchObject({ blob: thumbnail });
+  expect(getMediaAssetBlobMock).toHaveBeenCalledExactlyOnceWith(item.entityId);
+});
+
 it('returns existing thumbnails without rebuilding them', async () => {
   const existingThumbnail = {
     assetId: 'asset-1',

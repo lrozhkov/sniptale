@@ -114,7 +114,8 @@ async function applyImageSwitch(args: {
     if (source.kind === 'draft' && source.entry.document.displayName === undefined)
       store.setPageTitle(source.entry.sourceTitle ?? '');
     store.setCapturedAt(source.capturedAt);
-    restoreLocation = replaceEditorPageImageLocation(args.id);
+    const targetId = source.kind === 'draft' ? source.entry.aggregateId : args.id;
+    restoreLocation = replaceEditorPageImageLocation(targetId);
     // Transfer resource ownership last, after all fallible pre-commit work.
     autosave.adoptPreparedDocument(
       source.kind === 'draft'

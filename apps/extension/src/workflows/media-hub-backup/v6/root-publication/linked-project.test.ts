@@ -1,3 +1,4 @@
+import { legacyImageProjectId } from '../../../../composition/persistence/media-library/legacy-projects';
 import { captureRootKey } from '../../../../composition/persistence/sync-capture/contracts';
 import { parseSyncCaptureRecord } from '../../../../composition/persistence/sync-capture/guards';
 import { deleteImageWorkspaceProject } from '../../../../composition/persistence/image-aggregates/mutations';
@@ -39,9 +40,9 @@ vi.mock('../../../../composition/persistence/assets', async (original) => ({
 
 import { mediaLibraryRootPublisher } from './media';
 
-function fixture(bytes = 'image') {
+function fixture(bytes = 'image', archiveId = 'archive-project') {
   const { blob: _blob, ...entry } = createMediaLibraryEntry({
-    id: 'archive-project',
+    id: archiveId,
     filename: 'original.png',
     kind: 'screenshot',
     mimeType: 'image/png',
@@ -180,6 +181,52 @@ function fixture(bytes = 'image') {
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.finishDeletion.mockResolvedValue(undefined);
+});
+
+function legacyImageArchive(archiveId?: string) {
+  const { publication, tables } = fixture('image', archiveId);
+  const { linkedSourceMediaId: _source, ...metadata } = publication.envelope.metadata as Record<
+    string,
+    unknown
+  >;
+  const legacy = {
+    ...publication,
+    envelope: { ...publication.envelope, metadata: portableJson(metadata) },
+  };
+  return { legacy, tables };
+}
+
+it('keeps a combined Image root readable when its legacy ID cannot be linked', async () => {
+  const id = 'a'.repeat(257);
+  const { legacy, tables } = legacyImageArchive(id);
+  expect(await mediaLibraryRootPublisher.publish(legacy)).toMatchObject({ imported: true });
+  expect(tables.get('media_library')?.get(id)).toMatchObject({ id });
+  expect(tables.get('image_workspaces')?.get(id)).toMatchObject({ aggregateId: id });
+  expect(tables.get('image_workspaces')?.has(legacyImageProjectId(id))).toBe(false);
+});
+
+it('restores a combined Image root as one original and the stable legacy project', async () => {
+  const { legacy, tables } = legacyImageArchive();
+  const id = legacy.envelope.descriptor.rootId;
+  const projectId = legacyImageProjectId(id);
+  expect(await mediaLibraryRootPublisher.publish(legacy)).toMatchObject({ imported: true });
+  expect(tables.get('media_library')?.get(id)).toMatchObject({
+    id,
+    imageContentState: 'original',
+    workspaceRevision: 0,
+  });
+  expect(tables.get('media_library')?.has(projectId)).toBe(false);
+  expect(tables.get('image_workspaces')?.get(projectId)).toMatchObject({
+    aggregateId: projectId,
+    sourceMediaId: id,
+    document: { sourceImage: { assetId: 'staged-workspace' } },
+  });
+  expect(tables.get('image_workspaces')?.has(id)).toBe(false);
+  expect(await mediaLibraryRootPublisher.publish(legacy)).toMatchObject({
+    imported: false,
+    conflicted: true,
+  });
+  expect(tables.get('image_workspaces')?.size).toBe(1);
 });
 
 it('restores a missing Image project over a skipped original without publishing another media row', async () => {
@@ -528,3 +575,29 @@ it.each([false, true])(
     expect(tables.get('image_workspaces')?.has(rootId)).toBe(true);
   }
 );
+
+it('fences an offline Image project purge after the same ZIP is restored', async () => {
+  const { tables, publication, publish } = fixture();
+  const id = publication.envelope.descriptor.rootId;
+  const metadata = publication.envelope.metadata;
+  if (!isRecord(metadata) || !isRecord(metadata['entry']))
+    throw new Error('Expected image metadata.');
+  metadata['entry']['lifecycle'] = {
+    storageClass: 'library',
+    savedAt: 1,
+    updatedAt: 2,
+    trashedAt: 2,
+  };
+  await expect(publish()).resolves.toMatchObject({ imported: true });
+  await deleteImageWorkspaceProject(id, 1, 2);
+  expect(tables.get('image_workspaces')?.has(id)).toBe(false);
+  await expect(publish()).resolves.toMatchObject({ imported: true });
+  expect(tables.get('image_workspaces')?.get(id)).toMatchObject({
+    revision: 2,
+    lifecycle: { updatedAt: 2, trashedAt: 2 },
+  });
+  await expect(deleteImageWorkspaceProject(id, 1, 2)).rejects.toMatchObject({
+    name: 'StaleImageWorkspaceError',
+  });
+  expect(tables.get('image_workspaces')?.has(id)).toBe(true);
+});

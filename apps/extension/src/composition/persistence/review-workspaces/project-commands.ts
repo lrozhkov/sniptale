@@ -175,7 +175,7 @@ export async function deleteVideoWorkspaceProject(
             'local-edit',
             workspace.revision
           );
-          await fenceVideoReviewIdentity(tx, 'retired-project', id);
+          await fenceVideoReviewIdentity(tx, 'retired-project', id, workspace.revision);
           await createVideoWorkspaceStore(tx).delete(id);
           await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(id);
           if (operation.privateSources?.length)

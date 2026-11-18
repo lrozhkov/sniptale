@@ -1,3 +1,4 @@
+import { legacyQuickEditProjectId } from '../../../../composition/persistence/media-library/legacy-projects';
 import { readWorkspaceStorage } from '../../../../composition/persistence/review-workspaces/storage';
 import { openAsBlob } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -745,9 +746,10 @@ it('retains imported quick-edit recording and mirror without clearing source Tra
   expect(fixture.rows.get('asset_refs')!.has('restored-source')).toBe(true);
   const restored = await readWorkspaceStorage(
     fixture.database.transaction(['video_workspaces', 'video_workspace_history'], 'readonly'),
-    id
+    legacyQuickEditProjectId({ id, source: { kind: 'recording', recordingId: 'restored' } })
   );
   expect(restored.logical).toMatchObject({
+    sourceMediaId: id,
     advanced: {
       ui: {
         workspaceColors: { dark: '#123456ff' },

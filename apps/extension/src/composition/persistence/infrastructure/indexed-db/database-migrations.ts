@@ -1,4 +1,9 @@
 import { requireMigrationStores } from './migration-validation';
+import {
+  estimateLegacyLibraryProjectBytes,
+  installLegacyLibraryProjectMigration,
+  LEGACY_LIBRARY_PROJECT_MIGRATION_STORES,
+} from './legacy-library-projects-migration';
 import { editorVectorLibraryMigration } from './vector-library-migration';
 import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
@@ -1195,6 +1200,28 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
         db,
         [VIDEO_REVIEW_IDENTITIES_STORE],
         'Quick Edit lifetime store is unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'full',
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 45, to: 46 },
+      { domainId: 'assetGraph', from: 6, to: 7 },
+    ],
+    fromDatabaseVersion: 71,
+    toDatabaseVersion: 72,
+    risk: 'transforming',
+    stores: LEGACY_LIBRARY_PROJECT_MIGRATION_STORES,
+    estimateAdditionalBytes: estimateLegacyLibraryProjectBytes,
+    migrate(_database, transaction) {
+      return installLegacyLibraryProjectMigration(transaction);
+    },
+    validate(database) {
+      return requireMigrationStores(
+        database,
+        [...LEGACY_LIBRARY_PROJECT_MIGRATION_STORES, SYNC_CAPTURE_STORE],
+        'Legacy Library project stores are unavailable.'
       );
     },
   },

@@ -170,6 +170,26 @@ it('resolves two image project IDs to one source without copying the blob', asyn
   const source = await readImageOriginalSource('original');
   expect(source.asset?.id).toBe('original');
   expect(source.blob).toBe(blob);
+  expect(source.sourceMediaId).toBeUndefined();
+
+  const generation = 'current-project-generation';
+  mocks.initDB.mockResolvedValueOnce({
+    transaction: () => ({
+      done: Promise.resolve(),
+      objectStore: (name: string) => ({
+        get: (key: IDBValidKey) =>
+          name === 'image_workspace_identities'
+            ? Promise.resolve({ version: 1, aggregateId: key, generation, retired: false })
+            : mocks.get(name, key),
+      }),
+    }),
+  });
+  await expect(readImageOriginalSource('second-project', { includeBlob: false })).resolves.toEqual({
+    asset: expect.objectContaining({ id: 'second-project', workspaceRevision: 3 }),
+    sourceMediaId: 'original',
+    sourceGeneration: generation,
+    blob: undefined,
+  });
 });
 
 it('refuses to open an independent image project after losing its original', async () => {

@@ -200,6 +200,34 @@ it('loads preview blobs and seeds filename and tag drafts from the selected item
   expect(URL.createObjectURL).toHaveBeenCalledWith(blob);
 });
 
+it.each(['original', 'edited'] as const)(
+  'reads inline %s image bytes only when they can represent the preview',
+  async (imageContentState) => {
+    const blob = new Blob(['original'], { type: 'image/png' });
+    const values: ReturnType<typeof useGalleryPreviewState>[] = [];
+    getAggregatePreviewBlobMock.mockResolvedValue(undefined);
+    getMediaAssetBlobMock.mockResolvedValue(blob);
+
+    act(() => root?.render(<HookProbe onValue={(value) => values.push(value)} />));
+    act(() => {
+      values.at(-1)?.actions.setPreview({
+        inspectorCollapsed: false,
+        item: { ...createItem(), imageContentState },
+        url: null,
+      });
+    });
+    await flushEffects();
+
+    if (imageContentState === 'original') {
+      expect(getMediaAssetBlobMock).toHaveBeenCalledExactlyOnceWith('asset-1');
+      expect(URL.createObjectURL).toHaveBeenCalledWith(blob);
+    } else {
+      expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
+      expect(URL.createObjectURL).not.toHaveBeenCalled();
+    }
+  }
+);
+
 it('preserves newer filename and tag edits when the selected item refreshes', async () => {
   getAggregatePreviewBlobMock.mockResolvedValue(new Blob(['preview'], { type: 'image/png' }));
   const values: ReturnType<typeof useGalleryPreviewState>[] = [];

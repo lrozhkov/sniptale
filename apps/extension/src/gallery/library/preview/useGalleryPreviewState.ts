@@ -1,3 +1,4 @@
+import { readGalleryImagePreview } from '../items/image-preview-source';
 import {
   useCallback,
   useEffect,
@@ -104,7 +105,7 @@ async function loadPreviewBlob(
 
   const assetId = previewItem.entityId ?? previewItem.id;
   if (usesGalleryImagePresentation(previewItem)) {
-    return (await getAggregatePreviewBlob({ id: assetId, kind: 'image' })) ?? null;
+    return readGalleryImagePreview(previewItem);
   }
   if (previewItem.kind === 'web-archive') {
     const screenshot = (await getWebSnapshotScreenshotFile(assetId)) ?? null;

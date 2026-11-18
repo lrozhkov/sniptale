@@ -1,4 +1,9 @@
-import { readImageOriginalSource } from '../../../composition/persistence/image-workspaces/read';
+import { legacyImageProjectId } from '../../../composition/persistence/media-library/legacy-projects';
+import {
+  readImageOriginalSource,
+  recoverAndGetStoredImageWorkspace,
+} from '../../../composition/persistence/image-workspaces';
+import { readImageWorkspace } from '../../../composition/persistence/image-workspaces/read';
 import { ensureNativeEditingRootAvailable } from '../../../workflows/sync-transfer/editing-admission';
 import { getMediaLibraryEntry } from '../../../composition/persistence/media-library/index.library.ts';
 import {
@@ -64,10 +69,18 @@ export class MissingEditorOriginalError extends Error {
   }
 }
 
+export interface EditorImageRecovery {
+  routeAssetId: string;
+  aggregateId: string;
+  sourceMediaId?: string;
+  revision: number;
+  generation: string | null;
+}
+
 export class MissingEditorDraftAssetError extends Error {
   override name = 'MissingEditorDraftAssetError';
 
-  constructor() {
+  constructor(readonly recovery?: EditorImageRecovery) {
     super('A stored editor document file is missing from local storage.');
   }
 }
@@ -215,25 +228,62 @@ export async function resolveEditorPageRestoreSource(
   isCurrent?: () => boolean
 ): Promise<EditorPageRestoreSource> {
   const mediaId = locationState.originalId ?? locationState.assetId;
-  if (mediaId) await ensureNativeEditingRootAvailable({ rootKind: 'media', rootId: mediaId });
+  let targetId = aggregateId;
+  if (mediaId === aggregateId && !locationState.originalId) {
+    const migratedId = legacyImageProjectId(aggregateId);
+    const migrated = await recoverAndGetStoredImageWorkspace(migratedId);
+    if (migrated?.aggregateId === migratedId && migrated.sourceMediaId === aggregateId)
+      targetId = migratedId;
+  }
   let draftEntry: Awaited<ReturnType<EditorSessionAutosaveService['restoreDraft']>>;
+  let recovery: EditorImageRecovery | undefined;
   try {
-    draftEntry = await autosaveService.restoreDraft(aggregateId, isCurrent);
+    if (locationState.assetId && !locationState.originalId) {
+      const observed = await readImageOriginalSource(targetId, { includeBlob: false });
+      if (observed.asset?.id === targetId)
+        recovery = {
+          routeAssetId: locationState.assetId,
+          aggregateId: targetId,
+          revision: observed.asset.workspaceRevision ?? 0,
+          generation: observed.sourceGeneration,
+          ...(observed.sourceMediaId ? { sourceMediaId: observed.sourceMediaId } : {}),
+        };
+    }
+    if (targetId !== aggregateId) {
+      try {
+        await ensureNativeEditingRootAvailable({ rootKind: 'image-project', rootId: targetId });
+      } catch (error) {
+        // Check the local document so a failed cache request alone does not classify it as damaged.
+        const local = await readImageWorkspace(targetId);
+        local?.releaseDocumentAssets?.();
+        throw error;
+      }
+    } else if (mediaId) {
+      await ensureNativeEditingRootAvailable({ rootKind: 'media', rootId: mediaId });
+    }
+    draftEntry = await autosaveService.restoreDraft(targetId, isCurrent);
   } catch (error) {
     if (
       error instanceof MissingAssetObjectError ||
       error instanceof MissingEditorDocumentAssetError ||
       (error instanceof Error && error.name === 'NotFoundError')
-    ) {
-      throw new MissingEditorDraftAssetError();
-    }
+    )
+      throw new MissingEditorDraftAssetError(recovery);
     throw error;
   }
+  if (
+    targetId !== aggregateId &&
+    (draftEntry?.aggregateId !== targetId || draftEntry.sourceMediaId !== aggregateId)
+  )
+    throw new MissingEditorDraftAssetError(recovery);
   if (draftEntry) {
     return {
       kind: 'draft',
       entry: draftEntry,
-      capturedAt: await resolveOriginalCaptureTime(aggregateId, draftEntry.createdAt ?? null),
+      capturedAt: await resolveOriginalCaptureTime(
+        draftEntry.sourceMediaId ?? aggregateId,
+        draftEntry.createdAt ?? null
+      ),
     };
   }
 

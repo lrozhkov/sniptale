@@ -1,3 +1,4 @@
+import { legacyImageProjectId } from '../../../../composition/persistence/media-library/legacy-projects';
 import { createLibraryLifecycle } from '../../../../composition/persistence/library-lifecycle/contracts';
 import { expect, it, vi } from 'vitest';
 import { createEditorDocumentFixture } from '../../../../editor/document/page-session/document.test-support';
@@ -159,7 +160,7 @@ it('publishes the restored image vector closure with remapped workspace and owne
   expect(storeFor('asset_owners').put).toHaveBeenCalledWith(
     expect.objectContaining({
       ownerKind: 'image-workspace',
-      ownerId: rootId,
+      ownerId: legacyImageProjectId(rootId),
       role: `vector:${vectorId}`,
       assetId: 'restored-vector',
     })

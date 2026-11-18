@@ -121,6 +121,7 @@ export async function readImageOriginalSource(
   asset: MediaLibraryEntry | undefined;
   blob: Blob | undefined;
   sourceGeneration: string | null;
+  sourceMediaId?: string;
 }> {
   const db = await initDB();
   const tx = db.transaction(
@@ -178,10 +179,14 @@ export async function readImageOriginalSource(
   if (raw !== undefined && !asset) throw new Error('Image original metadata is invalid.');
   if (asset && identity?.retired) throw new Error('Image workspace lifetime has ended.');
   const sourceGeneration = identity?.generation ?? null;
-  if (options.includeBlob === false) return { asset, sourceGeneration, blob: undefined };
-  return {
+  const observed = {
     asset,
     sourceGeneration,
+    ...(sourceMediaId === undefined ? {} : { sourceMediaId }),
+  };
+  if (options.includeBlob === false) return { ...observed, blob: undefined };
+  return {
+    ...observed,
     blob:
       asset?.source.kind === 'screenshot'
         ? asset.blob

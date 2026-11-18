@@ -117,7 +117,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 45,
+    schemaVersion: 46,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
@@ -132,7 +132,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'assetGraph',
-    schemaVersion: 6,
+    schemaVersion: 7,
     stores: [
       { storeName: ASSET_REFS_STORE, dataClass: 'durable-authority' },
       { storeName: ASSET_RESIDENCY_STORE, dataClass: 'durable-authority' },

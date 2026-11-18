@@ -665,3 +665,24 @@ it('renames and downloads a chosen saved HTML without preparing the entire Scena
   });
   expect(preparePublicationMock).not.toHaveBeenCalled();
 });
+
+it('downloads and copies the exact inline original when no aggregate preview exists', async () => {
+  const previewItem = createMediaItem({
+    id: 'inline-original',
+    filename: 'original.png',
+    imageContentState: 'original',
+  });
+  const original = new Blob(['original'], { type: 'image/png' });
+  getAggregatePreviewBlobMock.mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined);
+  getMediaAssetBlobMock.mockResolvedValueOnce(original).mockResolvedValueOnce(original);
+  const { controller } = createController({ previewItem });
+
+  await expect(downloadPreviewItem(controller, createRunBusy())).resolves.toBe(true);
+  await expect(copyPreviewItem(controller, createRunBusy())).resolves.toBe(true);
+  expect(getMediaAssetBlobMock.mock.calls).toEqual([['inline-original'], ['inline-original']]);
+  expect(URL.createObjectURL).toHaveBeenCalledExactlyOnceWith(original);
+  expect(clickedFilename).toBe('original.png');
+  expect(writeBrowserClipboardItemsMock).toHaveBeenCalledWith([
+    expect.objectContaining({ data: { 'image/png': original } }),
+  ]);
+});

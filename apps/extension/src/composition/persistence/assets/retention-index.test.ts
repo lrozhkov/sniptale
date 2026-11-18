@@ -1,7 +1,10 @@
 import { expect, it, vi } from 'vitest';
-import { collectTargetAssetSnapshot } from './retention-index';
+import {
+  collectTargetAssetSnapshot,
+  collectTargetAssetSnapshotInTransaction,
+} from './retention-index';
 import { createTargetAssetDatabaseFixture } from './retention-authority.test-support';
-import { createVideoProjectEntry } from '../projects/index.test-support';
+import { createMediaLibraryEntry, createVideoProjectEntry } from '../projects/index.test-support';
 
 const source = { id: 'private', assetId: 'target', createdAt: 1, mimeType: 'image/png', size: 3 };
 const ref = {
@@ -197,3 +200,39 @@ it.each([
     expect((await collectTargetAssetSnapshot(db, ['target'])).authorityValid).toBe(false);
   }
 );
+
+it('does not request evidence when the selected asset set is empty', async () => {
+  const db = createTargetAssetDatabaseFixture(async () => []);
+  const transaction = vi.spyOn(db, 'transaction');
+  await expect(collectTargetAssetSnapshot(db, [])).resolves.toMatchObject({
+    authorityValid: true,
+    refs: [],
+  });
+  expect(transaction).not.toHaveBeenCalled();
+  await expect(
+    collectTargetAssetSnapshotInTransaction(
+      {
+        objectStore: vi.fn(() => {
+          throw new Error('Empty asset set must not open a store.');
+        }),
+      },
+      []
+    )
+  ).resolves.toMatchObject({ authorityValid: true, owners: [] });
+});
+
+it('recognizes an original that publishes a selected asset through project metadata', async () => {
+  const original = createMediaLibraryEntry({
+    id: 'original',
+    kind: 'image',
+    source: { kind: 'project-asset', projectAssetId: source.id },
+  });
+  const db = createTargetAssetDatabaseFixture(async (name) =>
+    name === 'media_library' ? [original] : name === 'project_assets' ? [source] : []
+  );
+
+  const snapshot = await collectTargetAssetSnapshot(db, ['target']);
+  expect(snapshot.authorityValid).toBe(true);
+  expect(snapshot.expectedOwners).toEqual([owner]);
+  expect(snapshot.publishedProjectAssetIds).toEqual(new Set([source.id]));
+});

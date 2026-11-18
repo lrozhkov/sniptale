@@ -156,6 +156,7 @@ export const EditorPage: React.FC<{ afterLayout?: React.ReactNode }> = ({ afterL
   hasImageRef.current = hasImage;
   const embedProps = createEditorPageEmbedProviderValue(embedMode, services.controller);
   const openStatus = useEditorOpenStatusOwner(embedMode === 'scenario' ? 'idle' : 'loading');
+  const recovery = services.recovery;
 
   useCommandPaletteHotkey({
     isOpen: commandPaletteOpen,
@@ -183,12 +184,19 @@ export const EditorPage: React.FC<{ afterLayout?: React.ReactNode }> = ({ afterL
             hasImage={hasImage}
             openStatus={openStatus.status}
             onCloseCommandPalette={() => setCommandPaletteOpen(false)}
-            onRecoverOriginal={async () => {
-              await recoverMissingEditorPageDocument();
-              await openStatus.runOpen(() =>
-                bootstrapEditorPageSession({ isCancelled: () => false, setPageTitle }, services)
-              );
-            }}
+            {...(recovery
+              ? {
+                  onRecoverOriginal: async () => {
+                    await recoverMissingEditorPageDocument(recovery);
+                    await openStatus.runOpen(() =>
+                      bootstrapEditorPageSession(
+                        { isCancelled: () => false, setPageTitle },
+                        services
+                      )
+                    );
+                  },
+                }
+              : {})}
           />
         </EditorEmbedProvider>
       </EditorOpenStatusContext.Provider>

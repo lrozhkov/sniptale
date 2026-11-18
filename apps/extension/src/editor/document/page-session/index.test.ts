@@ -1,3 +1,4 @@
+import { legacyImageProjectId } from '../../../composition/persistence/media-library/legacy-projects';
 import { MissingAssetObjectError } from '../../../composition/persistence/assets';
 // @vitest-environment jsdom
 
@@ -11,8 +12,12 @@ const mocks = vi.hoisted(() => ({
   createId: vi.fn(),
   getBlob: vi.fn(),
   getEntry: vi.fn(),
+  ensureNative: vi.fn(),
+  readLocalDraft: vi.fn(),
+  inspectRecovery: vi.fn(),
   readAssetId: vi.fn(),
   restore: vi.fn(),
+  stored: vi.fn(),
   toDataUrl: vi.fn(),
 }));
 
@@ -23,7 +28,9 @@ vi.mock('../../../composition/persistence/media-library/index.library.ts', async
 }));
 vi.mock('../../../composition/persistence/image-workspaces/read', async (original) => ({
   ...(await original()),
-  readImageOriginalSource: async () => {
+  readImageWorkspace: mocks.readLocalDraft,
+  readImageOriginalSource: async (id: string, options?: { includeBlob?: boolean }) => {
+    if (options?.includeBlob === false) return mocks.inspectRecovery(id);
     const [blob, asset] = await Promise.all([
       mocks.getBlob().catch((error: unknown) => {
         if (error instanceof Error && error.name === 'NotFoundError')
@@ -34,6 +41,10 @@ vi.mock('../../../composition/persistence/image-workspaces/read', async (origina
     ]);
     return { blob, asset, sourceGeneration: 'observed-generation' };
   },
+}));
+vi.mock('../../../composition/persistence/image-workspaces', async (original) => ({
+  ...(await original()),
+  recoverAndGetStoredImageWorkspace: mocks.stored,
 }));
 vi.mock('../../../workflows/editor/bootstrap', async (original) => ({
   ...(await original()),
@@ -58,6 +69,9 @@ vi.mock('../../../platform/media-utils/data-url', async (original) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.stored.mockReset().mockResolvedValue(undefined);
+  mocks.ensureNative.mockReset().mockResolvedValue(undefined);
+  mocks.inspectRecovery.mockReset().mockResolvedValue({ asset: undefined, sourceGeneration: null });
   window.history.replaceState({}, '', '/apps/extension/src/editor/index.html');
 });
 
@@ -307,7 +321,7 @@ describe('editor aggregate restore', () => {
 });
 
 vi.mock('../../../workflows/sync-transfer/editing-admission', () => ({
-  ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
+  ensureNativeEditingRootAvailable: mocks.ensureNative,
 }));
 
 it('replaces the library URL without bootstrap state and can restore the exact source location', async () => {
@@ -412,4 +426,70 @@ it('refuses a missing native original instead of replacing it from bootstrap pix
       { restoreDraft: mocks.restore }
     )
   ).rejects.toMatchObject({ name: 'MissingEditorOriginalError' });
+});
+
+it.each([null, 'consumed-bootstrap'])(
+  'resumes the migrated Image project with bootstrap=%s',
+  async (bootstrapId) => {
+    const sourceMediaId = 'legacy-image';
+    const id = legacyImageProjectId(sourceMediaId);
+    mocks.stored.mockImplementation(async () => {
+      expect(mocks.restore).not.toHaveBeenCalled();
+      return { aggregateId: id, sourceMediaId };
+    });
+    const entry = {
+      aggregateId: id,
+      sourceMediaId,
+      revision: 5,
+      document: createEditorDocumentFixture(),
+    };
+    mocks.restore.mockResolvedValue(entry);
+    mocks.getEntry.mockResolvedValue({ createdAt: 40 });
+    const { resolveEditorPageRestoreSource } = await import('./');
+    const result = await resolveEditorPageRestoreSource(
+      { assetId: sourceMediaId, bootstrapId },
+      sourceMediaId,
+      { restoreDraft: mocks.restore }
+    );
+    expect(result).toEqual({ kind: 'draft', entry, capturedAt: 40 });
+    expect(mocks.restore).toHaveBeenCalledExactlyOnceWith(id, undefined);
+    expect(mocks.getEntry).toHaveBeenCalledExactlyOnceWith(sourceMediaId);
+  }
+);
+
+it('offers original recovery when migrated project admission finds a missing document file', async () => {
+  const sourceMediaId = 'legacy-image';
+  const id = legacyImageProjectId(sourceMediaId);
+  mocks.stored.mockResolvedValue({ aggregateId: id, sourceMediaId });
+  mocks.inspectRecovery.mockResolvedValue({
+    asset: { id, workspaceRevision: 8 },
+    sourceMediaId,
+    sourceGeneration: 'before-opening',
+  });
+  mocks.ensureNative.mockRejectedValueOnce(new Error('Native editing resources are unavailable.'));
+  mocks.readLocalDraft.mockRejectedValueOnce(new MissingAssetObjectError('history-object'));
+  const { resolveEditorPageRestoreSource } = await import('./');
+  await expect(
+    resolveEditorPageRestoreSource({ assetId: sourceMediaId, bootstrapId: null }, sourceMediaId, {
+      restoreDraft: mocks.restore,
+    })
+  ).rejects.toMatchObject({
+    name: 'MissingEditorDraftAssetError',
+    recovery: {
+      routeAssetId: sourceMediaId,
+      aggregateId: id,
+      sourceMediaId,
+      revision: 8,
+      generation: 'before-opening',
+    },
+  });
+  expect(mocks.inspectRecovery.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.ensureNative.mock.invocationCallOrder[0]!
+  );
+  expect(mocks.ensureNative).toHaveBeenCalledExactlyOnceWith({
+    rootKind: 'image-project',
+    rootId: id,
+  });
+  expect(mocks.readLocalDraft).toHaveBeenCalledExactlyOnceWith(id);
+  expect(mocks.restore).not.toHaveBeenCalled();
 });

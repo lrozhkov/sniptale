@@ -125,7 +125,7 @@ it('adds empty scenario history and DB48 reference indexes before publishing cur
     [ROW_REFERENCE_INDEX, ROW_REFERENCE_FIELD, { multiEntry: true }],
   ]);
   await vi.waitFor(() =>
-    expect(openCursor).toHaveBeenCalledTimes(REFERENCE_INDEX_STORES.length + 2)
+    expect(openCursor).toHaveBeenCalledTimes(REFERENCE_INDEX_STORES.length + 4)
   );
   expect(tx.objectStore.mock.calls).toEqual([
     [SYNC_OUTBOX_STORE],
@@ -143,8 +143,12 @@ it('adds empty scenario history and DB48 reference indexes before publishing cur
     ...REFERENCE_INDEX_STORES.slice(1).map((name) => [name]),
     ['video_workspaces'],
     ['video_workspace_history'],
+    ['image_workspaces'],
+    ['video_workspaces'],
   ]);
-  expect(openCursor.mock.calls).toEqual(REFERENCE_INDEX_STORES.map(() => []).concat([[], []]));
+  expect(openCursor.mock.calls).toEqual(
+    REFERENCE_INDEX_STORES.map(() => []).concat([[], [], [], []])
+  );
   expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 15 });
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(getAll).not.toHaveBeenCalled();
