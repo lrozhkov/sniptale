@@ -1,6 +1,7 @@
 import { Pause, Play, RotateCcw, SquarePen, X } from 'lucide-react';
 import { useEffect, useId, useCallback, useRef, useState, type RefObject } from 'react';
 import { translate } from '../../platform/i18n';
+import { InspectorFieldClear } from '../../ui/compact-inspector-controls/text-field';
 import { CameraWindowButton } from './button';
 import { TeleprompterReader, type ReadingPreferences } from './teleprompter-reader';
 import { TeleprompterSettings, type PlaybackMode } from './teleprompter-settings';
@@ -10,10 +11,11 @@ const SECTION_CLASS = [
   'text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 const EDITOR_CLASS = [
-  'min-h-20 w-full flex-1 resize-y rounded-[4px] border border-transparent bg-transparent p-2',
+  'sniptale-compact-text-scroll min-h-20 w-full resize-y rounded-[4px]',
+  'border border-transparent bg-transparent p-2 pe-9 outline-none',
   '[font-family:var(--sniptale-font-document-sans)] text-[16px] leading-relaxed',
-  'hover:border-[var(--sniptale-color-border-soft)] hover:bg-[var(--sniptale-color-surface-panel)]',
-  'focus:border-[var(--sniptale-color-border-soft)] focus:bg-[var(--sniptale-color-surface-panel)]',
+  'hover:border-[var(--sniptale-color-border-soft)] hover:bg-[var(--sniptale-color-surface-input)]',
+  'focus:border-[var(--sniptale-color-border-soft)] focus:bg-[var(--sniptale-color-surface-input)]',
   'focus:placeholder:text-transparent',
 ].join(' ');
 /** A session-local script reader. The host retains the mounted component when hidden. */
@@ -40,6 +42,8 @@ export function Teleprompter({
   const [effectiveFontSize, setEffectiveFontSize] = useState(24);
   const [playback, setPlayback] = useState<PlaybackMode>('manual');
   const section = useRef<HTMLElement>(null);
+  const editor = useRef<HTMLTextAreaElement>(null);
+  const scriptLabel = translate('popup.video.teleprompterScript');
   const scroll = useTeleprompterScroll({
     paused: paused || !visible,
     editing,
@@ -115,15 +119,19 @@ export function Teleprompter({
             id={`${id}-script`}
             className="text-[12px] text-[var(--sniptale-color-text-secondary)]"
           >
-            {translate('popup.video.teleprompterScript')}
+            {scriptLabel}
           </span>
-          <textarea
-            aria-labelledby={`${id}-script`}
-            className={EDITOR_CLASS}
-            placeholder={translate('popup.video.teleprompterPlaceholder')}
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-          />
+          <div className="sniptale-text-value grid min-h-0 flex-1">
+            <textarea
+              ref={editor}
+              aria-labelledby={`${id}-script`}
+              className={EDITOR_CLASS}
+              placeholder={translate('popup.video.teleprompterPlaceholder')}
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+            />
+            {text ? <InspectorFieldClear label={scriptLabel} target={editor} /> : null}
+          </div>
         </div>
       ) : (
         <TeleprompterReader

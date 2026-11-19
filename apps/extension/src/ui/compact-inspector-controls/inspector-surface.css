@@ -844,6 +844,11 @@
 }
 .sniptale-compact-workspace .sniptale-highlighter-css-draft > .sniptale-field-clear {
   --sniptale-color-accent: var(--sniptale-color-text-muted-strong);
+}
+.sniptale-compact-workspace
+  .sniptale-text-value
+  > textarea.sniptale-compact-text-scroll
+  + .sniptale-field-clear {
   inset-inline-end: 8px;
 }
 textarea.sniptale-compact-text-scroll::-webkit-scrollbar {
@@ -867,7 +872,7 @@ textarea.sniptale-compact-text-scroll::-webkit-scrollbar-thumb {
 textarea.sniptale-compact-text-scroll::-webkit-scrollbar-thumb:hover {
   background-color: color-mix(in srgb, var(--sniptale-color-text-secondary) 45%, transparent);
 }
-.sniptale-highlighter-css-draft > textarea::-webkit-resizer {
+textarea.sniptale-compact-text-scroll::-webkit-resizer {
   background: linear-gradient(
       to top left,
       transparent 2px,

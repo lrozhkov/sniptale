@@ -55,6 +55,7 @@ export const CompactTextarea = React.forwardRef<HTMLTextAreaElement, ProductText
         {...props}
         data-ui="shared.ui.compact-textarea"
         className={cx(
+          'sniptale-compact-text-scroll',
           'min-h-[6.875rem] w-full min-w-0 max-w-full resize-y px-3 py-2 text-sm leading-5 outline-none',
           COMPACT_INSPECTOR_SOLID_CONTROL_CLASS_NAME,
           className

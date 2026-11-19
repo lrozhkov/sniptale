@@ -107,6 +107,29 @@ for (const [index, size] of [
         })
         .click();
       const field = inspector.getByRole('textbox');
+      const longNote = Array.from({ length: 16 }, (_, line) => `${line + 1}. ${edited}`).join('\n');
+      await field.fill(longNote);
+      await field.hover();
+      await field.evaluate((node) => (node.scrollTop = 0));
+      await page.screenshot({ path: info.outputPath('notes-text-overflow.png'), fullPage: false });
+      await expect
+        .poll(() =>
+          field.evaluate((node) => ({
+            thumb: getComputedStyle(node, '::-webkit-scrollbar-thumb').cursor,
+            track: getComputedStyle(node, '::-webkit-scrollbar').width,
+            corner: getComputedStyle(node, '::-webkit-scrollbar-corner').backgroundColor,
+            hasResizeHandle: getComputedStyle(node, '::-webkit-resizer').backgroundImage !== 'none',
+          }))
+        )
+        .toEqual({
+          thumb: 'default',
+          track: '6px',
+          corner: 'rgba(0, 0, 0, 0)',
+          hasResizeHandle: true,
+        });
+      await page.mouse.wheel(0, 100);
+      await expect.poll(() => field.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+      await expect(field).toHaveValue(longNote);
       await field.fill(edited);
       await checkInspectorPaintedFont(page, field, 'input');
       await field.press('Tab');

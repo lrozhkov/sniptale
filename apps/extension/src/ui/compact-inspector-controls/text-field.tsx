@@ -115,12 +115,11 @@ export function InspectorFieldClear(props: {
     onClick: () => {
       const input = props.target.current;
       if (!input || input.matches(':disabled') || input.readOnly) return;
-      const prototype =
-        input instanceof HTMLTextAreaElement
-          ? HTMLTextAreaElement.prototype
-          : HTMLInputElement.prototype;
+      // A node can be created in, or adopted into, a Document Picture-in-Picture window.
+      const prototype = Object.getPrototypeOf(input) as object;
       Object.getOwnPropertyDescriptor(prototype, 'value')?.set?.call(input, '');
-      input.dispatchEvent(new Event('input', { bubbles: true }));
+      const EventConstructor = input.ownerDocument.defaultView?.Event ?? Event;
+      input.dispatchEvent(new EventConstructor('input', { bubbles: true }));
       input.focus();
     },
   });
