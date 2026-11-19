@@ -214,7 +214,25 @@ it('edits hotspot visuals and copy through canonical history without click comma
     visual: { kind: 'highlight' },
   });
   await choose('Focus style', 'Animated frame');
-  expect(getTourHotspots(current())[0]!.visual.kind).toBe('frame');
+  for (const [label, value] of [
+    ['Frame width', '5'],
+    ['Frame radius', '12'],
+  ] as const) {
+    const control = host.querySelector(`input[aria-label="${label}"]`);
+    const row = control?.closest('[data-ui="shared.ui.compact-inspector.numeric-row"]');
+    expect(row).not.toBeNull();
+    expect(row?.hasAttribute('data-has-scrub')).toBe(false);
+    await fill(label, value);
+  }
+  expect(getTourHotspots(current())[0]!.visual).toMatchObject({
+    kind: 'frame',
+    strokeWidth: 5,
+    radius: 12,
+  });
+  const opacityRow = host
+    .querySelector('input[aria-label="Opacity"]')
+    ?.closest('[data-ui="shared.ui.compact-inspector.numeric-row"]');
+  expect(opacityRow?.getAttribute('data-has-scrub')).toBe('true');
   await choose('Focus style', 'Pulsating point');
   expect(getTourHotspots(current())[0]!.point.x).toBeCloseTo(0.3);
   expect(getTourHotspots(current())[0]!.point.y).toBeCloseTo(0.4);

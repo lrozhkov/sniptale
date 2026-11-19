@@ -67,11 +67,38 @@
 }
 .guide-ai-prompt-input {
   position: relative;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: 4px;
+  background: var(--sniptale-color-surface-input);
+}
+.guide-ai-prompt-input:is(:focus-within, :has(textarea:hover:not(:disabled))) {
+  background: var(--sniptale-color-surface-hover);
+}
+.guide-ai-prompt-input:has(textarea:focus-visible) {
+  border-color: var(--sniptale-color-border-strong);
+}
+.guide-ai-prompt-input > .guide-voice-field {
+  padding-block-end: 40px;
 }
 .guide-ai-prompt-input textarea {
+  display: block;
   width: 100%;
-  min-height: 110px;
-  padding-bottom: 44px;
+  min-height: 80px;
+  padding: 4px 12px;
+  border: 0;
+  background: transparent;
+  outline: none;
+  resize: none;
+}
+.guide-ai-prompt-input textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.guide-ai-prompt-input textarea::placeholder {
+  color: var(--sniptale-color-text-dim);
+}
+.guide-ai-prompt-input textarea:focus::placeholder {
+  color: transparent;
 }
 .guide-ai-prompt-input .guide-voice-control {
   top: auto;
@@ -138,19 +165,8 @@
   margin-bottom: 6px;
 }
 .guide-ai-selection-search {
-  display: flex;
-  align-items: center;
-  gap: 4px;
   flex: 1 1 180px;
   min-width: 0;
-  color: var(--sniptale-color-text-secondary);
-}
-.guide-ai-selection-search input {
-  min-width: 0;
-  width: 100%;
-}
-.guide-ai-selection-search button {
-  flex-shrink: 0;
 }
 .guide-ai-selection-list {
   max-height: 160px;
@@ -235,8 +251,7 @@
 .sniptale-scenario-workspace .guide-ai-body,
 .sniptale-scenario-workspace .guide-ai-prompt > span,
 .sniptale-scenario-workspace .guide-ai-scope-heading > span,
-.sniptale-scenario-workspace .guide-ai-selection-copy strong,
-.sniptale-scenario-workspace .guide-ai-selection-search input {
+.sniptale-scenario-workspace .guide-ai-selection-copy strong {
   font: 500 13px / 18px var(--sniptale-font-interface);
 }
 .sniptale-scenario-workspace .guide-ai-prompt,
@@ -262,10 +277,6 @@
 .sniptale-scenario-workspace .guide-ai-selection-section {
   font: 600 14px / 20px var(--sniptale-font-interface);
 }
-.sniptale-scenario-workspace .guide-ai-selection-search {
-  position: relative;
-  padding-inline-end: 24px;
-}
 .sniptale-scenario-workspace .guide-ai-selection-row {
   min-height: 56px;
   border-radius: 4px;
@@ -276,8 +287,7 @@
   background: var(--sniptale-color-surface-hover);
 }
 .sniptale-scenario-workspace .guide-ai-prompt-input textarea {
-  border-radius: 4px;
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: 400 13px / 18px var(--sniptale-font-document-sans);
 }
 .sniptale-scenario-workspace .guide-ai-prompt-input .guide-voice-field > .sniptale-field-clear {
   top: 4px;

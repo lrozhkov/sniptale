@@ -102,12 +102,18 @@ export function SearchField(props: {
   label: string;
   placeholder: string;
   value: string;
+  disabled?: boolean;
+  /** Suppress native suggestions and spelling assistance for literal queries. */
+  disableTextAssistance?: boolean;
   onChange: (value: string) => void;
   inputRef?: React.RefObject<HTMLInputElement | null>;
   onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
 }) {
   const localRef = React.useRef<HTMLInputElement>(null);
   const inputRef = props.inputRef ?? localRef;
+  const assistance = props.disableTextAssistance
+    ? { autoComplete: 'off', autoCorrect: 'off', autoCapitalize: 'none', spellCheck: false }
+    : {};
   return (
     <div className="sniptale-inspector-search">
       <Search size={14} aria-hidden="true" />
@@ -115,12 +121,16 @@ export function SearchField(props: {
         ref={inputRef}
         aria-label={props.label}
         type="search"
+        disabled={props.disabled}
+        {...assistance}
         value={props.value}
         placeholder={props.placeholder}
         onChange={(event) => props.onChange(event.currentTarget.value)}
         onKeyDown={props.onKeyDown}
       />
-      {props.value ? <InspectorFieldClear label={props.label} target={inputRef} /> : null}
+      {props.value && !props.disabled ? (
+        <InspectorFieldClear label={props.label} target={inputRef} />
+      ) : null}
     </div>
   );
 }

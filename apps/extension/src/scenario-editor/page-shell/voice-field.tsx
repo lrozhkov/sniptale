@@ -153,7 +153,11 @@ export function GuideVoiceField(props: VoiceFieldProps) {
       {props.singleLine ? (
         <Input {...attributes} />
       ) : (
-        <Textarea {...attributes} rows={props.rows ?? 1} />
+        <Textarea
+          {...attributes}
+          className={['sniptale-compact-text-scroll', props.className].filter(Boolean).join(' ')}
+          rows={props.rows ?? 1}
+        />
       )}
       <span className="guide-voice-control" onMouseDown={(event) => event.preventDefault()}>
         <VoiceInputButton

@@ -32,7 +32,7 @@ export function GuideAiPromptField({
           value={value}
           onValueChange={onChange}
           disabled={disabled}
-          formControl
+          placeholder={t('scenario.editor.guideAiInstruction')}
           rows={4}
           maxLength={SCENARIO_EDITOR_AI_PAYLOAD_LIMITS.maxInstructionChars}
         />

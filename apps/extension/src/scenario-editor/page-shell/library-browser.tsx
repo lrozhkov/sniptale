@@ -3,9 +3,9 @@ import { MaterialBrowser } from '@sniptale/ui/material-browser';
 import { LibraryNavigation } from '../../composition/library-preview/navigation';
 import { LibraryMediaPlayer } from '../../composition/library-preview/player';
 import { GUIDE_LIBRARY_IMAGE_DRAG_TYPE } from './image-drop';
-import { useCallback, useEffect, useRef, useState, useId, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Image, Film } from 'lucide-react';
-import { ProjectSearchField } from '@sniptale/ui/searchable-project-picker/parts';
+import { SearchField } from '../../ui/compact-inspector-controls/row-controls';
 import { subscribeToMediaHubEvents } from '../../features/media-hub/events';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { listMediaLibrary, getMediaThumbnail } from '../../composition/persistence/media-library';
@@ -200,7 +200,6 @@ export function GuideLibraryBrowser({
   previewContent,
 }: GuideLibraryBrowserProps) {
   const catalog = useLibraryCatalog();
-  const searchId = useId();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<'all' | 'video' | 'image'>('image');
   const [viewId, setViewId] = useState<string | null>(null);
@@ -224,6 +223,11 @@ export function GuideLibraryBrowser({
       (!view || matchesLibraryFilters(item, view.filters, Date.now()))
   );
   const preview = items.find((item) => item.id === previewId);
+  const searchLabel = t(
+    category === 'video'
+      ? 'scenario.editor.guideLibraryVideoSearch'
+      : 'scenario.editor.guideLibrarySearch'
+  );
   return (
     <MaterialBrowser
       className="guide-library-browser"
@@ -252,21 +256,10 @@ export function GuideLibraryBrowser({
       }
       search={
         <div className="guide-library-search">
-          <label className="sr-only" htmlFor={searchId}>
-            {t(
-              category === 'video'
-                ? 'scenario.editor.guideLibraryVideoSearch'
-                : 'scenario.editor.guideLibrarySearch'
-            )}
-          </label>
-          <ProjectSearchField
-            searchId={searchId}
-            presentation="compact"
-            searchPlaceholder={t(
-              category === 'video'
-                ? 'scenario.editor.guideLibraryVideoSearch'
-                : 'scenario.editor.guideLibrarySearch'
-            )}
+          <SearchField
+            label={searchLabel}
+            placeholder={searchLabel}
+            disableTextAssistance
             value={query}
             onChange={setQuery}
           />

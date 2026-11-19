@@ -64,7 +64,7 @@ it('shows section context, hidden numbering and image descriptions with reversib
   expect(node.textContent).toContain('Preparation');
   expect(node.textContent).toContain('Screenshot of upload');
   expect(node.querySelector('.guide-ai-selection-number svg')).not.toBeNull();
-  const input = node.querySelector('input[type="text"]')!;
+  const input = node.querySelector('input[type="search"]')!;
   act(() => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
       input,

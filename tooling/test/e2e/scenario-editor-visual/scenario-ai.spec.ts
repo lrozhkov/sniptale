@@ -15,6 +15,19 @@ for (const theme of ['light', 'dark'] as const) {
       Reflect.set(chrome.runtime, 'sendMessage', async (message: unknown) => {
         if (!message || typeof message !== 'object' || !('type' in message))
           throw new Error('Invalid message');
+        if ('operation' in message) {
+          if (
+            message.type === 'AI_SETTINGS_QUERY' &&
+            message.operation === 'read-scenario-selection'
+          )
+            return { success: true, scenarioSelection: null };
+          if (
+            message.type === 'AI_SETTINGS_MUTATION' &&
+            (message.operation === 'remember-scenario-selection' ||
+              message.operation === 'refresh-managed-catalogs')
+          )
+            return { success: true };
+        }
         if (message.type === 'AI_SETTINGS_QUERY')
           return {
             success: true,
@@ -77,7 +90,7 @@ for (const theme of ['light', 'dark'] as const) {
     await dialog.getByRole('button', { name: 'Choose steps', exact: true }).click();
     await expect(dialog.getByText('Introduction', { exact: true })).toBeVisible();
     await dialog.getByRole('button', { name: 'Clear selection', exact: true }).click();
-    await dialog.getByRole('textbox', { name: 'Find a step or section' }).fill('Text-only');
+    await dialog.getByRole('searchbox', { name: 'Find a step or section' }).fill('Text-only');
     await dialog.getByRole('button', { name: 'Select visible', exact: true }).click();
     await expect(dialog.getByText('Selected 1 of 2', { exact: true })).toBeVisible();
     await testInfo.attach(`ai-step-selection-${theme}`, {
@@ -119,8 +132,9 @@ for (const theme of ['light', 'dark'] as const) {
     const mic = await dialog.locator('[data-ui="scenario.voice-input"]').boundingBox();
     expect(field).not.toBeNull();
     expect(mic).not.toBeNull();
-    expect(mic!.y).toBeGreaterThan(field!.y + 8);
-    expect(mic!.y + mic!.height).toBeLessThanOrEqual(field!.y + field!.height);
+    const frame = (await dialog.locator('.guide-ai-prompt-input').boundingBox())!;
+    expect(mic!.y).toBeGreaterThanOrEqual(field!.y + field!.height);
+    expect(mic!.y + mic!.height).toBeLessThanOrEqual(frame.y + frame.height);
     const prompt = dialog.locator('.guide-ai-prompt-input textarea');
     const acceptedPrompt = await prompt.inputValue();
     expect(
@@ -278,6 +292,56 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
+for (const [theme, viewport] of [
+  ['light', { width: 1280, height: 560 }],
+  ['dark', { width: 1920, height: 900 }],
+] as const) {
+  test(`scenario AI instruction scrolls and clears in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await openVisualHarness(page, hostOrigin, theme, 'ru', viewport);
+    const trigger = page.getByRole('button', { name: 'Помощь AI', exact: true });
+    await trigger.click();
+    const dialog = page.getByRole('dialog');
+    const field = dialog.locator('.guide-ai-prompt-input textarea');
+    await expect(field).toHaveCSS('font-family', /Sniptale Text/);
+    await expect(field).toHaveCSS('font-weight', '400');
+    await field.fill(Array.from({ length: 24 }, (_, line) => `Строка ${line + 1}`).join('\n'));
+    await field.hover();
+    const scrollbar = await field.evaluate((node) => ({
+      corner: getComputedStyle(node, '::-webkit-scrollbar-corner').backgroundColor,
+      cursor: getComputedStyle(node, '::-webkit-scrollbar-thumb').cursor,
+      width: getComputedStyle(node, '::-webkit-scrollbar').width,
+      scrolls: node.scrollHeight > node.clientHeight,
+    }));
+    expect(scrollbar).toEqual({
+      corner: 'rgba(0, 0, 0, 0)',
+      cursor: 'default',
+      width: '6px',
+      scrolls: true,
+    });
+    await field.evaluate((node) => {
+      node.scrollTop = 0;
+    });
+    await page.mouse.wheel(0, 100);
+    await expect.poll(() => field.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+    const editor = (await field.boundingBox())!;
+    const templates = (await dialog.locator('.guide-ai-prompt-templates').boundingBox())!;
+    expect(editor.y + editor.height).toBeLessThanOrEqual(templates.y);
+    await expect(
+      dialog.getByRole('button', { name: 'Получить предложения', exact: true })
+    ).toBeInViewport();
+    await page.screenshot({ path: info.outputPath('instruction-overflow.png'), fullPage: false });
+    await dialog.locator('.guide-ai-prompt-input .sniptale-field-clear').click();
+    await expect(field).toHaveValue('');
+    await expect(field).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  });
+}
+
 for (const theme of ['light', 'dark'] as const) {
   test(`Russian step picker fits compact view and supports keyboard selection in ${theme}`, async ({
     page,
@@ -287,20 +351,38 @@ for (const theme of ['light', 'dark'] as const) {
     await page.getByRole('button', { name: 'Помощь AI', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('button', { name: 'Выбрать шаги', exact: true }).click();
-    await expect(dialog.getByRole('textbox', { name: 'Найти шаг или раздел' })).toBeVisible();
+    const search = dialog.getByPlaceholder('Найти шаг или раздел', { exact: true });
+    await expect(search).toHaveAccessibleName('Найти шаг или раздел');
+    await expect(search).not.toHaveAttribute('spellcheck');
+    await search.hover();
+    const frame = search.locator('..');
+    await expect(frame).toHaveCSS('border-top-width', '1px');
+    await expect(frame).toHaveCSS('height', '32px');
+    await expect(search).toHaveCSS('border-top-width', '0px');
     const second = dialog.getByRole('checkbox', { name: 'Text-only step', exact: true });
     await second.focus();
     await second.press('Space');
     await expect(second).toBeChecked();
     await expect(dialog.getByText('Выбрано 2 из 2', { exact: true })).toBeVisible();
+    const width = (await frame.boundingBox())!.width;
+    await search.fill('Compare');
+    await expect(second).toHaveCount(0);
+    await expect(dialog.getByText('Выбрано 2 из 2', { exact: true })).toBeVisible();
+    const clear = frame.locator('.sniptale-field-clear');
+    await expect(clear).toHaveCSS('width', '24px');
+    expect(Math.abs((await frame.boundingBox())!.width - width)).toBeLessThanOrEqual(1);
+    await clear.click();
+    await expect(search).toBeFocused();
+    await expect(search).toHaveValue('');
+    await expect(second).toBeChecked();
     await expect(
       dialog.getByRole('button', { name: 'Получить предложения', exact: true })
     ).toBeInViewport({ ratio: 1 });
     const overflow = await dialog.evaluate((node) => node.scrollWidth > node.clientWidth);
     expect(overflow).toBe(false);
-    await testInfo.attach(`ai-step-selection-ru-${theme}`, {
-      body: await page.screenshot(),
-      contentType: 'image/png',
+    await page.screenshot({
+      path: testInfo.outputPath(`ai-step-selection-ru-${theme}.png`),
+      fullPage: false,
     });
   });
 }
@@ -311,6 +393,16 @@ async function installLargeModelCatalog(page: Page) {
     Reflect.set(chrome.runtime, 'sendMessage', async (message: unknown) => {
       if (!message || typeof message !== 'object' || !('type' in message))
         throw new Error('Invalid message');
+      if ('operation' in message) {
+        if (message.type === 'AI_SETTINGS_QUERY' && message.operation === 'read-scenario-selection')
+          return { success: true, scenarioSelection: null };
+        if (
+          message.type === 'AI_SETTINGS_MUTATION' &&
+          (message.operation === 'remember-scenario-selection' ||
+            message.operation === 'refresh-managed-catalogs')
+        )
+          return { success: true };
+      }
       if (message.type !== 'AI_SETTINGS_QUERY') return original(message);
       const providerId = '20000000-0000-4000-8000-000000000002';
       const models = Array.from({ length: 80 }, (_, index) => ({

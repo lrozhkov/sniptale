@@ -35,8 +35,10 @@ textarea.text-input {
   border-color: transparent;
   background: transparent;
 }
-.text-field:not(:has(> .text-label:hover)) > .text-input:hover:not(:disabled):not(:read-only),
-.text-field:focus-within > .text-input:not(:disabled):not(:read-only) {
+.text-field:where(:not(.text-field--dictation)):not(:has(> .text-label:hover))
+  > .text-input:hover:not(:disabled):not(:read-only),
+.text-field:where(:not(.text-field--dictation)):focus-within
+  > .text-input:not(:disabled):not(:read-only) {
   background: var(--surface-hover);
   border-color: var(--field-border, var(--divider));
 }
@@ -292,23 +294,33 @@ html[data-input-mode='keyboard'] .text-input:focus-visible {
   stroke-linecap: round;
 }
 
+.text-field--dictation::before {
+  content: '';
+  grid-area: 2 / 1 / span 2 / 2;
+  border: 1px solid var(--reference-field-border);
+  border-radius: var(--radius);
+  background: var(--reference-field-idle);
+  pointer-events: none;
+}
+.text-field--dictation:is(:focus-within, :hover:not(:has(> .text-label:hover)))::before {
+  background: var(--reference-field-hover);
+  border-color: var(--reference-field-hover-border);
+}
+html[data-input-mode='keyboard'] .text-field--dictation:has(> textarea:focus-visible)::before {
+  border-color: var(--sniptale-color-border-strong);
+}
 .text-field.text-field--dictation > textarea.text-input {
   min-height: 90px;
   padding-inline-end: 36px;
-  padding-block-end: 32px;
-  background: var(--reference-field-idle);
-  border-color: var(--reference-field-border);
-}
-.text-field--dictation:focus-within > textarea.text-input,
-.text-field--dictation > textarea.text-input:hover {
-  background: var(--reference-field-hover);
-  border-color: var(--reference-field-hover-border);
+  background: transparent;
+  border-color: transparent;
+  outline: none;
 }
 .text-field.text-field--dictation > .text-clear {
   margin-inline-end: 12px;
 }
 .text-field--dictation > .inspector-dictation.action-button {
-  grid-area: 2 / 1;
+  grid-area: 3 / 1;
   align-self: end;
   justify-self: end;
   z-index: 1;
@@ -317,7 +329,7 @@ html[data-input-mode='keyboard'] .text-input:focus-visible {
   height: 24px;
   min-height: 24px;
   margin-inline-end: 12px;
-  margin-block-end: 4px;
+  margin-block: 4px;
   padding: 0;
   visibility: hidden;
 }
@@ -325,7 +337,7 @@ html[data-input-mode='keyboard'] .text-input:focus-visible {
   width: 14px;
   height: 14px;
 }
-.text-field--dictation:is(:focus-within, :has(> :is(textarea, .inspector-dictation):hover))
+.text-field--dictation:is(:focus-within, :hover:not(:has(> .text-label:hover)))
   > .inspector-dictation {
   visibility: visible;
 }

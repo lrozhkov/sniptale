@@ -27,6 +27,21 @@ import {
   type PanelSectionProps,
 } from './index';
 
+it('keeps a disabled search query visible without an available Clear action', () => {
+  const markup = renderToStaticMarkup(
+    <SearchField
+      label="Search"
+      placeholder="Find"
+      value="Retained query"
+      disabled
+      onChange={() => undefined}
+    />
+  );
+  expect(markup).toContain('disabled=""');
+  expect(markup).toContain('value="Retained query"');
+  expect(markup).not.toContain('sniptale-field-clear');
+});
+
 it('renders compact inspector layout, controls, and empty list states', () => {
   const markup = [
     renderPanelShellMarkup(),
@@ -39,6 +54,25 @@ it('renders compact inspector layout, controls, and empty list states', () => {
   assertFieldControlMarkup(markup);
   assertChoiceControlMarkup(markup);
   assertPresetAndStateMarkup(markup);
+});
+
+it('suppresses browser text assistance only when a search consumer requests it', () => {
+  const render = (disableTextAssistance: boolean) =>
+    renderToStaticMarkup(
+      <SearchField
+        label="Search"
+        placeholder="Find"
+        value=""
+        disableTextAssistance={disableTextAssistance}
+        onChange={() => undefined}
+      />
+    );
+  expect(render(false)).not.toMatch(/(?:autocomplete|autocorrect|autocapitalize|spellcheck)=/iu);
+  const optedIn = render(true);
+  expect(optedIn).toMatch(/autocomplete="off"/iu);
+  expect(optedIn).toMatch(/autocorrect="off"/iu);
+  expect(optedIn).toMatch(/autocapitalize="none"/iu);
+  expect(optedIn).toMatch(/spellcheck="false"/iu);
 });
 
 function renderPanelShellMarkup() {

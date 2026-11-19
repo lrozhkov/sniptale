@@ -825,18 +825,24 @@ test('voice header keeps text room at desktop minimum widths', async ({
     await openVisualHarness(page, hostOrigin, 'light', 'en', { width, height: 560 });
     const header = page.locator('.guide-page-header');
     const input = header.locator('.guide-project-name input');
-    const room = await input.evaluate((node) => {
-      const style = getComputedStyle(node);
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d')!;
-      context.font = style.font;
-      return {
-        available:
-          node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
-        minimum: context.measureText('0').width * 8,
-      };
-    });
-    expect(room.available, JSON.stringify(room)).toBeGreaterThanOrEqual(room.minimum - 1);
+    const textRoom = () =>
+      input.evaluate((node) => {
+        const style = getComputedStyle(node);
+        const context = document.createElement('canvas').getContext('2d')!;
+        context.font = style.font;
+        return {
+          available:
+            node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+          minimum: context.measureText('12345678').width,
+          width: node.getBoundingClientRect().width,
+        };
+      });
+    const idle = await textRoom();
+    expect(idle.available, JSON.stringify(idle)).toBeGreaterThanOrEqual(idle.minimum - 1);
+    await input.hover();
+    const hover = await textRoom();
+    expect(hover.available, JSON.stringify(hover)).toBeGreaterThanOrEqual(hover.minimum - 1);
+    expect(hover.width).toBeCloseTo(idle.width, 0);
     for (const icon of await header.locator('button[data-icon-only="true"] svg').all())
       await expect(icon).toBeVisible();
     if (width < 1280) {

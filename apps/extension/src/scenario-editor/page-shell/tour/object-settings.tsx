@@ -248,6 +248,7 @@ function TourHotspotVisualSettings({
                 min={1}
                 max={12}
                 unit="px"
+                scrub={false}
                 disabled={disabled}
                 onChange={(strokeWidth) =>
                   onChange({ ...value, visual: { ...visual, strokeWidth } })
@@ -259,6 +260,7 @@ function TourHotspotVisualSettings({
                 min={0}
                 max={32}
                 unit="px"
+                scrub={false}
                 disabled={disabled}
                 onChange={(radius) => onChange({ ...value, visual: { ...visual, radius } })}
               />

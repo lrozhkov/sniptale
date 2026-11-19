@@ -84,6 +84,51 @@ test.afterAll(async () => {
 });
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`reference prompt keeps dictation outside text scroll ${viewport.name}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize(viewport.size);
+    await page.goto(`${origin}examples/fields/?view=both&mode=examples&lang=ru`);
+    const themes = page.locator('.theme');
+    await expect(themes).toHaveCount(2);
+    for (const theme of await themes.all()) {
+      const input = theme.getByRole('textbox', { name: 'Запрос', exact: true });
+      const dictation = theme.getByRole('button', {
+        name: 'Вставить пример диктовки',
+        exact: true,
+      });
+      await input.fill(Array.from({ length: 24 }, (_, line) => `Строка ${line + 1}`).join('\n'));
+      await input.blur();
+      await theme.getByText('Запрос', { exact: true }).hover();
+      await expect(dictation).toBeHidden();
+      await input.hover();
+      await expect(dictation).toBeVisible();
+      const position = (await input.boundingBox())!;
+      const action = (await dictation.boundingBox())!;
+      expect(position.y + position.height).toBeLessThanOrEqual(action.y);
+      await page.mouse.move(
+        action.x + action.width / 2,
+        (position.y + position.height + action.y) / 2
+      );
+      await expect(dictation).toBeVisible();
+      await dictation.hover();
+      await expect(input).not.toBeFocused();
+      await input.hover();
+      await input.evaluate((node) => {
+        node.scrollTop = 0;
+      });
+      await page.mouse.wheel(0, 100);
+      await expect.poll(() => input.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+      await dictation.click();
+      await expect(input).toHaveValue(/Пример диктовки/u);
+      await expect(input).toBeFocused();
+      await page.screenshot({
+        path: info.outputPath(`reference-prompt-${await theme.getAttribute('data-theme')}.png`),
+        fullPage: false,
+      });
+    }
+  });
+
   test(`reference control composition ${viewport.name}`, async ({ page }, info) => {
     await page.setViewportSize(viewport.size);
     await page.goto(origin);

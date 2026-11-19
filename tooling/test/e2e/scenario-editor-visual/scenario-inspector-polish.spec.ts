@@ -427,6 +427,44 @@ for (const { locale, theme, size } of contexts) {
     await capture(page, panel, info, 'tour-region-hidden-animation');
   });
 
+  test(`tour frame has exact pixel controls and continuous opacity ${locale}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const t = createTranslator(locale);
+    await openVisualHarness(page, hostOrigin, theme, locale, size, 'compare', { tourFixture: '1' });
+    await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
+    const panel = page.locator('#guide-inspector-panel');
+    await addObject(page, panel, t, 'tourHotspot');
+    await category(panel, t('scenario.editor.appearance')).click();
+    const label = t('scenario.editor.tourVisual');
+    const option = t('scenario.editor.tourVisualFrame');
+    const visual = panel.getByRole('group', { name: label, exact: true });
+    if (await visual.count())
+      await visual.getByRole('button', { name: option, exact: true }).click();
+    else await selectOption(page, panel, label, option);
+    const radiusLabel = t('scenario.editor.tourFrameRadius');
+    const radius = panel.getByRole('textbox', { name: radiusLabel, exact: true });
+    const stroke = number(panel, t('scenario.editor.tourFrameStroke'));
+    const opacity = number(panel, t('scenario.editor.tourOpacity'));
+    await expect(stroke).not.toHaveAttribute('data-has-scrub', 'true');
+    await expect(number(panel, radiusLabel)).not.toHaveAttribute('data-has-scrub', 'true');
+    await radius.fill('12');
+    await radius.press('ArrowUp');
+    await expect(radius).toHaveValue('13');
+    await radius.press('ArrowDown');
+    await expect(radius).toHaveValue('12');
+    await radius.hover();
+    await number(panel, radiusLabel)
+      .getByRole('button', { name: `${radiusLabel} decrease`, exact: true })
+      .click();
+    await expect(radius).toHaveValue('11');
+    await page.screenshot({ path: info.outputPath('tour-frame-radius.png'), fullPage: false });
+    await opacity.hover();
+    await expect(opacity.getByRole('slider')).toBeVisible();
+    await page.screenshot({ path: info.outputPath('tour-frame-opacity.png'), fullPage: false });
+  });
+
   test(`tour navigation icon radios support one Tab stop and keyboard changes ${locale}`, async ({
     page,
     hostOrigin,
