@@ -21,6 +21,8 @@ export interface NumericValueFieldProps {
   /** Focus presentation: 'accent-box' draws an accent border box, 'quiet' a thin accent line. */
   focusAppearance?: 'accent-box' | 'quiet' | undefined;
   invalid?: boolean | undefined;
+  /** Let unmodified Up and Down apply the field's existing exact step. */
+  keyboardStep?: boolean | undefined;
   label: string;
   max?: number | undefined;
   min?: number | undefined;
@@ -164,6 +166,22 @@ function NumericValueInput({
       }}
       onKeyDown={(event) => {
         setPointerFocus(false);
+        if (
+          props.keyboardStep &&
+          !props.disabled &&
+          !event.defaultPrevented &&
+          !event.nativeEvent.isComposing &&
+          !event.altKey &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          !event.shiftKey &&
+          (event.key === 'ArrowUp' || event.key === 'ArrowDown')
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          state.applyStep(event.key === 'ArrowUp' ? 1 : -1);
+          return;
+        }
         state.handleKeyDown(event);
       }}
       onPointerDown={(event) => {

@@ -7,6 +7,7 @@ export function EditorCompactRangeField({
   max,
   min,
   onChange,
+  scrubbable = true,
   value,
 }: {
   displaySuffix?: CompactInspectorUnit;
@@ -14,17 +15,19 @@ export function EditorCompactRangeField({
   max: number;
   min: number;
   onChange: (value: number) => void;
+  scrubbable?: boolean;
   value: number;
 }) {
   return (
     <NumericRow
       appearance="plain"
+      keyboardStep={!scrubbable}
       label={label}
       max={max}
       min={min}
       onCommitValue={onChange}
       onPreviewValue={onChange}
-      scrub={{ max, min, step: 1 }}
+      scrub={scrubbable ? { max, min, step: 1 } : undefined}
       step={1}
       unit={displaySuffix}
       value={value}

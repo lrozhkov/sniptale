@@ -556,6 +556,24 @@ for (const theme of ['light', 'dark'] as const) {
         const comment = popover.getByRole('textbox', {
           name: /Element comment|Комментарий к элементу/u,
         });
+        await comment.fill(
+          Array.from({ length: 24 }, (_, index) => `Comment line ${index}`).join('\n')
+        );
+        const scrollbar = await comment.evaluate((node) => ({
+          width: getComputedStyle(node, '::-webkit-scrollbar').width,
+          scrolls: node.scrollHeight > node.clientHeight,
+        }));
+        expect(scrollbar).toEqual({ width: '6px', scrolls: true });
+        await comment.hover();
+        await comment.evaluate((node) => {
+          node.scrollTop = 0;
+        });
+        await page.mouse.wheel(0, 100);
+        await expect.poll(() => comment.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+        await expect(
+          popover.locator('[data-ui="content.design-review.comment-footer"]')
+        ).toBeInViewport();
+        await page.screenshot({ path: info.outputPath('comment-scroll.png'), fullPage: false });
         await comment.fill('Проверка композиции и сохранения комментария');
         await comment.press('Enter');
         await expect(popover).toHaveCount(0);
@@ -565,11 +583,8 @@ for (const theme of ['light', 'dark'] as const) {
         });
         await expect(remove).toBeVisible();
         const actionCenters = await popover
-          .locator('button')
-          .filter({
-            has: page.locator(
-              '.lucide-clipboard-copy, .lucide-text-cursor-input, .lucide-pencil, .lucide-trash-2'
-            ),
+          .getByRole('button', {
+            name: /^(Copy element data|Копировать данные элемента|Edit element text|Изменить текст элемента|Edit element properties|Изменить свойства элемента|Delete feedback|Удалить замечание)$/u,
           })
           .evaluateAll((buttons) =>
             buttons.map((button) => {
@@ -645,11 +660,16 @@ for (const theme of ['light', 'dark'] as const) {
         await page.keyboard.press('Escape');
         await expect(filterMenu).toHaveCount(0);
         await expect(filter).toBeFocused();
-        const search = feedback.getByRole('textbox');
+        const find = feedback.getByRole('button', { name: /Find feedback|Найти замечание/u });
+        await find.click();
+        const search = feedback.getByRole('textbox', { name: /Find feedback|Найти замечание/u });
+        await expect(search).toBeFocused();
         await search.fill('нет такого замечания');
         await expect(item).toHaveCount(0);
         await search.fill('Проверка композиции');
         await expect(item).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(find).toBeFocused();
         await page.keyboard.press('Escape');
         await expect(feedback).toHaveCount(0);
         await page.evaluate(() => {

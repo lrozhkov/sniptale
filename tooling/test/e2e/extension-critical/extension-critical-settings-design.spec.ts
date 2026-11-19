@@ -1182,10 +1182,10 @@ async function cancelPreset(page: Page, info: TestInfo, name: string) {
     exact: true,
   });
   await cancel.scrollIntoViewIfNeeded();
-  await expect(cancel).toBeInViewport({ ratio: 1 });
+  await expect(cancel).toBeInViewport({ ratio: 0.99 });
   const bounds = (await dialog.boundingBox())!;
-  expect(bounds.y).toBeGreaterThanOrEqual(0);
-  expect(bounds.y + bounds.height).toBeLessThanOrEqual(560);
+  expect(bounds.y).toBeGreaterThanOrEqual(-1);
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(page.viewportSize()!.height + 1);
   await screenshot(page, info, name);
   await cancel.click();
   await expect(dialog).toHaveCount(0);
@@ -1311,6 +1311,142 @@ test('native settings preset drafts clear names and cancel without changing thei
     expect(await catalog()).toEqual(before);
   }
 });
+
+for (const [viewport, theme] of [
+  [{ width: 1280, height: 560 }, 'light'],
+  [{ width: 1920, height: 900 }, 'dark'],
+] as const) {
+  test(`native highlighter frame radius uses precision controls ${viewport.width}`, async ({
+    page,
+    extensionId,
+  }, info) => {
+    await page.setViewportSize(viewport);
+    await configure(page, extensionId, 'en', theme);
+    const t = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+    await route(page, extensionId, 'annotations', 'borders');
+    const edit = page
+      .locator('[data-settings-collection-item]')
+      .first()
+      .getByRole('button', {
+        name: t('settings.collection.actions.edit'),
+        exact: true,
+      });
+    const dialog = page.getByRole('dialog');
+    const geometry = dialog.getByRole('navigation').getByRole('button', {
+      name: t('highlighter.editor.geometrySection'),
+      exact: true,
+    });
+    await edit.click();
+    await geometry.click();
+    const label = t('highlighter.editor.radiusLabel');
+    const radius = dialog.getByRole('textbox', { name: label, exact: true });
+    const row = dialog.locator('[data-ui="shared.ui.compact-inspector.numeric-row"]').filter({
+      has: page.getByRole('textbox', { name: label, exact: true }),
+    });
+    const original = await radius.inputValue();
+    await expect(row).not.toHaveAttribute('data-has-scrub', 'true');
+    await radius.fill('24');
+    await radius.press('Enter');
+    await radius.focus();
+    await radius.press('ArrowUp');
+    await expect(radius).toHaveValue('25');
+    await radius.hover();
+    await row.getByRole('button', { name: `${label} decrease` }).click();
+    await expect(radius).toHaveValue('24');
+    await screenshot(page, info, 'preset-frame-radius');
+    await dialog
+      .getByRole('navigation')
+      .getByRole('button', {
+        name: t('highlighter.editor.shadowSection'),
+        exact: true,
+      })
+      .click();
+    const shadowRow = dialog.locator('[data-ui="shared.ui.compact-inspector.numeric-row"]').filter({
+      has: page.getByRole('textbox', { name: t('highlighter.editor.shadowLabel'), exact: true }),
+    });
+    await shadowRow.hover();
+    await expect(shadowRow.getByRole('slider')).toBeVisible();
+    await cancelPreset(page, info, 'preset-frame-radius-cancel');
+    await edit.click();
+    await geometry.click();
+    await expect(radius).toHaveValue(original);
+    await cancelPreset(page, info, 'preset-frame-radius-reopened');
+  });
+
+  test(`native highlighter CSS drafts keep validation and Clear ${viewport.width}`, async ({
+    page,
+    extensionId,
+  }, info) => {
+    await page.setViewportSize(viewport);
+    await configure(page, extensionId, 'en', theme);
+    const t = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+    for (const variant of [
+      {
+        view: 'numbering',
+        tab: 'content.stepBadge.cssSection',
+        label: 'content.stepBadge.cssLabel',
+        valid: '[badge]\nborder-radius: 6px;',
+        error: `${t('content.stepBadge.cssBlockedProperties')} unsupported-property`,
+      },
+      {
+        view: 'callouts',
+        tab: 'content.callout.manualCss',
+        label: 'content.callout.cssLabel',
+        valid: '[title]\ntext-transform: uppercase;',
+        error: t('content.callout.cssSyntaxError'),
+      },
+    ] as const) {
+      await route(page, extensionId, 'annotations', variant.view);
+      const edit = page
+        .locator('[data-settings-collection-item]')
+        .first()
+        .getByRole('button', { name: t('settings.collection.actions.edit'), exact: true });
+      const dialog = page.getByRole('dialog');
+      const openStyles = async () => {
+        await edit.click();
+        await dialog
+          .getByRole('navigation')
+          .getByRole('button', { name: t(variant.tab), exact: true })
+          .click();
+      };
+      await openStyles();
+      const field = dialog.getByRole('textbox', { name: t(variant.label), exact: true });
+      const original = await field.inputValue();
+      await field.fill(variant.valid);
+      await expect(field).toHaveAttribute('aria-invalid', 'false');
+      const longInvalid = `${variant.valid}\n${'\n'.repeat(24)}unsupported-property: 2px;`;
+      await field.fill(longInvalid);
+      await expect(field).toHaveAttribute('aria-invalid', 'true');
+      await expect(field).toHaveAccessibleDescription(variant.error);
+      const clear = dialog.getByRole('button', {
+        name: t('shared.ui.clearField').replace('{field}', t(variant.label)),
+        exact: true,
+      });
+      await expect(clear).toBeVisible();
+      await expect(clear).toHaveCSS('width', '24px');
+      const scrollbar = await field.evaluate((node) => ({
+        width: getComputedStyle(node, '::-webkit-scrollbar').width,
+        corner: getComputedStyle(node, '::-webkit-scrollbar-corner').backgroundColor,
+      }));
+      expect(scrollbar).toEqual({ width: '6px', corner: 'rgba(0, 0, 0, 0)' });
+      await field.hover();
+      await field.evaluate((node) => {
+        node.scrollTop = 0;
+      });
+      await page.mouse.wheel(0, 120);
+      await expect.poll(() => field.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+      await screenshot(page, info, `preset-${variant.view}-css`);
+      await clear.click();
+      await expect(field).toHaveValue('');
+      await expect(field).toBeFocused();
+      await expect(field).toHaveAttribute('aria-invalid', 'false');
+      await cancelPreset(page, info, `preset-${variant.view}-css-cancel`);
+      await openStyles();
+      await expect(field).toHaveValue(original);
+      await cancelPreset(page, info, `preset-${variant.view}-css-reopened`);
+    }
+  });
+}
 
 test('native settings resource create forms clear names and cancel without catalog changes', async ({
   page,

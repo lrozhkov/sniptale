@@ -68,6 +68,32 @@ afterEach(() => {
   container = null;
 });
 
+it('uses exact arrow steps only for an opted-in field and leaves modified and composing keys alone', () => {
+  const { onCommitValue, onPreviewValue } = renderNumeric({ keyboardStep: true });
+  const field = input();
+  act(() => field.focus());
+  const press = (key: string, modifiers: KeyboardEventInit = {}) => {
+    const event = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key,
+      ...modifiers,
+    });
+    act(() => field.dispatchEvent(event));
+    return event.defaultPrevented;
+  };
+  expect(press('ArrowUp')).toBe(true);
+  expect(field.value).toBe('45');
+  expect(press('ArrowDown')).toBe(true);
+  expect(field.value).toBe('40');
+  expect(press('ArrowUp', { isComposing: true })).toBe(false);
+  expect(press('ArrowDown', { altKey: true })).toBe(false);
+  expect(field.value).toBe('40');
+  expect(onPreviewValue).toHaveBeenCalledTimes(2);
+  expect(onCommitValue).toHaveBeenNthCalledWith(1, 45);
+  expect(onCommitValue).toHaveBeenNthCalledWith(2, 40);
+});
+
 it('steps focused wheel through irregular domain boundaries and commits without blur duplicates', () => {
   const getStepValue = vi.fn((value: number, direction: 1 | -1) =>
     direction === 1 ? (value < 12 ? 12 : 20) : value === 20 ? 12 : 0

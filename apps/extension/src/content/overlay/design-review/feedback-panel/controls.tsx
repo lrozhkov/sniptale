@@ -36,16 +36,18 @@ export function FeedbackPanelSearch(props: {
             props.onQueryChange('');
         }}
       >
-        <Search className="absolute left-2 top-2 text-[var(--sniptale-color-text-dim)]" size={16} />
+        <Search
+          aria-hidden="true"
+          className="pointer-events-none absolute left-[9px] top-[9px] text-[var(--sniptale-color-text-dim)]"
+          size={14}
+        />
         <span className="sr-only">{translate('content.designReview.panelSearch')}</span>
         <input
           ref={input}
           className={[
-            'sniptale-design-review-authored-text',
-            'h-8 w-full rounded-[4px] border bg-transparent pl-8 pr-8 outline-none',
+            'sniptale-design-review-authored-text sniptale-feedback-search-field',
+            'h-8 w-full rounded-[4px] border pl-8 pr-8 outline-none',
             'text-[13px] leading-[18px] font-normal',
-            'border-[color:var(--sniptale-color-border-soft)]',
-            'focus:border-[color:var(--sniptale-color-accent)]',
           ].join(' ')}
           placeholder={translate('content.designReview.panelSearch')}
           value={props.query}

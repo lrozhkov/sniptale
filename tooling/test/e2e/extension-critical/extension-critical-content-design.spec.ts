@@ -565,7 +565,7 @@ async function reenterHighlighter(page: Page) {
   }
 }
 
-async function createAuthoredCallout(page: Page, locale: Locale) {
+async function openFrameAnnotationToolbar(page: Page) {
   await reenterHighlighter(page);
   const target = (await page.locator('#annotation-target').boundingBox())!;
   await page.mouse.click(target.x + target.width / 2, target.y + target.height / 2);
@@ -578,6 +578,11 @@ async function createAuthoredCallout(page: Page, locale: Locale) {
     })
     .toBe(true);
   await trigger.click();
+  return page.locator('.sniptale-action-toolbar:visible');
+}
+
+async function createAuthoredCallout(page: Page, locale: Locale) {
+  await openFrameAnnotationToolbar(page);
   await page
     .getByRole('button', {
       name: translate('content.interactiveFrame.calloutAdd', locale),
@@ -699,6 +704,97 @@ async function openCalloutSettings(page: Page, locale: Locale) {
   if (await fork.count()) await fork.first().click();
   await expect(ui(page, 'shared.callout-alignment')).toBeVisible();
   return panel;
+}
+
+for (const [viewport, theme] of [
+  [PRIMARY_BROWSER_VIEWPORTS[0].size, 'light'],
+  [PRIMARY_BROWSER_VIEWPORTS[1].size, 'dark'],
+] as const) {
+  test(`native content Highlighter edits CSS and exact radius at ${viewport.width}`, async ({
+    context,
+    extensionId,
+  }, info) => {
+    const locale = 'en';
+    const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+    await withHost(context, extensionId, { locale, theme, viewport }, info, async (page) => {
+      const toolbar = await openFrameAnnotationToolbar(page);
+      await toolbar
+        .getByRole('button', { name: t('content.callout.settingsTitle'), exact: true })
+        .click();
+      await ui(page, 'content.interactive-frame.add-callout').click();
+      const editable = page.locator('.sniptale-callout [contenteditable="true"]').last();
+      await editable.fill('Authored annotation');
+      await editable.press('Escape');
+      const comment = page.locator('.sniptale-callout [contenteditable]').last();
+      await expect(comment).toBeVisible();
+      const initialTransform = await comment.evaluate(
+        (node) => getComputedStyle(node).textTransform
+      );
+      const callout = await openCalloutSettings(page, locale);
+      await callout
+        .getByRole('navigation')
+        .getByRole('button', { name: t('content.callout.manualCss'), exact: true })
+        .click();
+      const label = t('content.callout.cssLabel');
+      const css = callout.getByRole('textbox', { name: label, exact: true });
+      const draft = '[body]\ntext-transform: uppercase;';
+      await css.fill(draft);
+      await expect(css).toHaveAttribute('aria-invalid', 'false');
+      await expect(comment).toHaveCSS('text-transform', 'uppercase');
+      await css.fill(`${draft}\n${'\n'.repeat(28)}broken`);
+      await expect(css).toHaveAttribute('aria-invalid', 'true');
+      await expect(comment).toHaveCSS('text-transform', 'uppercase');
+      await css.hover();
+      await css.evaluate((node) => {
+        node.scrollTop = 0;
+      });
+      await page.mouse.wheel(0, 120);
+      await expect.poll(() => css.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+      const corner = await css.evaluate(
+        (node) => getComputedStyle(node, '::-webkit-scrollbar-corner').backgroundColor
+      );
+      expect(corner).toBe('rgba(0, 0, 0, 0)');
+      await screenshot(page, info, 'content-css-overflow');
+      await callout
+        .getByRole('button', {
+          name: t('shared.ui.clearField').replace('{field}', label),
+          exact: true,
+        })
+        .click();
+      await expect(css).toHaveValue('');
+      await expect(css).toBeFocused();
+      await expect(css).toHaveAttribute('aria-invalid', 'false');
+      await expect(comment).toHaveCSS('text-transform', initialTransform);
+      await callout
+        .getByRole('button', { name: t('content.callout.closeSettings'), exact: true })
+        .click();
+      await expect(callout).toHaveCount(0);
+
+      await ui(page, 'content.toolbar.future-frame-style.menu').click();
+      const frame = page.locator('.sniptale-frame-settings-popover');
+      const fork = frame
+        .getByRole('button', { name: t('content.templateFork.fork'), exact: true })
+        .first();
+      await fork.focus();
+      await fork.press('Enter');
+      await frame
+        .getByRole('navigation')
+        .getByRole('button', { name: t('highlighter.editor.geometrySection'), exact: true })
+        .click();
+      const radius = frame.getByRole('textbox', {
+        name: t('highlighter.editor.radiusLabel'),
+        exact: true,
+      });
+      await radius.fill('24');
+      await radius.press('ArrowUp');
+      await expect(radius).toHaveValue('25');
+      await radius.press('ArrowDown');
+      await expect(radius).toHaveValue('24');
+      await screenshot(page, info, 'content-frame-radius');
+      await ui(page, 'content.toolbar.future-frame-style.menu').click();
+      await expect(frame).toHaveCount(0);
+    });
+  });
 }
 
 test('native annotation property Undo and temporary draft recovery preserve authored text', async ({

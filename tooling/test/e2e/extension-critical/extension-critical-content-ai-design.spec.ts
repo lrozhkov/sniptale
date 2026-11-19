@@ -296,7 +296,24 @@ async function geometry(page: Page, c: Composition) {
   });
   expect.soft(alpha, 'Content AI modal hides underlying page text').toBe(255);
   const prompt = page.locator('#ai-prompt');
+  const initialPrompt = await prompt.inputValue();
   await prompt.click();
+  await prompt.fill(Array.from({ length: 24 }, (_, index) => `Prompt line ${index}`).join('\n'));
+  expect(await prompt.evaluate((node) => getComputedStyle(node, '::-webkit-scrollbar').width)).toBe(
+    '6px'
+  );
+  expect(
+    await prompt.evaluate(
+      (node) => getComputedStyle(node, '::-webkit-scrollbar-thumb').borderTopColor
+    )
+  ).toBe('rgba(0, 0, 0, 0)');
+  await prompt.hover();
+  await prompt.evaluate((node) => {
+    node.scrollTop = 0;
+  });
+  await page.mouse.wheel(0, 100);
+  await expect.poll(() => prompt.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  await prompt.fill(initialPrompt);
   const promptFrame = await prompt.evaluate((node) => {
     const probe = document.createElement('span');
     probe.style.color = 'var(--sniptale-color-border-strong)';
@@ -474,6 +491,7 @@ async function configureProvider(settings: Page, c: Composition, providerOrigin:
   await named(models, c, 'common.actions.add').click();
   await named(dialog, c, 'settings.aiProviders.modelProviderPlaceholder').click();
   await settings.getByRole('option', { name: providerName, exact: true }).click();
+  await named(dialog, c, 'settings.aiProviders.modelManualEntry').click();
   await dialog
     .getByPlaceholder(tr(c, 'settings.aiProviders.modelNamePlaceholder'), { exact: true })
     .fill(modelName);

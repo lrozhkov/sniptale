@@ -363,6 +363,19 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       const submit = ui(page, 'content.ai-text.submit');
       await expect(popover).toBeVisible();
       await expect(prompt).toBeFocused();
+      await prompt.fill(
+        Array.from({ length: 24 }, (_, index) => `Rewrite line ${index}`).join('\n')
+      );
+      expect(
+        await prompt.evaluate((node) => getComputedStyle(node, '::-webkit-scrollbar').width)
+      ).toBe('6px');
+      await prompt.hover();
+      await prompt.evaluate((node) => {
+        node.scrollTop = 0;
+      });
+      await page.mouse.wheel(0, 100);
+      await expect.poll(() => prompt.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+      await prompt.fill('');
       const templates = ui(page, 'ai-modal.template-picker');
       await expect(templates.getByRole('button')).toBeEnabled();
       await templates.getByRole('button').click();

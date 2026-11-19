@@ -202,6 +202,7 @@ function TextRewritePromptFields({
           placeholder={translate('content.toolbar.aiTextPlaceholder')}
           className={[
             'sniptale-design-review-authored-text block min-h-20 max-h-40 w-full resize-none overflow-y-auto',
+            'sniptale-compact-text-scroll',
             'rounded-[4px] border border-[color:var(--sniptale-color-border-strong)]',
             'bg-[var(--sniptale-color-surface-input)] py-2 pl-3 pr-12 text-xs leading-5',
             'text-[var(--sniptale-color-text-primary)] outline-none',
