@@ -533,8 +533,12 @@ async function checkTextGesture(page: Page, block: Locator, undo: Locator, redo:
   await expect.poll(async () => (await block.boundingBox())!.x).toBeGreaterThan(initial.x + 20);
 }
 
-async function resizeInspectorContent(page: Page, dialog: Locator, width: number) {
-  const content = dialog.locator('.review-inspector-scroll');
+async function resizeInspectorContent(
+  page: Page,
+  dialog: Locator,
+  width: number,
+  content = dialog.locator('.review-inspector-scroll')
+) {
   const readWidth = () =>
     content.evaluate((element) => Number.parseFloat(getComputedStyle(element).width));
   const current = await readWidth();
@@ -578,15 +582,15 @@ async function inspectTextSearch(
   const geometry = await search.evaluate((node) => {
     const parent = node.parentElement!;
     const style = getComputedStyle(parent);
-    const icon = parent.querySelector('svg')!;
+    const [iconSlot] = style.gridTemplateColumns.split(' ');
     return {
       width: node.getBoundingClientRect().width,
       available:
         parent.clientWidth -
         parseFloat(style.paddingLeft) -
         parseFloat(style.paddingRight) -
-        icon.getBoundingClientRect().width -
-        parseFloat(style.columnGap),
+        parseFloat(iconSlot!) -
+        24,
     };
   });
   expect(Math.abs(geometry.width - geometry.available)).toBeLessThanOrEqual(1);
@@ -602,6 +606,7 @@ async function inspectTextSearch(
   await expect(toggle).toHaveAttribute('data-active', 'true');
   await expect(dot).toHaveCount(0);
   await search.fill('Длинный поисковый запрос для проверки ширины');
+  expect((await search.boundingBox())!.width).toBe(searchBox.width);
   await expect(dot).toBeVisible();
   await expect(toggle).toHaveAttribute(
     'aria-description',
@@ -612,6 +617,7 @@ async function inspectTextSearch(
   await expect(toggle).not.toHaveAttribute('data-active', 'true');
   await expect(dot).toBeVisible();
   await expect(search).toHaveValue('Длинный поисковый запрос для проверки ширины');
+  await search.hover();
   await document
     .getByRole('button', { name: label('gallery.videoReview.historySearchClear'), exact: true })
     .click();
@@ -664,9 +670,35 @@ for (const variant of [
       await dialog
         .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
         .click();
-      await dialog
-        .getByRole('button', { name: label('gallery.videoReview.textTrackOpen'), exact: true })
-        .click();
+      const textTrack = dialog.locator(
+        '[data-review-header-track="text"] [data-review-track-select]'
+      );
+      await textTrack.scrollIntoViewIfNeeded();
+      const hitGeometry = await textTrack.evaluate((button) => {
+        const box = button.getBoundingClientRect();
+        const hit = button.ownerDocument.elementFromPoint(
+          box.left + box.width / 2,
+          box.top + box.height / 2
+        );
+        return {
+          reachable: button.contains(hit),
+          hit: hit?.closest('[data-ui]')?.getAttribute('data-ui'),
+          lane: { top: box.top, bottom: box.bottom },
+          layout: [
+            ...button.ownerDocument.querySelectorAll<HTMLElement>(
+              '[data-ui="gallery.videoReview.timelinePanes"], [data-ui="gallery.videoReview.timeline"], [data-ui="gallery.videoReview.toolbar"], [data-ui="gallery.videoReview.trackListViewport"]'
+            ),
+          ].map((node) => ({
+            name: node.dataset.ui,
+            top: node.getBoundingClientRect().top,
+            height: node.getBoundingClientRect().height,
+            client: node.clientHeight,
+            scroll: node.scrollTop,
+          })),
+        };
+      });
+      expect(hitGeometry.reachable, JSON.stringify(hitGeometry)).toBe(true);
+      await textTrack.click();
       await dialog
         .getByRole('button', { name: label('gallery.videoReview.textViewCards'), exact: true })
         .click();
@@ -705,13 +737,15 @@ for (const variant of [
       await expect(jump).toContainText(/\d{2}:\d{2}\.\d{2}–\d{2}:\d{2}\.\d{2}/);
       await jump.click();
       await expect(expand).toHaveAttribute('aria-expanded', 'false');
-      const inspector = dialog.locator('.review-inspector-scroll');
+      const inspector = dialog
+        .locator('[data-ui="gallery.videoReview.trackWorkspace"]')
+        .locator('[role="tabpanel"]:visible');
       const initialWidth = await inspector.evaluate((node) =>
         Number.parseFloat(getComputedStyle(node).width)
       );
       for (const width of [initialWidth, 523, 524, 525]) {
         if (variant.width !== 1920 && width !== initialWidth) continue;
-        if (width !== initialWidth) await resizeInspectorContent(page, dialog, width);
+        if (width !== initialWidth) await resizeInspectorContent(page, dialog, width, inspector);
         await jump.scrollIntoViewIfNeeded();
         const bounds = (await inspector.boundingBox())!;
         for (const control of [jump, expand]) {

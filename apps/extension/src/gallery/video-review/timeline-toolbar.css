@@ -99,6 +99,10 @@
   .review-timeline-toolbar[data-layout='compact'] {
     grid-template-columns: auto auto minmax(0, 1fr);
   }
+  /* Automatic height must leave space for the ruler and a track below the stacked toolbar. */
+  [data-ui='gallery.videoReview.timeline']:has(> .review-timeline-toolbar[data-layout='stacked']) {
+    --review-stacked-timeline-floor: 232px;
+  }
   .review-timeline-toolbar[data-layout='stacked'] {
     grid-template-columns: minmax(0, 1fr);
   }

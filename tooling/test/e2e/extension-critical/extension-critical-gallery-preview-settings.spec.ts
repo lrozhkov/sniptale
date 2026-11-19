@@ -393,3 +393,85 @@ for (const variant of variants) {
     }
   });
 }
+
+for (const variant of [variants[0], variants[1]]) {
+  test(`preview resolution uses the same compact field as frame rate at ${variant.width}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width: variant.width, height: variant.height });
+    const host = await startHostServer();
+    const label = (key: Message) => translate(key, variant.locale);
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const review = page.locator('[data-ui="gallery.videoReview.dialog"]');
+      if (variant.width === 1920) {
+        await review
+          .getByRole('button', {
+            name: label('gallery.videoReview.advancedEditing'),
+            exact: true,
+          })
+          .click();
+      }
+      const gear = review.locator('[data-ui="gallery.videoReview.previewSettings"]');
+      await gear.click();
+      const panel = review.locator('[data-ui="gallery.videoReview.previewInspector"]');
+      const field = (key: Message) =>
+        panel
+          .locator('[data-ui="shared.ui.compact-inspector.select-field"]')
+          .getByRole('button', { name: label(key), exact: true });
+      const resolution = field('gallery.videoReview.previewResolution');
+      const frameRate = field('gallery.videoReview.previewFrameRate');
+      const rateBounds = await frameRate.boundingBox();
+      const resolutionBounds = await resolution.boundingBox();
+      expect(resolutionBounds?.height).toBe(rateBounds?.height);
+      await resolution.click();
+      const choice = page.getByRole('option', { name: '360p', exact: true });
+      await expect(choice).toBeVisible();
+      await page.screenshot({
+        path: info.outputPath('preview-resolution-menu.png'),
+        fullPage: false,
+        animations: 'disabled',
+      });
+      await choice.click();
+      await expect(resolution).toHaveText('360p');
+      if (variant.width === 1920) {
+        const inspector = review.locator('[data-ui="gallery.videoReview.inspector"]');
+        const handle = review.locator('[data-ui="gallery.videoReview.resizeInspector"]');
+        const handleBox = (await handle.boundingBox())!;
+        const initial = (await inspector.boundingBox())!;
+        const triggerWidth = (await resolution.boundingBox())!.width;
+        const x = handleBox.x + handleBox.width / 2;
+        const y = handleBox.y + 20;
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        await page.mouse.move(x - 220, y, { steps: 6 });
+        await page.mouse.up();
+        await expect
+          .poll(async () => (await inspector.boundingBox())!.width)
+          .toBeGreaterThan(initial.width + 180);
+        expect((await resolution.boundingBox())!.width).toBeCloseTo(triggerWidth, 0);
+        await page.screenshot({ path: info.outputPath('preview-wide-value.png'), fullPage: false });
+      }
+      await resolution.click();
+      await expect(choice).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(choice).toBeHidden();
+      await expect(resolution).toBeFocused();
+      await expect(resolution).toHaveText('360p');
+    } finally {
+      host.server.close();
+    }
+  });
+}

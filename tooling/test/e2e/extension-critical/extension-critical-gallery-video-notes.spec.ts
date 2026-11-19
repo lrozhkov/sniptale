@@ -51,6 +51,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS)
             }
           );
           await page.mouse.up();
+          await button('gallery.videoReview.comments').click();
           await button('gallery.videoReview.addComment').first().click();
           const form = dialog.locator('[data-ui="gallery.videoReview.commentComposer"]');
           const field = form.getByRole('textbox', {
@@ -153,6 +154,11 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS)
           await expect(row).toContainText('An edited note');
           await button('common.actions.close').click();
           await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+          await page
+            .getByRole('dialog', { name: 'beta-v1.webm', exact: true })
+            .getByRole('button', { name: /^beta-v1\.webm / })
+            .click();
+          await button('gallery.videoReview.comments').click();
           await expect(row).toContainText('An edited note');
           await row.getByRole('button').first().click();
           await expect(remove).toBeVisible();

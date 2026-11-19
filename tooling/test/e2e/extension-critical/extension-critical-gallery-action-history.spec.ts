@@ -637,6 +637,7 @@ async function verifyHistorySearchSelection(
     .click();
   await expect(search).toHaveValue(label('gallery.videoReview.eventCursorIdle'));
   await expect(configure).toBeFocused();
+  await search.hover();
   await history
     .getByRole('button', { name: label('gallery.videoReview.historySearchClear'), exact: true })
     .click();
@@ -1168,3 +1169,50 @@ async function seedReadableKeyboardHistory(page: Page) {
     db.close();
   }, betaV1Fixture);
 }
+
+test('action history search clears without losing focus from the mouse track', async ({
+  page,
+}, info) => {
+  const host = await startHostServer();
+  try {
+    await applyHarnessBootstrap(page, {
+      preserveMediaLibrary: true,
+      storage: {
+        'sniptale-locale-preference': 'en',
+        'sniptale-theme-preference': 'light',
+      },
+    });
+    await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=light`);
+    await page.locator('[data-ui="gallery.page.root"]').waitFor();
+    await seedReviewVideo(page, 'review-vp8-opus.webm', {
+      width: 160,
+      height: 90,
+      duration: 12.01,
+    });
+    await seedHistory(page, true);
+    await page.reload();
+    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+    const dialog = page.locator('dialog');
+    await dialog.getByRole('button', { name: 'Advanced editing', exact: true }).click();
+    await dialog.locator('[data-review-header-track="mouse"] [data-review-track-select]').click();
+    const history = dialog.locator('[data-ui="gallery.videoReview.actionHistory"]:visible');
+    const search = history.getByRole('searchbox');
+    await expect(search).toBeVisible();
+    const bounds = await search.boundingBox();
+    await search.fill('missing mouse event');
+    const clear = history.getByRole('button', {
+      name: translate('gallery.videoReview.historySearchClear', 'en'),
+      exact: true,
+    });
+    await expect(clear).toBeVisible();
+    expect(await search.boundingBox()).toEqual(bounds);
+    await page.screenshot({ path: info.outputPath('mouse-history-search.png'), fullPage: false });
+    await clear.click();
+    await expect(search).toHaveValue('');
+    await expect(search).toBeFocused();
+    await expect(clear).toHaveCount(0);
+  } finally {
+    host.server.close();
+  }
+});

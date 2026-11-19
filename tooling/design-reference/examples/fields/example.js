@@ -112,14 +112,7 @@ export function render(root, { manifest }) {
       text: 'Enter добавляет строку. Blur принимает текст. Escape возвращает принятое значение.',
     })
   );
-  const search = TextField({ label: 'Поиск сцен', placeholder: 'Название сцены' }),
-    results = el('p', { role: 'status', text: 'Найдено: 3' }),
-    names = ['Вступление', 'Демонстрация', 'Завершение'];
-  search.input.addEventListener('input', () => {
-    const count = names.filter((n) => n.toLowerCase().includes(search.draft.toLowerCase())).length;
-    results.textContent = count ? 'Найдено: ' + count : 'Сцены не найдены. Измените запрос.';
-  });
-  add('search').append(search.element, results);
+  add('search').append(...searchExample());
   add('long').append(
     TextField({
       label:
@@ -128,4 +121,26 @@ export function render(root, { manifest }) {
       multiline: true,
     }).element
   );
+}
+
+function searchExample() {
+  const search = TextField({ label: 'Поиск сцен', placeholder: 'Название сцены' }),
+    results = el('p', { role: 'status', text: 'Найдено: 3' }),
+    names = ['Вступление', 'Демонстрация', 'Завершение'];
+  search.input.type = 'search';
+  search.element.classList.add('text-field--search');
+  const svgNamespace = 'http://www.w3.org/2000/svg';
+  const searchIcon = document.createElementNS(svgNamespace, 'svg');
+  searchIcon.setAttribute('class', 'text-search-icon');
+  searchIcon.setAttribute('aria-hidden', 'true');
+  searchIcon.setAttribute('viewBox', '0 0 24 24');
+  const searchPath = document.createElementNS(svgNamespace, 'path');
+  searchPath.setAttribute('d', 'M21 21l-4.3-4.3M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z');
+  searchIcon.append(searchPath);
+  search.input.before(searchIcon);
+  search.input.addEventListener('input', () => {
+    const count = names.filter((n) => n.toLowerCase().includes(search.draft.toLowerCase())).length;
+    results.textContent = count ? 'Найдено: ' + count : 'Сцены не найдены. Измените запрос.';
+  });
+  return [search.element, results];
 }

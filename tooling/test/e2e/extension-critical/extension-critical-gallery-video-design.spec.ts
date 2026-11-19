@@ -725,3 +725,82 @@ async function checkInspectorWidthTransitions(
   ).toBeInViewport();
   await page.screenshot({ path: info.outputPath('below-minimum.png'), fullPage: false });
 }
+
+for (const [theme, viewport] of [
+  ['light', { width: 1280, height: 560 }],
+  ['dark', { width: 1920, height: 900 }],
+] as const) {
+  test(`track item search keeps its geometry and restores focus in ${theme}`, async ({
+    page,
+  }, info) => {
+    const host = await startHostServer();
+    try {
+      await page.setViewportSize(viewport);
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': 'en',
+          'sniptale-theme-preference': theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(
+        page,
+        'review-vp8-opus.webm',
+        { width: 160, height: 90, duration: 12 },
+        false,
+        true
+      );
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const items = page.locator('[data-ui="gallery.videoReview.trackItems"]:visible');
+      const search = items.getByRole('searchbox');
+      const rows = items.getByRole('button', { name: /beta-v1\.webm/ });
+      await expect(rows).toHaveCount(1);
+      const bounds = await search.boundingBox();
+      await search.fill('missing-source');
+      await expect(rows).toHaveCount(0);
+      const noMatches = items.getByText(translate('gallery.videoReview.trackItemsNoMatches', 'en'));
+      await expect(noMatches).toBeVisible();
+      const clear = items.getByRole('button', {
+        name: translate('gallery.videoReview.historySearchClear', 'en'),
+        exact: true,
+      });
+      await expect(clear).toBeVisible();
+      expect(await search.boundingBox()).toEqual(bounds);
+      await noMatches.click();
+      expect(await clear.isVisible()).toBe(false);
+      await items.locator('.review-search-field > svg').hover();
+      expect(await clear.isVisible()).toBe(false);
+      await search.hover();
+      await expect(clear).toBeVisible();
+      const clearBounds = (await clear.boundingBox())!;
+      expect(clearBounds).toMatchObject({ width: 24, height: 24 });
+      await page.mouse.move(clearBounds.x + 12, clearBounds.y + 12, { steps: 20 });
+      await expect(clear).toBeVisible();
+      await expect(clear).toHaveCSS('opacity', '1');
+      await expect(clear).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      // Drive the inherited disabled state without racing a pending deletion.
+      await items.evaluate((fieldset: HTMLFieldSetElement) => (fieldset.disabled = true));
+      await expect(search).toBeDisabled();
+      await expect(clear).toBeHidden();
+      await expect(search).toHaveValue('missing-source');
+      expect(await search.boundingBox()).toEqual(bounds);
+      await items.evaluate((fieldset: HTMLFieldSetElement) => (fieldset.disabled = false));
+      await search.focus();
+      await page.screenshot({
+        path: info.outputPath('track-search-filtered.png'),
+        fullPage: false,
+      });
+      await clear.click();
+      await expect(search).toHaveValue('');
+      await expect(search).toBeFocused();
+      await expect(rows).toHaveCount(1);
+      await expect(clear).toHaveCount(0);
+    } finally {
+      host.server.close();
+    }
+  });
+}

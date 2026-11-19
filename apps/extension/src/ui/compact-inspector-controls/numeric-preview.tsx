@@ -12,6 +12,8 @@ export function DraftNumericRow(props: {
   step: number;
   precision?: number;
   enterBehavior?: ComponentProps<typeof NumericRow>['enterBehavior'];
+  /** Disable the contextual range for a value adjusted by exact entry or stepping. */
+  scrubEnabled?: boolean;
   scrubStep?: number;
   scrubMax?: number;
   scrubMin?: number;
@@ -75,11 +77,15 @@ export function PreviewNumericRow(
         unit={props.unit}
         value={draft}
         disabled={props.disabled}
-        scrub={{
-          min: props.scrubMin ?? props.min,
-          max: props.scrubMax ?? props.max,
-          step: props.scrubStep ?? props.step,
-        }}
+        scrub={
+          props.scrubEnabled === false
+            ? undefined
+            : {
+                min: props.scrubMin ?? props.min,
+                max: props.scrubMax ?? props.max,
+                step: props.scrubStep ?? props.step,
+              }
+        }
         onPreviewValue={(value) => {
           if (!cancelled.current) {
             initial.current ??= props.value;

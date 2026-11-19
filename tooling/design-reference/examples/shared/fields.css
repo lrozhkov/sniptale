@@ -214,12 +214,38 @@ html[data-input-mode='keyboard'] .text-input:focus-visible {
   pointer-events: auto;
 }
 
-.text-field.text-field--clearable:where(:not([slot='inspector-text'])):has(
+.text-field.text-field--clearable:where(:not([slot='inspector-text'], .text-field--search)):has(
     > input:is(:hover, :focus),
     > .text-clear:is(:hover, :focus)
   )
   > input {
   padding-inline-end: 36px;
+}
+
+.text-field--search {
+  --surface-hover: var(--reference-field-hover);
+  --field-border: var(--reference-field-hover-border);
+}
+.text-field.text-field--search > input[type='search'] {
+  padding-inline: 28px 34px;
+  background: var(--reference-field-idle);
+  border-color: var(--reference-field-border);
+}
+.text-field--search > input::-webkit-search-cancel-button {
+  display: none;
+}
+.text-field--search > .text-search-icon {
+  z-index: 1;
+  grid-area: 2 / 1;
+  align-self: center;
+  margin-inline-start: 8px;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  fill: none;
+  stroke: var(--secondary);
+  stroke-width: 2;
+  stroke-linecap: round;
 }
 
 .text-field[slot='inspector-text'] {

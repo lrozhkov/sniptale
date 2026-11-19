@@ -2,12 +2,7 @@ import { useState } from 'react';
 import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
 import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import type { useReviewWorkspaceColor } from './workspace-color';
-import {
-  ColorField,
-  CompactSelect,
-  SelectField,
-  ToggleField,
-} from '../../ui/compact-inspector-controls';
+import { ColorField, SelectField, ToggleField } from '../../ui/compact-inspector-controls';
 import { translate, useAppLocale } from '../../platform/i18n';
 import {
   QUICK_PREVIEW_RASTER_PRESETS,
@@ -72,23 +67,19 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
           {props.actualRaster ? `${props.actualRaster.width} × ${props.actualRaster.height}` : '—'}
         </output>
       </InspectorParameterRow>
-      <InspectorParameterRow label={label('previewResolution')}>
-        <div className="min-w-0 w-full">
-          <CompactSelect
-            appearance="plain"
-            aria-label={label('previewResolution')}
-            disabled={props.disabled}
-            value={props.preferences.rasterPreset}
-            options={QUICK_PREVIEW_RASTER_PRESETS.map((value) => ({
-              value,
-              label: value === 'current' ? translate('gallery.videoReview.previewCurrent') : value,
-            }))}
-            onChange={(rasterPreset: QuickPreviewPreferences['rasterPreset']) =>
-              props.onChange({ rasterPreset })
-            }
-          />
-        </div>
-      </InspectorParameterRow>
+      <SelectField
+        className={reviewSelectFieldClassName}
+        label={label('previewResolution')}
+        disabled={props.disabled}
+        value={props.preferences.rasterPreset}
+        options={QUICK_PREVIEW_RASTER_PRESETS.map((value) => ({
+          value,
+          label: value === 'current' ? translate('gallery.videoReview.previewCurrent') : value,
+        }))}
+        onChange={(rasterPreset: QuickPreviewPreferences['rasterPreset']) =>
+          props.onChange({ rasterPreset })
+        }
+      />
 
       <div title={translate('gallery.videoReview.previewFrameRateLimit')}>
         <SelectField

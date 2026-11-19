@@ -215,7 +215,7 @@ it('opens the image picker and forwards only a selected file', async () => {
   expect(onImportImage).toHaveBeenCalledWith(file, undefined);
 });
 
-it('uses precise layout sliders without limiting typed high-resolution values', async () => {
+it('uses padding and shadow sliders and an exact radius stepper', async () => {
   const change = vi.fn();
   act(() =>
     root.render(
@@ -226,30 +226,27 @@ it('uses precise layout sliders without limiting typed high-resolution values', 
     )
   );
   const ranges = [...host.querySelectorAll<HTMLInputElement>('input[type="range"]')];
-  expect(ranges.map((input) => input.max)).toEqual(['200', '100', '100']);
-  for (const [index, key] of ['padding', 'cornerRadius'].entries()) {
-    await act(async () => {
-      ranges[index]!.dispatchEvent(
-        new KeyboardEvent('keydown', {
-          key: 'ArrowRight',
-          bubbles: true,
-          cancelable: true,
-        })
+  expect(ranges.map((input) => input.max)).toEqual(['200', '100']);
+  const incrementRange = (range: HTMLInputElement) =>
+    act(async () => {
+      range.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })
       );
-      ranges[index]!.dispatchEvent(
-        new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true })
-      );
+      range.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true }));
     });
-    expect(change).toHaveBeenLastCalledWith({
-      layout: { ...layout, [key]: (key === 'padding' ? layout.padding : layout.cornerRadius) + 1 },
-    });
-  }
+  await incrementRange(ranges[0]!);
+  expect(change).toHaveBeenLastCalledWith({ layout: { ...layout, padding: layout.padding + 1 } });
   await act(async () => {
-    ranges[2]!.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })
-    );
-    ranges[2]!.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true }));
+    host
+      .querySelector<HTMLButtonElement>(
+        'button[aria-label="gallery.videoReview.backgroundCornerRadius increase"]'
+      )!
+      .click();
   });
+  expect(change).toHaveBeenLastCalledWith({
+    layout: { ...layout, cornerRadius: layout.cornerRadius + 1 },
+  });
+  await incrementRange(ranges[1]!);
   expect(change).toHaveBeenLastCalledWith({
     layout: { ...layout, shadow: { intensity: 1, color: '#475569ff' } },
   });

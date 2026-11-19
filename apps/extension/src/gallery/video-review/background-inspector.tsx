@@ -198,7 +198,8 @@ function ReviewBackgroundLayoutControls({
       unit="px"
       min={0}
       max={4096}
-      scrubMax={key === 'padding' ? 200 : 100}
+      scrubEnabled={key === 'padding'}
+      scrubMax={200}
       step={1}
       value={background.layout[key]}
       onPreview={(value) =>

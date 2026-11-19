@@ -18,7 +18,7 @@ import { useReviewTextFormMode } from './text-voice-focus';
 import type { ReviewTextVoiceAccess } from './use-text-voice';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { SelectField, SegmentedRow } from '../../ui/compact-inspector-controls';
-import { HistorySearch } from './action-history-filters';
+import { ReviewSearchField } from './search-field';
 import {
   reviewTextRecordingMaximum,
   queryReviewText,
@@ -103,7 +103,7 @@ export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
       onKeyDown={(event) => event.stopPropagation()}
     >
       <div className="flex min-w-0 items-center gap-1">
-        <HistorySearch
+        <ReviewSearchField
           query={filters.query}
           label={translate('gallery.videoReview.textFragmentSearch')}
           onChange={(query) => {

@@ -373,8 +373,8 @@ function reviewTimelineHeightClass(
   if (props.fillHeight) return 'h-full';
   return props.actionsTrackVisible !== false &&
     (props.markers.length || props.onAddCursorFocusKey || props.cursorArchiveAvailable)
-    ? 'max-h-[max(160px,min(42dvh,calc(100dvh-420px)))]'
-    : 'max-h-[min(42dvh,calc(100dvh-420px))]';
+    ? 'max-h-[max(var(--review-stacked-timeline-floor,0px),160px,min(42dvh,calc(100dvh-420px)))]'
+    : 'max-h-[max(var(--review-stacked-timeline-floor,0px),min(42dvh,calc(100dvh-420px)))]';
 }
 
 /** Independent semantic rows retain the compact capture-event presentation. */

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, useRef, useLayoutEffect } from 'react';
-import { ArrowUpRight, Search, Trash2, X } from 'lucide-react';
+import { ArrowUpRight, Trash2, X } from 'lucide-react';
 import { translate, useAppLocale } from '../../platform/i18n';
 import type { QuickEditTrack } from '../../features/video/review/advanced/types';
 import type { LoadedReview } from './use-session';
@@ -11,6 +11,7 @@ import { HistoryCheckbox } from './action-history-list';
 import { ReviewButton, reviewDeleteButtonClassName, reviewTimeLabel } from './controls';
 import { reviewTrackItems, removeReviewTrackItems, type ReviewTrackItem } from './track-items';
 import type { ReviewInspectorNavigation } from './inspector-navigation';
+import { ReviewSearchField } from './search-field';
 import './action-history.css';
 import './track-items.css';
 
@@ -213,19 +214,14 @@ export function ReviewTrackItemsInspector(props: {
       data-track={track}
     >
       <div className="review-track-items-toolbar">
-        <label className="review-track-items-search">
-          <Search size={14} aria-hidden="true" />
-          <input
-            type="search"
-            aria-label={translate('gallery.videoReview.trackItemsSearch')}
-            placeholder={translate('gallery.videoReview.trackItemsSearch')}
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setLimit(50);
-            }}
-          />
-        </label>
+        <ReviewSearchField
+          label={translate('gallery.videoReview.trackItemsSearch')}
+          query={query}
+          onChange={(query) => {
+            setQuery(query);
+            setLimit(50);
+          }}
+        />
         <div className="review-history-selection">
           <HistoryCheckbox
             label={translate('gallery.videoReview.trackItemsSelectAll')}

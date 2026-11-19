@@ -314,6 +314,40 @@
   margin-top: 0;
 }
 
+/* Inline choices keep their own value width as the inspector grows. */
+.sniptale-compact-workspace
+  [data-ui='gallery.videoReview.inspector']
+  [data-ui='shared.ui.compact-inspector.select-field'][data-layout='inline']
+  > .sniptale-parameter-value {
+  justify-self: end;
+  min-inline-size: min(100px, 100%);
+}
+@layer utilities {
+  /* The generic inspector gives select values full width in this layer. */
+  .sniptale-compact-workspace
+    [data-ui='gallery.videoReview.inspector']
+    [data-ui='shared.ui.compact-inspector.select-field'][data-layout='inline']
+    > .sniptale-parameter-value {
+    width: fit-content !important;
+  }
+}
+
+[data-ui='gallery.videoReview.inspector']
+  [data-ui='shared.ui.compact-select']
+  > button:focus-visible {
+  outline: 1px solid var(--sniptale-color-text-muted-strong);
+  outline-offset: -1px;
+}
+
+/* A swatch opens the picker for the complete color or gradient value. */
+.review-background-paint .sniptale-paint-value {
+  border-radius: var(--sniptale-radius-sm);
+}
+.review-background-paint
+  .sniptale-paint-value:has(> .sniptale-paint-swatch-trigger:is(:hover, [aria-expanded='true'])) {
+  background: var(--sniptale-color-surface-hover);
+}
+
 .review-inspector-scroll {
   container: review-inspector-content / inline-size;
 }

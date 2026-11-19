@@ -190,6 +190,7 @@ function observeReviewPaneLayout(
     );
     // Read all row geometry before changing any row or pane layout.
     fixed.style.height = `${rulerHeight}px`;
+    left.style.scrollPaddingBlockStart = `${rulerHeight}px`;
     list.style.height = `${Math.max(0, planeRect.height - rulerHeight)}px`;
     root.style.setProperty('--review-scrollbar-height', `${scrollbarHeight}px`);
     for (const { row, parent, position, rect } of placements) {

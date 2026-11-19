@@ -674,7 +674,9 @@ for (const size of [
           review.getByRole('button', { name: label(key), exact: true });
         const ruler = review.locator('[data-ui="gallery.videoReview.ruler"]');
         await ruler.click({ position: { x: 24, y: 10 } });
-        await command('gallery.videoReview.textTrackOpen').click();
+        await review
+          .locator('[data-review-header-track="text"] [data-review-track-select]')
+          .click();
         const document = review.locator('[data-ui="gallery.videoReview.textDocument"]');
         await document
           .getByRole('button', {

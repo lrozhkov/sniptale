@@ -1,6 +1,5 @@
-import { useRef } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { Search, SlidersHorizontal, X } from 'lucide-react';
+import { SlidersHorizontal } from 'lucide-react';
 import { NumericRow, SelectField } from '../../ui/compact-inspector-controls';
 import { translate } from '../../platform/i18n';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
@@ -18,6 +17,7 @@ export function historySelectableKey(marker: ReviewTelemetryMarker): string | nu
 import type { ReviewClickAnimation } from '../../features/video/review/advanced/click-animation';
 import type { ReviewKeyAnimation } from '../../features/video/project/action-feedback/key-animation';
 import { reviewEventLabel, reviewMouseButtonLabel, reviewSelectFieldClassName } from './controls';
+import { ReviewSearchField } from './search-field';
 
 export interface HistoryFilterValues {
   query: string;
@@ -117,7 +117,11 @@ export function HistoryFilters({
   return (
     <>
       <div className="flex items-center gap-1">
-        <HistorySearch query={query} onChange={(query) => onChange({ query })} />
+        <ReviewSearchField
+          label={translate('gallery.videoReview.historySearch')}
+          query={query}
+          onChange={(query) => onChange({ query })}
+        />
         <ContentToolbarButton
           type="button"
           tone="utility"
@@ -229,51 +233,6 @@ function historySearchText(marker: ReviewTelemetryMarker): string {
   const searchable =
     `${reviewEventLabel(marker.eventType)} ${marker.target ?? ''} ${targetLabel}`.toLocaleLowerCase();
   return searchable;
-}
-
-/** Search owns input focus restoration independently of filter selection. */
-export function HistorySearch({
-  query,
-  onChange,
-  label,
-  clearLabel,
-}: {
-  query: string;
-  onChange(query: string): void;
-  label?: string;
-  clearLabel?: string;
-}) {
-  const search = useRef<HTMLInputElement>(null);
-  return (
-    <div className="review-history-search min-w-0 flex-1">
-      <Search size={16} aria-hidden="true" />
-      <input
-        ref={search}
-        type="search"
-        aria-label={label ?? translate('gallery.videoReview.historySearch')}
-        placeholder={label ?? translate('gallery.videoReview.historySearch')}
-        value={query}
-        onChange={(event) => {
-          onChange(event.target.value);
-        }}
-      />
-      {query ? (
-        <ContentToolbarButton
-          type="button"
-          tone="utility"
-          size="compact"
-          aria-label={clearLabel ?? translate('gallery.videoReview.historySearchClear')}
-          title={clearLabel ?? translate('gallery.videoReview.historySearchClear')}
-          onClick={() => {
-            onChange('');
-            search.current?.focus();
-          }}
-        >
-          <X size={14} aria-hidden="true" />
-        </ContentToolbarButton>
-      ) : null}
-    </div>
-  );
 }
 
 /** Expanded criteria share one controlled value with the persistent history owner. */
