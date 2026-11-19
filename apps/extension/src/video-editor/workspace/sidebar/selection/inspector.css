@@ -178,33 +178,3 @@
   padding: 4px 32px 4px 8px;
   font: 500 13px / 18px var(--sniptale-font-sans);
 }
-.sniptale-compact-workspace .video-library-search {
-  display: flex;
-  align-items: center;
-  min-height: 32px;
-  gap: 6px;
-  padding-inline: 8px 32px;
-  border-radius: 4px;
-  background: var(--sniptale-color-surface-input);
-}
-.sniptale-compact-workspace .video-library-search > svg {
-  flex: none;
-  color: var(--sniptale-color-text-secondary);
-}
-.sniptale-compact-workspace .video-library-search > input {
-  min-width: 0;
-  width: 100%;
-  height: 32px;
-  border: 0;
-  outline: none;
-  background: transparent;
-  font: inherit;
-  color: var(--sniptale-color-text-primary);
-}
-.sniptale-compact-workspace .video-library-search:has(:focus-visible) {
-  outline: 2px solid var(--sniptale-color-accent);
-  outline-offset: 2px;
-}
-.sniptale-compact-workspace .video-library-search input::-webkit-search-cancel-button {
-  -webkit-appearance: none;
-}

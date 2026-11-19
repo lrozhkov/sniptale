@@ -44,6 +44,15 @@ it('does not create before confirmation and rejects whitespace', () => {
   expect(onClose).toHaveBeenCalledOnce();
   expect(onCreate).not.toHaveBeenCalled();
 });
+it('clears the copied name, returns focus and keeps the draft unsubmitted', () => {
+  const { host, onCreate } = mount(true);
+  const input = host.querySelector<HTMLInputElement>('input')!;
+  act(() => host.querySelector<HTMLButtonElement>('.sniptale-field-clear')!.click());
+  expect(input.value).toBe('');
+  expect(document.activeElement).toBe(input);
+  expect(host.querySelector<HTMLButtonElement>('[type=submit]')!.disabled).toBe(true);
+  expect(onCreate).not.toHaveBeenCalled();
+});
 it('keeps dialog open on failure and allows retry', async () => {
   const create = vi
     .fn()

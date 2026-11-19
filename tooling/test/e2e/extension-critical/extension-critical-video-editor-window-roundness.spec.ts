@@ -196,12 +196,13 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await field.scrollIntoViewIfNeeded();
       await expect(field).toHaveValue(String(selected.windowCornerRadius));
       await field.fill('48');
-      await field.press('Enter');
-      await expect.poll(readRadius).toBe(48);
+      await field.press('ArrowUp');
+      await expect(field).toHaveValue('49');
+      await expect.poll(readRadius).toBe(49);
       await page.locator('[data-ui="video-editor.timeline.toolbar.undo"]').click();
       await expect.poll(readRadius).toBe(selected.windowCornerRadius);
       await page.locator('[data-ui="video-editor.timeline.toolbar.redo"]').click();
-      await expect.poll(readRadius).toBe(48);
+      await expect.poll(readRadius).toBe(49);
       await field.fill(String(selected.windowCornerRadius));
       await field.press('Enter');
       await expect.poll(readRadius).toBe(selected.windowCornerRadius);

@@ -130,6 +130,7 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
           step={1}
           precision={2}
           unit="px"
+          keyboardStep
           scrub={{ min: 0, max: 100, step: 1 }}
           disabled={props.locked || !props.onEditMediaClip}
           normalizeValue={(value) =>
