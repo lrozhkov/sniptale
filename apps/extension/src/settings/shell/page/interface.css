@@ -36,6 +36,43 @@
   min-width: 0;
 }
 .sniptale-settings-workspace
+  [data-layout='inline']
+  .settings-control-value
+  > .settings-compact-select-shell {
+  inline-size: fit-content;
+  min-inline-size: min(128px, 100%);
+  max-inline-size: 100%;
+  margin-inline-start: auto;
+}
+.sniptale-settings-workspace .sniptale-select {
+  --sniptale-field-bg-idle: var(--sniptale-color-surface-input);
+  --sniptale-field-border-idle: var(--sniptale-color-border-soft);
+  --sniptale-field-bg-hover: var(--sniptale-color-surface-hover);
+  --sniptale-field-border-hover: var(--sniptale-color-border-soft);
+  --sniptale-field-shadow-hover: none;
+  --sniptale-field-bg-active: var(--sniptale-color-surface-hover);
+  --sniptale-field-border-active: var(--sniptale-color-border-strong);
+  --sniptale-field-shadow-active: none;
+}
+.sniptale-settings-workspace .sniptale-select-chevron {
+  width: 12px;
+  height: 12px;
+}
+.sniptale-settings-workspace .sniptale-select[aria-expanded='true'] {
+  --sniptale-field-border-hover: var(--sniptale-color-border-strong);
+}
+.sniptale-settings-workspace .sniptale-select:focus-visible:not([aria-expanded='true']) {
+  outline: 1px solid var(--sniptale-color-border-strong);
+  outline-offset: -1px;
+}
+.sniptale-select-menu.settings-popup-startup-options {
+  max-height: calc(50dvh - 24px);
+}
+.settings-viewport-preset-options .sniptale-select-value-label-menu {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.sniptale-settings-workspace
   .settings-control-value
   > [data-ui='shared.ui.compact-inspector.numeric-row'] {
   max-width: 220px;
@@ -126,6 +163,53 @@
 }
 .sniptale-settings-workspace .sniptale-text-value > .sniptale-textarea {
   padding: 8px 32px 8px 8px;
+}
+.sniptale-settings-workspace .sniptale-textarea::-webkit-scrollbar {
+  width: 6px;
+  cursor: default;
+}
+.sniptale-settings-workspace .sniptale-textarea::-webkit-scrollbar-track,
+.sniptale-settings-workspace .sniptale-textarea::-webkit-scrollbar-corner {
+  background: transparent;
+  cursor: default;
+}
+.sniptale-settings-workspace .sniptale-textarea::-webkit-scrollbar-thumb {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sniptale-color-text-secondary) 30%, transparent) padding-box;
+  cursor: default;
+}
+.sniptale-settings-workspace .sniptale-textarea::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--sniptale-color-text-secondary) 45%, transparent);
+}
+.sniptale-settings-workspace .sniptale-textarea::-webkit-scrollbar-button {
+  display: none;
+}
+.sniptale-settings-workspace .sniptale-textarea::-webkit-resizer {
+  background: linear-gradient(
+      to top left,
+      transparent 2px,
+      var(--sniptale-color-text-muted) 2px 3px,
+      transparent 3px 5px,
+      var(--sniptale-color-text-muted) 5px 6px,
+      transparent 6px
+    )
+    right bottom / 8px 8px no-repeat;
+}
+.sniptale-settings-workspace .settings-draft-textarea > textarea {
+  resize: vertical;
+}
+.sniptale-settings-workspace .settings-draft-textarea > .sniptale-field-clear {
+  --sniptale-color-accent: var(--sniptale-color-text-muted-strong);
+  inset-inline-end: 8px;
+  visibility: hidden;
+}
+.sniptale-settings-workspace
+  .settings-draft-textarea:is(:focus-within, :has(> textarea:hover, > .sniptale-field-clear:hover))
+  > .sniptale-field-clear {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .sniptale-settings-workspace.sniptale-compact-workspace

@@ -443,6 +443,122 @@ async function interfaceChoice(page: Page, locale: Locale) {
   await expect(startup).toContainText(t('settings.appearance.popupStartupOptions.menu'));
 }
 
+for (const [width, height, theme] of [
+  [1280, 560, 'light'],
+  [1920, 900, 'dark'],
+] as const) {
+  test(`native settings compact dropdown appearance ${width}`, async ({
+    page,
+    extensionId,
+  }, info) => {
+    await page.setViewportSize({ width, height });
+    await configure(page, extensionId, 'en', theme);
+    await interfaceChoice(page, 'en');
+    const trigger = page.getByRole('button', {
+      name: translate('settings.appearance.popupStartupAriaLabel', 'en'),
+      exact: true,
+    });
+    await trigger.scrollIntoViewIfNeeded();
+    await page.mouse.move(10, 10);
+    const box = (await trigger.boundingBox())!;
+    expect(box.width).toBeLessThanOrEqual(160);
+    expect(box.height).toBe(32);
+    const tokens = await trigger.evaluate((node) => {
+      const probe = document.createElement('span');
+      node.append(probe);
+      const style = getComputedStyle(probe);
+      probe.style.backgroundColor = 'var(--sniptale-color-surface-input)';
+      const resting = style.backgroundColor;
+      probe.style.backgroundColor = 'var(--sniptale-color-surface-hover)';
+      const active = style.backgroundColor;
+      probe.style.color = 'var(--sniptale-color-border-strong)';
+      const border = style.color;
+      probe.remove();
+      return { resting, active, border };
+    });
+    await expect(trigger).toHaveCSS('background-color', tokens.resting);
+    await trigger.hover();
+    await expect(trigger).toHaveCSS('background-color', tokens.active);
+    await trigger.click();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await expect(trigger).toHaveCSS('border-top-color', tokens.border);
+    const menu = page.getByRole('listbox');
+    await expect(menu).toBeInViewport({ ratio: 1 });
+    const openTriggerBox = (await trigger.boundingBox())!;
+    const menuBox = (await menu.boundingBox())!;
+    expect(
+      menuBox.y >= openTriggerBox.y + openTriggerBox.height ||
+        menuBox.y + menuBox.height <= openTriggerBox.y
+    ).toBe(true);
+    await screenshot(page, info, 'settings-compact-select-open');
+    await page.keyboard.press('End');
+    await expect(menu.getByRole('option').last()).toBeFocused();
+    await expect(menu.getByRole('option').last()).toBeInViewport({ ratio: 1 });
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+    await expect(trigger).toBeFocused();
+    await expect(trigger).toContainText(
+      translate('settings.appearance.popupStartupOptions.menu', 'en')
+    );
+  });
+
+  test(`native quick action preset dimensions stay visible ${width}`, async ({
+    page,
+    extensionId,
+  }, info) => {
+    const t = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+    await page.setViewportSize({ width, height });
+    await configure(page, extensionId, 'en', theme);
+    await route(page, extensionId, 'screen-sizes');
+    const dialog = page.getByRole('dialog');
+    const name = `Recording browser viewport for QA ${randomUUID().slice(0, 8)}`;
+    for (const presetHeight of ['1080', '1200']) {
+      await page
+        .getByRole('button', { name: t('viewportPresets.section.addButton'), exact: true })
+        .click();
+      await dialog.getByRole('textbox', { name: t('viewportPresets.editor.nameLabel') }).fill(name);
+      await dialog
+        .getByRole('spinbutton', { name: t('viewportPresets.editor.widthLabel') })
+        .fill('1920');
+      await dialog
+        .getByRole('spinbutton', { name: t('viewportPresets.editor.heightLabel') })
+        .fill(presetHeight);
+      await dialog
+        .getByRole('button', { name: t('viewportPresets.editor.create'), exact: true })
+        .click();
+      await expect(dialog).toHaveCount(0);
+    }
+    await route(page, extensionId, 'quick-actions');
+    await page
+      .getByRole('button', { name: t('settings.quickActions.addButton'), exact: true })
+      .click();
+    await dialog
+      .getByRole('button', { name: t('settings.quickActions.appearanceCapture'), exact: true })
+      .click();
+    const trigger = dialog
+      .locator('[data-ui="settings.control-row"]')
+      .filter({ hasText: t('settings.quickActions.screenEmulationLabel') })
+      .getByRole('button', { name: t('viewportPresets.section.nativeOption'), exact: true });
+    await trigger.click();
+    expect((await trigger.boundingBox())!.width).toBeLessThanOrEqual(160);
+    const menu = page.getByRole('listbox');
+    const options = menu.getByRole('option').filter({ hasText: name });
+    await expect(options).toHaveCount(2);
+    await expect(options.nth(0)).toContainText('1,920 × 1,080');
+    await expect(options.nth(1)).toContainText('1,920 × 1,200');
+    for (const label of await options.locator('.sniptale-select-value-label-menu').all()) {
+      await label.scrollIntoViewIfNeeded();
+      const clipped = await label.evaluate((node) => node.scrollHeight > node.clientHeight + 1);
+      expect(clipped).toBe(false);
+    }
+    await screenshot(page, info, 'quick-actions-preset-dimensions');
+    await options.nth(1).click();
+    await expect(dialog.getByRole('button', { name: /1,920 × 1,200/ })).toBeVisible();
+    await dialog.getByRole('button', { name: t('common.actions.cancel'), exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+  });
+}
+
 async function paletteFlow(page: Page, locale: Locale, info: TestInfo) {
   const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
   const anchor = ui(page, 'settings.sidebar').getByRole('button').first();
@@ -463,7 +579,9 @@ async function paletteFlow(page: Page, locale: Locale, info: TestInfo) {
   await page.keyboard.press('Escape');
   await expect(palette).toHaveCount(0);
   await page.keyboard.press('Control+k');
+  await expect(query).toBeFocused();
   await query.fill(t('settings.navigation.aiConnections'));
+  await expect(palette.getByRole('option')).toHaveCount(1);
   await query.press('Enter');
   await expect(palette).toHaveCount(0);
   await expect(page).toHaveURL(/section=ai-connections/);
@@ -517,11 +635,19 @@ async function providerAndModelFlow(
   await models.getByRole('button', { name: t('common.actions.add'), exact: true }).click();
   await submit.scrollIntoViewIfNeeded();
   await submit.click();
-  await expect.poll(() => dialog.locator('.sniptale-input-error').count()).toBeGreaterThan(0);
+  await expect(dialog.getByRole('alert')).toHaveText(
+    t('settings.aiProviders.modelProviderChanged')
+  );
+  await dialog
+    .getByRole('button', { name: t('settings.aiProviders.modelRefreshConnections'), exact: true })
+    .click();
   await dialog
     .getByRole('button', { name: t('settings.aiProviders.modelProviderPlaceholder'), exact: true })
     .click();
   await page.getByRole('option', { name, exact: true }).click();
+  await dialog
+    .getByRole('button', { name: t('settings.aiProviders.modelManualEntry'), exact: true })
+    .click();
   const modelName = dialog.getByPlaceholder(t('settings.aiProviders.modelNamePlaceholder'), {
     exact: true,
   });
@@ -685,7 +811,58 @@ async function voiceTestField(page: Page, locale: Locale, info: TestInfo) {
   await expect(field).toHaveValue('Текст проверки микрофона');
   await screenshot(page, info, 'voice-diagnostics');
   await diagnostics.click();
-  await field.fill('');
+  await field.focus();
+  const clear = page.getByRole('button', {
+    name: t('shared.ui.clearField').replace('{field}', t('settings.voiceInput.textareaLabel')),
+    exact: true,
+  });
+  await expect(clear).toBeVisible();
+  expect(await clear.boundingBox()).toMatchObject({ width: 24, height: 24 });
+  await field.fill(Array.from({ length: 30 }, (_, index) => `Строка ${index + 1}`).join('\n'));
+  await field.hover();
+  await field.evaluate((node) => {
+    node.scrollTop = 0;
+  });
+  await page.mouse.wheel(0, 120);
+  await expect.poll(() => field.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  const scrollChrome = await field.evaluate((node) => ({
+    width: getComputedStyle(node, '::-webkit-scrollbar').width,
+    thumb: getComputedStyle(node, '::-webkit-scrollbar-thumb').cursor,
+    track: getComputedStyle(node, '::-webkit-scrollbar-track').cursor,
+    buttons: getComputedStyle(node, '::-webkit-scrollbar-button').display,
+    corner: getComputedStyle(node, '::-webkit-scrollbar-corner').backgroundColor,
+  }));
+  expect(scrollChrome).toEqual({
+    width: '6px',
+    thumb: 'default',
+    track: 'default',
+    buttons: 'none',
+    corner: 'rgba(0, 0, 0, 0)',
+  });
+  const box = (await field.boundingBox())!;
+  const x = box.x + box.width - 3;
+  const y = box.y + box.height - 3;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x, y + 20, { steps: 5 });
+  await page.mouse.up();
+  expect((await field.boundingBox())!.height).toBeGreaterThan(box.height);
+  await field.focus();
+  await field.press('Tab');
+  await expect(clear).toBeFocused();
+  const neutralFocus = await clear.evaluate((node) => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--sniptale-color-text-muted-strong)';
+    node.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  });
+  await expect(clear).toHaveCSS('outline-color', neutralFocus);
+  await screenshot(page, info, 'voice-test-scroll');
+  await clear.press('Enter');
+  await expect(field).toHaveValue('');
+  await expect(field).toBeFocused();
   await field.blur();
   expect.soft(await placeholder()).toEqual({ color, opacity: '0.72' });
   await screenshot(page, info, 'voice-test-field');
@@ -892,36 +1069,84 @@ test('native AI unlock utility remains usable at its supported popup size', asyn
 async function transferChoices(page: Page, extensionId: string, info: TestInfo) {
   const t = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
   await route(page, extensionId, 'settings-transfer');
-  const choices = page.getByRole('group', {
+  const choices = page.getByRole('button', {
     name: t('settings.settingsTransfer.exportKindLabel'),
     exact: true,
   });
-  const complete = choices.getByRole('button', {
+  const complete = page.getByRole('option', {
     name: t('settings.settingsTransfer.completeBackup'),
     exact: true,
   });
-  const selective = choices.getByRole('button', {
+  const selective = page.getByRole('option', {
     name: t('settings.settingsTransfer.selectivePackage'),
     exact: true,
   });
-  await expect(complete).toHaveAttribute('aria-pressed', 'true');
-  await expect(complete).toHaveCSS('font-size', '13px');
-  await expect(complete).toHaveCSS('line-height', '18px');
-  await expect(complete).toHaveCSS('font-weight', '400');
-  await expect(complete).toHaveCSS('box-shadow', 'none');
-  await expect(complete).toHaveCSS('border-top-width', '0px');
+  await expect(choices).toContainText(t('settings.settingsTransfer.completeBackup'));
+  await choices.click();
+  await expect(complete).toHaveAttribute('aria-selected', 'true');
   await selective.click();
-  await expect(selective).toHaveAttribute('aria-pressed', 'true');
-  await expect(complete).toHaveAttribute('aria-pressed', 'false');
+  await expect(choices).toContainText(t('settings.settingsTransfer.selectivePackage'));
   const tree = page.getByRole('tree', {
     name: t('settings.settingsTransfer.treeLabel'),
     exact: true,
   });
   await expect(tree).toBeVisible();
   await screenshot(page, info, 'transfer-selective-choice');
+  await choices.click();
+  await expect(selective).toHaveAttribute('aria-selected', 'true');
   await complete.click();
-  await expect(complete).toHaveAttribute('aria-pressed', 'true');
+  await expect(choices).toContainText(t('settings.settingsTransfer.completeBackup'));
   await expect(tree).toHaveCount(0);
+}
+
+for (const [width, height, theme] of [
+  [1280, 560, 'light'],
+  [1920, 900, 'dark'],
+] as const) {
+  test(`settings transfer search preserves tree selection ${width}`, async ({
+    page,
+    extensionId,
+  }, info) => {
+    const t = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+    await page.setViewportSize({ width, height });
+    await configure(page, extensionId, 'en', theme);
+    await route(page, extensionId, 'settings-transfer');
+    await page
+      .getByRole('button', { name: t('settings.settingsTransfer.exportKindLabel'), exact: true })
+      .click();
+    await page
+      .getByRole('option', { name: t('settings.settingsTransfer.selectivePackage'), exact: true })
+      .click();
+    const tree = page.getByRole('tree', {
+      name: t('settings.settingsTransfer.treeLabel'),
+      exact: true,
+    });
+    const selected = tree.locator('li:not([aria-expanded]) input:enabled').first();
+    await expect(selected).toBeChecked();
+    await selected.uncheck();
+    const searchLabel = t('settings.settingsTransfer.searchLabel');
+    const search = page.getByLabel(searchLabel, { exact: true });
+    await search.scrollIntoViewIfNeeded();
+    const widthBefore = (await search.boundingBox())!.width;
+    await search.fill('no matching settings for this query');
+    await expect(
+      page.getByText(t('settings.settingsTransfer.noSearchResults'), { exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: t('settings.settingsTransfer.selectFound'), exact: true })
+    ).toBeDisabled();
+    expect((await search.boundingBox())!.width).toBe(widthBefore);
+    const clear = page.getByRole('button', {
+      name: t('shared.ui.clearField').replace('{field}', searchLabel),
+      exact: true,
+    });
+    await expect(clear).toBeVisible();
+    await screenshot(page, info, 'transfer-search-empty');
+    await clear.click();
+    await expect(search).toHaveValue('');
+    await expect(search).toBeFocused();
+    await expect(selected).not.toBeChecked();
+  });
 }
 
 async function clearPresetName(page: Page, fieldLabel: string, value: string) {
@@ -1142,6 +1367,15 @@ test('native settings resource create forms clear names and cancel without catal
     const save = dialog.getByRole('button', { name: t(resource.save), exact: true });
     await expect(save).toBeDisabled();
     await expect(name).toBeFocused();
+    if (resource.view === 'surfaces') {
+      const cssLabel = t('content.callout.surfaceStyle.advancedCss');
+      const css = dialog.getByRole('textbox', { name: cssLabel, exact: true });
+      await css.fill('unsupported-property: 4px;');
+      await expect(css).toHaveAttribute('aria-invalid', 'true');
+      await expect(css).toHaveAccessibleDescription(t('content.callout.surfaceStyle.cssInvalid'));
+      await clearPresetName(page, cssLabel, 'border-radius: 4px;');
+      await expect(css).toHaveAttribute('aria-invalid', 'false');
+    }
     await cancelPreset(page, info, `resource-${resource.view}-cleared-name`);
     expect(await catalog()).toEqual(before);
     await add.click();
@@ -1207,8 +1441,7 @@ for (const theme of ['light', 'dark'] as const) {
 }
 
 async function journalFilterLabels(page: Page) {
-  const search = ui(page, 'settings.page.content-scroll').getByRole('textbox').first();
-  const filters = search.locator('..').locator('..');
+  const filters = ui(page, 'settings.events-log.filters');
   const labels = await filters.evaluate((node) =>
     Array.from(node.children).map((field) => {
       const range = document.createRange();
@@ -1318,7 +1551,11 @@ for (const locale of ['ru', 'en'] as const)
         expect(geometry.ownerScrollWidth).toBeLessThanOrEqual(
           Math.max(880, geometry.ownerWidth) + 1
         );
-        const search = ui(page, 'settings.page.content-scroll').getByRole('textbox').first();
+        const searchLabel = translate('settings.eventsLogs.search', locale);
+        const search = ui(page, 'settings.page.content-scroll').getByLabel(searchLabel, {
+          exact: true,
+        });
+        const searchWidth = (await search.boundingBox())!.width;
         await search.fill('LongDiagnosticValue');
         await expect(table.locator('tbody tr')).toHaveCount(1);
         await expect(longRow).toBeVisible();
@@ -1330,7 +1567,17 @@ for (const locale of ['ru', 'en'] as const)
           source: 'diagnostic-source-'.repeat(6),
           context: 'context-'.repeat(10),
         });
-        await search.fill('');
+        await search.focus();
+        const clear = page.getByRole('button', {
+          name: translate('shared.ui.clearField', locale).replace('{field}', searchLabel),
+          exact: true,
+        });
+        await expect(clear).toBeVisible();
+        expect((await search.boundingBox())!.width).toBe(searchWidth);
+        expect(await clear.boundingBox()).toMatchObject({ width: 24, height: 24 });
+        await clear.click();
+        await expect(search).toHaveValue('');
+        await expect(search).toBeFocused();
         await expect(table.locator('tbody tr').filter({ hasText: 'Preview ready' })).toHaveCount(
           23
         );

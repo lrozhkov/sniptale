@@ -2,7 +2,7 @@ import { getVoiceInputProviderErrorKey } from '../../../../composition/voice-inp
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { AlertCircle, ChevronDown, Download, Info, Mic, Square } from 'lucide-react';
 import { AudioAmplitudeBars } from '@sniptale/ui/audio-amplitude-bars';
-import { ProductSelect, ProductTextarea } from '@sniptale/ui/product-form-controls';
+import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { usePushToTalk } from '@sniptale/ui/voice-input/use-push-to-talk';
 import { translate, type TranslationKey } from '../../../../platform/i18n';
 import {
@@ -10,6 +10,7 @@ import {
   SettingsControlRow,
   settingsSectionClassName,
 } from '../../../section-surface';
+import { SettingsDraftTextarea } from '../../../section-surface/draft-textarea';
 import { VoiceModelPreferences } from './model-preferences';
 import { VoiceInputHistoryPanel } from './history';
 import type { VoiceInputSettingsController } from './controller-contract';
@@ -541,9 +542,9 @@ function VoiceInputTestPanel({
             'text-[var(--sniptale-color-text-secondary)]'
           }
         >
-          <ProductTextarea
-            aria-label={translate('settings.voiceInput.textareaLabel')}
-            className="!min-h-28 w-full flex-1 resize-y !text-[13px] !leading-5"
+          <SettingsDraftTextarea
+            label={translate('settings.voiceInput.textareaLabel')}
+            className="!min-h-28 w-full !text-[13px] !leading-5"
             placeholder={translate('settings.voiceInput.textareaPlaceholder')}
             readOnly={active || pending}
             value={transcript}

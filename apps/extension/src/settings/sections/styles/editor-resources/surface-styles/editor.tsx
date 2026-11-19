@@ -1,6 +1,5 @@
 import { ResourcePresetNameField } from '../preset-name-field';
-import { ProductTextarea } from '@sniptale/ui/product-form-controls';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
   ProductModal,
   ProductModalBody,
@@ -14,6 +13,7 @@ import { CompactPaintSelector } from '../../../../../ui/paint-selector';
 import { canonicalizeSurfaceCss } from '../../../../../features/highlighter/surface-style/surface-css';
 import type { ManagedSurfaceStylePreset } from '../../../../../composition/persistence/surface-style-presets';
 import { settingsModalClassName } from '../../../../section-surface';
+import { SettingsDraftTextarea } from '../../../../section-surface/draft-textarea';
 
 export function SurfaceStylePresetEditor(props: {
   onClose(): void;
@@ -25,6 +25,8 @@ export function SurfaceStylePresetEditor(props: {
   const nameRef = useRef<HTMLInputElement>(null);
   const [style, setStyle] = useState<SurfaceStyle | null>(null);
   const [saving, setSaving] = useState(false);
+  const cssErrorId = useId();
+  const cssLabel = translate('content.callout.surfaceStyle.advancedCss');
   useEffect(() => {
     if (!props.open) return;
     setName(props.preset?.name ?? '');
@@ -82,26 +84,30 @@ export function SurfaceStylePresetEditor(props: {
             title={translate('content.callout.surfaceStyle.paint')}
             value={style.fillPaint}
           />
-          <label
+          <div
             className={[
               'grid gap-1 text-[13px] leading-[18px] font-medium',
               'text-[var(--sniptale-color-text-secondary)]',
             ].join(' ')}
           >
-            {translate('content.callout.surfaceStyle.advancedCss')}
-            <ProductTextarea
+            <span>{cssLabel}</span>
+            <SettingsDraftTextarea
+              label={cssLabel}
               disabled={saving}
+              invalid={canonicalCss === null}
+              aria-invalid={canonicalCss === null}
+              aria-describedby={canonicalCss === null ? cssErrorId : undefined}
               maxLength={4000}
-              placeholder={translate('content.callout.surfaceStyle.advancedCss')}
+              placeholder={cssLabel}
               onChange={(event) =>
                 setStyle((current) => ({ ...current!, surfaceCss: event.target.value }))
               }
               rows={7}
               value={style.surfaceCss}
             />
-          </label>
+          </div>
           {canonicalCss === null ? (
-            <p role="alert" className="text-xs text-[var(--sniptale-color-danger)]">
+            <p id={cssErrorId} role="alert" className="text-xs text-[var(--sniptale-color-danger)]">
               {translate('content.callout.surfaceStyle.cssInvalid')}
             </p>
           ) : null}

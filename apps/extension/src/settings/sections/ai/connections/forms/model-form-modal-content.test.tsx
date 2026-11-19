@@ -255,6 +255,14 @@ it('changes audio protocol explicitly and removes hidden chat fields when return
   select('settings.aiProviders.modelAudioFormat', 'verbose_json');
   select('settings.aiProviders.modelAudioTimestamps', 'segment');
   expect(latest()?.timestampGranularity).toBe('segment');
+  const clearLabel = translate('shared.ui.clearField').replace(
+    '{field}',
+    translate('settings.aiProviders.modelAudioPrompt')
+  );
+  const clear = container!.querySelector<HTMLButtonElement>(`button[aria-label="${clearLabel}"]`)!;
+  act(() => clear.click());
+  expect(latest()).toMatchObject({ prompt: '', timestampGranularity: 'segment' });
+  expect(document.activeElement).toBe(prompt);
 });
 
 beforeEach(() => {
@@ -424,6 +432,34 @@ it('shows speech controls and forwards voice changes without exposing the text p
   expect(onAudioChange).toHaveBeenCalledWith({
     speech: { voiceId: 'new-voice', responseFormat: 'mp3' },
   });
+  const label = translate('settings.aiProviders.modelAudioInstructions');
+  const instructions = container!.querySelector<HTMLTextAreaElement>(
+    `textarea[aria-label="${label}"]`
+  )!;
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(
+      instructions,
+      'Read calmly'
+    );
+    instructions.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const speech = { voiceId: 'voice', responseFormat: 'mp3' as const };
+  expect(onAudioChange).toHaveBeenLastCalledWith({
+    speech: { ...speech, instructions: 'Read calmly' },
+  });
+  renderContent({
+    onAudioChange,
+    formData: {
+      ...base.formData,
+      operation: 'speech',
+      audio: { speech: { ...speech, instructions: 'Read calmly' } },
+    },
+  });
+  const clearLabel = translate('shared.ui.clearField').replace('{field}', label);
+  const clear = container!.querySelector<HTMLButtonElement>(`button[aria-label="${clearLabel}"]`)!;
+  act(() => clear.click());
+  expect(onAudioChange).toHaveBeenLastCalledWith({ speech });
+  expect(document.activeElement).toBe(container!.querySelector(`textarea[aria-label="${label}"]`));
 });
 
 it('displays a known retirement date as read-only localized metadata', () => {

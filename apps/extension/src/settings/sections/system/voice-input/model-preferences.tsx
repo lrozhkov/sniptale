@@ -1,10 +1,10 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { ProductTextarea } from '@sniptale/ui/product-form-controls';
 import { AIModelSelector } from '../../../../features/ai/model-selector';
 import { CompactSegmentedSelector } from '../../../../ui/compact-inspector-controls/control-renderers';
 import { translate } from '../../../../platform/i18n';
 import { SettingsControlRow, settingsCompactWorkbenchClassName } from '../../../section-surface';
 import { SettingsSwitch } from '../../../section-surface/panel-controls';
+import { SettingsDraftTextarea } from '../../../section-surface/draft-textarea';
 import type { VoiceInputSettingsController } from './controller-contract';
 
 export function VoiceModelPreferences({
@@ -155,7 +155,8 @@ function VoiceCorrectionPrompt({
       >
         {translate('settings.voiceInput.correctionPrompt')}
       </span>
-      <ProductTextarea
+      <SettingsDraftTextarea
+        label={translate('settings.voiceInput.correctionPrompt')}
         data-ui="settings.voice.correction-prompt"
         aria-labelledby="voice-correction-prompt-label"
         value={models.prompt}

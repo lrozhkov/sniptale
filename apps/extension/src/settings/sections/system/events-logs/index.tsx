@@ -7,7 +7,8 @@ import {
   type RuntimeLogEntry,
 } from '../../../../composition/persistence/diagnostics/model';
 import { useEffect, useId, useRef, useState } from 'react';
-import { ProductInput, ProductSelect } from '@sniptale/ui/product-form-controls';
+import { ProductSelect } from '@sniptale/ui/product-form-controls';
+import { SearchField } from '../../../../ui/compact-inspector-controls/row-controls';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import { createMaintenanceLog } from '../../../../composition/persistence/library-lifecycle/maintenance-log';
 import {
@@ -348,27 +349,27 @@ function JournalFilters({
   onChange(value: JournalFilterValues): void;
   sources: string[];
 }) {
-  const root = useRef<HTMLDivElement>(null);
+  const search = useRef<HTMLInputElement>(null);
   const labelsId = useId();
+  const searchLabel = translate('settings.eventsLogs.search');
   useEffect(() => {
-    root.current?.querySelector<HTMLInputElement>('input')?.focus();
+    search.current?.focus();
   }, []);
   const all = { value: 'all', label: translate('settings.eventsLogs.all') };
   return (
-    <div ref={root} className="shrink-0 space-y-2 px-2 py-2">
+    <div className="shrink-0 space-y-2 px-2 py-2">
       <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
         {translate('settings.eventsLogs.retention')}
       </p>
-      <div className="flex flex-wrap items-end gap-2">
+      <div className="flex flex-wrap items-end gap-2" data-ui="settings.events-log.filters">
         <div className="grid min-w-48 flex-1 gap-1">
-          <span id={`${labelsId}-search`} className="sniptale-parameter-name">
-            {translate('settings.eventsLogs.search')}
-          </span>
-          <ProductInput
-            aria-labelledby={`${labelsId}-search`}
-            className="h-8 min-h-8 w-full"
+          <span className="sniptale-parameter-name">{searchLabel}</span>
+          <SearchField
+            inputRef={search}
+            label={searchLabel}
+            placeholder={searchLabel}
             value={filters.query}
-            onChange={(event) => onChange({ ...filters, query: event.target.value })}
+            onChange={(query) => onChange({ ...filters, query })}
           />
         </div>
         <div className="grid w-48 gap-1">
