@@ -210,8 +210,7 @@ for (const variant of [
       }
       const group = ui('shared.linked-padding-fields');
       const slider = ui('editor.frame.padding-slider');
-      const paddingHeader = group.locator('[data-padding-link="all"]').locator('..');
-      await expect(paddingHeader).toHaveAttribute('data-padding-hover', 'all');
+      const paddingHeader = group.locator('[data-padding-hover="all"]').first();
       await paddingHeader.hover();
       await expect(slider.locator('input')).toBeVisible();
       expect(

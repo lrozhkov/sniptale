@@ -1,5 +1,7 @@
+import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
 import { Check, Pencil } from 'lucide-react';
 import {
+  useContext,
   useEffect,
   useEffectEvent,
   useId,
@@ -108,14 +110,14 @@ function useNumericDraft({
     error,
     min,
     max,
+    valid,
     numericValue: valid ? next : value,
     stepHint: copy.numericStepHint,
     step: (direction: 1 | -1) => {
       const value = clampNumber(Number((next + step * direction).toPrecision(15)), min, max);
-      if (!valid || next === value) return false;
+      if (!valid || next === value) return;
       setDraft({ text: formatCompactEditNumber(value, { precision }), value, edited: true });
       setError(false);
-      return true;
     },
     input,
     trigger,
@@ -148,8 +150,14 @@ function NumberEditor({
 }) {
   const inputRef = editor.input;
   const hintId = useId();
+  const scoped = useContext(CommandPressScope);
+  const applyPress = useCommandPress({
+    enabled: scoped,
+    onClick: () => editor.commit(true),
+  });
   const handleWheel = useEffectEvent((event: WheelEvent) => {
     if (
+      !editor.valid ||
       !inputRef.current?.matches(':focus') ||
       event.defaultPrevented ||
       !event.cancelable ||
@@ -160,7 +168,9 @@ function NumberEditor({
       Math.abs(event.deltaX) >= Math.abs(event.deltaY)
     )
       return;
-    if (editor.step(event.deltaY < 0 ? 1 : -1)) event.preventDefault();
+    event.preventDefault();
+    event.stopPropagation();
+    editor.step(event.deltaY < 0 ? 1 : -1);
   });
   useEffect(() => {
     const surface = inputRef.current?.closest<HTMLElement>('.compound-field, .color-frame');
@@ -225,10 +235,11 @@ function NumberEditor({
       </div>
       {applyLabel && (
         <button
+          {...applyPress.props}
           type="button"
           className="field-action"
           aria-label={applyLabel}
-          onClick={() => editor.commit(true)}
+          data-command-press={scoped ? '' : undefined}
         >
           <Check aria-hidden="true" />
         </button>
@@ -288,6 +299,7 @@ export function OpacityField(
 ) {
   const unit = resolveCompactUnitLabel(props.unit ?? '%');
   const min = props.min ?? 0;
+  const readoutUnit = unit && unit !== '%' ? `\u00a0${unit}` : unit;
   const interaction = useRef<{
     start: number;
     kind: 'pointer' | 'key';
@@ -327,7 +339,7 @@ export function OpacityField(
     else props.onChange(current.start);
   };
   return (
-    <NumericField props={props} className="opacity-field" unit={unit}>
+    <NumericField props={props} className="opacity-field" unit={readoutUnit}>
       {(editor) => (
         <>
           <div
@@ -344,7 +356,7 @@ export function OpacityField(
             </div>
             <span className="opacity-value number-readout" aria-hidden="true">
               <span className="readout-digits">{shownValue}</span>
-              <span className="field-unit">{unit}</span>
+              <span className="field-unit">{readoutUnit}</span>
             </span>
             <input
               type="range"
@@ -397,19 +409,40 @@ export function OpacityField(
               }}
             />
           </div>
-          <button
-            ref={editor.trigger}
-            type="button"
-            className="field-action"
-            aria-label={props.copy.editOpacity}
-            title={props.copy.editOpacity}
+          <OpacityEditButton
+            editor={editor}
+            label={props.copy.editOpacity}
             disabled={props.disabled}
-            onClick={editor.open}
-          >
-            <Pencil aria-hidden="true" />
-          </button>
+          />
         </>
       )}
     </NumericField>
+  );
+}
+
+function OpacityEditButton({
+  editor,
+  disabled,
+  label,
+}: {
+  editor: ReturnType<typeof useNumericDraft>;
+  disabled: boolean | undefined;
+  label: string;
+}) {
+  const scoped = useContext(CommandPressScope);
+  const editPress = useCommandPress({ disabled, enabled: scoped, onClick: editor.open });
+  return (
+    <button
+      {...editPress.props}
+      ref={editor.trigger}
+      type="button"
+      className="field-action"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      data-command-press={scoped ? '' : undefined}
+    >
+      <Pencil aria-hidden="true" />
+    </button>
   );
 }

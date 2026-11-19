@@ -1,4 +1,6 @@
+import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
 import {
+  useContext,
   useEffect,
   useEffectEvent,
   useId,
@@ -57,14 +59,14 @@ function useNumericDraft({ copy, value, max, onChange }: NumericProps) {
     draft,
     error,
     max,
+    valid,
     numericValue: valid ? next : value,
     stepHint: copy.numericStepHint,
     step: (direction: 1 | -1) => {
       const adjusted = next + direction;
-      if (!valid || adjusted < 0 || adjusted > max) return false;
+      if (!valid || adjusted < 0 || adjusted > max) return;
       setDraft(String(adjusted));
       setError(false);
-      return true;
     },
     input,
     trigger,
@@ -96,6 +98,7 @@ function NumberEditor({
   const hintId = useId();
   const handleWheel = useEffectEvent((event: WheelEvent) => {
     if (
+      !editor.valid ||
       !inputRef.current?.matches(':focus') ||
       event.defaultPrevented ||
       !event.cancelable ||
@@ -106,7 +109,9 @@ function NumberEditor({
       Math.abs(event.deltaX) >= Math.abs(event.deltaY)
     )
       return;
-    if (editor.step(event.deltaY < 0 ? 1 : -1)) event.preventDefault();
+    event.preventDefault();
+    event.stopPropagation();
+    editor.step(event.deltaY < 0 ? 1 : -1);
   });
   useEffect(() => {
     if (!editing) return;
@@ -199,6 +204,8 @@ export function ColorAlphaValue({
   const errorId = useId();
   const editor = useNumericDraft({ copy, labelledBy: labelId, value, max: 100, onChange });
   const label = copy.alpha;
+  const scoped = useContext(CommandPressScope);
+  const editPress = useCommandPress({ disabled, enabled: scoped, onClick: editor.open });
 
   return (
     <div className="alpha-value sniptale-inspector-numeric">
@@ -208,13 +215,14 @@ export function ColorAlphaValue({
       <NumberEditor editor={editor} value={value} labelledBy={labelId} unit="%" errorId={errorId} />
       {editor.draft === null && (
         <button
+          {...editPress.props}
           ref={editor.trigger}
           type="button"
           className="number-readout"
           aria-label={label + ', ' + value + '%'}
           title={copy.editAlpha}
           disabled={disabled}
-          onClick={editor.open}
+          data-command-press={scoped ? '' : undefined}
         >
           <span className="readout-digits sr-only">{value}</span>
           <span className="field-unit sr-only">%</span>

@@ -62,7 +62,9 @@ export function FrameBlurControls(props: {
         min={1}
         onCommitValue={props.handleBlurChange}
         onPreviewValue={props.handleBlurChange}
+        rangePresentation="field"
         scrub={{ max: 25, min: 1 }}
+        unit="px"
         value={props.settings.amount}
       />
       {inspector ? (
@@ -115,6 +117,7 @@ export function FrameFocusControls(props: {
         min={0}
         onCommitValue={handleDimmingChange}
         onPreviewValue={handleDimmingChange}
+        rangePresentation="field"
         scrub={{ max: 100, min: 0 }}
         unit="%"
         value={dimmingValue}
@@ -126,6 +129,7 @@ export function FrameFocusControls(props: {
         min={0}
         onCommitValue={props.handleFocusBlurChange}
         onPreviewValue={props.handleFocusBlurChange}
+        rangePresentation="field"
         scrub={{ max: 25, min: 0 }}
         unit="px"
         value={props.settings.blurAmount ?? 0}

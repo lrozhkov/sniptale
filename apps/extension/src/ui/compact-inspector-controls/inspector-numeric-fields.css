@@ -349,3 +349,16 @@
   height: 14px;
   stroke-width: 1.4;
 }
+
+@layer utilities {
+  .sniptale-inspector-numeric .compound-field button.field-action[data-command-press] {
+    --sniptale-control-icon-stroke: var(--inspector-numeric-icon-stroke);
+  }
+
+  .sniptale-inspector-numeric
+    .compound-field
+    button.field-action[data-command-press]:focus-visible {
+    outline: 1px solid var(--inspector-numeric-field-focus) !important;
+    outline-offset: -2px;
+  }
+}

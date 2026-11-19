@@ -194,9 +194,21 @@ async function interactWithFields(state: ReturnType<typeof createBaseState>) {
   });
 
   selectCategory('highlighter.editor.shadowSection');
+  act(() => {
+    container
+      ?.querySelector<HTMLButtonElement>(
+        'button.field-action[aria-label="highlighter.editor.shadowLabel"]'
+      )
+      ?.click();
+  });
   await act(async () => {
     const shadowInput = getNumericInput('highlighter.editor.shadowLabel');
-    setNumericInputValue(shadowInput, '100');
+    setInputValue(shadowInput, '100');
+  });
+  act(() => {
+    getNumericInput('highlighter.editor.shadowLabel').dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+    );
   });
 
   selectCategory('highlighter.editor.behaviorSection');

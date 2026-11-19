@@ -1016,7 +1016,8 @@
   top: calc(50% - 8px);
 }
 
-.sniptale-compact-workspace .sniptale-parameter-row.sniptale-boolean-parameter {
+.sniptale-compact-workspace
+  .sniptale-parameter-row.sniptale-boolean-parameter:not(.sniptale-content-appearance-surface *) {
   grid-template-columns: minmax(0, 1fr) 40px;
 }
 
@@ -1235,4 +1236,13 @@ input.sniptale-range[data-out-of-scale='true']::-moz-range-thumb {
   .sniptale-compact-workspace .sniptale-parameter-check--round::after {
     background: Highlight;
   }
+}
+
+/* A linked padding group owns the outer label and value columns. */
+.sniptale-compact-workspace .sniptale-parameter-row.sniptale-padding-number {
+  display: flex;
+  padding: 0;
+}
+.sniptale-padding-number > [data-ui='shared.ui.compact-inspector.numeric-value-field'] {
+  width: 100%;
 }

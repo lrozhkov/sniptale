@@ -152,12 +152,14 @@ it('wires the focus blur control into creation settings', async () => {
     )
   );
   const blurLabel = translate('content.overlayControls.focusBlurLabel');
-  const increase = document.querySelector<HTMLButtonElement>(
-    `button[aria-label="${blurLabel} increase"]`
+  const blur = document.querySelector<HTMLInputElement>(
+    `input[type="range"][aria-label="${blurLabel}"]`
   );
-
-  expect(increase).not.toBeNull();
-  act(() => increase?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  expect(blur).not.toBeNull();
+  act(() => {
+    blur?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    blur?.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowUp', bubbles: true }));
+  });
   expect(onChange).toHaveBeenLastCalledWith(
     expect.objectContaining({
       focusSettings: expect.objectContaining({ blurAmount: 1 }),
@@ -165,18 +167,19 @@ it('wires the focus blur control into creation settings', async () => {
   );
 
   const dimmingLabel = translate('content.overlayControls.focusDimmingLabelPrefix');
-  const dimmingIncrease = document.querySelector<HTMLButtonElement>(
-    `button[aria-label="${dimmingLabel} increase"]`
+  const dimming = document.querySelector<HTMLInputElement>(
+    `input[type="range"][aria-label="${dimmingLabel}"]`
   );
   const decorationToggle = document.querySelector<HTMLButtonElement>(
     `button[aria-label="${translate('content.overlayControls.showBorderTitle')}"]`
   );
   act(() => {
-    dimmingIncrease?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    dimming?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    dimming?.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowUp', bubbles: true }));
     decorationToggle?.click();
   });
 
-  expect(dimmingIncrease).not.toBeNull();
+  expect(dimming).not.toBeNull();
   expect(decorationToggle).not.toBeNull();
 
   anchor.remove();

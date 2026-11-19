@@ -829,12 +829,33 @@ for (const theme of ['light', 'dark'] as const) {
         expect.soft(Math.abs(item.x - geometry[0]!.x)).toBeLessThanOrEqual(1);
       }
       const padding = ui(page, 'editor.frame.padding-fields');
-      await padding
-        .getByText(translate('editor.scene.paddingAroundImage', 'ru'), { exact: true })
-        .hover();
-      const range = padding.getByRole('slider');
-      await expect(range).toBeVisible();
+      const row = padding.locator('[data-padding-hover="all"]').first();
+      const name = row.getByText(translate('editor.scene.paddingAroundImage', 'ru'), {
+        exact: true,
+      });
+      const input = row.getByRole('textbox');
+      const range = padding.locator('[data-ui="editor.frame.padding-slider"] input');
+      await row.scrollIntoViewIfNeeded();
+      const nameBounds = (await name.boundingBox())!;
+      const inputBounds = (await input.boundingBox())!;
+      await page.mouse.move(
+        (nameBounds.x + nameBounds.width + inputBounds.x) / 2,
+        inputBounds.y + inputBounds.height / 2
+      );
+      await expect(range).toHaveAttribute('tabindex', '0');
+      await range.hover();
+      await expect(range).toHaveAttribute('tabindex', '0');
+      await input.fill('48');
+      await input.press('Enter');
+      await expect(input).toHaveValue('48');
       await screenshot(page, info, 'scene-padding-rhythm');
+
+      const link = row.locator('[data-padding-link="all"]');
+      await link.click();
+      await expect(range).toHaveCount(0);
+      await link.click();
+      await input.focus();
+      await expect(range).toHaveAttribute('tabindex', '0');
     });
   }
 }

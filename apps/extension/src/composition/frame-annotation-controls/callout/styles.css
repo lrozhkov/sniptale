@@ -7,24 +7,24 @@
   cursor: default !important;
 }
 
-.sniptale-callout-settings-popover * {
+.sniptale-callout-settings-popover:not(.sniptale-content-appearance-surface) * {
   cursor: default !important;
 }
 
-.sniptale-callout-settings-popover button,
-.sniptale-callout-settings-popover [role='button'],
-.sniptale-callout-settings-popover [role='option'] {
+.sniptale-callout-settings-popover:not(.sniptale-content-appearance-surface) button,
+.sniptale-callout-settings-popover:not(.sniptale-content-appearance-surface) [role='button'],
+.sniptale-callout-settings-popover:not(.sniptale-content-appearance-surface) [role='option'] {
   cursor: pointer !important;
 }
 
-.sniptale-callout-settings-popover button *,
-.sniptale-callout-settings-popover [role='button'] *,
-.sniptale-callout-settings-popover [role='option'] * {
+.sniptale-callout-settings-popover:not(.sniptale-content-appearance-surface) button *,
+.sniptale-callout-settings-popover:not(.sniptale-content-appearance-surface) [role='button'] *,
+.sniptale-callout-settings-popover:not(.sniptale-content-appearance-surface) [role='option'] * {
   cursor: inherit !important;
 }
 
-.sniptale-callout-settings-popover input[type='text'],
-.sniptale-callout-settings-popover input[type='number'] {
+.sniptale-callout-settings-popover:not(.sniptale-content-appearance-surface) input[type='text'],
+.sniptale-callout-settings-popover:not(.sniptale-content-appearance-surface) input[type='number'] {
   cursor: text !important;
 }
 

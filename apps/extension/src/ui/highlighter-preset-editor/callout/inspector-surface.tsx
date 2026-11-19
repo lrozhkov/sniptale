@@ -64,7 +64,6 @@ export function CalloutSizeSettings(props: ManualContentProps) {
       <NumericProperty
         label={translate('content.callout.defaultWidthLabel')}
         min={100}
-        scrubMax={800}
         step={10}
         value={typography.maxWidth}
         onChange={(maxWidth) => props.onChange({ style: { typography: { maxWidth } } })}
@@ -99,6 +98,7 @@ export function CalloutBackgroundSettings(props: ManualContentProps) {
       />
       <NumericProperty
         label={translate('content.callout.shadowLabel')}
+        scale
         min={0}
         max={32}
         value={surface.shadow}

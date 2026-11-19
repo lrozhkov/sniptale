@@ -193,7 +193,7 @@
 }
 
 .sniptale-framed-color-value[data-alpha] {
-  grid-template-columns: minmax(0, 1fr) 54px;
+  grid-template-columns: minmax(0, 1fr) var(--sniptale-color-alpha-width, 54px);
 }
 
 .sniptale-framed-color-errors {
@@ -269,4 +269,10 @@
   height: 16px;
   border: 1px solid var(--sniptale-color-field-border);
   border-radius: 3px;
+}
+
+@layer utilities {
+  .alpha-value.sniptale-inspector-numeric > button[data-command-press]:focus-visible {
+    outline: none !important;
+  }
 }

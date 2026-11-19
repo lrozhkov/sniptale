@@ -194,9 +194,9 @@ it('keeps the linked value beside its label and places the full-row control belo
   const fields = container.querySelector('[data-ui="shared.linked-padding-fields"]');
   expect(fields?.firstElementChild?.querySelector('input[type="text"]')).not.toBeNull();
   expect(fields?.querySelector('input[type="range"]')?.parentElement).toBe(fields);
-  expect(fields?.querySelector('[data-padding-link="all"]')?.parentElement).toBe(
-    fields?.firstElementChild
-  );
+  expect(
+    fields?.querySelector('[data-padding-link="all"]')?.closest('[data-padding-hover="all"]')
+  ).toBe(fields?.firstElementChild);
 });
 
 it('uses the same linkage for previews and commits while preserving an explicit split', async () => {

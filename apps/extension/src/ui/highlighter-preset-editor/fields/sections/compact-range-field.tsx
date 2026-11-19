@@ -7,6 +7,7 @@ export function EditorCompactRangeField({
   max,
   min,
   onChange,
+  scale,
   value,
 }: {
   displaySuffix?: CompactInspectorUnit;
@@ -14,6 +15,7 @@ export function EditorCompactRangeField({
   max: number;
   min: number;
   onChange: (value: number) => void;
+  scale?: boolean;
   value: number;
 }) {
   return (
@@ -24,6 +26,7 @@ export function EditorCompactRangeField({
       min={min}
       onCommitValue={onChange}
       onPreviewValue={onChange}
+      {...(scale ? { rangePresentation: 'field', scrub: { min, max, step: 1 } } : {})}
       step={1}
       unit={displaySuffix}
       value={value}
