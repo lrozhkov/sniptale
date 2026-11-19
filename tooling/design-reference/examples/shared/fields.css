@@ -248,6 +248,44 @@ html[data-input-mode='keyboard'] .text-input:focus-visible {
   stroke-linecap: round;
 }
 
+.text-field.text-field--dictation > textarea.text-input {
+  min-height: 90px;
+  padding-inline-end: 36px;
+  padding-block-end: 32px;
+  background: var(--reference-field-idle);
+  border-color: var(--reference-field-border);
+}
+.text-field--dictation:focus-within > textarea.text-input,
+.text-field--dictation > textarea.text-input:hover {
+  background: var(--reference-field-hover);
+  border-color: var(--reference-field-hover-border);
+}
+.text-field.text-field--dictation > .text-clear {
+  margin-inline-end: 12px;
+}
+.text-field--dictation > .inspector-dictation.action-button {
+  grid-area: 2 / 1;
+  align-self: end;
+  justify-self: end;
+  z-index: 1;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  margin-inline-end: 12px;
+  margin-block-end: 4px;
+  padding: 0;
+  visibility: hidden;
+}
+.text-field--dictation > .inspector-dictation svg {
+  width: 14px;
+  height: 14px;
+}
+.text-field--dictation:is(:focus-within, :has(> :is(textarea, .inspector-dictation):hover))
+  > .inspector-dictation {
+  visibility: visible;
+}
+
 .text-field[slot='inspector-text'] {
   --surface-hover: var(--reference-field-hover);
   --field-border: var(--reference-field-hover-border);
@@ -285,42 +323,51 @@ html[data-input-mode='keyboard'] .text-input:focus-visible {
   outline: 0;
 }
 .text-field[slot='inspector-text'] > textarea.text-input {
+  min-height: 64px;
+}
+.text-field:is([slot='inspector-text'], .text-field--dictation) > textarea.text-input {
   --text-scroll-thumb: color-mix(in srgb, var(--secondary) 34%, transparent);
   --text-resize-ink: color-mix(in srgb, var(--secondary) 52%, transparent);
-  min-height: 64px;
   cursor: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--text-scroll-thumb) transparent;
 }
 @supports selector(::-webkit-scrollbar) {
-  .text-field[slot='inspector-text'] > textarea.text-input {
+  .text-field:is([slot='inspector-text'], .text-field--dictation) > textarea.text-input {
     scrollbar-width: auto;
     scrollbar-color: auto;
   }
-  .text-field[slot='inspector-text'] > textarea.text-input::-webkit-scrollbar {
+  .text-field:is([slot='inspector-text'], .text-field--dictation)
+    > textarea.text-input::-webkit-scrollbar {
     width: 7px;
     cursor: default;
   }
-  .text-field[slot='inspector-text'] > textarea.text-input::-webkit-scrollbar-track {
+  .text-field:is([slot='inspector-text'], .text-field--dictation)
+    > textarea.text-input::-webkit-scrollbar-track {
     background: transparent;
     cursor: default;
   }
-  .text-field[slot='inspector-text'] > textarea.text-input::-webkit-scrollbar-thumb {
+  .text-field:is([slot='inspector-text'], .text-field--dictation)
+    > textarea.text-input::-webkit-scrollbar-thumb {
     border: 1px solid transparent;
     border-radius: 999px;
     background: var(--text-scroll-thumb) padding-box;
     cursor: default;
   }
-  .text-field[slot='inspector-text'] > textarea.text-input::-webkit-scrollbar-thumb:hover {
+  .text-field:is([slot='inspector-text'], .text-field--dictation)
+    > textarea.text-input::-webkit-scrollbar-thumb:hover {
     background-color: color-mix(in srgb, var(--secondary) 52%, transparent);
   }
-  .text-field[slot='inspector-text'] > textarea.text-input::-webkit-scrollbar-button {
+  .text-field:is([slot='inspector-text'], .text-field--dictation)
+    > textarea.text-input::-webkit-scrollbar-button {
     display: none;
   }
-  .text-field[slot='inspector-text'] > textarea.text-input::-webkit-scrollbar-corner {
+  .text-field:is([slot='inspector-text'], .text-field--dictation)
+    > textarea.text-input::-webkit-scrollbar-corner {
     background: transparent;
   }
-  .text-field[slot='inspector-text'] > textarea.text-input::-webkit-resizer {
+  .text-field:is([slot='inspector-text'], .text-field--dictation)
+    > textarea.text-input::-webkit-resizer {
     background: linear-gradient(
         to top left,
         transparent 2px,
@@ -333,10 +380,11 @@ html[data-input-mode='keyboard'] .text-input:focus-visible {
   }
 }
 @media (forced-colors: active) {
-  .text-field[slot='inspector-text'] > textarea.text-input {
+  .text-field:is([slot='inspector-text'], .text-field--dictation) > textarea.text-input {
     --text-resize-ink: CanvasText;
   }
-  .text-field[slot='inspector-text'] > textarea.text-input::-webkit-resizer {
+  .text-field:is([slot='inspector-text'], .text-field--dictation)
+    > textarea.text-input::-webkit-resizer {
     forced-color-adjust: none;
   }
 }

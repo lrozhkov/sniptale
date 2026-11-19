@@ -4,6 +4,7 @@ import { VoiceInputButton } from '../../composition/voice-input/button';
 import { useVoiceInputSession } from '../../composition/voice-input/session';
 import { getVoiceInputProviderErrorKey } from '../../composition/voice-input/provider-error-copy';
 import { translate } from '../../platform/i18n';
+import { InspectorFieldClear } from '../../ui/compact-inspector-controls/text-field';
 
 /** Binds shared dictation to this prompt and cancels insertion after manual edits or task changes. */
 export function ImagePrompt(props: {
@@ -14,6 +15,7 @@ export function ImagePrompt(props: {
   onChange(value: string): void;
 }) {
   const field = useRef<HTMLTextAreaElement>(null);
+  const label = translate('editor.ai.prompt');
   const latest = useRef(props);
   latest.current = props;
   const insertion = useRef<{ start: number; end: number; sequence: number } | null>(null);
@@ -75,7 +77,7 @@ export function ImagePrompt(props: {
           rows={3}
           maxLength={4000}
           value={props.value}
-          aria-label={translate('editor.ai.prompt')}
+          aria-label={label}
           placeholder={translate(props.refining ? 'editor.ai.refine' : 'editor.ai.prompt')}
           onChange={(event) => {
             cancel();
@@ -93,14 +95,21 @@ export function ImagePrompt(props: {
             }
           }}
           className={[
-            'block w-full resize-y !pb-8 !pr-9 focus:!border-[var(--sniptale-color-border-strong)]',
+            'block w-full !pb-8 !pr-9 focus:!border-[var(--sniptale-color-border-strong)]',
             'focus:!shadow-none',
             'selection:bg-[color-mix(in_srgb,var(--sniptale-color-text-secondary)_22%,transparent)]',
             'selection:text-[var(--sniptale-color-text-primary)]',
           ].join(' ')}
           data-ui="editor.ai.prompt"
         />
-        <span className="absolute bottom-1 right-1" onMouseDown={(event) => event.preventDefault()}>
+        {props.value ? <InspectorFieldClear label={label} target={field} /> : null}
+        <span
+          className="absolute bottom-1 end-3"
+          data-image-prompt-voice-active={
+            voice.state.active || voice.state.pending || voice.state.errorCode !== null
+          }
+          onMouseDown={(event) => event.preventDefault()}
+        >
           <VoiceInputButton
             dataUi="editor.ai.voice"
             className="!h-6 !w-6 !rounded-[4px] !border-transparent !bg-transparent"

@@ -417,10 +417,7 @@
   border-color: var(--sniptale-color-border-soft);
   background: var(--sniptale-color-surface-input);
 }
-.sniptale-compact-workspace .sniptale-field-clear {
-  position: absolute;
-  inset-inline-end: 0;
-  top: 4px;
+:is(.sniptale-compact-workspace, .sniptale-inspector-search) .sniptale-field-clear {
   display: grid;
   place-items: center;
   width: 24px;
@@ -432,9 +429,69 @@
   color: var(--sniptale-color-text-secondary);
   cursor: pointer;
 }
-.sniptale-compact-workspace .sniptale-field-clear:hover {
+.sniptale-compact-workspace .sniptale-field-clear {
+  position: absolute;
+  inset-inline-end: 0;
+  top: 4px;
+}
+:is(.sniptale-compact-workspace, .sniptale-inspector-search) .sniptale-field-clear:hover {
   background: transparent;
   color: var(--sniptale-color-text-primary-strong);
+}
+.sniptale-inspector-search {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 24px;
+  align-items: center;
+  flex-shrink: 0;
+  min-inline-size: 0;
+  block-size: 32px;
+  padding-inline: 8px 4px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: var(--sniptale-radius-sm);
+  background: var(--sniptale-color-surface-input);
+  color: var(--sniptale-color-text-muted);
+}
+.sniptale-inspector-search:is(:focus-within, :has(> input:hover, > .sniptale-field-clear:hover)) {
+  background: var(--sniptale-color-surface-hover);
+}
+.sniptale-inspector-search:focus-within {
+  border-color: var(--sniptale-color-border-strong);
+}
+.sniptale-inspector-search > input[type='search'] {
+  min-inline-size: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  padding-inline-end: 6px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--sniptale-color-text-primary);
+  font-size: var(--sniptale-compact-font-size, 12px);
+  font-weight: 400;
+}
+.sniptale-inspector-search > input::placeholder {
+  color: var(--sniptale-color-text-muted);
+  opacity: 1;
+}
+.sniptale-inspector-search > input:focus::placeholder {
+  color: transparent;
+}
+.sniptale-inspector-search > input::-webkit-search-cancel-button {
+  display: none;
+}
+.sniptale-inspector-search > .sniptale-field-clear {
+  position: static;
+  visibility: hidden;
+}
+.sniptale-inspector-search:is(:focus-within, :has(> input:hover, > .sniptale-field-clear:hover))
+  > .sniptale-field-clear:not(:disabled) {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+.sniptale-inspector-search > .sniptale-field-clear:focus-visible {
+  outline: 1px solid var(--sniptale-color-text-muted-strong);
+  outline-offset: -1px;
 }
 .sniptale-compact-workspace [data-ui='shared.ui.color-selector.picker-trigger'] {
   order: 1;

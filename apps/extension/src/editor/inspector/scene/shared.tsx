@@ -51,6 +51,7 @@ export function EditorInspectorRangeField(props: {
   min?: number;
   onChange: (value: number) => void;
   onPreview?: ((value: number) => void) | undefined;
+  scrubEnabled?: boolean;
   step?: number;
   unit: '' | '%' | 'deg' | 'px';
   value: number;
@@ -67,7 +68,7 @@ export function EditorInspectorRangeField(props: {
       step={step}
       unit={props.unit}
       {...draft}
-      scrub={{ min, max: props.max, step }}
+      scrub={props.scrubEnabled === false ? undefined : { min, max: props.max, step }}
     />
   );
 }

@@ -5,6 +5,95 @@ import { applyHarnessBootstrap, EDITOR_HARNESS_PATH } from '../extension-critica
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { startHostServer } from '../support/host-server';
 
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`image prompt scrollbar and dictation affordance ${viewport.name}`, async ({
+    page,
+  }, info) => {
+    const host = await startHostServer();
+    try {
+      const theme = viewport.size.width === 1280 ? 'light' : 'dark';
+      await page.setViewportSize(viewport.size);
+      await applyHarnessBootstrap(page, {
+        storage: { 'sniptale-theme-preference': theme },
+      });
+      await page.goto(`${host.origin}${EDITOR_HARNESS_PATH}?theme=${theme}`);
+      await expect(page.locator('[data-ui="editor.page.root"]')).toBeVisible();
+      await installImageApiFixture(page);
+      await page.locator('[data-ui="editor.floating.layers.mode.ai"]').click();
+      const prompt = page.locator('[data-ui="editor.ai.prompt"]');
+      const voice = page.locator('[data-ui="editor.ai.voice"]');
+      const clear = page.getByRole('button', {
+        name: translate('shared.ui.clearField', 'en').replace(
+          '{field}',
+          translate('editor.ai.prompt', 'en')
+        ),
+        exact: true,
+      });
+      await expect(prompt).toBeVisible();
+      await expect(voice).toHaveCount(1);
+      await page.mouse.move(400, 100);
+      expect(await voice.isVisible()).toBe(false);
+      await prompt.hover();
+      await expect(voice).toBeVisible();
+      await prompt.fill(Array.from({ length: 30 }, (_, index) => `Line ${index + 1}`).join('\n'));
+      await expect(clear).toBeVisible();
+      expect(await clear.boundingBox()).toMatchObject({ width: 24, height: 24 });
+      await prompt.evaluate((node) => {
+        node.scrollTop = 0;
+      });
+      await page.mouse.wheel(0, 120);
+      await expect.poll(() => prompt.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+      const scrollbar = await prompt.evaluate((node) => ({
+        width: getComputedStyle(node, '::-webkit-scrollbar').width,
+        cursor: getComputedStyle(node, '::-webkit-scrollbar-thumb').cursor,
+        trackCursor: getComputedStyle(node, '::-webkit-scrollbar-track').cursor,
+        buttons: getComputedStyle(node, '::-webkit-scrollbar-button').display,
+        corner: getComputedStyle(node, '::-webkit-scrollbar-corner').backgroundColor,
+      }));
+      expect(scrollbar).toEqual({
+        width: '6px',
+        cursor: 'default',
+        trackCursor: 'default',
+        buttons: 'none',
+        corner: 'rgba(0, 0, 0, 0)',
+      });
+      const promptBounds = (await prompt.boundingBox())!;
+      const voiceBounds = (await voice.boundingBox())!;
+      const clearBounds = (await clear.boundingBox())!;
+      expect(Math.abs(clearBounds.x - voiceBounds.x)).toBeLessThanOrEqual(1);
+      expect(clearBounds.y + clearBounds.height).toBeLessThan(voiceBounds.y);
+      expect(
+        promptBounds.x + promptBounds.width - voiceBounds.x - voiceBounds.width
+      ).toBeGreaterThanOrEqual(8);
+      const resizeX = promptBounds.x + promptBounds.width - 3;
+      const resizeY = promptBounds.y + promptBounds.height - 3;
+      await page.mouse.move(resizeX, resizeY);
+      await page.mouse.down();
+      await page.mouse.move(resizeX, resizeY + 24, { steps: 6 });
+      await page.mouse.up();
+      expect((await prompt.boundingBox())!.height).toBeGreaterThan(promptBounds.height);
+      await page.mouse.move(400, 100);
+      await prompt.focus();
+      await expect(voice).toBeVisible();
+      await prompt.press('Tab');
+      await expect(clear).toBeFocused();
+      await clear.press('Tab');
+      await expect(voice).toBeFocused();
+      await expect(voice).toHaveCSS('outline-width', '1px');
+      await expect(voice).toHaveCSS('box-shadow', 'none');
+      await page.screenshot({ path: info.outputPath('image-prompt-scroll.png'), fullPage: false });
+      await voice.press('Shift+Tab');
+      await clear.press('Enter');
+      await expect(prompt).toBeFocused();
+      await expect(prompt).toHaveValue('');
+      await expect(clear).toHaveCount(0);
+      await expect(page.locator('[data-ui="editor.ai.generate"]')).toBeDisabled();
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
+
 for (const locale of ['en', 'ru'] as const) {
   for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     test(`image AI inspector generates, retains its session and applies with Undo ${locale} ${viewport.name}`, async ({

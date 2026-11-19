@@ -1,8 +1,9 @@
-import type React from 'react';
+import React from 'react';
 import { Search } from 'lucide-react';
 import { OptionRowValue, OptionToggleIndicator } from './control-renderers';
 import { cx } from './shared';
 import { InspectorParameterRow, useInspectorLayout } from './layout';
+import { InspectorFieldClear } from './text-field';
 
 function getNodeTitle(value: React.ReactNode): string | undefined {
   return typeof value === 'string' ? value : undefined;
@@ -102,29 +103,24 @@ export function SearchField(props: {
   placeholder: string;
   value: string;
   onChange: (value: string) => void;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
+  onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
 }) {
+  const localRef = React.useRef<HTMLInputElement>(null);
+  const inputRef = props.inputRef ?? localRef;
   return (
-    <label
-      className={cx(
-        'flex h-10 items-center gap-2 rounded-[10px] border px-3',
-        'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]'
-      )}
-    >
-      <Search size={15} strokeWidth={2} className="text-[color:var(--sniptale-color-text-muted)]" />
-      <span className="sr-only">{props.label}</span>
+    <div className="sniptale-inspector-search">
+      <Search size={14} aria-hidden="true" />
       <input
+        ref={inputRef}
         aria-label={props.label}
         type="search"
         value={props.value}
         placeholder={props.placeholder}
         onChange={(event) => props.onChange(event.currentTarget.value)}
-        className={cx(
-          'min-w-0 flex-1 border-0 bg-transparent p-0 text-[length:var(--sniptale-compact-font-size,12px)] font-medium',
-          'text-[color:var(--sniptale-color-text-primary)] outline-none',
-          'placeholder:text-[color:var(--sniptale-color-text-muted)]'
-        )}
+        onKeyDown={props.onKeyDown}
       />
-    </label>
+      {props.value ? <InspectorFieldClear label={props.label} target={inputRef} /> : null}
+    </div>
   );
 }

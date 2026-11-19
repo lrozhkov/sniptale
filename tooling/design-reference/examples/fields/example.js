@@ -1,5 +1,5 @@
 import { el, exampleCase } from '../shared/dom.js';
-import { TextField } from '../shared/fields.js';
+import { DictationSampleButton, TextField } from '../shared/fields.js';
 import { ActionButton, AsyncCommand } from '../shared/buttons.js';
 export function render(root, { manifest }) {
   const add = (key) => {
@@ -106,11 +106,20 @@ export function render(root, { manifest }) {
     multiline: true,
     context: 'inspector',
   });
+  const prompt = TextField({
+    label: 'Запрос',
+    multiline: true,
+    value:
+      'Сделай фон светлее.\nСохрани содержимое кадра.\nИспользуй мягкие тени.\nНе добавляй подписи.\nОставь поля по краям.\nСохрани пропорции изображения.',
+  });
+  prompt.element.classList.add('text-field--dictation');
+  prompt.element.append(DictationSampleButton(prompt.input, 'ru'));
   add('multiline').append(
     multiline.element,
     el('p', {
       text: 'Enter добавляет строку. Blur принимает текст. Escape возвращает принятое значение.',
-    })
+    }),
+    prompt.element
   );
   add('search').append(...searchExample());
   add('long').append(

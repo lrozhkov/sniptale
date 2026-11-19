@@ -7,7 +7,7 @@ import {
   type RefObject,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Search } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { useCompactSelectController } from '@sniptale/ui/compact-inspector-controls/select-controller';
 import { useFloatingSurfaceWheelContainment } from '@sniptale/ui/floating-interactions/wheel';
 import { mergeFloatingInteractionLayerStyle } from '@sniptale/ui/floating-interactions/placement';
@@ -17,6 +17,7 @@ import {
 } from '@sniptale/ui/floating-interactions/ownership';
 import { CompactSelectTrigger } from '../../../ui/compact-inspector-controls/select-trigger';
 import { translate } from '../../../platform/i18n';
+import { SearchField } from '../../chrome/ui';
 
 type CollectionOption = { value: string; label: string; prefix?: string };
 type CollectionSelect = ReturnType<typeof useCompactSelectController<string>>;
@@ -86,22 +87,14 @@ function CollectionSearchPopup({
         }
       }}
     >
-      <label className="flex h-8 shrink-0 items-center gap-2 px-2 text-[var(--sniptale-color-text-secondary)]">
-        <Search size={14} aria-hidden="true" />
-        <input
-          ref={input}
-          type="search"
-          value={query}
-          aria-label={translate('editor.elements.searchCollections')}
-          placeholder={translate('editor.elements.searchCollections')}
-          className={[
-            'min-w-0 flex-1 bg-transparent text-xs',
-            'text-[var(--sniptale-color-text-primary)] outline-none placeholder:!opacity-100',
-          ].join(' ')}
-          onChange={(event) => setQuery(event.currentTarget.value)}
-          onKeyDown={(event) => handleCollectionSearchKeyDown(event, options, select.actions)}
-        />
-      </label>
+      <SearchField
+        inputRef={input}
+        value={query}
+        label={translate('editor.elements.searchCollections')}
+        placeholder={translate('editor.elements.searchCollections')}
+        onChange={setQuery}
+        onKeyDown={(event) => handleCollectionSearchKeyDown(event, options, select.actions)}
+      />
       <div
         id={id}
         role="listbox"

@@ -35,8 +35,12 @@ vi.mock('../../composition/voice-input/button', () => ({
         <button disabled={props.disabled} onClick={props.onStart}>
           start
         </button>
-        <button onClick={props.onStop}>stop</button>
-        <button onClick={props.onCancel}>cancel</button>
+        <button data-voice-command="stop" onClick={props.onStop}>
+          stop
+        </button>
+        <button data-voice-command="cancel" onClick={props.onCancel}>
+          cancel
+        </button>
       </>
     );
   },
@@ -152,7 +156,9 @@ it('ignores late text after manual edits, task changes, disabling, cancellation 
   disabled = false;
   await render();
   await start();
-  await act(async () => host.querySelectorAll('button')[2]!.click());
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[data-voice-command="cancel"]')!.click()
+  );
   await transcript('cancelled', 4);
   expect(value).toBe('manual');
   await start();
@@ -160,6 +166,22 @@ it('ignores late text after manual edits, task changes, disabling, cancellation 
   await transcript('blurred', 5);
   expect(value).toBe('manual');
   expect(voice.actions.cancel).toHaveBeenCalled();
+});
+
+it('clears the prompt and cancels the current insertion before accepting new dictation', async () => {
+  value = 'draft';
+  await render();
+  await start();
+  const cancellations = voice.actions.cancel.mock.calls.length;
+  await act(async () => host.querySelector<HTMLButtonElement>('.sniptale-field-clear')!.click());
+  expect(voice.actions.cancel).toHaveBeenCalledTimes(cancellations + 1);
+  expect(value).toBe('');
+  expect(document.activeElement).toBe(field());
+  await transcript('late', 1);
+  expect(value).toBe('');
+  await start();
+  await transcript('new dictation', 2);
+  expect(value).toBe('new dictation');
 });
 
 it('does not restart an active or pending session and reports the shared voice failure', async () => {
@@ -176,6 +198,8 @@ it('does not restart an active or pending session and reports the shared voice f
   voice.state.errorCode = 'runtime';
   await render();
   expect(host.querySelector('[role="alert"]')?.textContent).toBeTruthy();
-  await act(async () => host.querySelectorAll('button')[1]!.click());
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[data-voice-command="stop"]')!.click()
+  );
   expect(voice.actions.stop).toHaveBeenCalledOnce();
 });

@@ -76,6 +76,7 @@ vi.mock('./shared', async (importOriginal) => ({
     label: string;
     value: number;
     max: number;
+    scrubEnabled?: boolean;
     onChange: (value: number) => void;
     onPreview?: (value: number) => void;
   }) => (
@@ -85,6 +86,7 @@ vi.mock('./shared', async (importOriginal) => ({
       aria-label={props.label}
       data-value={String(props.value)}
       data-max={String(props.max)}
+      data-scrub={props.scrubEnabled !== false}
       onPointerMove={() => props.onPreview?.(50)}
       onClick={() => props.onChange(50)}
     >
@@ -264,7 +266,7 @@ for (const colorIndex of [0, 1]) {
   });
 }
 
-it('routes all source sliders to live previews with native units and commits separately', async () => {
+it('keeps radius exact and routes source numeric fields to separate preview and commit', async () => {
   const applyFramePatch = vi.fn();
   const previewFramePatch = vi.fn();
   await renderUi(
@@ -277,6 +279,7 @@ it('routes all source sliders to live previews with native units and commits sep
   );
   const ranges = container!.querySelectorAll<HTMLButtonElement>('[data-testid="range"]');
   expect(ranges).toHaveLength(3);
+  expect(Array.from(ranges, (field) => field.dataset['scrub'])).toEqual(['false', 'true', 'true']);
   for (const range of ranges) {
     act(() => range.dispatchEvent(new PointerEvent('pointermove', { bubbles: true })));
   }

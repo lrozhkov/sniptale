@@ -81,10 +81,6 @@ function SourceImageRangeControl(props: {
   );
 }
 
-function SourceImageRangeSection(props: Parameters<typeof SourceImageRangeControl>[0]) {
-  return <SourceImageRangeControl {...props} />;
-}
-
 function resolveSourceImageNumericUnit(valueText: string): '' | '%' | 'deg' | 'px' {
   if (valueText.endsWith('%')) {
     return '%';
@@ -119,11 +115,12 @@ export function EditorInspectorFrameSourceImageBasics(
 
   return (
     <div className="sniptale-parameter-stack" data-ui="editor.frame.source-basics">
-      <SourceImageRangeSection
+      <EditorInspectorRangeField
         label={translate('editor.compact.cornerRadius')}
         max={80}
         value={settings.radius}
-        valueText={`${settings.radius}px`}
+        unit="px"
+        scrubEnabled={false}
         onPreview={
           props.previewFramePatch
             ? (radius) => patchSourceImage(props, { radius }, true)
