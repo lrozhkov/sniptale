@@ -1,4 +1,4 @@
-import { Funnel, Search, X } from 'lucide-react';
+import { Funnel } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import type {
@@ -6,6 +6,7 @@ import type {
   AnnotationTemplateTagId,
 } from '@sniptale/runtime-contracts/highlighter/annotation-template-tags';
 import { translate } from '../../platform/i18n';
+import { SearchField } from '../compact-inspector-controls/row-controls';
 import { FloatingFilterMenu, useFloatingFilterMenu } from './floating-filter-menu';
 
 const FILTER_TRIGGER_BASE_CLASS_NAME = [
@@ -48,34 +49,14 @@ export function AnnotationTemplateQueryControls(props: {
 
   return (
     <div className="flex items-center gap-2" data-ui="shared.annotation-template-query.controls">
-      <label
-        className={[
-          'flex h-8 min-w-0 flex-1 items-center gap-2 rounded-[4px] border px-2.5',
-          'border-[var(--sniptale-color-border-soft)]',
-          'bg-[var(--sniptale-color-surface-input)]',
-        ].join(' ')}
-      >
-        <Search aria-hidden="true" size={14} className="text-[var(--sniptale-color-text-muted)]" />
-        <span className="sr-only">{translate('highlighter.templateTags.searchLabel')}</span>
-        <input
-          aria-label={translate('highlighter.templateTags.searchLabel')}
-          className="min-w-0 flex-1 cursor-text bg-transparent text-xs outline-none focus:placeholder-transparent"
-          onChange={(event) => props.onQueryChange(event.currentTarget.value)}
-          placeholder={translate('highlighter.templateTags.searchPlaceholder')}
-          type="text"
-          value={props.query}
-        />
-        {props.query ? (
-          <button
-            className={'sniptale-dismiss-button'}
-            aria-label={translate('highlighter.templateTags.clearSearch')}
-            onClick={() => props.onQueryChange('')}
-            type="button"
-          >
-            <X aria-hidden="true" size={13} />
-          </button>
-        ) : null}
-      </label>
+      <SearchField
+        className="flex-1"
+        label={translate('highlighter.templateTags.searchLabel')}
+        placeholder={translate('highlighter.templateTags.searchPlaceholder')}
+        clearLabel={translate('highlighter.templateTags.clearSearch')}
+        value={props.query}
+        onChange={props.onQueryChange}
+      />
       <div className="relative" data-floating-ui-owner-id={floating.ownerId} ref={floating.rootRef}>
         <button
           aria-expanded={open}

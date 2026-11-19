@@ -77,7 +77,6 @@ function EditorVisualRanges({ state }: { state: EditorState }) {
         label={translate('highlighter.editor.radiusLabel')}
         min={0}
         max={50}
-        scrubbable={false}
         value={state.radius}
         displaySuffix="px"
         onChange={state.setRadius}

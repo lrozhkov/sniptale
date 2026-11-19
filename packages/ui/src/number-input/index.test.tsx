@@ -26,7 +26,7 @@ function render(node: ReactNode) {
   return input;
 }
 function wheel(input: HTMLInputElement, deltaY = -120) {
-  const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY });
+  const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY, altKey: true });
   act(() => input.dispatchEvent(event));
   return event;
 }

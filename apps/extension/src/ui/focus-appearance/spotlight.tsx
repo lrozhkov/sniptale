@@ -27,6 +27,7 @@ export function SpotlightAppearanceFields(props: {
           <LensShapeFields value={value} onChange={onChange} onPreview={props.onPreview} />
           <PreviewNumericRow
             label={translate('gallery.videoReview.clickMagnification')}
+            rangePresentation="field"
             min={1}
             max={4}
             step={0.1}
@@ -83,6 +84,7 @@ export function SpotlightAppearanceFields(props: {
       {value.effect === 'dim' ? (
         <PreviewNumericRow
           label={translate('gallery.videoReview.focusStrength')}
+          rangePresentation="field"
           min={0}
           max={100}
           step={1}
@@ -97,6 +99,7 @@ export function SpotlightAppearanceFields(props: {
       ) : value.effect === 'blur' ? (
         <PreviewNumericRow
           label={translate('gallery.videoReview.focusBlurRadius')}
+          rangePresentation="field"
           min={0}
           max={40}
           step={1}

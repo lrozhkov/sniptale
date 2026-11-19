@@ -153,7 +153,19 @@ it('clears the review draft, stops dictation, and rejects a final transcript aft
     expect(save).not.toHaveBeenCalled();
     expect(discard).not.toHaveBeenCalled();
     expect(leave).not.toHaveBeenCalled();
+    const accessory = host.querySelector('.sniptale-textarea-accessory')!;
+    expect(accessory.hasAttribute('data-persistent')).toBe(false);
+    harness.pending = true;
+    act(() => root.render(<Harness />));
+    expect(accessory.getAttribute('data-persistent')).toBe('true');
+    const saveControl = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.getAttribute('aria-label') === 'gallery.videoReview.save'
+    )!;
+    act(() => saveControl.focus());
+    expect(document.activeElement).toBe(saveControl);
+    expect(accessory.getAttribute('data-persistent')).toBe('true');
   } finally {
+    harness.pending = false;
     act(() => root.unmount());
     host.remove();
     vi.unstubAllGlobals();

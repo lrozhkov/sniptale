@@ -33,7 +33,7 @@ type CompactInspectorInteractiveControlStyle = React.CSSProperties & {
   '--sniptale-range-thumb-size': string;
 };
 
-export const COMPACT_INSPECTOR_SOLID_CONTROL_CLASS_NAME = [
+const COMPACT_INSPECTOR_SOLID_CONTROL_CLASS_NAME = [
   'rounded-[10px]',
   'border border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_52%,transparent)]',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_72%,var(--sniptale-color-surface-panel)_28%)]',

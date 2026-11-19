@@ -1,4 +1,6 @@
 import { createRoot } from 'react-dom/client';
+import { ColorCopyActivation } from '../../../ui/color-selector/inspector-color-value';
+import { isBridgedMouseEvent } from '../../platform/trusted-events/synthetic-mouse';
 import {
   initializeContentUiRoots,
   mountContentUiHost,
@@ -125,7 +127,11 @@ export function initializeTopLevelContentEntry(): void {
   const disposeContentUiScaleCompensation = installContentUiScaleCompensation(host);
 
   const root = createRoot(appContainer);
-  root.render(<App />);
+  root.render(
+    <ColorCopyActivation value={(event) => event.isTrusted || isBridgedMouseEvent(event)}>
+      <App />
+    </ColorCopyActivation>
+  );
   const disposeContentRuntime = initializeTopLevelContentRuntime(readWindowViewportInfo);
   const disposePageZoomSynchronization = installPageZoomSynchronization();
   const disposeToastHostAdapter = installContentToastHostAdapter();

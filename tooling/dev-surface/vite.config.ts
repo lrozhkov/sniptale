@@ -144,7 +144,7 @@ function settledSourceReload(): Plugin {
         return;
       if (/\.(?:css|scss)$/u.test(context.file)) return;
       if (timer) clearTimeout(timer);
-      context.server.moduleGraph.invalidateAll();
+      // Vite already invalidates the changed file and its importers before this hook.
       timer = setTimeout(() => {
         timer = undefined;
         context.server.ws.send({ type: 'full-reload' });

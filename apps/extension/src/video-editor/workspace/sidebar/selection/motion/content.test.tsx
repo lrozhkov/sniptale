@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { MotionFocusModeField } from './fields';
+import { MotionCameraFields, MotionTimingFields, MotionBehaviorFields } from './content';
 import { createMotionPanelProps } from './test-support';
 import {
   DEFAULT_CAMERA_PERSPECTIVE,
@@ -83,8 +84,6 @@ it.each([
   ['enter', 'gallery.videoReview.zoomTransitionDuration'],
   ['exit', 'gallery.videoReview.zoomTransitionDuration'],
 ] as const)('keeps %s gestures local until one commit and discards Escape', async (kind, label) => {
-  const { MotionCameraFields, MotionTimingFields, MotionBehaviorFields } =
-    await import('./content');
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const panel = createMotionPanelProps();
   panel.onUpdateMotionRegion = vi.fn();
@@ -102,31 +101,49 @@ it.each([
     act(() => root.render(<Fields motionRegion={region} panel={panel} />));
     const owner =
       kind === 'enter' || kind === 'exit' ? host.querySelector(`[data-phase="${kind}"]`)! : host;
-    const input = owner.querySelector<HTMLInputElement>(
-      `input[aria-label="${translate(label)} range"]`
-    )!;
+    const input = owner.querySelector<HTMLInputElement>(`input[aria-label="${translate(label)}"]`)!;
     expect(input).not.toBeNull();
     const baseline = input.value;
-    const key = (type: string, key: string) =>
-      act(() => input.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true })));
-    key('keydown', 'ArrowRight');
-    key('keydown', 'ArrowRight');
+    const start = () =>
+      act(() => {
+        if (kind === 'scale') {
+          input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+        } else {
+          input
+            .closest('.sniptale-framed-stepper')!
+            .querySelector('button[aria-label$=" increase"]')!
+            .dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+        }
+      });
+    const end = () =>
+      act(() =>
+        kind === 'scale'
+          ? input.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowUp', bubbles: true }))
+          : window.dispatchEvent(new MouseEvent('pointerup'))
+      );
+    const cancel = () =>
+      act(() =>
+        (kind === 'scale' ? input : window).dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+        )
+      );
+    start();
     expect(panel.onUpdateMotionRegion).not.toHaveBeenCalled();
     expect(input.value).not.toBe(baseline);
-    key('keydown', 'Escape');
-    key('keyup', 'ArrowRight');
+    cancel();
+    end();
     expect(input.value).toBe(baseline);
     expect(panel.onUpdateMotionRegion).not.toHaveBeenCalled();
-    key('keydown', 'ArrowRight');
+    start();
     const accepted = Number(input.value);
-    key('keyup', 'ArrowRight');
-    key('keyup', 'ArrowRight');
+    end();
+    end();
     expect(panel.onUpdateMotionRegion).toHaveBeenCalledExactlyOnceWith(
       region.id,
       kind === 'scale'
         ? { scale: accepted / 100 }
         : kind === 'duration'
-          ? { duration: accepted }
+          ? { duration: expect.closeTo(accepted, 8) }
           : { motionTransitionPhase: { phase: kind, duration: accepted } }
     );
   } finally {

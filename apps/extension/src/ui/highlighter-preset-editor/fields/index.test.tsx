@@ -283,26 +283,7 @@ describe('BorderPresetEditorFields', () => {
     expect(
       widthRow?.querySelector('button[aria-label="highlighter.editor.widthLabel increase"]')
     ).not.toBeNull();
-    vi.spyOn(widthRow as HTMLElement, 'getBoundingClientRect').mockReturnValue({
-      bottom: 40,
-      height: 40,
-      left: 0,
-      right: 240,
-      top: 0,
-      width: 240,
-      x: 0,
-      y: 0,
-      toJSON: () => ({}),
-    });
-    act(() => {
-      widthRow?.dispatchEvent(
-        new MouseEvent('pointermove', { bubbles: true, clientX: 120, clientY: 35 })
-      );
-    });
-    expect(widthRow?.dataset['rangeVisible']).toBe('true');
-    expect(
-      widthRow?.querySelector('input[aria-label="highlighter.editor.widthLabel range"]')
-    ).not.toBeNull();
+    expect(widthRow?.querySelector('input[type="range"]')).toBeNull();
 
     await interactWithFields(state);
   });

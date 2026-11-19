@@ -33,7 +33,8 @@ export function PresentationFadeFields(props: {
             value={props.duration ?? props.value.duration}
             min={0}
             max={60}
-            scrubMax={3}
+            scrubEnabled={false}
+            stepperPlacement="sides"
             step={0.1}
             unit="s"
             precision={2}

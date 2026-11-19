@@ -3,7 +3,7 @@ import { isShapeClip } from '../../../../../features/video/project/timeline';
 import { VideoProjectShapeType } from '../../../../../features/video/project/types';
 import type { WorkspaceSidebarProps } from '../../contracts/props';
 import { ColorField } from '../shared/controls';
-import { SliderField } from '../shared/sliders';
+import { NumberInput } from './number';
 
 export function renderShapeStyleFields(
   selectedClip: WorkspaceSidebarProps['selectedClip'],
@@ -41,14 +41,14 @@ export function renderShapeStyleFields(
         onUpdateShapeStyle={onUpdateShapeStyle}
       />
       {connector ? null : (
-        <SliderField
+        <NumberInput
           label={translate('videoEditor.sidebar.radiusLabel')}
           disabled={selectedTrackLocked}
           value={selectedClip.style.borderRadius}
           min={0}
           max={100}
           step={1}
-          formatValue={(value) => `${Math.round(value)} px`}
+          unit="px"
           onChange={(value) => onUpdateShapeStyle(selectedClip.id, { borderRadius: value })}
         />
       )}
@@ -63,14 +63,14 @@ function ShapeStyleStrokeWidthField(props: {
   strokeWidth: number;
 }) {
   return (
-    <SliderField
+    <NumberInput
       label={translate('videoEditor.sidebar.strokeWidthLabel')}
       disabled={props.disabled}
       value={props.strokeWidth}
       min={0}
       max={32}
       step={1}
-      formatValue={(value) => `${Math.round(value)} px`}
+      unit="px"
       onChange={(value) => props.onUpdateShapeStyle(props.clipId, { strokeWidth: value })}
     />
   );

@@ -27,6 +27,7 @@ import {
 } from '@sniptale/ui/theme/safe-portal';
 import { translate } from '../../platform/i18n';
 import type { GradientTemplateResources } from '../../composition/gradient-preset-resources/use-gradient-preset-catalog';
+import { useInspectorLayout } from '../compact-inspector-controls/layout';
 import { ColorCatalogToggle } from '../color-selector/catalog-panel';
 import { PickerFooter } from '../color-selector/picker-sections';
 import { resolvePaintSelectorLayerStyle } from './lifecycle';
@@ -92,20 +93,22 @@ function PaintSelectorLayer(props: LayerProps) {
   const [section, setSection] = useState<PaintSelectorSection>('paint');
   const theme = useResolvedPortalTheme(props.rootRef.current);
   const width = props.draft.kind === 'gradient' ? 620 : 300;
+  const framed = useInspectorLayout();
   const inspectorBoundary = props.rootRef.current?.closest('[data-picker-boundary]');
   const baseStyle = useColorSelectorLayerStyle(
     props.rootRef.current,
     props.open,
-    'auto',
+    framed ? 'anchor' : 'auto',
     null,
     props.layerRef,
     'palette',
     560,
-    inspectorBoundary ? width : undefined
+    framed || inspectorBoundary ? width : undefined
   );
-  const layerStyle = inspectorBoundary
-    ? baseStyle
-    : resolvePaintSelectorLayerStyle(baseStyle, props.rootRef.current, width);
+  const layerStyle =
+    framed || inspectorBoundary
+      ? baseStyle
+      : resolvePaintSelectorLayerStyle(baseStyle, props.rootRef.current, width);
   return (
     <ColorSelectorFloatingLayer
       layerRef={props.layerRef}

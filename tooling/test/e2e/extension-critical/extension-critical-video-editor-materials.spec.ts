@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
 import { mapCompositionPointThroughSourceContent } from '../../../../apps/extension/src/features/video/composition/motion/source-window';
 import { fitQuickEditSourceCrop } from '../../../../apps/extension/src/features/video/review/advanced/canvas';
@@ -662,11 +663,13 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         label('gallery.videoReview.webcamPlacement'),
         label('gallery.videoReview.webcamPlacement_top-left')
       );
-      const galleryZoom = galleryCamera.getByRole('textbox', {
-        name: label('videoEditor.sidebar.cameraCropZoom'),
-        exact: true,
-      });
-      await galleryZoom.fill('1.5');
+      const galleryZoom = numericControl(
+        galleryCamera,
+        label('videoEditor.sidebar.cameraCropZoom')
+      );
+      await (
+        await openNumericControl(galleryCamera, label('videoEditor.sidebar.cameraCropZoom'))
+      ).fill('1.5');
       await galleryZoom.press('Enter');
       await cameraSection('gallery.videoReview.webcamAppearance');
       const galleryMirror = galleryCamera.getByRole('switch', {
@@ -775,8 +778,8 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         ['gallery.videoReview.backgroundCornerRadius', '6'],
         ['gallery.videoReview.backgroundShadow', '60'],
       ] as const) {
-        const field = inspector.getByRole('textbox', { name: label(key), exact: true });
-        await field.fill(value);
+        const field = numericControl(inspector, label(key));
+        await (await openNumericControl(inspector, label(key))).fill(value);
         await field.press('Enter');
       }
       const readAuthoredScene = async () => {
@@ -2542,8 +2545,8 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         ['gallery.videoReview.backgroundCornerRadius', '6'],
         ['gallery.videoReview.backgroundShadow', '60'],
       ] as const) {
-        const field = inspector.getByRole('textbox', { name: label(key), exact: true });
-        await field.fill(value);
+        const field = numericControl(inspector, label(key));
+        await (await openNumericControl(inspector, label(key))).fill(value);
         await field.press('Enter');
       }
       await chooseInspectorValue(
@@ -2555,11 +2558,10 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await inspector
         .locator('[data-ui="gallery.videoReview.backgroundInspector"] input[type="file"]')
         .setInputFiles(await solidImageUpload(page, 'Retained background.png', '#2050a0', 32, 32));
-      const backgroundBlur = inspector.getByRole('textbox', {
-        name: label('editor.scene.backgroundBlurAmount'),
-        exact: true,
-      });
-      await backgroundBlur.fill('2');
+      const backgroundBlur = numericControl(inspector, label('editor.scene.backgroundBlurAmount'));
+      await (
+        await openNumericControl(inspector, label('editor.scene.backgroundBlurAmount'))
+      ).fill('2');
       await backgroundBlur.press('Enter');
       if (index === 1)
         await chooseInspectorValue(

@@ -22,6 +22,7 @@ import {
 } from './annotation-effects-geometry';
 import type { useReviewAnnotationEffects } from './annotation-effects-editor';
 import { ReviewAnnotationInspector } from './annotation-effects-inspector';
+import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 
 let root: Root;
 let host: HTMLDivElement;
@@ -84,6 +85,7 @@ function fixture(name: string) {
       },
     },
     gestureId: null,
+    placementGestureActive: false,
     setGeometry: vi.fn((next) => {
       currentGeometry = next;
       for (const listener of geometryListeners) listener();
@@ -185,10 +187,16 @@ it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners', 'arr
           `[aria-label="${resolveEffectLocaleText(control.label, getCurrentLocale()) || control.id}"]:not([role="tab"])`
         )
       ).not.toBeNull();
-      if (control.kind === 'number' && !control.options?.length)
-        expect(
-          input(`${resolveEffectLocaleText(control.label, getCurrentLocale())} range`)
-        ).not.toBeNull();
+      if (control.kind === 'number' && !control.options?.length) {
+        const label = resolveEffectLocaleText(control.label, getCurrentLocale());
+        if (
+          control.presentation === 'slider' &&
+          control.id !== 'opacity' &&
+          !(name === 'frame' && (control.id === 'stroke' || control.id === 'radius'))
+        ) {
+          expect(input(`${label} range`)).not.toBeNull();
+        }
+      }
     }
     const expected = new Set(
       value.document.controls.map(
@@ -211,9 +219,10 @@ it('previews multiline text without history, commits once on Ctrl+Enter and canc
   const node = reveal(
     `textarea[aria-label="${resolveEffectLocaleText(control.label, getCurrentLocale())}"]`
   ) as HTMLTextAreaElement;
+  expect(node.parentElement?.querySelector('.sniptale-field-clear')).toBeNull();
   type(node, 'Typed value');
   expect(value.editor.previewGesture).toHaveBeenLastCalledWith({
-    controls: { ...value.instance.controls, title: 'Typed value' },
+    controls: { title: 'Typed value' },
   });
   expect(value.editor.commitGesture).not.toHaveBeenCalled();
   act(() =>
@@ -242,8 +251,13 @@ it('applies an SDK visual preset without changing text, geometry or fixed anchor
   const option = document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')[1];
   if (!option) throw new Error('Missing preset option');
   await act(async () => option.click());
-  const patch = vi.mocked(value.editor.change).mock.lastCall?.[1];
-  expect(patch?.controls?.['title']).toBe(value.instance.controls['title']);
+  const edit = vi.mocked(value.editor.change).mock.lastCall?.[1];
+  const current = {
+    ...value.instance,
+    controls: { ...value.instance.controls, title: 'Latest title' },
+  };
+  const patch = typeof edit === 'function' ? edit(current) : edit;
+  expect(patch?.controls?.['title']).toBe('Latest title');
   expect(patch?.controls?.['accent']).toBe(value.document.controlPresets?.[0]?.values['accent']);
   expect(patch?.transform).toBeUndefined();
   expect(patch?.anchors).toBeUndefined();
@@ -347,9 +361,86 @@ it('disables reflected attachment conversion and restores it when valid geometry
   const option = await open();
   expect(option.disabled).toBe(false);
   await act(async () => option.click());
-  expect(value.editor.change).toHaveBeenLastCalledWith(
-    value.instance.id,
-    expect.objectContaining({ attachment: 'viewport' })
+  const [id, edit] = vi.mocked(value.editor.change).mock.lastCall ?? [];
+  expect(id).toBe(value.instance.id);
+  const current = { ...value.instance, transform: { ...value.instance.transform, rotation: 0.5 } };
+  const patch = typeof edit === 'function' ? edit(current) : edit;
+  expect(patch?.attachment).toBe('viewport');
+  expect(patch?.transform?.rotation).toBeCloseTo(0.5, 10);
+});
+
+it('keeps the authored exact opacity domain when a slider has no upper bound', () => {
+  const value = fixture('frame');
+  const control = value.document.controls.find((item) => item.id === 'opacity');
+  if (control?.kind !== 'number') throw new Error('Missing opacity fixture');
+  delete control.max;
+  expect(validateAnimationTemplate(value.document).ok).toBe(true);
+  act(() =>
+    root.render(
+      <InspectorLayout>
+        <ReviewAnnotationInspector
+          editor={value.editor}
+          id="selected"
+          source={JSON.stringify(value.document)}
+          duration={4}
+          busy={false}
+        />
+      </InspectorLayout>
+    )
+  );
+  const label = resolveEffectLocaleText(control.label, getCurrentLocale());
+  const exact = input(label);
+  expect(exact.type).toBe('text');
+  expect(host.querySelector('.opacity-field')).toBeNull();
+  act(() => exact.focus());
+  type(exact, '125');
+  act(() => exact.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(value.editor.previewGesture).toHaveBeenLastCalledWith({
+    controls: { opacity: 125 },
+  });
+});
+
+it('keeps a geometry-bound percent field on its authored exact editor', () => {
+  const value = fixture('callout');
+  const control = value.document.controls.find((item) => item.id === 'opacity');
+  const handle = value.document.objectLayout?.handles?.[0];
+  if (control?.kind !== 'number' || !handle) throw new Error('Missing geometry fixture');
+  control.min = 0;
+  control.max = 100;
+  control.step = 1;
+  control.unit = 'percent';
+  control.presentation = 'slider';
+  handle.xControl = control.id;
+  const tip = value.document.objectLayout?.reflow?.tip;
+  if (tip) tip.xControl = control.id;
+  delete value.document.controlPresets;
+  delete value.document.defaultControlPresetId;
+  value.document.animation.w = 32;
+  const validation = validateAnimationTemplate(value.document);
+  expect(validation.ok, JSON.stringify(validation)).toBe(true);
+  act(() =>
+    root.render(
+      <InspectorLayout>
+        <ReviewAnnotationInspector
+          editor={value.editor}
+          id="selected"
+          source={JSON.stringify(value.document)}
+          duration={4}
+          busy={false}
+        />
+      </InspectorLayout>
+    )
+  );
+  const exact = input(resolveEffectLocaleText(control.label, getCurrentLocale()));
+  expect(exact.type).toBe('text');
+  expect(host.querySelector('.opacity-field')).toBeNull();
+  act(() => exact.focus());
+  type(exact, '80');
+  act(() => exact.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(value.editor.previewGesture).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      anchors: expect.objectContaining({ [handle.id]: expect.anything() }),
+    })
   );
 });
 
@@ -385,7 +476,7 @@ it('retains the SDK type of numeric select options and their localized labels', 
   );
   await act(async () => options[1]?.click());
   expect(value.editor.previewGesture).toHaveBeenLastCalledWith({
-    controls: { ...value.instance.controls, [control.id]: option.value },
+    controls: { [control.id]: option.value },
   });
   expect(typeof option.value).toBe('number');
   expect(value.editor.commitGesture).toHaveBeenCalledOnce();
@@ -414,14 +505,20 @@ it.each(['save', 'edit', 'acquisition'] as const)(
   }
 );
 
-it('offers bounded scrub tracks in displayed units without changing authored values', () => {
+it('uses exact placement fields and retains the explicit SDK slider', () => {
   const value = fixture('callout');
   value.instance.transform.x = 5;
   render(value);
-  const x = input(`${translate('gallery.videoReview.annotationX')} range`);
-  expect([x.min, x.max, x.value]).toEqual(['-100', '500', '500']);
-  const width = input(`${translate('gallery.videoReview.annotationWidth')} range`);
-  expect([width.min, width.max, width.value]).toEqual(['0.01', '200', '40']);
+  for (const [key, expected] of [
+    ['annotationX', '500'],
+    ['annotationWidth', '40'],
+  ] as const) {
+    const label = translate(`gallery.videoReview.${key}`);
+    const field = input(label);
+    expect(field.value).toBe(expected);
+    expect(field.closest('[data-stepper-placement="sides"]')).not.toBeNull();
+    expect(host.querySelector(`input[aria-label="${label} range"]`)).toBeNull();
+  }
   const handle = value.document.objectLayout!.handles![0]!;
   const control = value.document.controls.find((item) => item.id === handle.xControl)!;
   const anchor = input(`${resolveEffectLocaleText(control.label, getCurrentLocale())} range`);
@@ -431,35 +528,25 @@ it('offers bounded scrub tracks in displayed units without changing authored val
   expect(value.editor.change).not.toHaveBeenCalled();
 });
 
-it.each(['pointerup', 'pointercancel', 'Escape'] as const)(
-  'keeps scrub proposals in one annotation draft and handles %s',
-  (ending) => {
-    const value = fixture('callout');
-    value.instance.transform.x = 5;
-    render(value);
-    const node = input(`${translate('gallery.videoReview.annotationX')} range`);
-    act(() => node.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
-    type(node, '420');
-    value.instance.transform.x = 4.2;
-    render(value);
-    type(node, '410');
-    expect(node.max).toBe('500');
-    expect(value.editor.beginGesture).toHaveBeenCalledOnce();
+it.each(['Enter', 'Escape'] as const)('ends exact placement entry with %s', (key) => {
+  const value = fixture('callout');
+  value.instance.transform.x = 5;
+  render(value);
+  const node = input(translate('gallery.videoReview.annotationX'));
+  act(() => node.focus());
+  type(node, '410');
+  expect(value.editor.commitGesture).not.toHaveBeenCalled();
+  act(() => node.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })));
+  if (key === 'Enter') {
     expect(value.editor.previewGesture).toHaveBeenLastCalledWith({
       transform: { ...value.instance.transform, x: 4.1 },
     });
+    expect(value.editor.commitGesture).toHaveBeenCalledOnce();
+  } else {
+    expect(node.value).toBe('500');
     expect(value.editor.commitGesture).not.toHaveBeenCalled();
-    if (ending === 'Escape') {
-      act(() => node.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-      act(() => node.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', bubbles: true })));
-    } else act(() => node.dispatchEvent(new MouseEvent(ending, { bubbles: true })));
-    if (ending === 'pointerup') expect(value.editor.commitGesture).toHaveBeenCalledOnce();
-    else {
-      expect(value.editor.cancelGesture).toHaveBeenCalledOnce();
-      expect(value.editor.commitGesture).not.toHaveBeenCalled();
-    }
   }
-);
+});
 
 it.each(['Escape', 'Undo', 'pointercancel', 'blur', 'unmount', 'boundary'])(
   'releases the annotation gesture after a numeric hold ends with %s',
@@ -582,6 +669,44 @@ it('keeps bound anchors and scale dimensions disabled without geometry, while pl
   expect(input(resolveEffectLocaleText(bound.label, getCurrentLocale())).disabled).toBe(false);
   render(value, value.source, true);
   expect(host.querySelectorAll('input[type="range"]')).toHaveLength(0);
+});
+
+it('uses the shared exact pixel stepper for both stored Frame dimensions', () => {
+  const value = fixture('frame');
+  render(value);
+  for (const id of ['stroke', 'radius']) {
+    const control = value.document.controls.find((item) => item.id === id)!;
+    const label = resolveEffectLocaleText(control.label, getCurrentLocale());
+    expect(input(label).closest('[data-stepper-placement="sides"]')).not.toBeNull();
+    expect(host.querySelector(`input[aria-label="${label} range"]`)).toBeNull();
+  }
+});
+
+it('preserves the published Arrow geometry scales in the inspector layout', () => {
+  const value = fixture('arrow');
+  act(() =>
+    root.render(
+      <InspectorLayout>
+        <ReviewAnnotationInspector
+          editor={value.editor}
+          id="selected"
+          source={value.source}
+          duration={4}
+          busy={false}
+        />
+      </InspectorLayout>
+    )
+  );
+  const authored = value.document.controls.filter(
+    (control) =>
+      control.kind === 'number' && control.presentation === 'slider' && control.group === 'geometry'
+  );
+  expect(authored.length).toBeGreaterThan(0);
+  for (const control of authored) {
+    const label = resolveEffectLocaleText(control.label, getCurrentLocale());
+    const slider = input(`${label} range`);
+    expect(slider.type).toBe('range');
+  }
 });
 
 const explicitSliderCases: Array<{

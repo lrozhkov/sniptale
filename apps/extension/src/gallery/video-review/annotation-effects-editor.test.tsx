@@ -126,15 +126,17 @@ function setup(inspect = false, withCommands = false) {
   function Harness() {
     renders();
     const current = useReviewSnapshot(session);
-    advanced = useReviewAdvanced(session);
+    const content = useReviewAdvanced(session);
+    advanced = content;
     editor = useReviewAnnotationEffects(
       {
         session,
-        lane: advanced.advanced.annotationEffects,
-        setLane: advanced.setAnnotationEffects,
+        lane: content.advanced.annotationEffects,
+        readLane: () => content.readCurrentContent().annotationEffects,
+        setLane: content.setAnnotationEffects,
         flush: async () => {
           await holdFlush?.();
-          await advanced.flush();
+          await content.flush();
         },
         allowed: () => !blocked && current.snapshot.workspace.advanced.ui.mode === 'advanced',
         pause,
@@ -454,7 +456,7 @@ it('keeps Save behind held publication and retains the field draft after flush f
   let saved = false;
   let saving: Promise<void> | undefined;
   await act(async () => {
-    editor.beginGesture('first');
+    editor.beginGesture('first', 'field');
     editor.previewGesture({ controls: { title: 'Held title' } });
     saving = editor.flush().then(async () => {
       await session.saveBuffered();
@@ -464,6 +466,8 @@ it('keeps Save behind held publication and retains the field draft after flush f
   });
   expect(saved).toBe(false);
   expect(save).not.toHaveBeenCalled();
+  expect(editor.pending).toBe(false);
+  expect(editor.hasPending()).toBe(true);
   await act(async () => {
     release?.();
     await saving;
@@ -493,6 +497,262 @@ it('keeps Save behind held publication and retains the field draft after flush f
   expect(save).toHaveBeenCalledTimes(2);
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(2);
 });
+
+it('retains a confirmed field in the buffer and retries the failed publication', async () => {
+  setup(true);
+  holdFlush = async () => {
+    throw new Error('Synthetic field publication failure');
+  };
+  await act(async () => {
+    expect(editor.beginGesture('first', 'field')).toBe(true);
+    editor.previewGesture({ controls: { title: 'Confirmed field to retry' } });
+    expect(await editor.commitGesture()).toBe(false);
+  });
+  expect(editor.gestureId).toBeNull();
+  expect(editor.pending).toBe(false);
+  expect(editor.hasPending()).toBe(true);
+  expect(editor.failure).toBe('edit');
+  expect(editor.lane?.instances[0]?.controls['title']).toBe('Confirmed field to retry');
+  expect(
+    session.getSnapshot().document.advancedContent.annotationEffects?.instances[0]?.controls[
+      'title'
+    ]
+  ).toBeUndefined();
+
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
+
+  holdFlush = null;
+  await settle(() => editor.retry());
+  expect(editor.hasPending()).toBe(false);
+  expect(editor.failure).toBeNull();
+  expect(
+    session.getSnapshot().document.advancedContent.annotationEffects?.instances[0]?.controls[
+      'title'
+    ]
+  ).toBe('Confirmed field to retry');
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+});
+
+it('does not acknowledge an old field write in a replacement editor', async () => {
+  setup(true);
+  const previous = session;
+  const held = Promise.withResolvers<void>();
+  holdFlush = () => held.promise;
+  let late!: Promise<boolean>;
+  await act(async () => {
+    expect(editor.beginGesture('first', 'field')).toBe(true);
+    editor.previewGesture({ controls: { title: 'Old editor title' } });
+    late = editor.commitGesture();
+  });
+  expect(editor.lane?.instances[0]?.controls['title']).toBe('Old editor title');
+  act(() => root.render(null));
+  setup(true);
+  holdFlush = null;
+
+  await act(async () => {
+    expect(editor.beginGesture('first', 'field')).toBe(true);
+    editor.previewGesture({ controls: { title: 'Replacement title' } });
+    expect(await editor.commitGesture()).toBe(true);
+    held.resolve();
+    expect(await late).toBe(false);
+  });
+  expect(editor.hasPending()).toBe(false);
+  expect(editor.failure).toBeNull();
+  expect(
+    session.getSnapshot().document.advancedContent.annotationEffects?.instances[0]?.controls[
+      'title'
+    ]
+  ).toBe('Replacement title');
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  await previous.dispose();
+});
+
+it('keeps the latest field edit when the user changes it again during publication', async () => {
+  setup();
+  const held = Promise.withResolvers<void>();
+  holdFlush = () => held.promise;
+  let first!: Promise<boolean>;
+  let second!: Promise<boolean>;
+  await act(async () => {
+    expect(editor.beginGesture('first', 'field')).toBe(true);
+    editor.previewGesture({ controls: { title: 'First edit' } });
+    first = editor.commitGesture();
+  });
+  await act(async () => {
+    expect(editor.beginGesture('first', 'field')).toBe(true);
+    editor.previewGesture({ controls: { title: 'Latest edit' } });
+    second = editor.commitGesture();
+    held.resolve();
+    expect(await first).toBe(true);
+    expect(await second).toBe(true);
+  });
+  expect(editor.hasPending()).toBe(false);
+  expect(
+    session.getSnapshot().document.advancedContent.annotationEffects?.instances[0]?.controls[
+      'title'
+    ]
+  ).toBe('Latest edit');
+});
+
+it.each(['title first', 'rotation first', 'two text fields'] as const)(
+  'keeps distinct fields after a held annotation publication with %s',
+  async (order) => {
+    setup();
+    const held = Promise.withResolvers<void>();
+    holdFlush = () => held.promise;
+    const title = { controls: { title: 'Kept title' } };
+    const rotation = { transform: { ...instance.transform, rotation: 0.5 } };
+    const subtitle = { controls: { subtitle: 'Kept subtitle' } };
+    const [initial, next] =
+      order === 'title first'
+        ? [title, rotation]
+        : order === 'rotation first'
+          ? [rotation, title]
+          : [title, subtitle];
+    let first!: Promise<boolean>;
+    let second!: Promise<boolean>;
+    await act(async () => {
+      expect(editor.beginGesture('first', 'field')).toBe(true);
+      editor.previewGesture(initial);
+      first = editor.commitGesture();
+    });
+    await act(async () => {
+      expect(editor.beginGesture('first', 'field')).toBe(true);
+      editor.previewGesture(next);
+      second = editor.commitGesture();
+      held.resolve();
+      expect(await first).toBe(true);
+      expect(await second).toBe(true);
+    });
+    expect(
+      session.getSnapshot().document.advancedContent.annotationEffects?.instances[0]
+    ).toMatchObject({
+      ...(order === 'two text fields'
+        ? { controls: { ...title.controls, ...subtitle.controls } }
+        : { ...title, ...rotation }),
+    });
+  }
+);
+
+it('keeps the next text draft visible after a preceding value reaches the optimistic lane', async () => {
+  setup(true);
+  const postStage = Promise.withResolvers<void>();
+  holdFlush = () =>
+    advanced.readCurrentContent().annotationEffects?.instances[0]?.controls['title'] ===
+    'Submitted title'
+      ? postStage.promise
+      : Promise.resolve();
+  let saving!: Promise<boolean>;
+  await act(async () => {
+    expect(editor.beginGesture('first', 'field')).toBe(true);
+    editor.previewGesture({ controls: { title: 'Submitted title' } });
+    saving = editor.commitGesture();
+    await Promise.resolve();
+  });
+  expect(editor.lane?.instances[0]?.controls['title']).toBe('Submitted title');
+  const input = host.querySelector('textarea')!;
+  expect(input.value).toBe('Submitted title');
+  act(() => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!;
+    setter.call(input, 'New live text');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(input.value).toBe('New live text');
+  expect(editor.previewLane?.instances[0]?.controls['title']).toBe('New live text');
+  await act(async () => {
+    postStage.resolve();
+    expect(await saving).toBe(true);
+  });
+});
+
+it.each([true, false])(
+  'keeps the confirmed value apart from later typing (Escape=%s)',
+  async (escape) => {
+    setup(true);
+    const gate = Promise.withResolvers<void>();
+    holdFlush = () => gate.promise;
+    const type = (title: string) => {
+      if (!editor.gestureId) expect(editor.beginGesture('first', 'field')).toBe(true);
+      editor.previewGesture({ controls: { title } });
+    };
+    let first!: Promise<boolean>;
+    let second!: Promise<boolean>;
+    await act(async () => {
+      type('First accepted');
+      first = editor.commitGesture();
+    });
+    await act(async () => {
+      type('Second accepted');
+      second = editor.commitGesture();
+    });
+    await act(async () => {
+      type('Third draft');
+      if (escape) editor.cancelGesture();
+      gate.resolve();
+      expect(await first).toBe(true);
+      expect(await second).toBe(true);
+    });
+    expect(
+      session.getSnapshot().document.advancedContent.annotationEffects?.instances[0]?.controls[
+        'title'
+      ]
+    ).toBe('Second accepted');
+    expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(2);
+    expect(editor.previewLane?.instances[0]?.controls['title']).toBe(
+      escape ? 'Second accepted' : 'Third draft'
+    );
+  }
+);
+
+it.each(['toggle', 'duplicate', 'delete'] as const)(
+  'accepts the mounted inspector %s after a pending field write',
+  async (action) => {
+    setup(true);
+    const held = Promise.withResolvers<void>();
+    holdFlush = () => held.promise;
+    let publication!: Promise<boolean>;
+    await act(async () => {
+      expect(editor.beginGesture('first', 'field')).toBe(true);
+      editor.previewGesture({ controls: { title: 'Confirmed title' } });
+      publication = editor.commitGesture();
+    });
+
+    if (action === 'toggle') {
+      const appearance = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
+        (node) => node.getAttribute('aria-controls')?.endsWith('-sdk:appearance')
+      );
+      act(() => appearance?.click());
+    }
+    const button = host.querySelector<HTMLButtonElement>(
+      action === 'toggle'
+        ? `[role="switch"][aria-label="${translate('gallery.videoReview.annotationEnabled')}"]`
+        : `[data-selection-action="${action}"]`
+    )!;
+    expect(button).not.toBeNull();
+    expect(button.disabled).toBe(false);
+    act(() => button.click());
+    expect(editor.lane?.instances).toHaveLength(1);
+
+    await act(async () => {
+      held.resolve();
+      expect(await publication).toBe(true);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    const items = session.getSnapshot().document.advancedContent.annotationEffects?.instances;
+    if (action === 'delete') {
+      expect(items).toHaveLength(0);
+      await act(async () => session.history('undo'));
+      expect(editor.lane?.instances[0]?.controls['title']).toBe('Confirmed title');
+    } else if (action === 'duplicate') {
+      expect(items?.map((item) => item.controls['title'])).toEqual([
+        'Confirmed title',
+        'Confirmed title',
+      ]);
+    } else {
+      expect(items).toMatchObject([{ enabled: false, controls: { title: 'Confirmed title' } }]);
+    }
+  }
+);
 
 it('protects the field on unload, retains cancelled edits and removes the guard on teardown', async () => {
   setup();
@@ -558,46 +818,45 @@ it('retries the retained live field before clearing a completed edit failure', a
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
 });
 
-it('commits actual inspector scrub once, restores through Undo/Redo and cancels without history', async () => {
+it('commits exact inspector edits once, restores Undo/Redo and cancels without history', async () => {
   const { save } = setup(true);
   act(() =>
     host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-placement"]')!.click()
   );
-  const range = () =>
+  const field = () =>
     host.querySelector<HTMLInputElement>(
-      `input[aria-label="${translate('gallery.videoReview.annotationX')} range"]`
+      `input[aria-label="${translate('gallery.videoReview.annotationX')}"]`
     )!;
-  expect(range()).not.toBeNull();
-  const pointer = (kind: string) => range().dispatchEvent(new MouseEvent(kind, { bubbles: true }));
+  const press = (key: string) =>
+    field().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key }));
   const propose = (value: string) => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(range(), value);
-    range().dispatchEvent(new Event('input', { bubbles: true }));
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field(), value);
+    field().dispatchEvent(new Event('input', { bubbles: true }));
   };
   act(() => {
-    pointer('pointerdown');
+    field().focus();
     propose('25');
     propose('30');
   });
-  expect(editor.previewLane?.instances[0]?.transform.x).toBe(0.3);
+  expect(field().value).toBe('30');
+  expect(editor.previewLane?.instances[0]?.transform.x).toBe(0.2);
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
-  await settle(() => pointer('pointerup'));
+  await settle(() => press('Enter'));
+  expect(editor.previewLane?.instances[0]?.transform.x).toBe(0.3);
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
   await act(async () => session.history('undo'));
-  expect(range().value).toBe('20');
+  expect(field().value).toBe('20');
   await act(async () => session.history('redo'));
-  expect(range().value).toBe('30');
+  expect(field().value).toBe('30');
   act(() => {
-    pointer('pointerdown');
+    field().focus();
     propose('40');
-    pointer('pointercancel');
+    press('Escape');
   });
-  expect(range().value).toBe('30');
+  expect(field().value).toBe('30');
   expect(editor.gestureId).toBeNull();
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
-  await settle(() => {
-    pointer('pointerdown');
-    pointer('pointerup');
-  });
+  await settle(() => press('Enter'));
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
   expect(save).not.toHaveBeenCalled();
 });
@@ -641,6 +900,66 @@ it('derives preset presentation through canonical history, rejected edits and pe
   });
   expect(label()).toBe(accepted);
   await previous.dispose();
+});
+
+it('keeps a placement edit made after switching attachment during a held field write', async () => {
+  setup(true);
+  const { createReviewAnnotationGeometry } = await import('./annotation-effects-geometry');
+  act(() =>
+    editor.setGeometry(
+      createReviewAnnotationGeometry({
+        source: { width: 640, height: 360 },
+        output: { width: 1280, height: 720 },
+        camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
+        background: { enabled: false },
+      })
+    )
+  );
+  const hold = Promise.withResolvers<void>();
+  holdFlush = () => hold.promise;
+  let first!: Promise<boolean>;
+  await act(async () => {
+    expect(editor.beginGesture('first', 'field')).toBe(true);
+    editor.previewGesture({ controls: { title: 'Accepted title' } });
+    first = editor.commitGesture();
+  });
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-placement"]')!.click()
+  );
+  const trigger = host.querySelector<HTMLButtonElement>(
+    `button[aria-label="${translate('gallery.videoReview.annotationAttachment')}"]`
+  )!;
+  await act(async () => {
+    trigger.click();
+    await vi.advanceTimersByTimeAsync(16);
+  });
+  const option = [...document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+    (node) =>
+      node.textContent?.includes(translate('gallery.videoReview.annotationViewportAttachment'))
+  )!;
+  await settle(() => option.click());
+  expect(editor.lane?.instances[0]?.attachment).toBe('viewport');
+  const rotation = host.querySelector<HTMLInputElement>(
+    `input[aria-label="${translate('gallery.videoReview.annotationRotation')}"]`
+  )!;
+  act(() => {
+    rotation.focus();
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    setter.call(rotation, '35');
+    rotation.dispatchEvent(new Event('input', { bubbles: true }));
+    rotation.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    );
+  });
+  await act(async () => {
+    hold.resolve();
+    expect(await first).toBe(true);
+  });
+  const accepted = session.getSnapshot().document.advancedContent.annotationEffects!.instances[0]!;
+  expect(accepted.attachment).toBe('viewport');
+  expect(accepted.controls['title']).toBe('Accepted title');
+  expect(accepted.transform.rotation).toBeCloseTo((35 * Math.PI) / 180, 10);
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(3);
 });
 
 it('switches attachment with current perspective geometry, no root update and one restorable edit', async () => {

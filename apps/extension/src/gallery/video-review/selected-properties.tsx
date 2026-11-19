@@ -967,7 +967,6 @@ function ReviewFreezeDuration(props: {
       max={600}
       step={0.01}
       precision={3}
-      scrub={{ min: 0.5, max: 30, step: 0.5 }}
       disabled={props.disabled}
       onPreviewValue={setValue}
       onCommitValue={props.onChange}

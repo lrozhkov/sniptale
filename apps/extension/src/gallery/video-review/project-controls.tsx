@@ -1,5 +1,6 @@
 import { createSyncProductClient } from '../../platform/runtime-messaging/sync-product-client';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { translate } from '../../platform/i18n';
 import type { useReviewEditorState } from './use-editor-state';
 
@@ -148,11 +149,12 @@ export function ReviewProjectTitle({
     );
   return (
     <span className="flex min-w-0 flex-col">
-      <input
+      <ProductInput
         ref={focusInput}
         className="review-project-title w-full min-w-0"
         aria-label={translate('videoEditor.app.projectNameLabel')}
         aria-invalid={failed}
+        invalid={failed}
         aria-describedby={failed ? 'review-project-rename-error' : undefined}
         value={draft}
         maxLength={256}

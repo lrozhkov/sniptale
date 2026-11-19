@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { createTranslator } from '../support/catalog-fixture';
@@ -1556,11 +1557,8 @@ for (const [locale, theme, viewport, camera] of [
       .getByRole('button', { name: t('scenario.editor.tourCameraMode'), exact: true })
       .click();
     await page.getByRole('option', { name: t(`scenario.editor.${camera}`), exact: true }).click();
-    const zoom = panel.getByRole('textbox', {
-      name: t('scenario.editor.tourCameraZoom'),
-      exact: true,
-    });
-    await zoom.fill('200');
+    const zoom = numericControl(panel, t('scenario.editor.tourCameraZoom'));
+    await (await openNumericControl(panel, t('scenario.editor.tourCameraZoom'))).fill('200');
     await zoom.press('Enter');
     await page
       .locator('.tour-header-controls')

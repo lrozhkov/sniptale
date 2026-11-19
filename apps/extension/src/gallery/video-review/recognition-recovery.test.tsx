@@ -260,7 +260,15 @@ it.each([
         host.querySelector<HTMLButtonElement>(`[role="tab"][aria-controls$="-${id}"]`)!.click()
       );
     await section('audio');
-    const gain = () => button(translate('gallery.videoReview.volume') + ' decrease');
+    const gain = () =>
+      host.querySelector<HTMLInputElement>(
+        `input[type="range"][aria-label="${translate('gallery.videoReview.volume')}"]`
+      )!;
+    const lowerGain = () => {
+      for (const type of ['keydown', 'keyup']) {
+        gain().dispatchEvent(new KeyboardEvent(type, { key: 'ArrowLeft', bubbles: true }));
+      }
+    };
     expect(gain().disabled).toBe(false);
     const applyLabel = translate(
       autosave ? 'gallery.videoReview.recognitionApply' : 'gallery.videoReview.recognitionSaveApply'
@@ -278,7 +286,7 @@ it.each([
     await section('audio');
     expect(commit).toHaveBeenCalledTimes(retry ? 2 : 1);
     // A keyboard step is a real gain gesture after the buffer join, before acceptance acknowledgement.
-    await act(async () => gain().click());
+    await act(async () => lowerGain());
     await act(async () => release());
     await act(async () => vi.advanceTimersByTimeAsync(1000));
     expect(content.pending).toBe(false);
@@ -286,7 +294,7 @@ it.each([
     expect(session.getSnapshot().document.advancedContent.audio.original.volume).toBe(1);
     expect(remote.job).toHaveBeenCalledOnce();
     expect(gain().disabled).toBe(false);
-    await act(async () => gain().click());
+    await act(async () => lowerGain());
     await act(async () => vi.advanceTimersByTimeAsync(1000));
     expect(session.getSnapshot().document.advancedContent.audio.original.volume).toBe(0.99);
     expect(session.getSnapshot().document.advancedContent.text?.fragments).toHaveLength(1);

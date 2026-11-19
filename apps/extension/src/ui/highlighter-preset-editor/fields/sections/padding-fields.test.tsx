@@ -65,7 +65,7 @@ it('updates padding with parsed numbers and falls back to zero for invalid input
 });
 
 it.each(['top', 'right', 'bottom', 'left'] as const)(
-  'steps focused %s padding through its existing update callback',
+  'steps focused %s padding only with Alt and the wheel',
   async (side) => {
     const updatePadding = vi.fn();
     await renderUi(
@@ -76,15 +76,28 @@ it.each(['top', 'right', 'bottom', 'left'] as const)(
     );
     const index = ['top', 'right', 'bottom', 'left'].indexOf(side);
     const input = container!.querySelectorAll('input')[index]!;
-    const ignored = new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true });
-    await act(async () => input.dispatchEvent(ignored));
-    expect(ignored.defaultPrevented).toBe(false);
-    expect(updatePadding).not.toHaveBeenCalled();
-    const wheel = new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true });
+    const wheel = new WheelEvent('wheel', {
+      altKey: true,
+      deltaY: -100,
+      bubbles: true,
+      cancelable: true,
+    });
+    const unfocused = new WheelEvent('wheel', {
+      altKey: true,
+      deltaY: -100,
+      bubbles: true,
+      cancelable: true,
+    });
+    const scrolling = new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true });
+    await act(async () => input.dispatchEvent(unfocused));
+    expect(unfocused.defaultPrevented).toBe(false);
     await act(async () => {
       input.focus();
-      input.dispatchEvent(wheel);
+      input.dispatchEvent(scrolling);
     });
+    expect(scrolling.defaultPrevented).toBe(false);
+    expect(updatePadding).not.toHaveBeenCalled();
+    await act(async () => input.dispatchEvent(wheel));
     expect(wheel.defaultPrevented).toBe(true);
     expect(updatePadding).toHaveBeenCalledWith(side, index + 2);
     expect(document.activeElement).toBe(input);

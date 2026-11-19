@@ -13,6 +13,7 @@ export function AudioVolumeField({
     <SliderField
       disabled={disabled}
       label={translate('videoEditor.sidebar.volumeLabel')}
+      rangePresentation="field"
       value={value}
       min={0}
       max={2}
@@ -39,6 +40,7 @@ export function AudioEnvelopeFields({
       <SliderField
         disabled={disabled}
         label={translate('videoEditor.sidebar.volumeEnvelopeStartLabel')}
+        rangePresentation="field"
         value={startValue}
         min={0}
         max={2}
@@ -49,6 +51,7 @@ export function AudioEnvelopeFields({
       <SliderField
         disabled={disabled}
         label={translate('videoEditor.sidebar.volumeEnvelopeEndLabel')}
+        rangePresentation="field"
         value={endValue}
         min={0}
         max={2}

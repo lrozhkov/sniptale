@@ -121,25 +121,34 @@ function renderGeneratedColorControl(args: GeneratedControlRenderArgs) {
 }
 
 function renderGeneratedNumberControl(args: GeneratedControlRenderArgs) {
-  const stepProps = args.props.control.step === undefined ? {} : { step: args.props.control.step };
+  const { binding, step, defaultValue } = args.props.control;
+  const min = args.props.control.min ?? 0;
+  const max = args.props.control.max ?? 100;
+  const usesOpacityScale =
+    binding.kind === VideoAnnotationControlBindingKind.NODE_PROPERTY &&
+    binding.property === 'opacity' &&
+    min === 0 &&
+    max === 1;
+  const stepProps = step === undefined ? {} : { step };
+  const opacityProps = usesOpacityScale
+    ? { rangePresentation: 'field' as const, formatValue: (value: number) => `${value * 100}%` }
+    : {};
   return (
     <SliderField
       label={args.label}
       disabled={args.props.disabled}
-      value={
-        typeof args.value === 'number' ? args.value : Number(args.props.control.defaultValue) || 0
-      }
-      min={args.props.control.min ?? 0}
-      max={args.props.control.max ?? 100}
+      value={typeof args.value === 'number' ? args.value : Number(defaultValue) || 0}
+      min={min}
+      max={max}
+      scrubEnabled={usesOpacityScale}
       {...stepProps}
-      {...(args.props.control.binding.kind ===
-        VideoAnnotationControlBindingKind.TIMELINE_PROPERTY &&
-      args.props.control.binding.field === 'durationMs'
+      {...(binding.kind === VideoAnnotationControlBindingKind.TIMELINE_PROPERTY &&
+      binding.field === 'durationMs'
         ? { formatValue: (value: number) => `${(value / 1000).toFixed(2)} s` }
-        : args.props.control.binding.kind === VideoAnnotationControlBindingKind.NODE_PROPERTY &&
-            args.props.control.binding.property === 'radius'
+        : binding.kind === VideoAnnotationControlBindingKind.NODE_PROPERTY &&
+            binding.property === 'radius'
           ? { formatValue: (value: number) => `${value} px` }
-          : {})}
+          : opacityProps)}
       onChange={args.onChange}
     />
   );

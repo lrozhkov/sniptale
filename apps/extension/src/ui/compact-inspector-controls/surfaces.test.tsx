@@ -243,7 +243,7 @@ function assertFieldControlMarkup(markup: string) {
   expect(markup).toContain('width:auto');
   expect(markup).toContain('top:calc(var(--sniptale-range-thumb-size) / -2)');
   expect(markup).not.toContain('translate-y-1/2');
-  expect(markup).toContain('h-8 min-w-0 w-full border-transparent');
+  expect(markup).toContain('sniptale-inspector-select');
 }
 
 function assertChoiceControlMarkup(markup: string) {

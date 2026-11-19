@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { build } from 'esbuild';
 import { expect, test } from '@playwright/test';
 
@@ -81,11 +82,8 @@ for (const viewport of [
       await page.reload();
       await open();
       await button('gallery.videoReview.scene').click();
-      const field = page.getByRole('textbox', {
-        name: label('editor.scene.backgroundBlurAmount'),
-        exact: true,
-      });
-      await field.fill('12');
+      const field = numericControl(page, label('editor.scene.backgroundBlurAmount'));
+      await (await openNumericControl(page, label('editor.scene.backgroundBlurAmount'))).fill('12');
       await field.press('Enter');
       const raster = page.locator('[data-ui="gallery.videoReview.backgroundBlur"]');
       await expect(raster).toBeVisible();

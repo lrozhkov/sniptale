@@ -113,6 +113,7 @@ export function GlTransitionFields(props: {
               max={control.max ?? (integer ? 2147483647 : 3.4028234663852886e38)}
               step={control.step ?? (integer ? 1 : 0.01)}
               precision={integer ? 0 : 6}
+              scrubEnabled={control.presentation === 'slider'}
               scrubMin={scrub.min}
               scrubMax={scrub.max}
               scrubStep={control.step ?? (integer ? 1 : 0.01)}

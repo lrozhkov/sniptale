@@ -4,10 +4,6 @@ import type { ViewportPreset } from '../../../../../contracts/settings';
 import { VIEWPORT_PRESET_MAX_DIMENSION } from '../../../../../features/viewport-presets/contracts';
 import { getViewportPresetDisplayName } from '../../../../../features/viewport-presets/display-name';
 
-export function clampViewportDimension(value: string, max: number) {
-  return Math.min(max, Math.max(1, Number.parseInt(value, 10) || 1));
-}
-
 export const maxViewportPresetDimension = VIEWPORT_PRESET_MAX_DIMENSION;
 
 export function resolveViewportPresetEditorTitle(preset?: ViewportPreset) {

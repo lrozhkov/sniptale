@@ -155,6 +155,7 @@ export function MotionBlurField(props: {
       {setting.enabled ? (
         <SliderField
           label={translate('gallery.videoReview.motionBlurStrength')}
+          rangePresentation="field"
           value={setting.strength * 100}
           min={0}
           max={100}

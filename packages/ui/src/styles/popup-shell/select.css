@@ -33,7 +33,17 @@
   );
   --sniptale-field-border-active: var(--sniptale-color-border-soft);
   --sniptale-field-shadow-active: none;
+  font-family: inherit;
+  font-weight: inherit;
   line-height: 1.25;
+}
+
+.sniptale-popup-select.sniptale-select:focus-visible:not(.sniptale-select-open) {
+  border-color: var(--sniptale-field-border-idle);
+}
+
+.sniptale-popup-select.sniptale-select-open > .sniptale-select-value {
+  opacity: 1;
 }
 
 .sniptale-popup-select .sniptale-select-value {

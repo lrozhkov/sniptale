@@ -9,7 +9,6 @@ interface CompactSelectTriggerProps<T extends string> extends Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
   'children'
 > {
-  appearance?: 'surface' | 'plain' | undefined;
   menuId: string;
   open: boolean;
   placeholder?: string | undefined;
@@ -18,7 +17,6 @@ interface CompactSelectTriggerProps<T extends string> extends Omit<
 }
 
 export function CompactSelectTrigger<T extends string>({
-  appearance = 'surface',
   className,
   disabled,
   menuId,
@@ -40,19 +38,9 @@ export function CompactSelectTrigger<T extends string>({
       aria-haspopup="listbox"
       disabled={disabled}
       className={cx(
-        'flex h-9 w-full min-w-0 max-w-full items-center justify-between gap-2',
-        'overflow-hidden rounded-[8px] border px-3',
-        appearance === 'surface' &&
-          [
-            'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
-            'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
-          ].join(' '),
-        appearance === 'plain' && 'border-transparent bg-transparent',
-        'text-left text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
+        'flex w-full min-w-0 max-w-full items-center justify-between overflow-hidden',
         'text-[color:var(--sniptale-color-text-primary)]',
-        'transition hover:border-[color:var(--sniptale-color-border-strong)]',
-        'focus-visible:outline-none focus-visible:border-[color:var(--sniptale-color-border-accent-strong)]',
-        open && 'border-[color:var(--sniptale-color-border-accent-strong)]',
+        'transition-colors',
         disabled ? 'cursor-not-allowed opacity-55' : 'cursor-pointer',
         className
       )}
@@ -82,6 +70,7 @@ function CompactSelectTriggerContent<T extends string>({
         {selectedOption?.description ? (
           <TextWithOverflowHint
             className={[
+              'sniptale-compact-select-description',
               'block truncate text-[length:var(--sniptale-compact-font-size,11px)] font-medium',
               'text-[color:var(--sniptale-color-text-muted)]',
             ].join(' ')}

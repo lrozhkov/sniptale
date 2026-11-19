@@ -1,10 +1,9 @@
-import { useRef } from 'react';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type React from 'react';
 import { translate } from '../../../../../platform/i18n';
+import { SearchField } from '../../../../../ui/compact-inspector-controls/row-controls';
 import { ExpandChevronIcon } from '../preview/icons';
 import { DataSelectionPreviewActions } from './actions';
-import { ListFilter, Search, X } from 'lucide-react';
+import { ListFilter } from 'lucide-react';
 
 type DataSpoilerHeaderProps = {
   getSummaryToneClass: () => string;
@@ -37,7 +36,6 @@ export function DataSelectionPreviewHeader({
   toggleExpandAll,
   toggleSelectAll,
 }: DataSpoilerHeaderProps) {
-  const searchInput = useRef<HTMLInputElement>(null);
   const stopHeaderToggle = (event: React.SyntheticEvent) => event.stopPropagation();
   return (
     <div className="sniptale-spoiler-header">
@@ -66,37 +64,15 @@ export function DataSelectionPreviewHeader({
           onMouseDown={stopHeaderToggle}
           onPointerDown={stopHeaderToggle}
         >
-          <label className="sniptale-ai-data-search">
-            <Search aria-hidden="true" size={13} />
-            <input
-              ref={searchInput}
-              aria-label={translate('aiModal.searchDataLabel')}
-              title={translate('aiModal.searchDataLabel')}
-              disabled={isLoading}
-              onChange={(event) => setFilterQuery(event.target.value)}
-              placeholder={translate('aiModal.searchDataPlaceholder')}
-              type="text"
-              value={filterQuery}
-            />
-            {filterQuery ? (
-              <ProductActionButton
-                tone="secondary"
-                data-command-chrome="true"
-                aria-label={translate('aiModal.clearSearchLabel')}
-                className="sniptale-ai-data-search-clear"
-                title={translate('aiModal.clearSearchLabel')}
-                onPointerDown={(event) => event.preventDefault()}
-                disabled={isLoading}
-                onClick={() => {
-                  setFilterQuery('');
-                  searchInput.current?.focus();
-                }}
-                type="button"
-              >
-                <X aria-hidden="true" size={13} />
-              </ProductActionButton>
-            ) : null}
-          </label>
+          <SearchField
+            className="sniptale-ai-data-search"
+            label={translate('aiModal.searchDataLabel')}
+            clearLabel={translate('aiModal.clearSearchLabel')}
+            disabled={isLoading}
+            onChange={setFilterQuery}
+            placeholder={translate('aiModal.searchDataPlaceholder')}
+            value={filterQuery}
+          />
           <button
             aria-label={translate(
               showSelectedOnly ? 'aiModal.showAllDataLabel' : 'aiModal.showSelectedOnlyLabel'

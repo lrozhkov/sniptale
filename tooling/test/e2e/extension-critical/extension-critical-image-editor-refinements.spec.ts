@@ -329,7 +329,11 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     });
     const row = border.locator('[data-ui="shared.ui.compact-inspector.select-field"]');
     await expect(row).toHaveAttribute('data-layout', 'inline');
-    expect((await select.boundingBox())!.width).toBeLessThanOrEqual(120);
+    const radiusField = radiusRow.locator('[data-stepper-placement="sides"]');
+    const radiusBox = (await radiusField.boundingBox())!;
+    const selectBox = (await select.boundingBox())!;
+    expect(selectBox.x).toBeCloseTo(radiusBox.x, 0);
+    expect(selectBox.width).toBeCloseTo(radiusBox.width, 0);
     await expect(select).toHaveCSS('border-top-width', '1px');
     const initial = await select.textContent();
     await select.press('Enter');

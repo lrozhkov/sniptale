@@ -100,6 +100,14 @@ export function StatusRow(props: { label: React.ReactNode; value: React.ReactNod
 
 export function SearchField(props: {
   label: string;
+  clearLabel?: string;
+  showClear?: boolean;
+  className?: string;
+  dataUi?: string;
+  inputProps?: Pick<
+    React.InputHTMLAttributes<HTMLInputElement>,
+    'autoFocus' | 'onCompositionStart' | 'onCompositionEnd'
+  >;
   placeholder: string;
   value: string;
   disabled?: boolean;
@@ -115,7 +123,7 @@ export function SearchField(props: {
     ? { autoComplete: 'off', autoCorrect: 'off', autoCapitalize: 'none', spellCheck: false }
     : {};
   return (
-    <div className="sniptale-inspector-search">
+    <div className={cx('sniptale-inspector-search', props.className)} data-ui={props.dataUi}>
       <Search size={14} aria-hidden="true" />
       <input
         ref={inputRef}
@@ -123,13 +131,14 @@ export function SearchField(props: {
         type="search"
         disabled={props.disabled}
         {...assistance}
+        {...props.inputProps}
         value={props.value}
         placeholder={props.placeholder}
         onChange={(event) => props.onChange(event.currentTarget.value)}
         onKeyDown={props.onKeyDown}
       />
-      {props.value && !props.disabled ? (
-        <InspectorFieldClear label={props.label} target={inputRef} />
+      {props.showClear !== false && props.value && !props.disabled ? (
+        <InspectorFieldClear label={props.label} clearLabel={props.clearLabel} target={inputRef} />
       ) : null}
     </div>
   );

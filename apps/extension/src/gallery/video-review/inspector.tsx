@@ -11,6 +11,7 @@ import {
 } from './inspector-sections';
 import '../../ui/compact-inspector-controls/inspector-surface.css';
 import './inspector.css';
+import './field-surfaces.css';
 import {
   ArrowLeft,
   List,
@@ -34,7 +35,14 @@ import {
   Crop,
   Type,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnnotation } from '../../features/video/review/types';
 import {
@@ -137,6 +145,8 @@ export function ReviewInspector(props: {
     <ReviewIntervalHintContext value={hintOwner}>
       <InspectorLayout>
         <aside
+          onKeyDownCapture={keepNumericAltInEditor}
+          onKeyUpCapture={keepNumericAltInEditor}
           onKeyDown={(event) => {
             if (shown === 'preview' && event.key === 'Escape' && !event.defaultPrevented) {
               event.preventDefault();
@@ -294,6 +304,24 @@ export function ReviewInspector(props: {
       </InspectorLayout>
     </ReviewIntervalHintContext>
   );
+}
+
+// Chromium can treat an unconsumed Alt press as a request to activate its menu.
+function keepNumericAltInEditor(event: KeyboardEvent<HTMLElement>) {
+  const input = event.target;
+  if (
+    event.key === 'Alt' &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.shiftKey &&
+    input instanceof HTMLInputElement &&
+    input.type === 'text' &&
+    !input.readOnly &&
+    input.matches(':focus:enabled') &&
+    input.closest('.sniptale-numeric-value, .sniptale-inspector-numeric')
+  ) {
+    event.preventDefault();
+  }
 }
 
 /** Saved timeline comments with hover, select, and row actions. */

@@ -1,0 +1,351 @@
+.sniptale-inspector-numeric {
+  --inspector-numeric-field-idle: var(--sniptale-color-field);
+  --inspector-numeric-field-hover: var(--sniptale-color-field-hover);
+  --inspector-numeric-field-border: var(--sniptale-color-field-border);
+  --inspector-numeric-field-hover-border: var(--sniptale-color-field-border);
+  --inspector-numeric-field-focus: var(--sniptale-color-field-focus);
+  --inspector-numeric-field-error-gap: var(--reference-field-error-gap, 6px);
+  --inspector-numeric-field-error-font: var(
+    --reference-field-error-font,
+    400 11px/16px var(--sniptale-font-sans)
+  );
+  --inspector-numeric-field-error-color: var(
+    --reference-field-error-color,
+    var(--sniptale-color-danger)
+  );
+  --inspector-numeric-action-width: var(
+    --reference-inspector-action-width,
+    calc(var(--inspector-numeric-control-height) - 2px)
+  );
+  --inspector-numeric-icon-ink: var(
+    --reference-inspector-icon-ink,
+    var(--sniptale-color-text-muted-strong)
+  );
+  --inspector-numeric-icon-size: var(--reference-inspector-icon-size, 14px);
+  --inspector-numeric-icon-stroke: var(--reference-inspector-icon-stroke, 1.4px);
+  --inspector-numeric-control-height: var(--control-height, 32px);
+  --inspector-numeric-radius: var(--radius, 4px);
+  --inspector-numeric-text: var(--text, var(--sniptale-color-text-primary));
+  --inspector-numeric-secondary: var(--secondary, var(--sniptale-color-text-secondary));
+  --inspector-numeric-panel: var(--panel, var(--sniptale-color-surface-panel));
+  --inspector-numeric-font-ui: var(--font-ui, var(--sniptale-font-sans));
+  --inspector-numeric-font-control-size: var(--font-control-size, 13px);
+  --inspector-numeric-font-control-line: var(--font-control-line, 18px);
+  --inspector-numeric-font-control-weight: var(
+    --font-control-weight,
+    var(--sniptale-font-weight-interface, 400)
+  );
+  min-width: 0;
+  width: 100%;
+  .compound-field {
+    display: flex;
+    min-height: var(--inspector-numeric-control-height);
+    width: 100%;
+    align-items: stretch;
+    border: 1px solid var(--inspector-numeric-field-border);
+    border-radius: var(--inspector-numeric-radius);
+    background: var(--inspector-numeric-field-idle);
+    color: var(--inspector-numeric-text);
+  }
+  .compound-field:hover {
+    background: var(--inspector-numeric-field-hover);
+    border-color: var(--inspector-numeric-field-hover-border);
+  }
+  .compound-field[data-editing='true'],
+  .radius-field:has(> .radius-value:focus) {
+    border-color: var(--inspector-numeric-field-focus);
+  }
+  .compound-field[data-invalid='true'] {
+    border-color: var(--sniptale-color-danger);
+  }
+  .compound-field button {
+    border-radius: calc(var(--inspector-numeric-radius) - 1px);
+  }
+  .compound-field :is(button:not(.radius-value), input[type='range']):focus-visible {
+    outline: 1px solid var(--inspector-numeric-field-focus);
+    outline-offset: -2px;
+  }
+  .compound-field > .radius-value:focus,
+  .numeric-editor input:focus {
+    outline: 0 solid transparent;
+  }
+  .numeric-editor input::selection {
+    background: var(--sniptale-color-border-strong);
+    color: var(--inspector-numeric-text);
+  }
+  .field-action {
+    flex: 0 0 var(--inspector-numeric-action-width);
+    display: grid;
+    place-items: center;
+    min-height: calc(var(--inspector-numeric-control-height) - 2px);
+    padding: 0;
+    color: var(--inspector-numeric-icon-ink);
+    cursor: pointer;
+  }
+  .field-action svg {
+    width: var(--inspector-numeric-icon-size);
+    height: var(--inspector-numeric-icon-size);
+  }
+  .field-action svg > * {
+    vector-effect: non-scaling-stroke;
+    stroke-width: var(--inspector-numeric-icon-stroke);
+  }
+  .field-action:hover:not([aria-disabled]),
+  .radius-value:hover {
+    color: var(--inspector-numeric-text);
+    background: color-mix(in srgb, var(--inspector-numeric-field-hover-border) 36%, transparent);
+  }
+  .field-action[aria-disabled='true'] {
+    opacity: 0.42;
+  }
+  .opacity-field .field-action {
+    position: relative;
+  }
+  .opacity-field .field-action::before {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    border-inline-start: 1px solid var(--inspector-numeric-field-border);
+  }
+  .opacity-track {
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    align-items: center;
+    isolation: isolate;
+  }
+  .opacity-paint {
+    position: absolute;
+    inset: 0 3px;
+    pointer-events: none;
+  }
+  .opacity-fill {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: -3px;
+    width: calc(3px + 100% * var(--progress));
+    border-start-start-radius: calc(var(--inspector-numeric-radius) - 1px);
+    border-end-start-radius: calc(var(--inspector-numeric-radius) - 1px);
+    background: var(--sniptale-color-field-selected);
+  }
+  .opacity-track:has(input[value='0']) .opacity-fill {
+    width: 0;
+  }
+  .opacity-marker {
+    position: absolute;
+    inset-block: 1px;
+    inset-inline-start: calc(100% * var(--progress));
+    width: 2px;
+    transform: translateX(-1px);
+    border-radius: 1px;
+    background: var(--inspector-numeric-icon-ink);
+  }
+  .opacity-value {
+    position: relative;
+    margin-inline: 9px 4px;
+    pointer-events: none;
+    text-shadow: 0 0 3px var(--inspector-numeric-panel);
+  }
+  .opacity-track input {
+    appearance: none;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    border-radius: calc(var(--inspector-numeric-radius) - 1px) 0 0
+      calc(var(--inspector-numeric-radius) - 1px);
+    background: transparent;
+    cursor: ew-resize;
+  }
+  .opacity-track input::-webkit-slider-thumb {
+    appearance: none;
+    width: 6px;
+    height: 28px;
+    background: transparent;
+  }
+  .opacity-track input::-moz-range-thumb {
+    width: 6px;
+    height: 28px;
+    border: 0;
+    background: transparent;
+  }
+  .radius-value {
+    min-width: 0;
+    flex: 1;
+    padding-inline: 2px;
+    cursor: text;
+    white-space: nowrap;
+  }
+  .field-unit {
+    color: var(--inspector-numeric-secondary);
+  }
+  .number-readout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    font: var(--inspector-numeric-font-control-weight)
+      var(--inspector-numeric-font-control-size)/var(--inspector-numeric-font-control-line)
+      var(--inspector-numeric-font-ui);
+    font-variant-numeric: tabular-nums;
+  }
+  .radius-field .number-readout {
+    gap: 0.25em;
+  }
+  .numeric-editor {
+    display: flex;
+    width: 100%;
+    align-items: center;
+  }
+  .numeric-editor > .number-readout {
+    flex: 1;
+  }
+  .opacity-field .number-readout {
+    justify-content: start;
+  }
+  .opacity-field .field-unit {
+    color: inherit;
+  }
+  .opacity-field .numeric-editor > .number-readout {
+    padding-inline: 9px 4px;
+  }
+  .radius-field .numeric-editor > .number-readout {
+    padding-inline-start: var(--inspector-numeric-action-width);
+  }
+  .numeric-editor input {
+    field-sizing: content;
+    min-inline-size: 1ch;
+    max-inline-size: calc(100% - 2ch);
+    height: calc(var(--inspector-numeric-control-height) - 2px);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    caret-color: var(--inspector-numeric-text);
+    font: inherit;
+    font-variant-numeric: inherit;
+  }
+  .field-error {
+    margin: var(--inspector-numeric-field-error-gap) 0 0;
+    color: var(--inspector-numeric-field-error-color);
+    font: var(--inspector-numeric-field-error-font);
+  }
+}
+
+.sniptale-numeric-entry {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  min-height: 32px;
+  gap: 4px;
+  padding-inline: 8px;
+  border: 1px solid var(--sniptale-color-field-border);
+  border-radius: 4px;
+  background: var(--sniptale-color-field);
+  font: var(--sniptale-font-weight-interface, 400) 13px / 18px var(--sniptale-font-interface);
+  cursor: text;
+}
+.sniptale-numeric-entry:hover,
+.sniptale-numeric-entry:focus-within {
+  background: var(--sniptale-color-field-hover);
+}
+.sniptale-numeric-entry:focus-within {
+  border-color: var(--sniptale-color-field-focus);
+}
+.sniptale-numeric-entry > :is(input, span) {
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.sniptale-numeric-unit {
+  flex: none;
+  color: var(--sniptale-color-text-secondary);
+}
+.sniptale-numeric-entry > input::selection {
+  background: var(--sniptale-color-border-strong);
+  color: var(--sniptale-color-text-primary);
+}
+
+.sniptale-framed-stepper[data-stepper-placement='sides'] {
+  position: relative;
+  min-inline-size: 0;
+  height: 32px;
+  padding-inline: 30px;
+  border: 1px solid var(--sniptale-color-field-border);
+  border-radius: 4px;
+  background: var(--sniptale-color-field);
+}
+
+.sniptale-framed-stepper[data-stepper-placement='sides']:hover {
+  background: var(--sniptale-color-field-hover);
+}
+
+.sniptale-framed-stepper[data-stepper-placement='sides']:focus-within {
+  border-color: var(--sniptale-color-field-focus);
+}
+
+.sniptale-framed-stepper[data-stepper-placement='sides'] .sniptale-numeric-entry {
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  min-height: 30px;
+  padding-inline: 2px;
+  border-color: transparent;
+  background: transparent;
+  font: var(--font-control-weight, 400) var(--font-control-size, 13px) /
+    var(--font-control-line, 18px) var(--font-ui, var(--sniptale-font-interface));
+  cursor: text;
+}
+
+.sniptale-framed-stepper .sniptale-numeric-entry > :is(input, span) {
+  font: inherit;
+}
+
+.sniptale-framed-stepper [data-placement='sides'] {
+  display: contents;
+}
+
+.sniptale-framed-stepper[data-stepper-placement='sides'] .sniptale-numeric-entry > input {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 1ch;
+  max-width: 100%;
+  padding: 0;
+  field-sizing: content;
+  text-align: center;
+}
+
+.sniptale-framed-stepper .sniptale-numeric-entry > input:enabled {
+  cursor: text;
+}
+
+.sniptale-framed-stepper [data-placement='sides'] > button {
+  position: absolute;
+  inset-block-start: 0;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.sniptale-framed-stepper [data-placement='sides'] > button:first-child {
+  inset-inline-start: 0;
+}
+
+.sniptale-framed-stepper [data-placement='sides'] > button:last-child {
+  inset-inline-end: 0;
+}
+
+.sniptale-framed-stepper [data-placement='sides'] > button svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.4;
+}

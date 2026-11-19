@@ -1,8 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import type { SystemViewportPreset, UserViewportPreset } from '../../../../../contracts/settings';
 import {
-  clampViewportDimension,
-  maxViewportPresetDimension,
   resolveViewportPresetEditorTitle,
   resolveViewportPresetSubmitLabel,
   syncViewportPresetForm,
@@ -36,10 +34,7 @@ const systemPreset: SystemViewportPreset = {
   width: 1280,
 };
 
-it('clamps dimensions and resolves editor copy for create, edit, and saving states', () => {
-  expect(clampViewportDimension('invalid', maxViewportPresetDimension)).toBe(1);
-  expect(clampViewportDimension('0', maxViewportPresetDimension)).toBe(1);
-  expect(clampViewportDimension('20000', maxViewportPresetDimension)).toBe(16384);
+it('resolves editor copy for create, edit, and saving states', () => {
   expect(resolveViewportPresetEditorTitle()).toBe('viewportPresets.editor.newTitle');
   expect(resolveViewportPresetEditorTitle(userPreset)).toBe('viewportPresets.editor.editTitle');
   expect(resolveViewportPresetSubmitLabel({ isSaving: true })).toBe(

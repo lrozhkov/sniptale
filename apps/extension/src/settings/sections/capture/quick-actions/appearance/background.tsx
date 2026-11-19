@@ -98,6 +98,7 @@ export function QuickActionBackgroundSettings(props: {
       {background.kind !== 'none' ? (
         <>
           <NumericRow
+            appearance="plain"
             label={translate('settings.quickActions.appearancePadding')}
             value={background.padding}
             min={0}
@@ -107,6 +108,7 @@ export function QuickActionBackgroundSettings(props: {
             onCommitValue={(padding) => update({ padding })}
           />
           <NumericRow
+            appearance="plain"
             label={translate('settings.quickActions.appearanceRadius')}
             value={background.radius}
             min={0}
@@ -116,7 +118,10 @@ export function QuickActionBackgroundSettings(props: {
             onCommitValue={(radius) => update({ radius })}
           />
           <NumericRow
+            appearance="plain"
             label={translate('settings.quickActions.appearanceShadow')}
+            rangePresentation="field"
+            scrub={{ min: 0, max: 128, step: 1 }}
             value={background.shadow}
             min={0}
             max={128}

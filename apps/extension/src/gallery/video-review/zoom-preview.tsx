@@ -297,7 +297,7 @@ function PreparedZoomPreview(
           sourceTime,
           props.onInteract
         )}
-        className="relative overflow-hidden rounded-[var(--sniptale-radius-sm)]"
+        className="relative mx-2 overflow-hidden rounded-[var(--sniptale-radius-sm)]"
         style={{ background: overlay ? previewBackgroundPaint(background) : '#000000' }}
       >
         {overlay ? (

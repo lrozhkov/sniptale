@@ -66,9 +66,17 @@ it('uses diameter for a circle and rectangular geometry for explicit and legacy 
 });
 it('previews diameter, cancels without writing, then commits one centered size change', () => {
   render('circle');
-  const range = host.querySelector<HTMLInputElement>('input[type="range"]')!;
+  const stepper = host.querySelector<HTMLButtonElement>(
+    'button[aria-label="gallery.videoReview.focusLensDiameter increase"]'
+  )!;
   const key = (type: string, key: string) =>
-    act(() => range.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true })));
+    act(() => {
+      if (key === 'Escape')
+        window.dispatchEvent(new KeyboardEvent('keydown', { key, cancelable: true }));
+      else if (type === 'keydown')
+        stepper.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      else window.dispatchEvent(new MouseEvent('pointerup'));
+    });
   key('keydown', 'ArrowRight');
   expect(change).not.toHaveBeenCalled();
   const area = preview.mock.lastCall?.[0].area;

@@ -16,7 +16,7 @@ it.each([false, true])(
       const buttons = container.querySelectorAll('button');
       act(() => buttons[0]!.click());
       act(() => buttons[1]!.click());
-      expect(onStep.mock.calls).toEqual(disabled ? [] : [[1], [-1]]);
+      expect(onStep.mock.calls).toEqual(disabled ? [] : [[-1], [1]]);
       act(() => buttons[0]!.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })));
       expect(onStep).toHaveBeenCalledTimes(disabled ? 0 : 2);
     } finally {

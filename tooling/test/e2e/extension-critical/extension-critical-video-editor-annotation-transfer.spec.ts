@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { buildProjectTransitionSegments } from '../../../../apps/extension/src/features/video/project/transition/project';
 import type { GlTrackNode } from '../../../../apps/extension/src/features/video/project/transition/gl-track-plan';
 import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
@@ -437,10 +438,7 @@ async function checkTransferredResultVoiceEditing(
     exact: true,
   });
   if ((await audio.getAttribute('aria-expanded')) === 'false') await audio.click();
-  const volume = page.getByRole('textbox', {
-    name: label('videoEditor.sidebar.volumeLabel'),
-    exact: true,
-  });
+  const volume = numericControl(page, label('videoEditor.sidebar.volumeLabel'));
   await expect(volume).toBeVisible();
   await expect(volume).toHaveValue('80');
   await checkInspectorPaintedFont(page, volume, 'result-voice-volume');
@@ -739,8 +737,8 @@ async function configureGallerySpatialDetails(page: Page, dialog: Locator, label
     ['gallery.videoReview.depthStrength', '55'],
     ['gallery.videoReview.depthSoftness', '35'],
   ] as const) {
-    const input = dialog.getByRole('textbox', { name: label(key), exact: true });
-    await input.fill(value);
+    const input = numericControl(dialog, label(key));
+    await (await openNumericControl(dialog, label(key))).fill(value);
     await input.press('Enter');
   }
   for (const phase of ['enter', 'exit'] as const) {
@@ -757,11 +755,10 @@ async function configureGallerySpatialDetails(page: Page, dialog: Locator, label
     await blur
       .getByRole('switch', { name: label('gallery.videoReview.motionBlur'), exact: true })
       .click();
-    const strength = blur.getByRole('textbox', {
-      name: label('gallery.videoReview.motionBlurStrength'),
-      exact: true,
-    });
-    await strength.fill('65');
+    const strength = numericControl(blur, label('gallery.videoReview.motionBlurStrength'));
+    await (
+      await openNumericControl(blur, label('gallery.videoReview.motionBlurStrength'))
+    ).fill('65');
     await strength.press('Enter');
     await checkInspectorPaintedFont(page, strength, `gallery-resource-motion-blur-${phase}`);
   }
@@ -863,12 +860,11 @@ async function checkTransferredSpatialDetails(
     })
     .click();
   const exit = page.locator('[data-ui="video-editor.motion.blur"][data-phase="exit"]');
-  const exitStrength = exit.getByRole('textbox', {
-    name: label('gallery.videoReview.motionBlurStrength'),
-    exact: true,
-  });
+  const exitStrength = numericControl(exit, label('gallery.videoReview.motionBlurStrength'));
   await expect(exitStrength).toHaveValue('65');
-  await exitStrength.fill('75');
+  await (
+    await openNumericControl(exit, label('gallery.videoReview.motionBlurStrength'))
+  ).fill('75');
   await exitStrength.press('Enter');
   await expect
     .poll(async () => (await accepted()).motionBlur?.exit)
@@ -894,12 +890,11 @@ async function checkTransferredSpatialDetails(
     })
     .click();
   const blur = page.locator('[data-ui="video-editor.motion.blur"][data-phase="enter"]');
-  const blurStrength = blur.getByRole('textbox', {
-    name: label('gallery.videoReview.motionBlurStrength'),
-    exact: true,
-  });
+  const blurStrength = numericControl(blur, label('gallery.videoReview.motionBlurStrength'));
   await expect(blurStrength).toHaveValue('65');
-  await blurStrength.fill('75');
+  await (
+    await openNumericControl(blur, label('gallery.videoReview.motionBlurStrength'))
+  ).fill('75');
   await blurStrength.press('Enter');
   await expect
     .poll(
@@ -1840,8 +1835,8 @@ for (const {
               'gallery.videoReview.focusAreaWidth',
               'gallery.videoReview.focusAreaHeight',
             ] as const) {
-              const input = dialog.getByRole('textbox', { name: label(key), exact: true });
-              await input.fill('10');
+              const input = numericControl(dialog, label(key));
+              await (await openNumericControl(dialog, label(key))).fill('10');
               await input.press('Enter');
             }
           }
@@ -2700,8 +2695,8 @@ for (const {
             ['gallery.videoReview.rangeStart', '1'],
             ['gallery.videoReview.rangeEnd', '11'],
           ] as const) {
-            const field = fields.getByRole('textbox', { name: label(key), exact: true });
-            await field.fill(value);
+            const field = numericControl(fields, label(key));
+            await (await openNumericControl(fields, label(key))).fill(value);
             await field.press('Enter');
           }
           await saved();
@@ -3806,11 +3801,13 @@ for (const {
           await expect
             .poll(async () => (await readNativeVideoProject(page))?.sceneBackground?.kind)
             .toBe('image');
-          const backgroundBlur = background.getByRole('textbox', {
-            name: label('editor.scene.backgroundBlurAmount'),
-            exact: true,
-          });
-          await backgroundBlur.fill('0');
+          const backgroundBlur = numericControl(
+            background,
+            label('editor.scene.backgroundBlurAmount')
+          );
+          await (
+            await openNumericControl(background, label('editor.scene.backgroundBlurAmount'))
+          ).fill('0');
           await backgroundBlur.press('Enter');
           await expect
             .poll(async () => (await readNativeVideoProject(page))?.sceneBackground?.blur ?? 0)

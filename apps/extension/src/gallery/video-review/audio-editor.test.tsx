@@ -167,7 +167,7 @@ it('explains cut suppression without changing the authored mute flag or deleting
   expect(host.querySelector('[role="status"]')).toBeNull();
 });
 
-it('keeps long fades available by typing while using a five-second slider', () => {
+it('keeps long fades available through the exact time fields', () => {
   const clip = createQuickEditAudioClip({
     id: 'music',
     assetId: 'long-music',
@@ -179,8 +179,10 @@ it('keeps long fades available by typing while using a five-second slider', () =
   act(() =>
     host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-animation"]')!.click()
   );
-  const ranges = [...host.querySelectorAll<HTMLInputElement>('input[type="range"]')];
-  expect(ranges.map((range) => range.max)).toEqual(['5', '5']);
+  expect(host.querySelector('input[type="range"]')).toBeNull();
+  expect(
+    host.querySelector('button[aria-label="gallery.videoReview.audioFadeOut increase"]')
+  ).not.toBeNull();
   const fade = host.querySelector<HTMLInputElement>(
     '[aria-label="gallery.videoReview.audioFadeOut"]'
   )!;

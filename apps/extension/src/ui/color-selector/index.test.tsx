@@ -107,6 +107,9 @@ async function openPalette() {
 
 it('shows an unlabeled palette above the picker controls for drawing tools', async () => {
   renderSelector({ pickerOnly: true, paletteInPicker: true, recentColors: [], palette: PALETTE });
+  const trigger = document.querySelector('[data-ui="shared.ui.color-selector.trigger"]');
+  expect(trigger?.querySelectorAll('button')).toHaveLength(1);
+  expect(trigger?.querySelector('.sniptale-framed-color-value')).toBeNull();
   await openPicker();
   const picker = document.querySelector('[data-ui="shared.ui.color-selector.picker"]');
   expect(

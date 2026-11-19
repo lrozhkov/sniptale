@@ -403,6 +403,7 @@ function useReviewEditorCore(resource: LoadedReview, mappedOriginal: boolean) {
     commands,
     session: base.session,
     lane: base.advanced.annotationEffects,
+    readLane: () => base.advancedState.readCurrentContent().annotationEffects,
     setLane: base.advancedState.setAnnotationEffects,
     flush: base.advancedState.flush,
     beforeAction: base.beforeAction,

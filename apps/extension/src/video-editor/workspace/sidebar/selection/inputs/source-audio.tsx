@@ -338,6 +338,7 @@ function SourceAudioRangeGroup({
           />
           <SliderField
             label={translate('videoEditor.sidebar.sourceAudioLevel')}
+            rangePresentation="field"
             value={range.volume}
             min={0}
             max={branch === 'ranges' ? 2 : 1}

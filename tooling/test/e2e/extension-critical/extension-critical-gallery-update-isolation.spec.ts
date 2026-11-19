@@ -1,3 +1,4 @@
+import { numericControl } from '../support/inspector-numeric';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
@@ -291,10 +292,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         const started = await page.evaluate(() => performance.now());
         await items.nth(index).click();
         await expectTimelineSelection(items.nth(index));
-        const scale = inspector.getByRole('textbox', {
-          name: translate('gallery.videoReview.zoomScale', 'en'),
-          exact: true,
-        });
+        const scale = numericControl(inspector, translate('gallery.videoReview.zoomScale', 'en'));
         await scale.scrollIntoViewIfNeeded();
         await expect(scale).toBeInViewport();
         await expect(scale).toBeVisible();

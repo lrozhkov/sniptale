@@ -128,7 +128,9 @@ describe('product-form-controls contract', () => {
 
   it('keeps compact select labels single-line in triggers and two-line clamped in menus', () => {
     expect(productFormControlsStylesheet).toContain("@import './select.css';");
-    expect(productSelectStylesheet).toContain('--sniptale-field-bg-idle: transparent;');
+    expect(productSelectStylesheet).toContain(
+      '--sniptale-field-bg-idle: var(--sniptale-color-field);'
+    );
     expect(productSelectStylesheet).toContain(
       '.sniptale-select:hover:not(.sniptale-select-disabled) {'
     );

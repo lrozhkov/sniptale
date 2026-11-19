@@ -314,7 +314,7 @@ function handleNumericKeyDown({
     commitDraft();
     if (enterBehavior === 'blur') event.currentTarget.blur();
     else focusNextCompactInput(event.currentTarget);
-  } else if (event.key === 'Escape') {
+  } else if (event.key === 'Escape' && draftState.editingRef.current) {
     event.preventDefault();
     cancelNumericEditing(draftState);
   }

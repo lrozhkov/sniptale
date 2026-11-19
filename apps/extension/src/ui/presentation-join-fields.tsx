@@ -43,7 +43,8 @@ export function PresentationJoinFields(props: {
         value={timing[edge]}
         min={value[opposite] === 0 ? 0.05 : 0}
         max={60 - value[opposite]}
-        scrubMax={Math.min(3, 60 - value[opposite])}
+        scrubEnabled={false}
+        stepperPlacement="sides"
         step={0.05}
         precision={2}
         unit="s"
@@ -124,7 +125,8 @@ export function PresentationJoinFields(props: {
             value={timing.before + timing.after}
             min={0.05}
             max={60}
-            scrubMax={3}
+            scrubEnabled={false}
+            stepperPlacement="sides"
             step={0.05}
             precision={2}
             unit="s"

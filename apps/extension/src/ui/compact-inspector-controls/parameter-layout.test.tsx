@@ -66,9 +66,9 @@ it('keeps color names and padding inert while its value edits and selects all te
   const row = host.querySelector<HTMLElement>('.sniptale-parameter-row')!;
   const label = row.querySelector<HTMLElement>('.sniptale-parameter-name')!;
   act(() => label.click());
-  expect(host.querySelector('input')).toBeNull();
+  expect(host.querySelector('input:not([readonly])')).toBeNull();
   act(() => row.click());
-  expect(host.querySelector('input')).toBeNull();
+  expect(host.querySelector('input:not([readonly])')).toBeNull();
   act(() =>
     row
       .querySelector<HTMLButtonElement>('[data-ui="shared.ui.color-selector.value-trigger"]')!
@@ -88,7 +88,7 @@ it('keeps color names and padding inert while its value edits and selects all te
   expect(host.querySelector('input')).toBe(input);
   expect(document.activeElement).toBe(input);
   act(() => input.blur());
-  expect(host.querySelector('input')).toBeNull();
+  expect(host.querySelector('input:not([readonly])')).toBeNull();
   act(() =>
     row
       .querySelector<HTMLButtonElement>('[data-ui="shared.ui.color-selector.value-trigger"]')!
@@ -108,12 +108,12 @@ it('keeps color names and padding inert while its value edits and selects all te
   expect(next.value).toBe('invalid');
   expect(next.getAttribute('aria-invalid')).toBe('true');
   act(() => next.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-  expect(host.querySelector('input')).toBeNull();
+  expect(host.querySelector('input:not([readonly])')).toBeNull();
   expect(change).not.toHaveBeenCalled();
   render(true);
   act(() => label.click());
   act(() => row.click());
-  expect(host.querySelector('input')).toBeNull();
+  expect(host.querySelector('input:not([readonly])')).toBeNull();
   expect(change).not.toHaveBeenCalled();
 });
 
@@ -477,6 +477,49 @@ it('presents a scoped static value without an editable or disabled control', () 
   expect(row?.querySelector('[title]')?.textContent).toBe('Selected object');
   expect(row?.querySelector('.sniptale-parameter-value')?.textContent).toBe(value);
   expect(row?.querySelector('input,textarea,button,[aria-disabled]')).toBeNull();
+});
+
+it('stacks a wide control and keeps compact fields in the shared inline column', () => {
+  const metrics = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(560);
+  const context = { font: '', measureText: (text: string) => ({ width: text.length * 8 }) };
+  const canvas = vi
+    .spyOn(HTMLCanvasElement.prototype, 'getContext')
+    .mockReturnValue(context as unknown as CanvasRenderingContext2D);
+  const style = document.createElement('style');
+  style.textContent = `
+    .sniptale-parameter-name {
+      --sniptale-parameter-label-width: 144px;
+      --sniptale-parameter-value-width: 160px;
+    }
+  `;
+  document.head.append(style);
+  try {
+    act(() =>
+      root.render(
+        <InspectorLayout>
+          <InspectorParameterRow label="Theme mode" valueMinimum={380}>
+            <button>System</button>
+          </InspectorParameterRow>
+          <InspectorParameterRow label="Width" valueMinimum={112}>
+            <input />
+          </InspectorParameterRow>
+          <InspectorParameterRow label="Name" valueMinimum={144} valueText={'Long name '.repeat(8)}>
+            <input />
+          </InspectorParameterRow>
+        </InspectorLayout>
+      )
+    );
+    const rows = host.querySelectorAll<HTMLElement>('.sniptale-parameter-row');
+    expect(Array.from(rows, (row) => row.dataset['layout'])).toEqual([
+      'stacked',
+      'inline',
+      'inline',
+    ]);
+  } finally {
+    style.remove();
+    canvas.mockRestore();
+    metrics.mockRestore();
+  }
 });
 
 it.each([false, true])(

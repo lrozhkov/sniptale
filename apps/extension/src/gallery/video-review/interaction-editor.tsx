@@ -302,9 +302,10 @@ export function ReviewInteractionAdd({
       <ProductSelect
         aria-label={translate('gallery.videoReview.addKeyPress')}
         placeholder={translate('gallery.videoReview.addKeyPress')}
+        menuClassName="sniptale-parameter-menu sniptale-inspector-select-menu"
         value=""
         controlSize="sm"
-        className={reviewTextButtonClassName}
+        className={`${reviewTextButtonClassName} sniptale-inspector-select`}
         containerClassName="!w-auto !min-w-0"
         menuWidth={240}
         options={REVIEW_KEY_CATALOG.map((item) => ({ value: item.value, label: item.label }))}

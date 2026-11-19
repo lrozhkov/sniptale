@@ -214,11 +214,8 @@ it.each([
       )
     );
     const inputs = [...container.querySelectorAll<HTMLInputElement>('input[type="text"]')];
-    const ranges = [...container.querySelectorAll<HTMLInputElement>('input[type="range"]')];
-    expect(ranges.map((input) => input.max)).toEqual([
-      String(Math.min(5, duration)),
-      String(Math.min(5, duration)),
-    ]);
+    expect(container.querySelector('input[type="range"]')).toBeNull();
+    expect(container.querySelectorAll('button[aria-label$=" increase"]')).toHaveLength(2);
     await act(async () => {
       inputs[0]!.focus();
       inputs[0]!.blur();

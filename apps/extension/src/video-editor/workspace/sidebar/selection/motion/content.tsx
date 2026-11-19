@@ -178,6 +178,7 @@ function MotionScaleFields(props: {
     <DraftNumericRow
       key={props.motionRegion.id}
       label={translate('videoEditor.sidebar.motionScaleLabel')}
+      rangePresentation="field"
       value={Math.round(props.motionRegion.scale * 100)}
       min={10}
       max={400}

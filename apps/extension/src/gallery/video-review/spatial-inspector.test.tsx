@@ -47,7 +47,7 @@ it.each(['tilt', 'rotation', 'focus'] as const)(
 );
 
 it.each(['pointerup', 'pointercancel', 'Escape'])(
-  'shows a scrub draft and handles %s without leaking intermediate edits',
+  'shows a stepper draft and handles %s without leaking intermediate edits',
   async (finish) => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     const host = document.createElement('div');
@@ -74,34 +74,29 @@ it.each(['pointerup', 'pointercancel', 'Escape'])(
     const field = host.querySelector<HTMLInputElement>(
       'input[aria-label="gallery.videoReview.perspectiveY"]'
     )!;
-    const slider = host.querySelector<HTMLInputElement>(
-      'input[aria-label="gallery.videoReview.perspectiveY range"]'
+    const stepper = host.querySelector<HTMLButtonElement>(
+      'button[aria-label="gallery.videoReview.perspectiveY increase"]'
     )!;
-    act(() => slider.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(slider, '40');
-      slider.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    expect(field.value).toContain('40');
+    act(() => stepper.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+    expect(field.value).toBe('20.1');
     expect(
       field.closest('[data-ui="shared.ui.compact-inspector.numeric-row"]')?.textContent
     ).toContain('°');
     expect(onChange).not.toHaveBeenCalled();
     expect(onPreview).toHaveBeenLastCalledWith({
-      perspective: { ...region.perspective, rotateY: 40 },
+      perspective: { ...region.perspective, rotateY: 20.1 },
     });
     act(() => {
-      if (finish === 'Escape')
-        slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-      slider.dispatchEvent(
-        new MouseEvent(finish === 'pointercancel' ? finish : 'pointerup', { bubbles: true })
-      );
+      if (finish === 'Escape') {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+      }
+      window.dispatchEvent(new MouseEvent(finish === 'pointercancel' ? finish : 'pointerup'));
     });
     expect(onPreview).toHaveBeenLastCalledWith(null);
     if (finish === 'pointerup') {
       expect(onChange).toHaveBeenCalledTimes(1);
       expect(onChange).toHaveBeenCalledWith({
-        perspective: { ...region.perspective, rotateY: 40 },
+        perspective: { ...region.perspective, rotateY: 20.1 },
       });
     } else {
       expect(onChange).not.toHaveBeenCalled();
@@ -180,19 +175,17 @@ it('edits focus area and strength through the existing unit fields', async () =>
     ['depthSoftness', 'softness'],
     ['depthStrength', 'strength'],
   ] as const) {
-    const slider = host.querySelector<HTMLInputElement>(
-      `input[aria-label="gallery.videoReview.${name} range"]`
+    const field = host.querySelector<HTMLInputElement>(
+      `input[aria-label="gallery.videoReview.${name}"]`
     )!;
-    act(() => slider.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+    const commits = onChange.mock.calls.length;
+    act(() => field.focus());
     await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(slider, '60');
-      slider.dispatchEvent(new Event('input', { bubbles: true }));
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '60');
+      field.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    expect(onPreview).toHaveBeenLastCalledWith({
-      depthOfField: { ...region.depthOfField, [key]: 0.6 },
-    });
-    act(() => slider.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
-    expect(onPreview).toHaveBeenLastCalledWith(null);
+    expect(onChange).toHaveBeenCalledTimes(commits);
+    act(() => field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
     expect(onChange).toHaveBeenLastCalledWith({
       depthOfField: { ...region.depthOfField, [key]: 0.6 },
     });

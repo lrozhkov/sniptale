@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { chooseInspectorValue } from '../support/inspector-utilities';
 import { readFile, writeFile } from 'node:fs/promises';
 import { startHostServer } from '../support/host-server';
@@ -63,8 +64,8 @@ test('quick editor exports a small left-edge blur with browser header and shadow
     const button = (key: Parameters<typeof translate>[0]) =>
       dialog.getByRole('button', { name: label(key), exact: true });
     const number = async (key: Parameters<typeof translate>[0], value: string) => {
-      const field = dialog.getByRole('textbox', { name: label(key), exact: true });
-      await field.fill(value);
+      const field = numericControl(dialog, label(key));
+      await (await openNumericControl(dialog, label(key))).fill(value);
       await field.press('Enter');
     };
     await button('gallery.videoReview.advancedEditing').click();

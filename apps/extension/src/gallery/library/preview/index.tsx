@@ -1,3 +1,4 @@
+import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { RemoteProjectActions } from './remote-project-actions';
 import { NativeCacheActions } from './native-cache-actions';
 import './preview.css';
@@ -142,8 +143,8 @@ function PreviewFilenameField(
         </p>
       ) : (
         <div className="gallery-preview-filename-value">
-          <div className="gallery-preview-filename-input">
-            <input
+          <div className="gallery-preview-filename-input sniptale-text-value" data-framed>
+            <ProductInput
               ref={inputRef}
               aria-labelledby={inputId}
               placeholder={translate(
@@ -162,10 +163,8 @@ function PreviewFilenameField(
               }}
               aria-describedby={extension ? `${inputId}-extension` : undefined}
               readOnly={!editable}
-              className="w-full min-w-0 bg-transparent text-[13px] font-normal leading-[18px]
-              text-[var(--sniptale-color-text-primary)] outline-none"
             />
-            {stem ? (
+            {stem && editable ? (
               <InspectorFieldClear
                 target={inputRef}
                 label={translate(

@@ -360,11 +360,11 @@ function ReviewAnnotationToolControl(props: {
       }}
     >
       <ProductSelect
-        menuClassName="sniptale-parameter-menu"
+        menuClassName="sniptale-parameter-menu sniptale-inspector-select-menu"
         aria-label={translate('gallery.videoReview.annotationEffectsAdd')}
         dataUi="gallery.videoReview.annotationType"
         controlSize="sm"
-        className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
+        className={`${reviewTextButtonClassName} sniptale-inspector-select !min-w-0 !py-0 !font-normal`}
         containerClassName="!w-auto !min-w-0 max-w-64 shrink-0"
         menuWidth={280}
         value=""

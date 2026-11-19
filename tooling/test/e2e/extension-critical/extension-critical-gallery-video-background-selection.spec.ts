@@ -31,7 +31,9 @@ for (const variant of [
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.advancedEditing').click();
-      await button('gallery.videoReview.scene').click();
+      await dialog
+        .getByRole('tab', { name: label('gallery.videoReview.background'), exact: true })
+        .click();
       const kinds = dialog.locator('.review-background-kinds');
       const solid = button('gallery.videoReview.backgroundSolid');
       const segmented = await solid.count();
@@ -61,9 +63,7 @@ for (const variant of [
       }
       const paint = dialog.locator('.review-background-paint .sniptale-parameter-row');
       const fieldBox = (await paint.boundingBox())!;
-      const paintBox = (await paint
-        .locator('[data-ui="shared.ui.paint-selector.trigger"]')
-        .boundingBox())!;
+      const paintBox = (await paint.locator('.sniptale-paint-value').boundingBox())!;
       expect(paintBox.x + paintBox.width).toBeCloseTo(fieldBox.x + fieldBox.width - 8, 0);
       await expect(paint.locator('[data-ui="shared.ui.color-selector.value-trigger"]')).toHaveCount(
         1
@@ -121,9 +121,16 @@ for (const variant of [
       await expect(selected).toHaveCSS('outline-color', colors.accent);
       await expect(dialog.locator('[data-ui="gallery.videoReview.inspector"]')).toBeInViewport();
       const presetName = await selected.getAttribute('aria-label');
-      await button('common.actions.close').click();
-      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
-      await button('gallery.videoReview.scene').click();
+      const editorUrl = page.url();
+      await dialog.locator('[data-ui="gallery.videoReview.moreActions"]').click();
+      await page
+        .getByRole('menuitem', { name: label('common.actions.close'), exact: true })
+        .click();
+      await expect(page.locator('[data-ui="gallery.videoReview.dialog"]')).toBeHidden();
+      await page.goto(editorUrl);
+      await dialog
+        .getByRole('tab', { name: label('gallery.videoReview.background'), exact: true })
+        .click();
       // The combined palette starts with colors; reveal the gradient page again on reopen.
       await more.click();
       const restored = dialog.locator(
@@ -132,7 +139,10 @@ for (const variant of [
       await expect(restored).toHaveCount(1);
       await expect(restored).toHaveAttribute('aria-label', presetName!);
       await expect(restored).toHaveCSS('outline-width', '1px');
-      await button('common.actions.close').click();
+      await dialog.locator('[data-ui="gallery.videoReview.moreActions"]').click();
+      await page
+        .getByRole('menuitem', { name: label('common.actions.close'), exact: true })
+        .click();
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }
@@ -179,11 +189,14 @@ for (const viewport of [
       const swatch = value.locator('[data-ui="shared.ui.paint-selector.trigger"]');
       const hex = value.locator('[data-ui="shared.ui.color-selector.value-trigger"]');
       const originalHex = await hex.innerText();
-      await expect(swatch).toHaveCSS('width', '32px');
+      await expect(value).toHaveCSS('height', '32px');
+      await expect(swatch).toHaveCSS('height', '30px');
+      await expect(swatch).toHaveCSS('border-inline-end-width', '1px');
       if (viewport.width === 1920) {
         const inspector = review.locator('[data-ui="gallery.videoReview.inspector"]');
         const initial = (await inspector.boundingBox())!;
-        const width = (await value.boundingBox())!.width;
+        const initialField = (await value.boundingBox())!;
+
         const handle = (await review
           .locator('[data-ui="gallery.videoReview.resizeInspector"]')
           .boundingBox())!;
@@ -196,12 +209,17 @@ for (const viewport of [
         await expect
           .poll(async () => (await inspector.boundingBox())!.width)
           .toBeGreaterThan(initial.width + 180);
-        expect((await value.boundingBox())!.width).toBeLessThanOrEqual(width + 1);
+        const expanded = (await inspector.boundingBox())!;
+        const expandedField = (await value.boundingBox())!;
+        expect(expandedField.width).toBe(206);
+        expect(
+          Math.abs(expandedField.x - expanded.x - (initialField.x - initial.x))
+        ).toBeLessThanOrEqual(1);
       }
       await swatch.hover();
       const neutral = await value.evaluate((field) => {
         const probe = document.createElement('span');
-        probe.style.backgroundColor = 'var(--sniptale-color-surface-hover)';
+        probe.style.backgroundColor = 'var(--sniptale-color-field-hover)';
         field.append(probe);
         const expected = getComputedStyle(probe).backgroundColor;
         probe.remove();
@@ -264,21 +282,111 @@ for (const viewport of [
       const paddingRow = numeric(paddingLabel).locator(
         'xpath=ancestor::*[@data-ui="shared.ui.compact-inspector.numeric-row"]'
       );
+      const radiusFrame = radiusRow.locator('[data-stepper-placement="sides"]');
+      const shadowColor = panel.locator('[data-ui="shared.ui.color-selector.trigger"]').last();
+      await expect(radiusFrame).toHaveCSS('height', '32px');
+      await expect(shadowColor).toHaveCSS('height', '32px');
+      const [paintBox, radiusBox, shadowBox] = await Promise.all([
+        value.boundingBox(),
+        radiusFrame.boundingBox(),
+        shadowColor.boundingBox(),
+      ]);
+      expect(Math.abs(radiusBox!.width - shadowBox!.width)).toBeLessThanOrEqual(1);
+      expect(Math.abs(radiusBox!.width - paintBox!.width)).toBeLessThanOrEqual(1);
+      const shadowSwatch = shadowColor.locator(
+        '[data-ui="shared.ui.color-selector.picker-trigger"]'
+      );
+      expect((await shadowSwatch.boundingBox())!.x - shadowBox!.x).toBe(1);
       await expect(radiusRow).not.toHaveAttribute('data-has-scrub', 'true');
-      await expect(paddingRow).toHaveAttribute('data-has-scrub', 'true');
+      await expect(paddingRow).not.toHaveAttribute('data-has-scrub', 'true');
+      const minus = radiusRow.getByRole('button', { name: `${radiusLabel} decrease`, exact: true });
+      const plus = radiusRow.getByRole('button', { name: `${radiusLabel} increase`, exact: true });
+      await expect(minus.locator('svg.lucide-minus')).toBeVisible();
+      await expect(plus.locator('svg.lucide-plus')).toBeVisible();
+      const [left, middle, right] = await Promise.all([
+        minus.boundingBox(),
+        radius.boundingBox(),
+        plus.boundingBox(),
+      ]);
+      expect(left!.x + left!.width).toBeLessThanOrEqual(middle!.x);
+      expect(right!.x).toBeGreaterThanOrEqual(middle!.x + middle!.width);
       await radius.fill('24');
       await radius.press('Enter');
       await expect(radius).toHaveValue('24');
-      await radius.hover();
-      await radiusRow.getByRole('button', { name: `${radiusLabel} increase`, exact: true }).click();
+      await plus.click();
       await expect(radius).toHaveValue('25');
+      await radius.press('ArrowUp');
+      await expect(radius).toHaveValue('26');
+      await plus.hover();
+      await page.mouse.wheel(0, -80);
+      await expect(radius).toHaveValue('26');
+      await radius.focus();
+      await plus.hover();
+      await expect(radius).toBeFocused();
+      await page.keyboard.down('Alt');
+      try {
+        await page.mouse.wheel(0, -80);
+        await expect(radius).toHaveValue('27');
+      } finally {
+        await page.keyboard.up('Alt');
+      }
       await radius.fill('41');
       await radius.press('Escape');
-      await expect(radius).toHaveValue('25');
+      await expect(radius).toHaveValue('27');
       await paddingRow.hover();
-      await expect(paddingRow.getByRole('slider')).toBeVisible();
+      await expect(paddingRow.locator('input[type="range"]')).toHaveCount(0);
       await page.screenshot({
         path: info.outputPath('background-numeric-fields.png'),
+        fullPage: false,
+      });
+      await value.scrollIntoViewIfNeeded();
+      await expect(hex).toHaveCSS('cursor', 'text');
+      const hexBox = await value.locator('.inspector-hex-editor input').boundingBox();
+      await hex.click();
+      const colorInput = value.getByRole('textbox', { name: /· HEX$/u });
+      expect(await colorInput.boundingBox()).toEqual(hexBox);
+      const alphaButton = value.getByRole('button', { name: /· Opacity,/u });
+      const alpha = value.getByRole('spinbutton', { name: /· Opacity/u });
+      await colorInput.fill('#5985A380');
+      await colorInput.press('Enter');
+      await expect(hex).toHaveText('#5985A3');
+      await expect(alphaButton).toHaveText('50%');
+      await expect(alphaButton).toHaveCSS('cursor', 'text');
+      const alphaBox = await value.locator('.alpha-value input').boundingBox();
+      await alphaButton.click();
+      expect(await alpha.boundingBox()).toEqual(alphaBox);
+      await alpha.fill('60');
+      await alpha.press('Enter');
+      await expect(alphaButton).toHaveText('60%');
+      await value.hover();
+      const copy = value.getByRole('button', { name: 'Copy color HEX', exact: true });
+      await expect(copy).toHaveAttribute('title', 'Copy color HEX');
+      await expect(copy).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await page.evaluate(() => {
+        Object.defineProperty(document, 'execCommand', { configurable: true, value: () => false });
+      });
+      await copy.click();
+      await expect(copy).toHaveAttribute('data-copy-state', 'failed');
+      await expect(value.getByRole('textbox', { name: 'Copy color HEX' })).toHaveCount(0);
+      await expect(copy.locator('svg.lucide-check')).toHaveCount(0);
+
+      // The harness replaces navigator.clipboard with an image-only mock.
+      await page.evaluate(() => {
+        Reflect.deleteProperty(document, 'execCommand');
+        Reflect.deleteProperty(navigator, 'clipboard');
+      });
+      await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], {
+        origin: host.origin,
+      });
+      await page.bringToFront();
+      await value.hover();
+      await copy.click();
+      await expect(copy.locator('svg.lucide-check')).toBeVisible();
+      await expect
+        .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+        .toBe('#5985A399');
+      await page.screenshot({
+        path: info.outputPath('background-color-alpha.png'),
         fullPage: false,
       });
     } finally {

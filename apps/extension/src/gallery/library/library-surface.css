@@ -17,21 +17,6 @@
 .sniptale-library-workspace [data-ui='gallery.header.clearSearch'] {
   --sniptale-color-accent: var(--sniptale-color-text-muted-strong);
 }
-.sniptale-library-workspace .gallery-saved-view-field > input:focus::placeholder {
-  color: transparent;
-}
-.sniptale-library-workspace .gallery-saved-view-field > input[aria-invalid='true'] {
-  border-color: var(--sniptale-color-danger);
-}
-.sniptale-library-workspace .gallery-saved-view-field > .sniptale-field-clear {
-  --sniptale-color-accent: var(--sniptale-color-text-muted-strong);
-  visibility: hidden;
-}
-.sniptale-library-workspace
-  .gallery-saved-view-field:is(:focus-within, :has(> input:hover, > .sniptale-field-clear:hover))
-  > .sniptale-field-clear {
-  visibility: visible;
-}
 .sniptale-library-workspace .gallery-tag-entry:is(:focus-within, :has(input:hover)) {
   background: var(--sniptale-color-surface-hover);
 }
@@ -62,36 +47,6 @@
 }
 .sniptale-library-workspace [data-ui='gallery.header.view-mode'] {
   gap: 2px;
-}
-:is(
-  .sniptale-library-workspace [data-ui='gallery.header.controls'] .sniptale-select,
-  .sniptale-library-workspace #gallery-trash-retention-days,
-  .gallery-library-modal .sniptale-select
-) {
-  --sniptale-field-bg-idle: var(--sniptale-color-surface-input);
-  --sniptale-field-border-idle: var(--sniptale-color-border-soft);
-  --sniptale-field-bg-hover: var(--sniptale-color-surface-hover);
-  --sniptale-field-border-hover: var(--sniptale-color-border-soft);
-  --sniptale-field-shadow-hover: none;
-  --sniptale-field-bg-active: var(--sniptale-color-surface-hover);
-  --sniptale-field-border-active: var(--sniptale-color-border-strong);
-  --sniptale-field-shadow-active: none;
-}
-:is(
-  .sniptale-library-workspace [data-ui='gallery.header.controls'] .sniptale-select,
-  .sniptale-library-workspace #gallery-trash-retention-days,
-  .gallery-library-modal .sniptale-select
-)[aria-expanded='true'] {
-  --sniptale-field-border-hover: var(--sniptale-color-border-strong);
-}
-:is(
-    .sniptale-library-workspace [data-ui='gallery.header.controls'] .sniptale-select,
-    .sniptale-library-workspace #gallery-trash-retention-days,
-    .gallery-library-modal .sniptale-select
-  )
-  .sniptale-select-chevron {
-  width: 12px;
-  height: 12px;
 }
 .sniptale-library-workspace .sniptale-library-utility {
   min-width: 32px;

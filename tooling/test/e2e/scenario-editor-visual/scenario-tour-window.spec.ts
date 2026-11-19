@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { expect, type Locator, type Page } from '@playwright/test';
@@ -241,10 +242,7 @@ for (const [locale, theme, size] of [
     await expect(page.locator('#guide-resource-drawer')).toHaveCount(0);
     await expect(replace).toBeFocused();
     const framing = panel.locator('[data-ui="tour.image.framing"]');
-    const scale = framing.getByRole('textbox', {
-      name: t('scenario.editor.tourImageScale'),
-      exact: true,
-    });
+    const scale = numericControl(framing, t('scenario.editor.tourImageScale'));
     const position = framing.getByRole('textbox', {
       name: t('scenario.editor.tourImagePositionX'),
       exact: true,
@@ -262,7 +260,7 @@ for (const [locale, theme, size] of [
       })
       .toBeGreaterThan(1);
     const headerWidth = (await player.locator('.tour-window-header').boundingBox())!.width;
-    await scale.fill('150');
+    await (await openNumericControl(framing, t('scenario.editor.tourImageScale'))).fill('150');
     await scale.press('Enter');
     const miniStage = framing.locator('.tour-image-viewport');
     const miniBox = (await miniStage.boundingBox())!;

@@ -30,8 +30,12 @@ it('wraps focused wheel angles through the existing draft and keeps bounds from 
   const input = host.querySelector('input')!;
   act(() => input.focus());
   act(() => {
-    input.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -1 }));
-    input.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -1 }));
+    input.dispatchEvent(
+      new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -1, altKey: true })
+    );
+    input.dispatchEvent(
+      new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -1, altKey: true })
+    );
   });
   expect(input.value).toBe('1');
   expect(onChange.mock.calls).toEqual([['0'], ['1']]);
@@ -40,7 +44,12 @@ it('wraps focused wheel angles through the existing draft and keeps bounds from 
     root.render(<PickerNumberField ariaLabel="Angle" value={100} max={100} onChange={onChange} />)
   );
   onChange.mockClear();
-  const atBound = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -1 });
+  const atBound = new WheelEvent('wheel', {
+    bubbles: true,
+    cancelable: true,
+    deltaY: -1,
+    altKey: true,
+  });
   act(() => input.dispatchEvent(atBound));
   expect(atBound.defaultPrevented).toBe(true);
   expect(input.value).toBe('100');

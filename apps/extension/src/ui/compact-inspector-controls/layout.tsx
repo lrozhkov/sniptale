@@ -188,7 +188,8 @@ export function InspectorParameterRow(props: {
     if (!width) return null;
     const context = document.createElement('canvas').getContext('2d');
     if (!context) return null;
-    context.font = getComputedStyle(label).font;
+    const style = getComputedStyle(label);
+    context.font = style.font;
     const available = width - 16;
     const accessoryWidth = hasLabelAccessory
       ? (label.querySelector('[data-parameter-label-accessory]')?.getBoundingClientRect().width ??
@@ -202,14 +203,24 @@ export function InspectorParameterRow(props: {
       !valueOptions.every((value): value is string => typeof value === 'string')
     )
       return null;
-    const valueWidth = Math.max(
+    const minimumValueWidth = Math.max(
       props.valueMinimum ?? 100,
-      props.valueText ? context.measureText(props.valueText).width + 40 : 0,
       valueOptions.length
         ? valueOptions.reduce((width, text) => width + context.measureText(text).width + 12, 0) +
             4 +
             2 * (valueOptions.length - 1)
         : 0
+    );
+    const labelCap = Number.parseFloat(style.getPropertyValue('--sniptale-parameter-label-width'));
+    const valueCap = Number.parseFloat(style.getPropertyValue('--sniptale-parameter-value-width'));
+    if (Number.isFinite(labelCap) && Number.isFinite(valueCap)) {
+      const labelColumn = Math.min(labelCap, available * 0.45);
+      const valueColumn = Math.min(valueCap, available - labelColumn - 8);
+      return () => setStacked(labelWidth > labelColumn || minimumValueWidth > valueColumn);
+    }
+    const valueWidth = Math.max(
+      minimumValueWidth,
+      props.valueText ? context.measureText(props.valueText).width + 40 : 0
     );
     const needsStack = labelWidth + valueWidth + 8 > available;
     const nameColumn = Math.max(
@@ -270,6 +281,7 @@ export function InspectorParameterRow(props: {
     <div
       ref={row}
       data-ui={props.dataUi}
+      data-compact-select-menu-bounds="parameter"
       data-layout={props.stacked || stacked ? 'stacked' : 'inline'}
       data-activates={props.onActivate ? 'true' : undefined}
       className={cx('sniptale-parameter-row', props.className)}
@@ -288,6 +300,7 @@ export function InspectorParameterRow(props: {
     >
       <span
         ref={name}
+        data-compact-select-menu-label=""
         title={props.label}
         className={cx(
           'sniptale-parameter-name',

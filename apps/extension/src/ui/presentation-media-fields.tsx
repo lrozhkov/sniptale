@@ -76,8 +76,7 @@ export function PresentationMediaFields(props: Props) {
     max: number,
     step: number,
     patch: (next: number) => MediaPatch,
-    unit: 's' | '%',
-    scrub?: { min: number; max: number }
+    unit: 's' | '%'
   ) => (
     <PreviewNumericRow
       label={label(name)}
@@ -87,7 +86,7 @@ export function PresentationMediaFields(props: Props) {
       step={step}
       unit={unit}
       precision={step === 0.001 ? Math.max(3, decimalPrecision(current)) : 2}
-      {...(scrub ? { scrubMin: scrub.min, scrubMax: scrub.max } : {})}
+      stepperPlacement={unit === 's' ? 'sides' : undefined}
       onChange={(next) => propose(patch(next), false)}
       onPreview={(next) => propose(next === null ? null : patch(next), true)}
     />
@@ -102,8 +101,7 @@ export function PresentationMediaFields(props: Props) {
           60,
           0.1,
           (duration) => ({ duration }),
-          's',
-          { min: 0.1, max: 10 }
+          's'
         )}
       {props.kind === 'video' && (
         <>

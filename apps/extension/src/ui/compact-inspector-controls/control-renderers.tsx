@@ -124,7 +124,7 @@ function InspectorSegments<T extends string>(
           aria-label={props.ariaLabel}
           data-ui="shared.ui.compact-inspector.segmented-row"
           data-icon-only={iconOnly ? 'true' : undefined}
-          className="sniptale-property-segments"
+          className={'sniptale-property-segments sniptale-framed-segments'}
           style={{
             gridTemplateColumns: `repeat(${props.options.length}, minmax(${iconOnly ? '0' : 'max-content'}, 1fr))`,
           }}

@@ -1,8 +1,8 @@
 import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
-import { NumberInput, type NumberInputProps } from '@sniptale/ui/number-input';
+import type { NumberInputProps } from '@sniptale/ui/number-input';
 import { forwardRef, useContext, useRef, useState } from 'react';
 import type React from 'react';
-import type { ProductInputProps } from '@sniptale/ui/product-form-controls';
+import { ProductInput, type ProductInputProps } from '@sniptale/ui/product-form-controls';
 import { focusNextCompactInput } from '@sniptale/ui/compact-inspector-controls/focus';
 import { cx } from './shared';
 import { X } from 'lucide-react';
@@ -47,6 +47,25 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
   const inspector = useInspectorLayout();
   const hasText = String(props.value ?? uncontrolledText).length > 0;
   const setInputRef = (node: HTMLInputElement | null) => assignTextFieldRef(inputRef, ref, node);
+  const field = (
+    <div className="sniptale-text-value" data-framed>
+      <TextFieldInput
+        invalid={invalid}
+        label={label}
+        lastCommittedValueRef={lastCommittedValueRef}
+        setEditing={setEditing}
+        setInputRef={setInputRef}
+        {...props}
+        onChange={(event) => {
+          setUncontrolledText(event.currentTarget.value);
+          props.onChange?.(event);
+        }}
+      />
+      {!props.disabled && !props.readOnly && hasText ? (
+        <InspectorFieldClear label={label} target={inputRef} />
+      ) : null}
+    </div>
+  );
 
   if (inspector)
     return (
@@ -59,23 +78,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
         dataUi="shared.ui.compact-inspector.text-field"
       >
         <div className={trailingActions ? 'sniptale-text-compound' : 'contents'}>
-          <div className="sniptale-text-value">
-            <TextFieldInput
-              invalid={invalid}
-              label={label}
-              lastCommittedValueRef={lastCommittedValueRef}
-              setEditing={setEditing}
-              setInputRef={setInputRef}
-              {...props}
-              onChange={(event) => {
-                setUncontrolledText(event.currentTarget.value);
-                props.onChange?.(event);
-              }}
-            />
-            {!props.disabled && !props.readOnly && hasText ? (
-              <InspectorFieldClear label={label} target={inputRef} />
-            ) : null}
-          </div>
+          {field}
           {trailingActions ? <div className="sniptale-text-actions">{trailingActions}</div> : null}
         </div>
       </InspectorParameterRow>
@@ -90,14 +93,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
       <span className={cx('min-w-0', TEXT_FIELD_LABEL_CLASS_NAME)} title={label}>
         {label}
       </span>
-      <TextFieldInput
-        invalid={invalid}
-        label={label}
-        lastCommittedValueRef={lastCommittedValueRef}
-        setEditing={setEditing}
-        setInputRef={setInputRef}
-        {...props}
-      />
+      {field}
     </div>
   );
 });
@@ -105,9 +101,11 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
 /** Clears through the native input event and keeps acceptance with the field owner. */
 export function InspectorFieldClear(props: {
   label: string;
+  clearLabel?: string | undefined;
   target: React.RefObject<HTMLInputElement | HTMLTextAreaElement | null>;
 }) {
-  const label = translate('shared.ui.clearField').replace('{field}', props.label);
+  const label =
+    props.clearLabel ?? translate('shared.ui.clearField').replace('{field}', props.label);
   const scoped = useContext(CommandPressScope);
   const press = useCommandPress({
     enabled: scoped,
@@ -159,7 +157,7 @@ function TextFieldInput({
   setInputRef: (node: HTMLInputElement | null) => void;
 }) {
   return (
-    <NumberInput
+    <ProductInput
       {...props}
       type={props.type ?? 'text'}
       ref={setInputRef}
@@ -175,19 +173,8 @@ function TextFieldInput({
       onKeyDown={(event) =>
         handleTextFieldKeyDown(event, lastCommittedValueRef, onKeyDown, onValueCommit)
       }
-      className={cx(
-        'h-[var(--sniptale-compact-control-height,32px)]',
-        'w-full min-w-0 rounded-[6px] border px-2.5 py-1 text-left outline-none',
-        'bg-[color:var(--sniptale-color-surface-input)]',
-        'border-[color:var(--sniptale-color-border-soft)]',
-        'focus:border-[color:var(--sniptale-color-border-accent-strong)]',
-        'disabled:cursor-not-allowed disabled:opacity-50',
-        invalid && 'border-[color:var(--sniptale-color-border-accent-strong)]',
-        'text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
-        'text-[color:var(--sniptale-color-text-primary)]',
-        'placeholder:text-[color:var(--sniptale-color-text-muted)]',
-        inputClassName
-      )}
+      invalid={invalid}
+      className={cx('sniptale-input-compact', inputClassName)}
     />
   );
 }

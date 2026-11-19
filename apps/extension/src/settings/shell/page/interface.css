@@ -39,31 +39,7 @@
   [data-layout='inline']
   .settings-control-value
   > .settings-compact-select-shell {
-  inline-size: fit-content;
-  min-inline-size: min(128px, 100%);
-  max-inline-size: 100%;
-  margin-inline-start: auto;
-}
-.sniptale-settings-workspace .sniptale-select {
-  --sniptale-field-bg-idle: var(--sniptale-color-surface-input);
-  --sniptale-field-border-idle: var(--sniptale-color-border-soft);
-  --sniptale-field-bg-hover: var(--sniptale-color-surface-hover);
-  --sniptale-field-border-hover: var(--sniptale-color-border-soft);
-  --sniptale-field-shadow-hover: none;
-  --sniptale-field-bg-active: var(--sniptale-color-surface-hover);
-  --sniptale-field-border-active: var(--sniptale-color-border-strong);
-  --sniptale-field-shadow-active: none;
-}
-.sniptale-settings-workspace .sniptale-select-chevron {
-  width: 12px;
-  height: 12px;
-}
-.sniptale-settings-workspace .sniptale-select[aria-expanded='true'] {
-  --sniptale-field-border-hover: var(--sniptale-color-border-strong);
-}
-.sniptale-settings-workspace .sniptale-select:focus-visible:not([aria-expanded='true']) {
-  outline: 1px solid var(--sniptale-color-border-strong);
-  outline-offset: -1px;
+  inline-size: 100%;
 }
 .sniptale-select-menu.settings-popup-startup-options {
   max-height: calc(50dvh - 24px);
@@ -156,7 +132,7 @@
 .sniptale-settings-workspace.sniptale-compact-workspace
   :is(.sniptale-input, .sniptale-textarea):not(.sniptale-input-error):not(
     [aria-invalid='true']
-  ):focus {
+  ):not(.sniptale-modal *):focus {
   border-color: var(--sniptale-color-border-strong) !important;
   box-shadow: none !important;
   outline: none;
@@ -262,32 +238,4 @@
   border: 0;
   background: transparent;
   box-shadow: none;
-}
-.sniptale-settings-workspace
-  .sniptale-modal
-  :is(.sniptale-input, .sniptale-textarea):not(.sniptale-input-error) {
-  border: 1px solid transparent;
-  background: transparent;
-  box-shadow: none;
-  outline: none;
-}
-.sniptale-settings-workspace
-  .sniptale-modal
-  :is(.sniptale-input, .sniptale-textarea):not(.sniptale-input-error):is(:hover, :focus) {
-  border-color: var(--sniptale-color-border-soft);
-  background: var(--sniptale-color-surface-input);
-}
-.sniptale-settings-workspace
-  .sniptale-modal
-  :is(.sniptale-input, .sniptale-textarea):not(.sniptale-input-error):focus-visible {
-  border-color: var(--sniptale-color-border-strong);
-}
-
-/* The legacy form focus skin uses important declarations. Keep this override settings-only. */
-.sniptale-settings-workspace
-  .sniptale-modal
-  :is(.sniptale-input, .sniptale-textarea):not(.sniptale-input-error):focus {
-  border-color: var(--sniptale-color-border-strong) !important;
-  background: var(--sniptale-color-surface-input) !important;
-  box-shadow: none !important;
 }

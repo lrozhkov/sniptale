@@ -55,11 +55,7 @@ import {
   setReviewAnnotationBodyBounds,
 } from './annotation-effects-geometry';
 import type { useReviewAnnotationEffects } from './annotation-effects-editor';
-import {
-  AnnotationNumeric,
-  annotationNumericScrub,
-  annotationPlacementScrub,
-} from './annotation-effects-numeric';
+import { AnnotationNumeric, annotationNumericScrub } from './annotation-effects-numeric';
 import { reviewAnnotationPresetId } from './annotation-effects-presets';
 
 type Editor = ReturnType<typeof useReviewAnnotationEffects>;
@@ -131,7 +127,11 @@ function AnnotationParameters(
         ...instance.controls,
       };
   const preview = (patch: Patch) => {
-    if (disabled || (editor.gestureId !== instance.id && !editor.beginGesture(instance.id))) return;
+    if (
+      disabled ||
+      (editor.gestureId !== instance.id && !editor.beginGesture(instance.id, 'field'))
+    )
+      return;
     editor.previewGesture(patch);
   };
   const commit = () => {
@@ -158,7 +158,7 @@ function AnnotationParameters(
       max={max}
       step={unit === 's' ? 0.1 : 1}
       unit={unit}
-      scrub={annotationPlacementScrub(key, value, min, max, unit === 's' ? 0.1 : 1)}
+      stepperPlacement="sides"
     />
   );
   const opposite = instance.attachment === 'content' ? 'viewport' : 'content';
@@ -278,15 +278,17 @@ function AnnotationParameters(
               },
             ]}
             onChange={(attachment) => {
-              if (geometry) {
-                const next = convertReviewAnnotationAttachment(instance, attachment, geometry);
-                if (next)
-                  editor.change(instance.id, {
-                    attachment,
-                    transform: next.transform,
-                    ...(next.anchors ? { anchors: next.anchors } : {}),
-                  });
-              }
+              if (!geometry) return;
+              editor.change(instance.id, (current) => {
+                const next = convertReviewAnnotationAttachment(current, attachment, geometry);
+                return next
+                  ? {
+                      attachment,
+                      transform: next.transform,
+                      ...(next.anchors ? { anchors: next.anchors } : {}),
+                    }
+                  : null;
+              });
             }}
           />
           {!converted && (
@@ -506,9 +508,9 @@ function AnnotationPreset(props: {
       ]}
       onChange={(id) =>
         id &&
-        editor.change(instance.id, {
-          controls: applyEffectControlPreset(document, instance.controls, id),
-        })
+        editor.change(instance.id, (current) => ({
+          controls: applyEffectControlPreset(document, current.controls, id),
+        }))
       }
     />
   );
@@ -548,7 +550,7 @@ function AnnotationControl(props: AnnotationControlProps) {
           : null;
       return anchors ? { anchors } : null;
     }
-    return { controls: { ...instance.controls, [control.id]: value } };
+    return { controls: { [control.id]: value } };
   };
   const preview = (value: string | number) => {
     const next = patch(value);
@@ -569,8 +571,16 @@ function AnnotationControl(props: AnnotationControlProps) {
     );
   if (control.kind === 'number') {
     const value = typeof props.value === 'number' ? props.value : control.defaultValue;
-    const range =
-      control.presentation === 'slider' ? effectControlSliderRange(control, value) : control;
+    // Stored Frame templates use exact pixel steps for their border dimensions.
+    const frameDimension =
+      props.document.id === 'sniptale-frame' &&
+      (control.id === 'radius' || control.id === 'stroke') &&
+      control.unit === 'px' &&
+      control.min !== undefined &&
+      control.max !== undefined &&
+      !bound;
+    const authoredSlider = control.presentation === 'slider' && !frameDimension;
+    const range = authoredSlider ? effectControlSliderRange(control, value) : control;
     const layout = props.document.objectLayout;
     const handle = layout?.handles?.find(
       (item) => item.xControl === control.id || item.yControl === control.id
@@ -592,18 +602,29 @@ function AnnotationControl(props: AnnotationControlProps) {
         max={control.max}
         step={control.step}
         unit={effectControlUnit(control.unit)}
-        revealScrub={control.presentation === 'slider'}
+        revealScrub={authoredSlider}
+        rangePresentation={
+          !bound &&
+          control.id === 'opacity' &&
+          control.unit === 'percent' &&
+          control.min === 0 &&
+          control.max === 100 &&
+          (control.step ?? 1) === 1
+            ? 'field'
+            : undefined
+        }
+        stepperPlacement={frameDimension ? 'sides' : undefined}
         patch={patch}
         scrub={
-          control.presentation === 'number'
-            ? undefined
-            : annotationNumericScrub(
+          authoredSlider
+            ? annotationNumericScrub(
                 value,
                 range.min,
                 range.max,
                 range.step,
                 length === undefined ? undefined : { min: -length, max: 2 * length }
               )
+            : undefined
         }
       />
     );
@@ -666,6 +687,7 @@ function AnnotationTextControl(
   if (control.presentation === 'textarea')
     return (
       <TextareaField
+        clearable={false}
         label={label}
         disabled={disabled}
         value={typeof props.value === 'string' ? props.value : control.defaultValue}

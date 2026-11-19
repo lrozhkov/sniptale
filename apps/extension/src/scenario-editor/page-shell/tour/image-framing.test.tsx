@@ -143,7 +143,7 @@ it('restores an external Tour numeric preview without accepting the canceled edi
   }
   act(() => root.render(<Field />));
   const field = host.querySelector<HTMLInputElement>('input[type="text"]')!;
-  const increase = host.querySelector('button')!;
+  const increase = host.querySelector('button[aria-label="Duration increase"]')!;
   pointer(increase, 'pointerdown', 100);
   expect(field.value).toBe('11');
   pointer(increase, 'pointercancel', 100);

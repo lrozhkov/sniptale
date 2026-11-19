@@ -551,7 +551,13 @@ async function appearanceClick(name: string) {
   await act(async () => pageButton(name).click());
 }
 async function appearanceNumber(name: string, value: string) {
-  const field = document.querySelector<HTMLInputElement>(`input[aria-label="${name}"]`);
+  const pencil = document.querySelector<HTMLButtonElement>(
+    `.opacity-field button[aria-label="${name}"]`
+  );
+  if (pencil) await act(async () => pencil.click());
+  const field = document.querySelector<HTMLInputElement>(
+    `input[type="text"][aria-label="${name}"]`
+  );
   if (!field) throw new Error(`Missing ${name}`);
   await act(async () => field.focus());
   await act(async () => {
@@ -676,7 +682,7 @@ describe('catalog accepted appearance', () => {
   );
 });
 
-it('exposes the actual stroke multiplier to assistive technology while using a logarithmic slider', async () => {
+it('edits the stroke multiplier with the shared stepper and keeps opacity inside its field', async () => {
   vi.stubGlobal(
     'ResizeObserver',
     class {
@@ -701,16 +707,18 @@ it('exposes the actual stroke multiplier to assistive technology while using a l
   mocks.snapshot.entries[0]!.definition = definition;
   await renderPanel();
   await appearanceClick('editor.elements.appearance');
-  const range = document.querySelector<HTMLInputElement>(
-    'input[aria-label="editor.elements.strokeScale range"]'
-  );
-  if (!range) throw new Error('Missing stroke range');
-  expect(range.value).toBe('50');
-  expect(range.getAttribute('aria-valuetext')).toBe('1');
+  const scale = document.querySelector<HTMLInputElement>(
+    'input[aria-label="editor.elements.strokeScale"]'
+  )!;
+  expect(
+    scale.closest('[data-stepper-placement="sides"]')?.querySelectorAll('button')
+  ).toHaveLength(2);
+  expect(
+    document.querySelector('.opacity-field input[type="range"]')?.closest('.opacity-field')
+  ).not.toBeNull();
+  expect(scale.value).toBe('1');
   await appearanceNumber('editor.elements.strokeScale', '100');
-  expect(range.value).toBe('100');
-  expect(range.getAttribute('aria-valuetext')).toBe('100');
+  expect(scale.value).toBe('100');
   await appearanceNumber('editor.elements.strokeScale', '0.01');
-  expect(range.value).toBe('0');
-  expect(range.getAttribute('aria-valuetext')).toBe('0.01');
+  expect(scale.value).toBe('0.01');
 });

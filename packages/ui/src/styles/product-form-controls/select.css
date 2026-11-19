@@ -8,40 +8,22 @@
 }
 
 .sniptale-select {
-  --sniptale-field-height: 44px;
-  --sniptale-field-padding-block: 10px;
-  --sniptale-field-padding-inline-start: 13px;
-  --sniptale-field-padding-inline-end: 40px;
-  --sniptale-field-gap: 12px;
-  --sniptale-field-radius: 12px;
-  --sniptale-field-font-size: 14px;
-  --sniptale-field-bg-idle: transparent;
-  --sniptale-field-border-idle: transparent;
+  --sniptale-field-height: 32px;
+  --sniptale-field-padding-block: 6px;
+  --sniptale-field-padding-inline-start: 8px;
+  --sniptale-field-padding-inline-end: 28px;
+  --sniptale-field-gap: 6px;
+  --sniptale-field-radius: 4px;
+  --sniptale-field-font-size: 13px;
+  --sniptale-field-bg-idle: var(--sniptale-color-field);
+  --sniptale-field-border-idle: var(--sniptale-color-field-border);
   --sniptale-field-shadow-idle: none;
-  --sniptale-field-bg-hover: color-mix(
-    in srgb,
-    var(--sniptale-color-surface-input) 86%,
-    var(--sniptale-color-surface-panel) 14%
-  );
-  --sniptale-field-border-hover: color-mix(
-    in srgb,
-    var(--sniptale-color-border-soft) 92%,
-    transparent
-  );
-  --sniptale-field-shadow-hover: inset 0 0 0 1px
-    color-mix(in srgb, var(--sniptale-color-border-subtle) 36%, transparent);
-  --sniptale-field-bg-active: color-mix(
-    in srgb,
-    var(--sniptale-color-surface-input) 86%,
-    var(--sniptale-color-surface-panel) 14%
-  );
-  --sniptale-field-border-active: color-mix(
-    in srgb,
-    var(--sniptale-color-accent) 32%,
-    var(--sniptale-color-border-soft) 68%
-  );
-  --sniptale-field-shadow-active: inset 0 0 0 1px
-    color-mix(in srgb, var(--sniptale-color-accent) 10%, transparent);
+  --sniptale-field-bg-hover: var(--sniptale-color-field-hover);
+  --sniptale-field-border-hover: var(--sniptale-color-field-border);
+  --sniptale-field-shadow-hover: none;
+  --sniptale-field-bg-active: var(--sniptale-color-field-hover);
+  --sniptale-field-border-active: var(--sniptale-color-field-border);
+  --sniptale-field-shadow-active: none;
   position: relative;
   width: 100%;
   min-height: var(--sniptale-field-height);
@@ -55,8 +37,8 @@
   border: 1px solid var(--sniptale-field-border-idle);
   border-radius: var(--sniptale-field-radius);
   color: var(--sniptale-text-main);
-  font-size: var(--sniptale-field-font-size);
-  font-family: inherit;
+  font: var(--sniptale-font-weight-interface) var(--sniptale-field-font-size) / 18px
+    var(--sniptale-font-interface);
   text-align: left;
   outline: none;
   cursor: pointer;
@@ -65,14 +47,6 @@
     box-shadow 0.2s,
     background-color 0.2s;
   box-shadow: var(--sniptale-field-shadow-idle);
-}
-
-.sniptale-select-sm {
-  --sniptale-field-height: 38px;
-  --sniptale-field-padding-block: 8px;
-  --sniptale-field-gap: 10px;
-  --sniptale-field-radius: 10px;
-  --sniptale-field-font-size: 13px;
 }
 
 .sniptale-select:hover:not(.sniptale-select-disabled) {
@@ -86,6 +60,14 @@
   background: var(--sniptale-field-bg-active);
   border-color: var(--sniptale-field-border-active);
   box-shadow: var(--sniptale-field-shadow-active);
+}
+
+.sniptale-select:focus-visible:not(.sniptale-select-open) {
+  border-color: var(--sniptale-color-field-focus);
+}
+
+.sniptale-select-open > .sniptale-select-value {
+  opacity: 0.4;
 }
 
 .sniptale-select-disabled {

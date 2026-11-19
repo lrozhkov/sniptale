@@ -7,6 +7,7 @@ import { OptionButtonsField } from '../shared/option-buttons';
 import { ColorField, SelectInput } from '../shared/controls';
 import { InspectorDetails } from '../shared/details';
 import { SliderField } from '../shared/sliders';
+import { NumberInput } from '../inputs/number';
 
 type CommonProps = {
   disabled: boolean;
@@ -22,6 +23,7 @@ function ActionOpacityField(props: {
   return (
     <SliderField
       label={translate('videoEditor.sidebar.actionOpacity')}
+      rangePresentation="field"
       value={props.value}
       min={0}
       max={1}
@@ -52,9 +54,9 @@ export function ActionClickStyleFields(
         onRememberRecentColor={props.onRememberRecentColor}
         onChange={(color) => change({ color })}
       />
-      <SliderField
+      <NumberInput
         label={translate('videoEditor.sidebar.actionSize')}
-        formatValue={(value) => `${value} px`}
+        unit="px"
         value={props.value.size}
         min={8}
         max={160}
@@ -67,9 +69,9 @@ export function ActionClickStyleFields(
         disabled={props.disabled}
         onChange={(opacity) => change({ opacity })}
       />
-      <SliderField
+      <NumberInput
         label={translate('videoEditor.sidebar.actionStroke')}
-        formatValue={(value) => `${value} px`}
+        unit="px"
         value={props.value.strokeWidth}
         min={1}
         max={12}
@@ -116,9 +118,9 @@ export function ActionKeyStyleFields(
           { value: 'monospace', label: translate('videoEditor.sidebar.keyMono') },
         ]}
       />
-      <SliderField
+      <NumberInput
         label={translate('videoEditor.sidebar.keyFontSize')}
-        formatValue={(value) => `${value} px`}
+        unit="px"
         value={props.value.fontSize}
         min={12}
         max={96}
@@ -164,9 +166,9 @@ export function ActionKeyStyleFields(
           disabled={props.disabled}
           onChange={(opacity) => change({ opacity })}
         />
-        <SliderField
+        <NumberInput
           label={translate('videoEditor.sidebar.keyRadius')}
-          formatValue={(value) => `${value} px`}
+          unit="px"
           value={props.value.cornerRadius}
           min={0}
           max={32}
@@ -174,9 +176,9 @@ export function ActionKeyStyleFields(
           disabled={props.disabled}
           onChange={(cornerRadius) => change({ cornerRadius })}
         />
-        <SliderField
+        <NumberInput
           label={translate('videoEditor.sidebar.keyMargin')}
-          formatValue={(value) => `${value} px`}
+          unit="px"
           value={props.value.margin}
           min={0}
           max={160}

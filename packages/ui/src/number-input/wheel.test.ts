@@ -19,6 +19,7 @@ function wheel(input: HTMLInputElement, options: WheelEventInit = {}) {
     composed: true,
     cancelable: true,
     deltaY: -120,
+    altKey: true,
     ...options,
   });
   input.dispatchEvent(event);
@@ -48,7 +49,7 @@ it('changes only the focused wheel target and consumes the event before floating
 it.each([
   { ctrlKey: true },
   { metaKey: true },
-  { altKey: true },
+  { altKey: false },
   { shiftKey: true },
   { deltaX: 200, deltaY: 10 },
   { deltaY: 0 },

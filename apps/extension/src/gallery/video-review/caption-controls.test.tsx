@@ -126,14 +126,14 @@ it('shows inherited/local style compactly and never stales retained voice by app
   act(() => switches()[1]!.click());
   let fragment = JSON.parse(host.querySelector('output')!.textContent!) as ReviewTextFragment;
   expect(fragment.style?.position).toBe('top');
-  const sizeInput = host.querySelector<HTMLInputElement>('fieldset input[type="range"]')!;
-  expect(sizeInput).not.toBeNull();
-  act(() => sizeInput.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  expect(host.querySelector('fieldset input[type="range"]')).toBeNull();
+  const sizeInput = host.querySelector<HTMLInputElement>('fieldset input[type="text"]')!;
+  act(() => sizeInput.focus());
   act(() => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(sizeInput, '8');
     sizeInput.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  act(() => sizeInput.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+  act(() => sizeInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
   fragment = JSON.parse(host.querySelector('output')!.textContent!) as ReviewTextFragment;
   expect(fragment.style?.fontSize).toBe(0.08);
   expect(reviewVoiceTextStatus(fragment, snapshot)).toBe('current');

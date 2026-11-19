@@ -8,6 +8,7 @@ import { ReviewInspector as Inspector } from './inspector';
 import { useReviewInspectorNavigation } from './inspector-navigation';
 import { ReviewInspectorSections, reviewInspectorActions } from './inspector-sections';
 import type { ReviewSelection } from '../../features/video/review/types';
+import { NumericValueField } from '../../ui/compact-inspector-controls/numeric';
 
 let ownerRenders = 0;
 let currentNavigation: ReturnType<typeof useReviewInspectorNavigation>;
@@ -33,6 +34,67 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
+
+it('cancels the Alt menu shortcut only for an editable focused number', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    act(() =>
+      root.render(
+        <ReviewInspector
+          filename="clip.webm"
+          annotations={[]}
+          selectedId={null}
+          busy={false}
+          message={null}
+          contextKey="edit:1"
+          selectionLabel="Selection"
+          onBack={vi.fn()}
+          onAdd={vi.fn()}
+          onSelect={vi.fn()}
+          onEdit={vi.fn()}
+          onHover={vi.fn()}
+          onDelete={vi.fn()}
+          onReport={vi.fn()}
+        >
+          <NumericValueField
+            label="Duration"
+            value={1}
+            onPreviewValue={vi.fn()}
+            onCommitValue={vi.fn()}
+          />
+          <input aria-label="Text" />
+        </ReviewInspector>
+      )
+    );
+    const number = host.querySelector<HTMLInputElement>('[aria-label="Duration"]')!;
+    const text = host.querySelector<HTMLInputElement>('[aria-label="Text"]')!;
+    const prevented = (node: HTMLElement, type: string, init: KeyboardEventInit = {}) => {
+      const event = new KeyboardEvent(type, {
+        key: 'Alt',
+        bubbles: true,
+        cancelable: true,
+        ...init,
+      });
+      act(() => node.dispatchEvent(event));
+      return event.defaultPrevented;
+    };
+    act(() => number.focus());
+    expect(prevented(number, 'keydown')).toBe(true);
+    expect(prevented(number, 'keyup')).toBe(true);
+    expect(prevented(number, 'keydown', { ctrlKey: true })).toBe(false);
+    expect(prevented(number, 'keydown', { key: 'ArrowLeft', altKey: true })).toBe(false);
+    act(() => text.focus());
+    expect(prevented(number, 'keyup')).toBe(false);
+    expect(prevented(text, 'keyup')).toBe(false);
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});
 
 it('hover highlights without seeking; comment selection and edit are distinct explicit actions', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

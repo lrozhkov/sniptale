@@ -96,10 +96,10 @@ function ZoomTransitionSection(props: {
           unit="s"
           min={0}
           max={props.max}
-          scrubMax={Math.min(5, props.max)}
           step={0.1}
           precision={2}
-          scrubStep={0.01}
+          scrubEnabled={false}
+          stepperPlacement="sides"
           disabled={props.value.type === 'none'}
           value={props.value.duration}
           previewValue={props.previewValue?.duration}
@@ -391,6 +391,7 @@ function ReviewZoomPositionFields(props: FocusParameterProps) {
         max={4}
         step={0.1}
         precision={2}
+        rangePresentation="field"
         scrubStep={0.05}
         value={region.transform.scale}
         previewValue={props.previewRegion?.transform.scale}
@@ -658,6 +659,7 @@ function ReviewMotionBlurSettings(props: {
       {value.enabled ? (
         <ReviewNumberRow
           label={translate('gallery.videoReview.motionBlurStrength')}
+          rangePresentation="field"
           unit="%"
           min={0}
           max={100}

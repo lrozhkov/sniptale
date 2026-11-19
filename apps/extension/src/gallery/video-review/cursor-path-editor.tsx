@@ -327,6 +327,8 @@ export function ReviewCursorPathSettings(props: {
       >
         <ReviewNumberRow
           label={translate('videoEditor.sidebar.cursorFocusSmoothing')}
+          rangePresentation="field"
+          unit=""
           value={props.path.smoothing}
           min={0}
           max={1}

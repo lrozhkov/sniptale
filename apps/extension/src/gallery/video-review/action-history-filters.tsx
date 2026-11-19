@@ -346,7 +346,6 @@ function HistoryFilterFields({
           max={86400}
           step={0.1}
           precision={1}
-          scrub={{ min: 0, max: 10, step: 0.1 }}
           unit="s"
           enterBehavior="blur"
           onPreviewValue={(value) => onChange({ longer: value })}

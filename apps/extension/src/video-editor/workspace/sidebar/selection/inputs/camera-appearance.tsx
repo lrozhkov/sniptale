@@ -25,6 +25,7 @@ import { RuntimePreviewContext } from '../../../../runtime/controller/compositio
 import { translate } from '../../../../../platform/i18n';
 import { OptionButtonsField } from '../shared/option-buttons';
 import { SliderField } from '../shared/sliders';
+import { NumberInput } from './number';
 import { CameraCropPreview } from './camera-crop-preview';
 
 export function CameraAppearanceControls(props: {
@@ -78,18 +79,14 @@ export function CameraAppearanceControls(props: {
         onChange={(shape) => change({ ...base, shape })}
       />
       {value.shape === 'circle' ? (
-        <SliderField
+        <NumberInput
           label={translate('gallery.videoReview.webcamDiameter')}
           value={diameter}
           min={Math.min(40, maximumDiameter)}
           max={maximumDiameter}
-          scrubMax={Math.max(
-            Math.min(40, maximumDiameter),
-            Math.min(maximumDiameter, props.project.width, props.project.height)
-          )}
           step={1}
           disabled={props.disabled || !props.onUpdateClipTransform}
-          formatValue={(v) => `${Math.round(v)}px`}
+          unit="px"
           onChange={(size) => {
             const scale = size / diameter;
             props.onUpdateClipTransform?.(props.clip.id, {
@@ -100,7 +97,7 @@ export function CameraAppearanceControls(props: {
         />
       ) : (
         (['width', 'height'] as const).map((field) => (
-          <SliderField
+          <NumberInput
             key={field}
             label={translate(
               field === 'width'
@@ -110,25 +107,22 @@ export function CameraAppearanceControls(props: {
             value={transform[field]}
             min={40}
             max={7680}
-            scrubValue={transform[field]}
-            scrubMin={40}
-            scrubMax={Math.max(40, props.project[field])}
             step={1}
             disabled={props.disabled || !props.onUpdateClipTransform}
-            formatValue={(v) => `${Math.round(v)}px`}
+            unit="px"
             onChange={(size) => props.onUpdateClipTransform?.(props.clip.id, { [field]: size })}
           />
         ))
       )}
       {value.shape !== 'ellipse' && value.shape !== 'circle' ? (
-        <SliderField
+        <NumberInput
           label={translate('videoEditor.sidebar.cameraRoundness')}
           min={0}
           max={100}
           step={1}
           value={value.roundness}
           disabled={disabled}
-          formatValue={(v) => `${Math.round(v)}%`}
+          unit="%"
           onChange={(roundness) => change({ ...base, roundness })}
         />
       ) : null}
@@ -247,6 +241,7 @@ function renderCameraCropControls(props: {
         <div className="min-w-0 flex-1">
           <SliderField
             label={translate('videoEditor.sidebar.cameraCropZoom')}
+            rangePresentation="field"
             min={100}
             max={400}
             step={1}

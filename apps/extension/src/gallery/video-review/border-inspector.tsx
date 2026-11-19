@@ -104,7 +104,8 @@ function ReviewBorderPhaseFields({
         unit="s"
         step={0.1}
         precision={2}
-        scrubStep={0.01}
+        scrubEnabled={false}
+        stepperPlacement="sides"
         disabled={clock.type === 'none'}
         value={clock.duration}
         onPreview={(duration) =>

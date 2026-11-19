@@ -29,6 +29,8 @@ type SliderFieldProps = {
   scrubValueToDisplayValue?: (value: number) => number;
   step?: number;
   precision?: number;
+  rangePresentation?: 'field';
+  scrubEnabled?: boolean;
   value: number;
 };
 
@@ -151,10 +153,14 @@ function resolveSliderUnit(
 }
 
 function resolveSliderScrub(props: SliderFieldProps, display: SliderDisplayMapping, step: number) {
+  const displayStep =
+    props.rangePresentation === 'field' && props.scrubStep !== undefined && props.max > props.min
+      ? (props.scrubStep * (display.max - display.min)) / (props.max - props.min)
+      : display.step;
   return {
     max: props.scrubValue === undefined ? display.max : (props.scrubMax ?? props.max),
     min: props.scrubValue === undefined ? display.min : (props.scrubMin ?? props.min),
-    step: props.scrubValue === undefined ? display.step : (props.scrubStep ?? step),
+    step: props.scrubValue === undefined ? displayStep : (props.scrubStep ?? step),
     ...(props.scrubValue === undefined ? {} : { value: props.scrubValue }),
     ...(props.scrubValueToDisplayValue === undefined
       ? {}
@@ -200,7 +206,9 @@ export function SliderField(props: SliderFieldProps) {
       max={display.max}
       min={display.min}
       precision={props.precision ?? display.precision}
-      scrub={resolveSliderScrub(props, display, step)}
+      scrub={props.scrubEnabled === false ? undefined : resolveSliderScrub(props, display, step)}
+      rangePresentation={props.rangePresentation}
+      stepperPlacement="sides"
       step={display.step}
       unit={resolveSliderUnit(props.value, props.formatValue) || display.unit}
       value={display.value}

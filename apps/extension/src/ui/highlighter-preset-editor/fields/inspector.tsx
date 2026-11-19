@@ -159,7 +159,6 @@ function BorderGeometrySection(props: BorderStyleInspectorProps) {
         label={translate('highlighter.editor.radiusLabel')}
         max={50}
         min={0}
-        scrubbable={false}
         onChange={(radius) => props.onChange({ radius })}
         value={props.style.radius}
       />

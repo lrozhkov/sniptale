@@ -57,7 +57,7 @@ it('enables default motion without changing its opening pose and preserves data 
     easing: 'ease-in-out',
   });
   render(value);
-  expect(host.querySelectorAll('input[type="range"]')).toHaveLength(3);
+  expect(host.querySelectorAll('button[aria-label$=" increase"]')).toHaveLength(3);
   act(() => host.querySelector<HTMLButtonElement>('[role="switch"]')!.click());
   expect(change.mock.lastCall![0]).toEqual({ ...value, enabled: false });
   expect(DEFAULT_CAMERA_PERSPECTIVE.enabled).toBe(false);
@@ -116,12 +116,18 @@ it.each([
     easing: 'linear',
   };
   render(value);
-  const range = host.querySelector<HTMLInputElement>(
-    `input[type="range"][aria-label^="${translate(`gallery.videoReview.${label}`)}"]`
+  const stepper = host.querySelector<HTMLButtonElement>(
+    `button[aria-label="${translate(`gallery.videoReview.${label}`)} increase"]`
   )!;
-  expect(range).not.toBeNull();
+  expect(stepper).not.toBeNull();
   const key = (type: string, key: string) =>
-    act(() => range.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true })));
+    act(() => {
+      if (key === 'Escape')
+        window.dispatchEvent(new KeyboardEvent('keydown', { key, cancelable: true }));
+      else if (type === 'keydown')
+        stepper.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      else window.dispatchEvent(new MouseEvent('pointerup'));
+    });
   key('keydown', 'ArrowRight');
   expect(change).not.toHaveBeenCalled();
   expect(preview.mock.lastCall![0]!.end[axis]).toBeCloseTo(value.end[axis] + 0.1);

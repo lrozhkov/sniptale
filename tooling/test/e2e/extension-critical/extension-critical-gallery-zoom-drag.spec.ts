@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { expect, test } from '@playwright/test';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { translate } from '../support/catalog-fixture';
@@ -34,11 +35,8 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.advancedEditing').click();
       await addReviewFocus(page);
-      const scale = dialog.getByRole('textbox', {
-        name: label('gallery.videoReview.zoomScale'),
-        exact: true,
-      });
-      await scale.fill('2');
+      const scale = numericControl(dialog, label('gallery.videoReview.zoomScale'));
+      await (await openNumericControl(dialog, label('gallery.videoReview.zoomScale'))).fill('2');
       await scale.press('Enter');
       await expect.poll(async () => (await persistedFocus(page))?.transform.scale).toBe(2);
       const preview = dialog.locator('[data-ui="gallery.videoReview.zoomPreview"]');

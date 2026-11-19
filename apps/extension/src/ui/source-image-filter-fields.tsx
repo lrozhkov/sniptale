@@ -184,6 +184,7 @@ export function SourceImageFilterFields(props: {
           />
           <DraftNumericRow
             label={translate('videoEditor.sidebar.sourceFiltersIntensity')}
+            rangePresentation="field"
             value={entry.intensity * 100}
             min={0}
             max={100}
@@ -208,6 +209,10 @@ export function SourceImageFilterFields(props: {
               <DraftNumericRow
                 key={key}
                 label={translate(range.labelKey)}
+                {...(key === 'seed'
+                  ? { stepperPlacement: 'none' }
+                  : { rangePresentation: 'field' })}
+                unit=""
                 value={value}
                 min={range.min}
                 max={range.max}

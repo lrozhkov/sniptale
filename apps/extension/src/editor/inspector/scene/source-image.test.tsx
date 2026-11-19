@@ -76,7 +76,7 @@ vi.mock('./shared', async (importOriginal) => ({
     label: string;
     value: number;
     max: number;
-    scrubEnabled?: boolean;
+    scale?: boolean;
     onChange: (value: number) => void;
     onPreview?: (value: number) => void;
   }) => (
@@ -86,7 +86,7 @@ vi.mock('./shared', async (importOriginal) => ({
       aria-label={props.label}
       data-value={String(props.value)}
       data-max={String(props.max)}
-      data-scrub={props.scrubEnabled !== false}
+      data-scrub={props.scale === true}
       onPointerMove={() => props.onPreview?.(50)}
       onClick={() => props.onChange(50)}
     >
@@ -279,7 +279,7 @@ it('keeps radius exact and routes source numeric fields to separate preview and 
   );
   const ranges = container!.querySelectorAll<HTMLButtonElement>('[data-testid="range"]');
   expect(ranges).toHaveLength(3);
-  expect(Array.from(ranges, (field) => field.dataset['scrub'])).toEqual(['false', 'true', 'true']);
+  expect(Array.from(ranges, (field) => field.dataset['scrub'])).toEqual(['false', 'true', 'false']);
   for (const range of ranges) {
     act(() => range.dispatchEvent(new PointerEvent('pointermove', { bubbles: true })));
   }

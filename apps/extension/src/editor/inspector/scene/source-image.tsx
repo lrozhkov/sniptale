@@ -55,6 +55,7 @@ function SourceImageRangeControl(props: {
   value: number;
   valueText: string;
   fractionalPercent?: boolean;
+  scale?: boolean;
   onChange: (value: number) => void;
   onPreview?: ((value: number) => void) | undefined;
 }) {
@@ -68,6 +69,7 @@ function SourceImageRangeControl(props: {
       label={props.label}
       value={value}
       unit={resolveSourceImageNumericUnit(props.valueText)}
+      {...(props.scale ? { scale: true } : {})}
       min={percent ? Math.round(min * 100) : min}
       max={percent ? Math.round(props.max * 100) : props.max}
       {...(step === undefined ? {} : { step })}
@@ -120,7 +122,6 @@ export function EditorInspectorFrameSourceImageBasics(
         max={80}
         value={settings.radius}
         unit="px"
-        scrubEnabled={false}
         onPreview={
           props.previewFramePatch
             ? (radius) => patchSourceImage(props, { radius }, true)
@@ -160,6 +161,7 @@ function SourceImageShadowSection(args: {
           max={100}
           value={settings.shadow}
           valueText={`${settings.shadow}%`}
+          scale
           onPreview={
             props.previewFramePatch
               ? (shadow) => patchSourceImage(props, { shadow }, true)

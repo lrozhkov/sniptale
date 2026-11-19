@@ -61,9 +61,12 @@ function renderStyleNumberInput(props: {
   onUpdateAnnotationClipStyle: AnnotationStyleControlsProps['onUpdateAnnotationClipStyle'];
   step?: number;
 }) {
+  const continuous = props.field === 'depthAmount' || props.field === 'shimmerAmount';
   return (
     <SliderField
       label={props.label}
+      scrubEnabled={continuous}
+      {...(continuous ? { rangePresentation: 'field' } : {})}
       value={props.clip.style[props.field]}
       disabled={props.disabled}
       min={props.min ?? 0}

@@ -1,0 +1,105 @@
+@layer theme, base, components, utilities;
+
+button.sniptale-inspector-select[aria-haspopup='listbox'] {
+  min-height: 32px;
+  height: 32px;
+  gap: 6px;
+  padding: 0 0 0 8px;
+  border: 1px solid var(--sniptale-color-field-border);
+  border-radius: 4px;
+  background: var(--sniptale-color-field);
+  box-shadow: none;
+  text-align: start;
+  font: var(--sniptale-font-weight-interface, 400) 13px/18px
+    var(--font-ui, var(--sniptale-font-sans));
+}
+
+button.sniptale-inspector-select
+  :is(.truncate, .sniptale-select-value-label-trigger, .sniptale-select-placeholder) {
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.sniptale-inspector-select
+  :is(.sniptale-compact-select-description, .sniptale-select-option-description) {
+  display: none;
+}
+
+button.sniptale-inspector-select[aria-haspopup='listbox']:hover:not(:disabled),
+button.sniptale-inspector-select[aria-haspopup='listbox']:is(
+    [aria-expanded='true'],
+    :focus-visible
+  ):not(:disabled) {
+  background: var(--sniptale-color-field-hover);
+}
+
+button.sniptale-inspector-select[aria-haspopup='listbox']:focus-visible:not(
+    :disabled,
+    [aria-expanded='true']
+  ) {
+  border-color: var(--sniptale-color-field-focus);
+}
+
+button.sniptale-inspector-select[aria-haspopup='listbox'][aria-expanded='true']:enabled {
+  outline: none;
+}
+
+.inspector-hex-trigger:disabled,
+button.sniptale-inspector-select[aria-haspopup='listbox'][aria-expanded='true']:enabled
+  > span:first-child {
+  opacity: 0.4;
+}
+
+button.sniptale-inspector-select[aria-haspopup='listbox'] > svg:last-child {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  margin-inline: 8px;
+  color: var(--sniptale-color-text-muted-strong);
+  stroke-width: 1.4;
+}
+
+.sniptale-inspector-select-menu[role='listbox'] {
+  border-radius: 4px;
+  font: var(--sniptale-font-weight-interface, 400) 13px/18px
+    var(--font-ui, var(--sniptale-font-sans));
+}
+.sniptale-inspector-select-menu [role='option'][aria-selected='true'] svg.lucide-check {
+  color: var(--sniptale-color-text-muted-strong);
+}
+
+.sniptale-framed-segments {
+  display: grid;
+  min-height: 32px;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--sniptale-color-field-border);
+  border-radius: 4px;
+  background: var(--sniptale-color-field);
+}
+
+@layer utilities {
+  div.sniptale-framed-segments[data-ui] > button {
+    height: auto !important;
+    min-height: 26px !important;
+    padding: 2px 6px !important;
+    border: 0 !important;
+    border-radius: 3px !important;
+    background: transparent !important;
+    color: var(--sniptale-color-text-secondary);
+    font: var(--sniptale-font-weight-interface, 400) 13px/18px
+      var(--font-ui, var(--sniptale-font-sans)) !important;
+  }
+
+  div.sniptale-framed-segments[data-ui] > button[aria-pressed='false']:hover:enabled {
+    background: var(--sniptale-color-field-hover) !important;
+  }
+
+  div.sniptale-framed-segments[data-ui] > button[aria-pressed='true'] {
+    background: var(--sniptale-color-field-selected) !important;
+    color: var(--sniptale-color-text-primary) !important;
+  }
+}

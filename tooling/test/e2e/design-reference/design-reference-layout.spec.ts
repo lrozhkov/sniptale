@@ -534,6 +534,66 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
   for (const theme of ['light', 'dark'] as const) {
+    test(`reference inspector fields keep their idle geometry during editing ${viewport.name} ${theme}`, async ({
+      page,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await page.goto(`${origin}examples/layers/?view=${theme}&mode=examples&lang=ru`);
+      const fields = page.locator('.inspector-fields');
+      const gradient = fields.locator(
+        '.gradient-field [data-ui="shared.ui.paint-selector.trigger"]'
+      );
+      await expect(gradient).toHaveCSS('height', '32px');
+      await expect(gradient.locator('svg')).toHaveCount(0);
+      const swatch = gradient.locator('[data-ui="shared.ui.paint-selector.preview"]');
+      await expect(swatch).toHaveCSS('width', '26px');
+      await expect(swatch).toHaveCSS('height', '16px');
+      await expect(gradient.locator('.paint-inspector-value')).toHaveCSS('white-space', 'nowrap');
+      const gradientBorder = await gradient.evaluate((node) => getComputedStyle(node).borderColor);
+      await gradient.click();
+      await expect(gradient).toHaveAttribute('aria-expanded', 'true');
+      await expect(gradient).toHaveCSS('border-color', gradientBorder);
+      await page.keyboard.press('Escape');
+      await expect(gradient).toHaveAttribute('aria-expanded', 'false');
+
+      const color = fields.locator('.color-alpha-field .color-frame');
+      const colorSwatch = color.locator('.inspector-swatch-trigger');
+      const hex = color.locator('.inspector-hex-editor input');
+      const alpha = color.locator('.alpha-value input');
+      await expect(hex).toHaveCSS('opacity', '1');
+      await expect(alpha).toHaveCSS('opacity', '1');
+      const colorBorder = await color.evaluate((node) => getComputedStyle(node).borderColor);
+      await colorSwatch.click();
+      await expect(hex).toHaveCSS('opacity', '0.4');
+      await expect(alpha).toHaveCSS('opacity', '0.4');
+      await expect(color).toHaveCSS('border-color', colorBorder);
+      await page.keyboard.press('Escape');
+      await expect(hex).toHaveCSS('opacity', '1');
+      await expect(alpha).toHaveCSS('opacity', '1');
+
+      const title = fields.getByRole('textbox', { name: 'Название', exact: true });
+      const clear = fields.locator('.reference-inspector-text .sniptale-field-clear');
+      const textarea = fields.getByRole('textbox', { name: 'Текст', exact: true });
+      await expect(title).toHaveCSS('height', '32px');
+      await expect(textarea).toHaveCSS('min-height', '80px');
+      await expect(textarea).toHaveCSS('padding-inline-start', '8px');
+      const radius = fields.locator('.sniptale-framed-stepper');
+      const radiusWidth = (await radius.boundingBox())!.width;
+      const columnWidth = (await gradient.boundingBox())!.width;
+      expect(Math.abs(radiusWidth - columnWidth)).toBeLessThanOrEqual(1);
+      await title.hover();
+      await expect(clear).toHaveCSS('opacity', '1');
+      await title.click();
+      await expect(title).toBeFocused();
+      await expect(clear).toHaveCSS('opacity', '0');
+      await title.fill('Новая подпись');
+      await title.press('Escape');
+      await expect(title).toHaveValue('Новый объект');
+      await expect(title).not.toBeFocused();
+      await page.evaluate(() => document.fonts.ready);
+      await page.screenshot({ path: info.outputPath('inspector-fields.png'), fullPage: false });
+    });
+
     test(`reference picker geometry and editing ${viewport.name} ${theme}`, async ({
       page,
     }, info) => {
@@ -582,7 +642,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await color.getByRole('button', { name: 'Исходный', exact: true }).click();
       await expect(hex).toHaveValue('#FA7116');
       await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
-      const copy = color.getByRole('button', { name: 'Копировать цвет', exact: true });
+      const copy = color.getByRole('button', { name: 'Скопировать HEX цвета', exact: true });
       await copy.click();
       await expect
         .poll(() => page.evaluate(() => navigator.clipboard.readText()))

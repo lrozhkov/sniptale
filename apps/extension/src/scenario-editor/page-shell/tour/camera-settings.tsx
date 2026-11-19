@@ -59,6 +59,7 @@ export function TourCameraSettings({
           <TourInspectorNumericRow
             key={`${slide.id}:zoom:${camera.mode}`}
             label={t('scenario.editor.tourCameraZoom')}
+            rangePresentation="field"
             value={zoom * 100}
             min={100}
             max={800}

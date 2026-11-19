@@ -56,7 +56,7 @@ it('renders compact inspector inputs, ranges, selects, and color options', () =>
   expect(markup).toContain('shared.ui.compact-textarea');
   expect(markup).toContain('sniptale-textarea');
   expect(markup).toContain('shared.ui.compact-inspector.text-field');
-  expect(markup).toContain('rounded-[10px]');
+  expect(markup).toContain('sniptale-input-compact');
   expect(markup).toContain('sniptale-range');
   expect(markup).toContain('--sniptale-range-fill-ratio:32%');
   expect(markup).toContain('style="--sniptale-field-height:40px');
@@ -69,11 +69,10 @@ it('renders compact inspector inputs, ranges, selects, and color options', () =>
   expect(markup).toContain('--sniptale-range-shell-bg-active:transparent');
   expect(markup).toContain('--sniptale-range-shell-shadow-active:none');
   expect(markup).toContain('shared.ui.compact-select');
-  expect(markup).toContain('border-transparent bg-transparent');
+  expect(markup).toContain('sniptale-inspector-select');
   expect(markup).not.toContain('title="Light"');
   expect(markup).toContain('relative w-full min-w-0 max-w-full');
-  expect(markup).toContain('max-w-full items-center justify-between gap-2 overflow-hidden');
-  expect(markup).toContain('h-10 w-full min-w-0 max-w-full');
+  expect(markup).toContain('max-w-full items-center justify-between overflow-hidden');
   expect(markup).toContain('--sniptale-field-bg-idle:transparent');
   expect(markup).toContain(COMPACT_INTERACTIVE_SURFACE_MIX_STYLE);
   expect(markup).not.toContain('sniptale-select');

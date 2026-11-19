@@ -645,6 +645,7 @@ it('uses effective preview controls and retains geometry while overlays are hidd
     previewLane,
     geometry: { read: () => null, subscribe: () => () => undefined },
     gestureId: instance.id,
+    placementGestureActive: true,
     setGeometry: vi.fn(),
     pending: false,
     failure: null,

@@ -6,6 +6,16 @@
   cursor: text;
 }
 
+.sniptale-input[type='number'] {
+  appearance: textfield;
+}
+
+.sniptale-input[type='number']::-webkit-inner-spin-button,
+.sniptale-input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .sniptale-input::placeholder,
 .sniptale-textarea::placeholder {
   color: var(--sniptale-color-text-dim);
@@ -21,9 +31,9 @@
 
 .sniptale-input.sniptale-input-compact {
   min-height: 32px;
-  padding: 6px 10px;
-  border-radius: 9px;
-  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 13px;
   line-height: 18px;
 }
 

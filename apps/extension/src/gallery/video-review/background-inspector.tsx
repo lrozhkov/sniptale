@@ -153,6 +153,7 @@ function ReviewBackgroundMotionControls(props: {
             <ReviewPreviewNumberRow
               key={key}
               enterBehavior="blur"
+              rangePresentation="field"
               label={translate(
                 key === 'speed'
                   ? 'editor.scene.backgroundMotionSpeed'
@@ -198,8 +199,8 @@ function ReviewBackgroundLayoutControls({
       unit="px"
       min={0}
       max={4096}
-      scrubEnabled={key === 'padding'}
-      scrubMax={200}
+      scrubEnabled={false}
+      stepperPlacement="sides"
       step={1}
       value={background.layout[key]}
       onPreview={(value) =>
@@ -214,6 +215,7 @@ function ReviewBackgroundLayoutControls({
         <ReviewPreviewNumberRow
           enterBehavior="blur"
           label={translate('editor.scene.backgroundBlurAmount')}
+          rangePresentation="field"
           unit="px"
           min={0}
           max={25}
@@ -230,6 +232,7 @@ function ReviewBackgroundLayoutControls({
       <ReviewPreviewNumberRow
         enterBehavior="blur"
         label={translate('gallery.videoReview.backgroundShadow')}
+        rangePresentation="field"
         unit="%"
         min={0}
         max={100}

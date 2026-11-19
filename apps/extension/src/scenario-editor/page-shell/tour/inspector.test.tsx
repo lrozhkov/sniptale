@@ -232,7 +232,8 @@ it('edits hotspot visuals and copy through canonical history without click comma
   const opacityRow = host
     .querySelector('input[aria-label="Opacity"]')
     ?.closest('[data-ui="shared.ui.compact-inspector.numeric-row"]');
-  expect(opacityRow?.getAttribute('data-has-scrub')).toBe('true');
+  expect(opacityRow?.querySelector('.opacity-track input[type="range"]')).not.toBeNull();
+  expect(opacityRow?.querySelector('button[aria-label="Opacity"]')).not.toBeNull();
   await choose('Focus style', 'Pulsating point');
   expect(getTourHotspots(current())[0]!.point.x).toBeCloseTo(0.3);
   expect(getTourHotspots(current())[0]!.point.y).toBeCloseTo(0.4);
@@ -694,7 +695,7 @@ it('shows one section heading in sections mode and moves object actions into it'
   expect(host.querySelectorAll('.guide-inspector-group')).toHaveLength(4);
 });
 
-it('renders tour numeric rows as plain accent-focus rows with scrub', async () => {
+it('uses the exact shared stepper for tour camera numbers', async () => {
   presentation = 'sections';
   draw();
   await click('Actions');
@@ -707,16 +708,11 @@ it('renders tour numeric rows as plain accent-focus rows with scrub', async () =
     expect(row.getAttribute('data-appearance')).toBe('plain');
     const field = row.querySelector('[data-ui="shared.ui.compact-inspector.numeric-value-field"]')!;
     expect(field.getAttribute('data-focus-appearance')).toBe('accent-box');
-    expect(row.querySelector('input[type=range]')).not.toBeNull();
+    expect(row.querySelector('input[type=range]')).toBeNull();
+    expect(row.querySelector('button[aria-label$=" increase"]')).not.toBeNull();
   }
-  const zoom = host.querySelector<HTMLInputElement>('input[aria-label="Zoom"]')!;
-  expect(zoom.value).toBeTruthy();
-  const range = host.querySelector<HTMLInputElement>('input[type=range]')!;
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(range, '250');
-    range.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-  expect(host.querySelector<HTMLInputElement>('input[aria-label="Zoom"]')!.value).toBeTruthy();
+  await fill('Zoom', '250');
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Zoom"]')!.value).toBe('250');
 });
 
 it('preserves image categories through All and object drill-down without editing the tour', async () => {
@@ -795,7 +791,7 @@ it('keeps marker and auto-zoom rectangle independent and bounds the rectangle', 
   const point = structuredClone(getTourHotspots(current())[0]!.point);
   const area = host.querySelector('section[aria-label="Auto-zoom area"]')!;
   expect(area.querySelector<HTMLElement>('[title]')?.title).toContain('one hotspot');
-  expect(area.querySelector('input[aria-label="X range"]')?.getAttribute('max')).toBe('80');
+  expect(area.querySelector('input[type="range"]')).toBeNull();
   const x = area.querySelector<HTMLInputElement>('input[aria-label="X"]')!;
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(x, '95');
@@ -804,10 +800,16 @@ it('keeps marker and auto-zoom rectangle independent and bounds the rectangle', 
   await act(async () => x.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(getTourHotspots(current())[0]!.targetRect?.x).toBe(0.8);
   expect(getTourHotspots(current())[0]!.point).toEqual(point);
-  const width = host.querySelector(
-    'section[aria-label="Auto-zoom area"] input[aria-label="Width range"]'
-  );
-  expect(Number(width?.getAttribute('max'))).toBeCloseTo(20);
+  const width = host.querySelector<HTMLInputElement>(
+    'section[aria-label="Auto-zoom area"] input[aria-label="Width"]'
+  )!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(width, '50');
+    width.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await act(async () => width.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+  expect(getTourHotspots(current())[0]!.targetRect?.width).toBeCloseTo(0.2);
+  expect(getTourHotspots(current())[0]!.point).toEqual(point);
   await click('Auto-zoom area');
   expect(getTourHotspots(current())[0]!.targetRect).toBeNull();
   expect(getTourHotspots(current())[0]!.point).toEqual(point);

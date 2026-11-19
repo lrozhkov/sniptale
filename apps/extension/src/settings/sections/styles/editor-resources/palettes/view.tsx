@@ -1,3 +1,4 @@
+import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { useEffect, useRef, useState } from 'react';
 import { colorIdentity, getCssColorName } from '../../../../../ui/color-selector/catalog-model';
 import { translate } from '../../../../../platform/i18n';
@@ -120,21 +121,15 @@ function PaletteNameEditor(props: {
     }
   };
   return (
-    <input
+    <ProductInput
       type="text"
       maxLength={80}
       value={draft}
       disabled={busy}
+      invalid={failed}
       aria-invalid={failed || undefined}
       aria-label={`${translate('shared.ui.colorCatalogName')}: ${props.color}`}
       placeholder={getCssColorName(props.color) ?? translate('shared.ui.colorCatalogName')}
-      className={[
-        'h-8 w-full min-w-0 rounded-[4px] border border-transparent bg-transparent px-2 text-[13px]',
-        'text-[var(--sniptale-color-text-primary)] hover:border-[var(--sniptale-color-border-soft)]',
-        'hover:bg-[var(--sniptale-color-surface-input)] focus:border-[var(--sniptale-color-border-soft)]',
-        'focus:bg-[var(--sniptale-color-surface-input)] focus:outline-none',
-        'focus-visible:border-[var(--sniptale-color-border-strong)]',
-      ].join(' ')}
       onChange={(event) => {
         setDraft(event.currentTarget.value);
         setFailed(false);

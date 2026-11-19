@@ -281,13 +281,14 @@ it('shows the shared blur control for image and gradient, hides it on solid and 
     ...props,
     sceneBackground: { kind: 'image', assetId: 'asset-2', blur: 0.000123 },
   });
+  const button = container?.querySelector<HTMLButtonElement>(
+    '.opacity-field button[aria-label="editor.scene.backgroundBlurAmount"]'
+  );
+  await act(async () => button?.click());
   const input = container?.querySelector<HTMLInputElement>(
-    'input[aria-label="editor.scene.backgroundBlurAmount"]'
+    '[role="spinbutton"][aria-label="editor.scene.backgroundBlurAmount"]'
   );
   expect(input).toBeTruthy();
-  await act(async () => {
-    input?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-  });
   expect(input?.value).toBe('0');
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, '18');

@@ -1,3 +1,4 @@
+import { ProductInput } from '@sniptale/ui/product-form-controls';
 import type { KeyboardEvent, RefObject } from 'react';
 import {
   Camera,
@@ -160,13 +161,10 @@ export function ContextMenuTreeRow(props: {
           )}
         </span>
         {props.editingValue !== undefined ? (
-          <input
+          <ProductInput
             ref={props.inputRef}
             aria-label={t('settings.appearance.contextMenuSectionName')}
-            className={[
-              'min-w-0 flex-1 rounded-[4px] border border-[var(--sniptale-color-border-soft)]',
-              'bg-[var(--sniptale-color-surface-canvas)] px-2 py-1 text-[13px]',
-            ].join(' ')}
+            className="min-w-0 flex-1"
             maxLength={40}
             value={props.editingValue}
             placeholder={label}

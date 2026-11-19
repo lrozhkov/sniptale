@@ -77,7 +77,7 @@ export function SettingsControlRow(props: {
       {typeof props.label === 'string' ? (
         <InspectorParameterRow
           label={props.label}
-          valueMinimum={props.valueMinimum ?? 220}
+          valueMinimum={props.valueMinimum ?? 144}
           keepInline={props.keepInline ?? false}
         >
           {control}

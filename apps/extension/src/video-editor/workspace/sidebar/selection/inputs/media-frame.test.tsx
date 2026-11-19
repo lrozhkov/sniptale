@@ -178,15 +178,24 @@ describe('workspace-sidebar/selection/media-frame', () => {
       onUpdateMediaClipShadowMode,
     });
 
-    const shadowInput = Array.from(
-      container?.querySelectorAll<HTMLInputElement>('input[type="range"]') ?? []
-    ).at(-1);
+    await act(async () =>
+      container
+        ?.querySelector<HTMLButtonElement>('.opacity-field button[aria-label="Тень"]')
+        ?.click()
+    );
+    const shadowInput = container?.querySelector<HTMLInputElement>(
+      '[role="spinbutton"][aria-label="Тень"]'
+    );
     expect(shadowInput).toBeDefined();
     expect(container?.textContent).toContain('Тень');
     expect(container?.textContent).toContain('Режим тени');
 
     await act(async () => {
+      shadowInput!.focus();
       setInputValue(shadowInput!, '42');
+    });
+    await act(async () => {
+      shadowInput!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     });
 
     expect(onUpdateMediaClipShadowIntensity).toHaveBeenCalledWith('clip-1', 42);
@@ -322,6 +331,9 @@ it('commits the shared radius row and preserves fine authored values on unchange
     (input) => input.getAttribute('aria-label') === 'Скругление углов'
   );
   expect(label).toBeDefined();
+  const row = label!.closest('[data-ui="shared.ui.compact-inspector.numeric-row"]')!;
+  expect(row.querySelector('input[type="range"]')).toBeNull();
+  expect(row.querySelectorAll('[data-stepper-placement="sides"] button')).toHaveLength(2);
   await act(async () => {
     label!.focus();
     label!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));

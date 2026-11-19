@@ -364,6 +364,7 @@ it('displays timeline milliseconds as editable seconds and writes native millise
     'input[aria-label="localized:videoEditor.sidebar.annotationTemplates.controls.durationMs"]'
   )!;
   expect(duration.value).toBe('2.2');
+  expect(duration.closest('[data-stepper-placement="sides"]')).not.toBeNull();
   expect(container!.textContent).toContain('s');
   act(() => {
     duration.focus();
@@ -379,7 +380,7 @@ it('displays timeline milliseconds as editable seconds and writes native millise
   );
 });
 
-it('labels known radius with pixels and leaves arbitrary imported numbers unitless', () => {
+it('uses exact pixels for radius and the in-field scale for normalized opacity', () => {
   const template = createTemplate();
   template.controls = [
     ...template.controls,
@@ -418,7 +419,7 @@ it('labels known radius with pixels and leaves arbitrary imported numbers unitle
   expect(
     radius.closest('[data-ui="shared.ui.compact-inspector.numeric-row"]')?.textContent
   ).toContain('px');
-  expect(
-    amount.closest('[data-ui="shared.ui.compact-inspector.numeric-row"]')?.textContent
-  ).not.toContain('px');
+  expect(radius.closest('[data-stepper-placement="sides"]')).not.toBeNull();
+  expect(amount.closest('.opacity-field')).not.toBeNull();
+  expect(amount.getAttribute('aria-valuetext')).toBe('50%');
 });

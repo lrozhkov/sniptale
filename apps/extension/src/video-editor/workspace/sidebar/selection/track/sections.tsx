@@ -165,6 +165,7 @@ export function TrackAudioFields(props: {
       <NumericRow
         appearance="plain"
         label={translate('videoEditor.sidebar.trackVolumeLabel')}
+        rangePresentation="field"
         scrub={{ min: 0, max: 200, step: 1 }}
         value={getProjectTrackAudioVolume(props.project, props.selectedTrack.id) * 100}
         min={0}

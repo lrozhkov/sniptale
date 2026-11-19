@@ -17,7 +17,7 @@ export function NumberInput({
   min,
   max,
   step = 1,
-  scrub = min !== undefined && max !== undefined,
+  scrub = false,
   unit = '',
   scrubRange,
   revealScrub = false,

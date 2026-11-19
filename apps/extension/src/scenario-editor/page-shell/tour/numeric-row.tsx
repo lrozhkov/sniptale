@@ -15,6 +15,7 @@ export function TourInspectorNumericRow({
   unit,
   precision = 0,
   scrub,
+  rangePresentation,
   disabled,
   onPreview,
   onChange,
@@ -27,6 +28,7 @@ export function TourInspectorNumericRow({
   unit?: CompactInspectorUnit;
   precision?: number;
   scrub?: { min: number; max: number; step?: number } | false;
+  rangePresentation?: 'field';
   disabled: boolean;
   onPreview?: (value: number) => void;
   onChange: (value: number) => void;
@@ -42,8 +44,9 @@ export function TourInspectorNumericRow({
       step={step}
       unit={unit}
       precision={precision}
-      scrub={scrub === false ? undefined : (scrub ?? { min, max, step })}
-      keyboardStep={scrub === false}
+      scrub={rangePresentation === 'field' ? { min, max, step } : scrub || undefined}
+      rangePresentation={rangePresentation}
+      keyboardStep={!scrub}
       disabled={disabled}
       focusAppearance="accent-box"
       onPreviewValue={(value) => {

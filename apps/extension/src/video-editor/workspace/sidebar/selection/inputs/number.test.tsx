@@ -17,15 +17,7 @@ function renderNumberInput(props: Partial<React.ComponentProps<typeof NumberInpu
   root = createRoot(container);
   act(() => {
     root?.render(
-      <NumberInput
-        label="Width"
-        value={640}
-        min={40}
-        max={7680}
-        scrub
-        onChange={onChange}
-        {...props}
-      />
+      <NumberInput label="Width" value={640} min={40} max={7680} onChange={onChange} {...props} />
     );
   });
   return { onChange };
@@ -51,18 +43,19 @@ it('routes numeric editing through the shared compact inspector numeric row', ()
   expect(markup).not.toContain('type="number"');
 });
 
-it('renders bounded values through the shared numeric scrub row with a single row label', () => {
+it('renders bounded values through the exact field with a single row label', () => {
   const markup = renderToStaticMarkup(
     <NumberInput label="Width" value={640} onChange={vi.fn()} min={40} max={7680} />
   );
 
   expect(markup).toContain('data-ui="shared.ui.compact-inspector.numeric-row"');
-  expect(markup).toContain('aria-label="Width range"');
+  expect(markup).not.toContain('type="range"');
+  expect(markup).toContain('aria-label="Width increase"');
   expect(markup.match(/>Width<\/span>/g)?.length ?? 0).toBe(1);
 });
 
 it('previews bounded scrub changes while the shared range is dragged', () => {
-  const { onChange } = renderNumberInput();
+  const { onChange } = renderNumberInput({ scrub: true });
   const range = container?.querySelector<HTMLInputElement>('input[aria-label="Width range"]');
   if (!range) {
     throw new Error('range input missing');

@@ -298,6 +298,7 @@ function AudioEffectFields(props: {
       >
         <DraftNumericRow
           label={translate('audioProcessing.wet')}
+          rangePresentation="field"
           value={effect.wet * 100}
           min={0}
           max={100}
@@ -315,6 +316,7 @@ function AudioEffectFields(props: {
           return (
             <DraftNumericRow
               key={parameter.key}
+              scrubEnabled={parameter.key === 'gain'}
               label={translate(presentation.labelKey)}
               unit={presentation.unit}
               value={raw * scale}

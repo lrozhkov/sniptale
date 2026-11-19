@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { Moon, Sun, X } from 'lucide-react';
+import { Sun, X } from 'lucide-react';
 import './appearance-panel.css';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -9,6 +9,7 @@ import {
   useResolvedPortalTheme,
 } from '@sniptale/ui/theme/safe-portal';
 import { InspectorSurface } from '../../../ui/compact-inspector-controls/layout';
+import { SegmentedRow } from '../../../ui/compact-inspector-controls';
 import { translate } from '../../../platform/i18n';
 import { EditorIconButton, NumericRow, ColorField } from '../../chrome/ui';
 import type { EditorVectorDefinition } from '../../../features/editor/document/vector-element';
@@ -26,7 +27,8 @@ function useAppearancePanelLifecycle(
   anchor: RefObject<HTMLDivElement | null>,
   onClose: () => void
 ) {
-  const [bounds, setBounds] = useState({ left: 12, top: 72, width: 300, maxHeight: 480 });
+  const panelWidth = 340;
+  const [bounds, setBounds] = useState({ left: 12, top: 72, width: panelWidth, maxHeight: 480 });
   const panel = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
@@ -36,7 +38,7 @@ function useAppearancePanelLifecycle(
     const update = () => {
       const rect = inspector?.getBoundingClientRect();
       const edge = rect?.left ?? window.innerWidth - 376;
-      const width = Math.min(300, Math.max(180, edge - 24));
+      const width = Math.min(panelWidth, Math.max(180, edge - 24));
       const maxHeight = Math.max(120, window.innerHeight - 96);
       setBounds({
         left: Math.max(12, edge - width - 12),
@@ -113,22 +115,16 @@ function AppearanceParameters({
       }}
       onKeyUp={(event) => event.stopPropagation()}
     >
-      <div className="flex gap-1">
-        {[false, true].map((dark) => (
-          <ProductActionButton
-            key={String(dark)}
-            compact
-            tone="toggle"
-            className="!h-8 !min-h-8 min-w-0 flex-1 !rounded-[4px] !px-2 !text-xs"
-            active={isPreset(dark)}
-            aria-pressed={isPreset(dark)}
-            onClick={() => onPreset(createEditorIconAppearance(dark))}
-          >
-            {dark ? <Moon size={14} /> : <Sun size={14} />}
-            {message(dark ? 'darkPreset' : 'lightPreset')}
-          </ProductActionButton>
-        ))}
-      </div>
+      <SegmentedRow
+        ariaLabel={message('appearance')}
+        columns={2}
+        value={isPreset(false) ? 'light' : isPreset(true) ? 'dark' : ''}
+        options={[
+          { value: 'light', label: message('lightPreset') },
+          { value: 'dark', label: message('darkPreset') },
+        ]}
+        onChange={(preset) => onPreset(createEditorIconAppearance(preset === 'dark'))}
+      />
       <div
         className={[
           'flex h-24 items-center justify-center rounded-[4px] border',
@@ -186,6 +182,8 @@ function AppearanceParameters({
             ))
           : null}
         <NumericRow
+          appearance="plain"
+          rangePresentation="field"
           label={message('opacity')}
           value={draft.opacity * 100}
           min={0}
@@ -198,6 +196,7 @@ function AppearanceParameters({
           onCommitValue={(value) => patch({ opacity: value / 100 })}
         />
         <NumericRow
+          appearance="plain"
           label={message('strokeScale')}
           disabled={Boolean(definition && !definition.capabilities.strokeScale)}
           value={draft.strokeScale}
@@ -207,13 +206,6 @@ function AppearanceParameters({
           step={0.1}
           unit="x"
           enterBehavior="blur"
-          scrub={{
-            min: 0,
-            max: 100,
-            step: 1,
-            value: (Math.log10(draft.strokeScale) + 2) * 25,
-            toValue: (value) => Number((10 ** (value / 25 - 2)).toPrecision(4)),
-          }}
           onPreviewValue={(strokeScale) => patch({ strokeScale })}
           onCommitValue={(strokeScale) => patch({ strokeScale })}
         />

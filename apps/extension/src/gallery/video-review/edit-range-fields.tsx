@@ -74,17 +74,6 @@ export function ReviewEditRangeFields(props: {
                       : (values.findLast((boundary) => boundary < value - 0.000001) ?? limits.min)
                 : undefined
             }
-            scrub={
-              values?.length
-                ? {
-                    min: 0,
-                    max: values.length - 1,
-                    step: 1,
-                    value: values.indexOf(normalize(draft[edge])),
-                    toValue: (index) => values[Math.round(index)] ?? draft[edge],
-                  }
-                : { min: limits.min, max: limits.max, step: 0.01 }
-            }
             onPreviewValue={change}
             onCommitValue={(value) => void commit({ ...draft, [edge]: normalize(value) })}
           />

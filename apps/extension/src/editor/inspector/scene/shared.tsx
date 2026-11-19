@@ -51,7 +51,7 @@ export function EditorInspectorRangeField(props: {
   min?: number;
   onChange: (value: number) => void;
   onPreview?: ((value: number) => void) | undefined;
-  scrubEnabled?: boolean;
+  scale?: boolean;
   step?: number;
   unit: '' | '%' | 'deg' | 'px';
   value: number;
@@ -62,13 +62,15 @@ export function EditorInspectorRangeField(props: {
 
   return (
     <NumericRow
+      appearance={props.scale ? 'plain' : 'surface'}
       label={props.label}
       min={min}
       max={props.max}
       step={step}
       unit={props.unit}
       {...draft}
-      scrub={props.scrubEnabled === false ? undefined : { min, max: props.max, step }}
+      rangePresentation={props.scale ? 'field' : undefined}
+      scrub={props.scale ? { min, max: props.max, step } : undefined}
     />
   );
 }

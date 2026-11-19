@@ -24,7 +24,7 @@
   color: var(--sniptale-color-text-secondary);
   overflow-wrap: anywhere;
 }
-.paint-inspector-field > button {
+.paint-inspector-field > button:not(.sniptale-gradient-value) {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -40,10 +40,10 @@
   text-align: start;
   cursor: pointer;
 }
-.paint-inspector-field > button:hover:not(:disabled) {
+.paint-inspector-field > button:hover:not(:disabled, .sniptale-gradient-value) {
   color: var(--sniptale-color-text-primary-strong);
 }
-.paint-inspector-field > button:focus-visible {
+.paint-inspector-field > button:focus-visible:not(.sniptale-gradient-value) {
   outline: 2px solid var(--sniptale-color-accent);
   outline-offset: 0;
 }

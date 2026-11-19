@@ -31,7 +31,14 @@ export function resolveCompactSelectMenuStyle(anchor: HTMLElement): CSSPropertie
   const rect = anchor.getBoundingClientRect();
   // Opt-in settings containers own horizontal space; the control still owns vertical placement.
   const bounds = anchor.closest<HTMLElement>('[data-compact-select-menu-bounds]');
-  const horizontal = bounds?.getBoundingClientRect() ?? rect;
+  const label =
+    bounds?.dataset['compactSelectMenuBounds'] === 'parameter'
+      ? bounds.querySelector<HTMLElement>(':scope > [data-compact-select-menu-label]')
+      : null;
+  const labelLeft = Math.min(label?.getBoundingClientRect().left ?? rect.left, rect.left);
+  const horizontal = label
+    ? { left: labelLeft, width: rect.right - labelLeft }
+    : (bounds?.getBoundingClientRect() ?? rect);
   const gap = 5;
   const viewportPadding = 8;
   const viewportWidth = window.innerWidth || rect.right + viewportPadding;

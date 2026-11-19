@@ -28,10 +28,10 @@
   margin-inline: 8px;
 }
 
-[data-ui='editor.frame-panel'] .sniptale-numeric-entry {
-  padding-inline-end: 0;
+[data-ui='editor.frame-panel'] [data-ui='editor.inspector.disclosure'] > .sniptale-parameter-stack {
+  padding-inline: 0;
 }
 
-[data-ui='editor.frame-panel'] > .sniptale-parameter-stack > details > .sniptale-parameter-stack {
-  padding-inline: 0;
+[data-ui='editor.frame.padding-fields'] [data-padding-hover='all'] > :has(> [data-padding-side]) {
+  width: 116px;
 }

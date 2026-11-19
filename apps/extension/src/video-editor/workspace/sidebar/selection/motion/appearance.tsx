@@ -294,7 +294,6 @@ function MotionFocusPhaseFields(
         max={Math.min(60, Math.max(0, duration - other.duration))}
         unit="s"
         step={0.1}
-        scrubStep={0.01}
         precision={2}
         disabled={clock.type === 'none'}
         onPreview={(duration) =>

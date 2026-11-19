@@ -77,6 +77,7 @@ export function TourMusicSettings({
         <>
           <TourInspectorNumericRow
             label={t('scenario.editor.tourVolume')}
+            rangePresentation="field"
             value={music.volume * 100}
             min={0}
             max={100}
@@ -101,6 +102,7 @@ export function TourMusicSettings({
           {music.ducking.enabled && (
             <TourInspectorNumericRow
               label={t('scenario.editor.tourMusicLevel')}
+              rangePresentation="field"
               value={music.ducking.level * 100}
               min={0}
               max={100}

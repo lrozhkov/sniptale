@@ -29,6 +29,7 @@ export function GradientAnimationControls(props: GradientControlProps) {
       {animation.mode !== VideoSceneGradientAnimationMode.NONE && (
         <SliderField
           label={translate('videoEditor.sidebar.sceneBackgroundAnimationSpeedLabel')}
+          rangePresentation="field"
           value={animation.speed}
           min={0}
           max={100}
@@ -40,6 +41,7 @@ export function GradientAnimationControls(props: GradientControlProps) {
       {animation.mode !== VideoSceneGradientAnimationMode.NONE && (
         <SliderField
           label={translate('videoEditor.sidebar.sceneBackgroundAnimationIntensityLabel')}
+          rangePresentation="field"
           value={animation.intensity}
           min={0}
           max={100}

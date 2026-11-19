@@ -133,6 +133,7 @@ it('keeps idle geometry reporting outside React while updating the real annotati
     const editor = useReviewAnnotationEffects({
       session,
       lane: undefined,
+      readLane: () => undefined,
       setLane: vi.fn(),
       flush: async () => {},
       allowed: () => true,

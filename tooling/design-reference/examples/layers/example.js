@@ -2,13 +2,10 @@ import { el, exampleCase, paramRow } from '../shared/dom.js';
 import { ActionButton } from '../shared/buttons.js';
 import { TextField } from '../shared/fields.js';
 import { createDropdown } from '../shared/choices.js';
-import { ParameterRow } from '../shared/parameter-row.js';
-import { PropertyChoice } from '../shared/property-choice.js';
 import { AnchoredLayer } from '../shared/layers.js';
 import { CommandMenu } from '../shared/command-menu.js';
 import { ModalDialog } from '../shared/modal-dialog.js';
 import { NativeHint } from '../shared/native-hint.js';
-import { createInspectorTextFields } from './inspector-text-fields.js';
 let pickerModule;
 async function loadPickers() {
   if (!pickerModule) {
@@ -18,36 +15,12 @@ async function loadPickers() {
 }
 
 async function renderInspector(inspectorStage, { theme, locale, mountPickerReferences }) {
-  const dropdown = el('div', { slot: 'inspector-dropdown' });
-  const segments = el('div', { slot: 'inspector-segments' });
   await mountPickerReferences(inspectorStage, {
     theme,
     locale,
     kind: 'inspector',
-    controls: [dropdown, segments, ...createInspectorTextFields(locale, { voiceEnabled: true })],
+    controls: [],
   });
-  createDropdown(
-    dropdown,
-    'Наложение',
-    [
-      { value: 'normal', label: 'Обычный' },
-      { value: 'multiply', label: 'Умножение' },
-      { value: 'screen', label: 'Экран' },
-    ],
-    'normal',
-    { onChange: (value) => inspectorStage.style.setProperty('--reference-blend-mode', value) }
-  );
-  const scale = PropertyChoice({
-    label: 'Масштаб',
-    options: [
-      { value: '0.5', label: '50%' },
-      { value: '0.75', label: '75%' },
-      { value: '1', label: '100%' },
-    ],
-    value: '1',
-    onChange: (value) => inspectorStage.style.setProperty('--reference-subject-scale', value),
-  });
-  segments.append(ParameterRow({ label: 'Масштаб', content: scale.element }).element);
 }
 
 export async function render(root, { manifest, theme }) {

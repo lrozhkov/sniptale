@@ -1,23 +1,14 @@
+import { NumericValueField } from '../../../../../ui/compact-inspector-controls/numeric';
 import { InspectorFieldClear } from '../../../../../ui/compact-inspector-controls/text-field';
 import { SettingsControlRow } from '../../../../section-surface';
-import {
-  useRef,
-  type CSSProperties,
-  type Dispatch,
-  type FormEvent,
-  type SetStateAction,
-} from 'react';
+import { useRef, type Dispatch, type FormEvent, type SetStateAction } from 'react';
 
 import { translate } from '../../../../../platform/i18n';
 import type { ViewportPreset } from '../../../../../contracts/settings';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { ProductModalBody, ProductModalFooter } from '@sniptale/ui/product-modal';
-import {
-  clampViewportDimension,
-  maxViewportPresetDimension,
-  resolveViewportPresetSubmitLabel,
-} from './helpers';
+import { maxViewportPresetDimension, resolveViewportPresetSubmitLabel } from './helpers';
 import { VIEWPORT_PRESET_MAX_NAME_LENGTH } from '../../../../../features/viewport-presets/contracts';
 import { isValidViewportPresetName } from '../../../../../features/viewport-presets/operations';
 
@@ -51,15 +42,6 @@ function ViewportPresetNameField(props: {
   );
 }
 
-const dimensionInputStyle: CSSProperties = {
-  MozAppearance: 'textfield',
-  WebkitAppearance: 'none',
-  marginInlineStart: 'auto',
-  maxWidth: 96,
-  textAlign: 'right',
-  display: 'block',
-};
-
 function ViewportPresetDimensionFields(props: {
   disabled: boolean;
   height: number;
@@ -67,51 +49,29 @@ function ViewportPresetDimensionFields(props: {
   setWidth: Dispatch<SetStateAction<number>>;
   width: number;
 }) {
+  const dimensions = [
+    [translate('viewportPresets.editor.widthLabel'), props.width, props.setWidth],
+    [translate('viewportPresets.editor.heightLabel'), props.height, props.setHeight],
+  ] as const;
+
   return (
     <div className="sniptale-parameter-stack">
-      <div>
-        <SettingsControlRow
-          label={translate('viewportPresets.editor.widthLabel')}
-          valueMinimum={80}
-        >
-          <ProductInput
-            type="number"
-            aria-label={translate('viewportPresets.editor.widthLabel')}
-            value={props.width}
-            onChange={(event) =>
-              props.setWidth(clampViewportDimension(event.target.value, maxViewportPresetDimension))
-            }
+      {dimensions.map(([label, value, setValue]) => (
+        <SettingsControlRow key={label} label={label} valueMinimum={112}>
+          <NumericValueField
+            className="w-full!"
+            label={label}
+            value={value}
             min={1}
             max={maxViewportPresetDimension}
-            required
+            unit="px"
+            normalizeValue={Math.trunc}
             disabled={props.disabled}
-            style={dimensionInputStyle}
+            onPreviewValue={() => undefined}
+            onCommitValue={setValue}
           />
         </SettingsControlRow>
-      </div>
-
-      <div>
-        <SettingsControlRow
-          label={translate('viewportPresets.editor.heightLabel')}
-          valueMinimum={80}
-        >
-          <ProductInput
-            type="number"
-            aria-label={translate('viewportPresets.editor.heightLabel')}
-            value={props.height}
-            onChange={(event) =>
-              props.setHeight(
-                clampViewportDimension(event.target.value, maxViewportPresetDimension)
-              )
-            }
-            min={1}
-            max={maxViewportPresetDimension}
-            required
-            disabled={props.disabled}
-            style={dimensionInputStyle}
-          />
-        </SettingsControlRow>
-      </div>
+      ))}
     </div>
   );
 }
@@ -163,7 +123,7 @@ export function ViewportPresetEditorContent(props: {
 }) {
   return (
     <ProductModalBody compact asForm onSubmit={props.onSubmit}>
-      <div className="space-y-4">
+      <div className="sniptale-parameter-stack">
         <ViewportPresetNameField
           disabled={props.isDisabled}
           label={props.label}

@@ -16,6 +16,7 @@ import {
   VIDEO_EDITOR_PLAYBACK_RATE_MIN,
 } from '../../../../project/state/clip-property/playback-rate';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
+import { NumberInput } from './number';
 import { SliderField } from '../shared/sliders';
 
 type ClipTimingControlsProps = WorkspaceSidebarSelectionPanelProps & {
@@ -91,7 +92,7 @@ export function ClipFadeFields(props: {
 }) {
   return (
     <div className="sniptale-parameter-stack space-y-3">
-      <SliderField
+      <NumberInput
         label={translate(
           props.audio
             ? 'videoEditor.sidebar.inspectorAudioFadeIn'
@@ -100,16 +101,14 @@ export function ClipFadeFields(props: {
         value={props.fadeInMs / 1000}
         min={0}
         max={props.audio ? getAudioFadeLimitSeconds(props.duration) : Math.min(5, props.duration)}
-        scrubMax={Math.min(5, props.duration)}
-        scrubValue={props.fadeInMs / 1000}
         step={0.05}
         disabled={props.locked}
-        formatValue={(value) => `${value.toFixed(2)} s`}
+        unit="s"
         onChange={(value) =>
           props.onUpdateClipFades(props.clipId, { fadeInMs: Math.round(value * 1000) })
         }
       />
-      <SliderField
+      <NumberInput
         label={translate(
           props.audio
             ? 'videoEditor.sidebar.inspectorAudioFadeOut'
@@ -118,11 +117,9 @@ export function ClipFadeFields(props: {
         value={props.fadeOutMs / 1000}
         min={0}
         max={props.audio ? getAudioFadeLimitSeconds(props.duration) : Math.min(5, props.duration)}
-        scrubMax={Math.min(5, props.duration)}
-        scrubValue={props.fadeOutMs / 1000}
         step={0.05}
         disabled={props.locked}
-        formatValue={(value) => `${value.toFixed(2)} s`}
+        unit="s"
         onChange={(value) =>
           props.onUpdateClipFades(props.clipId, { fadeOutMs: Math.round(value * 1000) })
         }

@@ -450,10 +450,14 @@ for (const theme of ['light', 'dark'] as const) {
       await input.fill('invalid');
       await input.press('Enter');
       await expect(input).toHaveAttribute('aria-invalid', 'true');
-      await expect(field.getByRole('alert')).toBeVisible();
-      expect(await field.boundingBox()).toEqual(before);
+      const error = field.getByRole('alert');
+      await expect(error).toBeVisible();
+      const invalidBounds = (await field.boundingBox())!;
+      expect(invalidBounds).toEqual({ ...before, height: before!.height + 18 });
+      expect((await error.boundingBox())!.height).toBeLessThanOrEqual(18);
       await input.press('Escape');
       await expect(value).toHaveText('#ABCDEF');
+      expect(await field.boundingBox()).toEqual(before);
       await swatch.click();
       const picker = page.locator('[data-ui="shared.ui.color-selector.picker-layer"]');
       await expect(picker).toBeVisible();

@@ -131,10 +131,17 @@ function renderInspector(
   };
 }
 
-it('keeps invalid and blank drafts local and clamps a numeric zero to the row minimum', async () => {
+it('keeps invalid and out-of-range scale drafts local until valid input', async () => {
   const change = vi.fn((_patch: QuickEditZoomRegionPatch) => undefined);
   const inspector = renderInspector(change);
-  const scale = inspector.field('gallery.videoReview.zoomScale');
+  act(() =>
+    host
+      .querySelector<HTMLButtonElement>('button[aria-label="gallery.videoReview.zoomScale"]')!
+      .click()
+  );
+  const scale = host.querySelector<HTMLInputElement>(
+    '[role="spinbutton"][aria-label="gallery.videoReview.zoomScale"]'
+  )!;
   await inspector.type(scale, 'not-a-number');
   await inspector.commit(scale);
   expect(change).not.toHaveBeenCalled();
@@ -143,7 +150,8 @@ it('keeps invalid and blank drafts local and clamps a numeric zero to the row mi
   expect(change).not.toHaveBeenCalled();
   await inspector.type(scale, '0');
   await inspector.commit(scale);
-  expect(change).toHaveBeenLastCalledWith({ scale: 1 });
+  expect(change).not.toHaveBeenCalled();
+  expect(scale.getAttribute('aria-invalid')).toBe('true');
   await inspector.type(scale, '2');
   // Typed digits stay in the draft; the commit boundary is blur/Enter.
   await inspector.commit(scale);
@@ -317,12 +325,12 @@ it('edits spotlight strength, area, reveal, rounding and blur through shared con
   expect(spotlight).toMatchObject({ effect: 'blur', blur: 8, reveal: 'contract' });
 });
 
-it('bounds the transition slider and typed duration by the other phase', async () => {
+it('bounds the exact transition duration by the other phase', async () => {
   const change = vi.fn();
   renderInspector(change);
   openAnimation();
   const phase = host.querySelector('fieldset')!;
-  expect(phase.querySelector('input[type="range"]')?.getAttribute('max')).toBe('1.7');
+  expect(phase.querySelector('input[type="range"]')).toBeNull();
   const duration = phase.querySelector<HTMLInputElement>('input')!;
   await type(duration, '12');
   await commit(duration);
@@ -343,7 +351,7 @@ it('keeps precise position nested while top-level parameter groups use tabs', ()
   expect(host.querySelector('[data-section="animation"]')).not.toBeNull();
 });
 
-it('offers five source seconds on the slider and retains valid longer typed phases', async () => {
+it('retains valid longer typed phases in the exact field', async () => {
   const change = vi.fn();
   const long = { ...region, start: 0, end: 10, sourceAnchor: { start: 0, end: 20 } };
   await act(async () =>
@@ -353,7 +361,7 @@ it('offers five source seconds on the slider and retains valid longer typed phas
   );
   openAnimation();
   const phase = host.querySelector('fieldset')!;
-  expect(phase.querySelector('input[type="range"]')?.getAttribute('max')).toBe('5');
+  expect(phase.querySelector('input[type="range"]')).toBeNull();
   const duration = phase.querySelector<HTMLInputElement>('input')!;
   await type(duration, '12');
   await commit(duration);
@@ -405,29 +413,28 @@ it('updates the opposite fractional budget live and keeps fitted values unchange
   });
   await act(async () => render());
   openAnimation();
-  const ranges = () => [...host.querySelectorAll<HTMLInputElement>('fieldset input[type="range"]')];
-  await type(ranges()[0]!, '0.17');
+  const field = (phase: 'In' | 'Out') =>
+    host.querySelector<HTMLInputElement>(
+      `fieldset[aria-label$="zoomTransition${phase}"] input[aria-label$="zoomTransitionDuration"]`
+    )!;
+  await type(field('In'), '0.17');
   expect(current.enter.duration).toBe(0.3);
-  expect(preview?.enter.duration).toBe(0.17);
+  expect(field('In').value).toBe('0.17');
   expect(change).not.toHaveBeenCalled();
   expect(current.exit.duration).toBe(0.3);
-  expect(Number(ranges()[1]!.max)).toBeCloseTo(0.43);
-  expect(
-    Number.parseFloat(ranges()[1]!.style.getPropertyValue('--sniptale-range-fill-ratio'))
-  ).toBeCloseTo((0.3 / 0.43) * 100);
-  await act(async () => ranges()[0]!.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+  await commit(field('In'));
   expect(current.enter.duration).toBe(0.17);
-  await type(ranges()[1]!, '0.42');
+  expect(preview).toBeUndefined();
+  await type(field('Out'), '0.42');
   expect(current.exit.duration).toBe(0.3);
-  expect(preview?.exit.duration).toBe(0.42);
-  expect(current.enter.duration + current.exit.duration).toBeLessThanOrEqual(0.6);
-  await act(async () => ranges()[1]!.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+  await commit(field('Out'));
+  expect(current.exit.duration).toBe(0.42);
   current = fitQuickEditZoomTransitions({ ...current, end: 0.4 });
   await act(async () => render());
   const before = structuredClone(current);
   change.mockClear();
-  await act(async () => ranges()[1]!.focus());
-  await act(async () => ranges()[1]!.blur());
+  await act(async () => field('Out').focus());
+  await act(async () => field('Out').blur());
   expect(current).toEqual(before);
   expect(change).not.toHaveBeenCalled();
 });
@@ -450,20 +457,25 @@ it('previews Border width without history writes, commits once, and cancels with
       />
     )
   );
-  const range = field('gallery.videoReview.borderWidth range');
-  act(() => range.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
-  await type(range, '5');
-  await type(range, '8');
+  const increase = host.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.borderWidth increase"]'
+  )!;
+  expect(host.querySelector('[aria-label="gallery.videoReview.borderWidth range"]')).toBeNull();
+  const press = () =>
+    act(() => increase.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  const release = () => act(() => window.dispatchEvent(new MouseEvent('pointerup')));
+  press();
   expect(onChange).not.toHaveBeenCalled();
-  expect(onPreview).toHaveBeenLastCalledWith(expect.objectContaining({ width: 8 }));
-  act(() => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+  expect(onPreview).toHaveBeenLastCalledWith(expect.objectContaining({ width: 4 }));
+  release();
   expect(onChange).toHaveBeenCalledTimes(1);
-  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ width: 8 }));
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ width: 4 }));
   onChange.mockClear();
-  act(() => range.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
-  await type(range, '11');
-  act(() => range.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-  act(() => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+  press();
+  act(() =>
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))
+  );
+  release();
   expect(onChange).not.toHaveBeenCalled();
   expect(onPreview).toHaveBeenLastCalledWith(null);
 });
@@ -619,18 +631,33 @@ it.each([
     );
     const range = host.querySelector<HTMLInputElement>(
       `input[type="range"][aria-label^="gallery.videoReview.${label}"]`
-    )!;
+    );
+    const increase = host.querySelector<HTMLButtonElement>(
+      `[aria-label="gallery.videoReview.${label} increase"]`
+    );
     const key = (type: string, key: string) =>
-      act(() => range.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true })));
-    key('keydown', 'ArrowRight');
+      act(() => range!.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true })));
+    const press = () =>
+      increase && !range
+        ? act(() => increase!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })))
+        : key('keydown', 'ArrowRight');
+    const release = () =>
+      increase && !range
+        ? act(() => window.dispatchEvent(new MouseEvent('pointerup')))
+        : key('keyup', 'ArrowRight');
+    press();
     expect(preview.mock.lastCall![0].spotlight[target]).not.toEqual(value[target]);
     expect(change).not.toHaveBeenCalled();
-    key('keydown', 'Escape');
-    key('keyup', 'ArrowRight');
+    if (increase && !range) {
+      act(() =>
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))
+      );
+    } else key('keydown', 'Escape');
+    release();
     expect(preview).toHaveBeenLastCalledWith(null);
     expect(change).not.toHaveBeenCalled();
-    key('keydown', 'ArrowRight');
-    key('keyup', 'ArrowRight');
+    press();
+    release();
     expect(change).toHaveBeenCalledOnce();
     expect(change.mock.lastCall![0].spotlight[target]).not.toEqual(value[target]);
   }

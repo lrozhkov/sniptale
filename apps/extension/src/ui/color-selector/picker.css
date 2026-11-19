@@ -243,9 +243,11 @@
   outline: 1px solid var(--sniptale-color-text-secondary) !important;
   outline-offset: 2px;
 }
-.sniptale-picker-select > svg {
+.sniptale-picker-root button.sniptale-picker-select[aria-haspopup='listbox'] > svg:last-child {
   width: 12px;
   height: 12px;
+  flex-basis: 12px;
+  margin-inline: 0;
   stroke-width: 1.75;
   color: var(--sniptale-color-text-primary);
 }

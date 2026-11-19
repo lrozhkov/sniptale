@@ -10,9 +10,13 @@ import type { LoadedReview } from './use-session';
 import { getAIProviderFailureKey } from '../../features/ai/provider-failure-copy';
 import { useRef, useState, type ReactNode } from 'react';
 import { AudioLines, FileText, LoaderCircle, SlidersHorizontal } from 'lucide-react';
-import { CheckboxField, SelectField, TextareaField } from '../../ui/compact-inspector-controls';
+import {
+  CheckboxField,
+  NumericRow,
+  SelectField,
+  TextareaField,
+} from '../../ui/compact-inspector-controls';
 import { ReviewInspectorSections, type ReviewInspectorSection } from './inspector-sections';
-import { PreviewNumericRow as ReviewPreviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 import { SpeechTranscriptionModelField } from './speech-profile';
 import { ReviewTextPhrase } from './speech-phrase';
 import { useReviewText } from './use-review-text';
@@ -61,8 +65,11 @@ export function ReviewOriginalSpeechPanel(
   const ownerKey = JSON.stringify(['gallery-original', props.original?.sourceAssetId]);
   const presets = useAudioPresets(ownerKey, masterAudio.audioProcessing);
   const volume = (applying: boolean) => (
-    <ReviewPreviewNumberRow
+    <NumericRow
+      appearance="plain"
       label={translate('gallery.videoReview.volume')}
+      rangePresentation="field"
+      scrub={{ min: 0, max: 200, step: 1 }}
       unit="%"
       min={0}
       max={200}
@@ -71,7 +78,8 @@ export function ReviewOriginalSpeechPanel(
       enterBehavior="blur"
       disabled={masterDisabled || applying}
       value={masterAudio.muted ? 0 : masterAudio.volume * 100}
-      onChange={(value) => {
+      onPreviewValue={() => undefined}
+      onCommitValue={(value) => {
         if (!masterDisabled && !applying) onMasterVolumeChange(value / 100);
       }}
     />

@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
@@ -149,8 +150,8 @@ for (const variant of [
     const controls = dialog.locator('[data-ui="gallery.videoReview.spatialControls"]');
     const tool = (key: Message) => tools.getByRole('button', { name: label(key), exact: true });
     const exact = async (key: Message, value: string) => {
-      const input = dialog.getByRole('textbox', { name: label(key), exact: true });
-      await input.fill(value);
+      const input = numericControl(dialog, label(key));
+      await (await openNumericControl(dialog, label(key))).fill(value);
       await input.press('Enter');
       await expect(input).not.toBeFocused();
     };
@@ -238,7 +239,7 @@ for (const variant of [
       expect(await historyCursor(page)).toBe(cursor);
       expect(await persistedFocus(page)).toEqual(initial);
       const scaleRange = dialog.locator(
-        `input[type="range"][aria-label="${label('gallery.videoReview.zoomScale')} range"]`
+        `input[type="range"][aria-label="${label('gallery.videoReview.zoomScale')}"]`
       );
       await scaleRange.focus();
       await page.keyboard.down('ArrowRight');
@@ -525,8 +526,8 @@ async function setupSpatialProof(page: Page, origin: string) {
   const number = async (key: Message, value: string) => {
     if (key === 'gallery.videoReview.zoomScale')
       await button('gallery.videoReview.spatialToolPosition').click();
-    const input = dialog.getByRole('textbox', { name: label(key), exact: true });
-    await input.fill(value);
+    const input = numericControl(dialog, label(key));
+    await (await openNumericControl(dialog, label(key))).fill(value);
     await input.press('Enter');
   };
   const enable = async (key: Message) => {

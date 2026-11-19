@@ -44,9 +44,11 @@ function Field({
   kind,
   disabled = false,
   onCommit,
+  scrub = false,
 }: {
   kind: 'slider' | 'number';
   disabled?: boolean;
+  scrub?: boolean;
   onCommit?: () => void;
 }) {
   const project = useVideoEditorStore((state) => state.project);
@@ -64,7 +66,7 @@ function Field({
   return kind === 'slider' ? (
     <SliderField {...props} />
   ) : (
-    <NumberInput {...props} {...(onCommit ? { onCommit } : {})} />
+    <NumberInput {...props} scrub={scrub} {...(onCommit ? { onCommit } : {})} />
   );
 }
 async function pointer(type: string, label = 'Size') {
@@ -228,7 +230,7 @@ for (const kind of ['slider', 'number'] as const) {
       useVideoEditorStore.getState().undoProject();
       root.render(
         <InspectorNumericHistoryProvider>
-          <Field kind={kind} />
+          <Field kind={kind} scrub />
         </InspectorNumericHistoryProvider>
       );
     });
@@ -268,7 +270,7 @@ for (const kind of ['slider', 'number'] as const) {
     act(() =>
       root.render(
         <InspectorNumericHistoryProvider>
-          <Field kind={kind} />
+          <Field kind={kind} scrub />
         </InspectorNumericHistoryProvider>
       )
     );
@@ -362,7 +364,7 @@ it.each(['slider', 'number'] as const)(
       useVideoEditorStore.getState().undoProject();
       root.render(
         <InspectorNumericHistoryProvider>
-          <Field kind={kind} onCommit={finish} />
+          <Field kind={kind} scrub onCommit={finish} />
         </InspectorNumericHistoryProvider>
       );
     });
@@ -377,7 +379,7 @@ it.each(['slider', 'number'] as const)(
     act(() =>
       root.render(
         <InspectorNumericHistoryProvider>
-          <Field kind={kind} disabled onCommit={finish} />
+          <Field kind={kind} scrub disabled onCommit={finish} />
         </InspectorNumericHistoryProvider>
       )
     );

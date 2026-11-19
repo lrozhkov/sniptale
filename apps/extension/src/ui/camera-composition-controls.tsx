@@ -69,6 +69,7 @@ export function CameraCompositionControls(props: {
   const number = (key: 'amount' | 'smoothness') => (
     <PreviewNumericRow
       enterBehavior="blur"
+      rangePresentation="field"
       label={translate(
         key === 'amount'
           ? 'editor.scene.cameraCompositionAmount'

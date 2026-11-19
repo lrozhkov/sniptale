@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { readFile, writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { createVideoProjectFromRecording } from '../../../../apps/extension/src/features/video/project/factories/creation';
@@ -148,11 +149,10 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
             (await readNativeVideoProject(page))?.sourceAudioDocuments?.[0]?.ranges[0]?.start
         )
         .toBe(0.123456);
-      const volume = editor.getByRole('textbox', {
-        name: label('videoEditor.sidebar.sourceAudioLevel'),
-        exact: true,
-      });
-      await volume.fill('50');
+      const volume = numericControl(editor, label('videoEditor.sidebar.sourceAudioLevel'));
+      await (
+        await openNumericControl(editor, label('videoEditor.sidebar.sourceAudioLevel'))
+      ).fill('50');
       await volume.press('Enter');
       await expect
         .poll(
@@ -240,7 +240,9 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await expect.poll(async () => (await readNativeVideoProject(page))?.clips.length).toBe(0);
       await open();
       await expect(start).toHaveValue('0.123456');
-      await volume.fill('25');
+      await (
+        await openNumericControl(editor, label('videoEditor.sidebar.sourceAudioLevel'))
+      ).fill('25');
       await volume.press('Enter');
       await expect
         .poll(

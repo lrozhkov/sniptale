@@ -2058,7 +2058,7 @@
       "colorCatalogFamilyNeutral": "Нейтральные",
       "colorSelectorOriginal": "Исходный",
       "colorSelectorCurrent": "Новый",
-      "colorSelectorCopy": "Копировать цвет",
+      "colorSelectorCopy": "Скопировать HEX цвета",
       "colorSelectorCopied": "Цвет скопирован",
       "colorSelectorCopyFailed": "Не удалось скопировать. Выделите значение и скопируйте вручную.",
       "colorSelectorCompactMode": "Компактный режим",

@@ -49,7 +49,6 @@ export function PointerFeedbackFields(props: PointerFeedbackFieldsProps) {
       label={label}
       factor={factor}
       unit={unit}
-      magnify={magnify}
       onChange={onChange}
     />
   );
@@ -140,21 +139,6 @@ const CLICK_BOUNDS = {
   lensShadow: [0, 100],
   lensEdgeWidth: [1, 30],
 } as const;
-const CLICK_SCRUB = {
-  magnification: [1, 2.5, 0.1],
-  lensShadow: [0, 50, 1],
-  lensEdgeWidth: [1, 30, 1],
-  radius: [2, 80, 1],
-  stroke: [0.5, 8, 0.5],
-  opacity: [0, 1, 0.01],
-  before: [0, 0.5, 0.01],
-  after: [0.05, 1.5, 0.01],
-  offset: [-0.25, 0.25, 0.01],
-  x: [-0.1, 0.1, 0.001],
-  y: [-0.1, 0.1, 0.001],
-  pulses: [1, 5, 1],
-} as const;
-
 /** Keep a drag local until release. Batch editing must not write history for every tick. */
 function ClickNumberRow(props: Omit<NumericRowProps, 'onPreviewValue'>) {
   const [draft, setDraft] = useState<number>();
@@ -165,6 +149,7 @@ function ClickNumberRow(props: Omit<NumericRowProps, 'onPreviewValue'>) {
       enterBehavior="blur"
       value={draft ?? props.value}
       onPreviewValue={setDraft}
+      onCancelValue={() => setDraft(undefined)}
       onCommitValue={(value) => {
         setDraft(undefined);
         props.onCommitValue(value);
@@ -321,13 +306,10 @@ function ClickSettingNumber(props: {
   label: Parameters<typeof translate>[0];
   factor: number;
   unit: '%' | 'px' | 'x' | '';
-  magnify: boolean;
   onChange(patch: Partial<ReviewClickStyle> | null): void;
 }) {
-  const { field: key, value, label, factor, unit, magnify } = props;
+  const { field: key, value, label, factor, unit } = props;
   const [min, max] = CLICK_BOUNDS[key];
-  const [scrubMin, scrubMax, scrubStep] =
-    key === 'radius' && magnify ? [20, 160, 1] : CLICK_SCRUB[key];
   return (
     <>
       <ClickNumberRow
@@ -352,7 +334,7 @@ function ClickSettingNumber(props: {
           key === 'magnification' || key === 'stroke' || key === 'x' || key === 'y' ? 1 : 0
         }
         unit={unit}
-        scrub={{ min: scrubMin * factor, max: scrubMax * factor, step: scrubStep * factor }}
+        scrub={key === 'magnification' ? { min: 1, max: 2.5, step: 0.1 } : undefined}
         onCommitValue={(next) => props.onChange({ [key]: next / factor })}
       />
       {value === null || value === undefined ? (
@@ -442,7 +424,6 @@ function ClickAnimation({
                     step={0.1}
                     precision={1}
                     unit="%"
-                    scrub={{ min, max, step: 0.1 }}
                     onCommitValue={(value) =>
                       props.onChange({ gestureArea: { ...area, [key]: value / 100 } })
                     }

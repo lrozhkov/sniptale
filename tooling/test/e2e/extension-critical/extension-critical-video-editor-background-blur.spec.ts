@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { build } from 'esbuild';
 import { createSceneGradientBackground } from '../../../../apps/extension/src/features/video/project/scene/background-gradient';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -121,12 +122,11 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
     try {
       const project = await openBackground(page, host.origin, locale, theme);
       const owner = await importBackground(page, locale);
-      const field = owner.getByRole('textbox', {
-        name: translate('editor.scene.backgroundBlurAmount', locale),
-        exact: true,
-      });
+      const field = numericControl(owner, translate('editor.scene.backgroundBlurAmount', locale));
       await expect(field).toHaveValue('12');
-      await field.fill('18');
+      await (
+        await openNumericControl(owner, translate('editor.scene.backgroundBlurAmount', locale))
+      ).fill('18');
       await field.press('Enter');
       await expect
         .poll(async () => (await readNativeVideoProject(page))?.sceneBackground?.blur)
@@ -139,12 +139,16 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await expect
         .poll(async () => (await readNativeVideoProject(page))?.sceneBackground?.blur)
         .toBe(18);
-      await field.fill('0');
+      await (
+        await openNumericControl(owner, translate('editor.scene.backgroundBlurAmount', locale))
+      ).fill('0');
       await field.press('Enter');
       await expect
         .poll(async () => (await readNativeVideoProject(page))?.sceneBackground?.blur)
         .toBe(0);
-      await field.fill('12');
+      await (
+        await openNumericControl(owner, translate('editor.scene.backgroundBlurAmount', locale))
+      ).fill('12');
       await field.press('Enter');
       await expect
         .poll(async () => (await readNativeVideoProject(page))?.sceneBackground?.blur)

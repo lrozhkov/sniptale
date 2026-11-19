@@ -238,7 +238,21 @@ it('covers text fallback alignment, font options, and inset number controls', as
   ).toBe('true');
   await selectOptionAt('editor.compact.font', 1);
   act(() => change('editor.compact.fontSize', '24'));
-  act(() => change('editor.compact.richShapeInsetTopShort', '12'));
+  const topLabel = 'editor.compact.richShapeInsetTopShort';
+  const top = input(topLabel);
+  expect(top.closest('[data-stepper-placement="sides"]')?.querySelectorAll('button')).toHaveLength(
+    2
+  );
+  act(() => {
+    top.focus();
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(top, '20');
+    top.dispatchEvent(new Event('input', { bubbles: true }));
+    top.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+  });
+  expect(props.applyRichShapePatch).not.toHaveBeenCalledWith({ text: { insets: { top: 20 } } });
+  expect(top).toHaveProperty('value', String(props.shape.text.insets.top));
+  act(() => top.focus());
+  act(() => change(topLabel, '12'));
 
   expect(props.applyRichShapePatch).toHaveBeenCalledWith({ text: { fontFamily: 'serif' } });
   expect(props.applyRichShapePatch).toHaveBeenCalledWith({ text: { fontSize: 24 } });

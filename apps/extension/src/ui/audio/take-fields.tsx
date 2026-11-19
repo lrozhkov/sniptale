@@ -49,6 +49,7 @@ export function AudioTakeLevelFields(
       ) : null}
       <DraftNumericRow
         label={translate('gallery.videoReview.audioClipVolume')}
+        rangePresentation="field"
         unit="%"
         min={0}
         max={200}
@@ -97,7 +98,6 @@ export function AudioTakeFadeFields(props: TakeFieldProps) {
           unit="s"
           min={0}
           max={getAudioFadeLimitSeconds(props.clip.duration)}
-          scrubMax={Math.min(5, props.clip.duration)}
           step={0.1}
           precision={2}
           value={props.clip[key]}

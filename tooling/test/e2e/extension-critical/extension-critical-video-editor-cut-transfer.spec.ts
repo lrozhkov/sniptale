@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { inspectVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
@@ -856,12 +857,9 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         exact: true,
       });
       await group.click();
-      const volume = page.getByRole('textbox', {
-        name: label('videoEditor.sidebar.volumeLabel'),
-        exact: true,
-      });
+      const volume = numericControl(page, label('videoEditor.sidebar.volumeLabel'));
       await expect(volume).toHaveValue('0');
-      await volume.fill('70');
+      await (await openNumericControl(page, label('videoEditor.sidebar.volumeLabel'))).fill('70');
       await volume.press('Enter');
       await expect
         .poll(

@@ -55,13 +55,15 @@ export function BorderAppearanceFields(props: {
         step={1}
         precision={1}
         unit="px"
+        scrubEnabled={false}
+        stepperPlacement="sides"
         value={value.width}
         onPreview={(width) => props.onPreview?.(width === null ? null : { width })}
         onChange={(width) => onChange({ width })}
       />
       <SegmentedRow
         columns={3}
-        layout="stacked"
+        layout="inline"
         ariaLabel={translate('gallery.videoReview.borderStyle')}
         label={translate('gallery.videoReview.borderStyle')}
         value={value.style}

@@ -85,7 +85,12 @@ it('forwards numeric wheel editing while keeping native text defaults and blur a
   const name = container.querySelector<HTMLInputElement>('[aria-label="Name"]')!;
   expect(name.type).toBe('text');
   act(() => seed.focus());
-  const wheel = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -1 });
+  const wheel = new WheelEvent('wheel', {
+    bubbles: true,
+    cancelable: true,
+    deltaY: -1,
+    altKey: true,
+  });
   act(() => seed.dispatchEvent(wheel));
   expect(seed.value).toBe('5');
   expect(change).toHaveBeenCalledOnce();

@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { chooseInspectorValue } from '../support/inspector-utilities';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -125,10 +126,7 @@ test.describe('Gallery webcam GPU crop publication', () => {
           .locator('[data-review-header-track="webcam"] [data-review-track-select]')
           .click();
         await expect(inspector).toBeVisible();
-        const zoom = inspector.getByRole('textbox', {
-          name: label('videoEditor.sidebar.cameraCropZoom'),
-          exact: true,
-        });
+        const zoom = numericControl(inspector, label('videoEditor.sidebar.cameraCropZoom'));
         if (!(await zoom.isVisible()))
           await inspector
             .getByRole('button', { name: label('gallery.videoReview.webcamLayout'), exact: true })
@@ -223,7 +221,9 @@ test.describe('Gallery webcam GPU crop publication', () => {
           );
         }
         const preZoomPixels = await painted();
-        await zoom.fill('2');
+        await (
+          await openNumericControl(inspector, label('videoEditor.sidebar.cameraCropZoom'))
+        ).fill('2');
         await zoom.press('Enter');
         await expect
           .poll(async () => {
@@ -324,10 +324,10 @@ test.describe('Gallery webcam GPU crop publication', () => {
                 return edit?.target === 'advancedContent' ? edit.after.webcam?.offsetSeconds : null;
               })
               .toBe(Number(value));
-            const zoomControl = inspector.getByRole('textbox', {
-              name: label('videoEditor.sidebar.cameraCropZoom'),
-              exact: true,
-            });
+            const zoomControl = numericControl(
+              inspector,
+              label('videoEditor.sidebar.cameraCropZoom')
+            );
             if (!(await zoomControl.isVisible()))
               await inspector
                 .getByRole('heading', {

@@ -242,10 +242,29 @@ it('previews logo opacity and accepts one normalized opacity without changing it
   const image = { assetId: 'project-asset:logo', width: 200, height: 100, size: 0.2, opacity: 1 };
   props.settings = { ...props.settings!, mode: 'image', image };
   await render();
-  const input = host.querySelector<HTMLInputElement>(
-    'input[aria-label="gallery.videoReview.watermarkOpacity"]'
+  const slider = host.querySelector<HTMLInputElement>(
+    'input[type="range"][aria-label="gallery.videoReview.watermarkOpacity"]'
   )!;
-  act(() => input.dispatchEvent(new FocusEvent('focusin', { bubbles: true })));
+  act(() => {
+    slider.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(slider, '50');
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(props.onPreview).toHaveBeenLastCalledWith(
+    expect.objectContaining({ image: { ...image, opacity: 0.5 } })
+  );
+  expect(props.onChange).not.toHaveBeenCalled();
+  act(() => slider.dispatchEvent(new MouseEvent('pointercancel', { bubbles: true })));
+  expect(props.onPreview).toHaveBeenLastCalledWith(null);
+
+  const edit = host.querySelector<HTMLButtonElement>(
+    'button[aria-label="gallery.videoReview.watermarkOpacity"]'
+  )!;
+  act(() => edit.click());
+  const input = host.querySelector<HTMLInputElement>(
+    'input[role="spinbutton"][aria-label="gallery.videoReview.watermarkOpacity"]'
+  )!;
+  expect(document.activeElement).toBe(input);
   act(() => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '35');
     input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -340,7 +359,7 @@ it('ignores a stale text acknowledgement after external settings replace the pen
   await act(async () => settle(true));
 });
 
-it('commits slider changes when canvas previews are echoed into settings', async () => {
+it('commits held stepper changes when canvas previews are echoed into settings', async () => {
   function Controlled() {
     const [draft, setDraft] = useState<WatermarkInspectorProps['settings']>(undefined);
     return (
@@ -357,23 +376,21 @@ it('commits slider changes when canvas previews are echoed into settings', async
     );
   }
   await act(async () => root.render(<Controlled />));
-  const range = host.querySelector<HTMLInputElement>('input[type="range"]')!;
-  const before = Number(range.value);
+  const size = () =>
+    host.querySelector<HTMLInputElement>('input[aria-label="gallery.videoReview.watermarkSize"]')!;
+  const stepper = host.querySelector<HTMLButtonElement>(
+    'button[aria-label="gallery.videoReview.watermarkSize increase"]'
+  )!;
+  const before = Number(size().value);
   const after = before + 1;
-  act(() =>
-    range.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-  );
-  expect(Number(range.value)).toBeCloseTo(after);
+  act(() => stepper.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  expect(Number(size().value)).toBeCloseTo(after);
   expect(props.onChange).not.toHaveBeenCalled();
-  await act(async () =>
-    range.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true }))
-  );
+  await act(async () => window.dispatchEvent(new MouseEvent('pointerup')));
   expect(props.onChange).toHaveBeenCalledOnce();
   await act(async () => root.render(null));
   await render();
-  expect(Number(host.querySelector<HTMLInputElement>('input[type="range"]')!.value)).toBeCloseTo(
-    after
-  );
+  expect(Number(size().value)).toBeCloseTo(after);
 });
 
 it('displays whole font pixels without writing rounded authoring on open or blur', async () => {

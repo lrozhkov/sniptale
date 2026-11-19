@@ -1,3 +1,4 @@
+import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import {
   ProductModal,
@@ -116,14 +117,13 @@ export function ProjectNameDialog(props: {
             <label htmlFor={nameId} className="text-xs text-[var(--sniptale-color-text-secondary)]">
               {nameLabel}
             </label>
-            <div className="sniptale-text-value">
-              <input
+            <div className="sniptale-text-value" data-framed>
+              <ProductInput
                 ref={input}
                 id={nameId}
                 value={name}
                 disabled={busy}
                 onChange={(event) => setName(event.target.value)}
-                className="w-full disabled:cursor-not-allowed disabled:opacity-50"
               />
               {name && !busy ? <InspectorFieldClear label={nameLabel} target={input} /> : null}
             </div>

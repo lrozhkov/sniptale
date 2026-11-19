@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { createHash } from 'node:crypto';
 import type { VideoProject } from '../../../../apps/extension/src/features/video/project/types/model';
 import { expect, test, type Locator, type Page } from '@playwright/test';
@@ -97,11 +98,10 @@ async function configureOriginalAudio(
   if (!source || (source.type !== 'AUDIO' && source.type !== 'VIDEO'))
     throw new Error('Missing original sound source');
   if (volume > 0) {
-    const level = owner.getByRole('textbox', {
-      name: label('videoEditor.sidebar.originalAudioLevel'),
-      exact: true,
-    });
-    await level.fill(String(volume * 100));
+    const level = numericControl(owner, label('videoEditor.sidebar.originalAudioLevel'));
+    await (
+      await openNumericControl(owner, label('videoEditor.sidebar.originalAudioLevel'))
+    ).fill(String(volume * 100));
     await level.press('Tab');
     await checkInspectorPaintedFont(page, level, 'original-audio-level');
   }
@@ -141,11 +141,10 @@ async function verifyOriginalAudioRestore(
   });
   if ((await summary.locator('..').getAttribute('open')) === null) await operate(summary);
   const owner = page.locator('[data-ui="video-editor.original-audio.existing"]');
-  const level = owner.getByRole('textbox', {
-    name: label('videoEditor.sidebar.originalAudioLevel'),
-    exact: true,
-  });
-  await level.fill('45');
+  const level = numericControl(owner, label('videoEditor.sidebar.originalAudioLevel'));
+  await (
+    await openNumericControl(owner, label('videoEditor.sidebar.originalAudioLevel'))
+  ).fill('45');
   await level.press('Tab');
   await expect
     .poll(async () => {
@@ -162,9 +161,10 @@ async function verifyOriginalAudioRestore(
       exact: true,
     })
   );
-  const volume = page
-    .locator('[data-section="audio"]')
-    .getByRole('textbox', { name: label('videoEditor.sidebar.volumeLabel'), exact: true });
+  const volume = numericControl(
+    page.locator('[data-section="audio"]'),
+    label('videoEditor.sidebar.volumeLabel')
+  );
   await expect(volume).toBeFocused();
   await expect
     .poll(async () => (await readProject(page))?.clips.find((clip) => clip.id === take.id))
@@ -206,12 +206,11 @@ async function verifyTrackAudioMaster(
       .getByRole('button', { name: label('videoEditor.sidebar.inspectorGroupAudio'), exact: true })
   );
   const owner = page.locator('[data-ui="video-editor.inspector.track-audio"]');
-  const level = owner.getByRole('textbox', {
-    name: label('videoEditor.sidebar.trackVolumeLabel'),
-    exact: true,
-  });
+  const level = numericControl(owner, label('videoEditor.sidebar.trackVolumeLabel'));
   for (const percent of [0, 150, 200]) {
-    await level.fill(String(percent));
+    await (
+      await openNumericControl(owner, label('videoEditor.sidebar.trackVolumeLabel'))
+    ).fill(String(percent));
     await level.press('Tab');
     await expect
       .poll(
@@ -241,7 +240,9 @@ async function verifyTrackAudioMaster(
     .toBe(1.5);
   await operate(page.locator('[data-ui="video-editor.timeline.toolbar.redo"]'));
   await expect(level).toHaveValue('200');
-  await level.fill('100');
+  await (
+    await openNumericControl(owner, label('videoEditor.sidebar.trackVolumeLabel'))
+  ).fill('100');
   await level.press('Tab');
   await expect
     .poll(
@@ -249,7 +250,9 @@ async function verifyTrackAudioMaster(
         (await readProject(page))?.tracks.find((track) => track.id === trackId)?.audioVolume
     )
     .toBe(1);
-  await level.fill('200');
+  await (
+    await openNumericControl(owner, label('videoEditor.sidebar.trackVolumeLabel'))
+  ).fill('200');
   await level.press('Tab');
   await expect
     .poll(

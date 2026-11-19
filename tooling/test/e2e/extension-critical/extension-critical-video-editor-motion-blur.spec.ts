@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
 import { readFile, writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
@@ -207,11 +208,13 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       (await read()).motionRegions!.find((region) => region.id === 'motion-first')!;
     const phase = (name: string) =>
       page.locator(`[data-ui="video-editor.motion.blur"][data-phase="${name}"]`);
-    const strength = (name: string) =>
-      phase(name).getByRole('textbox', {
-        name: label('gallery.videoReview.motionBlurStrength'),
-        exact: true,
-      });
+    const strengthLabel = label('gallery.videoReview.motionBlurStrength');
+    const strength = (name: string) => numericControl(phase(name), strengthLabel);
+    const setStrength = async (name: string, value: string) => {
+      const field = numericControl(phase(name), strengthLabel);
+      await (await openNumericControl(phase(name), strengthLabel)).fill(value);
+      await field.press('Enter');
+    };
     const selectFirst = async () => {
       await page
         .locator('[data-timeline-effect-segment="motion-first"]')
@@ -230,11 +233,9 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await openFixture(page, host.origin, locale, theme);
       const before = await read();
       await selectFirst();
-      await strength('enter').fill('73.1');
-      await strength('enter').press('Enter');
+      await setStrength('enter', '73.1');
       await expect.poll(async () => (await first()).motionBlur?.enter?.strength).toBe(0.731);
-      await strength('exit').fill('35.2');
-      await strength('exit').press('Enter');
+      await setStrength('exit', '35.2');
       await expect.poll(async () => (await first()).motionBlur?.exit?.strength).toBe(35.2 / 100);
       await phase('enter').getByRole('switch').click();
       await expect
@@ -248,8 +249,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await phase('enter').getByRole('switch').click();
       await expect.poll(async () => (await first()).motionBlur?.enter?.enabled).toBe(true);
       const unchanged = await read();
-      await strength('enter').fill('73.1');
-      await strength('enter').press('Enter');
+      await setStrength('enter', '73.1');
       expect(await read()).toEqual(unchanged);
       await checkInspectorPaintedFont(page, strength('enter'), 'phase-enter');
       await strength('enter').scrollIntoViewIfNeeded();
@@ -293,8 +293,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await expect(strength('link')).toHaveCount(0);
       await phase('link').getByRole('switch').click();
       await expect(strength('link')).toHaveValue('45');
-      await strength('link').fill('68.2');
-      await strength('link').press('Enter');
+      await setStrength('link', '68.2');
       await expect.poll(async () => (await first()).motionBlur?.link?.strength).toBe(68.2 / 100);
       await checkInspectorPaintedFont(page, strength('link'), 'phase-link');
       await page.screenshot({ path: info.outputPath('motion-phases-link.png'), fullPage: false });

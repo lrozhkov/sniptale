@@ -35,6 +35,7 @@ export function ReviewOriginalAudioInspector(props: {
               <>
                 <ReviewNumberRow
                   label={translate('gallery.videoReview.volume')}
+                  rangePresentation="field"
                   unit="%"
                   min={0}
                   max={range.origin && range.origin !== 'manual' ? 100 : 200}

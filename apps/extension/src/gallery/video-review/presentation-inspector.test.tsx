@@ -327,35 +327,44 @@ it.each([
   }
 );
 
-it('uses an independent 0.1–10 slider and previews before one keyboard commit', async () => {
+function startNumberStep(label: string) {
+  const stepper = host.querySelector<HTMLButtonElement>(`button[aria-label="${label} increase"]`)!;
+  act(() => stepper.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+}
+
+function endNumberStep() {
+  act(() => window.dispatchEvent(new MouseEvent('pointerup')));
+}
+
+function cancelNumberStep() {
+  act(() =>
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))
+  );
+  endNumberStep();
+}
+
+it('uses exact duration and previews a side step before one commit', async () => {
   retained();
   await render();
-  const range = field('Duration range');
-  expect(range.min).toBe('0.1');
-  expect(range.max).toBe('10');
-  act(() =>
-    range.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-  );
+  expect(field('Duration')?.closest('[data-stepper-placement="sides"]')).not.toBeNull();
+  expect(field('Duration range')).toBeNull();
+  startNumberStep('Duration');
   expect(props.onPreview).toHaveBeenLastCalledWith(
     expect.objectContaining({
       intro: expect.objectContaining({ image: expect.objectContaining({ duration: 3.1 }) }),
     })
   );
   expect(props.onChange).not.toHaveBeenCalled();
-  act(() => range.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true })));
+  endNumberStep();
   expect(props.onChange).toHaveBeenCalledOnce();
   expect(props.onPreview).toHaveBeenLastCalledWith(null);
 });
-it('cancels an active range preview before its key-up commit', async () => {
+it('cancels a held duration step before releasing it', async () => {
   retained();
   await render();
-  const range = field('Duration range');
-  act(() =>
-    range.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-  );
+  startNumberStep('Duration');
   expect(props.onPreview).toHaveBeenCalled();
-  act(() => range.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-  act(() => range.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true })));
+  cancelNumberStep();
   expect(props.onChange).not.toHaveBeenCalled();
   expect(props.onPreview).toHaveBeenLastCalledWith(null);
 });
@@ -363,11 +372,10 @@ it('rejects collapsed trim previews and cancels the validation feedback', async 
   retained('video');
   props.settings.intro.video!.trim = { start: 0, end: 0.001 };
   await render();
-  const range = field('Trim start range');
-  act(() => range.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true })));
+  startNumberStep('Trim start');
   expect(props.onPreview).toHaveBeenLastCalledWith(null);
   expect(host.textContent).toContain('Trim end must be after trim start.');
-  act(() => range.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  cancelNumberStep();
   expect(host.querySelector('[role="alert"]')).toBeNull();
   expect(props.onChange).not.toHaveBeenCalled();
 });
@@ -425,18 +433,15 @@ it('persists duration after the parent echoes each preview and survives inspecto
     );
   }
   await act(async () => root.render(<Controlled />));
-  const range = field('Duration range');
-  act(() =>
-    range.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-  );
-  expect(range.value).toBe('3.1');
+  startNumberStep('Duration');
+  expect(field('Duration').value).toBe('3.1');
   expect(props.settings.intro.image!.duration).toBe(3);
-  act(() => range.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true })));
+  endNumberStep();
   expect(props.onChange).toHaveBeenCalledOnce();
   expect(props.settings.intro.image!.duration).toBe(3.1);
   await act(async () => root.render(null));
   await render();
-  expect(field('Duration range').value).toBe('3.1');
+  expect(field('Duration').value).toBe('3.1');
 });
 
 it('configures and removes a join independently of the opposite edge and media', async () => {

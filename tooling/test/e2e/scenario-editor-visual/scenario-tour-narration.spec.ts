@@ -1,3 +1,4 @@
+import { numericControl } from '../support/inspector-numeric';
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
@@ -194,9 +195,7 @@ for (const [locale, theme, viewport] of [
     await expect(
       panel.getByRole('switch', { name: t('scenario.editor.tourMusicDucking'), exact: true })
     ).toBeChecked();
-    await expect(
-      panel.getByRole('textbox', { name: t('scenario.editor.tourMusicLevel'), exact: true })
-    ).toHaveValue('25');
+    await expect(numericControl(panel, t('scenario.editor.tourMusicLevel'))).toHaveValue('25');
     await panel
       .getByRole('button', { name: t('scenario.editor.tourMusicRemove'), exact: true })
       .click();

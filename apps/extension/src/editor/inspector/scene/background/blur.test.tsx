@@ -22,22 +22,20 @@ it('shows the localized bounded blur control and applies its value', () => {
     )
   );
   const label = translate('editor.scene.backgroundBlurAmount');
-  const numericInput = host.querySelector<HTMLInputElement>(
-    `input[aria-label="${label}"][type="text"]`
-  )!;
   const range = host.querySelector<HTMLInputElement>(
-    `input[aria-label="${label} range"][type="range"]`
+    `.opacity-field input[aria-label="${label}"][type="range"]`
   )!;
-  expect(numericInput.value).toBe('6');
+  expect(range.getAttribute('aria-valuetext')).toBe('6 px');
   expect(range.min).toBe('0');
   expect(range.max).toBe('25');
   act(() => {
+    range.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(range, '14');
     range.dispatchEvent(new Event('input', { bubbles: true }));
   });
   expect(applyFramePatch).not.toHaveBeenCalled();
   expect(range.value).toBe('14');
-  act(() => range.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'ArrowRight' })));
+  act(() => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, button: 0 })));
   expect(applyFramePatch).toHaveBeenCalledTimes(1);
   expect(applyFramePatch).toHaveBeenCalledWith({ backgroundBlurAmount: 14 });
   act(() => root.unmount());
@@ -66,12 +64,13 @@ it('previews blur before release and accepts it once after the preview prop catc
   act(() => root.render(<Harness />));
   const range = host.querySelector<HTMLInputElement>('input[type="range"]')!;
   act(() => {
+    range.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(range, '14');
     range.dispatchEvent(new Event('input', { bubbles: true }));
   });
   expect(previewFramePatch).toHaveBeenLastCalledWith({ backgroundBlurAmount: 14 });
   expect(applyFramePatch).not.toHaveBeenCalled();
-  act(() => range.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'ArrowRight' })));
+  act(() => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, button: 0 })));
   act(() => range.dispatchEvent(new Event('blur', { bubbles: true })));
   expect(applyFramePatch).toHaveBeenCalledTimes(1);
   expect(applyFramePatch).toHaveBeenCalledWith({ backgroundBlurAmount: 14 });

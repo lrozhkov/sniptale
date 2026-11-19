@@ -300,9 +300,10 @@ function ResizeToolDimensionRow(props: {
           field === 'width' ? 'editor.compact.widthDimension' : 'editor.compact.heightDimension'
         );
         return (
-          <InspectorParameterRow key={field} label={label} valueMinimum={140}>
+          <InspectorParameterRow key={field} label={label} valueMinimum={112} keepInline>
             <div className="flex w-full items-center justify-end gap-2">
               <NumericValueField
+                className="!w-28"
                 label={label}
                 value={props.active.draft[field]}
                 min={1}

@@ -1,0 +1,272 @@
+.inspector-hex-editor {
+  position: relative;
+  min-width: 0;
+  min-height: calc(var(--control-height, 32px) - 2px);
+  padding-inline: var(--color-hex-padding, 8px);
+  text-align: start;
+  color: var(--text, var(--sniptale-color-text-primary));
+  font: var(--font-control-weight, 400)
+    var(--font-control-size, 13px)/var(--font-control-line, 18px)
+    var(--font-ui, var(--sniptale-font-interface));
+  font-variant-numeric: tabular-nums;
+  text-transform: uppercase;
+}
+.inspector-hex-trigger {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: transparent;
+}
+.inspector-hex-trigger:enabled {
+  cursor: text;
+}
+.inspector-hex-editor > input[spellcheck='false'] {
+  display: block;
+  width: 100%;
+  height: calc(var(--control-height, 32px) - 2px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  caret-color: var(--text, var(--sniptale-color-text-primary));
+  cursor: text;
+  font: inherit;
+  font-variant-numeric: inherit;
+  text-transform: inherit;
+}
+.inspector-hex-editor > input[readonly],
+.alpha-value input[readonly] {
+  pointer-events: none;
+  text-overflow: ellipsis;
+}
+:is(.inspector-hex-editor, .alpha-value):has(> button:disabled) input {
+  opacity: 0.4;
+}
+
+.inspector-hex-editor input:focus,
+.inspector-hex-trigger:focus-visible {
+  outline: 0 solid transparent;
+}
+:is(.inspector-hex-editor, .alpha-value) input:focus::selection {
+  background: var(--sniptale-color-border-strong);
+  color: var(--text, var(--sniptale-color-text-primary));
+}
+:is(.inspector-hex-editor, .alpha-value) input:not(:focus)::selection {
+  background: transparent;
+  color: inherit;
+}
+
+.alpha-value {
+  position: relative;
+  min-width: 0;
+  border-inline-start: 1px solid var(--sniptale-color-field-border);
+  font: var(--font-control-weight, 400)
+    var(--font-control-size, 13px)/var(--font-control-line, 18px)
+    var(--font-ui, var(--sniptale-font-interface));
+  font-variant-numeric: tabular-nums;
+}
+.alpha-value .numeric-editor {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: calc(var(--control-height, 32px) - 2px);
+  justify-content: center;
+  padding: 0 5px;
+  outline: none;
+  white-space: nowrap;
+}
+.alpha-value > button {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+}
+.alpha-value > button:enabled,
+.alpha-value .numeric-editor {
+  cursor: text;
+}
+.alpha-value:is(:has(> button:hover:enabled), :focus-within) {
+  background: var(--sniptale-color-field-hover);
+}
+.alpha-value .numeric-editor input {
+  flex: 0 0 3ch;
+  inline-size: 3ch;
+  text-align: end;
+}
+
+.alpha-value.sniptale-inspector-numeric .numeric-editor input {
+  min-inline-size: 3ch;
+  max-inline-size: 3ch;
+}
+
+:is([data-ui='shared.ui.color-selector.trigger'], .sniptale-paint-value):has(
+  > .sniptale-framed-color-value
+),
+.sniptale-gradient-value,
+.color-frame {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  min-height: 32px;
+  width: 100%;
+  gap: 0;
+  border: 1px solid var(--sniptale-color-field-border);
+  border-radius: 4px;
+  background: var(--sniptale-color-field);
+}
+
+:is([data-ui='shared.ui.color-selector.trigger'], .sniptale-paint-value):has(
+    > .sniptale-framed-color-value
+  ):is(:hover, :focus-within),
+.sniptale-gradient-value:enabled:is(:hover, :focus-visible, [aria-expanded='true']),
+.color-frame:is(:hover, :focus-within) {
+  background: var(--sniptale-color-field-hover);
+}
+
+:is([data-ui='shared.ui.color-selector.trigger'], .sniptale-paint-value):has(
+    > .sniptale-framed-color-value
+  ):has(input:focus, .inspector-hex-trigger:focus-visible, .alpha-value > button:focus-visible),
+.color-frame:has(
+  input:focus,
+  .inspector-hex-trigger:focus-visible,
+  .alpha-value > button:focus-visible
+),
+.sniptale-gradient-value:focus-visible:not([aria-expanded='true']) {
+  border-color: var(--sniptale-color-field-focus);
+}
+
+:is([data-ui='shared.ui.color-selector.trigger'], .sniptale-paint-value):has(
+    > .sniptale-framed-color-value
+  ):has(input[aria-invalid='true']),
+.color-frame:has(input[aria-invalid='true']) {
+  height: auto;
+  align-items: flex-start;
+  border-color: var(--sniptale-color-danger);
+}
+
+:is([data-ui='shared.ui.color-selector.trigger'], .sniptale-paint-value):has(
+    > .sniptale-framed-color-value
+  )
+  > button:is([data-ui='shared.ui.color-selector.picker-trigger'], .sniptale-paint-swatch-trigger) {
+  order: -1;
+  display: grid;
+  place-items: center;
+  flex: 0 0 33px;
+  width: 33px;
+  height: 30px;
+  min-height: 0;
+  padding: 0;
+  border-inline-end: 1px solid var(--sniptale-color-field-border);
+  border-radius: 3px 0 0 3px;
+  background: transparent;
+  cursor: pointer;
+}
+
+:is([data-ui='shared.ui.color-selector.trigger'], .sniptale-paint-value):has(
+    > .sniptale-framed-color-value
+  )
+  > button:is(
+    [data-ui='shared.ui.color-selector.picker-trigger'],
+    .sniptale-paint-swatch-trigger
+  ):hover {
+  background: color-mix(in srgb, var(--sniptale-color-text-primary) 8%, transparent);
+}
+
+:is([data-ui='shared.ui.color-selector.trigger'], .sniptale-paint-value):has(
+    > .sniptale-framed-color-value
+  )
+  > button:is([data-ui='shared.ui.color-selector.picker-trigger'], .sniptale-paint-swatch-trigger)
+  > span {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+}
+
+.sniptale-framed-color-value {
+  --color-hex-padding: clamp(4px, calc(12% - 14px), 8px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  flex: 1;
+  min-width: 0;
+}
+
+.sniptale-framed-color-value[data-alpha] {
+  grid-template-columns: minmax(0, 1fr) 54px;
+}
+
+.sniptale-framed-color-errors {
+  grid-column: 1 / -1;
+}
+.sniptale-framed-color-errors:empty {
+  display: none;
+}
+.sniptale-framed-color-value .field-error {
+  margin: 2px 4px 4px;
+  color: var(--sniptale-color-danger);
+  font: 400 11px / 14px var(--sniptale-font-interface);
+}
+
+.sniptale-inline-color-copy {
+  position: absolute;
+  inset-inline-start: -25px;
+  inset-block-start: -1px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 32px;
+  border-radius: 4px;
+  color: var(--sniptale-color-text-secondary);
+  opacity: 0;
+  pointer-events: none;
+}
+:is(
+  .sniptale-parameter-row:hover .sniptale-inline-color-copy,
+  .sniptale-inline-color-copy:is(
+    :focus-visible,
+    [data-copy-state='copied'],
+    [data-copy-state='failed']
+  )
+):not(:disabled) {
+  opacity: 1;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.sniptale-inline-color-copy:hover {
+  color: var(--sniptale-color-text-primary);
+  background: transparent;
+}
+.sniptale-inline-color-copy svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.4;
+}
+
+.sniptale-gradient-value.sniptale-paint-value[data-ui] {
+  gap: 7px;
+  padding-inline: 7px;
+  color: var(--sniptale-color-text-primary);
+  font: var(--font-control-weight, var(--sniptale-font-weight-interface, 400))
+    var(--font-control-size, 13px)/var(--font-control-line, 18px)
+    var(--font-ui, var(--sniptale-font-interface));
+  text-align: start;
+  outline: none;
+  cursor: pointer;
+}
+.sniptale-gradient-value.sniptale-paint-value:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.sniptale-gradient-value .paint-inspector-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sniptale-gradient-value .paint-inspector-swatch {
+  flex: 0 0 26px;
+  height: 16px;
+  border: 1px solid var(--sniptale-color-field-border);
+  border-radius: 3px;
+}

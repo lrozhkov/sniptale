@@ -352,7 +352,7 @@ export function ReviewInspectorBinding({
         state.model.busy ||
         state.output.phase !== 'idle' ||
         state.editors.annotationEffects.pending ||
-        !!state.editors.annotationEffects.gestureId
+        state.editors.annotationEffects.placementGestureActive
       }
       commands={{
         session: state.session,

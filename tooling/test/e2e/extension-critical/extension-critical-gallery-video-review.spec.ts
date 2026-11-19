@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
 import {
@@ -710,11 +711,8 @@ for (const variant of [
         .poll(() => dialog.locator('video').evaluate((video) => video.currentTime))
         .toBeGreaterThan(beforeFraming);
       expect(await dialog.locator('video').evaluate((video) => video.paused)).toBe(true);
-      const scale = inspector.getByRole('textbox', {
-        name: label('gallery.videoReview.zoomScale'),
-        exact: true,
-      });
-      await scale.fill('');
+      const scale = numericControl(inspector, label('gallery.videoReview.zoomScale'));
+      await (await openNumericControl(inspector, label('gallery.videoReview.zoomScale'))).fill('');
       await scale.pressSequentially('2.25');
       await scale.press('Tab');
       await expect(scale).toHaveValue('2.25');
@@ -1564,9 +1562,9 @@ for (const variant of [
       );
       const focus = dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]');
       await expect(focus).toBeVisible();
-      await expect(
-        focus.getByRole('textbox', { name: label('gallery.videoReview.zoomScale'), exact: true })
-      ).toHaveValue('1.5');
+      await expect(numericControl(focus, label('gallery.videoReview.zoomScale'))).toHaveValue(
+        '1.5'
+      );
       await page.screenshot({ path: testInfo.outputPath('contextual-focus.png') });
       await action.click();
       await expect(
@@ -4278,12 +4276,11 @@ for (const locale of ['en', 'ru'] as const) {
       });
       await padding.fill('20');
       await padding.press('Enter');
-      const intensity = dialog.getByRole('textbox', {
-        name: label('gallery.videoReview.backgroundShadow'),
-        exact: true,
-      });
+      const intensity = numericControl(dialog, label('gallery.videoReview.backgroundShadow'));
       await expect(intensity).toHaveValue('0');
-      await intensity.fill('40');
+      await (
+        await openNumericControl(dialog, label('gallery.videoReview.backgroundShadow'))
+      ).fill('40');
       await intensity.press('Enter');
       await button('gallery.videoReview.backgroundShadowColor').click();
       const color = dialog.getByRole('textbox', {
@@ -4305,7 +4302,9 @@ for (const locale of ['en', 'ru'] as const) {
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.scene').click();
       await expect(intensity).toHaveValue('40');
-      await intensity.fill('0');
+      await (
+        await openNumericControl(dialog, label('gallery.videoReview.backgroundShadow'))
+      ).fill('0');
       await intensity.press('Enter');
       await expect
         .poll(() => window.evaluate((node) => getComputedStyle(node).boxShadow))
@@ -4437,11 +4436,8 @@ for (const zoomBehavior of ['fixed', 'follow-video'] as const) {
       const inspector = dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]');
       const preview = inspector.locator('[data-ui="gallery.videoReview.zoomPreview"]');
       await expect(preview).toHaveAttribute('data-status', 'ready');
-      const scale = inspector.getByRole('textbox', {
-        name: label('gallery.videoReview.zoomScale'),
-        exact: true,
-      });
-      await scale.fill('4');
+      const scale = numericControl(inspector, label('gallery.videoReview.zoomScale'));
+      await (await openNumericControl(inspector, label('gallery.videoReview.zoomScale'))).fill('4');
       await scale.press('Enter');
       await inspector
         .locator('summary')
@@ -4736,10 +4732,7 @@ for (const variant of [
       await duration.press('Enter');
       await expect(movement.locator('[aria-pressed="true"]')).toHaveCount(0);
       await expect(
-        fine.getByRole('textbox', {
-          name: label('videoEditor.sidebar.cursorFocusSmoothing'),
-          exact: true,
-        })
+        numericControl(fine, label('videoEditor.sidebar.cursorFocusSmoothing'))
       ).toBeAttached();
       await fine.scrollIntoViewIfNeeded();
       await page.screenshot({ path: info.outputPath('scene-camera-fine.png'), fullPage: false });

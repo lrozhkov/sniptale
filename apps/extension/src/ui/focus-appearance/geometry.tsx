@@ -19,6 +19,8 @@ export function FocusRoundnessField(props: {
       step={1}
       precision={0}
       unit="%"
+      scrubEnabled={false}
+      stepperPlacement="sides"
       value={props.value * 100}
       onPreview={(value) => props.onPreview(value === null ? null : value / 100)}
       onChange={(value) => props.onChange(value / 100)}

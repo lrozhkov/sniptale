@@ -15,6 +15,7 @@ export function EditorInspectorBackgroundBlurControl(props: {
       max={MAX_EDITOR_BACKGROUND_BLUR_AMOUNT}
       step={1}
       unit="px"
+      scale
       value={props.frameDraft.backgroundBlurAmount}
       onPreview={
         props.previewFramePatch

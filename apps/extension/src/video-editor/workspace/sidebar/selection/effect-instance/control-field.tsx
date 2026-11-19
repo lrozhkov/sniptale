@@ -92,7 +92,6 @@ function EffectNumberControl(
       onPreview={props.onPreview}
       onCommit={props.onCommit}
       unit={effectControlUnit(control.unit)}
-      scrub={control.presentation !== 'number'}
       scrubRange={range}
       revealScrub={control.presentation === 'slider'}
       {...(control.min === undefined ? {} : { min: control.min })}

@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { Minus, Plus } from 'lucide-react';
 import { useStepperRepeat } from '@sniptale/ui/compact-inspector-controls/stepper-repeat';
 import { cx } from './shared';
 
@@ -57,40 +57,36 @@ export function NumericStepper({
     repeat.start(direction);
   };
 
+  const directions = [-1, 1] as const;
   return (
     <span
       data-ui="shared.ui.compact-inspector.numeric-stepper"
+      data-placement="sides"
       className={cx(
         'flex shrink-0 flex-col opacity-0 transition-opacity',
         'group-hover/compact-numeric:opacity-100 group-focus-within/compact-numeric:opacity-100'
       )}
     >
-      <button
-        type="button"
-        aria-label={`${label} increase`}
-        disabled={disabled}
-        className={cx(
-          'flex h-3.5 w-5 items-center justify-center rounded-[4px]',
-          'bg-transparent text-[color:var(--sniptale-color-text-secondary)]',
-          'hover:text-[color:var(--sniptale-color-text-primary)]'
-        )}
-        {...getStepperButtonHandlers({ disabled, direction: 1, start, onStep, onFinish })}
-      >
-        <ChevronUp size={10} strokeWidth={2.4} />
-      </button>
-      <button
-        type="button"
-        aria-label={`${label} decrease`}
-        disabled={disabled}
-        className={cx(
-          'flex h-3.5 w-5 items-center justify-center rounded-[4px]',
-          'bg-transparent text-[color:var(--sniptale-color-text-secondary)]',
-          'hover:text-[color:var(--sniptale-color-text-primary)]'
-        )}
-        {...getStepperButtonHandlers({ disabled, direction: -1, start, onStep, onFinish })}
-      >
-        <ChevronDown size={10} strokeWidth={2.4} />
-      </button>
+      {directions.map((direction) => {
+        const increase = direction === 1;
+        const Icon = increase ? Plus : Minus;
+        return (
+          <button
+            key={direction}
+            type="button"
+            aria-label={`${label} ${increase ? 'increase' : 'decrease'}`}
+            disabled={disabled}
+            className={cx(
+              'flex h-3.5 w-5 items-center justify-center rounded-[4px]',
+              'bg-transparent text-[color:var(--sniptale-color-text-secondary)]',
+              'hover:text-[color:var(--sniptale-color-text-primary)]'
+            )}
+            {...getStepperButtonHandlers({ disabled, direction, start, onStep, onFinish })}
+          >
+            <Icon size={14} strokeWidth={1.4} aria-hidden="true" />
+          </button>
+        );
+      })}
     </span>
   );
 }

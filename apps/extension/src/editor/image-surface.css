@@ -46,29 +46,13 @@
   margin-block: 0;
 }
 
-/* Extend the editor frame without moving its value or trailing unit. */
-.sniptale-image-workspace.sniptale-compact-workspace .sniptale-numeric-entry {
+.sniptale-image-workspace.sniptale-compact-workspace
+  .sniptale-numeric-value:not(.sniptale-framed-stepper)
+  .sniptale-numeric-entry {
   padding-inline-end: 10px;
   margin-inline-end: -2px;
 }
-.sniptale-image-workspace [data-ui='shared.ui.compact-inspector.numeric-stepper'] > button {
-  justify-content: flex-end;
-}
 
-/* Inline choices fit their current value. Stacked choices use the full row. */
-.sniptale-image-workspace
-  [data-ui='shared.ui.compact-inspector.select-field'][data-layout='inline']
-  > .sniptale-parameter-value {
-  justify-self: end;
-  min-inline-size: min(100px, 100%);
-}
-@layer utilities {
-  .sniptale-image-workspace.sniptale-compact-workspace
-    [data-ui='shared.ui.compact-inspector.select-field'][data-layout='inline']
-    > .sniptale-parameter-value {
-    width: fit-content !important;
-  }
-}
 .sniptale-image-workspace.sniptale-compact-workspace
   [data-ui='shared.ui.compact-inspector.select-field']
   [data-ui='shared.ui.compact-select']

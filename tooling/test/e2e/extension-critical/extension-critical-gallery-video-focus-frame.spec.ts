@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { createVideoProjectCursorTrack } from '../../../../apps/extension/src/features/video/project/defaults';
 import { expect, test, type Page } from '@playwright/test';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
@@ -485,12 +486,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
           exact: true,
         })
       ).toBeDisabled();
-      await expect(
-        inspector.getByRole('textbox', {
-          name: label('gallery.videoReview.zoomScale'),
-          exact: true,
-        })
-      ).toBeEnabled();
+      await expect(numericControl(inspector, label('gallery.videoReview.zoomScale'))).toBeEnabled();
       await mode.scrollIntoViewIfNeeded();
       await page.screenshot({ path: info.outputPath('local-camera-follow.png'), fullPage: false });
       if (viewport.size.width === 1920)
@@ -554,12 +550,11 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await expect
         .poll(async () => (await persistedFocus(page))?.spotlight?.lensOptics)
         .toBe('optical');
-      const edge = inspector.getByRole('textbox', {
-        name: label('gallery.videoReview.clickLensEdgeWidth'),
-        exact: true,
-      });
+      const edge = numericControl(inspector, label('gallery.videoReview.clickLensEdgeWidth'));
       await expect(edge).toHaveValue('8');
-      await edge.fill('5');
+      await (
+        await openNumericControl(inspector, label('gallery.videoReview.clickLensEdgeWidth'))
+      ).fill('5');
       await edge.press('Enter');
       await expect.poll(async () => (await persistedFocus(page))?.spotlight?.lensEdgeWidth).toBe(5);
       const placement = inspector.getByRole('button', {

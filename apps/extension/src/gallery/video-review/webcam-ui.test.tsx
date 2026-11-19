@@ -157,6 +157,9 @@ function section(id: string) {
 }
 async function enter(name: string, value: string) {
   reveal(`[aria-label="${name}"]`);
+  act(() =>
+    host.querySelector<HTMLButtonElement>(`.opacity-field button[aria-label="${name}"]`)?.click()
+  );
   const node = field(name);
   expect(node).not.toBeNull();
   await act(async () => {

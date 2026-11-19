@@ -43,7 +43,7 @@ it.each([true, false])(
         )
       );
       const slider = host.querySelector<HTMLInputElement>(
-        'input[type="range"][aria-label="gallery.videoReview.zoomScale range"]'
+        'input[type="range"][aria-label="gallery.videoReview.zoomScale"]'
       )!;
       expect(slider).not.toBeNull();
       act(() => slider.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));

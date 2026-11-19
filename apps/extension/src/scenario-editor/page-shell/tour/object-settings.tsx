@@ -287,6 +287,7 @@ function TourHotspotVisualSettings({
           />
           <TourInspectorNumericRow
             label={t('scenario.editor.tourOpacity')}
+            rangePresentation="field"
             value={visual.opacity * 100}
             min={0}
             max={100}

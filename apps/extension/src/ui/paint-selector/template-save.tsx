@@ -1,3 +1,4 @@
+import { ProductInput } from '@sniptale/ui/product-form-controls';
 import {
   useEffect,
   useId,
@@ -26,12 +27,6 @@ const formClass = [
 const closeClass = [
   'grid h-6 w-6 place-items-center rounded-[4px] text-[var(--sniptale-color-text-secondary)]',
   'outline-none hover:bg-[var(--sniptale-color-surface-hover)] focus-visible:outline',
-  'focus-visible:outline-1 focus-visible:outline-[var(--sniptale-color-text-secondary)]',
-].join(' ');
-
-const nameClass = [
-  'h-8 min-w-0 rounded-[4px] border border-[var(--sniptale-color-border-soft)]',
-  'bg-[var(--sniptale-color-surface-input)] px-2 text-xs outline-none focus-visible:outline',
   'focus-visible:outline-1 focus-visible:outline-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 
@@ -222,7 +217,7 @@ export function GradientTemplateSave(props: TemplateSaveProps) {
             backgroundSize: '100% 100%, 12px 12px',
           }}
         />
-        <input
+        <ProductInput
           ref={input}
           id={nameId}
           autoFocus
@@ -232,7 +227,6 @@ export function GradientTemplateSave(props: TemplateSaveProps) {
           readOnly={busy}
           aria-label={translate('highlighter.paintPicker.templateName')}
           placeholder={translate('highlighter.paintPicker.templateName')}
-          className={nameClass}
           onChange={(event) => setName(event.target.value)}
         />
         <button

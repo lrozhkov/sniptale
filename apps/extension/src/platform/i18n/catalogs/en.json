@@ -2058,7 +2058,7 @@
       "colorCatalogFamilyNeutral": "Neutrals",
       "colorSelectorOriginal": "Original",
       "colorSelectorCurrent": "New",
-      "colorSelectorCopy": "Copy color",
+      "colorSelectorCopy": "Copy color HEX",
       "colorSelectorCopied": "Color copied",
       "colorSelectorCopyFailed": "Could not copy. Select the value and copy it manually.",
       "colorSelectorCompactMode": "Compact mode",

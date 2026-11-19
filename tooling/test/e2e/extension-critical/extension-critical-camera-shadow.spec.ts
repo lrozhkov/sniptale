@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { translate } from '../support/catalog-fixture';
@@ -112,9 +113,9 @@ async function chooseDirection(surface: Locator, locale: AppLocale, mode: Direct
 }
 
 async function setNumber(surface: Locator, locale: AppLocale, key: Message, value: number) {
-  const input = surface.getByRole('textbox', { name: translate(key, locale), exact: true });
+  const input = numericControl(surface, translate(key, locale));
   await input.scrollIntoViewIfNeeded();
-  await input.fill(String(value));
+  await (await openNumericControl(surface, translate(key, locale))).fill(String(value));
   await input.press('Enter');
 }
 

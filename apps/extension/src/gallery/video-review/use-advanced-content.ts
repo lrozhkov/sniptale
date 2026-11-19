@@ -220,13 +220,17 @@ function reviewContentCommands(
     setAnnotationEffects: (
       update: (
         lane: QuickEditAdvancedContent['annotationEffects']
-      ) => QuickEditAdvancedContent['annotationEffects']
-    ) =>
+      ) => QuickEditAdvancedContent['annotationEffects'],
+      discrete = false
+    ) => {
+      if (discrete) endTyping();
       stage((content) => {
         const { annotationEffects: previous, ...rest } = content;
         const annotationEffects = update(previous);
         return annotationEffects ? { ...rest, annotationEffects } : rest;
-      }),
+      });
+      if (discrete) endTyping();
+    },
     setText: (
       update: (text: QuickEditAdvancedContent['text']) => QuickEditAdvancedContent['text'],
       typing?: ReviewTextTypingTarget

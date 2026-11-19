@@ -1,3 +1,4 @@
+import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useId, useRef, useState } from 'react';
 import { InspectorFieldClear } from '../../../ui/compact-inspector-controls/text-field';
@@ -176,8 +177,8 @@ export function GallerySavedViewActions(
           border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-input)] p-1.5"
         >
           <div className="flex h-8 items-center gap-1.5">
-            <div className="sniptale-text-value gallery-saved-view-field min-w-0 flex-1">
-              <input
+            <div className="sniptale-text-value min-w-0 flex-1" data-framed>
+              <ProductInput
                 ref={inputRef}
                 autoFocus
                 value={name}
@@ -192,10 +193,10 @@ export function GallerySavedViewActions(
                   }
                 }}
                 aria-label={translate('gallery.app.savedViewName')}
+                invalid={Boolean(error)}
                 aria-invalid={error ? true : undefined}
                 aria-describedby={error ? errorId : undefined}
                 placeholder={translate('gallery.app.savedViewName')}
-                className="w-full min-w-0 outline-none"
               />
               {name.length > 0 ? (
                 <InspectorFieldClear

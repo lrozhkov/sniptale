@@ -116,6 +116,7 @@ export function InspectSourceVoiceoverPanel(props: { project: VideoProject; docu
             content: (
               <DraftNumericRow
                 label={translate('videoEditor.sidebar.originalAudioLevel')}
+                rangePresentation="field"
                 unit="%"
                 min={0}
                 max={100}

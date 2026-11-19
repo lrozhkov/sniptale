@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { expect, type Locator, type Page } from '@playwright/test';
@@ -408,8 +409,8 @@ async function sourceEditor(browser: Provider, fixture: Fixture, kind: Kind) {
   return editor;
 }
 async function number(owner: Page | Locator, key: Parameters<typeof translate>[0], value: string) {
-  const field = owner.getByRole('textbox', { name: label(key), exact: true });
-  await field.fill(value);
+  const field = numericControl(owner, label(key));
+  await (await openNumericControl(owner, label(key))).fill(value);
   await field.press('Enter');
   await expect(field).toHaveValue(value);
 }
@@ -779,12 +780,9 @@ async function verifyControls(page: Page, fixture: Fixture, kind: Kind) {
         exact: true,
       })
     ).toHaveValue('12');
-    await expect(
-      dialog.getByRole('textbox', {
-        name: label('gallery.videoReview.backgroundShadow'),
-        exact: true,
-      })
-    ).toHaveValue('40');
+    await expect(numericControl(dialog, label('gallery.videoReview.backgroundShadow'))).toHaveValue(
+      '40'
+    );
     await dialog
       .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
       .first()

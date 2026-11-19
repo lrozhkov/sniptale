@@ -260,6 +260,7 @@ export function WatermarkNumber(
     max: number;
     step: number;
     precision?: number;
+    rangePresentation?: 'field';
     change(value: number): QuickEditWatermarkSettings;
   }
 ) {
@@ -273,6 +274,7 @@ export function WatermarkNumber(
       max={props.max}
       step={props.step}
       precision={props.precision ?? 1}
+      rangePresentation={props.rangePresentation}
       onPreview={(value) => props.onPreview(value === null ? null : props.change(value))}
       onChange={(value) => props.onChange(props.change(value))}
     />

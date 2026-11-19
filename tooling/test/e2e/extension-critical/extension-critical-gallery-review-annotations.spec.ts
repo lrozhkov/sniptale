@@ -410,28 +410,21 @@ async function verifyAnnotationControls(
     name: label('gallery.videoReview.annotationX'),
     exact: true,
   });
-  const slider = inspector.getByRole('slider', {
-    name: `${label('gallery.videoReview.annotationX')} range`,
-    exact: true,
-  });
-  const reveal = async () => {
-    await field.scrollIntoViewIfNeeded();
-    await field
-      .locator('xpath=ancestor::*[@data-ui="shared.ui.compact-inspector.numeric-row"]')
-      .hover();
-    await expect(slider).toBeVisible();
-    await slider.focus();
-  };
+  const row = field.locator(
+    'xpath=ancestor::*[@data-ui="shared.ui.compact-inspector.numeric-row"]'
+  );
+  await expect(row.getByRole('slider')).toHaveCount(0);
+  await expect(row.locator('[data-stepper-placement="sides"]')).toBeVisible();
   const before = (await persistedReviewContent(page))!.annotationEffects!.instances[0]!.transform.x;
   const cursor = (await workspace())!.cursor;
-  await reveal();
-  await page.keyboard.down('ArrowRight');
-  await page.keyboard.down('ArrowRight');
   const next = (Math.floor(before * 100 + 1e-10) + 2) / 100;
-  await expect(field).toHaveValue(String(next * 100));
-  await page.screenshot({ path: info.outputPath('annotation-scrub-focused.png'), fullPage: false });
+  await field.fill(String(next * 100));
+  await page.screenshot({
+    path: info.outputPath('annotation-placement-focused.png'),
+    fullPage: false,
+  });
   expect((await workspace())!.cursor).toBe(cursor);
-  await page.keyboard.up('ArrowRight');
+  await field.press('Enter');
   await expect
     .poll(
       async () => (await persistedReviewContent(page))!.annotationEffects!.instances[0]!.transform.x
@@ -454,10 +447,8 @@ async function verifyAnnotationControls(
       async () => (await persistedReviewContent(page))!.annotationEffects!.instances[0]!.transform.x
     )
     .toBe(next);
-  await reveal();
-  await page.keyboard.down('ArrowRight');
-  await slider.press('Escape');
-  await page.keyboard.up('ArrowRight');
+  await field.fill(String(next * 100 + 10));
+  await field.press('Escape');
   expect((await workspace())!.cursor).toBe(cursor + 1);
   await expect
     .poll(

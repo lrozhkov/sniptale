@@ -29,11 +29,13 @@ export function buildRangeCompactCommand(args: {
     icon: args.icon,
     title: args.label,
     trigger: args.trigger ?? <CompactCommandToken>{args.token}</CompactCommandToken>,
-    value: args.valueText,
+    ...(percentUnit ? {} : { value: args.valueText }),
     content: (
-      <CompactCommandField label={args.label} value={args.valueText}>
+      <CompactCommandField label={args.label} hideLabel>
         <NumericRow
+          appearance="plain"
           label={args.label}
+          rangePresentation={percentUnit ? 'field' : undefined}
           unit={resolveRangeCommandUnit(args.valueText)}
           min={min}
           max={max}
@@ -44,7 +46,7 @@ export function buildRangeCompactCommand(args: {
             args.onChange(String(toCommandValue(nextValue)));
             args.onValueCommit?.();
           }}
-          scrub={{ min, max, step }}
+          scrub={percentUnit ? { min, max, step } : undefined}
         />
       </CompactCommandField>
     ),

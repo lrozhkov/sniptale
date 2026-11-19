@@ -443,6 +443,7 @@ function WebcamAppearance({ editor }: { editor: Editor }) {
         {appearance.shape !== 'ellipse' && appearance.shape !== 'circle' ? (
           <ReviewNumberRow
             label={translate('videoEditor.sidebar.cameraRoundness')}
+            stepperPlacement="sides"
             value={appearance.roundness}
             min={0}
             max={100}
@@ -498,6 +499,7 @@ function WebcamAppearance({ editor }: { editor: Editor }) {
         ) : null}
         <ReviewNumberRow
           label={translate('gallery.videoReview.webcamShadow')}
+          rangePresentation="field"
           value={camera.shadow?.intensity ?? 0}
           min={0}
           max={100}
@@ -546,6 +548,8 @@ function WebcamCrop({ editor }: { editor: Editor }) {
       />
       <ReviewNumberRow
         label={translate('videoEditor.sidebar.cameraCropZoom')}
+        rangePresentation="field"
+        unit=""
         value={crop.zoom}
         min={1}
         max={4}

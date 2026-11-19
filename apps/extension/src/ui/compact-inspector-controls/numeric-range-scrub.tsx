@@ -226,18 +226,19 @@ function NumericRangeInput(props: {
 }
 
 /** Snap user proposals only; derived controlled values and exact interval endpoints stay intact. */
-function snapRangeProposal(value: number, min: number, max: number, step: number): number {
+export function snapRangeProposal(value: number, min: number, max: number, step: number): number {
   const bounded = clampNumber(value, min, max);
   if (bounded === min || bounded === max) return bounded;
   const snapped = min + Math.round((bounded - min) / step) * step;
   return clampNumber(Number(snapped.toPrecision(15)), min, max);
 }
 
-function rangeKeyboardValue(
+export function rangeKeyboardValue(
   event: KeyboardEvent<HTMLInputElement>,
   min: number,
   max: number,
-  step: number
+  step: number,
+  currentValue = Number(event.currentTarget.value)
 ): number | null {
   if (event.altKey || event.ctrlKey || event.metaKey) return null;
   if (event.key === 'Home') return min;
@@ -261,7 +262,7 @@ function rangeKeyboardValue(
     default:
       return null;
   }
-  const position = (Number(event.currentTarget.value) - min) / step;
+  const position = (currentValue - min) / step;
   const tick = delta > 0 ? Math.floor(position + 1e-10) : Math.ceil(position - 1e-10);
   return snapRangeProposal(min + (tick + delta) * step, min, max, step);
 }

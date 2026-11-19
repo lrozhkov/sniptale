@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { createGlTransitionSelection } from '../../../../apps/extension/src/features/video/project/transition/gl-catalog';
 import type { VideoProject } from '../../../../apps/extension/src/features/video/project/types';
 import { createSourceImageFilter } from '../../../../apps/extension/src/features/image-filters/contract';
@@ -472,8 +473,8 @@ for (const [index, size] of [
         .poll(async () => (await read()).motionRegions![0]!.spotlightTarget)
         .toBe('scene');
       const editNumber = async (key: Parameters<typeof translate>[0], value: string) => {
-        const field = inspector.getByRole('textbox', { name: label(key), exact: true });
-        await field.fill(value);
+        const field = numericControl(inspector, label(key));
+        await (await openNumericControl(inspector, label(key))).fill(value);
         await field.press('Enter');
         return field;
       };

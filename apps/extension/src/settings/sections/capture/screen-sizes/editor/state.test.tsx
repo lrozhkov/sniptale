@@ -149,6 +149,15 @@ it('blocks blank names, exposes loading state, handles failures, and closes on E
   expect(loggerErrorMock).toHaveBeenCalledWith('Failed to save viewport preset', expect.any(Error));
   expect(requireState().status.isSaving).toBe(false);
 
+  act(() =>
+    requireState().handlers.handleKeyDown({
+      key: 'Escape',
+      defaultPrevented: true,
+    } as KeyboardEvent)
+  );
+  expect(onClose).not.toHaveBeenCalled();
+  expect(requireState().form.label).toBe('Preset');
+
   act(() => requireState().handlers.handleKeyDown({ key: 'Escape' } as KeyboardEvent));
   expect(onClose).toHaveBeenCalledOnce();
   act(() => requireState().handlers.handleKeyDown({ key: 'Enter' } as KeyboardEvent));

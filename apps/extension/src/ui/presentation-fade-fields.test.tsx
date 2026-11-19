@@ -42,6 +42,8 @@ it('keeps inherited audio and color omitted when committing only duration', () =
   const field = host.querySelector<HTMLInputElement>(
     'input[aria-label="gallery.videoReview.presentationDuration"]'
   )!;
+  expect(field.closest('[data-stepper-placement="sides"]')).not.toBeNull();
+  expect(host.querySelector('input[type="range"]')).toBeNull();
   expect(field.value).toContain('1.25');
   act(() => field.focus());
   act(() => {

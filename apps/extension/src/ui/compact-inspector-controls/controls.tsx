@@ -1,3 +1,4 @@
+import './inspector-select.css';
 import type React from 'react';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { CompactColorSelector, type CompactColorSelectorProps } from '../color-selector';
@@ -93,9 +94,6 @@ const COLOR_TRIGGER_CLASS_NAME = [
   "[&_[data-ui='shared.ui.color-selector.trigger']]:shadow-none",
 ].join(' ');
 
-const SELECT_FIELD_TRIGGER_CLASS_NAME =
-  'h-8 min-w-0 w-full border-transparent bg-transparent px-0 shadow-none';
-
 const SELECT_FIELD_CONTAINER_CLASS_NAME = 'ml-auto min-w-0 !w-[8.75rem] max-w-[58%] shrink-0';
 
 function getNodeTitle(value: React.ReactNode): string | undefined {
@@ -174,7 +172,6 @@ export function SelectField<T extends string>(props: {
   selectClassName?: string | undefined;
 }) {
   const [open, setOpen] = useState(false);
-  const rowRef = useRef<HTMLDivElement | null>(null);
   const inspector = useInspectorLayout();
 
   const selectProps = {
@@ -192,7 +189,7 @@ export function SelectField<T extends string>(props: {
     return (
       <InspectorParameterRow
         label={props.label}
-        valueText={props.options.find((option) => option.value === props.value)?.label}
+        keepInline
         dataUi="shared.ui.compact-inspector.select-field"
         className={props.className}
       >
@@ -202,26 +199,25 @@ export function SelectField<T extends string>(props: {
 
   return (
     <div
-      ref={rowRef}
       data-ui="shared.ui.compact-inspector.select-field"
       data-open={open ? 'true' : 'false'}
+      data-compact-select-menu-bounds="parameter"
       className={cx(
-        'flex min-h-10 w-full min-w-0 items-center justify-between gap-3 rounded-[10px] border px-3 py-1.5',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
-        open
-          ? 'border-[color:var(--sniptale-color-border-accent-strong)]'
-          : 'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
+        'flex min-h-8 w-full min-w-0 items-center justify-between gap-2',
         props.className
       )}
     >
-      <span className={cx('min-w-0', FIELD_LABEL_CLASS_NAME)} title={props.label}>
+      <span
+        className={cx('min-w-0', FIELD_LABEL_CLASS_NAME)}
+        data-compact-select-menu-label=""
+        title={props.label}
+      >
         {props.label}
       </span>
       <CompactSelect
         {...selectProps}
-        className={cx(SELECT_FIELD_TRIGGER_CLASS_NAME, props.selectClassName)}
+        className={props.selectClassName}
         containerClassName={SELECT_FIELD_CONTAINER_CLASS_NAME}
-        menuAnchorRef={rowRef}
       />
     </div>
   );
@@ -264,7 +260,7 @@ export function SegmentedRow<T extends string>(props: {
       <InspectorParameterRow
         label={typeof props.label === 'string' ? props.label : props.ariaLabel}
         stacked={stacked}
-        valueOptions={props.options.map((option) => option.label)}
+        valueOptions={props.options.map((option) => (option.icon ? '' : option.label))}
         dataUi="shared.ui.compact-inspector.segmented-field"
       >
         {selector}

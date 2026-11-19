@@ -1,3 +1,4 @@
+import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { createGlTransitionSelection } from '../../../../apps/extension/src/features/video/project/transition/gl-catalog';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { createSourceImageFilter } from '../../../../apps/extension/src/features/image-filters/contract';
@@ -271,9 +272,9 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
     const field = (key: Parameters<typeof translate>[0]) =>
       owner.getByRole('textbox', { name: label(key), exact: true });
     const number = async (key: Parameters<typeof translate>[0], value: string) => {
-      await field(key).scrollIntoViewIfNeeded();
-      await field(key).fill(value);
-      await field(key).press('Enter');
+      const editor = numericControl(owner, label(key));
+      await (await openNumericControl(owner, label(key))).fill(value);
+      await editor.press('Enter');
     };
     const effect = async (value: 'off' | 'ripple' | 'press' | 'glow' | 'magnify') => {
       await category('videoEditor.sidebar.historyClickEffects').click();

@@ -4,7 +4,12 @@
 
 ## Choose the editor
 
-[Numeric fields](../../tooling/design-reference/examples/layers/index.html) specify values, units, bounds, and precision. Use ranges for continuous values. Keep ordinary sliders visible. Use contextual sliders and repeating steppers with inspector values.
+[Numeric fields](../../tooling/design-reference/examples/layers/index.html) specify values, units, bounds, and precision. Keep ordinary sliders visible.
+
+- Use the scale with a pencil when users adjust an effect by sight or sound. Examples include opacity, blur, shadow strength and volume. Match the scale limits to the limits for exact entry.
+- Use the contextual slider when its useful limits differ from the limits for exact entry. Keep both sets of limits.
+- Use a stepper for values that users frequently adjust one step at a time. Examples include dimensions, corner radius, and trim times.
+- Use direct entry for an exact value when a step has little meaning. An example is a random seed.
 
 Preserve the product mapping, units, precision, snapping, valid boundaries, and accepted off-step values.
 

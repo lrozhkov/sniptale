@@ -1,4 +1,4 @@
-import { NumberInput } from '@sniptale/ui/number-input';
+import { NumericValueField } from '../../../ui/compact-inspector-controls/numeric';
 import { readCatalogPresentation } from '../../../features/video/project/effect-bundle/catalog/presentation';
 import { useEffect, useState, useRef } from 'react';
 import { ArrowLeft, Play, Pause } from 'lucide-react';
@@ -109,27 +109,24 @@ export function AnnotationSourcePreview(
           {`${time.toFixed(1)} / ${duration.toFixed(1)}`}
         </span>
       </div>
-      <label className="flex items-center justify-between gap-2 text-xs">
-        {translate('videoEditor.effectsLibrary.fxDuration')}
-        <NumberInput
-          className={[
-            'w-20 rounded-[4px] border border-[var(--sniptale-color-border-soft)]',
-            'bg-transparent px-2 py-1 text-right',
-          ].join(' ')}
-          type="number"
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span>{translate('videoEditor.effectsLibrary.fxDuration')}</span>
+        <NumericValueField
+          label={translate('videoEditor.effectsLibrary.fxDuration')}
           min={0.1}
           max={3600}
           step={0.1}
+          unit="s"
+          enterBehavior="blur"
           value={duration}
-          onChange={(event) => {
-            const value = Number(event.target.value);
-            if (!Number.isFinite(value) || value < 0.1 || value > 3600) return;
+          onPreviewValue={() => undefined}
+          onCommitValue={(value) => {
             setPlaying(false);
             setDuration(value);
-            setTime(Math.min(time, value));
+            setTime((current) => Math.min(current, value));
           }}
         />
-      </label>
+      </div>
       <div className="grid grid-cols-1 gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-2">
         <ContentToolbarButton
           className="!h-auto !min-h-10 !w-full !px-3 !py-2 text-xs whitespace-normal"

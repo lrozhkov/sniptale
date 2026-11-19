@@ -183,6 +183,7 @@ function WatermarkImageFields(props: WatermarkInspectorProps & Binding) {
           <WatermarkNumber
             {...props}
             label={translate('gallery.videoReview.watermarkOpacity')}
+            rangePresentation="field"
             unit="%"
             value={image.opacity * 100}
             min={0}

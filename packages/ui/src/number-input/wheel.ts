@@ -18,7 +18,7 @@ export function attachNumericInputWheel(
       !event.cancelable ||
       event.ctrlKey ||
       event.metaKey ||
-      event.altKey ||
+      !event.altKey ||
       event.shiftKey ||
       event.deltaY === 0 ||
       Math.abs(event.deltaX) >= Math.abs(event.deltaY)

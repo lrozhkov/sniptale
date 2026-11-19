@@ -15,7 +15,7 @@
     isolation: isolate;
     border-bottom: 1px solid var(--divider);
     background-color: var(--sniptale-color-surface-canvas);
-    --checker: color-mix(in srgb, var(--reference-field-border) 55%, transparent);
+    --checker: color-mix(in srgb, var(--sniptale-color-field-border) 55%, transparent);
     background-image: conic-gradient(
       var(--checker) 25%,
       transparent 0 50%,
@@ -27,8 +27,6 @@
   .subject {
     width: min(100%, 176px);
     height: 84px;
-    mix-blend-mode: var(--reference-blend-mode, normal);
-    scale: var(--reference-subject-scale, 1);
   }
   .parameters {
     --reference-inspector-value-width: 52%;
@@ -51,6 +49,47 @@
   slot {
     display: contents;
   }
+  .reference-inspector-text {
+    display: contents;
+    --sniptale-parameter-control-height: 32px;
+    --sniptale-parameter-context-space: 0px;
+  }
+  .reference-inspector-text .sniptale-parameter-row[data-layout='inline'] {
+    grid-template-columns: minmax(0, 1fr) minmax(0, var(--reference-inspector-value-width));
+  }
+  .reference-inspector-text .sniptale-parameter-row {
+    display: grid;
+    gap: 4px 8px;
+    min-width: 0;
+    align-items: start;
+  }
+  .reference-inspector-text .sniptale-parameter-name {
+    align-self: center;
+    color: var(--secondary);
+    font: var(--font-control-weight) var(--font-control-size)/var(--font-control-line)
+      var(--font-ui);
+  }
+  .reference-inspector-text .sniptale-parameter-value {
+    min-width: 0;
+  }
+  .reference-inspector-text [data-framed] {
+    position: relative;
+    min-width: 0;
+  }
+  .parameter > .sniptale-compact-workspace .sniptale-framed-stepper {
+    width: 100%;
+  }
+  .reference-inspector-dictation {
+    display: grid;
+    width: 24px;
+    height: 24px;
+    place-items: center;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .reference-inspector-dictation:hover {
+    background: var(--sniptale-color-field-hover);
+  }
   .parameter > .param-name,
   .color-row-name > .param-name,
   .gradient-field .paint-inspector-label {
@@ -65,203 +104,20 @@
     min-width: 0;
     font-variant-numeric: tabular-nums;
   }
-  .compound-field,
-  .color-frame,
-  .gradient-field .paint-inspector-field > button {
-    display: flex;
-    min-height: var(--control-height);
-    width: 100%;
-    align-items: stretch;
-    border: 1px solid var(--reference-field-border);
-    border-radius: var(--radius);
-    background: var(--reference-field-idle);
-    color: var(--text);
-  }
-  .compound-field:hover,
-  .color-frame:hover,
-  .gradient-field .paint-inspector-field > button:hover {
-    background: var(--reference-field-hover);
-    border-color: var(--reference-field-hover-border);
-  }
-  .compound-field[data-editing='true'],
-  .radius-field:has(> .radius-value:focus),
-  .color-frame:has(
-    :is(input:focus, .inspector-hex-trigger:focus-visible, .alpha-value > button:focus-visible)
-  ),
-  .color-field[data-open='true'] .color-frame,
-  .gradient-field .paint-inspector-field > button:is(:focus-visible, [aria-expanded='true']) {
-    border-color: var(--reference-field-focus);
-  }
-  .compound-field[data-invalid='true'],
-  .color-field .color-frame:has(input[aria-invalid='true']) {
-    border-color: var(--sniptale-color-danger);
-  }
-  .compound-field button,
   .color-frame button {
     border-radius: calc(var(--radius) - 1px);
   }
-  .compound-field :is(button:not(.radius-value), input[type='range']):focus-visible,
   .inspector-swatch-trigger:focus-visible {
-    outline: 1px solid var(--reference-field-focus);
+    outline: 1px solid var(--sniptale-color-field-focus);
     outline-offset: -2px;
   }
-  .compound-field > .radius-value:focus {
-    outline: 0 solid transparent;
-  }
-  .field-action {
-    flex: 0 0 var(--reference-inspector-action-width);
-    display: grid;
-    place-items: center;
-    min-height: calc(var(--control-height) - 2px);
-    padding: 0;
-    color: var(--reference-inspector-icon-ink);
-    cursor: pointer;
-  }
-  .color-copy svg,
-  .field-action svg {
+  .color-copy svg {
     width: var(--reference-inspector-icon-size);
     height: var(--reference-inspector-icon-size);
   }
-  .color-copy svg > *,
-  .field-action svg > * {
+  .color-copy svg > * {
     vector-effect: non-scaling-stroke;
     stroke-width: var(--reference-inspector-icon-stroke);
-  }
-  .field-action:hover:not([aria-disabled]),
-  .radius-value:hover {
-    color: var(--text);
-    background: color-mix(in srgb, var(--reference-field-hover-border) 36%, transparent);
-  }
-  .field-action[aria-disabled='true'] {
-    opacity: 0.42;
-  }
-  .opacity-field .field-action {
-    position: relative;
-  }
-  .opacity-field .field-action::before {
-    content: '';
-    position: absolute;
-    inset-block: 0;
-    inset-inline-start: 0;
-    border-inline-start: 1px solid var(--reference-field-border);
-  }
-  .opacity-track {
-    position: relative;
-    display: flex;
-    flex: 1;
-    min-width: 0;
-    align-items: center;
-    isolation: isolate;
-  }
-  .opacity-paint {
-    position: absolute;
-    inset: 0 3px;
-    pointer-events: none;
-  }
-  .opacity-fill {
-    position: absolute;
-    inset-block: 0;
-    inset-inline-start: -3px;
-    width: calc(3px + 100% * var(--progress));
-    border-start-start-radius: calc(var(--radius) - 1px);
-    border-end-start-radius: calc(var(--radius) - 1px);
-    background: color-mix(in srgb, var(--reference-inspector-icon-ink) 22%, transparent);
-  }
-  .opacity-track:has(input[value='0']) .opacity-fill {
-    width: 0;
-  }
-  .opacity-marker {
-    position: absolute;
-    inset-block: 1px;
-    inset-inline-start: calc(100% * var(--progress));
-    width: 2px;
-    transform: translateX(-1px);
-    border-radius: 1px;
-    background: var(--reference-inspector-icon-ink);
-  }
-  .opacity-value {
-    position: relative;
-    margin-inline: 9px 4px;
-    pointer-events: none;
-    text-shadow: 0 0 3px var(--panel);
-  }
-  .opacity-track input {
-    appearance: none;
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    border-radius: calc(var(--radius) - 1px) 0 0 calc(var(--radius) - 1px);
-    background: transparent;
-    cursor: ew-resize;
-  }
-  .opacity-track input::-webkit-slider-thumb {
-    appearance: none;
-    width: 6px;
-    height: 28px;
-    background: transparent;
-  }
-  .opacity-track input::-moz-range-thumb {
-    width: 6px;
-    height: 28px;
-    border: 0;
-    background: transparent;
-  }
-  .radius-value {
-    min-width: 0;
-    flex: 1;
-    padding-inline: 2px;
-    cursor: text;
-    white-space: nowrap;
-  }
-  .field-unit {
-    color: var(--secondary);
-  }
-  .number-readout {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 0;
-    font: var(--font-control-weight) var(--font-control-size)/var(--font-control-line)
-      var(--font-ui);
-    font-variant-numeric: tabular-nums;
-  }
-  .radius-field .number-readout {
-    gap: 0.25em;
-  }
-  .numeric-editor {
-    display: flex;
-    width: 100%;
-    align-items: center;
-  }
-  .numeric-editor > .number-readout {
-    flex: 1;
-  }
-  .opacity-field .number-readout {
-    justify-content: start;
-  }
-  .opacity-field .field-unit {
-    color: inherit;
-  }
-  .opacity-field .numeric-editor > .number-readout {
-    padding-inline: 9px 4px;
-  }
-  .radius-field .numeric-editor > .number-readout {
-    padding-inline-start: var(--reference-inspector-action-width);
-  }
-  .numeric-editor input {
-    field-sizing: content;
-    min-inline-size: 1ch;
-    max-inline-size: calc(100% - 2ch);
-    height: calc(var(--control-height) - 2px);
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    caret-color: var(--text);
-    font: inherit;
-    font-variant-numeric: inherit;
   }
   .field-error {
     margin: var(--reference-field-error-gap) 0 0;
@@ -286,7 +142,7 @@
     cursor: pointer;
   }
   .color-row:hover .color-copy,
-  .color-copy:is(:focus-visible, [data-copy-state='copied'], [data-copy-state='failed']) {
+  .color-copy:is(:focus-visible, [data-copy-state='copied']) {
     opacity: 1;
     pointer-events: auto;
   }
@@ -294,12 +150,8 @@
     color: var(--text);
   }
   .color-copy:focus-visible {
-    outline: 1px solid var(--reference-field-focus);
+    outline: 1px solid var(--sniptale-color-field-focus);
     outline-offset: -2px;
-  }
-  .color-copy-error {
-    grid-column: 1 / -1;
-    margin-block: 4px 1px;
   }
   @media (hover: none) {
     .color-copy {
@@ -324,7 +176,7 @@
     place-items: center;
     width: 100%;
     height: calc(var(--control-height) - 2px);
-    border-inline-end: 1px solid var(--reference-field-border);
+    border-inline-end: 1px solid var(--sniptale-color-field-border);
     cursor: pointer;
   }
   .inspector-swatch-trigger:hover {
@@ -333,7 +185,7 @@
   .inspector-swatch-color {
     width: 16px;
     height: 16px;
-    border: 1px solid var(--reference-field-border);
+    border: 1px solid var(--sniptale-color-field-border);
     border-radius: 3px;
     background-color: #fff;
     background-image:
@@ -343,100 +195,8 @@
       100% 100%,
       8px 8px;
   }
-  :is(.inspector-hex-trigger, .inspector-hex-editor) {
-    min-width: 0;
-    min-height: calc(var(--control-height) - 2px);
-    padding-inline: 8px;
-    text-align: start;
-    color: var(--text);
-    font: var(--font-control-weight) var(--font-control-size)/var(--font-control-line)
-      var(--font-ui);
-    font-variant-numeric: tabular-nums;
-    text-transform: uppercase;
-  }
-  .inspector-hex-trigger {
-    height: calc(var(--control-height) - 2px);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    cursor: text;
-  }
-  .inspector-hex-editor input {
-    display: block;
-    width: 100%;
-    height: calc(var(--control-height) - 2px);
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    caret-color: var(--text);
-    cursor: text;
-    font: inherit;
-    font-variant-numeric: inherit;
-    text-transform: inherit;
-  }
-  .numeric-editor input:focus,
-  .inspector-hex-editor input:focus,
-  .inspector-hex-trigger:focus-visible {
-    outline: 0 solid transparent;
-  }
-  .numeric-editor input::selection,
-  .inspector-hex-editor input::selection {
-    background: var(--sniptale-color-border-strong);
-    color: var(--text);
-  }
-  .gradient-field .paint-inspector-field > button {
-    align-items: center;
-    gap: 7px;
-    padding: 0 7px;
-    outline: 0;
-    font: var(--font-control-weight) var(--font-control-size)/var(--font-control-line)
-      var(--font-ui);
-  }
-  .gradient-field .paint-inspector-swatch {
-    width: 26px;
-    height: 16px;
-    border-radius: 3px;
-  }
-  .gradient-field .paint-inspector-value {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .gradient-field .paint-inspector-field > button > svg {
-    display: none;
-  }
-
-  .alpha-value {
+  .color-frame > .alpha-value {
     grid-area: 1 / 3;
-    position: relative;
-    min-width: 0;
-    border-inline-start: 1px solid var(--reference-field-border);
-    font: var(--font-control-weight) var(--font-control-size)/var(--font-control-line)
-      var(--font-ui);
-    font-variant-numeric: tabular-nums;
-  }
-  .alpha-value > button,
-  .alpha-value .numeric-editor {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    height: calc(var(--control-height) - 2px);
-    justify-content: center;
-    padding: 0 5px;
-    outline: none;
-    white-space: nowrap;
-  }
-  .alpha-value > button {
-    cursor: text;
-  }
-  .alpha-value > button:hover {
-    background: var(--reference-field-hover);
-  }
-  .alpha-value :is(.numeric-editor input, .readout-digits) {
-    flex: 0 0 3ch;
-    inline-size: 3ch;
-    text-align: end;
   }
   @container inspector-fields (max-width: 340px) {
     .parameters {
@@ -446,10 +206,13 @@
     .color-alpha-field .color-frame {
       grid-template-columns: 29px minmax(0, 1fr) 43px;
     }
-    .color-alpha-field :is(.inspector-hex-trigger, .inspector-hex-editor) {
+    .color-alpha-field .inspector-hex-editor {
       padding-inline: 4px;
     }
   }
+}
+
+[data-theme='light'] > .inspector-fields {
 }
 
 :is([data-ui='shared.ui.color-selector.picker-layer'], [data-ui='shared.ui.paint-selector.layer']) {
