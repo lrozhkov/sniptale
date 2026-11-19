@@ -36,6 +36,12 @@
       "proof": "Query filters results without changing stored scene names."
     },
     {
+      "id": "fields.suggestions",
+      "title": "Ввод с подсказками",
+      "states": ["open", "filtered", "selected", "created", "dismissed"],
+      "proof": "Type to filter the list. Use the arrow keys and Enter to choose. Escape closes the list and keeps the draft."
+    },
+    {
       "id": "fields.long",
       "title": "Длинный текст и разные письменности",
       "states": ["wrapping", "unicode"],

@@ -116,6 +116,50 @@ html[data-input-mode='keyboard'] .text-input:focus-visible {
   margin-bottom: 0;
 }
 
+.text-field--suggestions {
+  --surface-hover: var(--reference-field-hover);
+  --field-border: var(--reference-field-hover-border);
+  position: relative;
+  max-inline-size: 320px;
+}
+.text-field--suggestions > .text-input {
+  border-color: var(--reference-field-border);
+  background: var(--reference-field-idle);
+}
+.text-suggestions {
+  position: absolute;
+  z-index: 2;
+  inset-inline: 0;
+  inset-block-start: calc(100% + 4px);
+  max-block-size: 156px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.text-suggestions > button {
+  display: block;
+  inline-size: 100%;
+  min-block-size: var(--control-height);
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.text-suggestions > button:hover {
+  background: var(--surface-hover);
+}
+.text-suggestions > button[aria-selected='true'] {
+  background: color-mix(in srgb, var(--secondary) 18%, var(--panel));
+}
+
 /* Direct children keep field hover separate from the parameter name. */
 .text-field--clearable {
   display: grid;

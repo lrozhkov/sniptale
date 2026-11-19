@@ -1,8 +1,9 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { getGalleryPrimaryShortcut, getGalleryShortcutTitle } from '../keyboard/shortcut-labels';
 import { useState } from 'react';
-import { Check, ChevronDown, RotateCcw, Search, X } from 'lucide-react';
+import { Check, ChevronDown, RotateCcw, X } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
+import { SearchField } from '../../../ui/compact-inspector-controls/row-controls';
 import type { GallerySidebarProps } from './types';
 import {
   readGalleryFacetDisclosurePreferences,
@@ -26,16 +27,6 @@ const facetSummaryClassName = [
   'hover:bg-[var(--sniptale-color-surface-hover)]',
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
   'focus-visible:outline-[var(--sniptale-color-accent)]',
-].join(' ');
-
-const facetSearchClassName = [
-  'mb-1.5 flex h-8 items-center gap-1.5 rounded-[4px] border px-2',
-  'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-input)]',
-].join(' ');
-
-const facetSearchInputClassName = [
-  'min-w-0 flex-1 bg-transparent text-[13px] leading-[18px] outline-none',
-  'placeholder:text-[var(--sniptale-color-text-muted)] focus:placeholder:text-transparent',
 ].join(' ');
 
 function getFacetTitle(id: GallerySidebarProps['facets'][number]['id']): string {
@@ -199,29 +190,13 @@ function GalleryFacetSection(props: {
       </summary>
       <div className="px-2 pt-2 pb-2">
         {props.facet.searchable ? (
-          <div className={facetSearchClassName}>
-            <Search className="h-3.5 w-3.5 text-[var(--sniptale-color-text-muted)]" />
-            <input
+          <div className="gallery-facet-search mb-1.5">
+            <SearchField
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              aria-label={`${translate('gallery.app.facetSearch')} ${getFacetTitle(props.facet.id)}`}
+              onChange={setSearch}
+              label={`${translate('gallery.app.facetSearch')} ${getFacetTitle(props.facet.id)}`}
               placeholder={translate('gallery.app.facetSearch')}
-              className={facetSearchInputClassName}
             />
-            {search ? (
-              <ProductActionButton
-                tone="secondary"
-                compact
-                data-command-chrome="true"
-                type="button"
-                onClick={() => setSearch('')}
-                aria-label={translate('gallery.app.facetClearSearch')}
-                title={translate('gallery.app.facetClearSearch')}
-                className="sniptale-dismiss-button sniptale-library-utility h-8 w-8 shrink-0"
-              >
-                <X className="h-3 w-3" aria-hidden="true" />
-              </ProductActionButton>
-            ) : null}
           </div>
         ) : null}
         <div className={cx(props.facet.searchable && 'max-h-56 overflow-y-auto', 'pr-0.5')}>

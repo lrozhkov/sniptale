@@ -393,6 +393,7 @@ export default {
   'Запись не запущена': 'Recording has not started',
   'Запись остановлена. Конфигурация сохранена.': 'Recording stopped. Configuration retained.',
   'Запрос поиска': 'Search query',
+  'Ввод с подсказками': 'Input with suggestions',
   Затухание: 'Fade',
   'Затухание звука': 'Audio fade',
   'Зафиксировать применение и отмену': 'Record apply and cancel behavior',

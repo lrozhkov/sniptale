@@ -1,5 +1,5 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { InspectorFieldClear } from '../../../ui/compact-inspector-controls/text-field';
 import { ArrowDown, ArrowUp, Check, Save, Trash2, X } from 'lucide-react';
 import {
@@ -145,6 +145,7 @@ export function GallerySavedViewActions(
   props: GallerySidebarProps & { hasFacetedFilters: boolean }
 ) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const errorId = useId();
   const [isCreating, setIsCreating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState('');
@@ -175,7 +176,7 @@ export function GallerySavedViewActions(
           border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-input)] p-1.5"
         >
           <div className="flex h-8 items-center gap-1.5">
-            <div className="relative h-8 min-w-0 flex-1">
+            <div className="sniptale-text-value gallery-saved-view-field min-w-0 flex-1">
               <input
                 ref={inputRef}
                 autoFocus
@@ -183,6 +184,7 @@ export function GallerySavedViewActions(
                 maxLength={MAX_GALLERY_SAVED_VIEW_NAME_LENGTH}
                 onChange={(event) => setName(event.target.value)}
                 onKeyDown={(event) => {
+                  if (event.nativeEvent.isComposing) return;
                   if (event.key === 'Enter') void save();
                   if (event.key === 'Escape') {
                     setIsCreating(false);
@@ -190,11 +192,10 @@ export function GallerySavedViewActions(
                   }
                 }}
                 aria-label={translate('gallery.app.savedViewName')}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? errorId : undefined}
                 placeholder={translate('gallery.app.savedViewName')}
-                className="h-full w-full min-w-0 rounded-[4px] border
-                border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]
-                pl-2 pr-8 text-[13px] leading-[18px] outline-none
-                focus:border-[var(--sniptale-color-border-accent-strong)]"
+                className="w-full min-w-0 outline-none"
               />
               {name.length > 0 ? (
                 <InspectorFieldClear
@@ -232,7 +233,13 @@ export function GallerySavedViewActions(
             </ProductActionButton>
           </div>
           {error ? (
-            <p className="px-1 text-sm leading-5 text-[var(--sniptale-color-danger)]">{error}</p>
+            <p
+              id={errorId}
+              role="alert"
+              className="px-1 text-xs leading-4 text-[var(--sniptale-color-danger)]"
+            >
+              {error}
+            </p>
           ) : null}
         </div>
       ) : null}

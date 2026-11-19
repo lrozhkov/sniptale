@@ -65,10 +65,9 @@ it('shows a quiet clear button for nonempty search and restores input focus imme
     '[data-ui="gallery.header.clearSearch"]'
   );
   expect(clear?.getAttribute('aria-label')).toBe('gallery.app.clearSearch');
-  expect(clear?.className).toContain('h-7 w-7');
-  expect(clear?.className).toContain('focus-visible:ring-2');
-  expect(input?.className).toContain('min-w-0 flex-1');
-  expect(input?.parentElement?.tagName).toBe('DIV');
+  expect(clear?.classList.contains('sniptale-field-clear')).toBe(true);
+  expect(input?.type).toBe('search');
+  expect(input?.parentElement?.classList.contains('sniptale-inspector-search')).toBe(true);
 
   act(() => clear?.click());
   expect(commit).toHaveBeenLastCalledWith('');

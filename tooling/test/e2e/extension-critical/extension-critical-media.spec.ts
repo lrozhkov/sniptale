@@ -368,18 +368,26 @@ test('gallery backup export imports media as duplicate through the modal flow', 
   const assetId = 'gallery-backup-asset';
   const filename = 'gallery-backup.png';
   const createdAt = Date.now();
+  const blobText = 'backup-image';
 
+  await page.addInitScript(() => {
+    const bootstrap = window.__sniptaleHarnessBootstrap;
+    window.__sniptaleHarnessBootstrap = {
+      ...bootstrap,
+      storage: { ...bootstrap?.storage, 'sniptale-locale-preference': 'ru' },
+    };
+  });
   await applyGalleryScreenshotBootstrap(page, {
     id: assetId,
     filename,
     createdAt,
-    size: 256,
+    size: Buffer.byteLength(blobText),
     width: 1440,
     height: 900,
     sourceUrl: 'https://example.com/gallery-backup',
     sourceTitle: 'Gallery backup seed',
     tags: ['backup'],
-    blobText: 'backup-image',
+    blobText,
   });
 
   await page.goto(`${hostOrigin}${GALLERY_HARNESS_PATH}`, { waitUntil: 'domcontentloaded' });
@@ -394,7 +402,9 @@ test('gallery backup export imports media as duplicate through the modal flow', 
   const backupPath = testInfo.outputPath('gallery-backup.zip');
   await expect.poll(() => readLastSavedFile(page)).not.toBeNull();
   const savedBackup = await readLastSavedFile(page);
-  expect(savedBackup?.filename).toMatch(/^media-hub-backup-.*\.zip$/);
+  expect(savedBackup?.filename).toMatch(
+    /^Sniptale_media-hub-backup_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}\.zip$/
+  );
   await expect(readArchivePaths(savedBackup?.bytes ?? [])).resolves.toEqual(
     expect.arrayContaining([
       'Screenshots/gallery-backup.png',

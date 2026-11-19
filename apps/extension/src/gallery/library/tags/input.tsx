@@ -62,14 +62,14 @@ function GalleryTagInputField(props: {
     <div
       className={cx(
         'flex min-w-0 items-center gap-2 rounded-[4px] border border-[var(--sniptale-color-border-soft)]',
-        'bg-[var(--sniptale-color-surface-panel)] transition-colors',
-        'focus-within:border-[var(--sniptale-color-border-accent-strong)]',
-        'h-8 px-2.5'
+        'bg-[var(--sniptale-color-surface-input)] transition-colors',
+        'focus-within:border-[var(--sniptale-color-border-strong)]',
+        'gallery-tag-entry h-8 px-2.5'
       )}
     >
       <Tag
         aria-hidden="true"
-        className={cx('shrink-0 text-[var(--sniptale-color-text-muted)]', 'h-4 w-4')}
+        className="h-3.5 w-3.5 shrink-0 text-[var(--sniptale-color-text-muted)]"
       />
       <div
         className={cx(
@@ -96,7 +96,8 @@ function GalleryTagInputField(props: {
           onKeyDown={props.onKeyDown}
           placeholder={props.placeholder}
           className={cx(
-            'min-w-0 flex-1 bg-transparent outline-none placeholder:text-[var(--sniptale-color-text-muted)]',
+            'min-w-0 flex-1 bg-transparent outline-none',
+            'placeholder:text-[var(--sniptale-color-text-muted)] focus:placeholder:text-transparent',
             'h-full w-full pr-8 text-[13px] leading-[18px] font-normal'
           )}
         />

@@ -122,6 +122,8 @@ export function render(root, { manifest }) {
     prompt.element
   );
   add('search').append(...searchExample());
+  const locale = new URLSearchParams(location.search).get('lang') === 'en' ? 'en' : 'ru';
+  add('suggestions').append(suggestionExample(locale));
   add('long').append(
     TextField({
       label:
@@ -130,6 +132,116 @@ export function render(root, { manifest }) {
       multiline: true,
     }).element
   );
+}
+
+function suggestionExample(locale) {
+  const en = locale === 'en';
+  const label = en ? 'Tag' : 'Тег';
+  const field = TextField({
+    label,
+    placeholder: en ? 'Find or add a tag' : 'Найти или добавить тег',
+    clearLabel: en ? 'Clear tag' : 'Очистить тег',
+  });
+  const listId = field.input.id + '-suggestions';
+  const list = el('div', {
+    id: listId,
+    class: 'text-suggestions',
+    role: 'listbox',
+    'aria-label': en ? 'Suggested tags' : 'Подсказки тегов',
+    hidden: '',
+  });
+  const status = el('p', { class: 'field-status', role: 'status' });
+  const tags = en ? ['Design', 'Documentation', 'Review'] : ['Дизайн', 'Документация', 'Проверка'];
+  let active = -1;
+  let choices = [];
+
+  field.element.classList.add('text-field--suggestions');
+  field.input.setAttribute('role', 'combobox');
+  field.input.setAttribute('aria-autocomplete', 'list');
+  field.input.setAttribute('aria-controls', listId);
+  field.input.setAttribute('aria-expanded', 'false');
+
+  function close() {
+    active = -1;
+    list.hidden = true;
+    field.input.setAttribute('aria-expanded', 'false');
+    field.input.removeAttribute('aria-activedescendant');
+  }
+
+  function choose(value) {
+    if (!tags.includes(value)) tags.push(value);
+    field.setValue(value);
+    status.textContent = (en ? 'Selected: ' : 'Выбрано: ') + value;
+    close();
+  }
+
+  function show() {
+    const query = field.draft.trim();
+    const folded = query.toLocaleLowerCase(locale);
+    choices = tags
+      .filter((value) => value.toLocaleLowerCase(locale).includes(folded))
+      .map((value) => ({ value, label: value }));
+    if (query && !tags.some((value) => value.toLocaleLowerCase(locale) === folded)) {
+      choices.push({ value: query, label: en ? `Add “${query}”` : `Добавить «${query}»` });
+    }
+    list.replaceChildren(
+      ...choices.map((choice, index) => {
+        const option = el('button', {
+          id: listId + '-' + index,
+          type: 'button',
+          role: 'option',
+          tabindex: '-1',
+          'aria-selected': String(index === active),
+          text: choice.label,
+        });
+        option.addEventListener('mousedown', (event) => event.preventDefault());
+        option.addEventListener('click', () => choose(choice.value));
+        return option;
+      })
+    );
+    if (choices.length === 0) {
+      close();
+      return;
+    }
+    list.hidden = false;
+    field.input.setAttribute('aria-expanded', 'true');
+    field.input.removeAttribute('aria-activedescendant');
+  }
+
+  field.input.addEventListener('focus', show);
+  field.input.addEventListener('blur', close);
+  field.input.addEventListener('input', () => {
+    active = -1;
+    show();
+  });
+  field.input.addEventListener('keydown', (event) => {
+    if (event.isComposing || event.keyCode === 229) return;
+    if (event.key === 'Escape' && !list.hidden) {
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      if (list.hidden) show();
+      if (!choices.length) return;
+      event.preventDefault();
+      active =
+        event.key === 'ArrowDown'
+          ? (active + 1) % choices.length
+          : active <= 0
+            ? choices.length - 1
+            : active - 1;
+      const option = list.children[active];
+      for (const entry of list.children)
+        entry.setAttribute('aria-selected', String(entry === option));
+      field.input.setAttribute('aria-activedescendant', option.id);
+      option.scrollIntoView({ block: 'nearest' });
+    } else if (event.key === 'Enter' && !list.hidden && choices[active]) {
+      event.preventDefault();
+      choose(choices[active].value);
+    }
+  });
+  field.input.after(list);
+  return el('div', {}, [field.element, status]);
 }
 
 function searchExample() {
