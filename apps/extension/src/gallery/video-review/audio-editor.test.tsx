@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AudioTakeLevelFields } from '../../ui/audio/take-fields';
 import { ReviewOriginalAudioInspector } from './original-audio-inspector';
+import { ReviewSceneAudio } from './scene-inspector';
 import { ReviewAudioClipEditor, ReviewAudioInspectorSection } from './audio-editor';
 import { createQuickEditAudioClip } from '../../features/video/review/advanced/audio';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
@@ -300,7 +301,7 @@ it.each(['voiceover', 'music'] as const)(
   }
 );
 
-it('offers voiceover tempo choices without replacing an authored custom tempo', () => {
+it('offers voiceover tempo presets without replacing an authored custom tempo', async () => {
   const clip = {
     ...createQuickEditAudioClip({
       id: 'custom',
@@ -325,10 +326,13 @@ it('offers voiceover tempo choices without replacing an authored custom tempo', 
   expect(
     host.querySelector<HTMLInputElement>('[aria-label="gallery.videoReview.voiceoverTempo"]')?.value
   ).toBe('1.37');
+  const trigger = host.querySelector<HTMLButtonElement>(
+    'button[aria-label="gallery.videoReview.voiceoverTempoPreset"]'
+  )!;
+  expect(trigger.textContent).toContain('1.37×');
+  await act(async () => trigger.click());
   const choices = [
-    ...host.querySelectorAll<HTMLButtonElement>(
-      '[data-ui="shared.ui.compact-inspector.segmented-row"] button'
-    ),
+    ...document.querySelectorAll<HTMLButtonElement>('[role="listbox"] [role="option"]'),
   ];
   expect(choices.map((choice) => choice.textContent)).toEqual([
     '0.5×',
@@ -338,11 +342,31 @@ it('offers voiceover tempo choices without replacing an authored custom tempo', 
     '2×',
     '4×',
   ]);
-  expect(choices.every((choice) => choice.getAttribute('aria-pressed') === 'false')).toBe(true);
+  expect(choices.every((choice) => choice.getAttribute('aria-selected') === 'false')).toBe(true);
   expect(onPatch).not.toHaveBeenCalled();
-  act(() => choices[5]!.click());
+  await act(async () => choices[5]!.click());
   expect(onPatch).toHaveBeenLastCalledWith({ tempo: 4 });
 });
+
+it.each(['voiceover', 'music'] as const)(
+  'displays %s lane gain as a scale with exact input',
+  (lane) => {
+    act(() =>
+      root.render(
+        <ReviewSceneAudio
+          lane={lane}
+          audio={{ original: { muted: false, volume: 1 }, voiceover: [], music: [] }}
+          hasOriginalAudio
+          onOriginal={vi.fn()}
+          onLaneVolume={vi.fn()}
+        />
+      )
+    );
+    const slider = host.querySelector<HTMLInputElement>('.opacity-field input[type="range"]');
+    expect(slider?.value).toBe('100');
+    expect(slider?.max).toBe('200');
+  }
+);
 
 it.each(['voiceover', 'music'] as const)('separates processing from %s level fields', (lane) => {
   const clip = createQuickEditAudioClip({

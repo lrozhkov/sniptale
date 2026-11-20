@@ -150,7 +150,7 @@ export function ReviewVoiceoverRecording(props: {
       >
         <div className="grid min-w-0 content-start gap-3">
           <header
-            className="sticky top-0 z-10 flex min-h-9 items-center gap-2
+            className="review-voiceover-header sticky top-0 z-10 flex min-h-9 items-center gap-2
             bg-[var(--sniptale-color-surface-panel)]"
           >
             <span id={titleId} className="sr-only">
@@ -219,7 +219,7 @@ export function VoiceoverCaptureOptions(props: {
     <RecordingSetup
       device={
         <AudioRecordingDeviceSelect
-          menuClassName="sniptale-parameter-menu"
+          compact
           value={props.session.deviceId}
           onChange={props.session.setDeviceId}
           disabled={disabled || props.session.isSaving}
@@ -252,7 +252,7 @@ export function VoiceoverTransport(props: {
   const capturing = transport.status === 'recording' || transport.status === 'paused';
   return (
     <div
-      className="flex flex-wrap items-center gap-3 border-t border-[var(--sniptale-color-border-soft)] pt-3 text-xs"
+      className="review-voiceover-transport flex flex-wrap items-center gap-2 text-xs"
       role="status"
     >
       <span className="mr-auto inline-flex items-baseline gap-1 tabular-nums">

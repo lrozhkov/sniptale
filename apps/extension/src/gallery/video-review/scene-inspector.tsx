@@ -200,6 +200,7 @@ export function ReviewSceneAudio(props: {
             <ReviewNumberRow
               key={lane.key}
               label={translate(lane.label)}
+              rangePresentation="field"
               unit="%"
               value={Math.round(lane.volume * 100)}
               min={0}

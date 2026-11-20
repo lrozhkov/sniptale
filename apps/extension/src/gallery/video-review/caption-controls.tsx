@@ -23,6 +23,7 @@ function ReviewCaptionStyleControls(props: {
       sizeControl={
         <ReviewNumberRow
           label={translate('gallery.videoReview.captionSize')}
+          rangePresentation="field"
           unit="%"
           value={props.style.fontSize * 100}
           min={1.5}
@@ -45,8 +46,9 @@ export function ReviewCaptionSceneControls(props: {
 }) {
   const settings = props.settings ?? createReviewCaptionSettings();
   return (
-    <div className="min-w-0 space-y-2" data-ui="gallery.videoReview.captionScene">
+    <div className="sniptale-parameter-stack" data-ui="gallery.videoReview.captionScene">
       <ToggleField
+        showStatus
         value={settings.enabled}
         disabled={props.disabled}
         label={translate('gallery.videoReview.captionsEnabled')}
@@ -76,6 +78,7 @@ export function ReviewFragmentCaptionControls(props: {
   const style = (
     <>
       <ToggleField
+        showStatus
         value={!fragment.style}
         disabled={props.disabled}
         label={translate('gallery.videoReview.captionInherit')}
@@ -95,6 +98,7 @@ export function ReviewFragmentCaptionControls(props: {
   return (
     <>
       <ToggleField
+        showStatus
         label={translate('gallery.videoReview.textFragmentShown')}
         value={fragment.showInVideo}
         disabled={props.disabled}

@@ -51,9 +51,13 @@ it('starts globally disabled and preserves the configured appearance across disa
   await act(async () => root.render(<Scene />));
   const toggle = host.querySelector<HTMLButtonElement>('[role="switch"]')!;
   expect(toggle.getAttribute('aria-checked')).toBe('false');
+  expect(toggle.closest('.sniptale-switch-with-status')).not.toBeNull();
   expect(host.querySelector('fieldset')).toBeNull();
   act(() => toggle.click());
   expect(host.querySelector('fieldset')).not.toBeNull();
+  const size = host.querySelector<HTMLInputElement>('.opacity-field input[type="range"]');
+  expect(size?.min).toBe('1.5');
+  expect(size?.max).toBe('15');
   const top = host.querySelectorAll<HTMLButtonElement>('fieldset button[aria-pressed]')[1]!;
   act(() => top.click());
   expect(JSON.parse(host.querySelector('output')!.textContent!).style.position).toBe('top');
@@ -126,9 +130,11 @@ it('shows inherited/local style compactly and never stales retained voice by app
   act(() => switches()[1]!.click());
   let fragment = JSON.parse(host.querySelector('output')!.textContent!) as ReviewTextFragment;
   expect(fragment.style?.position).toBe('top');
-  expect(host.querySelector('fieldset input[type="range"]')).toBeNull();
-  const sizeInput = host.querySelector<HTMLInputElement>('fieldset input[type="text"]')!;
-  act(() => sizeInput.focus());
+  const size = host.querySelector('fieldset .opacity-field')!;
+  expect(size.querySelector<HTMLInputElement>('input[type="range"]')?.value).toBe('4');
+  act(() => size.querySelector<HTMLButtonElement>('button')!.click());
+  const sizeInput = size.querySelector<HTMLInputElement>('input[role="spinbutton"]')!;
+  expect(document.activeElement).toBe(sizeInput);
   act(() => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(sizeInput, '8');
     sizeInput.dispatchEvent(new Event('input', { bubbles: true }));

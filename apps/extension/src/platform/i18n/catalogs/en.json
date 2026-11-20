@@ -8186,6 +8186,7 @@
       "audioEmpty": "Drop an audio file here",
       "audioClipMute": "Mute audio",
       "voiceoverTempo": "Voiceover speed",
+      "voiceoverTempoPreset": "Speed preset",
       "audioClipVolume": "Volume level",
       "audioFadeIn": "Fade in",
       "audioFadeOut": "Fade out",

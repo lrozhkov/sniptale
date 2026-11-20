@@ -8186,6 +8186,7 @@
       "audioEmpty": "Перетащите сюда аудиофайл",
       "audioClipMute": "Без звука",
       "voiceoverTempo": "Скорость озвучки",
+      "voiceoverTempoPreset": "Пресет скорости",
       "audioClipVolume": "Уровень громкости",
       "audioFadeIn": "Нарастание громкости",
       "audioFadeOut": "Затухание громкости",

@@ -4,7 +4,7 @@ import { AudioProcessingFields } from './processing-fields';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
 import { getAudioFadeLimitSeconds } from '../../features/video/audio/fades';
 import { translate } from '../../platform/i18n';
-import { SegmentedRow } from '../compact-inspector-controls';
+import { SelectField } from '../compact-inspector-controls';
 import { DraftNumericRow } from '../compact-inspector-controls/numeric-preview';
 
 interface TakeFieldProps {
@@ -15,10 +15,17 @@ interface TakeFieldProps {
   onPatch(patch: Partial<Omit<QuickEditAudioClip, 'id' | 'assetId'>>): void;
 }
 
+const tempoPresets = ['0.5', '0.75', '1', '1.5', '2', '4'].map((value) => ({
+  value,
+  label: `${value}×`,
+}));
+
 /** Authored take parameters share bounds and numeric draft behavior across editors. */
 export function AudioTakeLevelFields(
   props: TakeFieldProps & { showTempo?: boolean; tempoChoices?: boolean; showProcessing?: boolean }
 ) {
+  const tempo = props.clip.tempo ?? 1;
+  const preset = tempoPresets.find((option) => option.value === String(tempo));
   return (
     <>
       {props.showTempo && (
@@ -29,22 +36,19 @@ export function AudioTakeLevelFields(
           max={4}
           step={0.05}
           precision={2}
-          value={props.clip.tempo ?? 1}
+          value={tempo}
           disabled={props.disabled}
           onChange={(tempo) => props.onPatch({ tempo })}
         />
       )}
       {props.showTempo && props.tempoChoices ? (
-        <SegmentedRow
-          ariaLabel={translate('gallery.videoReview.voiceoverTempo')}
-          columns={3}
-          value={String(props.clip.tempo ?? 1)}
-          options={[0.5, 0.75, 1, 1.5, 2, 4].map((tempo) => ({
-            value: String(tempo),
-            label: `${tempo}×`,
-            disabled: props.disabled,
-          }))}
-          onChange={(tempo) => props.onPatch({ tempo: Number(tempo) })}
+        <SelectField
+          label={translate('gallery.videoReview.voiceoverTempoPreset')}
+          value={preset?.value ?? ''}
+          placeholder={`${tempo}×`}
+          options={tempoPresets}
+          disabled={props.disabled}
+          onChange={(value) => props.onPatch({ tempo: Number(value) })}
         />
       ) : null}
       <DraftNumericRow
