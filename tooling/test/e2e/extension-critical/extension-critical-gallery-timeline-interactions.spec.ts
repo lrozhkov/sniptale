@@ -304,9 +304,12 @@ async function inspectPinnedTracks(
   await inspectOverflowingPins(dialog);
 
   await settings.click();
-  await command('gallery.videoReview.collapseTracks').click();
+  const collapse = command('gallery.videoReview.collapseTracks');
+  await expect(collapse.locator('.lucide-chevrons-down')).toBeVisible();
+  await collapse.click();
   const expand = command('gallery.videoReview.expandTracks');
   await expect(expand).toHaveAttribute('aria-expanded', 'false');
+  await expect(expand.locator('.lucide-chevrons-up')).toBeVisible();
   await expect(command('gallery.videoReview.trackSettings')).toBeDisabled();
   await expect(rows).toHaveCount(2);
   await expect.poll(first).toEqual(['source', 'text']);
@@ -324,6 +327,35 @@ async function inspectPinnedTracks(
   await textPin.click();
   await expect(textPin).toHaveAttribute('aria-pressed', 'false');
   await expect(rows.first()).toHaveAttribute('data-review-header-track', 'source');
+}
+
+async function inspectTimelineSelectionColor(
+  page: Page,
+  dialog: Locator,
+  speed: Locator,
+  color: string,
+  screenshotPath: string
+) {
+  const source = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
+  const edits = source.locator('[data-ui="gallery.videoReview.editBlock"]');
+  for (const [index, start] of [0.15, 0.55].entries()) {
+    if ((await speed.getAttribute('aria-pressed')) !== 'true') await speed.click();
+    await gesture(page, source, start, start + 0.18);
+    await expect(edits).toHaveCount(index + 1);
+  }
+  await edits.first().locator('button[aria-pressed]').press('Enter');
+  await expect(edits.first()).toHaveCSS('border-top-color', color);
+  await expect(edits.first()).toHaveCSS('border-top-width', '1px');
+  await edits
+    .last()
+    .locator('button[aria-pressed]')
+    .click({ modifiers: ['Control'] });
+  await expect(source.locator('[data-review-multi-selected="true"]')).toHaveCount(2);
+  for (const edit of await edits.all()) {
+    await expect(edit).toHaveCSS('border-top-color', color);
+    await expect(edit).toHaveCSS('border-top-width', '1px');
+  }
+  await page.screenshot({ path: screenshotPath, fullPage: false, animations: 'disabled' });
 }
 
 async function inspectPinnedScroll(page: Page, dialog: Locator, screenshotPath: string) {
@@ -412,9 +444,9 @@ async function inspectOverflowingPins(dialog: Locator) {
 }
 
 for (const variant of [
-  { width: 1280, height: 560, locale: 'ru' },
-  { width: 1920, height: 900, locale: 'en' },
-  { width: 1200, height: 560, locale: 'en' },
+  { width: 1280, height: 560, locale: 'ru', theme: 'light' },
+  { width: 1920, height: 900, locale: 'en', theme: 'dark' },
+  { width: 1200, height: 560, locale: 'en', theme: 'light' },
 ] as const) {
   test(`Gallery pinned tracks ${variant.width}`, async ({ page }, info) => {
     await page.setViewportSize({ width: variant.width, height: variant.height });
@@ -422,9 +454,12 @@ for (const variant of [
     try {
       await applyHarnessBootstrap(page, {
         preserveMediaLibrary: true,
-        storage: { 'sniptale-locale-preference': variant.locale },
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
       });
-      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=light`);
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
       await page.reload();
@@ -441,6 +476,14 @@ for (const variant of [
       const resize = dialog.locator('[data-review-panel-resize="timeline"]');
       for (let index = 0; index < 5; index++) await resize.press('ArrowUp');
       await inspectPinnedTracks(page, dialog, variant.locale, info.outputPath('track-pins.png'));
+      await command('gallery.videoReview.trackSettings').click();
+      await inspectTimelineSelectionColor(
+        page,
+        dialog,
+        command('gallery.videoReview.speedMode'),
+        variant.theme === 'dark' ? 'rgb(118, 118, 118)' : 'rgb(150, 150, 150)',
+        info.outputPath('timeline-selection.png')
+      );
       if (variant.width < 1280) {
         const zoom = dialog.getByRole('slider', {
           name: translate('videoEditor.timeline.zoom', variant.locale),

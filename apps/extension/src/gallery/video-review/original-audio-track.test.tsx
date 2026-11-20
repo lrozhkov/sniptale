@@ -329,7 +329,7 @@ it('requires the audio tool for drawing, ignores overlapping ranges and edits in
     expect(f.editor.selectedOriginal!.volume).toBe(0);
     expect(block.textContent).toBe('');
     expect(block.className).toContain('var(--sniptale-color-danger)_12%');
-    expect(block.className).toContain('border-[var(--sniptale-color-accent)]');
+    expect(block.classList.contains('review-timeline-item-selected')).toBe(true);
     act(() =>
       f.host
         .querySelector<HTMLButtonElement>(

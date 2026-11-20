@@ -442,7 +442,7 @@ it('marks the selected source edit while preserving neutral surfaces', () => {
   const blocks = host.querySelectorAll<HTMLElement>('[data-ui="gallery.videoReview.editBlock"]');
   expect(blocks[0]!.querySelector('button')!.getAttribute('aria-pressed')).toBe('false');
   expect(blocks[1]!.querySelector('button')!.getAttribute('aria-pressed')).toBe('true');
-  expect(blocks[1]!.className).toContain('border-[var(--sniptale-color-accent)]');
+  expect(blocks[1]!.classList.contains('review-timeline-item-selected')).toBe(true);
   expect(blocks[0]!.className).toContain('var(--sniptale-color-danger)_12%');
   expect(blocks[1]!.className).toContain('var(--sniptale-color-info)_12%');
   expect(host.querySelector('[data-ui="gallery.videoReview.sourceRange"]')).toBeNull();

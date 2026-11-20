@@ -68,12 +68,12 @@ export function ReviewWebcamPositionMarker(props: {
       )}
       aria-pressed={selected}
       className={
-        'absolute inset-y-0 z-20 flex w-7 -translate-x-1/2 items-center justify-center rounded-sm ' +
+        'absolute inset-y-0 z-20 flex w-7 -translate-x-1/2 items-center justify-center rounded-sm border ' +
         'outline-none focus-visible:ring-1 focus-visible:ring-[var(--sniptale-color-accent)] ' +
         'hover:bg-[var(--sniptale-color-surface-hover)] ' +
         (selected
-          ? 'text-[var(--sniptale-color-accent)]'
-          : 'text-[var(--sniptale-color-text-secondary)]')
+          ? 'review-timeline-item-selected text-[var(--sniptale-color-text-primary)]'
+          : 'border-transparent text-[var(--sniptale-color-text-secondary)]')
       }
       style={{
         left: `${((preview ?? position.time) / duration) * 100}%`,

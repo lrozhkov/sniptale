@@ -486,9 +486,7 @@ function CursorMotionPill({
       data-review-snap-end={projection.display.resultToDisplay(m.end, 'end')}
       className={[
         'review-timeline-item review-interaction-item absolute touch-none select-none rounded border px-3 text-xs',
-        selected
-          ? 'review-timeline-item-selected border-[var(--sniptale-color-accent)]'
-          : 'border-[var(--sniptale-color-border-soft)]',
+        selected ? 'review-timeline-item-selected' : 'border-[var(--sniptale-color-border-soft)]',
         'text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
       style={{

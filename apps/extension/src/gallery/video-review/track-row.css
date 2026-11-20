@@ -239,9 +239,10 @@
 [data-ui='gallery.videoReview.trackHeader'][data-review-header-selected='true'][data-review-header-muted='true'] {
   background-color: var(--sniptale-color-surface-input);
 }
-[data-review-multi-selected='true'],
+.review-timeline-item-selected,
+[data-review-multi-selected='true']:not(:has(.review-timeline-item)),
 [data-review-multi-selected='true'] .review-timeline-item {
-  border-color: var(--sniptale-color-accent);
+  border: 1px solid var(--sniptale-color-field-focus);
   --review-item-foreground: var(--sniptale-color-text-primary);
   --review-label-weight: 600;
 }

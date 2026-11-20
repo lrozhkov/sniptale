@@ -238,9 +238,9 @@ export function ReviewTrackControls(props: {
           onClick={props.disclosure.toggle}
         >
           {collapsed ? (
-            <ChevronsDown size={14} aria-hidden />
-          ) : (
             <ChevronsUp size={14} aria-hidden />
+          ) : (
+            <ChevronsDown size={14} aria-hidden />
           )}
         </ReviewButton>
       ) : null}

@@ -291,7 +291,7 @@ function ReviewHistoryCluster(props: {
           fontSize: 11,
           background: HISTORY_EVENT_BACKGROUND,
           borderColor: selected
-            ? 'var(--sniptale-color-accent)'
+            ? 'var(--sniptale-color-field-focus)'
             : 'var(--sniptale-color-border-soft)',
         }}
         className={[
