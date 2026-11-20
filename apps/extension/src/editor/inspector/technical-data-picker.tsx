@@ -72,10 +72,7 @@ function TechnicalDataLayoutToggle(props: {
   onSelectLayout: (layout: EditorTechnicalDataLayout) => void;
 }) {
   return (
-    <InspectorParameterRow
-      label={translate('editor.compact.technicalDataLayout')}
-      valueOptions={(['column', 'row'] as const).map(getTechnicalDataLayoutLabel)}
-    >
+    <InspectorParameterRow label={translate('editor.compact.technicalDataLayout')}>
       <SegmentedRow
         ariaLabel={translate('editor.compact.technicalDataLayout')}
         value={props.layout}

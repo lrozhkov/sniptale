@@ -18,7 +18,7 @@ export function VoiceModelPreferences({
   const models = controller.models;
   return (
     <div className={`${settingsCompactWorkbenchClassName} space-y-3`}>
-      <SettingsControlRow label={translate('settings.voiceInput.backendLabel')} valueMinimum={360}>
+      <SettingsControlRow label={translate('settings.voiceInput.backendLabel')}>
         <div data-ui="settings.voice.backend">
           <CompactSegmentedSelector
             ariaLabel={translate('settings.voiceInput.backendLabel')}

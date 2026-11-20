@@ -149,154 +149,26 @@ export function useInspectorFitting() {
   return React.useContext(InspectorRowFittingContext);
 }
 
-/** One geometry owner fits ordinary name/value rows before stacking the value. */
+/** Keep the value in its column unless the field declares a stacked layout. */
 export function InspectorParameterRow(props: {
   label: string;
   labelAccessory?: React.ReactNode;
   labelModified?: boolean | undefined;
   children: React.ReactNode;
-  valueMinimum?: number;
-  valueText?: string | undefined;
-  valueOptions?: readonly string[] | undefined;
   stacked?: boolean;
-  keepInline?: boolean;
   className?: string | undefined;
   dataUi?: string;
   onActivate?(): void;
 }) {
-  const row = React.useRef<HTMLDivElement>(null);
-  const name = React.useRef<HTMLSpanElement>(null);
-  const hasLabelAccessory = Boolean(props.labelAccessory);
-  const valueOptionsKey = JSON.stringify(props.valueOptions ?? []);
-  const [stacked, setStacked] = React.useState(props.stacked ?? false);
-  const fitting = useInspectorFitting();
-  const deferredFit = React.useRef<number | null>(null);
-  const lifetime = React.useRef(0);
-  const job = React.useRef<RowMeasurement | null>(null);
-  const fit = React.useCallback(() => {
-    const measure = job.current;
-    if (!measure) return;
-    if (fitting) fitting.schedule(measure);
-    else measure()?.();
-  }, [fitting]);
-  const measure = React.useCallback(() => {
-    const element = row.current;
-    const label = name.current;
-    if (!element?.isConnected || !label || props.stacked || props.keepInline) return null;
-    if (element.matches(':focus-within') || element.querySelector('[aria-expanded="true"]'))
-      return null;
-    // Blur can shrink a preceding row and move the pressed command before click.
-    if (element.ownerDocument.querySelector(':active')) {
-      if (fitting) fit();
-      else if (deferredFit.current === null)
-        deferredFit.current = requestAnimationFrame(() => {
-          deferredFit.current = null;
-          fit();
-        });
-      return null;
-    }
-    const width = element.clientWidth;
-    if (!width) return null;
-    const context = document.createElement('canvas').getContext('2d');
-    if (!context) return null;
-    const style = getComputedStyle(label);
-    context.font = style.font;
-    const available = width - 16;
-    const accessoryWidth = hasLabelAccessory
-      ? (label.querySelector('[data-parameter-label-accessory]')?.getBoundingClientRect().width ??
-        0)
-      : 0;
-    const labelWidth =
-      context.measureText(props.label).width + (accessoryWidth ? accessoryWidth + 4 : 0);
-    const valueOptions: unknown = JSON.parse(valueOptionsKey);
-    if (
-      !Array.isArray(valueOptions) ||
-      !valueOptions.every((value): value is string => typeof value === 'string')
-    )
-      return null;
-    const minimumValueWidth = Math.max(
-      props.valueMinimum ?? (valueOptions.length ? 0 : 100),
-      valueOptions.length ? measureSegmentWidth(context, valueOptions) : 0
-    );
-    const labelCap = Number.parseFloat(style.getPropertyValue('--sniptale-parameter-label-width'));
-    const valueCap = Number.parseFloat(style.getPropertyValue('--sniptale-parameter-value-width'));
-    const labelShare = Number.parseFloat(
-      style.getPropertyValue('--sniptale-parameter-label-share')
-    );
-    const labelFraction = Number.isFinite(labelShare) ? labelShare / 100 : 0.45;
-    if (Number.isFinite(labelCap) && Number.isFinite(valueCap)) {
-      const labelColumn = Math.min(labelCap, available * labelFraction);
-      const valueColumn = Math.min(valueCap, available - labelColumn - 8);
-      return () => setStacked(labelWidth > labelColumn || minimumValueWidth > valueColumn);
-    }
-    const valueWidth = Math.max(
-      minimumValueWidth,
-      props.valueText ? context.measureText(props.valueText).width + 40 : 0
-    );
-    const needsStack = labelWidth + valueWidth + 8 > available;
-    const nameColumn = Math.max(
-      labelWidth,
-      Math.min((available - 8) * labelFraction, available - 8 - valueWidth)
-    );
-    const nameFit = `${Math.ceil(nameColumn)}px`;
-    return () => {
-      if (element.style.getPropertyValue('--sniptale-parameter-name-fit') !== nameFit)
-        element.style.setProperty('--sniptale-parameter-name-fit', nameFit);
-      setStacked(needsStack);
-    };
-  }, [
-    fit,
-    fitting,
-    props.label,
-    hasLabelAccessory,
-    props.stacked,
-    props.keepInline,
-    props.valueMinimum,
-    props.valueText,
-    valueOptionsKey,
-  ]);
-  React.useLayoutEffect(() => {
-    const token = ++lifetime.current;
-    const current: RowMeasurement = () => {
-      if (token !== lifetime.current || !row.current?.isConnected) return null;
-      const apply = measure();
-      return apply
-        ? () => {
-            if (token === lifetime.current && row.current?.isConnected) apply();
-          }
-        : null;
-    };
-    job.current = current;
-    if (fitting) fitting.beforePaint(current);
-    else current()?.();
-    const element = row.current;
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fit);
-    if (element) observer?.observe(element);
-    let disposed = false;
-    void document.fonts?.ready.then(() => {
-      if (!disposed) fit();
-    });
-    return () => {
-      disposed = true;
-      lifetime.current = token + 1;
-      job.current = null;
-      fitting?.cancel(current);
-      observer?.disconnect();
-      if (deferredFit.current !== null) cancelAnimationFrame(deferredFit.current);
-      deferredFit.current = null;
-    };
-  }, [measure, fit, fitting]);
   const isActivation = (target: EventTarget) =>
     target instanceof Element && !target.closest('button,input,textarea,select,a,[role="slider"]');
   return (
     <div
-      ref={row}
       data-ui={props.dataUi}
       data-compact-select-menu-bounds="parameter"
-      data-layout={props.stacked || stacked ? 'stacked' : 'inline'}
+      data-layout={props.stacked ? 'stacked' : 'inline'}
       data-activates={props.onActivate ? 'true' : undefined}
       className={cx('sniptale-parameter-row', props.className)}
-      onBlurCapture={() => queueMicrotask(fit)}
       onPointerDown={(event) => {
         if (props.onActivate && event.button === 0 && isActivation(event.target))
           event.preventDefault();
@@ -310,7 +182,6 @@ export function InspectorParameterRow(props: {
       }}
     >
       <span
-        ref={name}
         data-compact-select-menu-label=""
         title={props.label}
         className={cx(

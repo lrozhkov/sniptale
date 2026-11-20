@@ -32,7 +32,6 @@ export function ToggleField(props: {
   return (
     <InspectorParameterRow
       label={props.label}
-      keepInline
       className={props.showStatus ? 'sniptale-status-parameter' : 'sniptale-boolean-parameter'}
       onActivate={() => trigger.current?.click()}
     >
@@ -68,7 +67,6 @@ export function CheckboxField(props: {
   return (
     <InspectorParameterRow
       label={props.label}
-      keepInline
       className="sniptale-boolean-parameter"
       onActivate={() => input.current?.click()}
     >
@@ -132,7 +130,6 @@ export function ColorField({
     return (
       <InspectorParameterRow
         label={props.label}
-        valueMinimum={props.triggerVariant === 'swatch' ? 100 : 140}
         stacked={layout === 'stacked'}
         dataUi="shared.ui.compact-inspector.color-field"
         className={className}
@@ -204,7 +201,6 @@ export function SelectField<T extends string>(props: {
     return (
       <InspectorParameterRow
         label={props.label}
-        keepInline
         dataUi="shared.ui.compact-inspector.select-field"
         className={props.className}
       >
@@ -277,9 +273,6 @@ export function SegmentedRow<T extends string>(props: {
       <InspectorParameterRow
         label={typeof props.label === 'string' ? props.label : props.ariaLabel}
         stacked={stacked}
-        valueOptions={props.options.map((option) =>
-          option.icon && !props.showOptionLabels ? '' : option.label
-        )}
         dataUi="shared.ui.compact-inspector.segmented-field"
       >
         {selector}

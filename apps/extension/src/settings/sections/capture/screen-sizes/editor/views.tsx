@@ -20,7 +20,7 @@ function ViewportPresetNameField(props: {
   const input = useRef<HTMLInputElement>(null);
   const label = translate('viewportPresets.editor.nameLabel');
   return (
-    <SettingsControlRow label={label} keepInline>
+    <SettingsControlRow label={label}>
       <div className="sniptale-text-value">
         <ProductInput
           ref={input}
@@ -57,7 +57,7 @@ function ViewportPresetDimensionFields(props: {
   return (
     <div className="sniptale-parameter-stack">
       {dimensions.map(([label, value, setValue]) => (
-        <SettingsControlRow key={label} label={label} valueMinimum={112}>
+        <SettingsControlRow key={label} label={label}>
           <NumericValueField
             className="w-full!"
             label={label}

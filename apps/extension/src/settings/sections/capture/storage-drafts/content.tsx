@@ -120,8 +120,6 @@ function RetentionSection(
       <SectionLabel>{translate('settings.storageDrafts.cleanupTitle')}</SectionLabel>
       <SettingsControlRow
         label={translate('settings.storageDrafts.cleanupEnabled')}
-        keepInline
-        valueMinimum={32}
         valueClassName="flex justify-end"
       >
         <SettingsSwitch
@@ -169,8 +167,6 @@ function TrashRetentionSection(
       <SectionLabel>{translate('settings.storageDrafts.trashTitle')}</SectionLabel>
       <SettingsControlRow
         label={translate('settings.storageDrafts.trashCleanupEnabled')}
-        keepInline
-        valueMinimum={32}
         valueClassName="flex justify-end"
       >
         <SettingsSwitch

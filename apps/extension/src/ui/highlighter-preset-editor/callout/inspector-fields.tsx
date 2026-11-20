@@ -42,7 +42,7 @@ export function ColorField(props: {
   value: string;
 }) {
   return (
-    <PropertyField label={props.label} valueMinimum={props.control ? 178 : 140}>
+    <PropertyField label={props.label}>
       <div className="flex min-w-0 items-center gap-1.5">
         <fieldset
           className={
@@ -94,7 +94,7 @@ export function BoundColorField(props: {
   const sourceLabel = translate(`content.callout.colorSource.${props.source}`);
   const sourceTitle = `${translate('content.callout.colorSourceLabel')} — ${sourceLabel}`;
   return (
-    <PropertyField label={props.label} valueMinimum={178}>
+    <PropertyField label={props.label}>
       <div className="flex min-w-0 items-center gap-1.5">
         <fieldset
           className={

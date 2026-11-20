@@ -98,7 +98,7 @@ export function TrackLayoutFields({
       className="sniptale-parameter-stack space-y-2"
       data-ui="video-editor.inspector.track-layout"
     >
-      <InspectorParameterRow label={translate('videoEditor.app.trackOrder')} valueMinimum={68}>
+      <InspectorParameterRow label={translate('videoEditor.app.trackOrder')}>
         <div className="flex min-w-0 flex-wrap justify-end gap-1">
           <InspectorActionButton
             compact

@@ -630,7 +630,6 @@ export function ReviewZoomLinkInspector(props: {
         <InspectorParameterRow
           dataUi="gallery.videoReview.zoomLinkDuration"
           label={translate('gallery.videoReview.zoomLinkDuration')}
-          keepInline
         >
           <span className="text-right text-xs tabular-nums text-[var(--sniptale-color-text-primary)]">
             {reviewTimeLabel(gap)}

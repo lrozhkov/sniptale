@@ -184,49 +184,6 @@ it('clears a controlled draft without accepting it and keeps input focus', () =>
   expect(commit).toHaveBeenCalledExactlyOnceWith('');
 });
 
-it('keeps a fitting name and value inline when either needs more than its former fixed share', () => {
-  const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(300);
-  const canvas = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-    font: '',
-    measureText: (text: string) => ({ width: text.length * 8 }),
-  } as unknown as CanvasRenderingContext2D);
-  try {
-    act(() =>
-      root.render(
-        <InspectorParameterRow label="A longer setting name">
-          <input />
-        </InspectorParameterRow>
-      )
-    );
-    expect(host.querySelector<HTMLElement>('.sniptale-parameter-row')!.dataset['layout']).toBe(
-      'inline'
-    );
-    act(() =>
-      root.render(
-        <InspectorParameterRow label="Name" valueMinimum={180}>
-          <input />
-        </InspectorParameterRow>
-      )
-    );
-    expect(host.querySelector<HTMLElement>('.sniptale-parameter-row')!.dataset['layout']).toBe(
-      'inline'
-    );
-    act(() =>
-      root.render(
-        <InspectorParameterRow label="A longer setting name" valueMinimum={180}>
-          <input />
-        </InspectorParameterRow>
-      )
-    );
-    expect(host.querySelector<HTMLElement>('.sniptale-parameter-row')!.dataset['layout']).toBe(
-      'stacked'
-    );
-  } finally {
-    canvas.mockRestore();
-    width.mockRestore();
-  }
-});
-
 it('keeps text names and padding inert while the input retains native focus', () => {
   act(() =>
     root.render(
@@ -479,150 +436,42 @@ it('presents a scoped static value without an editable or disabled control', () 
   expect(row?.querySelector('input,textarea,button,[aria-disabled]')).toBeNull();
 });
 
-it('stacks a wide control and keeps compact fields in the shared inline column', () => {
-  const metrics = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(560);
-  const context = { font: '', measureText: (text: string) => ({ width: text.length * 8 }) };
-  const canvas = vi
-    .spyOn(HTMLCanvasElement.prototype, 'getContext')
-    .mockReturnValue(context as unknown as CanvasRenderingContext2D);
-  const style = document.createElement('style');
-  style.textContent = `
-    .sniptale-parameter-name {
-      --sniptale-parameter-label-width: 144px;
-      --sniptale-parameter-value-width: 160px;
-    }
-  `;
-  document.head.append(style);
+it('keeps long choices inline and preserves explicitly stacked fields', () => {
+  const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(160);
+  const canvas = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    font: '',
+    measureText: (label: string) => ({ width: label.length * 8 }),
+  } as unknown as CanvasRenderingContext2D);
   try {
     act(() =>
       root.render(
         <InspectorLayout>
-          <InspectorParameterRow label="Theme mode" valueMinimum={380}>
-            <button>System</button>
-          </InspectorParameterRow>
-          <InspectorParameterRow label="Width" valueMinimum={112}>
-            <input />
-          </InspectorParameterRow>
-          <InspectorParameterRow label="Name" valueMinimum={144} valueText={'Long name '.repeat(8)}>
-            <input />
+          <SegmentedRow
+            label="Область видео"
+            ariaLabel="Область видео"
+            value="fit"
+            onChange={vi.fn()}
+            options={[
+              { value: 'fit', label: 'Вписать целиком' },
+              { value: 'crop', label: 'Кадрировать' },
+            ]}
+          />
+          <InspectorParameterRow label="Notes" stacked>
+            <textarea />
           </InspectorParameterRow>
         </InspectorLayout>
       )
     );
     const rows = host.querySelectorAll<HTMLElement>('.sniptale-parameter-row');
-    expect(Array.from(rows, (row) => row.dataset['layout'])).toEqual([
-      'stacked',
-      'inline',
-      'inline',
-    ]);
-  } finally {
-    style.remove();
-    canvas.mockRestore();
-    metrics.mockRestore();
-  }
-});
-
-it('fits short options in a narrow value column using the configured label share', () => {
-  const metrics = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(160);
-  const context = { font: '', measureText: (text: string) => ({ width: text.length * 8 }) };
-  const canvas = vi
-    .spyOn(HTMLCanvasElement.prototype, 'getContext')
-    .mockReturnValue(context as unknown as CanvasRenderingContext2D);
-  const style = document.createElement('style');
-  style.textContent = `
-    .sniptale-parameter-name {
-      --sniptale-parameter-label-width: 112px;
-      --sniptale-parameter-value-width: 170px;
-      --sniptale-parameter-label-share: 30%;
-    }
-  `;
-  document.head.append(style);
-  try {
-    act(() =>
-      root.render(
-        <InspectorLayout>
-          <InspectorParameterRow label="Rate" valueOptions={['Slow', 'Fast']}>
-            <button>Slow</button>
-          </InspectorParameterRow>
-          <InspectorParameterRow label="Rate" valueOptions={['Normal speed', 'Fast']}>
-            <button>Normal speed</button>
-          </InspectorParameterRow>
-        </InspectorLayout>
-      )
+    expect([...rows].map((row) => row.dataset['layout'])).toEqual(['inline', 'stacked']);
+    expect(rows[0]?.querySelector('button[aria-haspopup="listbox"]')?.textContent).toContain(
+      'Вписать целиком'
     );
-    const rows = host.querySelectorAll<HTMLElement>('.sniptale-parameter-row');
-    expect(Array.from(rows, (row) => row.dataset['layout'])).toEqual(['inline', 'stacked']);
   } finally {
-    style.remove();
+    width.mockRestore();
     canvas.mockRestore();
-    metrics.mockRestore();
   }
 });
-
-it.each([false, true])(
-  'defers a blurred row resize until the command press ends (scoped=%s)',
-  async (scoped) => {
-    let width = 140;
-    let held = false;
-    let frame: FrameRequestCallback | undefined;
-    const query = document.querySelector.bind(document);
-    const selector = vi
-      .spyOn(document, 'querySelector')
-      .mockImplementation((value) =>
-        value === ':active' ? (held ? document.body : null) : query(value)
-      );
-    const request = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-      frame = callback;
-      return 1;
-    });
-    const cancel = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
-    const metric = vi
-      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
-      .mockImplementation(() => width);
-    const canvas = vi
-      .spyOn(HTMLCanvasElement.prototype, 'getContext')
-      .mockImplementation(() => null);
-    // The layout owner needs only font assignment and text advance from this browser boundary.
-    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
-      configurable: true,
-      value: () => ({ font: '', measureText: (text: string) => ({ width: text.length * 8 }) }),
-    });
-    try {
-      const controls = (
-        <>
-          <InspectorParameterRow label="Title">
-            <input />
-          </InspectorParameterRow>
-          <button>None</button>
-        </>
-      );
-      act(() => root.render(scoped ? <InspectorLayout>{controls}</InspectorLayout> : controls));
-      const row = host.querySelector<HTMLElement>('.sniptale-parameter-row')!;
-      const input = host.querySelector('input')!;
-      expect(row.dataset['layout']).toBe('stacked');
-      act(() => input.focus());
-      width = 500;
-      held = true;
-      await act(async () => {
-        host.querySelector('button')!.focus();
-        await Promise.resolve();
-      });
-      expect(row.dataset['layout']).toBe('stacked');
-      expect(frame).toBeDefined();
-      act(() => frame!(0));
-      expect(row.dataset['layout']).toBe('stacked');
-      held = false;
-      act(() => frame!(1));
-      expect(row.dataset['layout']).toBe('inline');
-    } finally {
-      canvas.mockRestore();
-      metric.mockRestore();
-      selector.mockRestore();
-      request.mockRestore();
-      cancel.mockRestore();
-    }
-  }
-);
 
 it('retains text fitting across equivalent option arrays and refits changed labels and resizing', () => {
   const metric = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(500);
@@ -653,9 +502,6 @@ it('retains text fitting across equivalent option arrays and refits changed labe
     act(() =>
       root.render(
         <InspectorLayout>
-          <InspectorParameterRow label="Alignment" valueOptions={[first, 'Right']}>
-            <span>Left</span>
-          </InspectorParameterRow>
           <CompactSegmentedSelector
             ariaLabel="Alignment"
             columns={2}
@@ -768,315 +614,6 @@ it('changes segments to a dropdown when enlarged label metrics no longer fit', (
     style.mockRestore();
     metric.mockRestore();
     request.mockRestore();
-    cancel.mockRestore();
-  }
-});
-
-it.each(['initial', 'descendant'] as const)(
-  'measures every %s row before fitting any connected row and fits before paint',
-  (mount) => {
-    const order: string[] = [];
-    const metric = vi
-      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
-      .mockImplementation(function (this: HTMLElement) {
-        if (this.classList.contains('sniptale-parameter-row'))
-          order.push(`read:${this.dataset['ui']}`);
-        if (this.classList.contains('sniptale-property-choice')) order.push('read:segments');
-        return 300;
-      });
-    const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-      font: '',
-      measureText: (text: string) => ({ width: text.length * 8 }),
-    } as unknown as CanvasRenderingContext2D);
-    const original = CSSStyleDeclaration.prototype.setProperty;
-    const write = vi
-      .spyOn(CSSStyleDeclaration.prototype, 'setProperty')
-      .mockImplementation(function (this: CSSStyleDeclaration, property, value, priority) {
-        if (property === '--sniptale-parameter-name-fit') order.push('write');
-        return original.call(this, property, value, priority);
-      });
-    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 1);
-    function Rows() {
-      const [visible, setVisible] = useState(mount === 'initial');
-      return (
-        <>
-          <button onClick={() => setVisible(true)}>Mount parameters</button>
-          {visible ? (
-            <>
-              <InspectorParameterRow label="First" dataUi="first">
-                <input />
-              </InspectorParameterRow>
-              <InspectorParameterRow
-                label="A much longer second row"
-                valueMinimum={180}
-                dataUi="second"
-              >
-                <input />
-              </InspectorParameterRow>
-              <CompactSegmentedSelector
-                ariaLabel="Initial segments"
-                columns={2}
-                value="first"
-                onChange={vi.fn()}
-                options={[
-                  { value: 'first', label: 'A much longer option for this control' },
-                  { value: 'second', label: 'Another long choice' },
-                ]}
-              />
-            </>
-          ) : null}
-        </>
-      );
-    }
-    try {
-      act(() =>
-        root.render(
-          <InspectorLayout>
-            <Rows />
-          </InspectorLayout>
-        )
-      );
-      if (mount === 'descendant') act(() => host.querySelector('button')!.click());
-      const firstWrite = order.indexOf('write');
-      expect(firstWrite).toBeGreaterThan(-1);
-      expect(order.slice(0, firstWrite)).toContain('read:first');
-      expect(order.slice(0, firstWrite)).toContain('read:second');
-      expect(order.slice(0, firstWrite)).toContain('read:segments');
-      expect(order.slice(firstWrite).some((entry) => entry.startsWith('read:'))).toBe(false);
-      const rows = [...host.querySelectorAll<HTMLElement>('.sniptale-parameter-row')];
-      expect(rows[0]!.dataset['layout']).toBe('inline');
-      expect(rows[1]!.dataset['layout']).toBe('stacked');
-      expect(host.querySelector('button[aria-label="Initial segments"]')).not.toBeNull();
-      expect(raf).not.toHaveBeenCalled();
-    } finally {
-      metric.mockRestore();
-      context.mockRestore();
-      write.mockRestore();
-      raf.mockRestore();
-    }
-  }
-);
-
-it('coalesces observer, font and blur fits, skips unchanged writes and cancels disposed rows', async () => {
-  let width = 300;
-  const order: string[] = [],
-    callbacks = new Set<ResizeObserverCallback>();
-  const frames = new Map<number, FrameRequestCallback>();
-  let nextFrame = 0,
-    fontsReady!: () => void;
-  const ready = new Promise<void>((resolve) => {
-    fontsReady = resolve;
-  });
-  const fonts = Object.getOwnPropertyDescriptor(document, 'fonts');
-  Object.defineProperty(document, 'fonts', { configurable: true, value: { ready } });
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      constructor(private readonly callback: ResizeObserverCallback) {
-        callbacks.add(callback);
-      }
-      observe() {}
-      disconnect() {
-        callbacks.delete(this.callback);
-      }
-    }
-  );
-  const request = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-    const id = ++nextFrame;
-    frames.set(id, callback);
-    return id;
-  });
-  const cancel = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => {
-    frames.delete(id);
-  });
-  const metric = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (
-    this: HTMLElement
-  ) {
-    if (this.classList.contains('sniptale-parameter-row')) order.push(`read:${this.dataset['ui']}`);
-    return width;
-  });
-  const measureText = vi.fn((text: string) => ({ width: text.length * 8 }));
-  const context = vi
-    .spyOn(HTMLCanvasElement.prototype, 'getContext')
-    .mockReturnValue({ font: '', measureText } as unknown as CanvasRenderingContext2D);
-  const original = CSSStyleDeclaration.prototype.setProperty;
-  const write = vi.spyOn(CSSStyleDeclaration.prototype, 'setProperty').mockImplementation(function (
-    this: CSSStyleDeclaration,
-    property,
-    value,
-    priority
-  ) {
-    if (property === '--sniptale-parameter-name-fit') order.push('write');
-    return original.call(this, property, value, priority);
-  });
-  const render = (label = 'First', second = true) =>
-    root.render(
-      <InspectorLayout>
-        <InspectorParameterRow label={label} dataUi="first">
-          <input />
-        </InspectorParameterRow>
-        {second ? (
-          <InspectorParameterRow label="Second" dataUi="second">
-            <input />
-          </InspectorParameterRow>
-        ) : null}
-      </InspectorLayout>
-    );
-  const resize = () => {
-    for (const callback of [...callbacks]) callback([], {} as ResizeObserver);
-  };
-  const frame = () => {
-    const [id, callback] = [...frames][0]!;
-    frames.delete(id);
-    callback(0);
-  };
-  try {
-    act(() => render());
-    order.length = 0;
-    width = 400;
-    await act(async () => {
-      resize();
-      resize();
-      host.querySelector('input')!.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
-      fontsReady();
-      await Promise.resolve();
-    });
-    expect(frames.size).toBe(1);
-    expect(order).toEqual([]);
-    act(frame);
-    const firstWrite = order.indexOf('write');
-    expect(order.slice(0, firstWrite)).toEqual(['read:first', 'read:second']);
-    expect(order.slice(firstWrite)).toEqual(['write', 'write']);
-    order.length = 0;
-    act(resize);
-    act(frame);
-    expect(order).toEqual(['read:first', 'read:second']);
-    order.length = 0;
-    const staleCallbacks = [...callbacks];
-    act(resize);
-    act(() => render('Latest first label requiring more space', false));
-    expect(frames.size).toBe(0);
-    expect(order).toEqual(['read:first', 'write']);
-    const latest = host.querySelector<HTMLElement>('.sniptale-parameter-row')!;
-    expect(latest.querySelector('.sniptale-parameter-name')?.textContent).toBe(
-      'Latest first label requiring more space'
-    );
-    order.length = 0;
-    measureText.mockClear();
-    await act(async () => root.unmount());
-    act(() => {
-      for (const callback of staleCallbacks) callback([], {} as ResizeObserver);
-    });
-    expect(frames.size).toBe(0);
-    expect(order).toEqual([]);
-    expect(measureText).not.toHaveBeenCalled();
-    expect(cancel).toHaveBeenCalled();
-  } finally {
-    if (fonts) Object.defineProperty(document, 'fonts', fonts);
-    else Reflect.deleteProperty(document, 'fonts');
-    metric.mockRestore();
-    context.mockRestore();
-    write.mockRestore();
-    request.mockRestore();
-    cancel.mockRestore();
-  }
-});
-
-it('batches mixed row and segment observers, font and blur work before any fitting writes', async () => {
-  let width = 300,
-    queued: FrameRequestCallback | undefined,
-    fontsReady!: () => void;
-  const reads: string[] = [],
-    callbacks = new Set<ResizeObserverCallback>();
-  const fonts = Object.getOwnPropertyDescriptor(document, 'fonts');
-  Object.defineProperty(document, 'fonts', {
-    configurable: true,
-    value: {
-      ready: new Promise<void>((resolve) => {
-        fontsReady = resolve;
-      }),
-    },
-  });
-  const frame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-    queued = callback;
-    return 1;
-  });
-  const cancel = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      constructor(private readonly callback: ResizeObserverCallback) {
-        callbacks.add(callback);
-      }
-      observe() {}
-      disconnect() {
-        callbacks.delete(this.callback);
-      }
-    }
-  );
-  const metric = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (
-    this: HTMLElement
-  ) {
-    if (this.matches('.sniptale-parameter-row')) reads.push('row');
-    if (this.matches('.sniptale-property-choice')) reads.push('segments');
-    return width;
-  });
-  const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-    font: '',
-    measureText: (text: string) => ({ width: text.length * 8 }),
-  } as unknown as CanvasRenderingContext2D);
-  const original = CSSStyleDeclaration.prototype.setProperty;
-  const writes = vi
-    .spyOn(CSSStyleDeclaration.prototype, 'setProperty')
-    .mockImplementation(function (this: CSSStyleDeclaration, property, value, priority) {
-      if (property === '--sniptale-parameter-name-fit') reads.push('write');
-      return original.call(this, property, value, priority);
-    });
-  try {
-    act(() =>
-      root.render(
-        <InspectorLayout>
-          <InspectorParameterRow label="Width">
-            <input />
-          </InspectorParameterRow>
-          <CompactSegmentedSelector
-            ariaLabel="Mixed"
-            columns={2}
-            value="phrase"
-            onChange={vi.fn()}
-            options={[
-              { value: 'phrase', label: 'Each phrase' },
-              { value: 'script', label: 'Whole script' },
-            ]}
-          />
-        </InspectorLayout>
-      )
-    );
-    expect(host.querySelector('[role="group"]')).not.toBeNull();
-    expect(frame).not.toHaveBeenCalled();
-    reads.length = 0;
-    width = 140;
-    await act(async () => {
-      for (const callback of callbacks) callback([], {} as ResizeObserver);
-      host
-        .querySelector('.sniptale-property-choice')!
-        .dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
-      fontsReady();
-      await Promise.resolve();
-    });
-    expect(reads).toEqual([]);
-    expect(frame).toHaveBeenCalledOnce();
-    act(() => queued!(0));
-    expect(reads).toEqual(['row', 'segments', 'write']);
-    expect(host.querySelector('[role="group"]')).toBeNull();
-    expect(host.querySelector('button[aria-label="Mixed"]')).not.toBeNull();
-  } finally {
-    if (fonts) Object.defineProperty(document, 'fonts', fonts);
-    else Reflect.deleteProperty(document, 'fonts');
-    metric.mockRestore();
-    context.mockRestore();
-    writes.mockRestore();
-    frame.mockRestore();
     cancel.mockRestore();
   }
 });

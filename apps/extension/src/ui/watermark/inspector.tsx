@@ -268,10 +268,7 @@ function WatermarkSinglePlacement(props: Binding) {
   };
   return (
     <>
-      <InspectorParameterRow
-        label={translate('gallery.videoReview.watermarkAnchor')}
-        valueMinimum={116}
-      >
+      <InspectorParameterRow label={translate('gallery.videoReview.watermarkAnchor')}>
         <div
           role="group"
           aria-label={translate('gallery.videoReview.watermarkAnchor')}

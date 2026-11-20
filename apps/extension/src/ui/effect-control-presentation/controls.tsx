@@ -65,7 +65,7 @@ export function EffectControlChoices(props: {
   if (props.control.presentation === 'toggle') {
     const value = entries[selected]?.label ?? '';
     return (
-      <InspectorParameterRow label={label} keepInline>
+      <InspectorParameterRow label={label}>
         <span id={descriptionId} className="min-w-0 truncate text-xs">
           {value}
         </span>

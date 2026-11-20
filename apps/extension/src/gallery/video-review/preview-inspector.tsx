@@ -71,10 +71,7 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
           props.onChange({ rasterPreset })
         }
       />
-      <InspectorParameterRow
-        label={translate('gallery.videoReview.previewActualRaster')}
-        keepInline
-      >
+      <InspectorParameterRow label={translate('gallery.videoReview.previewActualRaster')}>
         <output
           className="block w-full whitespace-nowrap text-right text-[13px] font-normal tabular-nums
           text-[var(--sniptale-color-text-primary)]"

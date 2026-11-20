@@ -25,7 +25,7 @@ export function SegmentFitChoices({ locale }: { locale: 'ru' | 'en' }) {
         <input
           type="range"
           min={120}
-          max={440}
+          max={520}
           value={width}
           onChange={(event) => setWidth(event.currentTarget.valueAsNumber)}
         />

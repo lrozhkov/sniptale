@@ -352,47 +352,43 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       const width = fit.getByRole('slider');
       const segments = fit.getByRole('group', { name: 'Область', exact: true });
       const inside = segments.getByRole('button', { name: 'Внутри рамки', exact: true });
+      const trigger = fit.getByRole('button', { name: 'Область', exact: true });
+      await width.fill('520');
       await expect(segments).toBeVisible();
-      await width.fill('440');
-      await expect(row).toHaveAttribute('data-layout', 'inline');
-      const stackedMinimum = await segments.evaluate((group) => {
-        const row = group.closest('.sniptale-parameter-row');
-        if (!row) throw new Error('Missing parameter row for the choices.');
-        const style = getComputedStyle(row);
-        const probe = group.cloneNode(true);
-        if (!(probe instanceof HTMLElement)) throw new Error('Invalid choices probe.');
-        Object.assign(probe.style, {
-          width: 'max-content',
-          position: 'absolute',
-          visibility: 'hidden',
-          gridTemplateColumns: 'none',
-          gridAutoFlow: 'column',
-          gridAutoColumns: 'max-content',
-        });
-        group.after(probe);
-        const minimum =
-          probe.getBoundingClientRect().width +
-          parseFloat(style.paddingLeft) +
-          parseFloat(style.paddingRight);
-        probe.remove();
-        return Math.ceil(minimum);
-      });
       await inside.click();
       await expect(inside).toHaveAttribute('aria-pressed', 'true');
-      await width.fill(String(stackedMinimum + 1));
-      await expect(row).toHaveAttribute('data-layout', 'stacked');
       await expect(segments.getByRole('button', { name: 'Вне рамки', exact: true })).toBeDisabled();
-      await width.fill(String(stackedMinimum));
-      await expect(inside).toBeVisible();
-      await width.fill(String(stackedMinimum - 1));
-      const trigger = fit.locator('button[aria-haspopup="listbox"]');
+      const wideHeight = (await row.boundingBox())!.height;
+      let narrow = 120;
+      let wide = 520;
+      const resize = async (size: number) => {
+        await width.fill(String(size));
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+            )
+        );
+      };
+      while (wide - narrow > 1) {
+        const size = Math.floor((narrow + wide) / 2);
+        await resize(size);
+        if (await segments.isVisible()) wide = size;
+        else narrow = size;
+      }
+      for (const size of [wide + 1, wide, narrow]) {
+        await resize(size);
+        await expect(row).toHaveAttribute('data-layout', 'inline');
+        expect((await row.boundingBox())!.height).toBe(wideHeight);
+        expect(await segments.isVisible()).toBe(size >= wide);
+      }
       await expect(trigger).toHaveText('Внутри рамки');
       await trigger.click();
       const list = fit.getByRole('listbox');
       await expect(list.getByRole('option', { name: 'Вне рамки' })).toBeDisabled();
       await trigger.press('Escape');
       await expect(trigger).toBeFocused();
-      await width.fill('440');
+      await width.fill('520');
       await expect(inside).toHaveAttribute('aria-pressed', 'true');
       await expect(row).toHaveAttribute('data-layout', 'inline');
     });
@@ -408,21 +404,29 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       const transparent = 'rgba(0, 0, 0, 0)';
       const field = await pickerToken(full, '--sniptale-color-field');
       await expect(scale).toHaveCSS('background-color', transparent);
-      await expect(full).toHaveCSS('background-color', field);
-      await expect(half).toHaveCSS('background-color', transparent);
+      const paint = (button: Locator) =>
+        button.evaluate((element) => {
+          const { width, height, backgroundColor } = getComputedStyle(element, '::before');
+          return { width: parseFloat(width), height: parseFloat(height), backgroundColor };
+        });
+      const target = (await full.boundingBox())!;
+      const before = await paint(full);
+      expect(before.backgroundColor).toBe(field);
+      expect(target.width - before.width).toBeCloseTo(4);
+      expect(target.height - before.height).toBeCloseTo(6);
+      expect((await paint(half)).backgroundColor).toBe(transparent);
       await half.hover();
       await expect(half).toHaveCSS('cursor', 'pointer');
-      await expect(half).toHaveCSS(
-        'background-color',
-        await pickerToken(half, '--sniptale-color-field-hover')
-      );
-      const before = await scale.boundingBox();
+      const hover = await pickerToken(half, '--sniptale-color-field-hover');
+      await expect.poll(async () => (await paint(half)).backgroundColor).toBe(hover);
+      const groupBounds = await scale.boundingBox();
       await half.click();
       await page.mouse.move(0, 0);
       await expect(half).toHaveAttribute('aria-pressed', 'true');
-      await expect(half).toHaveCSS('background-color', field);
-      await expect(full).toHaveCSS('background-color', transparent);
-      expect(await scale.boundingBox()).toEqual(before);
+      expect((await paint(half)).backgroundColor).toBe(field);
+      expect((await paint(full)).backgroundColor).toBe(transparent);
+      expect(await scale.boundingBox()).toEqual(groupBounds);
+      expect(await full.boundingBox()).toEqual(target);
       await scale.scrollIntoViewIfNeeded();
       await page.screenshot({ path: info.outputPath('inspector-segments.png'), fullPage: false });
     });

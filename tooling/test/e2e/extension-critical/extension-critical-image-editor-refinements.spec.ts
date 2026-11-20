@@ -712,6 +712,41 @@ for (const locale of ['en', 'ru'] as const) {
   }
 }
 
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`metadata background palette stays within its value column ${viewport.name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await page.setViewportSize(viewport.size);
+    await openEditor(page, hostOrigin, 'ru');
+    await page.locator('[data-ui="editor.floating.layers.mode.meta"]').click();
+    const settings = translate('editor.compact.technicalDataTextSettings', 'ru');
+    await page.locator('summary').filter({ hasText: settings }).click();
+    const background = page.locator(
+      '[data-ui="content.toolbar.drawing-options.text.background-group"]'
+    );
+    await background
+      .locator('[data-ui="content.toolbar.drawing-options.text.background-none"]')
+      .click();
+    const swatches = background.locator(
+      '[data-ui="content.toolbar.drawing-options.quick-colors"] button'
+    );
+    await expect(swatches).toHaveCount(5);
+    expect(
+      await background.evaluate((group) => {
+        const value = group.closest('.sniptale-parameter-value')!;
+        const edge = value.getBoundingClientRect().right;
+        return [...group.querySelectorAll('button')].every(
+          (button) => button.getBoundingClientRect().right <= edge + 1
+        );
+      })
+    ).toBe(true);
+    await swatches.last().click();
+    await expect(swatches.last()).toHaveAttribute('aria-pressed', 'true');
+    await page.screenshot({ path: info.outputPath('metadata-background.png'), fullPage: false });
+  });
+}
+
 for (const locale of ['en', 'ru'] as const) {
   for (const theme of ['light', 'dark'] as const) {
     test(`short editor panel consistency ${locale} ${theme}`, async ({

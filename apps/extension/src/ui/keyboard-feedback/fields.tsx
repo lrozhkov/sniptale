@@ -197,10 +197,7 @@ function KeyChoice<T extends string>(props: {
 }) {
   return (
     <>
-      <InspectorParameterRow
-        label={props.label}
-        valueOptions={props.options.map((option) => option.label)}
-      >
+      <InspectorParameterRow label={props.label}>
         <CompactSegmentedSelector
           ariaLabel={props.label}
           value={props.value}

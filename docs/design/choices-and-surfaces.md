@@ -4,7 +4,7 @@
 
 ## Segment fit
 
-Follow [layout adaptation](responsive.md#compaction-order) for intrinsic fit, stacking, and deferred representation changes.
+Follow [layout adaptation](responsive.md#compaction-order) for segment fit and deferred representation changes.
 
 ## Choose the presentation
 
@@ -53,6 +53,6 @@ Paint selection as soon as the value changes. Animate only the idle segment hove
 
 [WAI combobox](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/).
 
-Compact inspector segments use 32px height and 6px horizontal padding per option. General controls retain their existing height.
+Compact inspector segments use 32px height and 6px horizontal padding per option. Inset the selected and hover surfaces by 3px vertically and 2px horizontally. Keep the button targets and row spacing at their specified sizes.
 
 Configured provider/model pickers refresh catalogs when opened. Keep the menu open and preserve search and choice during reads. Failed reads retain the last catalog and expose retry. Refresh never selects a different provider or model. Keep removed choices unresolved until replacement. Existing owners retain initial configured defaults.

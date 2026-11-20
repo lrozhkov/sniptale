@@ -78,7 +78,7 @@ export function TourTextField({
   return headingOwnsLabel ? (
     <div className="tour-heading-text-field">{field}</div>
   ) : (
-    <InspectorParameterRow label={label} stacked={!singleLine} valueMinimum={200}>
+    <InspectorParameterRow label={label} stacked={!singleLine}>
       {field}
     </InspectorParameterRow>
   );

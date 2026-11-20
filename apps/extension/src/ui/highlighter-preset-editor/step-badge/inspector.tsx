@@ -80,7 +80,7 @@ function ColorEditor(props: {
   const SourceIcon = SOURCE_ICONS[props.source];
   const sourceTitle = `${translate('content.stepBadge.colorSourceLabel')} — ${getSourceLabel(props.source)}`;
   return (
-    <PropertyField label={props.label} valueMinimum={178}>
+    <PropertyField label={props.label}>
       <div className="flex min-w-0 items-center gap-1.5">
         <fieldset
           className={

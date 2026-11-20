@@ -26,7 +26,7 @@ export function SurfaceStyleSelector(props: SurfaceStyleSelectorProps) {
       data-ui="shared.ui.surface-style-selector"
     >
       {props.fieldLabel && inspector ? (
-        <InspectorParameterRow label={props.fieldLabel} valueMinimum={160}>
+        <InspectorParameterRow label={props.fieldLabel}>
           <SurfaceStyleSelectorTrigger selector={props} controller={controller} />
         </InspectorParameterRow>
       ) : props.fieldLabel ? (

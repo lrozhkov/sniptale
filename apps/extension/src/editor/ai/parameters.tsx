@@ -130,7 +130,6 @@ export function ImageParametersEditor(props: {
               <InspectorParameterRow
                 key={field.key}
                 label={translate(field.label)}
-                keepInline
                 dataUi={`editor.ai.parameter.${field.key}`}
               >
                 <CompactSelect

@@ -29,7 +29,7 @@ export function AppearanceControlsCard({ state }: { state: AppearanceSectionStat
     <div className="space-y-1">
       <SettingsControlRow
         label={translate('settings.appearance.themeModeLabel', state.locale)}
-        valueMinimum={380}
+        className="[--sniptale-parameter-value-width:340px]"
       >
         <ThemeChips state={state} />
       </SettingsControlRow>

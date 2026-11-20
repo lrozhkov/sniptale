@@ -72,8 +72,6 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
       <InspectorParameterRow
         label={label}
         stacked={stacked ?? false}
-        valueMinimum={trailingActions ? 220 : 144}
-        valueText={String(props.value ?? uncontrolledText)}
         className={className}
         dataUi="shared.ui.compact-inspector.text-field"
       >

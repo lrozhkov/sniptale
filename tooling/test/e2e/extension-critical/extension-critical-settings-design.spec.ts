@@ -163,6 +163,21 @@ test('native settings sidebar wheel reaches the last section at short height', a
   await screenshot(page, info, 'site-access-mode');
 });
 
+for (const [width, height, theme] of [
+  [1280, 560, 'light'],
+  [1920, 900, 'dark'],
+] as const) {
+  test(`native Russian theme controls fit one row at ${width}`, async ({
+    page,
+    extensionId,
+  }, info) => {
+    await page.setViewportSize({ width, height });
+    await configure(page, extensionId, 'ru', theme);
+    await neutralThemeChoice(page, 'ru', info);
+    await verifyThemeActivation(page, 'ru', theme);
+  });
+}
+
 async function configure(page: Page, extensionId: string, locale: Locale, theme: Theme) {
   await openSettings(page, extensionId);
   await page.locator('#settings-interface-language').click();
@@ -359,6 +374,17 @@ async function neutralThemeChoice(page: Page, locale: Locale, info: TestInfo) {
     exact: true,
   });
   const selected = themes.locator('button[aria-pressed="true"]');
+  const field = themes.locator('xpath=ancestor::*[@data-layout][1]');
+  await expect(field).toHaveAttribute('data-layout', 'inline');
+  expect(
+    await themes.getByRole('button').evaluateAll((buttons) =>
+      buttons.every((button) => {
+        const bounds = button.getBoundingClientRect();
+        const caption = button.querySelector('span')!.getBoundingClientRect();
+        return caption.left >= bounds.left - 1 && caption.right <= bounds.right + 1;
+      })
+    )
+  ).toBe(true);
   await expect(selected).toHaveCount(1);
   await expect(
     selected,

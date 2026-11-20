@@ -8,12 +8,9 @@
   box-shadow: none;
 }
 
-[data-ui='shared.ui.paint-selector'][data-trigger-variant='swatch'] {
-  container: paint-inspector / inline-size;
-}
 .paint-inspector-field {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 12rem);
+  grid-template-columns: minmax(0, 1fr) minmax(0, min(55%, 12rem));
   align-items: center;
   gap: 8px;
   min-height: 36px;
@@ -66,10 +63,4 @@
 .paint-inspector-field > button > svg {
   flex: none;
   color: var(--sniptale-color-text-secondary);
-}
-@container paint-inspector (max-width: 280px) {
-  .paint-inspector-field {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 4px;
-  }
 }

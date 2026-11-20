@@ -20,8 +20,8 @@
     {
       "id": "choices.segment-fit",
       "title": "Переключатель при изменении ширины панели",
-      "states": ["equal", "intrinsic", "stacked", "dropdown", "disabled"],
-      "proof": "The same choices retain their value as the layout changes."
+      "states": ["equal", "intrinsic", "inline-dropdown", "disabled"],
+      "proof": "The choice keeps its value and row when the segments change to a dropdown."
     },
     {
       "id": "choices.switch-status",

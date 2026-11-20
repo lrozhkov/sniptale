@@ -22,7 +22,7 @@ Bound text and action lists to a readable content column. Do not stretch a short
 2. Reduce only declared spacing variants. Do not shrink font roles or hit targets arbitrarily.
 3. Hide lower-priority captions only for an established icon-and-text family with an approved icon-only variant.
 4. Preserve the full accessible name and native browser hint. Keep critical text-only commands explicit.
-5. Stack a control below its label before changing its representation. Measure options on the full available group width. Prefer equal segments, then allow intrinsic minimum widths for unequal labels. Keep a single row when complete labels fit without wrapping. Use a dropdown only when labels, individual padding, actual gaps, and insets exceed the full-width control. Preserve compact icon controls and existing overflow menus.
+5. Keep each inline field in its row outside the extension popup. Measure the segments in the value column. Prefer equal segments. Use intrinsic minimum widths when the labels have different lengths. Use a dropdown in the same column when the segments exceed the available width. Measure the full control width for a field with an explicit stacked layout.
 6. When the desktop surface reaches its minimum, preserve that width and use the outer horizontal scroll owner.
 
 Do not change representation during an active press, editing transaction, drag, or menu selection. Recompute after content changes, font readiness, and owner resizing. Avoid a hidden-caption measurement loop. Do not invent one universal viewport breakpoint for all toolbars or inspectors.
@@ -42,7 +42,7 @@ Density calculations include only controls in the layout flow. Exclude floating 
 | gallery/video-review/use-toolbar-layout.ts | Actual-fit measurement: balanced spacing, compact spacing, priority caption removal, then stacking |
 | gallery/video-review/panel-layout.tsx | Effective size clamping retains requested inspector/timeline sizes for later expansion |
 | gallery/video-review/inspector.css | Two-column All view at content-container 524px. Nested settings stay one column |
-| ui/paint-selector/trigger.css | Label/value stacking at local container 280px |
+| ui/paint-selector/trigger.css | Label and value columns fit the available width |
 | scenario-editor/page-shell/inspector.css | Numeric value adjustment at local container 300px and intrinsic row fitting |
 | packages/ui/src/inspector-shell | Expanded/collapsed width transitions remain with the shell |
 | packages/ui/src/styles/ai-modal/shell.css | Bounded modal, scrolling body, nonshrinking header/footer, wrapping footer commands |

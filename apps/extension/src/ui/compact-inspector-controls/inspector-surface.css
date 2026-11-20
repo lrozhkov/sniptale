@@ -379,6 +379,15 @@
   color: var(--sniptale-color-text-secondary);
   cursor: default;
 }
+.sniptale-compact-workspace
+  .sniptale-parameter-row[data-layout='inline']
+  > .sniptale-parameter-name
+  > span:first-child {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .sniptale-compact-workspace .sniptale-parameter-row > .sniptale-parameter-value {
   min-width: 0;
   width: 100%;

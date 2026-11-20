@@ -55,7 +55,6 @@ export function StatusRow(props: { label: React.ReactNode; value: React.ReactNod
       <InspectorParameterRow
         label={props.label}
         className="sniptale-static-parameter-row"
-        keepInline
         dataUi="shared.ui.compact-inspector.status-row"
       >
         <span

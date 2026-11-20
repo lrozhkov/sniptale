@@ -665,11 +665,9 @@ for (const locale of ['ru', 'en'] as const) {
         await layout.scrollIntoViewIfNeeded();
         const heading = (await layout.locator('.guide-inspector-group-heading').boundingBox())!;
         const field = (await layout.locator('[data-ui="shared.ui.compact-select"]').boundingBox())!;
-        if (width === 420)
-          expect(
-            Math.abs(heading.y + heading.height / 2 - field.y - field.height / 2)
-          ).toBeLessThanOrEqual(1);
-        else expect(field.y).toBeGreaterThanOrEqual(heading.y + heading.height);
+        expect(
+          Math.abs(heading.y + heading.height / 2 - field.y - field.height / 2)
+        ).toBeLessThanOrEqual(1);
         const rows = appearance.locator('.sniptale-parameter-row');
         expect(await rows.count()).toBeGreaterThan(1);
         for (const row of await rows.all()) {
@@ -689,7 +687,11 @@ for (const locale of ['ru', 'en'] as const) {
           appearance.locator('[data-ui="shared.ui.compact-inspector.segmented-field"]').filter({
             hasText: t('scenario.editor.appearanceTheme'),
           })
-        ).toHaveAttribute('data-layout', width === 260 ? 'stacked' : 'inline');
+        ).toHaveAttribute('data-layout', 'inline');
+        const accent = appearance.locator('.guide-style-accent .inspector-hex-editor input');
+        expect(
+          await accent.evaluate((input) => input.scrollWidth - input.clientWidth)
+        ).toBeLessThanOrEqual(1);
         await page.screenshot({
           path: info.outputPath(`semantic-rows-${width}.png`),
           fullPage: false,
