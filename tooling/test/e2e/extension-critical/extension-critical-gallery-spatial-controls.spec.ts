@@ -383,28 +383,16 @@ for (const variant of [
         exact: true,
       });
       await entrance.scrollIntoViewIfNeeded();
-      if (variant.width === 1920 && variant.locale === 'ru') {
-        const curve = entrance.getByRole('button', {
-          name: label('gallery.videoReview.zoomTransitionType'),
+      const curve = entrance.getByRole('group', {
+        name: label('gallery.videoReview.focusCurveType'),
+        exact: true,
+      });
+      await expect(
+        curve.getByRole('button', {
+          name: label('gallery.videoReview.focusCurveLinear'),
           exact: true,
-        });
-        await curve.click();
-        await expect(
-          page.getByRole('option', {
-            name: label('gallery.videoReview.transitionLinear'),
-            exact: true,
-          })
-        ).toBeVisible();
-        await page.keyboard.press('Escape');
-        await expect(curve).toBeFocused();
-      } else {
-        await expect(
-          entrance.getByRole('button', {
-            name: label('gallery.videoReview.transitionLinear'),
-            exact: true,
-          })
-        ).toBeVisible();
-      }
+        })
+      ).toBeVisible();
       await expect(
         entrance.getByRole('switch', { name: label('gallery.videoReview.motionBlur'), exact: true })
       ).toHaveAttribute('aria-checked', 'false');

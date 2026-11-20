@@ -225,6 +225,208 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
   for (const theme of ['light', 'dark'] as const) {
+    test(`reference switch with status ${viewport.name} ${theme}`, async ({ page }, info) => {
+      const ru = viewport.size.width === 1920;
+      const copy = ru
+        ? {
+            shadow: 'Тень',
+            enabled: 'Включено',
+            off: 'Выключено',
+            direction: 'Направление',
+            center: 'Центр',
+            down: 'Вниз',
+            offset: 'Смещение Y',
+            opacity: 'Непрозрачность',
+            radius: 'Скругление',
+            grid: 'Показать сетку',
+          }
+        : {
+            shadow: 'Shadow',
+            enabled: 'Enabled',
+            off: 'Disabled',
+            direction: 'Direction',
+            center: 'Center',
+            down: 'Down',
+            offset: 'Offset Y',
+            opacity: 'Opacity',
+            radius: 'Corner radius',
+            grid: 'Show grid',
+          };
+      await page.setViewportSize(viewport.size);
+      await page.goto(
+        `${origin}examples/choices/?view=${theme}&mode=examples&lang=${ru ? 'ru' : 'en'}`
+      );
+      const sample = page.locator('[data-case="choices.switch-status"]');
+      const toggle = sample.getByRole('switch', { name: copy.shadow, exact: true });
+      const status = sample.locator('.sniptale-switch-status');
+      const subject = sample.locator('.reference-switch-subject');
+      const opacity = sample.getByRole('slider', { name: copy.opacity, exact: true });
+      const corner = sample.getByRole('textbox', { name: copy.radius, exact: true });
+      const label = (text: string) => status.getByText(text, { exact: true });
+      const right = (box: { x: number; width: number }) => box.x + box.width;
+      await expect(toggle).toHaveAttribute('aria-checked', 'true');
+      await label(copy.enabled).hover();
+      await expect(status).toHaveCSS('cursor', 'pointer');
+      await expect(toggle.locator('.sniptale-glass-switch-thumb')).toBeVisible();
+      const initial = await status.boundingBox();
+      const cornerEdge = await corner.evaluate(
+        (element) => element.closest('.sniptale-parameter-value')!.getBoundingClientRect().right
+      );
+      expect(Math.abs(right((await toggle.boundingBox())!) - cornerEdge)).toBeLessThanOrEqual(1);
+      await toggle.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('switch-status-enabled.png'),
+        fullPage: false,
+      });
+      await label(copy.enabled).click();
+      await expect(toggle).toHaveAttribute('aria-checked', 'false');
+      await expect(label(copy.off)).toBeVisible();
+      const disabled = await status.boundingBox();
+      expect(disabled?.x).toBeCloseTo(initial!.x, 0);
+      expect(disabled?.width).toBeCloseTo(initial!.width, 0);
+      await expect(subject).toHaveCSS('box-shadow', 'none');
+      await expect(opacity).toBeDisabled();
+      await expect(sample.locator('.opacity-field')).toHaveCSS('opacity', '0.55');
+      await expect(corner).toBeEnabled();
+      await expect(sample.getByRole('switch', { name: copy.grid, exact: true })).toBeEnabled();
+      await page.screenshot({
+        path: info.outputPath('switch-status-disabled.png'),
+        fullPage: false,
+      });
+
+      await toggle.focus();
+      await page.keyboard.press('Space');
+      await expect(toggle).toHaveAttribute('aria-checked', 'true');
+      await expect(toggle).toBeFocused();
+      await expect(opacity).toHaveValue('25');
+      await expect(subject).not.toHaveCSS('box-shadow', 'none');
+      const direction = sample.getByRole('group', { name: copy.direction, exact: true });
+      const offset = sample.getByRole('textbox', { name: copy.offset, exact: true });
+      await direction.getByRole('button', { name: copy.center }).click();
+      await expect(offset).toBeDisabled();
+      await expect(offset).toHaveValue('0');
+      await direction.getByRole('button', { name: copy.down }).click();
+      await expect(offset).toBeEnabled();
+      await expect(offset).toHaveValue('12');
+      await toggle.focus();
+      const inspector = sample.locator('.reference-switch-inspector');
+      await inspector.evaluate((node) => node.style.setProperty('width', '218px'));
+      await expect
+        .poll(() => inspector.evaluate((node) => node.scrollWidth - node.clientWidth))
+        .toBeLessThanOrEqual(1);
+      await label(copy.enabled).click();
+      await expect(toggle).toHaveAttribute('aria-checked', 'false');
+      await expect(label(copy.off)).toBeVisible();
+    });
+
+    test(`reference lens and responsive choices ${viewport.name} ${theme}`, async ({
+      page,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await page.goto(`${origin}examples/choices/?view=${theme}&mode=examples&lang=ru`);
+      const lens = page.locator('[data-case="choices.lens"]');
+      const shape = lens.getByRole('group', { name: 'Форма линзы', exact: true });
+      const rectangle = shape.getByRole('button', { name: 'Прямоугольник', exact: true });
+      const diameter = lens
+        .locator('.sniptale-parameter-name')
+        .getByText('Диаметр', { exact: true });
+      await expect(rectangle).toHaveText('Прямоугольник');
+      await expect(rectangle.locator('svg')).toBeVisible();
+      await expect(diameter).toBeVisible();
+      await rectangle.press('Space');
+      await expect(rectangle).toHaveAttribute('aria-pressed', 'true');
+      await expect(rectangle).toHaveCSS('outline-style', 'solid');
+      await expect(lens.locator('.reference-lens')).toHaveAttribute('data-shape', 'rectangle');
+      await expect(diameter).toHaveCount(0);
+      await expect(lens.getByText('Ширина', { exact: true })).toBeVisible();
+      await expect(lens.getByText('Высота', { exact: true })).toBeVisible();
+      await lens.getByRole('button', { name: 'Оптическая', exact: true }).click();
+      await expect(lens.locator('.reference-lens')).toHaveAttribute('data-optics', 'optical');
+      await expect(lens.getByText('Ширина края', { exact: true })).toBeVisible();
+      await expect(lens.locator('.reference-lens-inspector')).toHaveCSS('width', '327px');
+      await lens.locator('.reference-lens-inspector').scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('lens-choices.png'), fullPage: false });
+
+      const fit = page.locator('[data-case="choices.segment-fit"]');
+      const row = fit.locator('.sniptale-parameter-row');
+      const width = fit.getByRole('slider');
+      const segments = fit.getByRole('group', { name: 'Область', exact: true });
+      const inside = segments.getByRole('button', { name: 'Внутри рамки', exact: true });
+      await expect(segments).toBeVisible();
+      await width.fill('440');
+      await expect(row).toHaveAttribute('data-layout', 'inline');
+      const stackedMinimum = await segments.evaluate((group) => {
+        const row = group.closest('.sniptale-parameter-row');
+        if (!row) throw new Error('Missing parameter row for the choices.');
+        const style = getComputedStyle(row);
+        const probe = group.cloneNode(true);
+        if (!(probe instanceof HTMLElement)) throw new Error('Invalid choices probe.');
+        Object.assign(probe.style, {
+          width: 'max-content',
+          position: 'absolute',
+          visibility: 'hidden',
+          gridTemplateColumns: 'none',
+          gridAutoFlow: 'column',
+          gridAutoColumns: 'max-content',
+        });
+        group.after(probe);
+        const minimum =
+          probe.getBoundingClientRect().width +
+          parseFloat(style.paddingLeft) +
+          parseFloat(style.paddingRight);
+        probe.remove();
+        return Math.ceil(minimum);
+      });
+      await inside.click();
+      await expect(inside).toHaveAttribute('aria-pressed', 'true');
+      await width.fill(String(stackedMinimum + 1));
+      await expect(row).toHaveAttribute('data-layout', 'stacked');
+      await expect(segments.getByRole('button', { name: 'Вне рамки', exact: true })).toBeDisabled();
+      await width.fill(String(stackedMinimum));
+      await expect(inside).toBeVisible();
+      await width.fill(String(stackedMinimum - 1));
+      const trigger = fit.locator('button[aria-haspopup="listbox"]');
+      await expect(trigger).toHaveText('Внутри рамки');
+      await trigger.click();
+      const list = fit.getByRole('listbox');
+      await expect(list.getByRole('option', { name: 'Вне рамки' })).toBeDisabled();
+      await trigger.press('Escape');
+      await expect(trigger).toBeFocused();
+      await width.fill('440');
+      await expect(inside).toHaveAttribute('aria-pressed', 'true');
+      await expect(row).toHaveAttribute('data-layout', 'inline');
+    });
+
+    test(`reference inspector segments use one selected surface ${viewport.name} ${theme}`, async ({
+      page,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await page.goto(`${origin}examples/layers/?view=${theme}&mode=examples&lang=ru`);
+      const scale = page.getByRole('group', { name: 'Масштаб', exact: true });
+      const half = scale.getByRole('button', { name: '50%', exact: true });
+      const full = scale.getByRole('button', { name: '100%', exact: true });
+      const transparent = 'rgba(0, 0, 0, 0)';
+      const field = await pickerToken(full, '--sniptale-color-field');
+      await expect(scale).toHaveCSS('background-color', transparent);
+      await expect(full).toHaveCSS('background-color', field);
+      await expect(half).toHaveCSS('background-color', transparent);
+      await half.hover();
+      await expect(half).toHaveCSS('cursor', 'pointer');
+      await expect(half).toHaveCSS(
+        'background-color',
+        await pickerToken(half, '--sniptale-color-field-hover')
+      );
+      const before = await scale.boundingBox();
+      await half.click();
+      await page.mouse.move(0, 0);
+      await expect(half).toHaveAttribute('aria-pressed', 'true');
+      await expect(half).toHaveCSS('background-color', field);
+      await expect(full).toHaveCSS('background-color', transparent);
+      expect(await scale.boundingBox()).toEqual(before);
+      await scale.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('inspector-segments.png'), fullPage: false });
+    });
+
     test(`reference choice identity and lifecycle ${viewport.name} ${theme}`, async ({
       page,
     }, info) => {

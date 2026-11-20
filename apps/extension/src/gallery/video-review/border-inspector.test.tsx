@@ -85,6 +85,12 @@ async function choose(label: string, option: string, scope: ParentNode = host) {
     );
 }
 async function editExact(name: string, value: string, cancel = false) {
+  if (field(name).type === 'range') {
+    const pencil = host.querySelector<HTMLButtonElement>(
+      `button[aria-label="gallery.videoReview.${name}"]`
+    )!;
+    await act(async () => pencil.click());
+  }
   const node = field(name);
   if (!cancel) return enter(node, value);
   await input(node, value);
@@ -195,26 +201,23 @@ it('uses source-time coupled duration budgets and exposes rotation speed only wh
   expect(region.border.segmentPercent).toBe(35);
   await editExact('borderSegmentPercent', '50', true);
   expect(region.border.segmentPercent).toBe(35);
-  await input(field('borderSegmentPercent'), '70');
-  act(() =>
-    field('borderSegmentPercent').dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
-    )
-  );
-  expect(region.border.segmentPercent).toBe(35);
   expect(preview).toHaveBeenLastCalledWith(null);
-  await enter(field('borderSegmentPercent'), '200');
+  await editExact('borderSegmentPercent', '200');
+  expect(field('borderSegmentPercent').getAttribute('aria-invalid')).toBe('true');
+  expect(region.border.segmentPercent).toBe(35);
+  await editExact('borderSegmentPercent', '100');
   expect(region.border.segmentPercent).toBe(100);
-  await enter(field('borderSegmentPercent'), '0');
+  await editExact('borderSegmentPercent', '1');
   expect(region.border.segmentPercent).toBe(1);
   await editExact('borderSpeed', '4');
   expect(region.border.period).toBe(0.5);
   await editExact('borderSpeed', '1', true);
   expect(region.border.period).toBe(0.5);
-  await enter(field('borderSpeed'), '0');
-  expect(region.border.period).toBe(20);
-  await enter(field('borderSpeed'), '10');
+  await editExact('borderSpeed', '0');
+  expect(field('borderSpeed').getAttribute('aria-invalid')).toBe('true');
   expect(region.border.period).toBe(0.5);
+  await editExact('borderSpeed', '0.1');
+  expect(region.border.period).toBe(20);
   await choose('focusReveal', 'borderRotateCounterclockwise', hold());
   expect(region.border.motion).toBe('counterclockwise');
   await choose('focusReveal', 'borderPulse', hold());
@@ -331,17 +334,18 @@ it.each(['pulse', 'ripple'] as const)(
     );
     expect(field('borderSpeed').value).toBe('1');
     expect(field('borderSegmentPercent')).toBeNull();
-    const stepper = host.querySelector<HTMLButtonElement>(
-      'button[aria-label="gallery.videoReview.borderSpeed increase"]'
-    )!;
-    act(() => stepper.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+    const slider = field('borderSpeed');
+    expect(slider.type).toBe('range');
+    act(() =>
+      slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    );
     expect(onPreview.mock.lastCall?.[0].border.period).toBeCloseTo(
       2 / (2 / region.border.period + 0.1)
     );
+    act(() => slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
     act(() =>
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))
+      slider.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true }))
     );
-    act(() => window.dispatchEvent(new MouseEvent('pointerup')));
     expect(onChange).not.toHaveBeenCalled();
     expect(onPreview).toHaveBeenLastCalledWith(null);
   }

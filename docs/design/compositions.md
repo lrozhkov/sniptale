@@ -23,6 +23,10 @@ Above-field and inline names use the same typography role. Neither becomes a cap
 
 ## Navigation and dependency changes
 
+Use a switch with status when the switch controls a group of settings. Put the status next to the switch in the value column. Reserve the width of the longer translated status. Clicking the status activates the same switch. Keep one tab stop and a stable accessible name.
+
+Indent the labels of the dependent fields by 8px. Keep their value column aligned with the switch and independent fields. Leave fields visible and disabled when their values help the user resume work. Collapse an optional group when its fields have no use in the current mode. Preserve accepted values in either case.
+
 Hiding a dependent group preserves its valid values. Do not make expansion equal enablement. Switching related panels preserves drafts and disclosure preferences according to the existing owner. Preserve logical focus when a selected object disappears, an operation fails, or a control becomes unavailable. Parameter names do not activate text, numeric, color, paint, or dropdown editors. Actual controls retain their complete clickable padding. Boolean named toggles retain their action.
 
 Actual trigger padding belongs to the control. Parameter names and row gaps remain outside its activation region.

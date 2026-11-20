@@ -17,7 +17,7 @@ Follow [layout adaptation](responsive.md#compaction-order) for intrinsic fit, st
 | Associated content panels | [Tabs](navigation.md) |
 | Exclusive drawing tool | Radio tools under [Buttons](buttons.md) |
 
-Choose by label length, comparison, and width. Search filters existing values without accepting arbitrary new values. Preserve accepted values across representation changes and defer changes during gestures. Segments use a neutral selected surface without an inner frame. Light-theme selection must remain distinct from both idle and hover surfaces. Use regular weight for selected labels.
+Choose by label length, comparison, and width. Search only filters existing values. Preserve values across presentations. Defer changes during gestures. Keep the segment group transparent. Use the stepper surface token and a neutral border on the selected segment. Use the field hover token on available idle segments. Keep label weight and segment size constant. Show keyboard focus independently of selection.
 
 Mark dropdown selection with a vector check. Use orange in the product and neutral ink in the sandbox. Keep the active row neutral. Omit option frames, underlines, repeated instructions, and bold selection labels.
 
@@ -49,7 +49,7 @@ The sample uses an active descendant and commits its active value on Tab exit. T
 
 Represent mixed, empty, custom, loading, unavailable, and error states explicitly. Escape, failed loading, and empty search retain the accepted value. Do not silently select the first available option. Preserve dependent values when temporarily hidden. Keep source dimensions distinct from an explicit aspect ratio. Custom-size editing is a command outside the value list. Invalid input preserves valid dimensions.
 
-Segment motion must not delay acceptance. Initial layout and resize do not animate selection. The chevron folds upward while open. Keep its drawing box and stroke fixed. Do not animate field geometry on hover. Respect reduced motion and dismiss through the layer owner when the anchor becomes invisible.
+Paint selection as soon as the value changes. Animate only the idle segment hover color. The chevron folds upward while open. Keep its drawing box and stroke fixed. Respect reduced motion. Dismiss through the layer owner when the anchor becomes invisible.
 
 [WAI combobox](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/).
 

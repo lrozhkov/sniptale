@@ -29,11 +29,11 @@ button.sniptale-glass-switch[data-command-press]:enabled[data-pressing='true'] {
 }
 
 @layer utilities {
-  button[data-command-press]:is(:enabled, :disabled) {
+  button[data-command-press]:is(:enabled, :disabled):where(:not([data-segment-face])) {
     font-weight: var(--sniptale-control-font-weight) !important;
   }
 
-  button[data-command-press]:enabled:is(:hover, :focus-visible) {
+  button[data-command-press]:enabled:is(:hover, :focus-visible):where(:not([data-segment-face])) {
     font-weight: var(--sniptale-control-font-weight-hover) !important;
   }
 
@@ -53,10 +53,15 @@ button.sniptale-glass-switch[data-command-press]:enabled[data-pressing='true'] {
   button[data-command-press][data-command-tone] {
     height: 32px !important;
     min-height: 32px !important;
-    border: 1px solid transparent !important;
+    border-width: 1px !important;
+    border-style: solid !important;
     border-radius: var(--sniptale-radius-sm, 4px) !important;
     padding: 0 8px !important;
     font: var(--sniptale-control-font-weight) 13px / 18px var(--sniptale-font-interface) !important;
+  }
+
+  button[data-command-press][data-command-tone]:where(:not([data-segment-face])) {
+    border-color: transparent !important;
     background: transparent !important;
     color: var(--sniptale-color-text-primary) !important;
   }
@@ -69,12 +74,14 @@ button.sniptale-glass-switch[data-command-press]:enabled[data-pressing='true'] {
   }
 
   button[data-command-press][data-command-tone='primary'],
-  button[data-command-press][data-command-tone='toggle'][data-command-active='true'] {
+  button[data-command-press][data-command-tone='toggle'][data-command-active='true']:where(
+      :not([data-segment-face])
+    ) {
     background: var(--sniptale-color-surface-hover) !important;
   }
 
   button[data-command-press][data-command-tone]:enabled:hover:where(
-      :not([data-command-chrome='true'])
+      :not([data-command-chrome='true'], [data-segment-face])
     ) {
     background: color-mix(
       in srgb,
@@ -117,7 +124,7 @@ button.sniptale-glass-switch[data-command-press]:enabled[data-pressing='true'] {
     color: var(--sniptale-color-text-primary) !important;
   }
 
-  button[data-command-press]:enabled:hover:is(
+  button[data-command-press]:enabled:hover:where(:not([data-segment-face])):is(
       [data-command-tone='toggle'],
       [data-command-property='true'],
       .review-command[aria-pressed]
@@ -125,7 +132,7 @@ button.sniptale-glass-switch[data-command-press]:enabled[data-pressing='true'] {
     border-color: transparent !important;
   }
 
-  button[data-command-press]:is(:enabled, :disabled):is(
+  button[data-command-press]:is(:enabled, :disabled):where(:not([data-segment-face])):is(
       [data-command-tone='toggle'][data-command-active='true'],
       [data-command-property='true'][data-active='true'],
       .review-command[aria-pressed='true']
@@ -144,7 +151,9 @@ button.sniptale-glass-switch[data-command-press]:enabled[data-pressing='true'] {
     }
   }
 
-  button[data-command-press]:focus-visible:not([data-focus-restoration='pointer']) {
+  button[data-command-press]:focus-visible:not([data-focus-restoration='pointer']):where(
+      :not([data-segment-face])
+    ) {
     outline: 2px solid var(--sniptale-color-accent) !important;
     outline-offset: -2px;
   }

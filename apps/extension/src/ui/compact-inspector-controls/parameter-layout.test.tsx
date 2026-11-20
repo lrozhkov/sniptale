@@ -522,6 +522,43 @@ it('stacks a wide control and keeps compact fields in the shared inline column',
   }
 });
 
+it('fits short options in a narrow value column using the configured label share', () => {
+  const metrics = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(160);
+  const context = { font: '', measureText: (text: string) => ({ width: text.length * 8 }) };
+  const canvas = vi
+    .spyOn(HTMLCanvasElement.prototype, 'getContext')
+    .mockReturnValue(context as unknown as CanvasRenderingContext2D);
+  const style = document.createElement('style');
+  style.textContent = `
+    .sniptale-parameter-name {
+      --sniptale-parameter-label-width: 112px;
+      --sniptale-parameter-value-width: 170px;
+      --sniptale-parameter-label-share: 30%;
+    }
+  `;
+  document.head.append(style);
+  try {
+    act(() =>
+      root.render(
+        <InspectorLayout>
+          <InspectorParameterRow label="Rate" valueOptions={['Slow', 'Fast']}>
+            <button>Slow</button>
+          </InspectorParameterRow>
+          <InspectorParameterRow label="Rate" valueOptions={['Normal speed', 'Fast']}>
+            <button>Normal speed</button>
+          </InspectorParameterRow>
+        </InspectorLayout>
+      )
+    );
+    const rows = host.querySelectorAll<HTMLElement>('.sniptale-parameter-row');
+    expect(Array.from(rows, (row) => row.dataset['layout'])).toEqual(['inline', 'stacked']);
+  } finally {
+    style.remove();
+    canvas.mockRestore();
+    metrics.mockRestore();
+  }
+});
+
 it.each([false, true])(
   'defers a blurred row resize until the command press ends (scoped=%s)',
   async (scoped) => {
@@ -672,8 +709,7 @@ it('changes segments to a dropdown when enlarged label metrics no longer fit', (
   const style = vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
     const current = computedStyle(element);
     Object.defineProperties(current, {
-      fontSize: { configurable: true, value: `${size}px` },
-      fontFamily: { configurable: true, value: 'sans-serif' },
+      font: { configurable: true, value: `400 ${size}px/18px sans-serif` },
     });
     return current;
   });

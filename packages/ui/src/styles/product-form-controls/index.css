@@ -1,5 +1,6 @@
 @import './range.css';
 @import './select.css';
+@import './segments.css';
 
 .sniptale-input,
 .sniptale-textarea {

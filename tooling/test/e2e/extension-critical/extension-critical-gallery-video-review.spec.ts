@@ -721,7 +721,7 @@ for (const variant of [
         exact: true,
       });
       const enterDuration = enter.getByRole('textbox', {
-        name: label('gallery.videoReview.zoomTransitionDuration'),
+        name: label('gallery.videoReview.focusPhaseDuration'),
         exact: true,
       });
       await enterDuration.fill('1.5');
@@ -846,15 +846,15 @@ for (const variant of [
         linkInspector.locator('[data-ui="gallery.videoReview.zoomLinkDuration"]')
       ).not.toBeEmpty();
       const easing = linkInspector.getByRole('group', {
-        name: label('gallery.videoReview.zoomLinkEasing'),
+        name: label('gallery.videoReview.focusCurveType'),
         exact: true,
       });
       await easing
-        .getByRole('button', { name: label('gallery.videoReview.transitionLinear'), exact: true })
+        .getByRole('button', { name: label('gallery.videoReview.focusCurveLinear'), exact: true })
         .click();
       await expect(
         easing.getByRole('button', {
-          name: label('gallery.videoReview.transitionLinear'),
+          name: label('gallery.videoReview.focusCurveLinear'),
           exact: true,
         })
       ).toHaveAttribute('aria-pressed', 'true');
@@ -879,7 +879,7 @@ for (const variant of [
       await link.click();
       await expect(
         easing.getByRole('button', {
-          name: label('gallery.videoReview.transitionLinear'),
+          name: label('gallery.videoReview.focusCurveLinear'),
           exact: true,
         })
       ).toHaveAttribute('aria-pressed', 'true');
@@ -2159,16 +2159,25 @@ for (const variant of [
         exact: true,
       });
       await entry
-        .getByRole('group', { name: label('gallery.videoReview.focusReveal'), exact: true })
+        .getByRole('group', {
+          name: label('gallery.videoReview.spotlightRevealLabel'),
+          exact: true,
+        })
         .getByRole('button', { name: label('gallery.videoReview.focusContract'), exact: true })
         .click();
       await expect(
         exit
-          .getByRole('group', { name: label('gallery.videoReview.focusReveal'), exact: true })
-          .getByRole('button', { name: label('gallery.videoReview.focusFade'), exact: true })
+          .getByRole('group', {
+            name: label('gallery.videoReview.spotlightRevealLabel'),
+            exact: true,
+          })
+          .getByRole('button', { name: label('gallery.videoReview.spotlightFade'), exact: true })
       ).toHaveAttribute('aria-pressed', 'true');
       await exit
-        .getByRole('group', { name: label('gallery.videoReview.focusReveal'), exact: true })
+        .getByRole('group', {
+          name: label('gallery.videoReview.spotlightRevealLabel'),
+          exact: true,
+        })
         .getByRole('button', { name: label('gallery.videoReview.focusExpand'), exact: true })
         .click();
       await expect(dialog.locator('[data-ui="gallery.videoReview.exportFooter"]')).toHaveCount(0);

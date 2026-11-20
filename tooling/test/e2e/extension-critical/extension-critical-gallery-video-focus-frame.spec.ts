@@ -1,16 +1,139 @@
-import { numericControl, openNumericControl } from '../support/inspector-numeric';
 import { createVideoProjectCursorTrack } from '../../../../apps/extension/src/features/video/project/defaults';
 import { expect, test, type Page } from '@playwright/test';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { translate } from '../support/catalog-fixture';
 import { syntheticSpeechWav, speechModelResponse } from '../support/voiceover-speech-fixture';
 import { startHostServer } from '../support/host-server';
+import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import {
   addReviewFocus,
   seedReviewVideo,
   persistedFocus,
 } from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`gallery lens framing matches the shared field layout at ${viewport.name}`, async ({
+    page,
+  }, info) => {
+    const host = await startHostServer();
+    const locale = viewport.size.width === 1280 ? 'en' : 'ru';
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+    const dialog = page.locator('dialog');
+    try {
+      await page.setViewportSize(viewport.size);
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': locale,
+          'sniptale-theme-preference': 'light',
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=light`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.advancedEditing') })
+        .click();
+      await dialog.locator('[data-review-header-track="zoom"] [data-review-track-select]').click();
+      const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
+      await ruler.scrollIntoViewIfNeeded();
+      const rulerBox = (await ruler.boundingBox())!;
+      await page.mouse.move(rulerBox.x + 1, rulerBox.y + 15);
+      await page.mouse.down();
+      await page.mouse.move(rulerBox.x + rulerBox.width / 6, rulerBox.y + 15, { steps: 8 });
+      await page.mouse.up();
+      await dialog
+        .locator('[data-ui="gallery.videoReview.focusTools"]')
+        .getByRole('button', {
+          name: label('gallery.videoReview.focusLens'),
+          exact: true,
+        })
+        .click();
+      const shape = dialog.getByRole('group', {
+        name: label('gallery.videoReview.clickLensShape'),
+        exact: true,
+      });
+      await expect(shape.locator('button > svg')).toHaveCount(2);
+      const framing = dialog.locator('.review-lens-shape');
+      await expect(framing.locator('[data-ui="gallery.videoReview.zoomPreview"]')).toBeVisible();
+      await expect(framing).toHaveCSS('border-bottom-width', '1px');
+      await expect(framing).toHaveCSS('margin-bottom', '9px');
+      await shape
+        .getByRole('button', {
+          name: label('gallery.videoReview.focusLensRounded'),
+          exact: true,
+        })
+        .click();
+      const width = dialog.getByRole('textbox', {
+        name: label('gallery.videoReview.focusAreaWidth'),
+      });
+      await expect(width).toBeVisible();
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.clickLensOptics_optical') })
+        .click();
+      const rim = dialog.getByRole('slider', {
+        name: label('gallery.videoReview.clickLensEdgeWidth'),
+      });
+      await expect(rim).toBeVisible();
+      await rim.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('gallery-lens-framing.png'), fullPage: false });
+
+      const resize = dialog.locator('[data-ui="gallery.videoReview.resizeInspector"]');
+      const grip = (await resize.boundingBox())!;
+      await page.mouse.move(grip.x + grip.width / 2, grip.y + 20);
+      await page.mouse.down();
+      await page.mouse.move(grip.x - 234, grip.y + 20, { steps: 10 });
+      await page.mouse.up();
+      await dialog.locator('[data-ui="gallery.videoReview.inspectorPresentation"]').click();
+      const allSections = dialog.locator(
+        '[data-ui="gallery.videoReview.inspectorSections"][data-presentation="all"]'
+      );
+      await expect(allSections).toBeVisible();
+      await expect
+        .poll(() =>
+          allSections.evaluate(
+            (node) => getComputedStyle(node).gridTemplateColumns.split(' ').length
+          )
+        )
+        .toBe(2);
+      const placement = allSections.locator('.sniptale-parameter-row').filter({
+        has: page.getByRole('group', {
+          name: label('editor.scene.cameraFollowTarget'),
+          exact: true,
+        }),
+      });
+      await expect(placement).toHaveAttribute('data-layout', 'inline');
+      await expect(placement.getByRole('button')).toHaveText([
+        label('editor.scene.cameraFollowManual'),
+        label('editor.scene.cameraFollowCursor'),
+      ]);
+      const animationFields = allSections.locator(
+        '.review-inspector-phase [data-ui="shared.ui.compact-inspector.segmented-field"]'
+      );
+      await expect(animationFields).toHaveCount(4);
+      for (const key of [
+        'gallery.videoReview.focusCurveType',
+        'gallery.videoReview.spotlightRevealLabel',
+      ] as const) {
+        const group = allSections.getByRole('group', { name: label(key), exact: true });
+        await expect(group).toHaveCount(2);
+      }
+      for (const field of await animationFields.all()) {
+        await expect(field).toHaveAttribute('data-layout', 'inline');
+      }
+      await page.screenshot({
+        path: info.outputPath('gallery-lens-two-columns.png'),
+        fullPage: false,
+      });
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
 
 for (const variant of [
   { locale: 'ru' as const, theme: 'light' as const },
@@ -462,31 +585,72 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await dialog
         .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
         .click();
-      await addReviewFocus(page);
+      await addReviewFocus(page, 'ru');
       const inspector = dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]');
-      const mode = inspector.getByRole('button', {
-        name: label('videoEditor.sidebar.cursorFocusMode'),
+      const focus = async () => {
+        const workspaceId = new URL(page.url()).searchParams.get('mediaId');
+        if (!workspaceId) return undefined;
+        const workspace = await readNativeReviewWorkspace(page, workspaceId);
+        const latest = workspace?.history
+          .slice(0, workspace.cursor)
+          .findLast((operation) => operation.target === 'advancedContent');
+        return latest?.target === 'advancedContent' ? latest.after.zoom.regions.at(-1) : undefined;
+      };
+      const mode = inspector.locator('[data-ui="camera.followTarget"]');
+      const follow = mode.getByRole('button', {
+        name: label('editor.scene.cameraFollowCursor'),
         exact: true,
       });
-      await mode.scrollIntoViewIfNeeded();
-      await mode.click();
-      const follow = page.getByRole('option', {
-        name: label('videoEditor.sidebar.cursorFocusFollow'),
+      const manual = mode.getByRole('button', {
+        name: label('editor.scene.cameraFollowManual'),
         exact: true,
       });
+      const preview = inspector.locator('[data-ui="gallery.videoReview.zoomPreview"]');
+      const scale = inspector.getByRole('slider', {
+        name: label('gallery.videoReview.zoomScale'),
+        exact: true,
+      });
+      await expect(preview).toBeVisible();
+      await expect(scale).toBeVisible();
+      expect((await preview.boundingBox())!.y).toBeLessThan((await scale.boundingBox())!.y);
+      expect((await scale.boundingBox())!.y).toBeLessThan((await mode.boundingBox())!.y);
+      await expect(mode.getByRole('button')).toHaveText([
+        label('editor.scene.cameraFollowManual'),
+        label('editor.scene.cameraFollowCursor'),
+      ]);
       await expect(follow).toBeEnabled();
       await follow.click();
-      await expect.poll(async () => (await persistedFocus(page))?.followCursor).toBe(true);
-      await inspector
-        .getByRole('heading', { name: label('gallery.videoReview.precisePosition'), exact: true })
-        .click();
+      await expect.poll(async () => (await focus())?.followCursor).toBe(true);
       await expect(
-        inspector.getByRole('textbox', {
-          name: label('gallery.videoReview.zoomFocusX'),
-          exact: true,
-        })
-      ).toBeDisabled();
-      await expect(numericControl(inspector, label('gallery.videoReview.zoomScale'))).toBeEnabled();
+        inspector
+          .locator('summary')
+          .filter({ hasText: label('gallery.videoReview.precisePosition') })
+      ).toHaveCount(0);
+      await expect(scale).toBeEnabled();
+      await inspector
+        .locator('summary')
+        .filter({ hasText: label('videoEditor.sidebar.inspectorMoreDetails') })
+        .click();
+      const policy = inspector.locator('[data-ui="cameraFollow.settings"]');
+      await expect(policy).toBeVisible();
+      const defaults = policy.getByRole('button', {
+        name: label('videoEditor.sidebar.cameraResetPolicy'),
+        exact: true,
+      });
+      await expect(defaults).toBeDisabled();
+      await policy
+        .locator('summary')
+        .filter({ hasText: label('videoEditor.sidebar.framingFineTune') })
+        .click();
+      const expansion = policy.getByRole('switch', {
+        name: label('videoEditor.sidebar.cameraAllowExpansion'),
+        exact: true,
+      });
+      await expansion.click();
+      await expect(defaults).toBeEnabled();
+      await expect.poll(async () => (await focus())?.cameraFollow).toBeTruthy();
+      await defaults.click();
+      await expect(defaults).toBeDisabled();
       await mode.scrollIntoViewIfNeeded();
       await page.screenshot({ path: info.outputPath('local-camera-follow.png'), fullPage: false });
       if (viewport.size.width === 1920)
@@ -501,6 +665,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await page.setViewportSize({ width: 1100, height: 560 });
       await dialog
         .getByRole('slider', { name: label('videoEditor.timeline.zoom'), exact: true })
+        .and(dialog.locator('input[max="100"]'))
         .press('End');
       const timelineViewport = dialog.locator('[data-ui="gallery.videoReview.timelineViewport"]');
       await expect
@@ -516,67 +681,17 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await page.screenshot({ path: info.outputPath('local-camera-narrow.png'), fullPage: false });
       await page.setViewportSize(viewport.size);
       await mode.scrollIntoViewIfNeeded();
-      await mode.click();
-      await page
-        .getByRole('option', { name: label('videoEditor.sidebar.cursorFocusFixed'), exact: true })
-        .click();
-      await expect.poll(async () => (await persistedFocus(page))?.followCursor).toBe(false);
-      await dialog
-        .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
-        .first()
-        .click();
-      const focusSelect = inspector.getByRole('button', {
-        name: label('gallery.videoReview.focusType'),
-        exact: true,
-      });
-      if (await focusSelect.count()) {
-        await focusSelect.click();
-        await page
-          .getByRole('option', { name: label('gallery.videoReview.focusLens'), exact: true })
-          .click();
-      } else
-        await inspector
-          .getByRole('button', { name: label('gallery.videoReview.focusLens'), exact: true })
-          .click();
-      await expect
-        .poll(async () => (await persistedFocus(page))?.spotlight?.effect)
-        .toBe('magnify');
-      const optics = inspector.getByRole('group', {
-        name: label('gallery.videoReview.clickLensOptics'),
-      });
-      await optics
-        .getByRole('button', { name: label('gallery.videoReview.clickLensOptics_optical') })
-        .click();
-      await expect
-        .poll(async () => (await persistedFocus(page))?.spotlight?.lensOptics)
-        .toBe('optical');
-      const edge = numericControl(inspector, label('gallery.videoReview.clickLensEdgeWidth'));
-      await expect(edge).toHaveValue('8');
-      await (
-        await openNumericControl(inspector, label('gallery.videoReview.clickLensEdgeWidth'))
-      ).fill('5');
-      await edge.press('Enter');
-      await expect.poll(async () => (await persistedFocus(page))?.spotlight?.lensEdgeWidth).toBe(5);
-      const placement = inspector.getByRole('button', {
-        name: label('gallery.videoReview.focusLensPlacement'),
-      });
-      await placement.click();
-      await page
-        .getByRole('option', { name: label('videoEditor.sidebar.cursorFocusFollow'), exact: true })
-        .click();
-      await expect.poll(async () => (await persistedFocus(page))?.followCursor).toBe(true);
-      await placement.scrollIntoViewIfNeeded();
-      await page.screenshot({
-        path: info.outputPath('following-optical-lens.png'),
-        fullPage: false,
-      });
+      await manual.click();
+      await expect.poll(async () => (await focus())?.followCursor).toBe(false);
+      await expect(manual).toHaveAttribute('aria-pressed', 'true');
+      await expect(policy).toHaveCount(0);
+      await follow.click();
+      await expect.poll(async () => (await focus())?.followCursor).toBe(true);
       await page.reload();
       await expect(dialog).toBeVisible();
-      await expect.poll(async () => (await persistedFocus(page))?.followCursor).toBe(true);
-      await expect.poll(async () => (await persistedFocus(page))?.spotlight?.lensEdgeWidth).toBe(5);
-      await expect
-        .poll(async () => (await persistedFocus(page))?.spotlight?.lensOptics)
-        .toBe('optical');
+      await dialog.locator('[data-review-removal-key^="focus:"]').first().click();
+      await expect(follow).toHaveAttribute('aria-pressed', 'true');
+      await expect.poll(async () => (await focus())?.followCursor).toBe(true);
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

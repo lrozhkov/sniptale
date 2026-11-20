@@ -332,12 +332,19 @@
 .sniptale-compact-workspace .sniptale-parameter-row {
   display: grid;
   grid-template-columns:
-    minmax(0, min(var(--sniptale-parameter-label-width), 45%))
+    minmax(
+      0,
+      min(var(--sniptale-parameter-label-width), var(--sniptale-parameter-label-share, 45%))
+    )
     minmax(
       0,
       min(
         var(--sniptale-parameter-value-width),
-        calc(100% - min(var(--sniptale-parameter-label-width), 45%) - 8px)
+        calc(
+          100% -
+            min(var(--sniptale-parameter-label-width), var(--sniptale-parameter-label-share, 45%)) -
+            8px
+        )
       )
     );
   align-items: center;
@@ -545,7 +552,8 @@
     )
   ) {
   max-inline-size: calc(
-    min(var(--sniptale-parameter-label-width), 45%) + 8px + var(--sniptale-parameter-value-width)
+    min(var(--sniptale-parameter-label-width), var(--sniptale-parameter-label-share, 45%)) + 8px +
+      var(--sniptale-parameter-value-width)
   );
 }
 .sniptale-compact-workspace .sniptale-property-segments[data-icon-only='true'] > button {
@@ -1019,6 +1027,53 @@
 .sniptale-compact-workspace
   .sniptale-parameter-row.sniptale-boolean-parameter:not(.sniptale-content-appearance-surface *) {
   grid-template-columns: minmax(0, 1fr) 40px;
+}
+
+.sniptale-compact-workspace .sniptale-status-parameter > .sniptale-parameter-name {
+  color: var(--sniptale-color-text-primary);
+  font-weight: 500;
+}
+
+.sniptale-compact-workspace .sniptale-parameter-dependents .sniptale-parameter-name {
+  padding-inline-start: 8px;
+}
+
+.sniptale-switch-with-status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  gap: 4px;
+}
+
+.sniptale-switch-with-status > .sniptale-glass-switch {
+  flex: none;
+}
+
+.sniptale-switch-status {
+  display: grid;
+  align-items: center;
+  justify-items: end;
+  min-height: var(--sniptale-parameter-control-height, 32px);
+  min-width: 0;
+  color: var(--sniptale-color-text-secondary);
+  font: var(--sniptale-font-weight-interface, 400) 13px / 18px var(--sniptale-font-interface);
+  cursor: pointer;
+  text-align: end;
+  overflow-wrap: anywhere;
+}
+
+.sniptale-switch-status > span {
+  grid-area: 1 / 1;
+}
+
+.sniptale-switch-status > span[data-current='false'] {
+  visibility: hidden;
+}
+
+.sniptale-switch-with-status:has(button:disabled) .sniptale-switch-status {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* Inline color editing uses the same neutral surface as numeric and text values. */

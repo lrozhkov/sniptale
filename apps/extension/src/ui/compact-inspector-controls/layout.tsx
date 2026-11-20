@@ -5,6 +5,17 @@ import { cx } from './shared';
 const InspectorLayoutContext = React.createContext(false);
 type RowMeasurement = () => (() => void) | null;
 
+/** Use the same option minimum before stacking and before replacing segments with a menu. */
+export function measureSegmentWidth(context: CanvasRenderingContext2D, labels: readonly string[]) {
+  return (
+    labels.reduce(
+      (width, label) => width + Math.max(32, context.measureText(label).width + 12),
+      0
+    ) +
+    2 * (labels.length - 1)
+  );
+}
+
 /** One mounted inspector batches connected layout reads before row writes. */
 function createInspectorRowFitting(invalidate: () => void) {
   const pending = new Set<RowMeasurement>();
@@ -204,17 +215,17 @@ export function InspectorParameterRow(props: {
     )
       return null;
     const minimumValueWidth = Math.max(
-      props.valueMinimum ?? 100,
-      valueOptions.length
-        ? valueOptions.reduce((width, text) => width + context.measureText(text).width + 12, 0) +
-            4 +
-            2 * (valueOptions.length - 1)
-        : 0
+      props.valueMinimum ?? (valueOptions.length ? 0 : 100),
+      valueOptions.length ? measureSegmentWidth(context, valueOptions) : 0
     );
     const labelCap = Number.parseFloat(style.getPropertyValue('--sniptale-parameter-label-width'));
     const valueCap = Number.parseFloat(style.getPropertyValue('--sniptale-parameter-value-width'));
+    const labelShare = Number.parseFloat(
+      style.getPropertyValue('--sniptale-parameter-label-share')
+    );
+    const labelFraction = Number.isFinite(labelShare) ? labelShare / 100 : 0.45;
     if (Number.isFinite(labelCap) && Number.isFinite(valueCap)) {
-      const labelColumn = Math.min(labelCap, available * 0.45);
+      const labelColumn = Math.min(labelCap, available * labelFraction);
       const valueColumn = Math.min(valueCap, available - labelColumn - 8);
       return () => setStacked(labelWidth > labelColumn || minimumValueWidth > valueColumn);
     }
@@ -225,7 +236,7 @@ export function InspectorParameterRow(props: {
     const needsStack = labelWidth + valueWidth + 8 > available;
     const nameColumn = Math.max(
       labelWidth,
-      Math.min((available - 8) * 0.45, available - 8 - valueWidth)
+      Math.min((available - 8) * labelFraction, available - 8 - valueWidth)
     );
     const nameFit = `${Math.ceil(nameColumn)}px`;
     return () => {

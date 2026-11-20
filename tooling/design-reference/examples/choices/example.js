@@ -1,7 +1,7 @@
 import { el, exampleCase } from '../shared/dom.js';
 import { createDropdown } from '../shared/choices.js';
 import { PropertyChoice } from '../shared/property-choice.js';
-export function render(root, { manifest }) {
+export async function render(root, { manifest, theme }) {
   const add = (key) => {
     const stage = el('div', { class: 'case-stage' });
     root.append(
@@ -31,13 +31,16 @@ export function render(root, { manifest }) {
   add('segments').append(
     PropertyChoice({
       label: 'Тип фокусировки',
-      options: focus,
+      options: focus.slice(0, 3),
       value: 'spotlight',
       onChange: (v) =>
         (segmentStatus.textContent = 'Выбран режим: ' + focus.find((o) => o.value === v).label),
     }).element,
     segmentStatus
   );
+  const lens = add('lens');
+  const segmentFit = add('segment-fit');
+  const switchStatus = add('switch-status');
   add('tiles').append(
     PropertyChoice({
       label: 'Стиль поверхности',
@@ -141,4 +144,11 @@ export function render(root, { manifest }) {
     if (focused) control.trigger.focus();
   });
   dd(add('edge'), 'Разрешение у края окна', catalog, 'fade');
+  const locale = new URLSearchParams(location.search).get('lang') === 'en' ? 'en' : 'ru';
+  const { mountPickerReferences } = await import('../../.generated/pickers.js');
+  await Promise.all([
+    mountPickerReferences(lens, { theme, locale, kind: 'lens' }),
+    mountPickerReferences(segmentFit, { theme, locale, kind: 'segment-fit' }),
+    mountPickerReferences(switchStatus, { theme, locale, kind: 'switch-status' }),
+  ]);
 }

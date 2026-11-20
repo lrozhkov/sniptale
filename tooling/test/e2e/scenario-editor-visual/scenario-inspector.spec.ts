@@ -502,7 +502,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         .first();
       await expect.soft(segment).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       const segments = segment.locator('..');
-      await expect(segments).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(segments).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       const inactive = segments.locator('button[aria-pressed="false"]').first();
       expect(await inactive.evaluate((node) => getComputedStyle(node).backgroundColor)).not.toBe(
         await segment.evaluate((node) => getComputedStyle(node).backgroundColor)

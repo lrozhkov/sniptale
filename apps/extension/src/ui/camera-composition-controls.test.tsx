@@ -33,11 +33,16 @@ it('keeps Manual available when captured cursor data is missing', () => {
     root.render(<CameraFollowTargetControls following cursorAvailable={false} onChange={change} />)
   );
   const buttons = host.querySelectorAll<HTMLButtonElement>('button');
-  expect(buttons[0]!.disabled).toBe(true);
-  expect(buttons[1]!.disabled).toBe(false);
-  act(() => buttons[0]!.click());
+  expect([...buttons].map((button) => button.textContent)).toEqual([
+    'editor.scene.cameraFollowManual',
+    'editor.scene.cameraFollowCursor',
+  ]);
+  const [manual, cursor] = buttons;
+  expect(manual!.disabled).toBe(false);
+  expect(cursor!.disabled).toBe(true);
+  act(() => cursor!.click());
   expect(change).not.toHaveBeenCalled();
-  act(() => buttons[1]!.click());
+  act(() => manual!.click());
   expect(change).toHaveBeenCalledExactlyOnceWith(false);
 });
 
@@ -92,7 +97,7 @@ it('previews rotation amount, cancels Escape and commits one following gesture',
     )
   );
   const slider = host.querySelector<HTMLInputElement>(
-    'input[type="range"][aria-label="editor.scene.cameraCompositionAmount range"]'
+    'input[type="range"][aria-label="editor.scene.cameraCompositionAmount"]'
   )!;
   const key = (type: string, key: string) =>
     act(() => slider.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true })));
@@ -160,10 +165,12 @@ it('adapts composition choices without changing retained camera settings', async
   ).toBe('true');
   expect(host.querySelector('input[aria-label="editor.scene.cameraCompositionAmount"]')).toBeNull();
   expect(
-    host.querySelector<HTMLInputElement>(
-      'input[aria-label="editor.scene.cameraCompositionSmoothness"]'
-    )?.value
-  ).toBe('29');
+    host
+      .querySelector<HTMLInputElement>(
+        'input[aria-label="editor.scene.cameraCompositionSmoothness"]'
+      )
+      ?.getAttribute('aria-valuetext')
+  ).toBe('29%');
   act(() =>
     group()!
       .querySelector<HTMLButtonElement>('[title="editor.scene.cameraCompositionRight"]')!

@@ -1,4 +1,5 @@
 @import '../../../packages/ui/src/styles/tailwind.css';
+@import '../../../packages/ui/src/styles/product-form-controls/segments.css';
 
 @source './entry.tsx';
 

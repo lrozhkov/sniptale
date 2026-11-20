@@ -33,7 +33,12 @@
   .sniptale-compact-workspace
     [data-ui='gallery.videoReview.inspector']
     .sniptale-parameter-row.sniptale-boolean-parameter {
-    grid-template-columns: minmax(0, var(--review-field-name-column)) max-content !important;
+    grid-template-columns:
+      minmax(
+        0,
+        min(var(--sniptale-parameter-label-width), var(--sniptale-parameter-label-share, 45%))
+      )
+      max-content !important;
     min-height: var(--review-field-control-height) !important;
     padding-block: 0 !important;
   }

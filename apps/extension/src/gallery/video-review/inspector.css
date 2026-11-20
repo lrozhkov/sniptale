@@ -346,6 +346,26 @@
   margin-top: 0;
 }
 
+.review-focus-framing,
+.review-inspector-phase {
+  --sniptale-parameter-label-width: 112px;
+  --sniptale-parameter-value-width: 170px;
+}
+
+.review-focus-framing {
+  inline-size: min(100%, 305px);
+  min-inline-size: 0;
+}
+
+.review-focus-framing.sniptale-parameter-stack > .review-focus-preview-group,
+.review-focus-framing .sniptale-parameter-stack > .review-focus-preview-group {
+  display: grid;
+  gap: 7px;
+  margin-block-end: 9px;
+  padding-block-end: 8px;
+  border-block-end: 1px solid var(--sniptale-color-field-border);
+}
+
 [data-ui='gallery.videoReview.inspector']
   [data-ui='shared.ui.compact-select']
   > button:focus-visible {
@@ -379,6 +399,12 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
     align-items: start;
+  }
+  [data-ui='gallery.videoReview.inspectorSections'][data-presentation='all']:not(
+      .review-inspector-section-body *
+    ):has(> details + details)
+    > details {
+    --sniptale-parameter-label-share: 30%;
   }
   [data-ui='gallery.videoReview.inspectorSections'][data-presentation='all']:has(
       > .review-inspector-section-column:only-child

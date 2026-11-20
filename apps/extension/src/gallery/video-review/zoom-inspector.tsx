@@ -34,6 +34,7 @@ import {
   PreviewNumericRow as ReviewPreviewNumberRow,
 } from '../../ui/compact-inspector-controls/numeric-preview';
 import { translate } from '../../platform/i18n';
+import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import type {
   QuickEditZoomLinkEasing,
   QuickEditZoomRegion,
@@ -55,9 +56,9 @@ import {
   reviewDeleteButtonClassName,
 } from './controls';
 
-const transitionLabels: Record<QuickEditZoomTransition['type'], Parameters<typeof translate>[0]> = {
-  none: 'gallery.videoReview.transitionNone',
-  linear: 'gallery.videoReview.transitionLinear',
+const focusCurveLabels: Record<QuickEditZoomTransition['type'], Parameters<typeof translate>[0]> = {
+  none: 'gallery.videoReview.focusCurveNone',
+  linear: 'gallery.videoReview.focusCurveLinear',
   'ease-in-out': 'gallery.videoReview.transitionSmooth',
 };
 
@@ -81,18 +82,17 @@ function ZoomTransitionSection(props: {
         {props.children}
         <SegmentedRow<QuickEditZoomTransition['type']>
           columns={3}
-          layout="stacked"
-          ariaLabel={translate('gallery.videoReview.zoomTransitionType')}
-          label={translate('gallery.videoReview.zoomTransitionType')}
+          ariaLabel={translate('gallery.videoReview.focusCurveType')}
+          label={translate('gallery.videoReview.focusCurveType')}
           value={props.value.type}
           options={(['none', 'linear', 'ease-in-out'] as const).map((type) => ({
             value: type,
-            label: translate(transitionLabels[type]),
+            label: translate(focusCurveLabels[type]),
           }))}
           onChange={(type) => props.onChange({ ...props.value, type })}
         />
         <ReviewPreviewNumberRow
-          label={translate('gallery.videoReview.zoomTransitionDuration')}
+          label={translate('gallery.videoReview.focusPhaseDuration')}
           unit="s"
           min={0}
           max={props.max}
@@ -131,6 +131,7 @@ export function ReviewZoomInspector(props: {
   preview?: ReactNode;
 }) {
   const { region, onChange } = props;
+  const zoom = !region.border && !region.spotlight && region.effect !== '3d';
   const [tool, onTool] = useState<SpatialTool>(region.effect === '3d' ? 'tilt' : 'position');
   const map = useContext(ReviewIntervalMap);
   const sourceRange = region.sourceAnchor ?? (map ? reviewFocusSourceRange(region, map) : null);
@@ -180,10 +181,16 @@ export function ReviewZoomInspector(props: {
               id: 'framing',
               label: translate('gallery.videoReview.zoomPreview'),
               icon: Scan,
-              content: (
-                <ReviewInspectorColumns>
-                  <div className="min-w-0 space-y-2">
-                    {!region.border && !region.spotlight && region.effect !== '3d' ? (
+              content: zoom ? (
+                <ReviewFocusFraming preview={props.preview}>
+                  <ReviewZoomPositionFields
+                    region={region}
+                    previewRegion={props.spatialPreview}
+                    tool={tool}
+                    followCursor={following}
+                    onChange={onChange}
+                    onPreview={props.onPreview}
+                    placement={
                       <CameraFollowTargetControls
                         following={following}
                         cursorAvailable={cursorAvailable}
@@ -199,43 +206,46 @@ export function ReviewZoomInspector(props: {
                           })
                         }
                       />
-                    ) : null}
-                    {props.preview}
-                  </div>
-                  <div className="min-w-0 space-y-2">
-                    <ReviewFocusParameters
-                      region={region}
-                      previewRegion={props.spatialPreview}
-                      tool={tool}
-                      followCursor={following}
-                      cursorAvailable={cursorAvailable}
-                      onChange={onChange}
-                      onPreview={props.onPreview}
-                    />
-                    {!region.border && !region.spotlight && region.effect !== '3d' && following ? (
-                      <ReviewDetails
-                        preferenceId="gallery.videoReview.cameraFollowPolicy"
-                        label={translate('videoEditor.sidebar.inspectorMoreDetails')}
-                      >
-                        <ReviewCameraFollowSettings
-                          settings={
-                            resolveCameraFollowPolicy({
-                              legacySensitivity: props.cursorPath?.sensitivity ?? 0.5,
-                              ...(props.cameraFollowDefaults
-                                ? { defaults: props.cameraFollowDefaults }
-                                : {}),
-                              ...(region.cameraFollow ? { override: region.cameraFollow } : {}),
-                            }).settings
-                          }
-                          inherited={!region.cameraFollow}
-                          legacySensitivity={props.cursorPath?.sensitivity ?? 0.5}
-                          onChange={(cameraFollow) => onChange({ cameraFollow })}
-                          onReset={() => onChange({ cameraFollow: null })}
-                        />
-                      </ReviewDetails>
-                    ) : null}
-                  </div>
-                </ReviewInspectorColumns>
+                    }
+                  />
+                  {following ? (
+                    <ReviewDetails
+                      preferenceId="gallery.videoReview.cameraFollowPolicy"
+                      label={translate('videoEditor.sidebar.inspectorMoreDetails')}
+                    >
+                      <ReviewCameraFollowSettings
+                        settings={
+                          resolveCameraFollowPolicy({
+                            legacySensitivity: props.cursorPath?.sensitivity ?? 0.5,
+                            ...(props.cameraFollowDefaults
+                              ? { defaults: props.cameraFollowDefaults }
+                              : {}),
+                            ...(region.cameraFollow ? { override: region.cameraFollow } : {}),
+                          }).settings
+                        }
+                        inherited={!region.cameraFollow}
+                        legacySensitivity={props.cursorPath?.sensitivity ?? 0.5}
+                        onChange={(cameraFollow) => onChange({ cameraFollow })}
+                        onReset={() => onChange({ cameraFollow: null })}
+                      />
+                    </ReviewDetails>
+                  ) : null}
+                </ReviewFocusFraming>
+              ) : (
+                <ReviewFocusFraming
+                  preview={region.spotlight || region.border ? undefined : props.preview}
+                >
+                  <ReviewFocusParameters
+                    region={region}
+                    previewRegion={props.spatialPreview}
+                    tool={tool}
+                    followCursor={following}
+                    cursorAvailable={cursorAvailable}
+                    focusPreview={props.preview}
+                    onChange={onChange}
+                    onPreview={props.onPreview}
+                  />
+                </ReviewFocusFraming>
               ),
             },
             {
@@ -272,12 +282,22 @@ export function ReviewZoomInspector(props: {
   );
 }
 
+function ReviewFocusFraming(props: { preview?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="review-focus-framing sniptale-parameter-stack">
+      {props.preview ? <div className="review-focus-preview-group">{props.preview}</div> : null}
+      {props.children}
+    </div>
+  );
+}
+
 type FocusParameterProps = {
   region: QuickEditZoomRegion;
   previewRegion?: QuickEditZoomRegion | undefined;
   tool: SpatialTool;
   followCursor?: boolean;
   cursorAvailable?: boolean;
+  focusPreview?: ReactNode;
   onChange(patch: QuickEditZoomRegionPatch): void;
   onPreview?: ((patch: QuickEditZoomRegionPatch | null) => void) | undefined;
 };
@@ -320,6 +340,12 @@ function ReviewFocusParameters(props: FocusParameterProps) {
         value={region.border}
         Details={ReviewDetails}
         preferenceId="gallery.videoReview.borderPreciseArea"
+        renderStroke={(choice) => (
+          <div className="review-focus-preview-group">
+            {props.focusPreview}
+            {choice}
+          </div>
+        )}
         onChange={(patch) =>
           onChange({
             border: {
@@ -344,42 +370,48 @@ function ReviewFocusParameters(props: FocusParameterProps) {
         }
       />
     );
-  if (region.spotlight)
+  if (region.spotlight) {
+    const spotlight = region.spotlight;
     return (
-      <>
-        {region.spotlight.effect === 'magnify' ? (
-          <SegmentedRow<'fixed' | 'follow'>
-            columns={2}
-            ariaLabel={translate('gallery.videoReview.focusLensPlacement')}
-            label={translate('gallery.videoReview.focusLensPlacement')}
-            value={props.followCursor ? 'follow' : 'fixed'}
-            options={[
-              { value: 'fixed', label: translate('videoEditor.sidebar.cursorFocusFixed') },
-              {
-                value: 'follow',
-                label: translate('videoEditor.sidebar.cursorFocusFollow'),
-                disabled: !props.cursorAvailable,
-              },
-            ]}
-            onChange={(mode) => onChange({ followCursor: mode === 'follow' })}
-          />
-        ) : null}
-        <SpotlightAppearanceFields
-          value={region.spotlight}
-          Details={ReviewDetails}
-          preferenceId="gallery.videoReview.preciseArea"
-          onChange={(patch) => onChange(reviewSpotlightPatch(region.spotlight!, patch))}
-          onPreview={(patch) =>
-            props.onPreview?.(patch ? reviewSpotlightPatch(region.spotlight!, patch) : null)
-          }
-        />
-      </>
+      <SpotlightAppearanceFields
+        value={spotlight}
+        Details={ReviewDetails}
+        preferenceId="gallery.videoReview.preciseArea"
+        onChange={(patch) => onChange(reviewSpotlightPatch(spotlight, patch))}
+        onPreview={(patch) =>
+          props.onPreview?.(patch ? reviewSpotlightPatch(spotlight, patch) : null)
+        }
+        framing={{
+          renderChoice: (choice) => (
+            <div
+              className={
+                spotlight.effect === 'magnify'
+                  ? 'review-focus-preview-group review-lens-shape'
+                  : 'review-focus-preview-group'
+              }
+            >
+              {props.focusPreview}
+              {choice}
+            </div>
+          ),
+          lensPlacement:
+            spotlight.effect === 'magnify' ? (
+              <CameraFollowTargetControls
+                following={props.followCursor ?? false}
+                cursorAvailable={props.cursorAvailable ?? false}
+                showUnavailableStatus={false}
+                onChange={(followCursor) => onChange({ followCursor })}
+              />
+            ) : undefined,
+        }}
+      />
     );
+  }
   return <ReviewZoomPositionFields {...props} />;
 }
 
 /** Position edits share the existing transient transaction with the preview. */
-function ReviewZoomPositionFields(props: FocusParameterProps) {
+function ReviewZoomPositionFields(props: FocusParameterProps & { placement?: ReactNode }) {
   const { region, onChange } = props;
   return (
     <>
@@ -400,6 +432,7 @@ function ReviewZoomPositionFields(props: FocusParameterProps) {
         }}
         onChange={(scale) => onChange({ scale })}
       />
+      {props.placement}
       {!props.followCursor ? (
         <ReviewDetails
           preferenceId="gallery.videoReview.precisePosition"
@@ -582,36 +615,35 @@ export function ReviewZoomLinkInspector(props: {
         end={source && target ? target.start : props.link.target.start}
         timeBasis={source && target ? 'source' : 'result'}
       />
-      <SegmentedRow<QuickEditZoomLinkEasing>
-        columns={2}
-        layout="stacked"
-        ariaLabel={translate('gallery.videoReview.zoomLinkEasing')}
-        label={translate('gallery.videoReview.zoomLinkEasing')}
-        value={props.link.source.linkEasing ?? 'ease-in-out'}
-        options={(['ease-in-out', 'linear'] as const).map((easing) => ({
-          value: easing,
-          label: translate(transitionLabels[easing]),
-        }))}
-        onChange={(linkEasing) => props.onChange({ linkEasing })}
-      />
-      <div
-        data-ui="gallery.videoReview.zoomLinkDuration"
-        className="flex min-h-8 w-full items-center justify-between gap-3 py-0.5"
-      >
-        <span className="text-xs font-medium text-[var(--sniptale-color-text-secondary)]">
-          {translate('gallery.videoReview.zoomLinkDuration')}
-        </span>
-        <span className="text-xs tabular-nums text-[var(--sniptale-color-text-primary)]">
-          {reviewTimeLabel(gap)}
-        </span>
-      </div>
-      {quickEditFocusType(props.link.source) === 'zoom' ? (
-        <ReviewMotionBlurSettings
-          phase="link"
-          region={props.link.source}
-          onChange={props.onChange}
+      <div className="review-focus-framing sniptale-parameter-stack">
+        <SegmentedRow<QuickEditZoomLinkEasing>
+          columns={2}
+          ariaLabel={translate('gallery.videoReview.focusCurveType')}
+          label={translate('gallery.videoReview.focusCurveType')}
+          value={props.link.source.linkEasing ?? 'ease-in-out'}
+          options={(['ease-in-out', 'linear'] as const).map((easing) => ({
+            value: easing,
+            label: translate(focusCurveLabels[easing]),
+          }))}
+          onChange={(linkEasing) => props.onChange({ linkEasing })}
         />
-      ) : null}
+        <InspectorParameterRow
+          dataUi="gallery.videoReview.zoomLinkDuration"
+          label={translate('gallery.videoReview.zoomLinkDuration')}
+          keepInline
+        >
+          <span className="text-right text-xs tabular-nums text-[var(--sniptale-color-text-primary)]">
+            {reviewTimeLabel(gap)}
+          </span>
+        </InspectorParameterRow>
+        {quickEditFocusType(props.link.source) === 'zoom' ? (
+          <ReviewMotionBlurSettings
+            phase="link"
+            region={props.link.source}
+            onChange={props.onChange}
+          />
+        ) : null}
+      </div>
       <ReviewInspectorSections
         sections={[
           reviewInspectorActions(
@@ -640,12 +672,13 @@ function ReviewMotionBlurSettings(props: {
   const value = props.region.motionBlur?.[props.phase] ?? { enabled: false, strength: 0.5 };
   return (
     <div
-      className="min-w-0 space-y-2"
+      className="sniptale-parameter-stack"
       data-ui="gallery.videoReview.motionBlurSettings"
       data-phase={props.phase}
     >
       <ToggleField
         label={translate('gallery.videoReview.motionBlur')}
+        showStatus
         value={value.enabled}
         onChange={(enabled) =>
           props.onChange({
@@ -657,23 +690,25 @@ function ReviewMotionBlurSettings(props: {
         }
       />
       {value.enabled ? (
-        <ReviewNumberRow
-          label={translate('gallery.videoReview.motionBlurStrength')}
-          rangePresentation="field"
-          unit="%"
-          min={0}
-          max={100}
-          step={1}
-          value={value.strength * 100}
-          onChange={(strength) =>
-            props.onChange({
-              motionBlur: {
-                ...props.region.motionBlur,
-                [props.phase]: { ...value, strength: strength / 100 },
-              },
-            })
-          }
-        />
+        <div className="sniptale-parameter-dependents">
+          <ReviewNumberRow
+            label={translate('gallery.videoReview.motionBlurStrength')}
+            rangePresentation="field"
+            unit="%"
+            min={0}
+            max={100}
+            step={1}
+            value={value.strength * 100}
+            onChange={(strength) =>
+              props.onChange({
+                motionBlur: {
+                  ...props.region.motionBlur,
+                  [props.phase]: { ...value, strength: strength / 100 },
+                },
+              })
+            }
+          />
+        </div>
       ) : null}
     </div>
   );

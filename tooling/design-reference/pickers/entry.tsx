@@ -31,6 +31,8 @@ import {
   type AppLocale,
 } from '../../../apps/extension/src/platform/i18n';
 import { InspectorFields } from './inspector-fields';
+import { LensChoices, SegmentFitChoices } from './lens-choices';
+import { SwitchStatus } from './switch-status';
 import { usePickerPreferences } from './reference-picker-preferences';
 import './reference.css';
 import './inspector-fields.css';
@@ -292,7 +294,7 @@ function PaintReferenceSession(props: {
 export async function mountPickerReferences(
   host: HTMLElement,
   options: { theme: 'light' | 'dark'; locale: AppLocale } & (
-    | { kind: 'color' | 'paint' }
+    | { kind: 'color' | 'paint' | 'lens' | 'segment-fit' | 'switch-status' }
     | { kind: 'inspector'; controls: readonly HTMLElement[] }
   )
 ) {
@@ -320,6 +322,12 @@ export async function mountPickerReferences(
     root.render(
       <InspectorFields locale={options.locale === 'ru' ? 'ru' : 'en'} palette={palette} />
     );
+  } else if (options.kind === 'lens') {
+    root.render(<LensChoices locale={options.locale === 'ru' ? 'ru' : 'en'} />);
+  } else if (options.kind === 'switch-status') {
+    root.render(<SwitchStatus locale={options.locale} />);
+  } else if (options.kind === 'segment-fit') {
+    root.render(<SegmentFitChoices locale={options.locale === 'ru' ? 'ru' : 'en'} />);
   } else {
     root.render(
       options.kind === 'color' ? <ColorReference /> : <PaintReference locale={options.locale} />

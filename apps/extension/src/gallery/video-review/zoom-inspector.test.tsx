@@ -181,22 +181,22 @@ it('edits transition type and duration in separate enter/exit sections', async (
   const inspector = renderInspector(change);
   openAnimation();
   const typeIn = host.querySelector<HTMLButtonElement>(
-    'fieldset[aria-label$="zoomTransitionIn"] [aria-label$="zoomTransitionType"] button[title$="transitionLinear"]'
+    'fieldset[aria-label$="zoomTransitionIn"] [aria-label$="focusCurveType"] button[title$="focusCurveLinear"]'
   )!;
   const typeOut = host.querySelector<HTMLButtonElement>(
-    'fieldset[aria-label$="zoomTransitionOut"] [aria-label$="zoomTransitionType"] button[title$="transitionLinear"]'
+    'fieldset[aria-label$="zoomTransitionOut"] [aria-label$="focusCurveType"] button[title$="focusCurveLinear"]'
   )!;
   expect(typeIn).not.toBe(typeOut);
   await act(async () => typeIn.click());
   expect(change).toHaveBeenLastCalledWith({ enter: { type: 'linear', duration: 0.3 } });
   const durationIn = host.querySelector<HTMLInputElement>(
-    'fieldset[aria-label$="zoomTransitionIn"] input[aria-label$="zoomTransitionDuration"]'
+    'fieldset[aria-label$="zoomTransitionIn"] input[aria-label$="focusPhaseDuration"]'
   )!;
   await inspector.type(durationIn, '0.5');
   await inspector.commit(durationIn);
   expect(change).toHaveBeenLastCalledWith({ enter: { type: 'ease-in-out', duration: 0.5 } });
   const durationOut = host.querySelector<HTMLInputElement>(
-    'fieldset[aria-label$="zoomTransitionOut"] input[aria-label$="zoomTransitionDuration"]'
+    'fieldset[aria-label$="zoomTransitionOut"] input[aria-label$="focusPhaseDuration"]'
   )!;
   await inspector.type(durationOut, '1');
   await inspector.commit(durationOut);
@@ -239,7 +239,7 @@ it('edits link easing, shows the derived gap duration, and removes explicitly', 
   const panel = host.querySelector('[data-ui="gallery.videoReview.zoomLinkInspector"]')!;
   expect(panel.textContent).toContain('2.0');
   const easing = host.querySelector<HTMLButtonElement>(
-    '[aria-label="gallery.videoReview.zoomLinkEasing"] button[title="gallery.videoReview.transitionLinear"]'
+    '[aria-label="gallery.videoReview.focusCurveType"] button[title="gallery.videoReview.focusCurveLinear"]'
   )!;
   await act(async () => easing.click());
   expect(change).toHaveBeenLastCalledWith({ linkEasing: 'linear' });
@@ -315,9 +315,9 @@ it('edits spotlight strength, area, reveal, rounding and blur through shared con
     );
   };
   expect(host.querySelector<HTMLDetailsElement>('details[data-level="group"]')?.open).toBe(false);
-  await choose('focusReveal', 'focusContract', 'zoomTransitionIn');
+  await choose('spotlightRevealLabel', 'focusContract', 'zoomTransitionIn');
   expect(spotlight.exitReveal).toBe('fade');
-  await choose('focusReveal', 'focusExpand', 'zoomTransitionOut');
+  await choose('spotlightRevealLabel', 'focusExpand', 'zoomTransitionOut');
   expect(spotlight.exitReveal).toBe('contract');
   await choose('focusOutside', 'focusBlur');
   await type(field('gallery.videoReview.focusBlurRadius'), '8');
@@ -415,7 +415,7 @@ it('updates the opposite fractional budget live and keeps fitted values unchange
   openAnimation();
   const field = (phase: 'In' | 'Out') =>
     host.querySelector<HTMLInputElement>(
-      `fieldset[aria-label$="zoomTransition${phase}"] input[aria-label$="zoomTransitionDuration"]`
+      `fieldset[aria-label$="zoomTransition${phase}"] input[aria-label$="focusPhaseDuration"]`
     )!;
   await type(field('In'), '0.17');
   expect(current.enter.duration).toBe(0.3);

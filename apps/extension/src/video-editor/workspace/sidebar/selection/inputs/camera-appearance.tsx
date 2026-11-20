@@ -136,7 +136,6 @@ export function CameraAppearanceControls(props: {
       })}
       <SegmentedRow
         columns={4}
-        layout="stacked"
         ariaLabel={translate('gallery.videoReview.webcamShadowDirection')}
         label={translate('gallery.videoReview.webcamShadowDirection')}
         value={props.clip.cameraShadowDirection?.mode ?? 'classic'}

@@ -21,7 +21,6 @@ export function ProjectDurationModeField(props: {
     <SegmentedRow<VideoProjectDurationMode>
       label={translate('videoEditor.sidebar.contentDuration')}
       ariaLabel={translate('videoEditor.sidebar.contentDuration')}
-      layout="stacked"
       columns={2}
       value={props.value}
       options={[

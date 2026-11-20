@@ -179,7 +179,6 @@ export function ReviewSpeedOptions(props: {
           ariaLabel={translate('gallery.videoReview.speedRate')}
           label={translate('gallery.videoReview.speedRate')}
           value={String(props.rate)}
-          layout="stacked"
           columns={4}
           options={rateOptions.map((option) => ({ ...option, disabled: props.busy }))}
           onChange={changeRate}

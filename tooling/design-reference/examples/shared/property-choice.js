@@ -23,16 +23,11 @@ export function PropertyChoice({
   group.className = 'property-options';
   group.dataset.presentation = presentation;
   const inputs = [];
-  let pill, fallback, fitObserver, textObserver;
+  let fallback, fitObserver, textObserver;
   const fallbackHost = document.createElement('div');
   fallbackHost.hidden = true;
   fallbackHost.className = 'property-fallback';
-  if (presentation === 'segments') {
-    pill = document.createElement('i');
-    pill.className = 'property-pill';
-    pill.setAttribute('aria-hidden', 'true');
-    group.append(pill);
-  }
+  if (presentation === 'segments') group.dataset.propertySegments = '';
   for (const option of options) {
     const row = document.createElement('label');
     row.className = 'property-option';
@@ -46,6 +41,7 @@ export function PropertyChoice({
     inputs.push(input);
     const face = document.createElement('span');
     face.className = 'property-face';
+    if (presentation === 'segments') face.dataset.segmentFace = '';
     if (presentation === 'tiles') {
       const swatch = document.createElement('span');
       swatch.className = 'property-swatch';
@@ -91,7 +87,6 @@ export function PropertyChoice({
     group.append(row);
     input.addEventListener('change', () => {
       if (input.checked) {
-        update();
         fallback?.setValue(input.value);
         onChange?.(input.value);
       }
@@ -99,16 +94,6 @@ export function PropertyChoice({
   }
   element.append(group);
   if (presentation === 'segments') element.append(fallbackHost);
-  function update() {
-    if (!pill) return;
-    const selected = inputs.find((input) => input.checked)?.parentElement;
-    if (!selected) return;
-    const r = selected.getBoundingClientRect(),
-      g = group.getBoundingClientRect();
-    pill.style.width = r.width + 'px';
-    pill.style.height = r.height + 'px';
-    pill.style.transform = 'translate(' + (r.left - g.left) + 'px,' + (r.top - g.top) + 'px)';
-  }
   function fit() {
     if (!fallback || !element.isConnected || !element.clientWidth) return;
     if (
@@ -117,16 +102,18 @@ export function PropertyChoice({
     )
       return;
     const context = document.createElement('canvas').getContext('2d');
+    if (!context) return;
     const faces = [...group.querySelectorAll('.property-face')];
-    context.font = getComputedStyle(faces[0]).font;
     const widths = faces.map((face) => {
       const css = getComputedStyle(face);
-      return (
+      context.font = css.font;
+      return Math.max(
+        parseFloat(css.minWidth) || 0,
         context.measureText(face.textContent).width +
-        parseFloat(css.paddingLeft) +
-        parseFloat(css.paddingRight) +
-        parseFloat(css.borderLeftWidth) +
-        parseFloat(css.borderRightWidth)
+          parseFloat(css.paddingLeft) +
+          parseFloat(css.paddingRight) +
+          parseFloat(css.borderLeftWidth) +
+          parseFloat(css.borderRightWidth)
       );
     });
     const shell = getComputedStyle(group),
@@ -148,14 +135,7 @@ export function PropertyChoice({
     legend.hidden = compact;
     fallbackHost.hidden = !compact;
     element.dataset.presentation = compact ? 'dropdown' : presentation;
-    if (!compact) requestAnimationFrame(update);
   }
-  const observer = new ResizeObserver(() => {
-    group.dataset.motion = 'false';
-    update();
-    requestAnimationFrame(() => (group.dataset.motion = 'true'));
-  });
-  observer.observe(group);
   if (presentation === 'segments')
     queueMicrotask(() => {
       if (!element.isConnected) return;
@@ -174,7 +154,6 @@ export function PropertyChoice({
           align,
           onChange: (next) => {
             inputs.forEach((i) => (i.checked = i.value === next));
-            update();
             onChange?.(next);
           },
         }
@@ -204,7 +183,6 @@ export function PropertyChoice({
       document.fonts.ready.then(fit);
       fit();
     });
-  requestAnimationFrame(update);
   return {
     element,
     inputs,
@@ -214,10 +192,8 @@ export function PropertyChoice({
     setValue(next) {
       inputs.forEach((i) => (i.checked = i.value === next));
       fallback?.setValue(next);
-      update();
     },
     destroy() {
-      observer.disconnect();
       fitObserver?.disconnect();
       textObserver?.disconnect();
       fallback?.close();

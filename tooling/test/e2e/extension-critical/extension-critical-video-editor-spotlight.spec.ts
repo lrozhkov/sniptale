@@ -345,16 +345,16 @@ for (const [index, size] of [
       await chooseInspectorValue(
         page,
         inspector,
-        label('gallery.videoReview.focusLensPlacement'),
-        label('videoEditor.sidebar.cursorFocusFollow')
+        label('editor.scene.cameraFollowTarget'),
+        label('editor.scene.cameraFollowCursor')
       );
       await expect.poll(async () => (await read()).motionRegions![0]!.focusMode).toBe('CURSOR');
       await page.screenshot({ path: info.outputPath('native-optical-lens.png'), fullPage: false });
       await chooseInspectorValue(
         page,
         inspector,
-        label('gallery.videoReview.focusLensPlacement'),
-        label('videoEditor.sidebar.cursorFocusFixed')
+        label('editor.scene.cameraFollowTarget'),
+        label('editor.scene.cameraFollowManual')
       );
       await chooseInspectorValue(
         page,
@@ -537,7 +537,7 @@ for (const [index, size] of [
       await chooseInspectorValue(
         page,
         enter,
-        label('gallery.videoReview.focusReveal'),
+        label('gallery.videoReview.spotlightRevealLabel'),
         label('gallery.videoReview.focusContract')
       );
       const duration = enter.getByRole('textbox', {
@@ -550,7 +550,7 @@ for (const [index, size] of [
       await chooseInspectorValue(
         page,
         enter,
-        label('gallery.videoReview.focusReveal'),
+        label('gallery.videoReview.spotlightRevealLabel'),
         label('gallery.videoReview.borderAppear')
       );
       await expect(duration).toBeDisabled();
@@ -558,15 +558,15 @@ for (const [index, size] of [
       await chooseInspectorValue(
         page,
         enter,
-        label('gallery.videoReview.focusReveal'),
-        label('gallery.videoReview.focusFade')
+        label('gallery.videoReview.spotlightRevealLabel'),
+        label('gallery.videoReview.spotlightFade')
       );
       await expect(duration).toBeEnabled();
       await expect.poll(async () => (await read()).motionRegions![0]!.zoomInDuration).toBe(0.3);
       await chooseInspectorValue(
         page,
         exit,
-        label('gallery.videoReview.focusReveal'),
+        label('gallery.videoReview.spotlightRevealLabel'),
         label('gallery.videoReview.focusExpand')
       );
       await expect

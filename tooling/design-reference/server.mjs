@@ -25,6 +25,7 @@ async function resolveFile(root, pathname) {
   const styles = [
     resolve(root, 'packages/ui/src/styles/design-tokens.css'),
     resolve(root, 'packages/ui/src/styles/product-form-controls/range.css'),
+    resolve(root, 'packages/ui/src/styles/product-form-controls/segments.css'),
   ];
   let candidate = resolve(root, '.' + pathname);
   if (

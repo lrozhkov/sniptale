@@ -115,7 +115,6 @@ export function ReviewCanvasSettings(props: {
       <SegmentedRow
         columns={2}
         label={translate('gallery.videoReview.sourceCropMode')}
-        layout="stacked"
         ariaLabel={translate('gallery.videoReview.sourceCropMode')}
         value={props.canvas?.crop ? 'crop' : 'fit'}
         options={[

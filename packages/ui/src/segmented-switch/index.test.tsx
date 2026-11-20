@@ -2,6 +2,27 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 import { SegmentedSwitch } from './index';
 
+it('puts the property surface on the selected button itself', () => {
+  const markup = renderToStaticMarkup(
+    <SegmentedSwitch
+      activeId="tab"
+      appearance="property"
+      ariaLabel="Capture target"
+      density="compact"
+      options={[
+        { id: 'tab', label: 'Tab' },
+        { id: 'area', label: 'Area', disabled: true },
+      ]}
+      onChange={vi.fn()}
+    />
+  );
+  expect(markup).toContain('data-property-segments');
+  expect(markup.match(/data-segment-face/g)).toHaveLength(2);
+  expect(markup).not.toContain('--sniptale-group-index');
+  expect(markup).toMatch(/<button[^>]*aria-pressed="true"[^>]*title="Tab"/);
+  expect(markup).toMatch(/<button[^>]*disabled=""[^>]*title="Area"/);
+});
+
 it.each([false, true])(
   'renders an explicit neutral selection without accent styling (wrap=%s)',
   (wrap) => {

@@ -46,7 +46,6 @@ export function ReviewBackgroundInspector(props: {
         <div className="review-background-kinds">
           <SegmentedRow
             label={translate('gallery.videoReview.backgroundType')}
-            layout="stacked"
             columns={3}
             ariaLabel={translate('gallery.videoReview.background')}
             options={kinds.map((kind) => ({ value: kind.key, label: translate(kind.label) }))}
@@ -294,7 +293,6 @@ function ReviewZoomObject(props: {
         columns={2}
         ariaLabel={translate('gallery.videoReview.backgroundZoom')}
         label={translate('gallery.videoReview.backgroundZoom')}
-        layout="stacked"
         value={value}
         options={modes}
         onChange={(zoomBehavior) => props.onChange({ zoomBehavior })}

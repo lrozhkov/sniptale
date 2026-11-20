@@ -50,7 +50,6 @@ export function InspectMotionConnectionPanel(props: WorkspaceSidebarSelectionPan
       <MotionInspectorFieldset locked={locked}>
         <OptionButtonsField
           label={translate('videoEditor.sidebar.motionEasingLabel')}
-          layout="stacked"
           value={connection.easing}
           options={getTemporalEasingOptions()}
           onChange={(easing) =>

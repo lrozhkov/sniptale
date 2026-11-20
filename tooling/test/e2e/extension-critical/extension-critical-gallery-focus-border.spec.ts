@@ -185,27 +185,21 @@ for (const variant of [
         await hold
           .getByRole('button', { name: label('gallery.videoReview.borderPulse'), exact: true })
           .click();
-        const speed = inspector.getByRole('textbox', {
-          name: label('gallery.videoReview.borderSpeed'),
-          exact: true,
-        });
+        const speedLabel = label('gallery.videoReview.borderSpeed');
+        const speed = numericControl(hold, speedLabel);
         await expect(speed).toHaveValue('1');
         await expect(
-          inspector.getByRole('textbox', {
-            name: label('gallery.videoReview.borderSegmentPercent'),
-            exact: true,
-          })
+          numericControl(hold, label('gallery.videoReview.borderSegmentPercent'))
         ).toHaveCount(0);
-        await speed.fill('0.5');
+        await (await openNumericControl(hold, speedLabel)).fill('0.5');
         await speed.press('Enter');
         await expect.poll(async () => (await persistedFocus(page))?.border?.period).toBe(4);
-        const style = inspector.getByRole('button', {
+        const style = inspector.getByRole('group', {
           name: label('gallery.videoReview.borderStyle'),
           exact: true,
         });
-        await style.click();
-        await page
-          .getByRole('option', {
+        await style
+          .getByRole('button', {
             name: label('gallery.videoReview.borderStyle_dashed'),
             exact: true,
           })
@@ -219,9 +213,8 @@ for (const variant of [
             exact: true,
           })
           .click();
-        await style.click();
-        await page
-          .getByRole('option', {
+        await style
+          .getByRole('button', {
             name: label('gallery.videoReview.borderStyle_solid'),
             exact: true,
           })
@@ -230,9 +223,8 @@ for (const variant of [
           hold.getByRole('button', { name: label('gallery.videoReview.borderStill'), exact: true })
         ).toHaveAttribute('aria-pressed', 'true');
         await expect(speed).toHaveCount(0);
-        await style.click();
-        await page
-          .getByRole('option', {
+        await style
+          .getByRole('button', {
             name: label('gallery.videoReview.borderStyle_dashed'),
             exact: true,
           })
@@ -247,12 +239,10 @@ for (const variant of [
           })
           .click();
         await expect(speed).toHaveValue('0.5');
-        const segmentSize = inspector.getByRole('textbox', {
-          name: label('gallery.videoReview.borderSegmentPercent'),
-          exact: true,
-        });
+        const segmentLabel = label('gallery.videoReview.borderSegmentPercent');
+        const segmentSize = numericControl(hold, segmentLabel);
         await expect(segmentSize).toHaveValue('100');
-        await segmentSize.fill('65');
+        await (await openNumericControl(hold, segmentLabel)).fill('65');
         await segmentSize.press('Enter');
         await expect
           .poll(async () => (await persistedFocus(page))?.border?.segmentPercent)

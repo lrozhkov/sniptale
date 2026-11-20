@@ -227,3 +227,115 @@
 [data-ui='shared.ui.color-selector.picker-layer']:focus {
   outline: none;
 }
+:is(.reference-lens-inspector, .reference-switch-inspector).sniptale-compact-workspace {
+  --sniptale-parameter-row-height: 32px;
+  --sniptale-parameter-label-width: 112px;
+  --sniptale-parameter-value-width: 170px;
+  --sniptale-parameter-context-space: 0px;
+  box-sizing: border-box;
+  width: 327px;
+  max-width: 100%;
+  padding: 16px 11px;
+  border: 1px solid var(--sniptale-color-field-border);
+  border-radius: 4px;
+  background: var(--sniptale-color-surface-panel);
+}
+
+.reference-lens-shape {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--sniptale-color-field-border);
+}
+
+.reference-lens-preview {
+  position: relative;
+  container-type: size;
+  width: calc(100% - 16px);
+  aspect-ratio: 288 / 148;
+  margin-inline: auto;
+  margin-bottom: 7px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #111;
+}
+
+.reference-lens-preview > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 44%;
+}
+
+.reference-lens {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  max-width: 88%;
+  border: 1px solid #f8f8f8;
+  border-radius: 3px;
+  background-image: var(--lens-source);
+  background-size: calc(var(--zoom) * 100cqw) auto;
+  background-position: var(--source-x) var(--source-y);
+  box-shadow: 0 0 0 1px #151515a0;
+  pointer-events: none;
+}
+
+.reference-lens[data-shape='circle'] {
+  border-radius: 50%;
+}
+
+.reference-lens[data-optics='optical'] {
+  box-shadow:
+    inset 0 0 var(--edge) #111,
+    0 0 0 1px #151515a0;
+}
+
+.reference-segment-width {
+  display: grid;
+  gap: 4px;
+  max-width: 440px;
+  padding-inline: 8px;
+  margin-bottom: 8px;
+}
+
+.reference-segment-width input {
+  accent-color: var(--sniptale-color-text-muted);
+}
+
+.reference-segment-fit.sniptale-compact-workspace {
+  --sniptale-parameter-label-width: 108px;
+  --sniptale-parameter-value-width: 316px;
+  max-width: 100%;
+}
+
+.reference-switch-inspector.sniptale-compact-workspace {
+  --sniptale-parameter-label-width: 120px;
+}
+
+.reference-switch-preview {
+  display: grid;
+  height: 124px;
+  margin: 0 8px 8px;
+  place-items: center;
+  border-radius: var(--radius);
+  background-color: var(--sniptale-color-surface-canvas);
+}
+
+.reference-switch-preview[data-grid='true'] {
+  background-image:
+    linear-gradient(to right, var(--divider) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--divider) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+
+.reference-switch-subject {
+  width: 106px;
+  height: 58px;
+  border: 1px solid var(--sniptale-color-field-border);
+  background: var(--sniptale-color-surface-panel);
+}
+
+.reference-switch-independent {
+  margin-block-start: 8px;
+  padding-block-start: 8px;
+  border-block-start: 1px solid var(--sniptale-color-field-border);
+}

@@ -18,6 +18,17 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+function openNumber(host: HTMLElement, name: string) {
+  const label = `gallery.videoReview.${name}`;
+  const input = () => host.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
+  if (input().type === 'range') {
+    act(() => host.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!.click());
+  }
+  const field = input();
+  act(() => field.focus());
+  return field;
+}
+
 it.each(['tilt', 'rotation', 'focus'] as const)(
   'shows only the selected %s fields without Apply or document mutation',
   (tool) => {
@@ -41,6 +52,16 @@ it.each(['tilt', 'rotation', 'focus'] as const)(
     );
     expect(!!host.querySelector('input[aria-label="gallery.videoReview.depthStrength"]')).toBe(
       tool === 'focus'
+    );
+    const ranges = [...host.querySelectorAll('input[type="range"]')].map((field) =>
+      field.getAttribute('aria-label')
+    );
+    expect(ranges).toEqual(
+      tool === 'focus'
+        ? ['gallery.videoReview.depthStrength', 'gallery.videoReview.depthSoftness']
+        : tool === 'tilt'
+          ? ['gallery.videoReview.perspectiveStrength']
+          : []
     );
     expect(onChange).not.toHaveBeenCalled();
   }
@@ -121,15 +142,12 @@ it.each(['tilt', 'rotation', 'focus'] as const)(
     );
     const name =
       tool === 'focus' ? 'depthStrength' : tool === 'tilt' ? 'perspectiveX' : 'perspectiveZ';
-    const input = host.querySelector<HTMLInputElement>(
-      `input[aria-label="gallery.videoReview.${name}"]`
-    )!;
+    let input = openNumber(host, name);
     const enter = () =>
       act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
-    act(() => input.focus());
     enter();
     expect(onChange).not.toHaveBeenCalled();
-    act(() => input.focus());
+    input = openNumber(host, name);
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '35');
       input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -175,11 +193,8 @@ it('edits focus area and strength through the existing unit fields', async () =>
     ['depthSoftness', 'softness'],
     ['depthStrength', 'strength'],
   ] as const) {
-    const field = host.querySelector<HTMLInputElement>(
-      `input[aria-label="gallery.videoReview.${name}"]`
-    )!;
     const commits = onChange.mock.calls.length;
-    act(() => field.focus());
+    const field = openNumber(host, name);
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '60');
       field.dispatchEvent(new Event('input', { bubbles: true }));

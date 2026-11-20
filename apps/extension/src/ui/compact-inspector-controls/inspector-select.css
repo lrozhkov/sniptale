@@ -1,5 +1,3 @@
-@layer theme, base, components, utilities;
-
 button.sniptale-inspector-select[aria-haspopup='listbox'] {
   min-height: 32px;
   height: 32px;
@@ -73,33 +71,37 @@ button.sniptale-inspector-select[aria-haspopup='listbox'] > svg:last-child {
 
 .sniptale-framed-segments {
   display: grid;
-  min-height: 32px;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--sniptale-color-field-border);
-  border-radius: 4px;
-  background: var(--sniptale-color-field);
 }
 
-@layer utilities {
-  div.sniptale-framed-segments[data-ui] > button {
-    height: auto !important;
-    min-height: 26px !important;
-    padding: 2px 6px !important;
-    border: 0 !important;
-    border-radius: 3px !important;
-    background: transparent !important;
-    color: var(--sniptale-color-text-secondary);
-    font: var(--sniptale-font-weight-interface, 400) 13px/18px
-      var(--font-ui, var(--sniptale-font-sans)) !important;
-  }
+.sniptale-framed-segments > button {
+  min-height: 32px;
+  padding: 2px 5px;
+  font: var(--sniptale-font-weight-interface, 400) 13px/18px
+    var(--font-ui, var(--sniptale-font-sans));
+}
 
-  div.sniptale-framed-segments[data-ui] > button[aria-pressed='false']:hover:enabled {
-    background: var(--sniptale-color-field-hover) !important;
-  }
+.sniptale-framed-segments:not([data-icon-only]) > button {
+  min-inline-size: 32px;
+}
 
-  div.sniptale-framed-segments[data-ui] > button[aria-pressed='true'] {
-    background: var(--sniptale-color-field-selected) !important;
-    color: var(--sniptale-color-text-primary) !important;
-  }
+.sniptale-framed-segments[data-visible-icons] > button {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 3px;
+  min-height: 52px;
+}
+
+.sniptale-framed-segments > button:enabled {
+  cursor: pointer;
+}
+
+.sniptale-framed-segments > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.sniptale-property-choice {
+  font: var(--sniptale-font-weight-interface, 400) 13px/18px
+    var(--font-ui, var(--sniptale-font-sans));
 }

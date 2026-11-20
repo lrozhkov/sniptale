@@ -7,31 +7,46 @@ import { CompactSegmentedSelector } from './control-renderers';
 import { cx } from './shared';
 import { InspectorParameterRow, useInspectorLayout } from './layout';
 import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
+import { translate } from '../../platform/i18n';
 
 /** Immediate boolean parameters retain the shared name/value construction. */
 export function ToggleField(props: {
   label: string;
   value: boolean;
   disabled?: boolean | undefined;
+  showStatus?: boolean;
   onChange(value: boolean): void;
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
+  const control = (
+    <ProductGlassSwitch
+      ref={trigger}
+      role="switch"
+      aria-label={props.label}
+      aria-checked={props.value}
+      on={props.value}
+      disabled={props.disabled}
+      onClick={() => props.onChange(!props.value)}
+    />
+  );
   return (
     <InspectorParameterRow
       label={props.label}
       keepInline
-      className="sniptale-boolean-parameter"
+      className={props.showStatus ? 'sniptale-status-parameter' : 'sniptale-boolean-parameter'}
       onActivate={() => trigger.current?.click()}
     >
-      <ProductGlassSwitch
-        ref={trigger}
-        role="switch"
-        aria-label={props.label}
-        aria-checked={props.value}
-        on={props.value}
-        disabled={props.disabled}
-        onClick={() => props.onChange(!props.value)}
-      />
+      {props.showStatus ? (
+        <div className="sniptale-switch-with-status">
+          <span className="sniptale-switch-status" aria-hidden="true">
+            <span data-current={props.value}>{translate('shared.ui.switch.enabled')}</span>
+            <span data-current={!props.value}>{translate('shared.ui.switch.disabled')}</span>
+          </span>
+          {control}
+        </div>
+      ) : (
+        control
+      )}
     </InspectorParameterRow>
   );
 }
@@ -228,6 +243,7 @@ export function SegmentedRow<T extends string>(props: {
   columns?: 2 | 3 | 4 | 5;
   label?: React.ReactNode | undefined;
   layout?: 'inline' | 'stacked';
+  showOptionLabels?: boolean | undefined;
   options: Array<{
     disabled?: boolean;
     description?: string;
@@ -247,6 +263,7 @@ export function SegmentedRow<T extends string>(props: {
       columns={columns}
       onChange={props.onChange}
       options={props.options}
+      showOptionLabels={props.showOptionLabels}
       value={props.value}
     />
   );
@@ -260,7 +277,9 @@ export function SegmentedRow<T extends string>(props: {
       <InspectorParameterRow
         label={typeof props.label === 'string' ? props.label : props.ariaLabel}
         stacked={stacked}
-        valueOptions={props.options.map((option) => (option.icon ? '' : option.label))}
+        valueOptions={props.options.map((option) =>
+          option.icon && !props.showOptionLabels ? '' : option.label
+        )}
         dataUi="shared.ui.compact-inspector.segmented-field"
       >
         {selector}
@@ -272,10 +291,9 @@ export function SegmentedRow<T extends string>(props: {
       data-ui="shared.ui.compact-inspector.segmented-field"
       className={cx(
         stacked
-          ? 'grid min-h-10 gap-2 rounded-[10px] border px-3 py-2'
-          : 'flex min-h-10 items-center justify-between gap-3 rounded-[10px] border px-3 py-1.5',
-        'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]'
+          ? 'grid min-h-10 gap-2 rounded-[10px] px-3 py-2'
+          : 'flex min-h-10 items-center justify-between gap-3 rounded-[10px] px-3 py-1.5',
+        'border border-transparent'
       )}
     >
       <span

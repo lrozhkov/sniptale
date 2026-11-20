@@ -29,7 +29,7 @@ Do not change representation during an active press, editing transaction, drag, 
 
 Keep segment labels on one line without splitting words or increasing height. Do not change representation during a focus-owned edit or while its menu is open. Reevaluate after the interaction ends.
 
-Measure fit using the active locale and loaded font. Retain values, labels, disabled options, and commit timing across representation changes. These segment-fit rules apply to ordinary segmented property choices. Tiles, compact icon properties, and toolbar tools retain their own presentation contracts.
+Measure every visible option with the active locale and loaded font. Keep values, labels, disabled states, and commit timing when the presentation changes. Apply these rules to ordinary segments. Tiles, compact icon properties, and toolbar tools retain their own presentation contracts.
 
 Measure settled geometry. Do not animate the geometry that a fit calculation changes. Repeated resize feedback must reach a stable layout.
 

@@ -25,7 +25,6 @@ export function SceneBackgroundFields(props: SceneBackgroundFieldProps) {
   return (
     <div className="sniptale-parameter-stack grid gap-3" data-ui="video-editor.scene-background">
       <OptionButtonsField
-        layout="stacked"
         label={translate('gallery.videoReview.backgroundZoom')}
         value={zoomBehavior}
         options={

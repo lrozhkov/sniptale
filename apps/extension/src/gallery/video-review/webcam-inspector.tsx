@@ -461,7 +461,6 @@ function WebcamAppearance({ editor }: { editor: Editor }) {
       <div className="sniptale-parameter-stack">
         <SegmentedRow
           columns={4}
-          layout="stacked"
           ariaLabel={translate('gallery.videoReview.webcamShadowDirection')}
           label={translate('gallery.videoReview.webcamShadowDirection')}
           value={camera.shadowDirection?.mode ?? 'classic'}

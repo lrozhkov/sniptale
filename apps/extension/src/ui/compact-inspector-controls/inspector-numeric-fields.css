@@ -98,6 +98,13 @@
   .field-action[aria-disabled='true'] {
     opacity: 0.42;
   }
+  .opacity-field:has(input:disabled) {
+    opacity: 0.55;
+    background: var(--inspector-numeric-field-idle);
+  }
+  .opacity-track input:disabled {
+    cursor: default;
+  }
   .opacity-field .field-action {
     position: relative;
   }

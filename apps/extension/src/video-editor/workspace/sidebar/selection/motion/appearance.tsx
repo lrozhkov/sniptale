@@ -16,6 +16,7 @@ import {
   SpotlightAppearanceFields,
   SpotlightRevealFields,
 } from '../../../../../ui/focus-appearance/spotlight';
+import { CameraFollowTargetControls } from '../../../../../ui/camera-composition-controls';
 import { SegmentedRow } from '../../../../../ui/compact-inspector-controls';
 import { PreviewNumericRow } from '../../../../../ui/compact-inspector-controls/numeric-preview';
 import { translate } from '../../../../../platform/i18n';
@@ -68,20 +69,13 @@ export function MotionFocusFields(props: FocusProps) {
     >
       <MotionFocusTargetFields {...props} onEdit={editing.commit} />
       {spotlight?.effect === 'magnify' ? (
-        <SegmentedRow<'fixed' | 'follow'>
-          columns={2}
-          layout="stacked"
-          label={translate('gallery.videoReview.focusLensPlacement')}
-          ariaLabel={translate('gallery.videoReview.focusLensPlacement')}
-          value={motionRegion.focusMode === VideoMotionFocusMode.CURSOR ? 'follow' : 'fixed'}
-          options={[
-            { value: 'fixed', label: translate('videoEditor.sidebar.cursorFocusFixed') },
-            { value: 'follow', label: translate('videoEditor.sidebar.cursorFocusFollow') },
-          ]}
-          onChange={(mode) =>
+        <CameraFollowTargetControls
+          following={motionRegion.focusMode === VideoMotionFocusMode.CURSOR}
+          cursorAvailable
+          showUnavailableStatus={false}
+          onChange={(follow) =>
             props.panel.onUpdateMotionRegion(motionRegion.id, {
-              focusMode:
-                mode === 'follow' ? VideoMotionFocusMode.CURSOR : VideoMotionFocusMode.MANUAL,
+              focusMode: follow ? VideoMotionFocusMode.CURSOR : VideoMotionFocusMode.MANUAL,
             })
           }
         />
@@ -129,7 +123,6 @@ function MotionFocusTargetFields(props: FocusProps & { onEdit(edit: MotionFocusE
   return (
     <>
       <SegmentedRow
-        layout="stacked"
         label={targetLabel}
         ariaLabel={targetLabel}
         value={target === 'viewport' ? '' : (motionRegion.sourceBinding?.clipId ?? '')}
@@ -162,7 +155,6 @@ function MotionFocusTargetFields(props: FocusProps & { onEdit(edit: MotionFocusE
       {spotlight && target !== 'viewport' && motionRegion.sourceBinding ? (
         <SegmentedRow<'window' | 'source-scene' | 'scene'>
           columns={3}
-          layout="stacked"
           label={translate('videoEditor.sidebar.spotlightCoverage')}
           ariaLabel={translate('videoEditor.sidebar.spotlightCoverage')}
           value={target === 'scene' || target === 'source-scene' ? target : 'window'}
