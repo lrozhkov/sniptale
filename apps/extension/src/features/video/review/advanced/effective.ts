@@ -1,3 +1,4 @@
+import { projectReviewAnnotationEffect } from '../annotation-effects/timing';
 import { hasCursorComposition } from '../../project/motion/spatial';
 import { hasSourceImageFilters } from '../../../image-filters/contract';
 import { withCursorMotionPath } from '../../project/cursor-motion';
@@ -149,6 +150,18 @@ export function resolveQuickEditEffectiveState(
 ): QuickEditEffectiveState {
   const advanced = state.ui.mode === 'advanced';
   const features = resolveQuickEditEffectiveFeatures(state);
+  const segments = state.audio.voiceoverSegments;
+  const annotationEffects =
+    features.annotationEffectsApplied &&
+    state.annotationEffects?.instances.some(
+      (instance) =>
+        instance.enabled &&
+        (!instance.visualAnchor ||
+          !segments ||
+          projectReviewAnnotationEffect(instance, segments).slices.length)
+    )
+      ? state.annotationEffects
+      : undefined;
   return {
     ...features,
     ...(state.sourceFilters ? { sourceFilters: state.sourceFilters } : {}),
@@ -168,7 +181,7 @@ export function resolveQuickEditEffectiveState(
     watermark: features.watermarkApplied ? state.watermark : undefined,
     captions: features.captionsApplied ? state.captions : undefined,
     text: features.captionsApplied ? state.text : undefined,
-    annotationEffects: features.annotationEffectsApplied ? state.annotationEffects : undefined,
+    annotationEffects,
     presentation:
       features.presentationApplied && state.presentation
         ? resolvePresentationSettings(state.presentation)
@@ -538,7 +551,7 @@ export function resolveQuickEditExportPlan(args: {
   if (features.watermarkApplied) visual.push('watermark');
   if (features.captionsApplied) visual.push('captions');
   if (effective.cursorMotions?.some((m) => m.enabled)) visual.push('cursor-motion');
-  if (features.annotationEffectsApplied) visual.push('annotation-effects');
+  if (effective.annotationEffects) visual.push('annotation-effects');
   if (features.zoomApplied && effective.zoomRegions.length > 0) visual.push('zoom');
   if (features.backgroundApplied) visual.push('background');
   if (

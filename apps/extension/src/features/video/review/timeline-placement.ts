@@ -1,3 +1,5 @@
+import { projectReviewVisualAnchor } from './visual-anchor';
+import type { QuickEditCursorMotion } from './advanced/types';
 import type { ReviewTimeSegment } from './time-segment';
 import type { CursorMotion } from '../project/cursor-motion';
 import type { QuickEditWebcam } from './advanced/webcam';
@@ -150,7 +152,7 @@ export function projectReviewWebcam(
 
 /** Authored movement follows the visual interval, including held video frames. */
 export function projectReviewCursorMotions(
-  motions: readonly CursorMotion[] | undefined,
+  motions: readonly QuickEditCursorMotion[] | undefined,
   segments?: readonly ReviewTimeSegment[]
 ) {
   if (!motions) return undefined;
@@ -158,7 +160,21 @@ export function projectReviewCursorMotions(
   let projections = cursorMotionProjections.get(motions);
   const cached = projections?.get(segments);
   if (cached) return cached;
-  const projected = motions.flatMap((motion) => {
+  const projected = motions.flatMap<CursorMotion>((motion) => {
+    if (motion.visualAnchor) {
+      const { visualAnchor, ...authored } = motion;
+      return projectReviewVisualAnchor(visualAnchor, segments).map((slice, index) => {
+        const start = slice.start - slice.offset / slice.rate;
+        return {
+          ...authored,
+          id: index === 0 ? motion.id : `${motion.id}:slice:${index}`,
+          start: slice.start,
+          end: slice.end,
+          timeDomain: 'result' as const,
+          phaseClock: { start, end: start + (motion.end - motion.start) / slice.rate },
+        };
+      });
+    }
     if (motion.timeDomain === 'result') return [motion];
     const range = projectReviewVisualRange(motion, segments);
     return range ? [{ ...motion, ...range, timeDomain: 'result' as const }] : [];

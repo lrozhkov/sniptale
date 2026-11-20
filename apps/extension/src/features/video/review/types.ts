@@ -106,6 +106,8 @@ export type ReviewOperation = { id: string; at: number } & (
       preserveFocusAnchors?: true;
       /** New non-destructive policy; absent historical operations keep their recorded replay behavior. */
       preserveUnderCuts?: true;
+      /** Retains the authored visual intervals when CUT changes. */
+      preserveVisualAnchors?: true;
       /** Preserves whole voiceover records in source coordinates; playback alone is projected. */
       preserveVoiceoverAnchors?: true;
       /** Text follows native voiceover timing only for operations that record this policy. */

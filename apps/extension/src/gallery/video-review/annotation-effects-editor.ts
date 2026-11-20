@@ -49,6 +49,7 @@ type Choice = {
   end?: number;
   endMax?: number;
   timeDomain?: 'result';
+  visualAnchor?: ReviewAnnotationEffect['visualAnchor'];
   locale: string;
   presetId?: string;
   attachment?: ReviewAnnotationEffect['attachment'];
@@ -216,13 +217,14 @@ export function useReviewAnnotationEffects(
       parsed.instances.every((item) => {
         const document = documents.get(item.snapshotId);
         return (
-          item.end <=
-            (item.timeDomain === 'result'
-              ? buildReviewTimeMap(
-                  workspace.source.duration,
-                  args.session.getSnapshot().document.edits
-                ).at(-1)!.resultEnd
-              : workspace.source.duration) &&
+          (item.visualAnchor ||
+            item.end <=
+              (item.timeDomain === 'result'
+                ? buildReviewTimeMap(
+                    workspace.source.duration,
+                    args.session.getSnapshot().document.edits
+                  ).at(-1)!.resultEnd
+                : workspace.source.duration)) &&
           document &&
           reviewAnnotationEffectMatchesDocument(item, document)
         );

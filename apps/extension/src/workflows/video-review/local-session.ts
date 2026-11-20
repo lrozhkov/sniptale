@@ -162,6 +162,7 @@ export function applyLocalReviewChange(
             ...change.operation,
             preserveFocusAnchors: true as const,
             preserveUnderCuts: true as const,
+            preserveVisualAnchors: true as const,
             preserveVoiceoverAnchors: true as const,
             preserveTextAnchors: true as const,
             normalizeVoiceoverTempo: true as const,

@@ -1,3 +1,4 @@
+import type { ReviewVisualPlacement } from '../visual-anchor';
 /** Canonical plane fractions; rotation is clockwise radians around the body centre. */
 export interface ReviewAnnotationEffectTransform {
   x: number;
@@ -8,7 +9,7 @@ export interface ReviewAnnotationEffectTransform {
 }
 
 /** Source-time annotation independent from the catalog and disposable timeline rows. */
-export interface ReviewAnnotationEffect {
+export interface ReviewAnnotationEffect extends ReviewVisualPlacement {
   id: string;
   snapshotId: string;
   enabled: boolean;

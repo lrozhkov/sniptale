@@ -4901,3 +4901,126 @@ for (const locale of ['en', 'ru'] as const) {
     }
   });
 }
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`CUT preserves authored visual plates at ${viewport.width}`, async ({ page }, info) => {
+    const host = await startHostServer();
+    const dialog = page.locator('[data-ui="gallery.videoReview.dialog"]');
+    const button = (key: Parameters<typeof translate>[0]) =>
+      dialog.getByRole('button', { name: translate(key, 'en'), exact: true });
+    const selectTrack = (track: string) =>
+      dialog.locator(`[data-review-header-track="${track}"] [data-review-track-select]`).click();
+    try {
+      await page.setViewportSize(viewport);
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: { 'sniptale-locale-preference': 'en' },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await button('gallery.videoReview.advancedEditing').click();
+
+      const laneGesture = async (
+        lane: ReturnType<typeof dialog.locator>,
+        start: number,
+        end: number
+      ) => {
+        await lane.scrollIntoViewIfNeeded();
+        const bounds = (await lane.boundingBox())!;
+        await page.mouse.move(bounds.x + (bounds.width * start) / 12, bounds.y + bounds.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(bounds.x + (bounds.width * end) / 12, bounds.y + bounds.height / 2, {
+          steps: 10,
+        });
+        await page.mouse.up();
+      };
+      await timelineGesture(page, 1);
+      await addReviewFocus(page, 'en');
+      const zoomLane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
+      const focus = zoomLane.locator('[data-review-removal-key^="focus:"]');
+      await expect(focus).toHaveCount(1);
+      await laneGesture(zoomLane, 2, 3);
+      await expect
+        .poll(() => focus.evaluate((node: HTMLElement) => parseFloat(node.style.left)))
+        .toBeGreaterThan(10);
+
+      await timelineGesture(page, 2);
+      await selectTrack('cursorMotion');
+      await button('gallery.videoReview.cursorMotionAdd').click();
+      const cursor = dialog.locator('[data-review-removal-key^="cursor-motion:"]');
+      await expect(cursor).toHaveCount(1);
+
+      await selectTrack('annotationEffects');
+      await button('gallery.videoReview.annotationEffectsAdd').click();
+      await page.getByRole('option', { name: 'Title', exact: true }).click();
+      const annotationLane = dialog.locator(
+        '[data-ui="gallery.videoReview.annotationEffectsLane"]'
+      );
+      const annotation = annotationLane.locator('[data-annotation-effect-id]');
+      await expect(annotation).toHaveCount(1);
+
+      const authored = () =>
+        Promise.all(
+          [focus, cursor, annotation].map((plate) =>
+            plate.evaluate((node: HTMLElement) => [
+              parseFloat(node.style.left).toFixed(3),
+              parseFloat(node.style.width).toFixed(3),
+            ])
+          )
+        );
+      const original = await authored();
+      await selectTrack('source');
+      const sourceLane = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
+      await sourceLane.scrollIntoViewIfNeeded();
+      await timelineGesture(page, 1, 7);
+      await button('gallery.videoReview.cutMode').click();
+      const cut = sourceLane.locator('[data-ui="gallery.videoReview.editBlock"]');
+      await expect(cut).toHaveCount(1);
+      expect(Number(await cut.getAttribute('data-review-snap-start'))).toBeLessThan(1.5);
+      expect(Number(await cut.getAttribute('data-review-snap-end'))).toBeGreaterThan(6.5);
+      await expect(focus).toHaveAttribute('data-cut-suppressed', 'true');
+      await expect.poll(authored).toEqual(original);
+      await expect(zoomLane.locator('[aria-hidden="true"].opacity-80')).toHaveCount(1);
+      await expect(annotationLane.locator('[aria-hidden="true"].opacity-80')).toHaveCount(1);
+      await expect(cursor.locator('..').locator('[aria-hidden="true"].opacity-80')).toHaveCount(1);
+      await dialog.locator('[data-ui="gallery.videoReview.resizeTimeline"]').press('End');
+      await cursor.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('cut-visual-plates.png'), fullPage: false });
+
+      await cut.click();
+      const edge = cut.getByRole('button', {
+        name: translate('gallery.videoReview.resizeEnd', 'en'),
+        exact: true,
+      });
+      const handle = (await edge.boundingBox())!;
+      const source = (await sourceLane.boundingBox())!;
+      await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(source.x + source.width / 3, handle.y + handle.height / 2, {
+        steps: 8,
+      });
+      await page.mouse.up();
+      await expect
+        .poll(async () => Number(await cut.getAttribute('data-review-snap-end')))
+        .toBeLessThan(5);
+      await expect.poll(authored).toEqual(original);
+
+      await cut.click();
+      await page.keyboard.press('Delete');
+      await expect(cut).toHaveCount(0);
+      await expect.poll(authored).toEqual(original);
+      await expect(focus).toHaveAttribute('data-cut-suppressed', 'false');
+      await cursor.click();
+      await expect(cursor).toHaveAttribute('aria-pressed', 'true');
+    } finally {
+      host.server.close();
+    }
+  });
+}

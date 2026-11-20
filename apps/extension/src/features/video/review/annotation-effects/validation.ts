@@ -1,3 +1,4 @@
+import { parseReviewVisualAnchor } from '../visual-anchor';
 import {
   readVerifiedRuntimeAnimationSource,
   verifyRuntimeAnimationSource,
@@ -108,6 +109,8 @@ function parseInstance(raw: unknown): ReviewAnnotationEffect | null {
     !Number.isSafeInteger(raw['order'])
   )
     return null;
+  const visualAnchor = parseReviewVisualAnchor(raw['visualAnchor'], raw['end'] - raw['start']);
+  if (visualAnchor === null) return null;
   const transform = parseTransform(raw['transform']);
   const controls = parseControls(raw['controls']);
   const anchors = parseAnchors(raw['anchors']);
@@ -119,6 +122,7 @@ function parseInstance(raw: unknown): ReviewAnnotationEffect | null {
     ...(raw['timeDomain'] === 'result' ? { timeDomain: 'result' as const } : {}),
     start: raw['start'],
     end: raw['end'],
+    ...(visualAnchor ? { visualAnchor } : {}),
     attachment: raw['attachment'],
     transform,
     controls,

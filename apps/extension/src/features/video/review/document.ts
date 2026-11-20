@@ -1,4 +1,9 @@
-import { retimeReviewResultRange, retimeReviewResultPoint } from './timeline-placement';
+import { anchorReviewVisual, anchorReviewVisualSource } from './visual-anchor';
+import {
+  projectReviewVisualRange,
+  retimeReviewResultRange,
+  retimeReviewResultPoint,
+} from './timeline-placement';
 import { retimeReviewTextDocument } from './text-timing';
 import { sameHistoryArray, sameHistoryRecord } from '@sniptale/foundation/history/equal';
 import { loadQuickEditAdvancedContentState } from './advanced/validation';
@@ -7,7 +12,7 @@ import { buildReviewTimeMap } from './timeline';
 import { reconcileReviewFocus } from './focus-edits';
 import type { ReviewDocument, ReviewOperation, ReviewSource } from './types';
 import { createQuickEditAdvancedContent } from './advanced/defaults';
-import type { QuickEditAdvancedContent } from './advanced/types';
+import type { QuickEditAdvancedContent, QuickEditCursorMotion } from './advanced/types';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 
 const historyMessages = {
@@ -258,6 +263,23 @@ export function applyReviewOperation(
     if (edit.kind === 'cut') removed += edit.end - edit.start;
   }
   if (removed >= source.duration) throw new ReviewHistoryError('entire-video-cut');
+  const preserveVisuals =
+    operation.preserveVisualAnchors &&
+    (operation.before?.kind === 'cut' || operation.after?.kind === 'cut');
+  const visualMap = preserveVisuals
+    ? buildReviewTimeMap(source.duration, document.edits)
+    : undefined;
+  const initial = document.advancedContent;
+  const needsSourceVisualMap =
+    visualMap &&
+    (initial.annotationEffects?.instances.some((item) => !item.timeDomain && !item.visualAnchor) ||
+      initial.cursorMotions?.some((motion) => !motion.timeDomain && !motion.visualAnchor));
+  const sourceVisualMap = needsSourceVisualMap
+    ? buildReviewTimeMap(
+        source.duration,
+        document.edits.filter((edit) => edit.kind !== 'cut')
+      )
+    : visualMap;
   let advancedContent = operation.preserveFocusAnchors
     ? {
         ...document.advancedContent,
@@ -269,6 +291,7 @@ export function applyReviewOperation(
             before: document.edits,
             after: edits,
             edit: operation.after,
+            ...(visualMap ? { preserveVisualAnchors: true as const } : {}),
             ...(operation.preserveUnderCuts ? { preserveUnderCuts: true as const } : {}),
           }),
         },
@@ -282,6 +305,20 @@ export function applyReviewOperation(
       annotationEffects: {
         ...advancedContent.annotationEffects,
         instances: advancedContent.annotationEffects.instances.flatMap((item) => {
+          if (item.visualAnchor) return [item];
+          if (visualMap) {
+            if (item.timeDomain === 'result') return [anchorReviewVisual(item, visualMap)];
+            if (!sourceVisualMap) return [item];
+            const interval = projectReviewVisualRange(item, sourceVisualMap);
+            return interval
+              ? [
+                  anchorReviewVisual(
+                    { ...item, ...interval, timeDomain: 'result' as const },
+                    sourceVisualMap
+                  ),
+                ]
+              : [item];
+          }
           if (item.timeDomain !== 'result') return [item];
           const range = retimeReviewResultRange(item, previous, next);
           return range.end > range.start ? [{ ...item, ...range }] : [];
@@ -289,12 +326,27 @@ export function applyReviewOperation(
       },
     };
   }
-  if (advancedContent.cursorMotions?.some((motion) => motion.timeDomain === 'result')) {
+  if (advancedContent.cursorMotions?.length) {
     const previous = buildReviewTimeMap(source.duration, document.edits);
     const next = buildReviewTimeMap(source.duration, edits);
+    const resultCursorClock =
+      (sourceVisualMap ?? previous).some((part) => part.kind === 'freeze') ||
+      advancedContent.cursorMotions.some((motion) => motion.timeDomain === 'result');
     advancedContent = {
       ...advancedContent,
-      cursorMotions: advancedContent.cursorMotions.flatMap((motion) => {
+      cursorMotions: advancedContent.cursorMotions.flatMap<QuickEditCursorMotion>((motion) => {
+        if (motion.visualAnchor) return [motion];
+        if (visualMap) {
+          if (motion.timeDomain === 'result') return [anchorReviewVisual(motion, visualMap)];
+          const resultMotion = { ...motion, timeDomain: 'result' as const };
+          if (!resultCursorClock)
+            return [{ ...resultMotion, visualAnchor: anchorReviewVisualSource(motion) }];
+          if (!sourceVisualMap) return [motion];
+          const interval = projectReviewVisualRange(motion, sourceVisualMap);
+          return interval
+            ? [anchorReviewVisual({ ...resultMotion, ...interval }, sourceVisualMap)]
+            : [motion];
+        }
         if (motion.timeDomain !== 'result') return [motion];
         const range = retimeReviewResultRange(motion, previous, next);
         return range.end > range.start ? [{ ...motion, ...range }] : [];

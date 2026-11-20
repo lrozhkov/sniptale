@@ -177,9 +177,10 @@ export function useReviewEditorState(resource: LoadedReview, mappedOriginal = fa
   );
   const cursorMotions = useMemo(
     () =>
-      projectReviewCursorMotions(
-        state.advanced.cursorMotions,
-        state.timeline.timeMap.getSegments()
+      state.advanced.cursorMotions?.flatMap((motion) =>
+        motion.visualAnchor
+          ? [motion]
+          : (projectReviewCursorMotions([motion], state.timeline.timeMap.getSegments()) ?? [])
       ),
     [state.advanced.cursorMotions, state.timeline.timeMap]
   );
@@ -201,6 +202,8 @@ export function useReviewEditorState(resource: LoadedReview, mappedOriginal = fa
     insertionPoint: (sourceTime) => state.insertionPoint(sourceTime),
     pause: state.pause,
     duration: cursorProjection.resultDuration,
+    projection: cursorProjection,
+    segments: state.timeline.timeMap.getSegments(),
     selection: state.activeSelection,
     onChange: state.setCursorMotions,
     onEnabledChange: state.setCursorMotionEnabled,

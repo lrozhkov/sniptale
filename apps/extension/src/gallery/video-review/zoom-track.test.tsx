@@ -493,7 +493,7 @@ for (const spotlight of [false, true]) {
       });
       expect(track.blocks[0]!.style.left).toBe('20%');
       expect(track.blocks[0]!.style.width).toBe('40%');
-      expect(track.blocks[0]!.dataset['cutSuppressed']).toBe('false');
+      expect(track.blocks[0]!.dataset['cutSuppressed']).toBe('true');
     }
   );
 
@@ -531,7 +531,7 @@ for (const spotlight of [false, true]) {
       await track.event(block, 'pointermove', 500, true);
       expect(Number.parseFloat(block.style.left)).toBeCloseTo(40);
       expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
-      expect(block.dataset['cutSuppressed']).toBe('false');
+      expect(block.dataset['cutSuppressed']).toBe('true');
       await track.event(block, 'pointermove', 600, true);
       expect(Number.parseFloat(block.style.left)).toBeCloseTo(50);
       expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
@@ -545,11 +545,19 @@ for (const spotlight of [false, true]) {
       expect(block.dataset['cutSuppressed']).toBe('false');
       await track.event(block, 'pointermove', 700, true);
       expect(Number.parseFloat(block.style.left)).toBeCloseTo(60);
-      expect(block.dataset['cutSuppressed']).toBe('false');
+      expect(block.dataset['cutSuppressed']).toBe('true');
       await track.event(block, 'pointerup', 700, true);
       expect(commit).toHaveBeenCalledExactlyOnceWith(
         'a',
-        { start: 3, end: 4, timeDomain: 'result' },
+        {
+          start: 3,
+          end: 5,
+          timeDomain: 'result',
+          visualAnchor: [
+            { start: 6, end: 7, offset: 0, rate: 1 },
+            { start: 7, end: 8, offset: 1, rate: 1 },
+          ],
+        },
         'move'
       );
     }

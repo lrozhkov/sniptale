@@ -1,3 +1,4 @@
+import { reviewVisualAnchorSourceRange } from '../../features/video/review/visual-anchor';
 import {
   createQuickEditBorder,
   createQuickEditSpotlight,
@@ -5,6 +6,7 @@ import {
 
 import {
   quickEditFocusConflicts,
+  resolveQuickEditActiveFocusRegions,
   quickEditFocusType,
 } from '../../features/video/review/advanced/focus-layout';
 
@@ -207,6 +209,8 @@ function resetFocusSettings(zoom: ZoomState, id: string): ZoomState {
   );
   const reset = fitQuickEditZoomTransitions({
     ...defaults,
+    ...(selected.timeDomain ? { timeDomain: selected.timeDomain } : {}),
+    ...(selected.visualAnchor ? { visualAnchor: selected.visualAnchor } : {}),
     ...(selected.overlapPolicy ? { overlapPolicy: selected.overlapPolicy } : {}),
     ...(selected.followCursor === undefined ? {} : { followCursor: selected.followCursor }),
     ...(selected.dormant !== undefined ? { dormant: selected.dormant } : {}),
@@ -365,7 +369,9 @@ function addZoomAt(
   const sourceRegions = args.timeMap
     ? args.zoom.regions.map((region) => ({
         ...region,
-        ...(region.sourceAnchor ?? reviewFocusSourceRange(region, args.timeMap!) ?? region),
+        ...(region.visualAnchor
+          ? reviewVisualAnchorSourceRange(region.visualAnchor)
+          : (region.sourceAnchor ?? reviewFocusSourceRange(region, args.timeMap!) ?? region)),
       }))
     : args.zoom.regions;
   const range = availableQuickEditZoomRange({
@@ -375,8 +381,11 @@ function addZoomAt(
   });
   if (!range) {
     return (
-      args.zoom.regions.find((region) => !region.dormant && at >= region.start && at < region.end)
-        ?.id ?? null
+      resolveQuickEditActiveFocusRegions(args.zoom.regions).find((region) =>
+        projectReviewFocus([region], args.timeMap).some(
+          (slice) => at >= slice.start && at < slice.end
+        )
+      )?.id ?? null
     );
   }
   const region = withReviewFocusType(
@@ -519,7 +528,7 @@ export function useReviewZoomEditor(args: ZoomEditorArgs) {
   };
   const commitDrag = (
     id: string,
-    range: { start: number; end: number; timeDomain?: 'result' },
+    range: Pick<QuickEditZoomRegion, 'start' | 'end' | 'visualAnchor' | 'timeDomain'>,
     edge: 'start' | 'end' | 'move',
     sourceAnchor?: QuickEditZoomRegion['sourceAnchor']
   ) =>
@@ -529,13 +538,24 @@ export function useReviewZoomEditor(args: ZoomEditorArgs) {
         if (
           !current ||
           range.start < 0 ||
-          range.end > args.timelineDuration ||
+          (!range.visualAnchor && range.end > args.timelineDuration) ||
           range.end <= range.start
         )
           return zoom;
         const { sourceAnchor: _anchor, ...base } = current;
         const next = fitQuickEditZoomTransitions({ ...base, ...range });
-        if (quickEditFocusConflicts(zoom.regions, next)) return zoom;
+        if (args.timeMap) {
+          const others = projectReviewFocus(
+            zoom.regions.filter((item) => item.id !== id),
+            args.timeMap
+          );
+          if (
+            projectReviewFocus([next], args.timeMap).some((part) =>
+              quickEditFocusConflicts(others, part)
+            )
+          )
+            return zoom;
+        } else if (quickEditFocusConflicts(zoom.regions, next)) return zoom;
         return { ...zoom, regions: zoom.regions.map((item) => (item.id === id ? next : item)) };
       }
       return sourceAnchor && args.timeMap

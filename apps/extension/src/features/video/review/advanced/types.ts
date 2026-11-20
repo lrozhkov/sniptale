@@ -1,3 +1,4 @@
+import type { ReviewVisualPlacement } from '../visual-anchor';
 import type { CursorCompositionSettings } from '../../project/motion/spatial';
 import type { SourceAudioGainRange } from '../../audio/source-envelope';
 import type { VideoSceneBackgroundMotion } from '../../project/types/layout';
@@ -105,7 +106,7 @@ export interface QuickEditCameraTransform {
  * Zoom interval on the quick-editor timeline. `start`/`end` are timeline seconds,
  * matching the shared ReviewTimeMap coordinate domain.
  */
-export interface QuickEditZoomRegion {
+export interface QuickEditZoomRegion extends ReviewVisualPlacement {
   timeDomain?: 'result';
   /** Independent spatial effect; it never occupies or moves the zoom camera. */
   effect?: '3d';
@@ -298,7 +299,7 @@ export interface QuickEditAdvancedContent {
   /** Source color processing is independent of presentation mode and overlay visibility. */
   sourceFilters?: import('../../../image-filters/contract').SourceImageFilterStack;
   cursorMotionEnabled?: boolean;
-  cursorMotions?: import('../../project/cursor-motion').CursorMotion[];
+  cursorMotions?: QuickEditCursorMotion[];
   cameraFollowDefaults?: import('../../project/camera/cursor-policy').CameraFollowSettings;
   cursorFocusPath?: import('../../project/cursor-focus-path/types').CursorFocusPath;
   text?: import('../text-types').ReviewTextDocument;
@@ -321,3 +322,6 @@ export interface QuickEditAdvancedContent {
   presentation?: import('./presentation').QuickEditPresentationSettings;
   audio: QuickEditAudioState;
 }
+
+export type QuickEditCursorMotion = import('../../project/cursor-motion').CursorMotion &
+  ReviewVisualPlacement;

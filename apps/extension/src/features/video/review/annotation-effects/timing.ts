@@ -1,3 +1,4 @@
+import { projectReviewVisualAnchor } from '../visual-anchor';
 import type { ReviewTimeSegment } from '../time-segment';
 import type { ReviewAnnotationEffect } from './types';
 
@@ -8,13 +9,19 @@ interface ReviewAnnotationEffectSlice {
   start: number;
   end: number;
   offset: number;
+  rate?: number;
 }
 
 /** Projects a source interval without changing its authored anchor or restarting animation after cuts. */
 export function projectReviewAnnotationEffect(
-  annotation: Pick<ReviewAnnotationEffect, 'start' | 'end' | 'timeDomain'>,
+  annotation: Pick<ReviewAnnotationEffect, 'start' | 'end' | 'timeDomain' | 'visualAnchor'>,
   segments: readonly ReviewTimeSegment[]
 ) {
+  if (annotation.visualAnchor)
+    return {
+      slices: projectReviewVisualAnchor(annotation.visualAnchor, segments),
+      duration: annotation.end - annotation.start,
+    };
   if (annotation.timeDomain === 'result')
     return {
       slices: [
@@ -64,11 +71,12 @@ export function sampleReviewAnnotationEffect(
     (part) => globalResultTime >= part.start && globalResultTime < part.end
   );
   if (!slice) return null;
-  const progress = (slice.offset + globalResultTime - slice.start) / projection.duration;
+  const rate = slice.rate ?? 1;
+  const progress = (slice.offset + (globalResultTime - slice.start) * rate) / projection.duration;
   return {
     time: progress * documentDuration,
     progress,
-    playbackRate: documentDuration / projection.duration,
+    playbackRate: (rate * documentDuration) / projection.duration,
   };
 }
 
@@ -76,7 +84,7 @@ export function sampleReviewAnnotationEffect(
 export function resolveUpcomingReviewAnnotationEffectSlice<
   T extends Pick<
     ReviewAnnotationEffect,
-    'id' | 'enabled' | 'order' | 'start' | 'end' | 'timeDomain'
+    'id' | 'enabled' | 'order' | 'start' | 'end' | 'timeDomain' | 'visualAnchor'
   >,
 >(
   instances: readonly T[],

@@ -1,3 +1,4 @@
+import { reviewVisualAnchorSourceRange } from '../visual-anchor';
 import type { QuickEditZoomRegion } from './types';
 
 /** The sole discriminator for the retained focus collection. */
@@ -17,7 +18,9 @@ export function quickEditFocusType(
 
 /** Authored intervals continue reserving source frames when a cut hides them. */
 function quickEditFocusInterval(region: QuickEditZoomRegion) {
-  return region.spatialClock || region.phaseClock ? region : (region.sourceAnchor ?? region);
+  if (region.spatialClock || region.phaseClock) return region;
+  if (region.visualAnchor) return reviewVisualAnchorSourceRange(region.visualAnchor);
+  return region.sourceAnchor ?? region;
 }
 
 /** Each focus family resolves its own links; independent overlays can share a camera transition. */
@@ -60,8 +63,9 @@ export function quickEditFocusConflicts(
 ): boolean {
   if (candidate.dormant || candidate.overlapPolicy || quickEditFocusType(candidate) !== 'zoom')
     return false;
-  const resultClock =
-    candidate.timeDomain === 'result' || regions.some((region) => region.timeDomain === 'result');
+  const needsResultClock = (region: QuickEditZoomRegion) =>
+    region.timeDomain === 'result' && !region.visualAnchor;
+  const resultClock = needsResultClock(candidate) || regions.some(needsResultClock);
   const interval = (region: QuickEditZoomRegion) =>
     resultClock ? region : quickEditFocusInterval(region);
   const a = interval(candidate);

@@ -324,7 +324,8 @@ export function planReviewProjectConversion(args: {
                 }
               : {}),
             cursorMotions: structuredClone(
-              (document.edits.some((edit) => edit.kind === 'freeze')
+              (document.edits.some((edit) => edit.kind === 'freeze') ||
+              authored.cursorMotions?.some((motion) => motion.visualAnchor)
                 ? projectReviewCursorMotions(
                     authored.cursorMotions,
                     buildReviewTimeMap(args.source.duration, document.edits)
@@ -516,7 +517,8 @@ export function planReviewProjectConversion(args: {
   const motion = planReviewProjectMotion(
     project,
     document.advancedContent,
-    application.zoomApplied
+    application.zoomApplied,
+    buildReviewTimeMap(args.source.duration, document.edits)
   );
   if (!motion) return blocked({ kind: 'unmapped-content', field: 'zoom' });
   project = motion;

@@ -1,3 +1,10 @@
+import { projectReviewFocus } from './focus-edits';
+import {
+  projectReviewAnnotationEffect,
+  sampleReviewAnnotationEffect,
+} from './annotation-effects/timing';
+import { projectReviewCursorMotions } from './timeline-placement';
+import { evaluateCursorMotion } from '../project/cursor-motion';
 import { createQuickEditZoomRegion } from './advanced/zoom';
 import { createQuickEditWatermark } from '../project/scene/watermark';
 import { reviewAdvancedContentBaseline } from './document';
@@ -937,3 +944,139 @@ it('preserves repeated immutable no-change and before-mismatch refusals', () => 
     ).toThrowError('Review operation does not match the current document.');
   }
 });
+
+it.each(['source', 'result'] as const)(
+  'keeps %s visual elements intact when a CUT is moved or removed',
+  (domain) => {
+    const baseline = createQuickEditAdvancedContent();
+    const interval = { start: 3, end: 5, ...(domain === 'result' ? { timeDomain: domain } : {}) };
+    const focus = {
+      ...createQuickEditZoomRegion({ id: 'focus', at: 3, duration: 2 }),
+      ...interval,
+      ...(domain === 'source' ? { sourceAnchor: { start: 3, end: 5 } } : {}),
+    };
+    const motion = {
+      ...interval,
+      id: 'cursor',
+      enabled: true,
+      shape: 'arrow' as const,
+      size: 48,
+      color: '#000000',
+      outline: '#ffffff',
+      shadow: true,
+      easing: 'smooth' as const,
+      points: [
+        { id: 'a', at: 0, x: 0.2, y: 0.3 },
+        { id: 'b', at: 1, x: 0.6, y: 0.7 },
+      ],
+    };
+    const annotation = {
+      ...interval,
+      id: 'annotation',
+      snapshotId: `effect:${'a'.repeat(64)}`,
+      enabled: true,
+      attachment: 'content' as const,
+      transform: { x: 0, y: 0, width: 0.5, height: 0.5, rotation: 0 },
+      controls: {},
+      order: 0,
+    };
+    baseline.zoom.regions = [focus];
+    baseline.cursorMotions = [motion];
+    baseline.annotationEffects = { enabled: true, instances: [annotation] };
+    const cut = {
+      kind: 'cut' as const,
+      id: 'cut',
+      start: 2,
+      end: 6,
+      requestedStart: 2,
+      requestedEnd: 6,
+    };
+    const moved = { ...cut, start: 4, end: 7, requestedStart: 4, requestedEnd: 7 };
+    const operation = {
+      target: 'edit' as const,
+      at: 1,
+      preserveFocusAnchors: true as const,
+      preserveUnderCuts: true as const,
+      preserveVisualAnchors: true as const,
+      preserveVoiceoverAnchors: true as const,
+    };
+    const history = [
+      { ...operation, id: 'add-cut', before: null, after: cut },
+      { ...operation, id: 'move-cut', before: cut, after: moved },
+      { ...operation, id: 'delete-cut', before: moved, after: null },
+    ];
+    const admitted = history.map((item) => parseReviewOperation(item, source.duration)!);
+    expect(admitted).toEqual(history);
+    const replay = (cursor: number) =>
+      replayReviewHistory(admitted, cursor, source, baseline).advancedContent;
+    const hidden = replay(1);
+    expect(hidden.zoom.regions).toMatchObject([focus]);
+    expect(hidden.zoom.regions[0]?.dormant).toBeUndefined();
+    expect(hidden.cursorMotions).toMatchObject([motion]);
+    expect(hidden.annotationEffects?.instances).toMatchObject([annotation]);
+    const partial = replay(2);
+    const map = partial.audio.voiceoverSegments!;
+    const projected = projectReviewCursorMotions(partial.cursorMotions, map);
+    expect(evaluateCursorMotion(projected, 3.5, 3.5)).toMatchObject({ motion: { id: 'cursor' } });
+    expect(evaluateCursorMotion(projected, 3.5, 3.5)?.x).toBeCloseTo(
+      evaluateCursorMotion([motion], 3.5, 3.5)!.x,
+      9
+    );
+    const effect = projectReviewAnnotationEffect(partial.annotationEffects!.instances[0]!, map);
+    expect(sampleReviewAnnotationEffect(effect, 1, 3.5)?.progress).toBeCloseTo(0.25, 9);
+    for (const cursor of [2, 3]) {
+      const state = replay(cursor);
+      expect(state.zoom.regions).toEqual(hidden.zoom.regions);
+      expect(state.cursorMotions).toEqual(hidden.cursorMotions);
+      expect(state.annotationEffects).toEqual(hidden.annotationEffects);
+    }
+
+    if (domain === 'source') {
+      const historicalCut = {
+        ...cut,
+        start: 3.25,
+        end: 4.75,
+        requestedStart: 3.25,
+        requestedEnd: 4.75,
+      };
+      const freeze = {
+        id: 'freeze',
+        kind: 'freeze' as const,
+        start: 7,
+        end: 7,
+        requestedStart: 7,
+        requestedEnd: 7,
+        duration: 1,
+        frameTime: 6.9,
+        frameDuration: 0.1,
+      };
+      const restored = replayReviewHistory(
+        [{ ...operation, id: 'remove-historical-cut', before: historicalCut, after: null }],
+        1,
+        source,
+        {
+          annotations: [],
+          canvasComments: [],
+          edits: [historicalCut, freeze],
+          advancedContent: baseline,
+        }
+      ).advancedContent;
+      const restoredMap = restored.audio.voiceoverSegments!;
+      expect(
+        projectReviewFocus(restored.zoom.regions, restoredMap).some(
+          (slice) => slice.start <= 4 && 4 < slice.end
+        )
+      ).toBe(true);
+      const restoredMotion = projectReviewCursorMotions(restored.cursorMotions, restoredMap);
+      expect(evaluateCursorMotion(restoredMotion, 4, 4)?.x).toBeCloseTo(
+        evaluateCursorMotion([motion], 4, 4)!.x,
+        9
+      );
+      const restoredEffect = projectReviewAnnotationEffect(
+        restored.annotationEffects!.instances[0]!,
+        restoredMap
+      );
+      expect(sampleReviewAnnotationEffect(restoredEffect, 1, 4)?.progress).toBeCloseTo(0.5, 9);
+    }
+  }
+);

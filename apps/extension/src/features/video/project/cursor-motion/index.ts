@@ -9,6 +9,8 @@ export interface CursorMotion {
   start: number;
   end: number;
   timeDomain?: 'result';
+  /** Full curve time for a projected slice with smaller visible bounds. */
+  phaseClock?: { start: number; end: number };
   enabled: boolean;
   shape: CursorMotionShape;
   size: number;
@@ -27,6 +29,7 @@ const motionFields = new Set([
   'start',
   'end',
   'timeDomain',
+  'phaseClock',
   'enabled',
   'shape',
   'size',
@@ -87,6 +90,14 @@ export function parseCursorMotions(value: unknown): CursorMotion[] | null {
       rawPoints.length > 256
     )
       return null;
+    const phaseClock = raw['phaseClock'];
+    if (
+      phaseClock !== undefined &&
+      (!isRecord(phaseClock) ||
+        !bounded(phaseClock['start'], -1e9, start) ||
+        !bounded(phaseClock['end'], end, 1e9))
+    )
+      return null;
     const points: CursorMotion['points'] = [];
     const pointIds = new Set<string>();
     let previous = -1;
@@ -113,6 +124,11 @@ export function parseCursorMotions(value: unknown): CursorMotion[] | null {
       start,
       end,
       ...(raw['timeDomain'] === 'result' ? { timeDomain: 'result' as const } : {}),
+      ...(isRecord(phaseClock) &&
+      typeof phaseClock['start'] === 'number' &&
+      typeof phaseClock['end'] === 'number'
+        ? { phaseClock: { start: phaseClock['start'], end: phaseClock['end'] } }
+        : {}),
       enabled,
       shape,
       size,
@@ -142,6 +158,7 @@ const segments = new WeakMap<CursorMotion, CursorFocusSegment>();
 export function cursorMotionSegment(motion: CursorMotion): CursorFocusSegment {
   let segment = segments.get(motion);
   if (!segment) {
+    const clock = motion.phaseClock ?? motion;
     segment = {
       id: motion.id,
       binding: { kind: 'project' },
@@ -149,7 +166,7 @@ export function cursorMotionSegment(motion: CursorMotion): CursorFocusSegment {
       end: motion.end,
       keys: motion.points.map((p) => ({
         id: p.id,
-        time: motion.start + p.at * (motion.end - motion.start),
+        time: clock.start + p.at * (clock.end - clock.start),
         x: p.x,
         y: p.y,
         anchor: 'manual' as const,

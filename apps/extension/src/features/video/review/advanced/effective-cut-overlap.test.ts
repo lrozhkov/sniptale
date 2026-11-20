@@ -26,6 +26,24 @@ it('does not require renderers for authored effects entirely hidden by a cut', (
       sourceAnchor: { start: 2, end: 3 },
     },
   ];
+  state.annotationEffects = {
+    enabled: true,
+    instances: [
+      {
+        id: 'hidden-effect',
+        snapshotId: `effect:${'a'.repeat(64)}`,
+        enabled: true,
+        start: 2,
+        end: 3,
+        timeDomain: 'result',
+        visualAnchor: [{ start: 2, end: 3, offset: 0, rate: 1 }],
+        attachment: 'content',
+        transform: { x: 0, y: 0, width: 0.5, height: 0.5, rotation: 0 },
+        controls: {},
+        order: 0,
+      },
+    ],
+  };
   state.audio.voiceover = [
     {
       id: 'voice',
@@ -56,6 +74,7 @@ it('does not require renderers for authored effects entirely hidden by a cut', (
   state.audio.original.ranges = [{ id: 'gain', start: 2, end: 3, volume: 0.5 }];
   expect(resolveQuickEditEffectiveState(state)).toMatchObject({
     zoomRegions: [],
+    annotationEffects: undefined,
     voiceover: [],
     music: [],
   });

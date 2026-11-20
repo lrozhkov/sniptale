@@ -395,6 +395,8 @@ function parseReviewOperationValue(value: unknown, duration: number): ReviewOper
       return null;
     if (value['preserveFocusAnchors'] !== undefined && value['preserveFocusAnchors'] !== true)
       return null;
+    if (value['preserveVisualAnchors'] !== undefined && value['preserveVisualAnchors'] !== true)
+      return null;
     if (value['preserveUnderCuts'] !== undefined && value['preserveUnderCuts'] !== true)
       return null;
     if (value['preserveUnderCuts'] === true && value['preserveFocusAnchors'] !== true) return null;
@@ -422,6 +424,7 @@ function parseReviewOperationValue(value: unknown, duration: number): ReviewOper
       before,
       after,
       ...(value['preserveFocusAnchors'] === true ? { preserveFocusAnchors: true as const } : {}),
+      ...(value['preserveVisualAnchors'] === true ? { preserveVisualAnchors: true as const } : {}),
       ...(value['preserveUnderCuts'] === true ? { preserveUnderCuts: true as const } : {}),
       ...(value['preserveVoiceoverAnchors'] === true
         ? { preserveVoiceoverAnchors: true as const }

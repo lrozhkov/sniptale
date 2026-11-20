@@ -1,3 +1,4 @@
+import { projectReviewVisualAnchor } from '../../features/video/review/visual-anchor';
 import { reviewInteractionFamily } from '../../features/video/review/interaction-timeline';
 import { resolveReviewTimelineSelection } from './timeline-batch-selection';
 import { reviewTrackEnabled } from '../../features/video/review/advanced/track-controls';
@@ -151,7 +152,11 @@ function selectionIntervals(
     }
     case 'annotation-effect': {
       const item = advanced.annotationEffects?.instances.find((item) => item.id === selection.id);
-      return ranges(item, item?.timeDomain ?? 'source');
+      return item?.visualAnchor
+        ? projectReviewVisualAnchor(item.visualAnchor, segments).flatMap((part) =>
+            ranges(part, 'result')
+          )
+        : ranges(item, item?.timeDomain ?? 'source');
     }
     case 'text': {
       const item = advanced.text?.fragments.find((item) => item.id === selection.id);

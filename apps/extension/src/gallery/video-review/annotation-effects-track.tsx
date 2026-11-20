@@ -1,3 +1,7 @@
+import {
+  anchorReviewVisualDisplay,
+  displayReviewVisualAnchor,
+} from '../../features/video/review/visual-anchor';
 import { reviewTimelineHint } from './timeline-hints';
 import { ReviewPlaybackPresentationClockContext } from './playback-presentation-clock';
 import { useReviewTimelineSnap } from './timeline-magnets';
@@ -24,7 +28,7 @@ import { useReviewDragEscape } from './timeline-drag';
 import { ReviewTimelineLabel } from './timeline-label';
 import type { ReviewTrackProjection } from './track-projection';
 
-type Range = Pick<ReviewAnnotationEffect, 'start' | 'end' | 'timeDomain'>;
+type Range = Pick<ReviewAnnotationEffect, 'start' | 'end' | 'timeDomain' | 'visualAnchor'>;
 type Drag = {
   id: string | null;
   before: Range;
@@ -94,12 +98,14 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
       display
         ? incoming.instances.map((item) => ({
             ...item,
-            start:
-              item.timeDomain === 'result'
+            start: item.visualAnchor
+              ? displayReviewVisualAnchor(item, display)
+              : item.timeDomain === 'result'
                 ? display.resultToDisplay(item.start)
                 : display.sourceToDisplay(item.start),
-            end:
-              item.timeDomain === 'result'
+            end: item.visualAnchor
+              ? displayReviewVisualAnchor(item, display, item.end - item.start)
+              : item.timeDomain === 'result'
                 ? display.resultToDisplay(item.end, 'end')
                 : display.sourceToDisplay(item.end, 'end'),
           }))
@@ -150,8 +156,7 @@ export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
         current.onPreview(
           current.display
             ? {
-                start: current.display.displayToResult(range.start),
-                end: current.display.displayToResult(range.end),
+                ...anchorReviewVisualDisplay(range, current.display),
                 timeDomain: 'result',
               }
             : range

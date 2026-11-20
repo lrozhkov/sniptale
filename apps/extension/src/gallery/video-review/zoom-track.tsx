@@ -1,3 +1,8 @@
+import {
+  anchorReviewVisualDisplay,
+  displayReviewVisualAnchor,
+  reviewVisualAnchorDuration,
+} from '../../features/video/review/visual-anchor';
 import { reviewTimelineHint } from './timeline-hints';
 import { useReviewTimelineSnap, type ReviewTimelineSnap } from './timeline-magnets';
 import { ReviewTrackVisibilityButton } from './track-row';
@@ -31,7 +36,7 @@ import { reviewTrackStatusButtonClassName, reviewTimeLabel } from './controls';
 import { reviewTimelinePointerSource, type ReviewTrackProjection } from './track-projection';
 import { useReviewDragEscape } from './timeline-drag';
 
-type FocusRange = Pick<QuickEditZoomRegion, 'start' | 'end' | 'sourceAnchor'>;
+type FocusRange = Pick<QuickEditZoomRegion, 'start' | 'end' | 'sourceAnchor' | 'visualAnchor'>;
 type FocusAxis = Pick<ReviewTrackProjection, 'duration' | 'source' | 'output'>;
 
 /** Focus feedback uses source seconds, including legacy ranges without a source anchor. */
@@ -52,6 +57,7 @@ type ZoomTrackProps = {
   compact?: boolean | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   sourceSelection?: ReviewAnchor | undefined;
+  displayClock?: boolean;
   projection?: ReviewTrackProjection | undefined;
   enabled?: boolean;
   onToggleEnabled?(): void;
@@ -71,7 +77,7 @@ type ZoomTrackProps = {
   onSelectLink?(id: string): void;
   onDragCommit(
     id: string,
-    range: { start: number; end: number; timeDomain?: 'result' },
+    range: FocusRange & { timeDomain?: 'result' },
     edge: 'start' | 'end' | 'move',
     sourceAnchor?: QuickEditZoomRegion['sourceAnchor']
   ): void;
@@ -202,15 +208,17 @@ export function ReviewZoomTrack(incoming: ZoomTrackProps) {
     () =>
       display
         ? incoming.regions.map((item) => {
-            const { sourceAnchor, ...region } = item;
+            const { sourceAnchor, visualAnchor, ...region } = item;
             return {
               ...region,
-              start:
-                sourceAnchor && item.timeDomain !== 'result'
+              start: visualAnchor
+                ? displayReviewVisualAnchor(item, display)
+                : sourceAnchor && item.timeDomain !== 'result'
                   ? display.sourceToDisplay(sourceAnchor.start)
                   : display.resultToDisplay(item.start),
-              end:
-                sourceAnchor && item.timeDomain !== 'result'
+              end: visualAnchor
+                ? displayReviewVisualAnchor(item, display, reviewVisualAnchorDuration(visualAnchor))
+                : sourceAnchor && item.timeDomain !== 'result'
                   ? display.sourceToDisplay(sourceAnchor.end, 'end')
                   : display.resultToDisplay(item.end, 'end'),
             };
@@ -223,6 +231,7 @@ export function ReviewZoomTrack(incoming: ZoomTrackProps) {
         ...incoming,
         duration: display.duration,
         projection: undefined,
+        displayClock: true,
         time: incoming.time === null ? null : display.resultToDisplay(incoming.time),
         regions,
         snapTimes: incoming.snapTimes?.map((time) => display.sourceToDisplay(time)),
@@ -236,8 +245,16 @@ export function ReviewZoomTrack(incoming: ZoomTrackProps) {
           incoming.onDragCommit(
             id,
             {
-              start: display.displayToResult(range.start),
-              end: display.displayToResult(range.end),
+              ...(incoming.regions.find((region) => region.id === id)?.visualAnchor ||
+              display.parts.some(
+                ({ segment, start, end }) =>
+                  segment.kind === 'cut' && range.start < end && range.end > start
+              )
+                ? anchorReviewVisualDisplay(range, display)
+                : {
+                    start: display.displayToResult(range.start),
+                    end: display.displayToResult(range.end),
+                  }),
               timeDomain: 'result',
             },
             edge
@@ -510,10 +527,11 @@ function reviewZoomBlockPresentation(
 ) {
   const { region, range, projection, duration } = props;
   const anchor = range.sourceAnchor;
+  const cutRange = anchor ?? (props.displayClock ? range : undefined);
   const cutOverlap =
-    !!anchor &&
+    !!cutRange &&
     props.edits.some(
-      (edit) => edit.kind === 'cut' && edit.start < anchor.end && edit.end > anchor.start
+      (edit) => edit.kind === 'cut' && edit.start < cutRange.end && edit.end > cutRange.start
     );
   const authored = !!anchor;
   const sourceDuration = projection?.duration ?? duration;

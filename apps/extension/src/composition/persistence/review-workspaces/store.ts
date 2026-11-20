@@ -767,6 +767,7 @@ function prepareCommittedOperation(
           ...parsed,
           preserveFocusAnchors: true as const,
           preserveUnderCuts: true as const,
+          preserveVisualAnchors: true as const,
           preserveVoiceoverAnchors: true as const,
           preserveTextAnchors: true as const,
           preserveResultText: true as const,

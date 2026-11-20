@@ -1,3 +1,16 @@
+import {
+  evaluateCursorMotion,
+  type CursorMotion,
+} from '../../features/video/project/cursor-motion';
+import { projectReviewFocus } from '../../features/video/review/focus-edits';
+import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import { projectReviewCursorMotions } from '../../features/video/review/timeline-placement';
+import { anchorReviewVisual } from '../../features/video/review/visual-anchor';
+import {
+  projectReviewAnnotationEffect,
+  sampleReviewAnnotationEffect,
+} from '../../features/video/review/annotation-effects/timing';
 import { planReviewCutTransitions, reviewCutTransitionAt } from '../../features/video/review/cuts';
 import { expect, it, vi } from 'vitest';
 import {
@@ -427,4 +440,65 @@ it('decodes both adjoining freeze frames and keeps each decorated side on the re
   }
   expect(left.close).toHaveBeenCalledOnce();
   expect(right.close).toHaveBeenCalledOnce();
+});
+
+it('keeps each CUT transition side on its authored visual phase', () => {
+  const original = buildReviewTimeMap(6, []);
+  const edits = [
+    { id: 'cut', kind: 'cut' as const, start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+  ];
+  const map = buildReviewTimeMap(6, edits);
+  const range = { start: 1, end: 5, timeDomain: 'result' as const };
+  const motion: CursorMotion = {
+    ...range,
+    id: 'cursor',
+    enabled: true,
+    shape: 'arrow',
+    size: 48,
+    color: '#000000',
+    outline: '#ffffff',
+    shadow: true,
+    easing: 'linear',
+    points: [
+      { id: 'a', at: 0, x: 0, y: 0 },
+      { id: 'b', at: 1, x: 1, y: 1 },
+    ],
+  };
+  const motions = projectReviewCursorMotions([anchorReviewVisual(motion, original)], map);
+  const focus = projectReviewFocus(
+    [
+      anchorReviewVisual(
+        {
+          ...createQuickEditZoomRegion({ id: 'focus', at: 1, duration: 4 }),
+          ...range,
+        },
+        original
+      ),
+    ],
+    map
+  );
+  const annotation = projectReviewAnnotationEffect(anchorReviewVisual(range, original), map);
+  expect(focus.map((slice) => [slice.start, slice.end, slice.phaseClock?.offset])).toEqual([
+    [1, 2, 0],
+    [2, 3, 3],
+  ]);
+  const blend = reviewCutTransitionAt(1.75, [plan])!;
+  const sides = reviewCutTransitionSides(
+    blend,
+    { left: frame(1.9), right: frame(4) },
+    frame(1.75),
+    1.75
+  );
+  expect(sides.map((side) => side.sample.timestamp)).toEqual([1.75, 4]);
+  for (const [index, side] of sides.entries()) {
+    const expected = index === 0 ? 0.1875 : 0.75;
+    expect(evaluateCursorMotion(motions, side.sample.timestamp, side.resultTime)?.x).toBeCloseTo(
+      expected,
+      8
+    );
+    expect(sampleReviewAnnotationEffect(annotation, 1, side.resultTime)?.progress).toBeCloseTo(
+      expected,
+      8
+    );
+  }
 });

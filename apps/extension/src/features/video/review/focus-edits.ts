@@ -1,5 +1,14 @@
+import {
+  anchorReviewVisual,
+  anchorReviewVisualSource,
+  projectReviewVisualAnchor,
+  reviewVisualAnchorDuration,
+} from './visual-anchor';
 import { projectReviewVisualRange, retimeReviewResultRange } from './timeline-placement';
-import { resolveQuickEditActiveFocusRegions } from './advanced/focus-layout';
+import {
+  resolveQuickEditActiveFocusRegions,
+  resolveQuickEditFocusLink,
+} from './advanced/focus-layout';
 import { projectSourceFocusPhases } from '../project/motion/source-phase-projection';
 import { fitQuickEditZoomTransitions } from './advanced/zoom';
 import type { QuickEditZoomRegion } from './advanced/types';
@@ -43,11 +52,39 @@ export function reconcileReviewFocus(args: {
   after: readonly ReviewEdit[];
   edit: ReviewEdit | null;
   preserveUnderCuts?: true;
+  preserveVisualAnchors?: true;
 }): QuickEditZoomRegion[] {
   const previous = buildReviewTimeMap(args.duration, args.before);
   const next = buildReviewTimeMap(args.duration, args.after);
   if (args.preserveUnderCuts) {
+    const frozenSourceMap =
+      args.preserveVisualAnchors &&
+      args.before.some((edit) => edit.kind === 'freeze') &&
+      args.regions.some((region) => region.sourceAnchor && !region.visualAnchor)
+        ? buildReviewTimeMap(
+            args.duration,
+            args.before.filter((edit) => edit.kind !== 'cut')
+          )
+        : undefined;
     return args.regions.map((region) => {
+      if (region.visualAnchor) return region;
+      if (args.preserveVisualAnchors) {
+        if (region.timeDomain === 'result') return anchorReviewVisual(region, previous);
+        if (region.sourceAnchor && frozenSourceMap) {
+          const frozenPlacement = projectReviewVisualRange(region.sourceAnchor, frozenSourceMap);
+          if (frozenPlacement)
+            return anchorReviewVisual({ ...region, ...frozenPlacement }, frozenSourceMap);
+        }
+        if (region.sourceAnchor) {
+          const anchor = region.sourceAnchor;
+          return next.some(
+            (part) =>
+              part.kind === 'cut' && anchor.start < part.sourceEnd && anchor.end > part.sourceStart
+          )
+            ? { ...region, visualAnchor: anchorReviewVisualSource(anchor) }
+            : region;
+        }
+      }
       if (region.timeDomain === 'result') {
         const range = retimeReviewResultRange(region, previous, next);
         return range.end > range.start ? { ...region, ...range } : { ...region, dormant: true };
@@ -95,10 +132,18 @@ export function projectReviewFocus(
   regions: readonly QuickEditZoomRegion[],
   map?: readonly ReviewTimeSegment[]
 ): QuickEditZoomRegion[] {
+  return projectReviewFocusGroups(regions, map).flatMap(({ slices }) => slices);
+}
+
+/** Keeps projected slices together for render and Native link continuity. */
+export function projectReviewFocusGroups(
+  regions: readonly QuickEditZoomRegion[],
+  map?: readonly ReviewTimeSegment[]
+) {
   const active = resolveQuickEditActiveFocusRegions(regions).map((region) =>
     fitQuickEditZoomTransitions(region)
   );
-  if (!map) return active;
+  if (!map) return active.map((region) => ({ region, slices: [region] }));
   const sourceSpans = map.flatMap((part) =>
     part.kind === 'cut'
       ? []
@@ -114,6 +159,30 @@ export function projectReviewFocus(
   );
   const inserted = map.some((part) => part.kind === 'freeze');
   const visible = active.map((region) => {
+    if (region.visualAnchor) {
+      const { visualAnchor, sourceAnchor: _anchor, linkTo, linkEasing, ...authored } = region;
+      const slices = projectReviewVisualAnchor(visualAnchor, map);
+      return slices.map((slice, index) => {
+        const clock = {
+          offset: slice.offset,
+          rate: slice.rate,
+          duration: reviewVisualAnchorDuration(visualAnchor),
+          enter: region.enter,
+          exit: region.exit,
+        };
+        return {
+          ...authored,
+          id: index === 0 ? region.id : `${region.id}:slice:${index}`,
+          start: slice.start,
+          end: slice.end,
+          phaseClock: clock,
+          ...(region.effect === '3d' ? { spatialClock: clock } : {}),
+          ...(region.border ? { borderClock: clock } : {}),
+          ...(index === slices.length - 1 && linkTo ? { linkTo } : {}),
+          ...(index === slices.length - 1 && linkTo && linkEasing ? { linkEasing } : {}),
+        };
+      });
+    }
     const anchor = region.timeDomain === 'result' ? undefined : region.sourceAnchor;
     if (!anchor) return [region];
     if (inserted) {
@@ -136,19 +205,6 @@ export function projectReviewFocus(
       const { linkTo: _linkTo, linkEasing: _linkEasing, ...withoutLink } = region;
       return {
         ...withoutLink,
-        ...(inserted
-          ? {
-              phaseClock: {
-                offset: span.sourceStart - anchor.start,
-                rate: span.rate,
-                duration: anchor.end - anchor.start,
-                enter: active.some((other) => other.linkTo === region.id)
-                  ? { type: 'none' as const, duration: 0 }
-                  : region.enter,
-                exit: region.linkTo ? { type: 'none' as const, duration: 0 } : region.exit,
-              },
-            }
-          : {}),
         ...(region.effect === '3d'
           ? {
               spatialClock: {
@@ -183,17 +239,50 @@ export function projectReviewFocus(
       };
     });
   });
-  return visible.flatMap((slices) =>
-    slices.map((slice, sliceIndex) => {
-      if (!slice.linkTo) return slice;
-      const targetIndex = active.findIndex((region) => region.id === slice.linkTo);
-      const target = active[targetIndex];
-      const targetSlice = visible[targetIndex]?.[0];
-      if (sliceIndex !== slices.length - 1 || !targetSlice || slice.linkTo !== target?.id) {
-        const { linkTo: _linkTo, linkEasing: _linkEasing, ...unlinked } = slice;
-        return unlinked;
-      }
-      return { ...slice, linkTo: targetSlice.id };
-    })
+  const outgoing = new Set<string>();
+  const incoming = new Set<string>();
+  const visibleIds = new Set(
+    active.filter((_region, index) => visible[index]!.length).map(({ id }) => id)
   );
+  if (active.some((region) => region.visualAnchor)) {
+    for (const region of active) {
+      if (!region.linkTo || !visibleIds.has(region.id) || !visibleIds.has(region.linkTo)) continue;
+      const link = resolveQuickEditFocusLink(active, region.id, { sourceTime: true });
+      if (!link) continue;
+      outgoing.add(region.id);
+      incoming.add(link.target.id);
+    }
+  }
+  return active.map((region, index) => {
+    const slices = visible[index]!;
+    return {
+      region,
+      slices: slices.map((slice, sliceIndex) => {
+        const phaseClock = slice.phaseClock;
+        const phased =
+          phaseClock && (incoming.has(region.id) || outgoing.has(region.id))
+            ? {
+                ...slice,
+                phaseClock: {
+                  ...phaseClock,
+                  ...(incoming.has(region.id)
+                    ? { enter: { type: 'none' as const, duration: 0 } }
+                    : {}),
+                  ...(outgoing.has(region.id)
+                    ? { exit: { type: 'none' as const, duration: 0 } }
+                    : {}),
+                },
+              }
+            : slice;
+        if (!phased.linkTo) return phased;
+        const targetIndex = active.findIndex((target) => target.id === phased.linkTo);
+        const targetSlice = visible[targetIndex]?.[0];
+        if (sliceIndex !== slices.length - 1 || !targetSlice) {
+          const { linkTo: _linkTo, linkEasing: _linkEasing, ...unlinked } = phased;
+          return unlinked;
+        }
+        return { ...phased, linkTo: targetSlice.id };
+      }),
+    };
+  });
 }
