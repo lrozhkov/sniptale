@@ -13,6 +13,21 @@
   padding-inline: 8px;
 }
 
+.review-webcam-crop-preview {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  margin-inline: 8px;
+  padding-block: 4px 8px;
+  border-block-end: 1px solid var(--sniptale-color-field-border);
+}
+
+.review-webcam-timing-divider {
+  margin-inline: 8px;
+  border: 0;
+  border-block-start: 1px solid var(--sniptale-color-field-border);
+}
+
 @layer utilities {
   .sniptale-compact-workspace
     [data-ui='gallery.videoReview.inspector']

@@ -259,6 +259,10 @@ it('selects a split pane and restores docked placement without rewriting its aut
   const dock = editor.placement;
   await choose(label('webcamSplit'), label('webcamSplit_left'));
   expect(editor.setSplit).toHaveBeenCalledWith('left');
+  expect(
+    field(label('webcamSplit')).compareDocumentPosition(field(label('webcamScreenBehavior'))) &
+      Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy();
   expect(field(label('webcamPlacement'))).toBeNull();
   await choose(label('webcamSplit'), label('webcamSplit_docked'));
   expect(editor.setSplit).toHaveBeenCalledWith(null);
@@ -285,6 +289,9 @@ it('edits an authored position and respects neighboring time bounds and transiti
   editor.selectedPosition = editor.camera!.positions[0];
   render = () => root.render(<ReviewWebcamInspector editor={editor} />);
   act(render);
+  section('webcam-timing');
+  expect(field(label('webcamOffset'))).not.toBeNull();
+  expect(field(label('webcamPositionTime'))).not.toBeNull();
   expect(field(label('webcamTransitionDuration'))).toBeNull();
   await choose(label('webcamTransition'), label('webcamSmooth'));
   await enter(label('webcamTransitionDuration'), '2');

@@ -112,6 +112,7 @@ it('loads once, previews crop gestures, commits once and releases resources on c
     await render();
     const video = host.querySelector('video')!,
       button = host.querySelector('button')!;
+    expect(video.hidden).toBe(true);
     Object.defineProperties(video, {
       duration: { value: 10 },
       readyState: { value: 2 },

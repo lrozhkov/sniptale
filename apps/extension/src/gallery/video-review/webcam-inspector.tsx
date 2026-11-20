@@ -186,24 +186,7 @@ export function ReviewWebcamInspector({
               id: 'webcam-timing',
               label: translate('gallery.videoReview.webcamTiming'),
               icon: Clock3,
-              content: (
-                <div className="sniptale-parameter-stack">
-                  <div title={translate('gallery.videoReview.webcamOffsetHint')}>
-                    <ReviewNumberRow
-                      label={translate('gallery.videoReview.webcamOffset')}
-                      value={camera.offsetSeconds}
-                      min={-86400}
-                      max={86400}
-                      step={0.01}
-                      precision={3}
-                      unit="s"
-                      onChange={(offsetSeconds) =>
-                        editor.patch({ offsetSeconds: Math.round(offsetSeconds * 1000) / 1000 })
-                      }
-                    />
-                  </div>
-                </div>
-              ),
+              content: <WebcamTiming editor={editor} />,
             },
             actions,
           ])}
@@ -214,15 +197,6 @@ export function ReviewWebcamInspector({
 function WebcamLayout({ editor }: { editor: Editor }) {
   const camera = editor.camera!;
   const position = editor.selectedPosition;
-  const index = position ? camera.positions.findIndex((item) => item.id === position.id) : -1;
-  const updatePosition = (patch: Partial<NonNullable<Editor['selectedPosition']>>) => {
-    if (position)
-      editor.patch({
-        positions: camera.positions.map((item) =>
-          item.id === position.id ? { ...item, ...patch } : item
-        ),
-      });
-  };
   return (
     <div className="sniptale-parameter-stack">
       <SelectField
@@ -239,6 +213,25 @@ function WebcamLayout({ editor }: { editor: Editor }) {
         onChange={(id) => editor.navigate(id === 'base' ? null : id)}
       />
 
+      <SelectField
+        className={reviewSelectFieldClassName}
+        label={translate('gallery.videoReview.webcamSplit')}
+        value={editor.split ?? 'docked'}
+        options={(['docked', 'left', 'right', 'top', 'bottom'] as const).map((side) => ({
+          value: side,
+          label: translate(`gallery.videoReview.webcamSplit_${side}`),
+        }))}
+        onChange={(side) => {
+          if (
+            side === 'docked' ||
+            side === 'left' ||
+            side === 'right' ||
+            side === 'top' ||
+            side === 'bottom'
+          )
+            editor.setSplit(side === 'docked' ? null : side);
+        }}
+      />
       {editor.split ? (
         <SelectField
           className={reviewSelectFieldClassName}
@@ -264,75 +257,89 @@ function WebcamLayout({ editor }: { editor: Editor }) {
           }}
         />
       ) : null}
-      <SelectField
-        className={reviewSelectFieldClassName}
-        label={translate('gallery.videoReview.webcamSplit')}
-        value={editor.split ?? 'docked'}
-        options={(['docked', 'left', 'right', 'top', 'bottom'] as const).map((side) => ({
-          value: side,
-          label: translate(`gallery.videoReview.webcamSplit_${side}`),
-        }))}
-        onChange={(side) => {
-          if (
-            side === 'docked' ||
-            side === 'left' ||
-            side === 'right' ||
-            side === 'top' ||
-            side === 'bottom'
-          )
-            editor.setSplit(side === 'docked' ? null : side);
-        }}
-      />
 
       <div className="review-inspector-columns">
         {!editor.split ? <WebcamPlacement editor={editor} /> : null}
         <WebcamCrop editor={editor} />
-        {position ? (
-          <div className="sniptale-parameter-stack">
-            <ReviewNumberRow
-              label={translate('gallery.videoReview.webcamPositionTime')}
-              value={position.time}
-              min={(camera.positions[index - 1]?.time ?? 0) + 0.001}
-              max={(camera.positions[index + 1]?.time ?? editor.duration) - 0.001}
-              step={0.01}
-              precision={3}
-              unit="s"
-              onChange={(time) => editor.movePosition(position.id, time)}
-            />
-            <SelectField
-              className={reviewSelectFieldClassName}
-              label={translate('gallery.videoReview.webcamTransition')}
-              value={position.transition.type}
-              options={[
-                { value: 'none', label: translate('gallery.videoReview.webcamInstant') },
-                { value: 'ease-in-out', label: translate('gallery.videoReview.webcamSmooth') },
-                { value: 'shrink', label: translate('videoEditor.sidebar.cameraTransitionShrink') },
-              ]}
-              onChange={(type) => {
-                if (type === 'none' || type === 'ease-in-out' || type === 'shrink')
-                  updatePosition({ transition: { ...position.transition, type } });
-              }}
-            />
-            {position.transition.type !== 'none' ? (
-              <ReviewNumberRow
-                label={translate('gallery.videoReview.webcamTransitionDuration')}
-                value={position.transition.duration}
-                min={0}
-                max={Math.min(
-                  60,
-                  (camera.positions[index + 1]?.time ?? editor.duration) - position.time
-                )}
-                step={0.05}
-                precision={2}
-                unit="s"
-                onChange={(duration) =>
-                  updatePosition({ transition: { ...position.transition, duration } })
-                }
-              />
-            ) : null}
-          </div>
-        ) : null}
       </div>
+    </div>
+  );
+}
+
+function WebcamTiming({ editor }: { editor: Editor }) {
+  const camera = editor.camera!;
+  const position = editor.selectedPosition;
+  const index = position ? camera.positions.findIndex((item) => item.id === position.id) : -1;
+  const updatePosition = (patch: Partial<NonNullable<Editor['selectedPosition']>>) => {
+    if (position)
+      editor.patch({
+        positions: camera.positions.map((item) =>
+          item.id === position.id ? { ...item, ...patch } : item
+        ),
+      });
+  };
+  return (
+    <div className="sniptale-parameter-stack">
+      <div title={translate('gallery.videoReview.webcamOffsetHint')}>
+        <ReviewNumberRow
+          label={translate('gallery.videoReview.webcamOffset')}
+          value={camera.offsetSeconds}
+          min={-86400}
+          max={86400}
+          step={0.01}
+          precision={3}
+          unit="s"
+          onChange={(offsetSeconds) =>
+            editor.patch({ offsetSeconds: Math.round(offsetSeconds * 1000) / 1000 })
+          }
+        />
+      </div>
+      {position ? (
+        <>
+          <hr className="review-webcam-timing-divider" />
+          <ReviewNumberRow
+            label={translate('gallery.videoReview.webcamPositionTime')}
+            value={position.time}
+            min={(camera.positions[index - 1]?.time ?? 0) + 0.001}
+            max={(camera.positions[index + 1]?.time ?? editor.duration) - 0.001}
+            step={0.01}
+            precision={3}
+            unit="s"
+            onChange={(time) => editor.movePosition(position.id, time)}
+          />
+          <SelectField
+            className={reviewSelectFieldClassName}
+            label={translate('gallery.videoReview.webcamTransition')}
+            value={position.transition.type}
+            options={[
+              { value: 'none', label: translate('gallery.videoReview.webcamInstant') },
+              { value: 'ease-in-out', label: translate('gallery.videoReview.webcamSmooth') },
+              { value: 'shrink', label: translate('videoEditor.sidebar.cameraTransitionShrink') },
+            ]}
+            onChange={(type) => {
+              if (type === 'none' || type === 'ease-in-out' || type === 'shrink')
+                updatePosition({ transition: { ...position.transition, type } });
+            }}
+          />
+          {position.transition.type !== 'none' ? (
+            <ReviewNumberRow
+              label={translate('gallery.videoReview.webcamTransitionDuration')}
+              value={position.transition.duration}
+              min={0}
+              max={Math.min(
+                60,
+                (camera.positions[index + 1]?.time ?? editor.duration) - position.time
+              )}
+              step={0.05}
+              precision={2}
+              unit="s"
+              onChange={(duration) =>
+                updatePosition({ transition: { ...position.transition, duration } })
+              }
+            />
+          ) : null}
+        </>
+      ) : null}
     </div>
   );
 }
@@ -453,12 +460,30 @@ function WebcamAppearance({ editor }: { editor: Editor }) {
           />
         ) : null}
         <ToggleField
+          showStatus
           label={translate('gallery.videoReview.webcamMirror')}
           value={camera.mirrored}
           onChange={(mirrored) => editor.patch({ mirrored })}
         />
       </div>
       <div className="sniptale-parameter-stack">
+        <ReviewNumberRow
+          label={translate('gallery.videoReview.webcamShadow')}
+          rangePresentation="field"
+          value={camera.shadow?.intensity ?? 0}
+          min={0}
+          max={100}
+          step={1}
+          unit="%"
+          onChange={(intensity) =>
+            editor.patch({
+              shadow: {
+                color: camera.shadow?.color ?? '#000000ff',
+                intensity,
+              },
+            })
+          }
+        />
         <SegmentedRow
           columns={4}
           ariaLabel={translate('gallery.videoReview.webcamShadowDirection')}
@@ -496,23 +521,6 @@ function WebcamAppearance({ editor }: { editor: Editor }) {
             }
           />
         ) : null}
-        <ReviewNumberRow
-          label={translate('gallery.videoReview.webcamShadow')}
-          rangePresentation="field"
-          value={camera.shadow?.intensity ?? 0}
-          min={0}
-          max={100}
-          step={1}
-          unit="%"
-          onChange={(intensity) =>
-            editor.patch({
-              shadow: {
-                color: camera.shadow?.color ?? '#000000ff',
-                intensity,
-              },
-            })
-          }
-        />
         <ColorField
           label={translate('gallery.videoReview.webcamShadowColor')}
           title={translate('gallery.videoReview.webcamShadowColor')}
@@ -548,7 +556,7 @@ function WebcamCrop({ editor }: { editor: Editor }) {
       <ReviewNumberRow
         label={translate('videoEditor.sidebar.cameraCropZoom')}
         rangePresentation="field"
-        unit=""
+        unit="x"
         value={crop.zoom}
         min={1}
         max={4}
