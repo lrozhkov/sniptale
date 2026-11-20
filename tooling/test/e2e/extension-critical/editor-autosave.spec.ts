@@ -689,7 +689,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         .toBe(edited.title);
       await reopened.locator('[data-ui="editor.floating.layers.mode.history"]').click();
       await expect(
-        reopened.locator('[data-ui="editor.inspector.history.entry"]').last()
+        reopened.locator('[data-ui="editor.inspector.history.entry"]').first()
       ).toHaveAttribute('aria-current', 'step');
       await reopened.screenshot({
         path: info.outputPath('history-working-copy-reopened.png'),
@@ -779,8 +779,10 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await reopened.locator('[data-ui="editor.floating.layers.mode.history"]').click();
       const rows = reopened.locator('[data-ui="editor.inspector.history.entry"]');
       await expect(rows).toHaveCount(initialIndex + 4);
-      await expect(rows.nth(initialIndex + 2)).toHaveAttribute('aria-current', 'step');
-      await expect(rows.last()).toHaveAttribute('data-future');
+      await expect(
+        rows.and(reopened.locator(`[data-index="${initialIndex + 2}"]`))
+      ).toHaveAttribute('aria-current', 'step');
+      await expect(rows.first()).toHaveAttribute('data-future');
       await reopened.screenshot({
         path: info.outputPath('history-reopened-at-undone-position.png'),
         fullPage: false,

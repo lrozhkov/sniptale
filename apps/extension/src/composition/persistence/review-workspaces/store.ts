@@ -6,7 +6,7 @@ import {
   assertUnusedVideoReviewIdentity,
 } from '../sync-capture/capture';
 import { materializeVideoWorkspaceProject } from './project-metadata';
-import { moveReviewWorkspaceCursor } from './history-cursor';
+import { moveReviewWorkspaceCursor, resolveReviewWorkspaceHistoryCursor } from './history-cursor';
 import type { MediaLibraryEntry } from '../media-library/contracts';
 import {
   buildPhysicalDeleteOperation,
@@ -90,7 +90,7 @@ import { loadQuickEditAdvancedState } from '../../../features/video/review/advan
 import type {
   ReviewDocument,
   ReviewOperation,
-  ReviewHistoryDirection,
+  ReviewHistoryMove,
   ReviewSource,
 } from '../../../features/video/review/types';
 import type {
@@ -920,7 +920,7 @@ export async function moveVideoWorkspaceHistory(args: {
   aggregateId: string;
   expectedRevision: number;
   expectedSourceAssetId: string;
-  direction: ReviewHistoryDirection;
+  direction: ReviewHistoryMove;
 }): Promise<VideoWorkspaceSnapshot> {
   return mutate(args.aggregateId, async (tx, _prepared, physicalDelete, _media, current) => {
     const { snapshot, storage } = await requireSnapshot(
@@ -928,10 +928,7 @@ export async function moveVideoWorkspaceHistory(args: {
       args.expectedRevision,
       args.expectedSourceAssetId
     );
-    const cursor =
-      args.direction === 'start'
-        ? 0
-        : snapshot.workspace.cursor + (args.direction === 'undo' ? -1 : 1);
+    const cursor = resolveReviewWorkspaceHistoryCursor(snapshot.workspace, args.direction);
     if (
       cursor === snapshot.workspace.cursor ||
       cursor < 0 ||

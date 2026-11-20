@@ -42,6 +42,52 @@
   border-color: transparent;
   background: transparent;
 }
+.review-edit-history {
+  padding-inline: 8px;
+}
+.review-edit-history-actions {
+  padding-block-end: 8px;
+  border-block-end: 1px solid var(--sniptale-color-border-soft);
+}
+.review-edit-history > ol {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.review-edit-history-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 8px;
+  border-radius: var(--sniptale-radius-sm);
+  font-size: 13px;
+  text-align: start;
+}
+.review-edit-history li[aria-current='step'] > .review-edit-history-row,
+.review-edit-history-row:enabled:hover {
+  background: var(--sniptale-color-surface-hover);
+}
+.review-edit-history-row:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: -2px;
+}
+.review-edit-history-marker {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: 50%;
+}
+.review-edit-history-status {
+  color: var(--sniptale-color-text-secondary);
+  font-size: 12px;
+}
 .review-inspector-list > li[data-editing='true'] {
   display: block;
   padding: 0;

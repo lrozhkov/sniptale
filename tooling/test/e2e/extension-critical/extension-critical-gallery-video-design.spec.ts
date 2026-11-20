@@ -390,6 +390,12 @@ test('product catalog renders migrated parameter families', async ({ page }, inf
 async function exerciseResetConfirmation(page: Page, label: Label, info: TestInfo) {
   await page.keyboard.press('Escape');
   await page
+    .getByRole('button', { name: label('gallery.videoReview.moreActions'), exact: true })
+    .click();
+  await page
+    .getByRole('menuitem', { name: label('gallery.videoReview.editHistoryTitle'), exact: true })
+    .click();
+  await page
     .getByRole('button', { name: label('gallery.videoReview.historyReset'), exact: true })
     .click();
   const choices = page.locator('[data-ui="gallery.videoReview.historyChoices"]');

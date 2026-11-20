@@ -7,7 +7,6 @@ import { reviewWheelZoom } from './timeline-geometry';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { ReviewPlaybackRange } from './playback-range';
 import { ReviewPlaybackRangeOverlay } from './ruler-range';
-import { ReviewResetControl } from './reset-control';
 import { AutosaveControl } from '@sniptale/ui/autosave-control';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
@@ -439,9 +438,7 @@ export function ReviewHistoryControls(props: {
   busy: boolean;
   cursor: number;
   length: number;
-  onHistory(
-    direction: import('../../features/video/review/types').ReviewHistoryDirection | 'reset'
-  ): void | Promise<unknown>;
+  onHistory(direction: 'undo' | 'redo'): void | Promise<unknown>;
   autosave?: {
     enabled: boolean;
     error: string | null;
@@ -469,13 +466,6 @@ export function ReviewHistoryControls(props: {
           {direction === 'undo' ? <Undo2 size={16} /> : <Redo2 size={16} />}
         </ReviewButton>
       ))}
-      <ReviewResetControl
-        busy={props.busy}
-        cursor={props.cursor}
-        autosaveEnabled={props.autosave?.enabled ?? true}
-        onStart={async () => props.onHistory('start')}
-        onReset={async () => props.onHistory('reset')}
-      />
       {props.autosave && (
         <>
           <ReviewToolbarSeparator />

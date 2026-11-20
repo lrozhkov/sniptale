@@ -1,6 +1,7 @@
 import type { CompositionJoinSettings } from '../project/scene/composition-join';
 /** Commands move the existing history cursor without appending an operation. */
-export type ReviewHistoryDirection = 'undo' | 'redo' | 'start';
+/** An exact selection uses a retained operation identity rather than a mutable array position. */
+export type ReviewHistoryMove = 'undo' | 'redo' | 'start' | { entryId: string };
 
 import type { Paint } from '@sniptale/foundation/paint';
 import type { ReviewSpeedRate } from './speed';

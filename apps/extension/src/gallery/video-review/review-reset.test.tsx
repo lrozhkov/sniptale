@@ -119,6 +119,20 @@ it('resets the mounted editor and preserves its changes on cancellation or faile
     );
     const edits = () => fixture.host.querySelectorAll('[data-ui="gallery.videoReview.editBlock"]');
     expect(edits()).toHaveLength(1);
+    expect(
+      fixture.host.querySelector('[aria-label="gallery.videoReview.historyReset"]')
+    ).toBeNull();
+    await fixture.click('moreActions');
+    const historyItem = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(
+      (item) => item.textContent === 'gallery.videoReview.editHistoryTitle'
+    );
+    await act(async () => historyItem!.click());
+    const history = fixture.host.querySelector('[data-ui="gallery.videoReview.editHistory"]')!;
+    expect(history.querySelectorAll('[data-history-step]')).toHaveLength(2);
+    expect(history.querySelector('li:last-child')?.getAttribute('data-history-step')).toBe('0');
+    expect(history.querySelector('[aria-current="step"]')?.getAttribute('data-history-step')).toBe(
+      '1'
+    );
     if (!fixture.host.querySelector('[role="alertdialog"]')) {
       if (!fixture.host.querySelector('[data-history-original]'))
         await fixture.click('historyReset');
@@ -133,9 +147,11 @@ it('resets the mounted editor and preserves its changes on cancellation or faile
     expect(integration.snapshot).not.toHaveBeenCalled();
     await confirm();
     expect(edits()).toHaveLength(1);
+    expect(history.querySelectorAll('[data-history-step]')).toHaveLength(2);
     expect(fixture.host.textContent).toContain('gallery.videoReview.saveFailed');
     await confirm();
     expect(edits()).toHaveLength(0);
+    expect(history.querySelectorAll('[data-history-step]')).toHaveLength(1);
     expect(fixture.button('undo').disabled).toBe(true);
     expect(fixture.button('redo').disabled).toBe(true);
     expect(fixture.host.querySelector('video')!.currentTime).toBe(0);
@@ -147,3 +163,48 @@ it('resets the mounted editor and preserves its changes on cancellation or faile
 vi.mock('../../workflows/sync-transfer/editing-admission', () => ({
   ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
 }));
+
+it('seeks from the video history rows and keeps the redo entry when the timeline rolls back', async () => {
+  const fixture = createEditorFixture(integration, {
+    history: [
+      {
+        id: 'cut-op',
+        at: 1,
+        target: 'edit',
+        before: null,
+        after: { id: 'cut', kind: 'cut', start: 1, end: 2, requestedStart: 1, requestedEnd: 2 },
+      },
+    ],
+  });
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    act(() => fixture.liveSession.setAutosaveEnabled(false));
+    const cut = fixture.host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.editBlock"] button:not([data-edge])'
+    )!;
+    await act(async () => cut.click());
+    await fixture.click('moreActions');
+    const historyItem = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(
+      (item) => item.textContent === 'gallery.videoReview.editHistoryTitle'
+    );
+    await act(async () => historyItem!.click());
+    const history = fixture.host.querySelector('[data-ui="gallery.videoReview.editHistory"]')!;
+    const edits = () => fixture.host.querySelectorAll('[data-ui="gallery.videoReview.editBlock"]');
+    const seek = async (step: number) =>
+      act(async () =>
+        history.querySelector<HTMLButtonElement>(`[data-history-step="${step}"] button`)!.click()
+      );
+    await seek(0);
+    expect(edits()).toHaveLength(0);
+    expect(history.isConnected).toBe(true);
+    expect(fixture.snapshot.workspace).toMatchObject({ cursor: 0, history: [{ id: 'cut-op' }] });
+    expect(fixture.button('redo').disabled).toBe(false);
+    await seek(1);
+    expect(edits()).toHaveLength(1);
+    expect(fixture.snapshot.workspace.cursor).toBe(1);
+  } finally {
+    await fixture.cleanup();
+  }
+});

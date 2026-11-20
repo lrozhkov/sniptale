@@ -60,6 +60,7 @@ type InspectorSection =
   | 'comments'
   | 'export'
   | 'history'
+  | 'editHistory'
   | 'preview'
   | 'speech'
   | 'text'
@@ -92,6 +93,7 @@ export function ReviewInspector(props: {
   speech?: ReactNode;
   textDocument?: ReactNode;
   actionHistory?: ReactNode;
+  editHistory?: ReactNode;
   selectionLabel?: string | undefined;
   selectionIcon?: LucideIcon | undefined;
   selectionPreferenceScope?: string;
@@ -251,40 +253,44 @@ export function ReviewInspector(props: {
                   : null
               }
             >
-              <ReviewInspectorPresentation
-                value={presentation}
-                section={shown}
-                selectionScope={props.selectionPreferenceScope}
-                onSectionCountChange={shown === 'selected' ? onSectionCountChange : undefined}
-              >
-                {shown === 'preview' ? (
-                  <div
-                    ref={previewHost}
-                    tabIndex={-1}
-                    aria-label={translate('gallery.videoReview.previewSection')}
-                    data-ui="gallery.videoReview.previewInspector"
-                  >
-                    {props.preview}
-                  </div>
-                ) : shown === 'project' ? (
-                  props.project
-                ) : shown === 'history' ? null : shown === 'export' ? (
-                  <section data-ui="gallery.videoReview.exportSection" className="space-y-3">
-                    {props.actions}
-                    <ReviewProjectActions {...props} />
-                  </section>
-                ) : shown === 'text' ? (
-                  props.textDocument
-                ) : shown === 'speech' ? (
-                  props.speech
-                ) : shown === 'scene' ? (
-                  props.scene
-                ) : shown === 'selected' ? (
-                  props.children
-                ) : (
-                  <ReviewNotes {...props} />
-                )}
-              </ReviewInspectorPresentation>
+              {shown === 'editHistory' ? (
+                props.editHistory
+              ) : (
+                <ReviewInspectorPresentation
+                  value={presentation}
+                  section={shown}
+                  selectionScope={props.selectionPreferenceScope}
+                  onSectionCountChange={shown === 'selected' ? onSectionCountChange : undefined}
+                >
+                  {shown === 'preview' ? (
+                    <div
+                      ref={previewHost}
+                      tabIndex={-1}
+                      aria-label={translate('gallery.videoReview.previewSection')}
+                      data-ui="gallery.videoReview.previewInspector"
+                    >
+                      {props.preview}
+                    </div>
+                  ) : shown === 'project' ? (
+                    props.project
+                  ) : shown === 'history' ? null : shown === 'export' ? (
+                    <section data-ui="gallery.videoReview.exportSection" className="space-y-3">
+                      {props.actions}
+                      <ReviewProjectActions {...props} />
+                    </section>
+                  ) : shown === 'text' ? (
+                    props.textDocument
+                  ) : shown === 'speech' ? (
+                    props.speech
+                  ) : shown === 'scene' ? (
+                    props.scene
+                  ) : shown === 'selected' ? (
+                    props.children
+                  ) : (
+                    <ReviewNotes {...props} />
+                  )}
+                </ReviewInspectorPresentation>
+              )}
             </ReviewInspectorActionTrayContext>
           </div>
           {props.recording ? (
@@ -521,6 +527,7 @@ const inspectorSectionLabels = {
   comments: 'gallery.videoReview.comments',
   export: 'gallery.videoReview.exportSection',
   history: 'gallery.videoReview.telemetry',
+  editHistory: 'gallery.videoReview.editHistoryTitle',
   preview: 'gallery.videoReview.previewSection',
   speech: 'gallery.videoReview.audioOriginal',
   text: 'gallery.videoReview.textTrack',
@@ -548,6 +555,7 @@ function ReviewInspectorHeader(
           comments: StickyNote,
           export: FileDown,
           history: History,
+          editHistory: History,
           preview: Eye,
           speech: AudioLines,
           text: Type,

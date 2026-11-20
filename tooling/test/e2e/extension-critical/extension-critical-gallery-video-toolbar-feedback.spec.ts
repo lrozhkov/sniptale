@@ -107,20 +107,18 @@ for (const width of [1280, 1920])
         await expect(page.locator('dialog[open]')).toHaveCount(2);
         await page.keyboard.press('Escape');
         await expect(more).toBeFocused();
-        for (const key of [
-          'gallery.videoReview.undo',
-          'gallery.videoReview.redo',
-          'gallery.videoReview.historyReset',
-        ] as const)
+        for (const key of ['gallery.videoReview.undo', 'gallery.videoReview.redo'] as const)
           await expect.soft(button(key).locator('[data-review-toolbar-label]')).toHaveCount(0);
-        const reset = button('gallery.videoReview.historyReset');
-        await reset.hover();
-        await expect(reset).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-        await expect(reset).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
-        await reset.click();
-        await expect(page.locator('[data-ui="gallery.videoReview.historyChoices"]')).toBeVisible();
-        await page.keyboard.press('Escape');
-        await expect(reset).toBeFocused();
+        await expect(button('gallery.videoReview.editHistoryTitle')).toHaveCount(0);
+        await more.click();
+        await page
+          .getByRole('menuitem', {
+            name: label('gallery.videoReview.editHistoryTitle'),
+            exact: true,
+          })
+          .click();
+        await expect(more).toBeFocused();
+        await expect(button('gallery.videoReview.historyReset')).toBeVisible();
         const cut = button('gallery.videoReview.cutMode');
         await page.mouse.move(0, 0);
         await expect.soft(cut).toHaveCSS('font-weight', '400');

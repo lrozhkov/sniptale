@@ -244,6 +244,7 @@ type ReviewInspectorBindingProps = {
   backLabel?: string | undefined;
   onJoinPreview?: ((slot: 'intro' | 'outro', target?: 'fade' | 'join') => void) | undefined;
   preview?: ReactNode;
+  editHistory?: ReactNode;
   resizeHandle?: ReactNode;
   fullHeight: boolean;
   navigation: ReviewInspectorNavigation;
@@ -282,6 +283,7 @@ export function ReviewInspectorBinding({
   navigation,
   resizeHandle,
   preview,
+  editHistory,
   onJoinPreview,
   recording,
   onProject,
@@ -501,6 +503,7 @@ export function ReviewInspectorBinding({
         textDocument={reviewInspectorTextDocument(state, canvasComments)}
         speech={renderSpeech()}
         preview={preview}
+        editHistory={editHistory}
         beforeAction={state.commands.beforeAction}
         fullHeight={fullHeight}
         resizeHandle={resizeHandle}

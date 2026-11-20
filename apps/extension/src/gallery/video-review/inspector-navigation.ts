@@ -14,6 +14,7 @@ type Section =
   | 'comments'
   | 'export'
   | 'history'
+  | 'editHistory'
   | 'preview'
   | 'speech'
   | 'text';
@@ -79,7 +80,7 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
       previewReturn.current = null;
       if (props.recordingAvailable) showRecording(false);
       explicitSection.current = value === section ? null : value;
-      if (value === 'project' || value === 'track') updateContext(null);
+      if (value === 'project' || value === 'track' || value === 'editHistory') updateContext(null);
       else if (
         value === 'export' ||
         value === 'selected' ||
@@ -104,11 +105,14 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
     if (scroll.current) scroll.current.scrollTop = 0;
   }, [contextKey, section]);
   const previousSettings = useRef(props.settingsAvailable);
+  const previousContextKey = useRef(contextKey);
   const previousExportRequest = useRef(0);
   const exportAvailable = props.exportAvailable;
   useEffect(() => {
     const modeChanged = previousSettings.current !== props.settingsAvailable;
     previousSettings.current = props.settingsAvailable;
+    const sameContext = previousContextKey.current === contextKey;
+    previousContextKey.current = contextKey;
     const exportRequested = previousExportRequest.current !== (props.exportRequest ?? 0);
     previousExportRequest.current = props.exportRequest ?? 0;
     const explicit = explicitSection.current;
@@ -138,6 +142,7 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
             props.contextSelection?.kind === 'none' &&
             !contextKey.startsWith('comments:')) ||
           (preserveExport && current === 'export') ||
+          (current === 'editHistory' && (sameContext || props.contextSelection?.kind === 'none')) ||
           ((current === 'history' ||
             ((current === 'speech' || current === 'text') && !modeChanged)) &&
             props.contextSelection?.kind === 'none') ||

@@ -1,6 +1,8 @@
 import { expect, it, vi } from 'vitest';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
+import { resolveReviewWorkspaceHistoryCursor } from '../../composition/persistence/review-workspaces/history-cursor';
+import type { ReviewHistoryMove } from '../../features/video/review/types';
 import {
   parseVideoWorkspace,
   parseVideoWorkspaceDraft,
@@ -50,11 +52,11 @@ function fixture() {
       };
       return structuredClone(durable);
     }),
-    moveVideoWorkspaceHistory: vi.fn(async (args: { direction: 'undo' | 'redo' | 'start' }) => {
-      durable.workspace.cursor =
-        args.direction === 'start'
-          ? 0
-          : durable.workspace.cursor + (args.direction === 'undo' ? -1 : 1);
+    moveVideoWorkspaceHistory: vi.fn(async (args: { direction: ReviewHistoryMove }) => {
+      durable.workspace.cursor = resolveReviewWorkspaceHistoryCursor(
+        durable.workspace,
+        args.direction
+      );
       durable.workspace.revision++;
       return structuredClone(durable);
     }),
@@ -88,6 +90,53 @@ it('returns directly to the saved baseline, retaining history, Redo and source a
     volume: 1,
   });
   expect(session.getSnapshot().snapshot.workspace.history).toEqual([]);
+});
+
+it('seeks directly by retained entry identity with autosave off and saves that cursor on retry', async () => {
+  const { session, deps } = fixture();
+  try {
+    session.setAutosaveEnabled(false);
+    await session.history({ entryId: 'note-1' });
+    expect(session.getSnapshot().document.annotations.map((note) => note.id)).toEqual(['note-1']);
+    expect(session.getSnapshot().snapshot.workspace.cursor).toBe(1);
+    await session.history({ entryId: 'note-2' });
+    expect(session.getSnapshot().snapshot.workspace.cursor).toBe(2);
+    await session.history({ entryId: 'note-1' });
+    expect(deps.moveVideoWorkspaceHistory).not.toHaveBeenCalled();
+    deps.saveVideoWorkspaceSnapshot.mockRejectedValueOnce(new Error('Quota'));
+    session.setAutosaveEnabled(true);
+    await expect(session.flush()).rejects.toThrow('Quota');
+    expect(session.getSnapshot().snapshot.workspace.cursor).toBe(1);
+    await session.flush();
+    await session.reload();
+    expect(session.getSnapshot().snapshot.workspace.cursor).toBe(1);
+    await session.history('redo');
+    expect(session.getSnapshot().snapshot.workspace.cursor).toBe(2);
+  } finally {
+    await session.dispose();
+  }
+});
+
+it('does not retarget a queued seek after an earlier queued edit replaces its selected entry', async () => {
+  const { session } = fixture();
+  try {
+    session.setAutosaveEnabled(false);
+    await session.history('start');
+    const commit = session.commit({
+      id: 'branch',
+      at: 3,
+      target: 'annotation',
+      before: null,
+      after: { id: 'branch', text: 'Branch', anchor: { kind: 'point', time: 3 } },
+    });
+    const seek = session.history({ entryId: 'note-2' });
+    const [committed, selected] = await Promise.all([commit, seek]);
+    expect(selected).toBe(committed);
+    expect(session.getSnapshot().snapshot.workspace.cursor).toBe(1);
+    expect(session.getSnapshot().document.annotations.map((note) => note.id)).toEqual(['branch']);
+  } finally {
+    await session.dispose();
+  }
 });
 
 it('buffers start with autosave off and persists the retained history when enabled', async () => {

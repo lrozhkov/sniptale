@@ -138,7 +138,8 @@ function isImmutableContentValue(value: object): boolean {
   return true;
 }
 
-function equalAdvancedContentValue(left: unknown, right: unknown): boolean {
+/** Compares validated advanced history values, including properties absent in older entries. */
+export function equalAdvancedContentValue(left: unknown, right: unknown): boolean {
   if (left === right) return true;
   if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object')
     return sameAdvancedContentValue(left, right);

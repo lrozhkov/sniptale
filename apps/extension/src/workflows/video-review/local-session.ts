@@ -1,5 +1,8 @@
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
-import { moveReviewWorkspaceCursor } from '../../composition/persistence/review-workspaces/history-cursor';
+import {
+  moveReviewWorkspaceCursor,
+  resolveReviewWorkspaceHistoryCursor,
+} from '../../composition/persistence/review-workspaces/history-cursor';
 import type { ReviewSpeechTarget } from '../../contracts/ai/audio';
 import { parseReviewOriginalSpeechTranscript } from '../../features/video/review/original-speech';
 import { parseReviewSpeechTranscript } from '../../features/video/review/speech-validation';
@@ -21,7 +24,7 @@ import {
 } from '../../composition/persistence/review-workspaces/parser';
 import type {
   ReviewAnnotation,
-  ReviewHistoryDirection,
+  ReviewHistoryMove,
   ReviewOperation,
 } from '../../features/video/review/types';
 
@@ -37,7 +40,7 @@ export type LocalReviewChange =
       consumeDraft: boolean;
       effectSnapshots?: readonly ReviewAnnotationEffectSnapshot[];
     }
-  | { kind: 'history'; direction: ReviewHistoryDirection };
+  | { kind: 'history'; direction: ReviewHistoryMove };
 
 /** Prepares only the content change; the session retains queue, identity and commit ownership. */
 export function prepareReviewSpeechTranscriptChange(
@@ -129,10 +132,9 @@ export function applyLocalReviewChange(
           );
     if (change.annotation !== null && !draft) throw new Error('Invalid review draft');
   } else if (change.kind === 'history') {
-    workspace = moveReviewWorkspaceCursor(
-      workspace,
-      change.direction === 'start' ? 0 : workspace.cursor + (change.direction === 'undo' ? -1 : 1)
-    );
+    const cursor = resolveReviewWorkspaceHistoryCursor(workspace, change.direction);
+    if (typeof change.direction === 'object' && cursor === workspace.cursor) return snapshot;
+    workspace = moveReviewWorkspaceCursor(workspace, cursor);
   } else {
     const merged = change.effectSnapshots
       ? mergeReviewAnnotationEffectSnapshots(

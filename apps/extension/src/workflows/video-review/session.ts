@@ -68,7 +68,7 @@ import type {
 } from '../../composition/persistence/review-workspaces/contracts';
 import type {
   ReviewAnnotation,
-  ReviewHistoryDirection,
+  ReviewHistoryMove,
   ReviewOperation,
 } from '../../features/video/review/types';
 import {
@@ -599,9 +599,9 @@ class VideoReviewSession {
         await this.reconcileTentativeBuffer();
         if (this.state.error && this.state.error !== 'storage')
           throw new VideoWorkspaceError(this.state.error);
-        const snapshot = this.acceptLocalSnapshot(
-          applyLocalReviewChange(this.state.snapshot, local)
-        );
+        const next = applyLocalReviewChange(this.state.snapshot, local);
+        if (next === this.state.snapshot) return next;
+        const snapshot = this.acceptLocalSnapshot(next);
         await this.annotationResources.reconcile(this.retainedBufferReferences(), false);
         return snapshot;
       }
@@ -1194,7 +1194,7 @@ class VideoReviewSession {
     });
   }
 
-  private history(direction: ReviewHistoryDirection) {
+  private history(direction: ReviewHistoryMove) {
     return this.enqueue(
       () =>
         this.deps.moveVideoWorkspaceHistory({

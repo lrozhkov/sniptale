@@ -441,6 +441,7 @@ it('routes rare commands into one More menu in Basic and Advanced without perman
     expect([...menu.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent)).toEqual(
       [
         translate('videoEditor.app.newProjectAction'),
+        translate('gallery.videoReview.editHistoryTitle'),
         translate('gallery.keyboard.title'),
         translate('gallery.app.selectionBackup'),
         ...(mode === 'advanced'

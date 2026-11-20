@@ -19,6 +19,13 @@ type RecordedFocusFacts = Omit<RecordedCursorFacts, 'actionEvents'> & {
   >[];
 };
 
+/** Visible path settings before the editor writes a path override. */
+export const DEFAULT_RECORDED_CURSOR_FOCUS_SETTINGS = {
+  smoothing: 0.5,
+  sensitivity: 0.5,
+  mode: 'fixed',
+} as const;
+
 /** Source-time authoring adapter. Coverage markers cut the path; exact click/dwell anchors survive. */
 export function deriveRecordedCursorFocusPath(
   facts: RecordedFocusFacts | null,
@@ -31,9 +38,7 @@ export function deriveRecordedCursorFocusPath(
   appendFocusAnchors(segments, anchors, facts, observed);
   const path: CursorFocusPath = {
     version: 1,
-    smoothing: 0.5,
-    sensitivity: 0.5,
-    mode: 'fixed',
+    ...DEFAULT_RECORDED_CURSOR_FOCUS_SETTINGS,
     gapPolicy: 'hold',
     segments,
   };

@@ -50,6 +50,7 @@ import { planReviewPresentationSequence } from '../../features/video/review/pres
 import { ReviewLoadStatus, reviewErrorMessage } from './feedback';
 import { ReviewDialog } from './review-dialog';
 import { ReviewHistoryControls } from './timeline-chrome';
+import { ReviewEditHistory } from './edit-history';
 import { reviewSelectionLabel, createReviewInspectorEditCommands } from './selected-properties';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { translate, useAppLocale, usePageLocaleMetadata } from '../../platform/i18n';
@@ -431,6 +432,19 @@ function ReviewEditor({
               }
               onJoinPreview={onJoinPreview ?? joinPreview.open}
               preview={previewSettings.inspector}
+              editHistory={
+                navigation.shown === 'editHistory' ? (
+                  <ReviewEditHistory
+                    operations={snapshot.snapshot.workspace.history}
+                    cursor={snapshot.snapshot.workspace.cursor}
+                    busy={busy || !!state.composer.before || editing.exporter.phase !== 'idle'}
+                    autosaveEnabled={snapshot.autosaveEnabled}
+                    onSeek={state.moveHistory}
+                    onStart={() => state.moveHistory('start')}
+                    onReset={() => state.moveHistory('reset')}
+                  />
+                ) : null
+              }
               navigation={navigation}
               resizeHandle={
                 panelsEnabled ? <ReviewPanelResizeHandle resize={panels.inspector} /> : null
@@ -655,6 +669,7 @@ function ReviewEditor({
                 }
                 utilityControls={
                   <ReviewKeyboardHelp
+                    onOpenEditHistory={() => navigation.setSection('editHistory')}
                     onBasicMode={
                       features.mode === 'advanced' ? () => state.setMode('basic') : undefined
                     }

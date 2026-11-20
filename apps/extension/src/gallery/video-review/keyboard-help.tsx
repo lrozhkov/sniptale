@@ -8,7 +8,15 @@ import {
   useResolvedPortalTheme,
 } from '@sniptale/ui/theme/safe-portal';
 import { isComposedEventWithinElement } from '@sniptale/ui/dom-events';
-import { Archive, FilePlus2, Keyboard, MoreHorizontal, PanelsTopLeft, X } from 'lucide-react';
+import {
+  Archive,
+  FilePlus2,
+  History,
+  Keyboard,
+  MoreHorizontal,
+  PanelsTopLeft,
+  X,
+} from 'lucide-react';
 import { ProductModalBody, ProductModalHeader } from '@sniptale/ui/product-modal';
 import { translate } from '../../platform/i18n';
 import { formatHotkey } from '../../features/keyboard-shortcuts/hotkey-format';
@@ -98,6 +106,7 @@ function KeyboardHelpDialog({ anchor, onClose }: { anchor: HTMLButtonElement; on
 export function ReviewKeyboardHelp(props: {
   busy?: boolean | undefined;
   onNewProject?: (() => void) | undefined;
+  onOpenEditHistory?: (() => void) | undefined;
   onBackup?: (() => void) | undefined;
   onBasicMode?: (() => void) | undefined;
   onClose?: (() => void) | undefined;
@@ -213,6 +222,19 @@ export function ReviewKeyboardHelp(props: {
                     <span data-ui="gallery.videoReview.newProject">
                       {translate('videoEditor.app.newProjectAction')}
                     </span>
+                  </ProductDropdownItem>
+                ) : null}
+                {props.onOpenEditHistory ? (
+                  <ProductDropdownItem
+                    role="menuitem"
+                    disabled={Boolean(props.busy)}
+                    onClick={() => {
+                      close();
+                      props.onOpenEditHistory?.();
+                    }}
+                  >
+                    <History size={16} aria-hidden="true" />
+                    {translate('gallery.videoReview.editHistoryTitle')}
                   </ProductDropdownItem>
                 ) : null}
                 <ProductDropdownItem

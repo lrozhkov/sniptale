@@ -93,15 +93,19 @@ export function EditorInspectorHistory({
         aria-busy={busy}
         onScroll={(event) => onScrollOffsetChange?.(event.currentTarget.scrollTop)}
       >
-        <ol className="editor-history-groups" aria-label={translate('editor.history.title')}>
-          {groups.map((group) => (
+        <ol
+          reversed
+          className="editor-history-groups"
+          aria-label={translate('editor.history.title')}
+        >
+          {groups.toReversed().map((group) => (
             <li
               key={group[0]!.index}
               className="editor-history-group"
               data-grouped={group.length > 1 || undefined}
             >
-              <ol className="editor-history-rows">
-                {group.map((entry) => {
+              <ol reversed className="editor-history-rows">
+                {group.toReversed().map((entry) => {
                   const current = entry.index === history.index;
                   const future = entry.index > history.index;
                   const action = entry.action;

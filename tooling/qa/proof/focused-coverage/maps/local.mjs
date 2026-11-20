@@ -1311,12 +1311,33 @@ unchanged project admission.',
     ],
   },
   {
+    owner: 'review-edit-history-inspector',
+    productionFile: 'apps/extension/src/gallery/video-review/edit-history.tsx',
+    reason:
+      'Mounted Gallery tests cover menu entry, cursor selection, reset, and failed save retry.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/index.test.tsx',
+      'apps/extension/src/gallery/video-review/review-reset.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-workspace-history-cursor',
+    productionFile:
+      'apps/extension/src/composition/persistence/review-workspaces/history-cursor.ts',
+    reason: 'Session and store tests prove retained step identity, cursor ordering, and rollback.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/session.history-start.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store.history-start.test.ts',
+    ],
+  },
+  {
     owner: 'review-workspace-concurrency',
     productionFile: 'apps/extension/src/composition/persistence/review-workspaces/store.ts',
     reason: 'Real writer tests prevent deleted content from returning after purge and recreation.',
     testFiles: [
       'apps/extension/src/composition/persistence/review-workspaces/sync-capture.test.ts',
       'apps/extension/src/composition/persistence/review-workspaces/store-history-retention.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store.history-start.test.ts',
       'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
       'apps/extension/src/gallery/video-review/use-session.purge.test.tsx',
     ],

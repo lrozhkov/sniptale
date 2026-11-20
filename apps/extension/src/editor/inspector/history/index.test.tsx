@@ -66,18 +66,18 @@ it('selects only the current leaf and keeps visual groups passive and future sta
   const rows = host.querySelectorAll<HTMLButtonElement>(
     '[data-ui="editor.inspector.history.entry"]'
   );
-  expect(rows).toHaveLength(4);
+  expect([...rows].map((row) => row.dataset['index'])).toEqual(['3', '2', '1', '0']);
   expect(host.querySelectorAll('[aria-current]')).toHaveLength(1);
-  expect(rows[1]?.getAttribute('aria-current')).toBe('step');
-  expect(rows[2]?.hasAttribute('data-future')).toBe(true);
+  expect(rows[2]?.getAttribute('aria-current')).toBe('step');
+  expect(rows[1]?.hasAttribute('data-future')).toBe(true);
   const group = host.querySelector('[data-grouped]');
   expect(group?.getAttribute('tabindex')).toBeNull();
   expect(group?.getAttribute('aria-current')).toBeNull();
   expect(group?.querySelectorAll('button')).toHaveLength(2);
   expect(host.textContent).not.toMatch(/Шаг \d|Step \d|2 действия|X:|синюю/);
-  expect(rows[3]?.textContent).toContain(translate('editor.history.operations.fill'));
-  expect(rows[3]?.querySelector('[aria-label="#c759ed"]')).not.toBeNull();
-  await act(async () => rows[2]?.click());
+  expect(rows[0]?.textContent).toContain(translate('editor.history.operations.fill'));
+  expect(rows[0]?.querySelector('[aria-label="#c759ed"]')).not.toBeNull();
+  await act(async () => rows[1]?.click());
   expect(mocks.seek).toHaveBeenCalledWith(2);
 });
 

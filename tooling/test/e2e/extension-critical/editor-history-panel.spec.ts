@@ -98,6 +98,9 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         await expect(ui('editor.inspector.history')).toBeVisible();
         const rows = ui('editor.inspector.history.entry');
         await expect(rows).toHaveCount(4);
+        expect(
+          await rows.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-index')))
+        ).toEqual(['3', '2', '1', '0']);
         await expect(
           page.locator('[data-ui="editor.inspector.history.entry"][aria-current]')
         ).toHaveCount(1);
@@ -109,25 +112,26 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         );
         await expect(group).not.toHaveAttribute('tabindex');
         await expect(group).not.toHaveAttribute('aria-current');
-        await rows.nth(1).click();
+        const creation = rows.and(page.locator('[data-index="1"]'));
+        await creation.click();
         await expect.poll(historyIndex).toBe(1);
         // History projection has the existing 0.5 CSS px coordinate tolerance.
         await expect.poll(pencilLeft).toBeCloseTo(initialLeft, 0);
-        await expect(rows.nth(1)).toHaveAttribute('aria-current', 'step');
+        await expect(creation).toHaveAttribute('aria-current', 'step');
         await expect(
           page.locator('[data-ui="editor.inspector.history.entry"][data-future]')
         ).toHaveCount(2);
-        const future = rows.nth(2);
+        const future = rows.and(page.locator('[data-index="2"]'));
         await expect(future).toHaveCSS('font-style', 'italic');
         expect(await future.evaluate((node) => getComputedStyle(node).backgroundColor)).not.toBe(
-          await rows.nth(1).evaluate((node) => getComputedStyle(node).backgroundColor)
+          await creation.evaluate((node) => getComputedStyle(node).backgroundColor)
         );
         await page.evaluate(() => document.fonts.ready);
         await page.screenshot({
           path: info.outputPath('history-current-and-undone.png'),
           fullPage: false,
         });
-        await rows.nth(3).focus();
+        await rows.first().focus();
         await page.keyboard.press('Enter');
         await expect.poll(historyIndex).toBe(3);
         await expect.poll(pencilLeft).toBeCloseTo(initialLeft + 2, 0);
@@ -142,7 +146,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
           .click();
         await expect(confirmation).toHaveCount(0);
         await expect(rows).toHaveCount(4);
-        await rows.nth(0).click();
+        await rows.last().click();
         await expect.poll(historyIndex).toBe(0);
         await expect
           .poll(() =>

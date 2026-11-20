@@ -91,14 +91,25 @@ it('returns to cursor zero in one revision, preserves baseline and draft, and re
   expect(saved).toEqual(atStart);
   saved = await moveVideoWorkspaceHistory({ ...identity(), direction: 'redo' });
   expect(saved.workspace.cursor).toBe(1);
+  const selected = { entryId: 'op2' };
+  await expect(
+    moveVideoWorkspaceHistory({ ...identity(), direction: { entryId: 'gone' } })
+  ).resolves.toMatchObject({ workspace: saved.workspace });
   harness.failure = true;
-  await expect(moveVideoWorkspaceHistory({ ...identity(), direction: 'start' })).rejects.toThrow();
+  await expect(moveVideoWorkspaceHistory({ ...identity(), direction: selected })).rejects.toThrow();
   harness.failure = false;
   expect(await readVideoWorkspace(id)).toEqual(saved);
+  const priorRevision = saved.workspace.revision;
+  saved = await moveVideoWorkspaceHistory({ ...identity(), direction: selected });
+  expect(saved.workspace).toMatchObject({ cursor: 2, revision: priorRevision + 1 });
   await expect(
-    moveVideoWorkspaceHistory({ ...identity(), expectedRevision: 1, direction: 'start' })
+    moveVideoWorkspaceHistory({ ...identity(), expectedRevision: 1, direction: selected })
   ).rejects.toMatchObject({ code: 'conflict' });
   await expect(
-    moveVideoWorkspaceHistory({ ...identity(), expectedSourceAssetId: 'other', direction: 'start' })
+    moveVideoWorkspaceHistory({
+      ...identity(),
+      expectedSourceAssetId: 'other',
+      direction: selected,
+    })
   ).rejects.toMatchObject({ code: 'conflict' });
 });
