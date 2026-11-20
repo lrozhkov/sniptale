@@ -291,10 +291,16 @@ it('edits source filters from the Effects library through the actual project com
   const fixture = await mountNativeLibrary('targetEffect');
   try {
     const add = [...fixture.host.querySelectorAll('button')].find(
-      (button) => button.textContent === translate('videoEditor.sidebar.sourceFiltersAddBlur')
+      (button) =>
+        button.getAttribute('aria-label') === translate('videoEditor.sidebar.sourceFiltersAdd')
     );
     expect(add).toBeDefined();
     await act(async () => add!.click());
+    const blur = [...document.querySelectorAll<HTMLButtonElement>('button[role="option"]')].find(
+      (button) => button.textContent === translate('videoEditor.sidebar.sourceFiltersAddBlur')
+    );
+    if (!blur) throw new Error('Missing Blur option');
+    await act(async () => blur.click());
     const changed = useVideoEditorStore
       .getState()
       .project!.clips.find((clip) => clip.id === fixture.first.id)!;
@@ -360,7 +366,8 @@ it.each(['targetEffect', 'transition'] as const)(
       const action = [...fixture.host.querySelectorAll<HTMLButtonElement>('button')].find(
         (button) =>
           kind === 'targetEffect'
-            ? button.textContent === translate('videoEditor.sidebar.sourceFiltersAddBlur')
+            ? button.getAttribute('aria-label') ===
+              translate('videoEditor.sidebar.sourceFiltersAdd')
             : button.getAttribute('aria-haspopup') === 'listbox' &&
               button.textContent?.includes('Fade')
       );

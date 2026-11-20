@@ -111,7 +111,7 @@ function Bookend(props: ReviewPresentationInspectorProps & { slot: SlotName }) {
         )}
         {control.mode === 'media' && (
           <>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 px-2">
               <button
                 type="button"
                 className={backgroundActionClassName}

@@ -183,10 +183,15 @@ export async function applyBuiltinSourceFilter(page: Page, locale: 'en' | 'ru' =
   await expect(fields).toBeVisible();
   await fields
     .getByRole('button', {
+      name: translate('videoEditor.sidebar.sourceFiltersAdd', locale),
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole('option', {
       name: translate('videoEditor.sidebar.sourceFiltersAddBlur', locale),
       exact: true,
     })
-    .first()
     .click();
   await page.locator('[data-ui="video-editor.materials.close"]').click();
 }

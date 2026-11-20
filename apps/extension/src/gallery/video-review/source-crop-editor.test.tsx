@@ -120,11 +120,14 @@ it('commits one bounded crop after pointer and keyboard editing and discards can
       width: expect.closeTo(0.75, 10),
       height: expect.closeTo(0.75, 10),
     });
-    const input = ui.host.querySelector('input')!;
+    const label = translate('gallery.videoReview.sourceCropSize');
+    const pencil = ui.host.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!;
+    act(() => pencil.click());
+    const input = ui.host.querySelector('input[role="spinbutton"]')!;
     act(() => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '50');
       input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     });
     ui.button('gallery.videoReview.sourceCropApply');
     expect(ui.apply.mock.lastCall?.[0]).toEqual({
@@ -156,6 +159,38 @@ it('offers frame retry without committing or losing the existing crop', () => {
     expect(ui.apply).not.toHaveBeenCalled();
     ui.button('gallery.videoReview.sourceCropApply');
     expect(ui.apply).toHaveBeenCalledWith({ x: 0.25, y: 0.25, width: 0.5, height: 0.5 });
+  } finally {
+    ui.dispose();
+  }
+});
+
+it('previews the size without changing the accepted crop on Escape', () => {
+  const ui = mount();
+  try {
+    const slider = ui.host.querySelector<HTMLInputElement>('input[type="range"]')!;
+    const context = ui.canvas.getContext('2d')!;
+    const press = (element: HTMLElement, key: string) =>
+      act(() =>
+        element.dispatchEvent(
+          new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+        )
+      );
+    const originalWidth = vi.mocked(context.strokeRect).mock.lastCall![2];
+    press(slider, 'ArrowRight');
+    expect(vi.mocked(context.strokeRect).mock.lastCall?.[2]).toBeGreaterThan(originalWidth);
+    press(slider, 'Escape');
+    expect(ui.cancel).not.toHaveBeenCalled();
+    expect(vi.mocked(context.strokeRect).mock.lastCall?.[2]).toBe(originalWidth);
+    const pencil = ui.host.querySelector<HTMLButtonElement>(
+      `button[aria-label="${translate('gallery.videoReview.sourceCropSize')}"]`
+    )!;
+    act(() => pencil.click());
+    const number = ui.host.querySelector<HTMLInputElement>('input[role="spinbutton"]')!;
+    press(number, 'Escape');
+    expect(ui.cancel).not.toHaveBeenCalled();
+    expect(ui.host.querySelector('input[type="range"]')).not.toBeNull();
+    press(ui.canvas, 'Escape');
+    expect(ui.cancel).toHaveBeenCalledOnce();
   } finally {
     ui.dispose();
   }

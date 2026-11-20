@@ -1,5 +1,8 @@
 import type { ComponentType } from 'react';
-import type { InspectorDisclosureProps } from '../compact-inspector-controls/shared';
+import type {
+  CompactInspectorUnit,
+  InspectorDisclosureProps,
+} from '../compact-inspector-controls/shared';
 import { AlignLeft, AlignCenter, AlignRight, Bold, Italic, Strikethrough } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -233,6 +236,7 @@ export function WatermarkTextFields(
         <WatermarkNumber
           {...props}
           label={translate('gallery.videoReview.watermarkWrap')}
+          rangePresentation="field"
           unit="%"
           value={text.wrapWidth * 100}
           min={5}
@@ -254,7 +258,7 @@ export function WatermarkTextFields(
 export function WatermarkNumber(
   props: Binding & {
     label: string;
-    unit?: '%' | 'px';
+    unit?: CompactInspectorUnit;
     value: number;
     min: number;
     max: number;

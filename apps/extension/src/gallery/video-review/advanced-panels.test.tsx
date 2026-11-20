@@ -606,7 +606,7 @@ it('keeps computer admission cancellation reachable while Scene controls are dis
   expect(cancel).toHaveBeenCalledOnce();
 });
 
-it('dispatches shared source filter controls through the Gallery content adapter', () => {
+it('dispatches shared source filter controls through the Gallery content adapter', async () => {
   const advanced = createQuickEditAdvancedState(),
     onSourceFilters = vi.fn();
   act(() =>
@@ -635,10 +635,17 @@ it('dispatches shared source filter controls through the Gallery content adapter
     host.querySelector<HTMLButtonElement>('[role="tab"][aria-controls$="-source-filters"]')!.click()
   );
   const add = [...host.querySelectorAll('button')].find(
-    (item) => item.textContent === translate('videoEditor.sidebar.sourceFiltersAddBloom')
+    (item) => item.getAttribute('aria-label') === translate('videoEditor.sidebar.sourceFiltersAdd')
   );
   if (!add) throw new Error('Missing shared source filter controls');
   act(() => add.click());
+  const bloom = [...document.querySelectorAll<HTMLButtonElement>('button[role="option"]')].find(
+    (item) => item.textContent === translate('videoEditor.sidebar.sourceFiltersAddBloom')
+  );
+  if (!bloom) throw new Error('Missing Bloom option');
+  await act(async () => {
+    bloom.click();
+  });
   expect(onSourceFilters).toHaveBeenCalledWith({
     version: 1,
     filters: [expect.objectContaining({ kind: 'bloom', enabled: true, intensity: 1 })],

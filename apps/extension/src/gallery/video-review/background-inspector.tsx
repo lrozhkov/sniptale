@@ -128,7 +128,7 @@ function ReviewBackgroundMotionControls(props: {
   if (!props.background.enabled) return null;
   if (props.background.type === 'solid')
     return (
-      <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+      <p className="px-2 text-xs text-[var(--sniptale-color-text-muted)]">
         {translate('editor.scene.backgroundMotionSolidHint')}
       </p>
     );

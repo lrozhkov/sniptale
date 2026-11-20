@@ -299,6 +299,24 @@
   margin-inline: -12px;
   padding-inline: 12px;
 }
+.review-source-crop-preview,
+.review-source-crop-actions {
+  margin-inline: 8px;
+}
+
+.review-source-crop-preview {
+  margin-block: 4px;
+  padding-block-end: 8px;
+  border-block-end: 1px solid var(--sniptale-color-field-border);
+}
+
+.review-source-crop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px;
+}
+
 .review-inspector-scroll {
   overflow-x: hidden;
 }

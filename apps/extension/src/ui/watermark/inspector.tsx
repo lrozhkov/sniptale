@@ -152,11 +152,13 @@ function WatermarkImageFields(props: WatermarkInspectorProps & Binding) {
   return (
     <>
       {props.imagePreviewUrl && (
-        <img
-          src={props.imagePreviewUrl}
-          alt={translate('gallery.videoReview.watermarkImage')}
-          className="h-20 w-full rounded-md border border-[var(--sniptale-color-border-subtle)] object-contain"
-        />
+        <div className="px-2">
+          <img
+            src={props.imagePreviewUrl}
+            alt={translate('gallery.videoReview.watermarkImage')}
+            className="h-20 w-full rounded-md border border-[var(--sniptale-color-border-subtle)] object-contain"
+          />
+        </div>
       )}
       <BackgroundImagePicker
         showPresets={false}
@@ -173,6 +175,7 @@ function WatermarkImageFields(props: WatermarkInspectorProps & Binding) {
           <WatermarkNumber
             {...props}
             label={translate('gallery.videoReview.watermarkSize')}
+            rangePresentation="field"
             unit="%"
             value={image.size * 100}
             min={1}
@@ -215,6 +218,7 @@ function WatermarkPlacementFields(props: Binding) {
       <SegmentedRow
         columns={2}
         ariaLabel={translate('gallery.videoReview.watermarkLayout')}
+        label={translate('gallery.videoReview.watermarkLayout')}
         value={settings.layout}
         options={[
           { value: 'single', label: translate('gallery.videoReview.watermarkSingle') },
@@ -229,6 +233,7 @@ function WatermarkPlacementFields(props: Binding) {
           <WatermarkNumber
             {...props}
             label={translate('gallery.videoReview.watermarkSpacing')}
+            rangePresentation="field"
             unit="%"
             value={settings.tile.spacing * 100}
             min={0}
@@ -239,6 +244,8 @@ function WatermarkPlacementFields(props: Binding) {
           <WatermarkNumber
             {...props}
             label={translate('gallery.videoReview.watermarkRotation')}
+            rangePresentation="field"
+            unit="deg"
             value={settings.tile.rotation}
             min={-180}
             max={180}

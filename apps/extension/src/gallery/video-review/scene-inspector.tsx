@@ -74,7 +74,7 @@ export function ReviewCanvasSettings(props: {
   return (
     <section
       ref={section}
-      className="review-inspector-columns"
+      className="sniptale-parameter-stack"
       data-ui="gallery.videoReview.canvasSettings"
     >
       <SelectField
@@ -220,7 +220,7 @@ export function ReviewWindowHeaderSettings(props: {
   onChange?: ((header: QuickEditWindowHeader | undefined) => void) | undefined;
 }) {
   return (
-    <section data-ui="gallery.videoReview.windowHeader">
+    <section className="sniptale-parameter-stack" data-ui="gallery.videoReview.windowHeader">
       <WindowHeaderSettings
         key={props.identity}
         header={props.header}

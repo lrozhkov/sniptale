@@ -10676,7 +10676,7 @@
       "sourceFiltersAddBlur": "Размытие",
       "sourceFiltersAddBloom": "Свечение",
       "sourceFiltersEmpty": "Добавьте фильтр для настройки исходного видео.",
-      "sourceFiltersEnabled": "Включён",
+      "sourceFiltersEnabled": "Фильтр",
       "sourceFiltersIntensity": "Интенсивность",
       "sourceFiltersUp": "Переместить фильтр выше",
       "sourceFiltersDown": "Переместить фильтр ниже",

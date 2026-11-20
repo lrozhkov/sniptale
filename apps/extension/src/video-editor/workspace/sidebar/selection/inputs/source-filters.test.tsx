@@ -17,7 +17,7 @@ afterEach(() => {
   host.remove();
   vi.unstubAllGlobals();
 });
-it('dispatches source filter insertion through the selected video edit callback and omits image clips', () => {
+it('dispatches source filter insertion through the selected video edit callback and omits image clips', async () => {
   const project = createProjectWithMediaTrack(),
     clip = project.clips.find((item) => item.id === 'clip-video')!,
     onEditMediaClip = vi.fn();
@@ -34,7 +34,7 @@ it('dispatches source filter insertion through the selected video edit callback 
   };
   act(() => root.render(<MediaFrameControls {...props} />));
   const add = [...host.querySelectorAll('button')].find(
-    (item) => item.textContent === translate('videoEditor.sidebar.sourceFiltersAddBlur')
+    (item) => item.getAttribute('aria-label') === translate('videoEditor.sidebar.sourceFiltersAdd')
   );
   if (!add) throw new Error('Missing shared source filter action');
   const disclosure = add.closest('details');
@@ -43,7 +43,12 @@ it('dispatches source filter insertion through the selected video edit callback 
       disclosure.open = true;
       disclosure.dispatchEvent(new Event('toggle'));
     });
-  act(() => add.click());
+  await act(async () => add.click());
+  const blur = [...document.querySelectorAll<HTMLButtonElement>('button[role="option"]')].find(
+    (item) => item.textContent === translate('videoEditor.sidebar.sourceFiltersAddBlur')
+  );
+  if (!blur) throw new Error('Missing Blur option');
+  await act(async () => blur.click());
   expect(onEditMediaClip).toHaveBeenCalledWith(clip.id, {
     kind: 'source-filters',
     stack: {
@@ -61,7 +66,10 @@ it('dispatches source filter insertion through the selected video edit callback 
   act(() => root.render(<MediaFrameControls {...props} locked />));
   expect(
     [...host.querySelectorAll('button')]
-      .find((item) => item.textContent === translate('videoEditor.sidebar.sourceFiltersAddBlur'))
+      .find(
+        (item) =>
+          item.getAttribute('aria-label') === translate('videoEditor.sidebar.sourceFiltersAdd')
+      )
       ?.matches(':disabled')
   ).toBe(true);
   const image = project.clips.find((item) => item.id === 'clip-image')!;

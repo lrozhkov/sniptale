@@ -10676,7 +10676,7 @@
       "sourceFiltersAddBlur": "Blur",
       "sourceFiltersAddBloom": "Bloom",
       "sourceFiltersEmpty": "Add a filter to adjust the source video.",
-      "sourceFiltersEnabled": "Enabled",
+      "sourceFiltersEnabled": "Filter",
       "sourceFiltersIntensity": "Intensity",
       "sourceFiltersUp": "Move filter up",
       "sourceFiltersDown": "Move filter down",
