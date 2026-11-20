@@ -86,26 +86,24 @@ export function ReviewComposer(props: {
             />
           }
         />
-        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 px-2">
-          <div className="ml-auto flex items-center gap-1">
-            <ReviewButton
-              label={translate('gallery.videoReview.discard')}
-              disabled={props.busy}
-              onClick={() => {
-                voice.cancel();
-                props.onDiscard();
-              }}
-            />
-            <ReviewButton
-              label={translate('gallery.videoReview.save')}
-              primary
-              disabled={props.busy || !props.annotation.text.trim()}
-              onClick={() => {
-                voice.cancel();
-                props.onSave();
-              }}
-            />
-          </div>
+        <div className="review-composer-actions flex min-w-0 flex-wrap items-center justify-end gap-1">
+          <ReviewButton
+            label={translate('gallery.videoReview.discard')}
+            disabled={props.busy}
+            onClick={() => {
+              voice.cancel();
+              props.onDiscard();
+            }}
+          />
+          <ReviewButton
+            label={translate('gallery.videoReview.save')}
+            primary
+            disabled={props.busy || !props.annotation.text.trim()}
+            onClick={() => {
+              voice.cancel();
+              props.onSave();
+            }}
+          />
         </div>
       </div>
       {props.annotation.region ? (

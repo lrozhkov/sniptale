@@ -192,6 +192,7 @@ function WatermarkImageFields(props: WatermarkInspectorProps & Binding) {
             min={0}
             max={100}
             step={1}
+            precision={2}
             change={(value) => ({ ...settings, image: { ...image, opacity: value / 100 } })}
           />
         </>

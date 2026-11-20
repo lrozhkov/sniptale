@@ -9,6 +9,10 @@
   --sniptale-parameter-value-width: var(--review-field-column-max);
 }
 
+.review-composer-actions {
+  padding-inline: 8px;
+}
+
 @layer utilities {
   .sniptale-compact-workspace
     [data-ui='gallery.videoReview.inspector']
@@ -24,7 +28,10 @@
     ),
   .sniptale-compact-workspace
     [data-ui='gallery.videoReview.inspector']
-    [data-ui='shared.ui.compact-inspector.numeric-row'][data-appearance='plain'].sniptale-parameter-row {
+    [data-ui='shared.ui.compact-inspector.numeric-row'][data-appearance='plain'].sniptale-parameter-row,
+  .sniptale-compact-workspace
+    [data-ui='gallery.videoReview.inspector']
+    .sniptale-parameter-row.sniptale-status-parameter {
     --sniptale-parameter-context-space: 0px;
     min-height: var(--review-field-control-height) !important;
     padding-block: 0;

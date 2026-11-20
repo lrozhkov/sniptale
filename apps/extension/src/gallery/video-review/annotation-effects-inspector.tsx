@@ -60,6 +60,15 @@ import { reviewAnnotationPresetId } from './annotation-effects-presets';
 
 type Editor = ReturnType<typeof useReviewAnnotationEffects>;
 type Patch = Partial<Omit<ReviewAnnotationEffect, 'id' | 'snapshotId' | 'order'>>;
+
+// These shipped templates declare sliders for dimensions that need exact pixel steps.
+const outlineDimensions = new Map<string, readonly string[]>([
+  ['sniptale-frame', ['stroke', 'radius']],
+  ['sniptale-corners', ['stroke']],
+  ['sniptale-arrow', ['stroke']],
+  ['sniptale-leader-labels', ['lineWidth']],
+]);
+
 type Props = {
   editor: Editor;
   id: string;
@@ -231,6 +240,7 @@ function AnnotationParameters(
   }
   const enabled = (
     <ToggleField
+      showStatus
       value={instance.enabled}
       disabled={disabled}
       label={translate('gallery.videoReview.annotationEnabled')}
@@ -571,15 +581,13 @@ function AnnotationControl(props: AnnotationControlProps) {
     );
   if (control.kind === 'number') {
     const value = typeof props.value === 'number' ? props.value : control.defaultValue;
-    // Stored Frame templates use exact pixel steps for their border dimensions.
-    const frameDimension =
-      props.document.id === 'sniptale-frame' &&
-      (control.id === 'radius' || control.id === 'stroke') &&
+    const outlineDimension =
+      outlineDimensions.get(props.document.id)?.includes(control.id) &&
       control.unit === 'px' &&
       control.min !== undefined &&
       control.max !== undefined &&
       !bound;
-    const authoredSlider = control.presentation === 'slider' && !frameDimension;
+    const authoredSlider = control.presentation === 'slider' && !outlineDimension;
     const range = authoredSlider ? effectControlSliderRange(control, value) : control;
     const layout = props.document.objectLayout;
     const handle = layout?.handles?.find(
@@ -613,7 +621,7 @@ function AnnotationControl(props: AnnotationControlProps) {
             ? 'field'
             : undefined
         }
-        stepperPlacement={frameDimension ? 'sides' : undefined}
+        stepperPlacement={outlineDimension ? 'sides' : undefined}
         patch={patch}
         scrub={
           authoredSlider

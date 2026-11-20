@@ -176,41 +176,53 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners', 'arrow'])(
-  'renders every declared SDK control and group for %s',
-  (name) => {
-    const value = fixture(name);
-    render(value);
-    for (const control of value.document.controls) {
-      expect(
-        reveal(
-          `[aria-label="${resolveEffectLocaleText(control.label, getCurrentLocale()) || control.id}"]:not([role="tab"])`
-        )
-      ).not.toBeNull();
-      if (control.kind === 'number' && !control.options?.length) {
-        const label = resolveEffectLocaleText(control.label, getCurrentLocale());
-        if (
-          control.presentation === 'slider' &&
-          control.id !== 'opacity' &&
-          !(name === 'frame' && (control.id === 'stroke' || control.id === 'radius'))
-        ) {
-          expect(input(`${label} range`)).not.toBeNull();
-        }
+const outlineDimensions: Record<string, readonly string[]> = {
+  frame: ['stroke', 'radius'],
+  corners: ['stroke'],
+  arrow: ['stroke'],
+  'leader-labels': ['lineWidth'],
+};
+
+it.each([
+  'lower-third',
+  'title',
+  'chapters',
+  'callout',
+  'frame',
+  'corners',
+  'arrow',
+  'leader-labels',
+])('renders every declared SDK control and group for %s', (name) => {
+  const value = fixture(name);
+  render(value);
+  for (const control of value.document.controls) {
+    expect(
+      reveal(
+        `[aria-label="${resolveEffectLocaleText(control.label, getCurrentLocale()) || control.id}"]:not([role="tab"])`
+      )
+    ).not.toBeNull();
+    if (control.kind === 'number' && !control.options?.length) {
+      const label = resolveEffectLocaleText(control.label, getCurrentLocale());
+      if (outlineDimensions[name]?.includes(control.id)) {
+        expect(input(label).closest('[data-stepper-placement="sides"]')).not.toBeNull();
+        expect(reveal(`[aria-label="${label} range"]`)).toBeNull();
+      } else if (control.presentation === 'slider' && control.id !== 'opacity') {
+        expect(input(`${label} range`)).not.toBeNull();
       }
     }
-    const expected = new Set(
-      value.document.controls.map(
-        (control) =>
-          `sdk:${resolveEffectControlGroup(control.group, value.document.controlGroups) ?? 'advanced'}`
-      )
-    );
-    for (const group of expected) {
-      openSection(group);
-      expect(host.querySelector(`[data-section="${group}"]`)).not.toBeNull();
-    }
-    expect(value.editor.change).not.toHaveBeenCalled();
   }
-);
+  const expected = new Set(
+    value.document.controls.map(
+      (control) =>
+        `sdk:${resolveEffectControlGroup(control.group, value.document.controlGroups) ?? 'advanced'}`
+    )
+  );
+  for (const group of expected) {
+    openSection(group);
+    expect(host.querySelector(`[data-section="${group}"]`)).not.toBeNull();
+  }
+  expect(value.editor.change).not.toHaveBeenCalled();
+});
 
 it('previews multiline text without history, commits once on Ctrl+Enter and cancels on Escape', () => {
   const value = fixture('title');

@@ -164,6 +164,21 @@ it('clears the review draft, stops dictation, and rejects a final transcript aft
     act(() => saveControl.focus());
     expect(document.activeElement).toBe(saveControl);
     expect(accessory.getAttribute('data-persistent')).toBe('true');
+
+    const cancels = harness.cancel.mock.calls.length;
+    act(() => saveControl.click());
+    expect(save).toHaveBeenCalledOnce();
+    expect(discard).not.toHaveBeenCalled();
+    expect(harness.cancel).toHaveBeenCalledTimes(cancels + 1);
+    act(() => emit(4, 'late after save'));
+    expect(field.value).toBe('New take');
+
+    const cancelControl = host.querySelector<HTMLButtonElement>(
+      '[aria-label="gallery.videoReview.discard"]'
+    )!;
+    act(() => cancelControl.click());
+    expect(discard).toHaveBeenCalledOnce();
+    expect(harness.cancel).toHaveBeenCalledTimes(cancels + 2);
   } finally {
     harness.pending = false;
     act(() => root.unmount());

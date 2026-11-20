@@ -778,7 +778,11 @@ for (const { size, name } of PRIMARY_BROWSER_VIEWPORTS) {
         .click();
       const watermark = inspector.locator('[data-ui="gallery.videoReview.watermarkInspector"]');
       await addWatermarkImage(watermark);
-      await checkOpacityField(page, watermark.locator('.opacity-field'), info, 'watermark');
+      const watermarkOpacity = watermark
+        .locator('[data-ui="shared.ui.compact-inspector.numeric-row"]')
+        .filter({ has: page.getByText('Opacity', { exact: true }) })
+        .locator('.opacity-field');
+      await checkOpacityField(page, watermarkOpacity, info, 'watermark');
       await addReviewAnnotation(page, review);
       const placement = inspector
         .locator('[data-inspector-tab-motion="placement"]')
