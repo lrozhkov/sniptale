@@ -50,7 +50,7 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
         onChange={(renderer: QuickPreviewPreferences['renderer']) => props.onChange({ renderer })}
       />
       {props.preferences.renderer === 'gpu' && props.rendererStatus?.fallback ? (
-        <p role="status" className="m-0 text-xs text-[var(--sniptale-color-text-muted)]">
+        <p role="status" className="review-inspector-notice">
           {translate(
             props.rendererStatus.fallback === 'device-failed'
               ? 'editor.scene.previewRendererFailed'
@@ -58,15 +58,6 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
           )}
         </p>
       ) : null}
-      <InspectorParameterRow label={translate('gallery.videoReview.previewActualRaster')}>
-        <output
-          className="block w-full whitespace-nowrap px-2 text-right text-[13px] font-normal tabular-nums
-          text-[var(--sniptale-color-text-primary)]"
-          aria-label={translate('gallery.videoReview.previewActualRaster')}
-        >
-          {props.actualRaster ? `${props.actualRaster.width} × ${props.actualRaster.height}` : '—'}
-        </output>
-      </InspectorParameterRow>
       <SelectField
         className={reviewSelectFieldClassName}
         label={label('previewResolution')}
@@ -80,6 +71,18 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
           props.onChange({ rasterPreset })
         }
       />
+      <InspectorParameterRow
+        label={translate('gallery.videoReview.previewActualRaster')}
+        keepInline
+      >
+        <output
+          className="block w-full whitespace-nowrap text-right text-[13px] font-normal tabular-nums
+          text-[var(--sniptale-color-text-primary)]"
+          aria-label={translate('gallery.videoReview.previewActualRaster')}
+        >
+          {props.actualRaster ? `${props.actualRaster.width} × ${props.actualRaster.height}` : '—'}
+        </output>
+      </InspectorParameterRow>
 
       <div title={translate('gallery.videoReview.previewFrameRateLimit')}>
         <SelectField
@@ -113,6 +116,7 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
         }
       />
       <ToggleField
+        showStatus
         label={label('previewShowFrameRate')}
         disabled={props.disabled}
         value={props.preferences.showFrameRate}

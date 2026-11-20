@@ -28,6 +28,13 @@
   border-block-start: 1px solid var(--sniptale-color-field-border);
 }
 
+.review-project-info {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  padding-inline: 8px;
+}
+
 @layer utilities {
   .sniptale-compact-workspace
     [data-ui='gallery.videoReview.inspector']
