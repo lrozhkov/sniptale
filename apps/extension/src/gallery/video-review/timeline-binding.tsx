@@ -310,17 +310,19 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
   const blocked = props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle';
   const [compact, setCompact] = useState(false);
   const [configuring, setConfiguring] = useState(false);
+  const [showPinnedOnly, setShowPinnedOnly] = useState(false);
   const projection = useMemo(
     () => createTrackProjection(props.source.duration, props.edits),
     [props.source.duration, props.edits]
   );
   const features = resolveQuickEditEffectiveFeatures(props.advanced);
-  const configurationVisible = features.mode === 'advanced' && configuring;
-  const trackOrder = useReviewTrackOrder(configurationVisible && !props.busy);
+  const collapsed = features.mode === 'advanced' && showPinnedOnly;
+  const configurationVisible = features.mode === 'advanced' && configuring && !collapsed;
+  const trackOrder = useReviewTrackOrder(configurationVisible && !blocked);
   useOriginalAudioPlacement(props);
   const focus = useFocusPlacement(props, projection);
   const annotation = useAnnotationPlacement(props);
-  const selectable = reviewSelectableTracks(props, features, configuring);
+  const selectable = reviewSelectableTracks(props, features, configurationVisible);
   const trackCommands = reviewTrackCommands(props);
   const clearTools = () => {
     cancelReviewTimelineGestures();
@@ -391,7 +393,11 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
           onHoverIntent={props.onHoverIntent}
           onHistoryRange={props.onHistoryRange}
           cursorArchiveAvailable={props.cursorArchiveAvailable}
-          trackOrder={trackOrder.order}
+          trackOrder={
+            collapsed
+              ? trackOrder.order.filter((track) => trackOrder.pinned.has(track))
+              : trackOrder.order
+          }
           cursorMotionTrack={
             features.mode === 'advanced' && props.cursorMotion ? (
               <ReviewCursorMotionTrack
@@ -562,7 +568,17 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
           snapRangePreview={props.advanced.ui.mode !== 'advanced' && props.editing.cutting}
           trackControls={
             <ReviewTimelineTrackControls
-              settings={{ active: configuring, toggle: () => setConfiguring((value) => !value) }}
+              settings={{
+                active: configurationVisible,
+                toggle: () => setConfiguring((value) => !value),
+              }}
+              disclosure={{
+                collapsed,
+                toggle: () => {
+                  setConfiguring(false);
+                  setShowPinnedOnly((value) => !value);
+                },
+              }}
               props={props}
               webcamVisible={features.webcamTrackVisible}
               density={{ compact, onToggle: () => setCompact((value) => !value) }}
@@ -922,16 +938,19 @@ function ReviewTimelineTrackControls({
   webcamVisible,
   settings,
   density,
+  disclosure,
 }: {
   props: TimelineBindingProps;
   webcamVisible: boolean;
   settings: { active: boolean; toggle(): void };
   density: { compact: boolean; onToggle(): void };
+  disclosure: { collapsed: boolean; toggle(): void };
 }) {
   return (
     <ReviewTrackControls
       settings={settings}
       density={density}
+      disclosure={disclosure}
       webcam={
         props.webcam
           ? {

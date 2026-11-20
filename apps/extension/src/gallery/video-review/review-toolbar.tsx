@@ -27,6 +27,8 @@ import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { ReviewTimelineTools } from './edit-actions';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
 import {
+  ChevronsDown,
+  ChevronsUp,
   StickyNote,
   Settings2,
   ZoomIn,
@@ -208,6 +210,7 @@ export function ReviewModeControl(props: {
 export function ReviewTrackControls(props: {
   density?: { compact: boolean; onToggle(): void };
   settings?: { active: boolean; toggle(): void };
+  disclosure?: { collapsed: boolean; toggle(): void };
   webcam?: { available: boolean; enabled: boolean; toggle(): void } | undefined;
   advanced: QuickEditAdvancedState;
   telemetryAvailable: boolean;
@@ -218,29 +221,43 @@ export function ReviewTrackControls(props: {
   const advanced = props.advanced;
   const features = resolveQuickEditEffectiveFeatures(advanced);
   if (features.mode !== 'advanced') return null;
+  const collapsed = props.disclosure?.collapsed ?? false;
   return (
     <fieldset
       disabled={props.busy}
       data-ui="gallery.videoReview.trackControls"
       className="flex w-full items-center gap-1"
     >
+      {props.disclosure ? (
+        <ReviewButton
+          label={translate(
+            collapsed ? 'gallery.videoReview.expandTracks' : 'gallery.videoReview.collapseTracks'
+          )}
+          aria-expanded={!collapsed}
+          className={`${reviewCompactTrackButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
+          onClick={props.disclosure.toggle}
+        >
+          {collapsed ? (
+            <ChevronsDown size={14} aria-hidden />
+          ) : (
+            <ChevronsUp size={14} aria-hidden />
+          )}
+        </ReviewButton>
+      ) : null}
       {props.density ? (
         <div className="flex w-7 shrink-0 items-center justify-center">
           <ReviewTrackHeightButton {...props.density} />
         </div>
       ) : null}
-      {features.mode === 'advanced' ? (
-        <>
-          <ReviewButton
-            label={translate('gallery.videoReview.trackSettings')}
-            aria-pressed={props.settings?.active ?? false}
-            className={`${reviewCompactTrackButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
-            onClick={props.settings?.toggle}
-          >
-            <Settings2 size={14} aria-hidden />
-          </ReviewButton>
-        </>
-      ) : null}
+      <ReviewButton
+        label={translate('gallery.videoReview.trackSettings')}
+        aria-pressed={props.settings?.active ?? false}
+        disabled={collapsed}
+        className={`${reviewCompactTrackButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
+        onClick={props.settings?.toggle}
+      >
+        <Settings2 size={14} aria-hidden />
+      </ReviewButton>
     </fieldset>
   );
 }

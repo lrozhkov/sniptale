@@ -3,9 +3,9 @@ import type { QuickEditTrack } from '../../features/video/review/advanced/types'
 
 /** View order has no effect on composition, history, or persisted project content. */
 export const REVIEW_TRACK_ORDER: readonly QuickEditTrack[] = [
+  'source',
   'keyboard',
   'mouse',
-  'source',
   'webcam',
   'zoom',
   'cursorMotion',
@@ -16,7 +16,13 @@ export const REVIEW_TRACK_ORDER: readonly QuickEditTrack[] = [
   'music',
 ];
 
-function moveTrack(order: readonly QuickEditTrack[], from: QuickEditTrack, to: QuickEditTrack) {
+function moveTrack(
+  order: readonly QuickEditTrack[],
+  pinned: ReadonlySet<QuickEditTrack>,
+  from: QuickEditTrack,
+  to: QuickEditTrack
+) {
+  if (from === to || pinned.has(from) !== pinned.has(to)) return order;
   const next = order.filter((track) => track !== from);
   next.splice(order.indexOf(to), 0, from);
   return next;
@@ -33,9 +39,11 @@ type Drag = {
 /** One disposable order receiver supports pointer preview, keyboard moves, and cancellation. */
 export function useReviewTrackOrder(active: boolean) {
   const [order, setOrder] = useState(REVIEW_TRACK_ORDER);
+  const [pinned, setPinned] = useState<ReadonlySet<QuickEditTrack>>(() => new Set(['source']));
   const current = useRef(order);
   const drag = useRef<Drag | null>(null);
   const update = useCallback((next: readonly QuickEditTrack[]) => {
+    if (next === current.current) return;
     current.current = next;
     setOrder(next);
   }, []);
@@ -67,10 +75,9 @@ export function useReviewTrackOrder(active: boolean) {
         };
         return !nearest || distance(row) < distance(nearest) ? row : nearest;
       }, null)?.dataset['reviewHeaderTrack'] as QuickEditTrack | undefined;
-      if (target && target !== pending.track)
-        update(moveTrack(current.current, pending.track, target));
+      if (target) update(moveTrack(current.current, pinned, pending.track, target));
     },
-    [update]
+    [pinned, update]
   );
   useEffect(() => {
     const cancel = () => finish(true);
@@ -121,10 +128,24 @@ export function useReviewTrackOrder(active: boolean) {
   };
   return {
     order,
+    pinned,
+    togglePin(track: QuickEditTrack) {
+      if (!active) return;
+      finish(true);
+      const nextPinned = new Set(pinned);
+      if (nextPinned.has(track)) nextPinned.delete(track);
+      else nextPinned.add(track);
+      const next = current.current.filter((item) => item !== track);
+      const firstUnpinned = next.findIndex((item) => !nextPinned.has(item));
+      next.splice(firstUnpinned < 0 ? next.length : firstUnpinned, 0, track);
+      setPinned(nextPinned);
+      update(next);
+    },
     interaction: (track: QuickEditTrack) => ({
       onPointerDown: (event: PointerEvent<HTMLButtonElement>) => start(event, track),
       onKeyDown: (event: import('react').KeyboardEvent<HTMLButtonElement>) => {
-        if (!active || !['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+        if (!active || drag.current || !['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key))
+          return;
         event.preventDefault();
         event.stopPropagation();
         const list = event.currentTarget.closest(
@@ -132,7 +153,9 @@ export function useReviewTrackOrder(active: boolean) {
         );
         const visible = [
           ...(list?.querySelectorAll<HTMLElement>('[data-review-header-track]') ?? []),
-        ].map((node) => node.dataset['reviewHeaderTrack'] as QuickEditTrack);
+        ]
+          .map((node) => node.dataset['reviewHeaderTrack'] as QuickEditTrack)
+          .filter((item) => pinned.has(item) === pinned.has(track));
         const index = visible.indexOf(track);
         const next =
           event.key === 'Home'
@@ -141,7 +164,7 @@ export function useReviewTrackOrder(active: boolean) {
               ? visible.length - 1
               : index + (event.key === 'ArrowUp' ? -1 : 1);
         const target = visible[next];
-        if (target) update(moveTrack(current.current, track, target));
+        if (target) update(moveTrack(current.current, pinned, track, target));
       },
     }),
   };

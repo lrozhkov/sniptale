@@ -15,7 +15,14 @@ import {
 } from 'react';
 import type { QuickEditTrack, QuickEditUiState } from '../../features/video/review/advanced/types';
 import { reviewTrackEnabled } from '../../features/video/review/advanced/track-controls';
-import { ChevronsDownUp, ChevronsUpDown, GripVertical, type LucideIcon } from 'lucide-react';
+import {
+  ChevronsDownUp,
+  ChevronsUpDown,
+  GripVertical,
+  Pin,
+  PinOff,
+  type LucideIcon,
+} from 'lucide-react';
 import { translate, useAppLocale } from '../../platform/i18n';
 import { ReviewButton, reviewCompactTrackButtonClassName } from './controls';
 import type { useReviewTrackOrder } from './track-order';
@@ -47,7 +54,8 @@ type LaneControls = Pick<
   unavailable: boolean;
   selectable: boolean;
   selectedTrack: QuickEditTrack | null;
-  order?: Pick<ReturnType<typeof useReviewTrackOrder>, 'interaction'>;
+  pinned: boolean;
+  order?: Pick<ReturnType<typeof useReviewTrackOrder>, 'interaction' | 'togglePin'>;
 };
 
 /** A mounted timeline publishes lane flags separately from its latest command receivers. */
@@ -60,6 +68,7 @@ function createTrackControlsStore(initial: ReviewTrackControlsState | null) {
   const setEnabled: ReviewTrackControlsState['setEnabled'] = (track, enabled) =>
     current?.setEnabled(track, enabled);
   const order: NonNullable<LaneControls['order']> = {
+    togglePin: (track) => current?.order?.togglePin(track),
     interaction: (track) => ({
       onPointerDown: (event) => current?.order?.interaction(track).onPointerDown(event),
       onKeyDown: (event) => current?.order?.interaction(track).onKeyDown(event),
@@ -74,6 +83,7 @@ function createTrackControlsStore(initial: ReviewTrackControlsState | null) {
           selectedTrack: current.selectedTrack === track ? track : null,
           configuring: current.configuring,
           busy: current.busy,
+          pinned: current.order?.pinned.has(track) ?? false,
           setEnabled,
           ...(current.selectTrack ? { selectTrack } : {}),
           ...(current.focusItemTrack ? { focusItemTrack } : {}),
@@ -108,6 +118,7 @@ function createTrackControlsStore(initial: ReviewTrackControlsState | null) {
         'selectedTrack',
         'configuring',
         'busy',
+        'pinned',
         'selectTrack',
         'focusItemTrack',
         'order',
@@ -368,6 +379,7 @@ const ReviewTrackHeaderIdentity = memo(function ReviewTrackHeaderIdentity({
   const track = props.track;
   const Icon = props.icon;
   const icon = Icon ? <Icon size={14} aria-hidden="true" /> : null;
+  const PinIcon = controls?.pinned ? Pin : PinOff;
   return (
     <>
       {track && controls?.configuring && controls.order ? (
@@ -393,6 +405,17 @@ const ReviewTrackHeaderIdentity = memo(function ReviewTrackHeaderIdentity({
             if (track !== 'source') controls.setEnabled(track, !enabled);
           }}
         />
+      ) : null}
+      {track && controls?.configuring && controls.order ? (
+        <ReviewButton
+          label={`${translate('gallery.videoReview.trackPinned')}: ${props.label}`}
+          aria-pressed={controls.pinned}
+          disabled={controls.busy}
+          className={`${reviewCompactTrackButtonClassName} review-track-pin !h-6 !min-h-6 !w-6 !px-1`}
+          onClick={() => controls.order?.togglePin(track)}
+        >
+          <PinIcon size={12} aria-hidden />
+        </ReviewButton>
       ) : null}
       {track && controls?.selectTrack ? (
         <button

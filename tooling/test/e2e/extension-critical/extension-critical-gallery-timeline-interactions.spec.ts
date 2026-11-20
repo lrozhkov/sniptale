@@ -226,6 +226,126 @@ async function inspectTrackControls(
   await expect(source).toHaveAttribute('data-review-track-locked', 'false');
 }
 
+async function inspectPinnedTracks(
+  page: Page,
+  dialog: Locator,
+  locale: 'ru' | 'en',
+  screenshotPath: string
+) {
+  const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+  const command = (key: Parameters<typeof translate>[0]) =>
+    dialog.getByRole('button', { name: label(key), exact: true });
+  const rows = dialog.locator('[data-review-header-track]');
+  const first = async () =>
+    (
+      await rows.evaluateAll((nodes) =>
+        nodes.map((node) => node.getAttribute('data-review-header-track'))
+      )
+    ).slice(0, 2);
+  const source = dialog.locator('[data-review-header-track="source"]');
+  const text = dialog.locator('[data-review-header-track="text"]');
+  const sourcePin = source.getByRole('button', {
+    name: `${label('gallery.videoReview.trackPinned')}: ${label('gallery.videoReview.sourceVideo')}`,
+    exact: true,
+  });
+  const textPin = text.locator('.review-track-pin');
+  await expect(sourcePin).toHaveAttribute('aria-pressed', 'true');
+  await expect(rows.first()).toHaveAttribute('data-review-header-track', 'source');
+  await textPin.press('Enter');
+  await expect(textPin).toHaveAttribute('aria-pressed', 'true');
+  await expect(textPin).toBeFocused();
+  await expect.poll(first).toEqual(['source', 'text']);
+  const textReorder = text.locator('.review-track-reorder');
+  await textReorder.press('Home');
+  await expect.poll(first).toEqual(['text', 'source']);
+  await expect(textReorder).toBeFocused();
+  await textReorder.dragTo(source.locator('.review-track-reorder'));
+  await expect.poll(first).toEqual(['source', 'text']);
+  await dialog.locator('[data-review-header-track="keyboard"] .review-track-reorder').press('Home');
+  await expect.poll(first).toEqual(['source', 'text']);
+  await inspectTimelinePanes(dialog);
+  await page.screenshot({ path: screenshotPath, fullPage: false, animations: 'disabled' });
+
+  await command('gallery.videoReview.collapseTracks').click();
+  const expand = command('gallery.videoReview.expandTracks');
+  await expect(expand).toHaveAttribute('aria-expanded', 'false');
+  await expect(command('gallery.videoReview.trackSettings')).toBeDisabled();
+  await expect(rows).toHaveCount(2);
+  await expect.poll(first).toEqual(['source', 'text']);
+  await expect(dialog.locator('[data-review-track="keyboard"]')).toHaveCount(0);
+  await inspectTimelinePanes(dialog);
+  await page.screenshot({
+    path: screenshotPath.replace('.png', '-collapsed.png'),
+    fullPage: false,
+    animations: 'disabled',
+  });
+  await expand.click();
+  await expect(command('gallery.videoReview.trackSettings')).toBeEnabled();
+  await expect(rows).not.toHaveCount(2);
+  await command('gallery.videoReview.trackSettings').click();
+  await textPin.click();
+  await expect(textPin).toHaveAttribute('aria-pressed', 'false');
+  await expect(rows.first()).toHaveAttribute('data-review-header-track', 'source');
+}
+
+for (const variant of [
+  { width: 1280, height: 560, locale: 'ru' },
+  { width: 1920, height: 900, locale: 'en' },
+  { width: 1200, height: 560, locale: 'en' },
+] as const) {
+  test(`Gallery pinned tracks ${variant.width}`, async ({ page }, info) => {
+    await page.setViewportSize({ width: variant.width, height: variant.height });
+    const host = await startHostServer();
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: { 'sniptale-locale-preference': variant.locale },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=light`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const command = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
+      const advanced = command('gallery.videoReview.advancedEditing');
+      if ((await advanced.getAttribute('aria-pressed')) !== 'true') await advanced.click();
+      await command('gallery.videoReview.trackSettings').click();
+      const textToggle = dialog.locator('[data-review-header-track="text"] [role="switch"]');
+      await textToggle.check();
+      const resize = dialog.locator('[data-review-panel-resize="timeline"]');
+      for (let index = 0; index < 5; index++) await resize.press('ArrowUp');
+      await inspectPinnedTracks(page, dialog, variant.locale, info.outputPath('track-pins.png'));
+      if (variant.width < 1280) {
+        const zoom = dialog.getByRole('slider', {
+          name: translate('videoEditor.timeline.zoom', variant.locale),
+          exact: true,
+        });
+        await zoom.press('End');
+        const viewport = dialog.locator('[data-ui="gallery.videoReview.timelineViewport"]');
+        const header = dialog.locator('[data-review-header-track="source"]');
+        const headerX = async () => (await header.boundingBox())?.x;
+        const before = await headerX();
+        expect(before).toBeDefined();
+        await expect
+          .poll(() => viewport.evaluate((node) => node.scrollWidth - node.clientWidth))
+          .toBeGreaterThan(0);
+        await viewport.evaluate((node) => {
+          node.scrollLeft = node.scrollWidth;
+        });
+        await expect.poll(() => viewport.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
+        await expect.poll(headerX).toBe(before);
+      }
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+}
+
 async function inspectNotes(page: Page, dialog: Locator, locale: 'ru' | 'en', basic: boolean) {
   const button = (key: Parameters<typeof translate>[0]) =>
     dialog.getByRole('button', { name: translate(key, locale), exact: true }).first();

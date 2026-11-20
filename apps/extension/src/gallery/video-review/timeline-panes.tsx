@@ -172,12 +172,14 @@ function observeReviewPaneLayout(
       const actions = row.header.querySelector<HTMLElement>('[data-track-controls]');
       const toggle = row.header.querySelector<HTMLElement>('[role="switch"]');
       const reorder = row.header.querySelector<HTMLElement>('.review-track-reorder');
+      const pin = row.header.querySelector<HTMLElement>('.review-track-pin');
       natural = Math.max(
         natural,
         (label?.scrollWidth ?? 0) +
           (actions?.scrollWidth ?? 0) +
           (toggle ? toggle.offsetWidth + 4 : 0) +
           (reorder ? reorder.offsetWidth + 4 : 0) +
+          (pin ? pin.offsetWidth + 4 : 0) +
           44
       );
       return { row, parent, position, rect };
@@ -193,6 +195,7 @@ function observeReviewPaneLayout(
     left.style.scrollPaddingBlockStart = `${rulerHeight}px`;
     list.style.height = `${Math.max(0, planeRect.height - rulerHeight)}px`;
     root.style.setProperty('--review-scrollbar-height', `${scrollbarHeight}px`);
+    const focused = document.activeElement;
     for (const { row, parent, position, rect } of placements) {
       if (parent.children[position] !== row.header)
         parent.insertBefore(row.header, parent.children[position] ?? null);
@@ -201,6 +204,12 @@ function observeReviewPaneLayout(
       row.header.style.top = `${row.ruler ? 0 : rect.top - planeRect.top - rulerHeight}px`;
       row.header.style.height = `${rect.height}px`;
     }
+    if (
+      document.activeElement === document.body &&
+      focused instanceof HTMLElement &&
+      list.contains(focused)
+    )
+      focused.focus({ preventScroll: true });
     labelWidth = width;
     root.style.setProperty('--review-label-width', `${width}px`);
     const top = Math.max(
