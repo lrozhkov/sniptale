@@ -1315,3 +1315,114 @@ it.each([true, false])(
     }
   }
 );
+
+it('keeps an editable text clip with its identity after refusal and saves it once on retry', async () => {
+  const { commands, save, select, acquire } = setup(false, true);
+  const context = commands!.capture();
+  if (!context) throw new Error('Text insertion command unavailable');
+  await act(async () => {
+    expect(await editor.addText({ start: 0.5, end: 3.5 }, 'Title', context)).toBe(true);
+  });
+  const title = editor.lane?.textClips?.[0];
+  if (!title) throw new Error('Native text was not accepted locally');
+  expect(title).toMatchObject({ start: 0.5, end: 3.5, order: 1 });
+  expect(select).toHaveBeenCalledWith({ kind: 'annotation-effect', id: title.id }, context);
+  expect(acquire).not.toHaveBeenCalled();
+  save.mockRejectedValueOnce(new DOMException('Workspace full', 'QuotaExceededError'));
+  await act(async () => {
+    await expect(session.saveBuffered()).rejects.toMatchObject({ name: 'QuotaExceededError' });
+  });
+  expect(editor.lane?.textClips).toEqual([title]);
+  await settle(() =>
+    editor.changeText(title.id, (clip) => ({
+      ...clip,
+      text: 'After refusal',
+      exit: { ...clip.exit, preset: 'blur' },
+    }))
+  );
+  await act(async () => {
+    const saved = await session.saveBuffered();
+    expect(saved.workspace.history).toHaveLength(2);
+  });
+  expect(editor.lane?.textClips).toMatchObject([
+    { id: title.id, text: 'After refusal', exit: { preset: 'blur' } },
+  ]);
+  expect(editor.lane?.instances).toEqual([instance]);
+});
+
+it.each(['package', 'duplicate', 'text'] as const)(
+  'appends %s after restoring the largest valid text stacking order',
+  async (kind) => {
+    const { commands, choice } = setup(false, true);
+    const { createReviewAnnotationTextClip } =
+      await import('../../features/video/review/annotation-effects/text-animation');
+    const retained = createReviewAnnotationTextClip(
+      'retained',
+      'Retained title',
+      0.5,
+      2,
+      Number.MAX_SAFE_INTEGER
+    );
+    await act(async () => {
+      advanced.setAnnotationEffects((lane) => lane && { ...lane, textClips: [retained] });
+      await advanced.flush();
+      await session.saveBuffered();
+    });
+    expect(editor.lane?.textClips?.[0]).toEqual(retained);
+    if (kind === 'duplicate') {
+      await settle(() => editor.duplicate(retained.id));
+    } else {
+      const context = commands!.capture();
+      if (!context) throw new Error('Annotation command unavailable');
+      await act(async () => {
+        if (kind === 'package') expect(await editor.add(choice, context)).toBeTruthy();
+        else expect(await editor.addText({ start: 1, end: 2 }, 'New title', context)).toBe(true);
+      });
+    }
+    const lane = session.getSnapshot().document.advancedContent.annotationEffects!;
+    const stacked = [...lane.instances, ...(lane.textClips ?? [])].sort(
+      (a, b) => a.order - b.order
+    );
+    expect(stacked.map(({ order }) => order)).toEqual([0, 1, 2]);
+    expect(stacked.slice(0, 2).map(({ id }) => id)).toEqual([instance.id, retained.id]);
+  }
+);
+
+it('retries a staged native placement after refusal without keeping a stale gesture or repeating history', async () => {
+  const { save } = setup();
+  const { createReviewAnnotationTextClip } =
+    await import('../../features/video/review/annotation-effects/text-animation');
+  const title = createReviewAnnotationTextClip('title', 'Hold', 0, 2, 1);
+  await act(async () => {
+    advanced.setAnnotationEffects((lane) => lane && { ...lane, textClips: [title] });
+    await advanced.flush();
+    await session.saveBuffered();
+    session.setAutosaveEnabled(true);
+  });
+  const moved = { ...title.transform, x: 0.4 };
+  holdFlush = async () => {
+    throw new Error('Placement publication refused');
+  };
+  await act(async () => {
+    expect(editor.beginGesture(title.id)).toBe(true);
+    editor.previewGesture({ transform: moved });
+    expect(await editor.commitGesture()).toBe(false);
+  });
+  expect(editor.gestureId).toBeNull();
+  expect(editor.failure).toBe('edit');
+  expect(editor.lane?.textClips?.[0]?.transform).toEqual(moved);
+  holdFlush = null;
+  await settle(() => editor.retry());
+  expect(editor.hasPending()).toBe(false);
+  expect(editor.failure).toBeNull();
+  expect(
+    session.getSnapshot().document.advancedContent.annotationEffects?.textClips?.[0]?.transform
+  ).toEqual(moved);
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(2);
+  await act(async () => session.saveBuffered());
+  expect(parseVideoWorkspace(save.mock.lastCall?.[0].workspace)?.history).toHaveLength(2);
+  act(() => {
+    expect(editor.beginGesture(title.id)).toBe(true);
+    editor.cancelGesture();
+  });
+});

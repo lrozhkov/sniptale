@@ -65,7 +65,7 @@ vi.mock('../../ui/compact-inspector-controls/control-renderers', () => ({
     </select>
   ),
 }));
-it('provides local slider drafts, larger typed values, and per-property batch patches', () => {
+it('provides local numeric drafts, larger typed values, and per-property batch patches', () => {
   const change = vi.fn();
   const value = { ...REVIEW_KEY_DEFAULT, enabled: true };
   act(() =>
@@ -89,12 +89,15 @@ it('provides local slider drafts, larger typed values, and per-property batch pa
   section('appearance');
   expect(input('key_fontSize').placeholder).toBe('—');
   expect(host.textContent).toContain('gallery.videoReview.clickMixed');
-  const range = input('key_fontSize range');
-  expect(range.max).toBe('48');
-  act(() => edit(range, '40'));
+  const fontSize = input('key_fontSize');
+  act(() => {
+    fontSize.focus();
+    edit(fontSize, '40');
+  });
+  expect(fontSize.value).toBe('40');
   expect(change).not.toHaveBeenCalled();
-  act(() => range.dispatchEvent(new Event('pointerup', { bubbles: true })));
-  expect(change).toHaveBeenLastCalledWith({ style: { fontSize: 40 } });
+  act(() => fontSize.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(change).toHaveBeenCalledExactlyOnceWith({ style: { fontSize: 40 } });
   for (const [name, next, patch] of [
     ['key_fontSize', '80', { style: { fontSize: 80 } }],
     ['key_cornerRadius', '20', { style: { cornerRadius: 20 } }],

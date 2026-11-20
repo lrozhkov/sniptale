@@ -1,6 +1,6 @@
 import type { ReviewInspectorNavigation } from './inspector-navigation';
 import { memo, useCallback, useLayoutEffect, useRef, type ReactNode } from 'react';
-import { Box } from 'lucide-react';
+import { Box, Type } from 'lucide-react';
 import { ReviewTrackHeightButton } from './track-row';
 import { reviewOriginalAudioPlacementIssue } from './range-placement';
 import type { ReviewFocusType } from './zoom-editor';
@@ -58,6 +58,8 @@ export type ReviewAnnotationTool = {
   retryable: boolean;
   onToggle(anchor: HTMLElement): void;
   onChoose(value: string): void;
+  addText?: (() => void) | undefined;
+  textAvailable?: boolean | undefined;
   onReload(): void;
   onRetry(): void;
 };
@@ -401,6 +403,17 @@ function ReviewAnnotationToolControl(props: {
         }
         onChange={(value) => tool.onChoose(value)}
       />
+      {tool.addText && (
+        <ReviewButton
+          label={translate('gallery.videoReview.annotationTextAdd')}
+          className={reviewTextButtonClassName}
+          disabled={busy || tool.pending || tool.textAvailable === false}
+          onClick={tool.addText}
+        >
+          <Type size={14} aria-hidden />
+          <span>{translate('gallery.videoReview.annotationTextAdd')}</span>
+        </ReviewButton>
+      )}
       <ReviewAnnotationToolFeedback {...props} hint={hint} />
     </div>
   );

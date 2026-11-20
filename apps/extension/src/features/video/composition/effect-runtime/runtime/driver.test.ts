@@ -185,7 +185,7 @@ it('closes rejected output and earlier retained output when output admission ref
     });
   await expect(
     renderEffectRuntimeFramePlans({ ...f, resourceScope: scope, plans: [plan('a'), plan('b')] })
-  ).rejects.toThrow('EFFECT_RUNTIME_OUTPUT_RESOURCE_LIMIT');
+  ).rejects.toMatchObject({ code: 'resourceLimit' });
   expect(f.outputs).toHaveLength(2);
   f.outputs.forEach((bitmap) => expect(bitmap.close).toHaveBeenCalledOnce());
   expect(ledger.snapshot()).toEqual({ liveDecodedRasterBytes: 0, liveRasterResources: 0 });

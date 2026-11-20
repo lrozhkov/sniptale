@@ -8,6 +8,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
 import { ReviewAnnotationEffectsTrack } from './annotation-effects-track';
 import * as i18n from '../../platform/i18n';
+import { createReviewAnnotationTextClip } from '../../features/video/review/annotation-effects/text-animation';
+import { createTrackProjection } from './track-projection';
 
 let host: HTMLDivElement;
 let root: Root;
@@ -431,4 +433,125 @@ it('uses the live gesture clock and rejects receivers from an abandoned annotati
   await act(async () => root.render(view(latestPlace, false, true)));
   act(() => lane.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
   expect(latestPlace).toHaveBeenCalledOnce();
+});
+
+it('moves a native text clip to the end across a Speed edge on the result clock', () => {
+  const projection = createTrackProjection(12, [
+    {
+      id: 'speed',
+      kind: 'speed',
+      start: 0,
+      end: 6,
+      requestedStart: 0,
+      requestedEnd: 6,
+      rate: 2,
+      audio: 'mute',
+    },
+  ]);
+  const title = createReviewAnnotationTextClip('title', 'Title', 1, 3, 0);
+  const options = { duration: 12, projection, textClips: [title], instances: [] };
+  const lane = render(options);
+  const plate = lane.querySelector<HTMLElement>('[data-annotation-effect-id="title"]')!;
+  pointer(plate, 'pointerdown', 200);
+  pointer(plate, 'pointermove', 200 + 8000 / 12, true);
+  expect(preview).toHaveBeenLastCalledWith({ start: 7, end: 9 });
+  const range = { left: plate.style.left, width: plate.style.width };
+  pointer(plate, 'pointerup', 200 + 8000 / 12, true);
+  expect(preview).toHaveBeenLastCalledWith({ start: 7, end: 9 });
+  expect(commit).toHaveBeenCalledOnce();
+  const published = render({ ...options, textClips: [{ ...title, start: 7, end: 9 }] });
+  const end = published.querySelector<HTMLElement>('[data-annotation-effect-id="title"]')!;
+  expect({ left: end.style.left, width: end.style.width }).toEqual(range);
+});
+
+it('snaps native text across a CUT gap to the actual plate edge without changing its duration', () => {
+  const projection = createTrackProjection(12, [
+    {
+      id: 'cut',
+      kind: 'cut',
+      start: 2,
+      end: 4,
+      requestedStart: 2,
+      requestedEnd: 4,
+    },
+  ]);
+  const title = createReviewAnnotationTextClip('title', 'Title', 1, 3, 0);
+  const options = {
+    duration: 12,
+    projection,
+    textClips: [title],
+    instances: [],
+    snapTimes: [6],
+    time: 11,
+  };
+  const lane = render(options);
+  const plate = lane.querySelector<HTMLElement>('[data-annotation-effect-id="title"]')!;
+  pointer(plate, 'pointerdown', 100);
+  pointer(plate, 'pointermove', 100 + (4.95 / 12) * 1000);
+  expect(preview).toHaveBeenLastCalledWith({ start: 4, end: 6 });
+  const guide = lane.querySelector<HTMLElement>('[data-annotation-effect-guide]');
+  expect(guide?.style.left).toBe(plate.style.left);
+  const range = { left: plate.style.left, width: plate.style.width };
+  pointer(plate, 'pointerup', 100 + (4.95 / 12) * 1000);
+  expect(commit).toHaveBeenCalledOnce();
+  const published = render({ ...options, textClips: [{ ...title, start: 4, end: 6 }] });
+  const final = published.querySelector<HTMLElement>('[data-annotation-effect-id="title"]')!;
+  expect({ left: final.style.left, width: final.style.width }).toEqual(range);
+});
+
+it('moves a title right after a cut shortened the visible result without trimming the authored tail', () => {
+  const projection = createTrackProjection(6, [
+    {
+      id: 'cut',
+      kind: 'cut',
+      start: 0,
+      end: 3,
+      requestedStart: 0,
+      requestedEnd: 3,
+    },
+  ]);
+  const title = createReviewAnnotationTextClip('title', 'Title', 1, 4, 0);
+  const lane = render({
+    duration: 6,
+    projection,
+    textClips: [title],
+    instances: [],
+    time: 0,
+    snapTimes: [],
+  });
+  const plate = lane.querySelector<HTMLElement>('[data-annotation-effect-id="title"]')!;
+  pointer(plate, 'pointerdown', 700);
+  pointer(plate, 'pointermove', 700 + 250 / 6);
+  pointer(plate, 'pointerup', 700 + 250 / 6);
+  const moved = preview.mock.lastCall?.[0];
+  expect(moved?.start).toBeCloseTo(1.25);
+  expect(moved?.end).toBeCloseTo(4.25);
+  expect(commit).toHaveBeenCalledOnce();
+});
+
+it('clears the local title plate preview on late admission and shows the authored plate after Undo', () => {
+  let admission: (() => void) | undefined;
+  const projection = createTrackProjection(10, []);
+  const title = createReviewAnnotationTextClip('title', 'Title', 1, 3, 0);
+  const options = {
+    projection,
+    textClips: [title],
+    instances: [],
+    beforeAction: (action: () => void) => {
+      admission = action;
+    },
+  };
+  const lane = render(options);
+  const plate = lane.querySelector<HTMLElement>('[data-annotation-effect-id="title"]')!;
+  pointer(plate, 'pointerdown', 100);
+  pointer(plate, 'pointermove', 200, true);
+  expect(plate.style.left).toBe('20%');
+  pointer(plate, 'pointerup', 200, true);
+  act(() => admission?.());
+  expect(commit).toHaveBeenCalledOnce();
+  expect(plate.style.left).toBe('10%');
+  render({ ...options, textClips: [{ ...title, start: 2, end: 4 }] });
+  expect(plate.style.left).toBe('20%');
+  render(options);
+  expect(plate.style.left).toBe('10%');
 });

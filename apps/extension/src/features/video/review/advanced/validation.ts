@@ -640,7 +640,8 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
     text === null ||
     captions === null ||
     annotationEffects === null ||
-    (annotationEffects && !supportsAdvancedSchema(raw['schemaVersion'], 15))
+    (annotationEffects && !supportsAdvancedSchema(raw['schemaVersion'], 15)) ||
+    (annotationEffects?.textClips?.length && !supportsAdvancedSchema(raw['schemaVersion'], 35))
   )
     return null;
   if (raw['webcam'] !== undefined && !supportsAdvancedSchema(raw['schemaVersion'], 3)) return null;
@@ -818,7 +819,7 @@ function supportsAdvancedSchema(version: unknown, firstHistorical: number): bool
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
     [
       2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
-      27, 28, 29, 30, 31, 32, 33,
+      27, 28, 29, 30, 31, 32, 33, 34,
     ].some((known) => known >= firstHistorical && version === known)
   );
 }

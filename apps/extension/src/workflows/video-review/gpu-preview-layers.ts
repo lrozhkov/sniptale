@@ -49,6 +49,8 @@ import {
 } from '../../features/video/composition/draw/pointer-feedback';
 import { drawReviewKeys } from './render-key-animation';
 import { type createReviewAnnotationRenderer } from './annotation-renderer';
+import { drawReviewAnnotationText, reviewViewportAnnotationLayers } from './draw-annotation-text';
+import type { ReviewAnnotationTextClip } from '../../features/video/review/annotation-effects/types';
 import {
   reviewGpuAnnotationLayer,
   reviewGpuAnnotationGroup,
@@ -169,6 +171,8 @@ export async function reviewGpuContentLayers(args: {
   dimensions: PreviewSceneDimensions;
   base: ReviewPresentedGeometry['layout'];
   geometry: ReviewPresentedGeometry;
+  annotationTextTime?: number;
+  includeAnnotationText?: boolean;
   sourceTime: number;
   fps: number;
   original: GpuPreviewGroup;
@@ -430,9 +434,41 @@ export async function reviewGpuContentLayers(args: {
       });
       viewportLayers.push(texture(raster, full));
     }
-    viewportLayers.push(
-      ...viewport.map((entry) => reviewGpuAnnotationLayer(entry, full, entry.source))
+    const lane = scene.annotationEffects?.lane;
+    const annotationTextTime = args.annotationTextTime ?? geometry.resultTime;
+    const viewportAnnotations = reviewViewportAnnotationLayers(
+      viewport,
+      lane?.enabled && args.includeAnnotationText !== false ? (lane.textClips ?? []) : [],
+      annotationTextTime
     );
+    const textRun: ReviewAnnotationTextClip[] = [];
+    const flushText = () => {
+      if (!textRun.length) return;
+      const raster = primitives.raster(
+        'preview-gpu-annotation-text',
+        dimensions.backing,
+        (context) => {
+          for (const clip of textRun)
+            drawReviewAnnotationText(
+              context,
+              clip,
+              annotationTextTime,
+              dimensions.canonical,
+              dimensions.backing
+            );
+        }
+      );
+      viewportLayers.push(texture(raster, full));
+      textRun.length = 0;
+    };
+    for (const layer of viewportAnnotations) {
+      if (layer.kind === 'text') textRun.push(layer.clip);
+      else {
+        flushText();
+        viewportLayers.push(reviewGpuAnnotationLayer(layer.frame, full, layer.frame.source));
+      }
+    }
+    flushText();
     const sourceClip = args.sourceClip;
     return {
       contentLayers: sourceClip
@@ -530,6 +566,7 @@ export function reviewGpuFinishLayers(args: {
   resultTime: number;
   primitives: ReviewGpuPrimitives;
   caption?: GpuPreviewLayer;
+  finalAnnotationText?: readonly ReviewAnnotationTextClip[];
   watermark: Awaited<ReturnType<typeof createWatermarkRenderer>> | null;
   blackout?: { opacity: number; color: string };
 }) {
@@ -574,6 +611,18 @@ export function reviewGpuFinishLayers(args: {
       });
     } else layers.push(pane);
   } else layers.push({ source: args.main, rect: full, inverse: identity });
+  const finalText = args.finalAnnotationText;
+  if (finalText?.length) {
+    const raster = primitives.raster(
+      'preview-gpu-annotation-text',
+      dimensions.backing,
+      (context) => {
+        for (const clip of finalText)
+          drawReviewAnnotationText(context, clip, args.resultTime, output, dimensions.backing);
+      }
+    );
+    layers.push(texture(raster, full));
+  }
   layers.push(
     ...webcamLayers(scene, dimensions, args.sourceTime, args.resultTime, args.camera, primitives)
   );

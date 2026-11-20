@@ -45,44 +45,44 @@ function input(node: HTMLInputElement, value: string) {
   node.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
-it('provides common slider ranges while accepting larger typed values', () => {
+function commitField(node: HTMLInputElement) {
+  node.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+}
+
+it('accepts typed radius values within the authored bounds and clamps excess input', () => {
   const change = vi.fn();
   act(() => root.render(<ReviewClickFields values={[click]} onChange={change} />));
-  let ranges = 0;
-  for (const tab of host.querySelectorAll<HTMLButtonElement>('[role="tab"]')) {
-    act(() => tab.click());
-    ranges += host.querySelectorAll('input[type="range"]').length;
-  }
-  expect(ranges).toBe(8);
-  const radius = field('clickRadius', 'range');
-  expect(radius.min).toBe('2');
-  expect(radius.max).toBe('80');
+  const radius = field('clickRadius');
   act(() => {
-    field('clickRadius').focus();
-    input(field('clickRadius'), '150');
+    radius.focus();
+    input(radius, '150');
+    commitField(radius);
   });
-  act(() =>
-    field('clickRadius').dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
-    )
-  );
   expect(change).toHaveBeenCalledExactlyOnceWith({ radius: 150 });
   expect(host.contains(document.activeElement)).toBe(false);
+  act(() => {
+    radius.focus();
+    input(radius, '201');
+    commitField(radius);
+  });
+  expect(change).toHaveBeenLastCalledWith({ radius: 200 });
 });
 
-it('shows slider drafts locally and commits one changed field for mixed selections', () => {
+it('shows numeric drafts locally and commits one changed field for mixed selections', () => {
   const change = vi.fn();
   act(() =>
     root.render(<ReviewClickFields values={[click, { ...click, radius: 40 }]} onChange={change} />)
   );
-  expect(field('clickRadius').placeholder).toBe('—');
-  const range = field('clickRadius', 'range');
-  expect(range).not.toBeNull();
-  act(() => input(range, '50'));
-  expect(field('clickRadius').value).toBe('50');
-  act(() => input(range, '60'));
+  const radius = field('clickRadius');
+  expect(radius.placeholder).toBe('—');
+  act(() => {
+    radius.focus();
+    input(radius, '50');
+  });
+  expect(radius.value).toBe('50');
+  act(() => input(radius, '60'));
   expect(change).not.toHaveBeenCalled();
-  act(() => range.dispatchEvent(new Event('pointerup', { bubbles: true })));
+  act(() => commitField(radius));
   expect(change).toHaveBeenCalledExactlyOnceWith({ radius: 60 });
 });
 
@@ -91,18 +91,15 @@ it('exposes only effective appearance controls and preserves fractional position
   act(() => root.render(<ReviewClickFields values={[click]} onChange={change} />));
   openSection('appearance');
   expect(field('clickOpacity')).toBeNull();
-  expect(field('clickX', 'range').min).toBe('-10');
-  expect(field('clickX', 'range').max).toBe('10');
-  act(() => input(field('clickX', 'range'), '0.84'));
-  expect(field('clickX').value).toBe('0.8');
+  const horizontal = field('clickX');
   act(() => {
-    field('clickX').focus();
-    input(field('clickX'), '0.5');
+    horizontal.focus();
+    input(horizontal, '0.84');
   });
-  act(() =>
-    field('clickX').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
-  );
-  expect(change).toHaveBeenLastCalledWith({ x: 0.005 });
+  expect(horizontal.value).toBe('0.84');
+  expect(change).not.toHaveBeenCalled();
+  act(() => commitField(horizontal));
+  expect(change).toHaveBeenCalledExactlyOnceWith({ x: 0.0084 });
   for (const effect of ['press', 'glow'] as const) {
     act(() => root.render(<ReviewClickFields values={[{ ...click, effect }]} onChange={change} />));
     expect(field('clickStroke')).toBeNull();
@@ -115,9 +112,14 @@ it('shows lens controls with fractional magnification and no repeated pulses', (
     root.render(<ReviewClickFields values={[{ ...click, effect: 'magnify' }]} onChange={change} />)
   );
   expect(field('clickMagnification').value).toBe('1.6');
-  expect(field('clickRadius', 'range').max).toBe('160');
+  expect(field('clickMagnification', 'range').min).toBe('1');
+  expect(field('clickMagnification', 'range').max).toBe('2.5');
   expect(field('clickPulses')).toBeNull();
-  expect(field('clickLensShadow').value).toBe('20');
+  openSection('appearance');
+  const shadow = host.querySelector<HTMLInputElement>(
+    'input[type="range"][aria-label="gallery.videoReview.clickLensShadow"]'
+  );
+  expect(shadow?.value).toBe('20');
   expect(host.textContent).toContain('gallery.videoReview.clickLensOptics_optical');
   expect(field('clickStroke')).not.toBeNull();
   act(() => {
@@ -206,7 +208,7 @@ it('offers factual hold appearance without inapplicable pulse timing or pointer 
   expect(host.textContent).not.toContain('gallery.videoReview.click_magnify');
 });
 
-it('puts frame geometry in a disclosure with bounded plain sliders', () => {
+it('puts editable frame geometry in a disclosure and enforces its bounds', () => {
   const change = vi.fn();
   act(() =>
     root.render(
@@ -223,14 +225,18 @@ it('puts frame geometry in a disclosure with bounded plain sliders', () => {
       />
     )
   );
-  const range = field('gestureArea_x', 'range');
-  expect(range).not.toBeNull();
-  expect(range.closest('details')?.open).toBe(false);
-  expect(range.max).toBe('50');
-  act(() => input(range, '40'));
+  const position = field('gestureArea_x');
+  const details = position.closest('details');
+  expect(details?.open).toBe(false);
+  act(() => details?.querySelector('summary')?.click());
+  expect(details?.open).toBe(true);
+  act(() => {
+    position.focus();
+    input(position, '60');
+  });
   expect(change).not.toHaveBeenCalled();
-  act(() => range.dispatchEvent(new Event('pointerup', { bubbles: true })));
+  act(() => commitField(position));
   expect(change).toHaveBeenCalledExactlyOnceWith({
-    gestureArea: { x: 0.4, y: 0.3, width: 0.5, height: 0.3 },
+    gestureArea: { x: 0.5, y: 0.3, width: 0.5, height: 0.3 },
   });
 });

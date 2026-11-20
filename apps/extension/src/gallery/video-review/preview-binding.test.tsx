@@ -650,6 +650,8 @@ it('uses effective preview controls and retains geometry while overlays are hidd
     pending: false,
     failure: null,
     add: vi.fn(),
+    addText: vi.fn(),
+    changeText: vi.fn(),
     change: vi.fn(),
     enabled: vi.fn(),
     remove: vi.fn(),

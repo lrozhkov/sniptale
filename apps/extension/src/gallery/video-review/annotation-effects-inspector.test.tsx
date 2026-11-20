@@ -93,6 +93,8 @@ function fixture(name: string) {
     pending: false,
     failure: null,
     add: vi.fn(),
+    addText: vi.fn(),
+    changeText: vi.fn(),
     change: vi.fn(),
     enabled: vi.fn(),
     remove: vi.fn(),

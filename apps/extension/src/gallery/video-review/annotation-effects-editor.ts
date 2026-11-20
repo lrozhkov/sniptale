@@ -2,8 +2,11 @@ import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { transformReviewAnnotationAnchors } from '../../features/video/review/annotation-effects/layout';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EffectBundleCatalogEntry } from '../../features/video/project/effect-bundle/catalog';
+import { createReviewAnnotationTextClip } from '../../features/video/review/annotation-effects/text-animation';
+import { prepareReviewAnnotationAppend } from '../../features/video/review/annotation-effects/types';
 import type {
   ReviewAnnotationEffect,
+  ReviewAnnotationTextClip,
   ReviewAnnotationEffects,
   ReviewAnnotationEffectTransform,
 } from '../../features/video/review/annotation-effects/types';
@@ -35,11 +38,13 @@ interface ReviewAnnotationGeometrySource {
 
 type Session = ReturnType<typeof createVideoReviewSession>;
 type Patch = Partial<Omit<ReviewAnnotationEffect, 'id' | 'snapshotId' | 'order'>>;
+type Clip = ReviewAnnotationEffect | ReviewAnnotationTextClip;
+type GesturePatch = Patch & Partial<Omit<ReviewAnnotationTextClip, 'id' | 'order'>>;
 type Gesture = {
   session: Session;
   kind: 'field' | 'placement';
-  before: ReviewAnnotationEffect;
-  after: ReviewAnnotationEffect;
+  before: Clip;
+  after: Clip;
 };
 type Failure = 'acquisition' | 'unsupported' | 'save' | 'edit' | 'stale' | 'invalid';
 type Choice = {
@@ -77,6 +82,27 @@ function sameInstance(first: ReviewAnnotationEffect, second: ReviewAnnotationEff
     );
   };
   return JSON.stringify(canonical(first)) === JSON.stringify(canonical(second));
+}
+
+function findClip(lane: ReviewAnnotationEffects | undefined, id: string): Clip | undefined {
+  return (
+    lane?.textClips?.find((clip) => clip.id === id) ??
+    lane?.instances.find((clip) => clip.id === id)
+  );
+}
+
+function sameClip(first: Clip, second: Clip) {
+  if ('text' in first || 'text' in second) return JSON.stringify(first) === JSON.stringify(second);
+  return sameInstance(first, second);
+}
+
+function replaceClip(lane: ReviewAnnotationEffects, clip: Clip): ReviewAnnotationEffects {
+  return 'text' in clip
+    ? {
+        ...lane,
+        textClips: lane.textClips?.map((item) => (item.id === clip.id ? clip : item)) ?? [],
+      }
+    : { ...lane, instances: lane.instances.map((item) => (item.id === clip.id ? clip : item)) };
 }
 
 /** Disposable gallery commands; content, queue and prepared resources remain owned by the session. */
@@ -177,11 +203,7 @@ export function useReviewAnnotationEffects(
     setFailure(null);
     const protect = (event: BeforeUnloadEvent) => {
       const value = draft.current;
-      if (
-        !value ||
-        value.session !== geometryOwner.session ||
-        sameInstance(value.before, value.after)
-      )
+      if (!value || value.session !== geometryOwner.session || sameClip(value.before, value.after))
         return;
       event.preventDefault();
       event.returnValue = '';
@@ -457,25 +479,22 @@ export function useReviewAnnotationEffects(
     const value = draft.current;
     if (!value) return publishFields();
     if (value.session !== args.session) return false;
-    if (sameInstance(value.before, value.after)) {
+    if (sameClip(value.before, value.after)) {
       cancelGesture();
       return publishFields();
     }
     const replace = (lane: ReviewAnnotationEffects | undefined) => {
-      const item = lane?.instances.find((entry) => entry.id === value.before.id);
-      if (!lane || !item || !sameInstance(item, value.before)) {
+      const item = findClip(lane, value.before.id);
+      if (!lane || !item || !sameClip(item, value.before)) {
         setFailure('stale');
         return false as const;
       }
-      return {
-        ...lane,
-        instances: lane.instances.map((entry) => (entry.id === item.id ? value.after : entry)),
-      };
+      return replaceClip(lane, value.after);
     };
     const finish = () => {
       if (draft.current === value) cancelGesture();
     };
-    if (value.kind === 'field') return stageField(replace, finish);
+    if (value.kind === 'field' || 'text' in value.before) return stageField(replace, finish);
     const committed = await mutate((lane) => {
       const next = replace(lane);
       if (next === false) throw new Error('Annotation draft changed.');
@@ -484,26 +503,57 @@ export function useReviewAnnotationEffects(
     if (committed) finish();
     return committed;
   };
-  const applyGesturePatch = (gesture: Gesture, patch: Patch) => {
-    if (gesture.kind === 'placement') return applyPatch(gesture.before, patch);
+  const applyGesturePatch = (gesture: Gesture, patch: GesturePatch) => {
+    const item = gesture.kind === 'placement' ? gesture.before : gesture.after;
+    if ('text' in item) return { ...item, ...structuredClone(patch) };
+    if (gesture.kind === 'placement') return applyPatch(item, patch);
     return applyPatch(
-      gesture.after,
-      patch.controls
-        ? { ...patch, controls: { ...gesture.after.controls, ...patch.controls } }
-        : patch
+      item,
+      patch.controls ? { ...patch, controls: { ...item.controls, ...patch.controls } } : patch
     );
   };
   const previewPlacement = (patch: Patch) => {
     const value = draft.current;
     if (!value || value.session !== args.session) return false;
+    const patched = applyGesturePatch(value, patch);
+    if ('text' in patched) return false;
     const parsed = parseReviewAnnotationEffects({
       enabled: true,
-      instances: [applyGesturePatch(value, patch)],
+      instances: [patched],
     })?.instances[0];
     if (!parsed || !notifyMovement(parsed)) return false;
     draft.current = { ...value, after: parsed };
     return true;
   };
+  const addText = (
+    range: { start: number; end: number },
+    text: string,
+    context: ReviewCommandContext
+  ) => {
+    if (draft.current) return Promise.resolve(false);
+    return execute(
+      async (owner, controller) => {
+        const { lane, order } = prepareReviewAnnotationAppend(currentLane());
+        const id = crypto.randomUUID();
+        const clip = createReviewAnnotationTextClip(id, text, range.start, range.end, order);
+        const next = { ...lane, textClips: [...(lane.textClips ?? []), clip] };
+        if (!valid(next)) {
+          setFailure('invalid');
+          return false;
+        }
+        owner.setLane(() => next, true);
+        try {
+          await owner.flush();
+        } finally {
+          if (active(owner, controller)) owner.select({ kind: 'annotation-effect', id }, context);
+        }
+      },
+      'save',
+      context
+    );
+  };
+  const previewCurrent =
+    gesture?.session === args.session ? findClip(args.lane, gesture.before.id) : undefined;
   return {
     geometry,
     bodyMeasurements,
@@ -518,18 +568,21 @@ export function useReviewAnnotationEffects(
     failure,
     lane: args.lane,
     previewLane:
-      gesture?.session === args.session &&
-      args.lane?.instances.some(
-        (item) => item.id === gesture.before.id && sameInstance(item, gesture.before)
-      )
-        ? {
-            ...args.lane,
-            instances: args.lane.instances.map((item) =>
-              item.id === gesture.before.id ? gesture.after : item
-            ),
-          }
+      gesture && args.lane && previewCurrent && sameClip(previewCurrent, gesture.before)
+        ? replaceClip(args.lane, gesture.after)
         : args.lane,
     add,
+    addText,
+    changeText: (
+      id: string,
+      edit: (clip: ReviewAnnotationTextClip) => ReviewAnnotationTextClip
+    ) => {
+      if (draft.current) return;
+      void stageField((lane) => {
+        const clip = lane?.textClips?.find((item) => item.id === id);
+        return lane && clip ? replaceClip(lane, edit(clip)) : lane;
+      });
+    },
     change,
     enabled: (enabled: boolean) => {
       if (draft.current || completion.current) return;
@@ -553,21 +606,31 @@ export function useReviewAnnotationEffects(
     remove: (id: string) => {
       if (draft.current) cancelGesture();
       void mutate(
-        (lane) => lane && { ...lane, instances: lane.instances.filter((item) => item.id !== id) }
+        (lane) =>
+          lane && {
+            ...lane,
+            instances: lane.instances.filter((item) => item.id !== id),
+            ...(lane.textClips
+              ? { textClips: lane.textClips.filter((item) => item.id !== id) }
+              : {}),
+          }
       );
     },
     duplicate: (id: string) => {
       if (draft.current) return;
       void execute(async (owner, controller) => {
-        const lane = currentLane();
-        const original = lane?.instances.find((item) => item.id === id);
-        if (!lane || !original) return;
+        const { lane, order } = prepareReviewAnnotationAppend(currentLane());
+        const original = findClip(lane, id);
+        if (!original) return;
         const copy = {
           ...structuredClone(original),
           id: crypto.randomUUID(),
-          order: Math.max(-1, ...lane.instances.map((item) => item.order)) + 1,
+          order,
         };
-        const next = { ...lane, instances: [...lane.instances, copy] };
+        const next =
+          'text' in copy
+            ? { ...lane, textClips: [...(lane.textClips ?? []), copy] }
+            : { ...lane, instances: [...lane.instances, copy] };
         if (!valid(next)) {
           setFailure('invalid');
           return;
@@ -580,7 +643,7 @@ export function useReviewAnnotationEffects(
     /** Call inside the existing note/gesture admission; only the final pointer transaction enters history. */
     beginGesture: (id: string, kind: Gesture['kind'] = 'placement') => {
       if (!args.allowed() || draft.current || operation.current || completion.current) return false;
-      const instance = args.readLane()?.instances.find((item) => item.id === id);
+      const instance = findClip(args.readLane(), id);
       if (!instance) return false;
       args.pause();
       const next = {
@@ -593,7 +656,7 @@ export function useReviewAnnotationEffects(
       setGesture(next);
       return true;
     },
-    previewGesture: (patch: Patch) => {
+    previewGesture: (patch: GesturePatch) => {
       if (
         (patch.transform || patch.anchors) &&
         Object.keys(patch).every((key) => key === 'transform' || key === 'anchors') &&

@@ -25,6 +25,8 @@ import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { createCanvasComment } from '../../features/video/review/comments';
 import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
 import { reviewPresentedGeometry } from './gpu-preview-geometry';
+import { createReviewExportDiagnostics } from './export-diagnostics';
+import { EffectRuntimeFrameError } from '../../features/video/composition/effect-runtime/runtime/frame-error';
 
 const io = vi.hoisted(() => ({
   order: [] as string[],
@@ -125,12 +127,15 @@ function setup() {
         rect: vi.fn(),
         clip: vi.fn(),
         scale: vi.fn(),
+        rotate: vi.fn(),
+        translate: vi.fn(),
         drawImage: vi.fn(),
         fillRect: vi.fn(() => io.order.push('outer-fade')),
         measureText: vi.fn((text: string) => ({ width: text.length * 8 })),
         beginPath: vi.fn(),
         roundRect: vi.fn(),
         fill: vi.fn(),
+        strokeText: vi.fn(),
         fillText: vi.fn(() => io.order.push('captions')),
       } as unknown as CanvasRenderingContext2D;
       const release = vi.fn();
@@ -3040,4 +3045,196 @@ it('releases a refused GL context allocation and retries without leaking its res
   await vi.waitFor(() => expect(lose).toHaveBeenCalledOnce());
   expect(reservations[1]).toHaveBeenCalledOnce();
   output.release();
+});
+
+it('uses the ordered Canvas path before allocating GPU text rasters for a dense mixed viewport stack', async () => {
+  const { createReviewAnnotationTextClip } =
+    await import('../../features/video/review/annotation-effects/text-animation');
+  const fixture = await annotationsFixture();
+  const lane = fixture.input.annotationEffects!.lane;
+  const template = lane.instances[1]!;
+  lane.instances = Array.from({ length: 32 }, (_, index) => ({
+    ...template,
+    id: `package-${index}`,
+    order: index * 2 + 1,
+    transform: { ...template.transform, width: 0.025, height: 0.025 },
+  }));
+  lane.textClips = Array.from({ length: 33 }, (_, index) =>
+    createReviewAnnotationTextClip(`text-${index}`, 'A', 0, 4, index * 2)
+  );
+  const { resources } = setup();
+  const gpu = { allocatedBytes: 0, render: vi.fn(), releaseScene: vi.fn(), dispose: vi.fn() };
+  io.gpu.mockReturnValue(gpu);
+  vi.stubGlobal('navigator', { gpu: {} });
+  const renderer = createReviewPreviewRenderer({
+    resources,
+    annotationExecutor: () => fixture.executor,
+  });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(fixture.input, dimensions, signal);
+  const source = { ...frame().source, videoFrame: () => ({}) as VideoFrame };
+  const result = await renderer.render(prepared, { ...frame(), source }, signal);
+  try {
+    expect(result.renderer.backend).toBe('legacy');
+    expect(gpu.render).not.toHaveBeenCalled();
+    expect(fixture.executor.renderFrame).toHaveBeenCalledTimes(32);
+    const imageCalls = vi.mocked(result.context.drawImage).mock;
+    const textCalls = vi.mocked(result.context.fillText).mock.invocationCallOrder;
+    expect(textCalls).toHaveLength(33);
+    for (const [index, bitmap] of fixture.bitmaps.entries()) {
+      const imageIndex = imageCalls.calls.findIndex(([image]) => Object.is(image, bitmap));
+      expect(imageIndex).toBeGreaterThanOrEqual(0);
+      const packageCall = imageCalls.invocationCallOrder[imageIndex]!;
+      expect(packageCall).toBeGreaterThan(textCalls[index]!);
+      expect(packageCall).toBeLessThan(textCalls[index + 1]!);
+      expect(bitmap.close).toHaveBeenCalledOnce();
+    }
+  } finally {
+    result.release();
+    renderer.dispose();
+  }
+});
+
+it('retains one cumulative raster budget across streamed viewport packages', async () => {
+  const { createReviewAnnotationTextClip } =
+    await import('../../features/video/review/annotation-effects/text-animation');
+  const fixture = await annotationsFixture();
+  const lane = fixture.input.annotationEffects!.lane;
+  const template = lane.instances[1]!;
+  lane.instances = Array.from({ length: 18 }, (_, index) => ({
+    ...template,
+    id: `package-${index}`,
+    order: index,
+    transform: { ...template.transform, width: 1, height: 1 },
+  }));
+  lane.textClips = [createReviewAnnotationTextClip('text', 'Title', 5, 6, 18)];
+  const { resources, leases } = setup();
+  const renderer = createReviewPreviewRenderer({
+    resources,
+    annotationExecutor: () => fixture.executor,
+  });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(
+    fixture.input,
+    { canonical: size, backing: size },
+    signal
+  );
+  try {
+    const sink = vi.fn();
+    const diagnostics = createReviewExportDiagnostics(
+      { destination: 'preview', route: 'render' },
+      sink
+    );
+    const rendering = diagnostics.phase('compose', () =>
+      renderer.render(prepared, frame(), signal)
+    );
+    await expect(
+      rendering.catch((error: unknown) => {
+        diagnostics.reportFailure(error);
+        throw error;
+      })
+    ).rejects.toThrow();
+    diagnostics.reportFailure(new EffectRuntimeFrameError('circuitOpen'), 'compose');
+    expect(sink).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining('effectCode=resourceLimit')
+    );
+    expect(fixture.executor.renderFrame.mock.calls.length).toBeLessThan(lane.instances.length);
+    expect(fixture.bitmaps.length).toBeGreaterThan(0);
+    for (const bitmap of fixture.bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+    expect(leases[0]?.release).toHaveBeenCalledOnce();
+  } finally {
+    prepared.release();
+    renderer.dispose();
+  }
+});
+
+it('admits Canvas after a text edit with retained GPU artwork and front leases', async () => {
+  const { createReviewAnnotationTextClip } =
+    await import('../../features/video/review/annotation-effects/text-animation');
+  const { createPreviewRenderResources } = await import('./preview-render-resources');
+  const fixture = await annotationsFixture();
+  const lane = fixture.input.annotationEffects!.lane;
+  lane.textClips = [createReviewAnnotationTextClip('first', 'First', 0, 4, 0)];
+  lane.instances[0]!.order = 1;
+  lane.instances[1]!.order = 2;
+  const backing = { width: 3840, height: 2160 };
+  const context = setup().resources.canvas('context', { width: 1, height: 1 }).context;
+  const resources = createPreviewRenderResources({
+    maximumManagedBytes: 1,
+    maximumCanvases: 1,
+    createCanvas: () =>
+      ({ width: 0, height: 0, getContext: () => context }) as unknown as HTMLCanvasElement,
+  });
+  const graph = allocationInput();
+  graph.publication.backing = backing;
+  const retained: { release(): void }[] = [];
+  const gpu = {
+    allocatedBytes: 0,
+    renderPresentation: vi.fn(async () => {
+      for (const role of [
+        'preview-gpu-background',
+        'preview-gpu-decoration',
+        'preview-gpu-captions',
+      ])
+        retained.push(resources.canvas(role, { width: 640, height: 360 }));
+      const front = resources.canvas('preview-publication', backing);
+      return {
+        canvas: front.canvas,
+        release: front.release,
+        outputKind: 'gpu-surface' as const,
+        retainedProviderBytes: () => 0,
+        isRetiredProvider: () => false,
+      };
+    }),
+    releaseScene: vi.fn(),
+    dispose: vi.fn(),
+  };
+  io.gpu.mockReturnValue(gpu);
+  vi.stubGlobal('navigator', { gpu: {} });
+  const renderer = createReviewPreviewRenderer({
+    resources,
+    annotationExecutor: () => fixture.executor,
+    allocation: { describe: () => graph, replaceLimits: resources.replaceLimits.bind(resources) },
+  });
+  const signal = new AbortController().signal;
+  const dims = { canonical: size, backing };
+  const source = { ...frame().source, videoFrame: () => ({}) as VideoFrame };
+  const first = await renderer.prepare(fixture.input, dims, signal);
+  const acquireOutput = vi.fn();
+  const front = await renderer.renderPresentation(
+    first,
+    { ...frame(), source },
+    signal,
+    acquireOutput
+  );
+  try {
+    expect(front.renderer.backend).toBe('gpu');
+    graph.publication.previousFront = backing;
+    graph.publication.previousFrontKind = 'gpu-surface';
+    const second = createReviewAnnotationTextClip('second', 'Second', 0, 4, 3);
+    const changed = {
+      ...fixture.input,
+      annotationEffects: {
+        ...fixture.input.annotationEffects!,
+        lane: { ...lane, textClips: [...lane.textClips, second] },
+      },
+    };
+    const dense = await renderer.prepare(changed, dims, signal);
+    const result = await renderer.renderPresentation(
+      dense,
+      { ...frame(), source },
+      signal,
+      acquireOutput
+    );
+    expect(result.renderer.backend).toBe('legacy');
+    expect(gpu.renderPresentation).toHaveBeenCalledOnce();
+    result.release();
+    dense.release();
+  } finally {
+    front.release();
+    first.release();
+    for (const lease of retained) lease.release();
+    renderer.dispose();
+    resources.dispose();
+  }
 });

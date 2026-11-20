@@ -82,7 +82,8 @@ export function resolveQuickEditEffectiveFeatures(
       advanced &&
       state.ui.tracks.annotationEffects !== false &&
       !!state.annotationEffects?.enabled &&
-      state.annotationEffects.instances.some((instance) => instance.enabled),
+      (state.annotationEffects.instances.some((instance) => instance.enabled) ||
+        !!state.annotationEffects.textClips?.some((clip) => clip.enabled && clip.text.trim())),
     watermarkApplied:
       advanced &&
       (state.watermark?.mode === 'text' ||
@@ -151,15 +152,19 @@ export function resolveQuickEditEffectiveState(
   const advanced = state.ui.mode === 'advanced';
   const features = resolveQuickEditEffectiveFeatures(state);
   const segments = state.audio.voiceoverSegments;
+  const resultDuration = segments ? (segments.at(-1)?.resultEnd ?? 0) : Infinity;
   const annotationEffects =
     features.annotationEffectsApplied &&
-    state.annotationEffects?.instances.some(
+    (state.annotationEffects?.instances.some(
       (instance) =>
         instance.enabled &&
         (!instance.visualAnchor ||
           !segments ||
           projectReviewAnnotationEffect(instance, segments).slices.length)
-    )
+    ) ||
+      state.annotationEffects?.textClips?.some(
+        (clip) => clip.enabled && clip.start < resultDuration && clip.text.trim()
+      ))
       ? state.annotationEffects
       : undefined;
   return {
@@ -597,6 +602,7 @@ export function hasSuppressedAdvancedFeatures(state: QuickEditAdvancedState): bo
     !!state.windowHeader ||
     !!state.webcam?.enabled ||
     !!state.annotationEffects?.instances.length ||
+    !!state.annotationEffects?.textClips?.length ||
     (!!state.captions?.enabled &&
       !!state.text?.fragments.some((fragment) => fragment.showInVideo && fragment.text.trim())) ||
     state.watermark?.mode === 'text' ||

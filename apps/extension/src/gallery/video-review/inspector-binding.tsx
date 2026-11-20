@@ -22,6 +22,7 @@ import {
   createMediaHubBackupExportOptions,
 } from '../../workflows/media-hub-backup';
 import { ReviewCursorPathEditor, ReviewCursorPathSettings } from './cursor-path-editor';
+import { ReviewAnnotationTextInspector } from './annotation-text-inspector';
 import { ReviewAnnotationInspector } from './annotation-effects-inspector';
 import { reviewSubtitleMainOffset } from '../../features/video/review/subtitle-export';
 import { ReviewSourceSpeechBinding } from './speech-panel';
@@ -1050,6 +1051,18 @@ function ReviewSelectionBinding({
     );
   if (state.model.activeSelection.kind === 'annotation-effect') {
     const selection = state.model.activeSelection;
+    const clip = state.editors.annotationEffects.lane?.textClips?.find(
+      (item) => item.id === selection.id
+    );
+    if (clip)
+      return (
+        <ReviewAnnotationTextInspector
+          key={`${state.model.workspace.sourceAssetId}:${clip.id}`}
+          clip={clip}
+          editor={state.editors.annotationEffects}
+          busy={state.model.busy || state.output.phase !== 'idle'}
+        />
+      );
     const instance = state.editors.annotationEffects.lane?.instances.find(
       (item) => item.id === selection.id
     );

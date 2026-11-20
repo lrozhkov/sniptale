@@ -151,7 +151,7 @@ export function reviewTrackItems(args: {
       };
     });
   }
-  if (track === 'annotationEffects')
+  if (track === 'annotationEffects') {
     rows = (content.annotationEffects?.instances ?? []).map((item) => {
       const snapshot = args.snapshots.find((snapshot) => snapshot.id === item.snapshotId);
       const definition = snapshot
@@ -169,6 +169,20 @@ export function reviewTrackItems(args: {
         inactive: !item.enabled,
       };
     });
+    rows.push(
+      ...(content.annotationEffects?.textClips ?? []).map((clip) => ({
+        id: clip.id,
+        start: axis.source(clip.start),
+        end: axis.source(clip.end, 'end'),
+        label: clip.text.trim() || translate('gallery.videoReview.annotationText'),
+        detail: '',
+        selection: { kind: 'annotation-effect' as const, id: clip.id },
+        timelineKey: `annotation:${clip.id}`,
+        removable: true,
+        inactive: !clip.enabled || clip.start >= axis.resultDuration,
+      }))
+    );
+  }
   if (track === 'voiceover' || track === 'music')
     rows = content.audio[track].map((clip) => {
       const range =
@@ -261,6 +275,9 @@ export function removeReviewTrackItems(
       annotationEffects: {
         ...content.annotationEffects,
         instances: content.annotationEffects.instances.filter((item) => !ids.has(item.id)),
+        ...(content.annotationEffects.textClips
+          ? { textClips: content.annotationEffects.textClips.filter((item) => !ids.has(item.id)) }
+          : {}),
       },
     };
   if (track === 'voiceover' || track === 'music')

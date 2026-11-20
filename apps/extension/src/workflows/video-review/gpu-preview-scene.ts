@@ -67,6 +67,7 @@ export async function buildReviewGpuScene(args: {
   painter: ReturnType<typeof createReviewBackgroundPainter>;
   image: ImageBitmap | null;
   resultTime: number;
+  omitAnnotationText: boolean;
   primitives: ReviewGpuPrimitives;
   cameraOverride?: QuickEditCameraTransform | undefined;
   fps?: number | undefined;
@@ -396,6 +397,8 @@ export async function buildReviewGpuScene(args: {
     dimensions,
     base,
     geometry: currentGeometry,
+    annotationTextTime: resultTime,
+    includeAnnotationText: !args.omitAnnotationText,
     sourceTime,
     fps: fps ?? 30,
     original,

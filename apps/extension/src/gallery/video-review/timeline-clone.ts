@@ -1,3 +1,4 @@
+import { prepareReviewAnnotationAppend } from '../../features/video/review/annotation-effects/types';
 import type { ReviewEdit, ReviewSelection } from '../../features/video/review/types';
 import type { QuickEditAdvancedContent } from '../../features/video/review/advanced/types';
 import { loadQuickEditAdvancedContentState } from '../../features/video/review/advanced/validation';
@@ -116,13 +117,17 @@ export function cloneReviewTimelineSelection(args: {
         break;
       }
       case 'annotation-effect': {
-        const source = next.annotationEffects?.instances.find((item) => item.id === selection.id);
-        if (!source || !next.annotationEffects) return null;
-        next.annotationEffects.instances.push({
-          ...structuredClone(source),
-          id: id(),
-          order: Math.max(-1, ...next.annotationEffects.instances.map((item) => item.order)) + 1,
-        });
+        const { lane, order } = prepareReviewAnnotationAppend(next.annotationEffects);
+        const text = lane.textClips?.find((item) => item.id === selection.id);
+        const source = lane.instances.find((item) => item.id === selection.id);
+        if (!text && !source) return null;
+        next.annotationEffects = lane;
+        if (text)
+          lane.textClips = [
+            ...(lane.textClips ?? []),
+            { ...structuredClone(text), id: id(), order },
+          ];
+        else if (source) lane.instances.push({ ...structuredClone(source), id: id(), order });
         break;
       }
       case 'text': {

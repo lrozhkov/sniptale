@@ -1,3 +1,4 @@
+import { prepareReviewAnnotationAppend } from '../../features/video/review/annotation-effects/types';
 import { createSyncProductClient } from '../../platform/runtime-messaging/sync-product-client';
 import { acquireSyncCheckpointEdit } from '../../composition/persistence/sync-capture/checkpoint-publication';
 import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
@@ -240,13 +241,13 @@ export function createReviewAnnotationPublication(
   before: QuickEditAdvancedContent,
   candidate: ReviewAnnotationEffect
 ): ReviewOperation {
-  const existing = before.annotationEffects?.instances ?? [];
-  if (existing.some((instance) => instance.id === candidate.id))
+  const { lane, order } = prepareReviewAnnotationAppend(before.annotationEffects);
+  if (
+    lane.instances.some((instance) => instance.id === candidate.id) ||
+    lane.textClips?.some((clip) => clip.id === candidate.id)
+  )
     throw new Error('Annotation instance already exists.');
-  const instance = {
-    ...candidate,
-    order: Math.max(-1, ...existing.map((value) => value.order)) + 1,
-  };
+  const instance = { ...candidate, order };
   const operation: ReviewOperation = {
     id: crypto.randomUUID(),
     at: Date.now(),
@@ -255,8 +256,8 @@ export function createReviewAnnotationPublication(
     after: {
       ...before,
       annotationEffects: {
-        enabled: before.annotationEffects?.enabled ?? true,
-        instances: [...existing, instance],
+        ...lane,
+        instances: [...lane.instances, instance],
       },
     },
   };

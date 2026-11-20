@@ -11,8 +11,12 @@ import {
 } from '@sniptale/runtime-contracts/animation-template';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { EFFECT_BUNDLE_LIMITS } from '../../project/effect-bundle/limits';
+import { REVIEW_TEXT_DIRECTIONS, REVIEW_TEXT_LOOPS, REVIEW_TEXT_TRANSITIONS } from './types';
 import type {
   ReviewAnnotationEffect,
+  ReviewAnnotationTextClip,
+  ReviewTextLoop,
+  ReviewTextTransition,
   ReviewAnnotationEffectAsset,
   ReviewAnnotationEffects,
   ReviewAnnotationEffectSnapshot,
@@ -21,6 +25,8 @@ import type {
 const MAX_INSTANCES = 512;
 const MAX_RETAINED_BYTES = 512 * 1024 * 1024;
 const MAX_TIME = 86_400;
+const MAX_CONCURRENT_TEXT_WORK = 8192;
+const TEXT_CLIP_PAINT_COST = 64;
 const identity = (value: unknown): value is string =>
   typeof value === 'string' &&
   value.length > 0 &&
@@ -131,13 +137,101 @@ function parseInstance(raw: unknown): ReviewAnnotationEffect | null {
   };
 }
 
+function parseTextTransition(raw: unknown): ReviewTextTransition | null {
+  if (!isRecord(raw)) return null;
+  const preset = REVIEW_TEXT_TRANSITIONS.find((item) => item === raw['preset']);
+  const direction = REVIEW_TEXT_DIRECTIONS.find((item) => item === raw['direction']);
+  if (
+    !preset ||
+    !direction ||
+    !finite(raw['duration'], 0, 30) ||
+    !finite(raw['distance'], 0, 1) ||
+    !finite(raw['stagger'], 0, 1)
+  )
+    return null;
+  return {
+    preset,
+    direction,
+    duration: raw['duration'],
+    distance: raw['distance'],
+    stagger: raw['stagger'],
+  };
+}
+
+function parseTextLoop(raw: unknown): ReviewTextLoop | null {
+  if (!isRecord(raw)) return null;
+  const preset = REVIEW_TEXT_LOOPS.find((item) => item === raw['preset']);
+  if (!preset || !finite(raw['period'], 0.1, 30) || !finite(raw['amount'], 0, 1)) return null;
+  return { preset, period: raw['period'], amount: raw['amount'] };
+}
+
+function parseTextClip(raw: unknown): ReviewAnnotationTextClip | null {
+  if (
+    !isRecord(raw) ||
+    !identity(raw['id']) ||
+    typeof raw['enabled'] !== 'boolean' ||
+    typeof raw['text'] !== 'string' ||
+    raw['text'].length > 4096 ||
+    !finite(raw['start'], 0, MAX_TIME) ||
+    !finite(raw['end'], 0, MAX_TIME) ||
+    raw['end'] <= raw['start'] ||
+    !Number.isSafeInteger(raw['order']) ||
+    !finite(raw['order'], 0, Number.MAX_SAFE_INTEGER) ||
+    !finite(raw['fontSize'], 0.005, 0.5) ||
+    typeof raw['color'] !== 'string' ||
+    !/^#[a-f0-9]{6}$/iu.test(raw['color'])
+  )
+    return null;
+  const transform = parseTransform(raw['transform']);
+  const entrance = parseTextTransition(raw['entrance']);
+  const exit = parseTextTransition(raw['exit']);
+  const loop = parseTextLoop(raw['loop']);
+  if (!transform || !entrance || !exit || !loop) return null;
+  return {
+    id: raw['id'],
+    enabled: raw['enabled'],
+    text: raw['text'],
+    start: raw['start'],
+    end: raw['end'],
+    transform,
+    color: raw['color'],
+    fontSize: raw['fontSize'],
+    order: raw['order'],
+    entrance,
+    loop,
+    exit,
+  };
+}
+
+function textWorkFitsFrame(clips: readonly ReviewAnnotationTextClip[]) {
+  const events = clips
+    .filter((clip) => clip.enabled && clip.text.trim())
+    .flatMap(({ start, end, text }) => {
+      const work = Math.max(TEXT_CLIP_PAINT_COST, text.length);
+      return [
+        { time: start, work },
+        { time: end, work: -work },
+      ];
+    })
+    .sort((a, b) => a.time - b.time || a.work - b.work);
+  let work = 0;
+  for (const event of events) {
+    work += event.work;
+    if (work > MAX_CONCURRENT_TEXT_WORK) return false;
+  }
+  return true;
+}
+
 /** Canonical JSON instances; disabled and wholly cut annotations remain authored content. */
 export function parseReviewAnnotationEffects(raw: unknown): ReviewAnnotationEffects | null {
   if (
     !isRecord(raw) ||
     typeof raw['enabled'] !== 'boolean' ||
     !Array.isArray(raw['instances']) ||
-    raw['instances'].length > MAX_INSTANCES
+    raw['instances'].length > MAX_INSTANCES ||
+    (raw['textClips'] !== undefined &&
+      (!Array.isArray(raw['textClips']) ||
+        raw['instances'].length + raw['textClips'].length > MAX_INSTANCES))
   )
     return null;
   const instances: ReviewAnnotationEffect[] = [];
@@ -150,7 +244,22 @@ export function parseReviewAnnotationEffects(raw: unknown): ReviewAnnotationEffe
     orders.add(instance.order);
     instances.push(instance);
   }
-  return { enabled: raw['enabled'], instances: instances.sort((a, b) => a.order - b.order) };
+  const textClips: ReviewAnnotationTextClip[] = [];
+  if (Array.isArray(raw['textClips'])) {
+    for (const value of raw['textClips']) {
+      const clip = parseTextClip(value);
+      if (!clip || ids.has(clip.id) || orders.has(clip.order)) return null;
+      ids.add(clip.id);
+      orders.add(clip.order);
+      textClips.push(clip);
+    }
+  }
+  if (!textWorkFitsFrame(textClips)) return null;
+  return {
+    enabled: raw['enabled'],
+    instances: instances.sort((a, b) => a.order - b.order),
+    ...(textClips.length ? { textClips: textClips.sort((a, b) => a.order - b.order) } : {}),
+  };
 }
 
 /** Each animation snapshot owns its complete checked local package. */

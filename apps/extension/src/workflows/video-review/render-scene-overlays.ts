@@ -22,6 +22,8 @@ import {
   spatialReviewCommentSpace,
 } from './scene-frame';
 import { drawReviewAnnotationFrame } from './annotation-renderer';
+import { drawReviewAnnotationText, reviewViewportAnnotationLayers } from './draw-annotation-text';
+import type { ReviewAnnotationTextClip } from '../../features/video/review/annotation-effects/types';
 import { drawReviewClicks } from './render-click-animation';
 import { reviewSpatialOverlayBounds } from './spatial-overlay-bounds';
 import { drawSceneBorders } from '../../features/video/composition/draw/border';
@@ -49,6 +51,11 @@ export function drawReviewSceneOverlays(args: {
   windowRaster?: ReviewWindowRaster | null | undefined;
   clicks?: readonly ReviewClickCue[] | undefined;
   annotationFrames?: readonly Parameters<typeof drawReviewAnnotationFrame>[1][];
+  annotationText?: {
+    clips: readonly ReviewAnnotationTextClip[];
+    plane: { width: number; height: number };
+    resultTime: number;
+  };
   exportSampling?: ReviewExportSamplingFrame;
   sharpPaint?: (
     context: CanvasRenderingContext2D,
@@ -132,14 +139,28 @@ export function drawReviewSceneOverlays(args: {
   );
   const annotationFrames = args.annotationFrames ?? [];
   const paintViewport = () => {
-    for (const frame of annotationFrames)
-      if (frame.instance.attachment === 'viewport')
-        drawReviewAnnotationFrame(context, frame, {
+    const layers = reviewViewportAnnotationLayers(
+      annotationFrames.filter((frame) => frame.instance.attachment === 'viewport'),
+      args.annotationText?.clips ?? [],
+      args.annotationText?.resultTime ?? args.globalResultTime
+    );
+    for (const layer of layers) {
+      if (layer.kind === 'package')
+        drawReviewAnnotationFrame(context, layer.frame, {
           x: 0,
           y: 0,
           width: canvas.width,
           height: canvas.height,
         });
+      else if (args.annotationText)
+        drawReviewAnnotationText(
+          context,
+          layer.clip,
+          args.annotationText.resultTime,
+          args.annotationText.plane,
+          canvas
+        );
+    }
   };
   if (
     spatial &&

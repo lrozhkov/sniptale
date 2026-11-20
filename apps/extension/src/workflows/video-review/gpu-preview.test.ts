@@ -2029,6 +2029,7 @@ it('prepares annotation descriptors after output and releases the marker before 
   const batch = () => ({ entries: [], release() {}, retain: () => ({ release() {} }) });
   const annotations: NonNullable<Parameters<typeof f.owner.render>[0]['annotations']> = {
     describe: () => [],
+    createFrameScope: vi.fn(),
     prepareGpu: async () => ({
       entries: [],
       release() {},

@@ -3,6 +3,8 @@ import { glTransitionUniforms } from '../../features/video/project/transition/gl
 import { createPreparedSourceBudget } from '../../features/video/composition/export-enhancement/prepared-source';
 import type { ExportEnhancer } from '../../features/video/composition/export-enhancement/enhancer';
 import { prepareReviewExportSourceSampling } from './export-source-sampling';
+import { reviewSplitRasterAt } from './camera-split-screen';
+import { reviewActiveAnnotationText } from './draw-annotation-text';
 import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
 import {
   reviewGpuAnnotationLayer,
@@ -477,6 +479,20 @@ export function createReviewGpuPreview(args: {
               cache: { key: 'captions', revision: art.captionRevision },
             }
           : undefined;
+      const lane = scene.annotationEffects?.lane;
+      const transformMain =
+        input.transition?.blend.plan.type === 'gl' ||
+        reviewSplitRasterAt(
+          scene.webcam,
+          input.sourceTime,
+          !!input.camera,
+          dimensions.backing,
+          geometry.resultTime
+        );
+      const finalAnnotationText =
+        transformMain && lane?.enabled
+          ? reviewActiveAnnotationText(lane.textClips ?? [], geometry.resultTime)
+          : [];
       const sceneInputs = {
         dimensions,
         playback: output.kind === 'presentation' && output.playback && !input.exportEnhancer,
@@ -495,6 +511,7 @@ export function createReviewGpuPreview(args: {
         painter: art.painter,
         image: input.image,
         resultTime: geometry.resultTime,
+        omitAnnotationText: finalAnnotationText.length > 0,
         primitives,
         cameraOverride: input.cameraOverride,
         fps: input.fps,
@@ -682,6 +699,7 @@ export function createReviewGpuPreview(args: {
         sourceTime: input.sourceTime,
         resultTime: geometry.resultTime,
         primitives,
+        finalAnnotationText,
         ...(caption ? { caption } : {}),
         watermark: input.watermark ?? null,
         ...(input.camera ? { camera: input.camera } : {}),

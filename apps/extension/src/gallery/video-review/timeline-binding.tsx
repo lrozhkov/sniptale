@@ -795,6 +795,24 @@ function useAnnotationPlacement(props: TimelineBindingProps) {
     );
     clear();
   };
+  const addText = () => {
+    const context = props.commands.capture();
+    const editor = props.annotationEffects;
+    if (!context || !editor) return;
+    props.commands.admit(context, (captured) => {
+      const insertion = reviewCommandInsertion(captured, 'result');
+      if (!insertion) return;
+      const range = reviewInsertionRange({
+        time: insertion.time,
+        duration: insertion.duration,
+        seconds: 3,
+        minimum: 0.001,
+      });
+      if (!range) return;
+      clear();
+      void editor.addText(range, translate('gallery.videoReview.annotationTextStarter'), captured);
+    });
+  };
   useEffect(() => {
     clear();
   }, [props.annotationSourceId, clear]);
@@ -813,6 +831,13 @@ function useAnnotationPlacement(props: TimelineBindingProps) {
         : null,
       retryable: props.annotationEffects?.failure !== 'unsupported',
       onChoose: placeChoice,
+      addText,
+      textAvailable: !!reviewInsertionRange({
+        time: renderContext.time,
+        duration: renderContext.duration,
+        seconds: 3,
+        minimum: 0.001,
+      }),
       onReload: () => {
         void catalog.reload();
       },

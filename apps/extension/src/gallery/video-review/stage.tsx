@@ -1,3 +1,4 @@
+import { ReviewAnnotationTextOverlay } from './annotation-text-overlay';
 import { ReviewCursorMotionOverlay } from './cursor-motion-overlay';
 import type { ReviewPreviewRendererStatus } from './preview-presentation-state';
 import {
@@ -747,11 +748,14 @@ function ReviewStageGeometryLayers({
       />
       {beforeAnnotation}
       {props.annotationEditing && annotationGeometry && (
-        <ReviewAnnotationOverlay
-          binding={props.annotationEditing}
-          geometry={annotationGeometry}
-          size={size}
-        />
+        <>
+          <ReviewAnnotationOverlay
+            binding={props.annotationEditing}
+            geometry={annotationGeometry}
+            size={size}
+          />
+          <ReviewAnnotationTextOverlay binding={props.annotationEditing} size={size} />
+        </>
       )}
       {afterAnnotation}
     </>

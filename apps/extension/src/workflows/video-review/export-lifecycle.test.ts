@@ -14,6 +14,7 @@ import { exportReviewedVideo, type ReviewExportClipPlan } from './export-lifecyc
 
 import { createCanvasComment } from '../../features/video/review/comments';
 import { anchorReviewVoiceover } from '../../features/video/review/voiceover-edits';
+import { createReviewAnnotationTextClip } from '../../features/video/review/annotation-effects/text-animation';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 
 const FRAME_SOURCE = readFileSync(
@@ -131,6 +132,35 @@ it('routes annotation-only fragments with immutable workspace sources and the fu
   expect(args.snapshot).toEqual(before);
   expect(deps.saveRecordingsBatchSafely).not.toHaveBeenCalled();
   expect(deps.openAudioSource).not.toHaveBeenCalled();
+});
+
+it('composes native text without a package on the full result clock of a fragment', async () => {
+  const { args, deps } = fixture();
+  const advanced = args.snapshot.workspace.advanced;
+  advanced.ui.mode = 'advanced';
+  const text = createReviewAnnotationTextClip('text', 'Result title', 2, 5, 0);
+  text.entrance.preset = 'cascade';
+  text.loop.preset = 'shine';
+  text.exit.preset = 'fade';
+  advanced.annotationEffects = { enabled: true, instances: [], textClips: [text] };
+  args.index.processedVideoCodec = 'vp8';
+  deps.writeReviewFrames.mockResolvedValue({
+    videoPackets: 10,
+    audioPackets: 0,
+    resultDuration: 2,
+    audioRanges: [],
+  });
+  await exportReviewedVideo(
+    { ...args, destination: 'download', selection: { kind: 'range', start: 4, end: 6 } },
+    deps
+  );
+  expect(deps.writeReviewPackets).not.toHaveBeenCalled();
+  expect(deps.writeReviewFrames).toHaveBeenCalledWith(
+    expect.objectContaining({
+      fragmentOffset: 2,
+      advanced: expect.objectContaining({ annotationEffects: advanced.annotationEffects }),
+    })
+  );
 });
 
 it('publishes a new prepared asset once and returns a separate downloadable file and revision receipt', async () => {

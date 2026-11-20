@@ -17,6 +17,13 @@ export interface ReviewVisualPlacement {
   visualAnchor?: VisualSpan[];
 }
 
+interface ReviewVisualDisplay {
+  parts: readonly { segment: ReviewTimeSegment; start: number; end: number }[];
+  resultToDisplay(time: number, edge?: 'start' | 'end'): number;
+  sourceToDisplay(time: number, edge?: 'start' | 'end'): number;
+  displayToResult(time: number): number;
+}
+
 export function parseReviewVisualAnchor(
   value: unknown,
   duration: number
@@ -167,7 +174,7 @@ export function reviewVisualAnchorSourceRange(
 /** Timeline geometry includes cut intervals, using the existing source and freeze display axes. */
 export function displayReviewVisualAnchor(
   item: ReviewVisualPlacement,
-  display: ReturnType<typeof import('./timeline').createReviewDisplayMap>,
+  display: ReviewVisualDisplay,
   phase = 0
 ) {
   const anchor = item.visualAnchor;
@@ -188,7 +195,7 @@ export function displayReviewVisualAnchor(
 /** A deliberate lane gesture creates a new placement, including the portion under a cut. */
 export function anchorReviewVisualDisplay(
   range: { start: number; end: number },
-  display: ReturnType<typeof import('./timeline').createReviewDisplayMap>
+  display: ReviewVisualDisplay
 ): ReviewVisualPlacement {
   let offset = 0;
   const visualAnchor = display.parts.flatMap((part) => {

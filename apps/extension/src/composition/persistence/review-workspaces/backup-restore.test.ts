@@ -1,3 +1,4 @@
+import { createReviewAnnotationTextClip } from '../../../features/video/review/annotation-effects/text-animation';
 import type { CursorFocusPath } from '../../../features/video/project/cursor-focus-path/types';
 import { createQuickEditSpotlight } from '../../../features/video/project/scene/focus-appearance';
 import { annotation, workspace, snapshotDatabase } from './backup-restore.test-support';
@@ -747,4 +748,30 @@ it('preserves recording-bound focus history across archived-source aliases and r
   expect(input.advanced.cursorFocusPath?.segments[0]?.binding).toMatchObject({
     recordingId: 'original',
   });
+});
+
+it('restores native annotation text, geometry and phase settings from the portable workspace', async () => {
+  const title = createReviewAnnotationTextClip('title', 'Восстановлено', 2, 5, 0);
+  title.entrance.preset = 'words';
+  title.loop = { preset: 'sway', amount: 0.5, period: 2.2 };
+  title.exit.preset = 'blur';
+  title.transform.y = 0.63;
+  const annotationEffects = { enabled: true, instances: [], textClips: [title] };
+  const input: VideoWorkspace = {
+    ...workspace,
+    advanced: { ...workspace.advanced, annotationEffects },
+  };
+  const portable = await readVideoReviewForBackup({
+    aggregateId: input.aggregateId,
+    sourceAssetId: input.sourceAssetId,
+    db: snapshotDatabase(input, undefined),
+  });
+  if (!portable) throw new Error('Missing portable workspace');
+  const restored = prepareVideoReviewRestore({
+    review: portable,
+    sourceAggregateId: input.aggregateId,
+    targetAggregateId: 'recording:restored',
+    sourceAssetId: 'restored-source',
+  });
+  expect(restored.workspace.advanced.annotationEffects).toEqual(annotationEffects);
 });

@@ -1,8 +1,11 @@
+import { configureGpuPreviewProofBrowser } from '../support/gpu-preview-proof';
 import { writeFile } from 'node:fs/promises';
 import { bundleQuickReviewAnnotationProbe } from '../support/quick-review-annotation-bundle';
 import { expect, test } from '@playwright/test';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
+
+configureGpuPreviewProofBrowser();
 
 for (const combinedBorders of [false, true]) {
   test(
@@ -58,10 +61,14 @@ for (const combinedBorders of [false, true]) {
   );
 }
 
-for (const converted of [false, true]) {
+for (const { converted, nativeText } of [
+  { converted: false, nativeText: false },
+  { converted: true, nativeText: false },
+  { converted: false, nativeText: true },
+]) {
   test(
     `native MP4/WebM exports retain annotations through full, fragment and presentation clocks ` +
-      `(converted=${converted})`,
+      `(converted=${converted}, nativeText=${nativeText})`,
     async ({ page }, info) => {
       test.setTimeout(120_000);
       const host = await startHostServer();
@@ -71,12 +78,12 @@ for (const converted of [false, true]) {
         await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
         await page.locator('[data-ui="gallery.page.root"]').waitFor();
         const results = await page.evaluate(
-          async ({ text, converted }) => {
+          async ({ text, converted, nativeText }) => {
             const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
             try {
               const module: typeof import('../support/quick-review-annotation-render-probe') =
                 await import(url);
-              return await module.exportProbe(converted);
+              return await module.exportProbe(converted, nativeText);
             } catch (error) {
               if (error instanceof Error && 'failures' in error)
                 throw new Error(`${error.message}: ${JSON.stringify(error.failures)}`, {
@@ -87,7 +94,7 @@ for (const converted of [false, true]) {
               URL.revokeObjectURL(url);
             }
           },
-          { text: bundle.outputFiles[0]!.text, converted }
+          { text: bundle.outputFiles[0]!.text, converted, nativeText }
         );
         await writeFile(
           info.outputPath('annotation-native-exports.json'),
@@ -118,3 +125,87 @@ for (const converted of [false, true]) {
     }
   );
 }
+
+test.describe('native text phases', () => {
+  test('holds native text in the final viewport through CUT and camera split', async ({ page }) => {
+    const host = await startHostServer();
+    try {
+      const bundle = await bundleQuickReviewAnnotationProbe(host.origin);
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+      const results = await page.evaluate(async (text) => {
+        const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+        try {
+          const module: typeof import('../support/quick-review-annotation-render-probe') =
+            await import(url);
+          return await module.textCutClockProbe();
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      }, bundle.outputFiles[0]!.text);
+      expect(results).toHaveLength(15);
+      const reference = results.find((frame) => frame.mode === 'reference')!;
+      for (const frame of results) {
+        const detail = JSON.stringify(frame);
+        expect(frame.backend, detail).toBe('gpu');
+        if (frame.visible) {
+          expect(frame.canvas.pixels, detail).toBeGreaterThan(100);
+          expect(frame.gpu.pixels, detail).toBeGreaterThan(100);
+          frame.gpu.bounds.forEach((edge, index) =>
+            expect(Math.abs(edge - frame.canvas.bounds[index]!), detail).toBeLessThanOrEqual(1)
+          );
+          if (frame.mode === 'gl' || frame.mode === 'split') {
+            frame.canvas.bounds.forEach((edge, index) =>
+              expect(Math.abs(edge - reference.canvas.bounds[index]!), detail).toBeLessThanOrEqual(
+                1
+              )
+            );
+          }
+        } else {
+          expect(frame.canvas.pixels, detail).toBe(0);
+          expect(frame.gpu.pixels, detail).toBe(0);
+        }
+      }
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+
+  test('produces the same text placement in Canvas, GPU and both export clocks', async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    const host = await startHostServer();
+    try {
+      const bundle = await bundleQuickReviewAnnotationProbe(host.origin);
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+      const results = await page.evaluate(async (text) => {
+        const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+        try {
+          const module: typeof import('../support/quick-review-annotation-render-probe') =
+            await import(url);
+          return await module.textClockProbe();
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      }, bundle.outputFiles[0]!.text);
+      expect(results).toHaveLength(3);
+      for (const frame of results) {
+        const detail = JSON.stringify(frame);
+        expect(frame.backend, detail).toBe('gpu');
+        expect(frame.canvas.pixels, detail).toBeGreaterThan(100);
+        expect(frame.gpu.pixels, detail).toBeGreaterThan(100);
+        frame.gpu.bounds.forEach((edge, index) =>
+          expect(Math.abs(edge - frame.canvas.bounds[index]!), detail).toBeLessThanOrEqual(1)
+        );
+        expect(frame.full, detail).toEqual({ pixels: 0, maxDifference: 0 });
+        expect(frame.fragment, detail).toEqual({ pixels: 0, maxDifference: 0 });
+      }
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+});

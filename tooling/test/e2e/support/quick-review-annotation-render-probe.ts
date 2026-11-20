@@ -1,4 +1,11 @@
+import { createReviewAnnotationTextClip } from '../../../../apps/extension/src/features/video/review/annotation-effects/text-animation';
 import { createReviewPresentationMain } from '../../../../apps/extension/src/workflows/video-review/presentation-main';
+import { reviewCutTransitionAt } from '../../../../apps/extension/src/features/video/review/cuts';
+import { createGlTransitionSelection } from '../../../../apps/extension/src/features/video/project/transition/gl-catalog';
+import {
+  createQuickEditWebcam,
+  quickEditWebcamPlacementAt,
+} from '../../../../apps/extension/src/features/video/review/advanced/webcam';
 import { resolveQuickEditEffectiveState } from '../../../../apps/extension/src/features/video/review/advanced/effective';
 import retainedCalloutSource from '../../../../apps/extension/src/features/video/project/effect-bundle/fixtures/retained/callout.sniptale-animation.json?raw';
 import { createQuickEditBorder } from '../../../../apps/extension/src/features/video/project/scene/focus-appearance';
@@ -604,8 +611,8 @@ function annotationExportScene(
 }
 
 /** Actual frame exporter, probed codecs, muxed files and decoded witnesses for full and fragment clocks. */
-export async function exportProbe(converted = false) {
-  const defs = await definitions();
+export async function exportProbe(converted = false, nativeText = false) {
+  const defs = nativeText ? [] : await definitions();
   const file = await encodedSource();
   const signal = new AbortController().signal;
   const index = await inspectReviewMedia(file, signal);
@@ -645,6 +652,13 @@ export async function exportProbe(converted = false) {
       const fragment = variant === 'fragment';
       const presentation = variant === 'presentation';
       const { scene, advanced } = annotationExportScene(defs, size, converted);
+      if (nativeText) {
+        const title = createReviewAnnotationTextClip('text', 'Новый титр 👩🏽‍💻', 0.95, 1.8, 0);
+        title.entrance = { ...title.entrance, preset: 'cascade', duration: 0.4 };
+        title.loop.preset = 'shine';
+        title.exit = { ...title.exit, preset: 'fade', duration: 0.3 };
+        scene.annotationEffects!.lane.textClips = [title];
+      }
       let bookend: Blob | null = null;
       if (presentation) {
         const card = surface(size);
@@ -867,4 +881,291 @@ export async function resourceFailureProbe() {
     resources: resources.counters,
     authoredUnchanged: before === JSON.stringify(scene.annotationEffects),
   };
+}
+
+function brightTextBounds(canvas: HTMLCanvasElement, threshold = 140) {
+  const { width, height } = canvas;
+  const raster = canvas.getContext('2d')!.getImageData(0, 0, width, height).data;
+  let left = width;
+  let top = height;
+  let right = -1;
+  let bottom = -1;
+  let pixels = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const offset = (y * width + x) * 4;
+      if (
+        raster[offset]! < threshold ||
+        raster[offset + 1]! < threshold ||
+        raster[offset + 2]! < threshold - 15
+      )
+        continue;
+      left = Math.min(left, x);
+      top = Math.min(top, y);
+      right = Math.max(right, x);
+      bottom = Math.max(bottom, y);
+      pixels++;
+    }
+  }
+  return { bounds: [left, top, right, bottom], pixels };
+}
+
+export async function textCutClockProbe() {
+  const size = { width: 640, height: 360 };
+  const signal = new AbortController().signal;
+  const sourceCanvas = surface(size);
+  const context = sourceCanvas.getContext('2d')!;
+  context.fillStyle = '#000';
+  context.fillRect(0, 0, size.width, size.height);
+  const sample = (timestamp: number) => ({
+    timestamp,
+    draw: (target: CanvasRenderingContext2D, x: number, y: number, width: number, height: number) =>
+      target.drawImage(sourceCanvas, x, y, width, height),
+    toVideoFrame: () => new VideoFrame(sourceCanvas, { timestamp: timestamp * 1e6 }),
+    close: () => {},
+  });
+  const frames = { left: sample(1.9), right: sample(4) };
+  const staticTitle = createReviewAnnotationTextClip('fixed', 'Title', 0.5, 3, 0);
+  staticTitle.transform = { ...staticTitle.transform, x: 0.55, y: 0.2, width: 0.35 };
+  const scenes = [
+    {
+      clip: createReviewAnnotationTextClip('end', 'Title', 0.5, 2, 0),
+      visible: [true, false, false],
+      mode: 'dissolve',
+    },
+    {
+      clip: createReviewAnnotationTextClip('start', 'Title', 2, 3, 0),
+      visible: [false, true, true],
+      mode: 'dissolve',
+    },
+    { clip: staticTitle, visible: [true, true, true], mode: 'reference' },
+    { clip: staticTitle, visible: [true, true, true], mode: 'gl' },
+    { clip: staticTitle, visible: [true, true, true], mode: 'split' },
+  ] as const;
+  const results = [];
+  for (const { clip, visible, mode } of scenes) {
+    const scene = fixture([], 0, size, 'viewport');
+    scene.source = size;
+    scene.annotationEffects!.lane.textClips = [clip];
+    if (mode === 'split') {
+      scene.webcam = {
+        ...createQuickEditWebcam('camera', size, size),
+        split: 'left',
+        screenBehavior: 'shrink',
+      };
+    }
+    const owner = managed(scene, size);
+    const renderer = createReviewPreviewRenderer({
+      resources: owner.resources,
+      allocation: owner.allocation,
+      renderer: 'gpu',
+    });
+    const prepared = await renderer.prepare(scene, { canonical: size, backing: size }, signal);
+    try {
+      for (const [index, time] of [1.95, 2, 2.05].entries()) {
+        const moving = sample(time < 2 ? time : time + 2);
+        const source = { timestamp: moving.timestamp, backing: size, draw: moving.draw };
+        const blend = reviewCutTransitionAt(time, [
+          {
+            id: 'cut',
+            ...(mode === 'gl'
+              ? {
+                  type: 'gl',
+                  selection: createGlTransitionSelection('DirectionalEased')!,
+                  easing: 'LINEAR',
+                }
+              : { type: 'dissolve' }),
+            seam: 2,
+            before: 0.5,
+            after: 0.5,
+            left: { start: 0, end: 2 },
+            right: { start: 4, end: 6 },
+          },
+        ])!;
+        const request = { generation: index * 2, resultTime: time, sourceTime: moving.timestamp };
+        const raw = moving.toVideoFrame();
+        try {
+          const transition = mode === 'dissolve' || mode === 'gl' ? { blend, frames } : undefined;
+          const camera = scene.webcam
+            ? {
+                representedMediaTime: moving.timestamp,
+                generation: index,
+                source: size,
+                placement: quickEditWebcamPlacementAt(scene.webcam, moving.timestamp),
+                drawable: { draw: moving.draw, videoFrame: () => raw },
+              }
+            : undefined;
+          const canvas = await renderer.render(
+            prepared,
+            {
+              ...request,
+              source,
+              ...(transition ? { transition } : {}),
+              ...(camera ? { camera } : {}),
+            },
+            signal
+          );
+          const canvasBounds = brightTextBounds(canvas.canvas, 45);
+          canvas.release();
+          const gpu = await renderer.render(
+            prepared,
+            {
+              ...request,
+              generation: request.generation + 1,
+              source: { ...source, videoFrame: () => raw },
+              ...(transition ? { transition } : {}),
+              ...(camera ? { camera } : {}),
+            },
+            signal
+          );
+          try {
+            results.push({
+              time,
+              clip: clip.id,
+              mode,
+              visible: visible[index],
+              canvas: canvasBounds,
+              gpu: brightTextBounds(gpu.canvas, 45),
+              backend: gpu.renderer.backend,
+            });
+          } finally {
+            gpu.release();
+          }
+        } finally {
+          raw.close();
+        }
+      }
+    } finally {
+      prepared.release();
+      renderer.dispose();
+      owner.resources.dispose();
+    }
+  }
+  return results;
+}
+
+/** Sample reveal, hold and exit in actual Canvas, WebGPU and both export clocks. */
+export async function textClockProbe() {
+  const size = { width: 640, height: 360 };
+  const inputSize = { width: 160, height: 90 };
+  const signal = new AbortController().signal;
+  const file = await encodedSource();
+  const index = await inspectReviewMedia(file, signal);
+  const fullEdits: ReviewEdit[] = [
+    { id: 'head', kind: 'cut', start: 0, end: 0.5, requestedStart: 0, requestedEnd: 0.5 },
+  ];
+  const fragments: ReviewEdit[] = [
+    { id: 'head', kind: 'cut', start: 0, end: 0.75, requestedStart: 0, requestedEnd: 0.75 },
+  ];
+  const segments = buildReviewTimeMap(4, fullEdits);
+  const title = createReviewAnnotationTextClip('text', 'А Новый титр 👩🏽‍💻', 0.25, 1.9, 0);
+  title.entrance = { ...title.entrance, duration: 0.45, preset: 'cascade' };
+  title.loop = { ...title.loop, preset: 'shine', period: 1.2 };
+  title.exit = { ...title.exit, duration: 0.45, preset: 'fade' };
+  const scene: Scene = {
+    ...fixture([], 0, size, 'viewport'),
+    source: inputSize,
+    annotationEffects: {
+      lane: { enabled: true, instances: [], textClips: [title] },
+      snapshots: [],
+      segments,
+    },
+  };
+  const owner = managed(scene, size);
+  const renderer = createReviewPreviewRenderer({
+    resources: owner.resources,
+    allocation: owner.allocation,
+    renderer: 'gpu',
+  });
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  advanced.canvas = size;
+  advanced.annotationEffects = scene.annotationEffects!.lane;
+  const settings = {
+    file,
+    index,
+    signal,
+    fps: 30,
+    effective: resolveQuickEditEffectiveState(advanced),
+    dimensions: { canonical: size, backing: size },
+    captionTimeMap: segments,
+    readAsset: async () => null,
+  };
+  const full = await createReviewPresentationMain({
+    ...settings,
+    edits: fullEdits,
+    fragmentOffset: 0,
+  });
+  const fragment = await createReviewPresentationMain({
+    ...settings,
+    edits: fragments,
+    fragmentOffset: 0.25,
+  });
+  const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
+  try {
+    const track = await input.getPrimaryVideoTrack();
+    if (!track) throw new Error('Text proof source is unavailable');
+    const sink = new VideoSampleSink(track);
+    const prepared = await renderer.prepare(scene, settings.dimensions, signal);
+    owner.admit(prepared);
+    const results = [];
+    for (const [generation, time] of [0.54, 1.3, 1.59].entries()) {
+      const sourceTime = time + 0.5;
+      const sample = await sink.getSample(sourceTime);
+      if (!sample) throw new Error('Text proof frame is unavailable');
+      const raw = sample.toVideoFrame();
+      const paint = {
+        timestamp: sample.timestamp,
+        backing: inputSize,
+        draw: sample.draw.bind(sample),
+      };
+      const request = { generation: generation * 2, fps: 30, sourceTime, resultTime: time };
+      try {
+        const canvas = await renderer.render(prepared, { ...request, source: paint }, signal);
+        const expected = surface(size);
+        expected.getContext('2d')!.drawImage(canvas.canvas, 0, 0);
+        canvas.release();
+        const gpu = await renderer.render(
+          prepared,
+          {
+            ...request,
+            generation: request.generation + 1,
+            source: { ...paint, videoFrame: () => raw },
+          },
+          signal
+        );
+        try {
+          const gpuCopy = surface(size);
+          gpuCopy.getContext('2d')!.drawImage(gpu.canvas, 0, 0);
+          const fullFrame = await full.renderAtTime(time);
+          const fragmentFrame = await fragment.renderAtTime(time - 0.25);
+          try {
+            results.push({
+              time,
+              backend: gpu.renderer.backend,
+              canvas: brightTextBounds(expected),
+              gpu: brightTextBounds(gpuCopy),
+              full: compare(expected, fullFrame.canvas),
+              fragment: compare(expected, fragmentFrame.canvas),
+            });
+          } finally {
+            fullFrame.release();
+            fragmentFrame.release();
+          }
+        } finally {
+          gpu.release();
+        }
+      } finally {
+        raw.close();
+        sample.close();
+      }
+    }
+    return results;
+  } finally {
+    renderer.dispose();
+    owner.resources.dispose();
+    full.dispose();
+    fragment.dispose();
+    input.dispose();
+  }
 }

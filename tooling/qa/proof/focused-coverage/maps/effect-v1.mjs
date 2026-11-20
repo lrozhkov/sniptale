@@ -195,6 +195,21 @@ export const EFFECT_V1_OWNER_MAPPINGS = [
   },
   {
     exclusive: true,
+    allowCrossOwner: true,
+    owner: 'effect-v1-standalone-frame-driver',
+    productionFile:
+      'apps/extension/src/features/video/composition/effect-runtime/runtime/driver.ts',
+    reason: 'The standalone frame driver owns output admission, disposal and diagnostic codes.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/effect-runtime/runtime/driver.test.ts',
+      'apps/extension/src/features/video/composition/effect-runtime/runtime/resource-limits.test.ts',
+      'apps/extension/src/effect-runtime-sandbox/broker/session.test.ts',
+      'apps/extension/src/workflows/video-review/render-preview.test.ts',
+      'apps/extension/src/workflows/video-review/export-diagnostics.test.ts',
+    ],
+  },
+  {
+    exclusive: true,
     owner: 'effect-v1-project-runtime',
     productionPrefix: 'apps/extension/src/features/video/composition/effect-runtime/',
     reason: 'EffectV1 frame, audio, media, and resource plans are covered by owner-local suites.',

@@ -161,6 +161,7 @@ export function ReviewAnnotationLane({
       snapshots={lane.snapshots.length ? lane.snapshots : EMPTY_ANNOTATION_SNAPSHOTS}
       key={JSON.stringify([sourceId, tool])}
       instances={advanced.annotationEffects?.instances ?? EMPTY_ANNOTATION_INSTANCES}
+      textClips={advanced.annotationEffects?.textClips}
       enabled={advanced.annotationEffects?.enabled !== false}
       onEnabled={editor.enabled}
       onSelect={(id) => onSelect?.(id)}

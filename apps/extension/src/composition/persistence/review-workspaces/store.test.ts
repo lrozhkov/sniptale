@@ -1,3 +1,4 @@
+import { createReviewAnnotationTextClip } from '../../../features/video/review/annotation-effects/text-animation';
 import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
 import {
   createQuickEditBorder,
@@ -384,6 +385,9 @@ it('refuses edits against replaced original bytes without deleting the old sessi
 it('rejects a stale tab after restore even when imported history has the same numeric revision', async () => {
   const opened = await openVideoWorkspace(id, source);
   const before = reviewAdvancedContentBaseline(opened.workspace.advanced);
+  const restoredTitle = createReviewAnnotationTextClip('restored-title', 'Restored', 5, 7, 0);
+  restoredTitle.loop.preset = 'pulse';
+  const restoredLane = { enabled: true, instances: [], textClips: [restoredTitle] };
   const restoredCanvas = {
     width: 360,
     height: 360,
@@ -399,6 +403,7 @@ it('rejects a stale tab after restore even when imported history has the same nu
     advanced: {
       ...opened.workspace.advanced,
       canvas: restoredCanvas,
+      annotationEffects: restoredLane,
       ui: {
         ...opened.workspace.advanced.ui,
         workspaceColors: { dark: '#123456ff' },
@@ -437,6 +442,9 @@ it('rejects a stale tab after restore even when imported history has the same nu
   });
   expect((await readVideoWorkspace(id))?.workspace.history).toEqual([]);
   expect((await readVideoWorkspace(id))?.workspace.advanced.canvas).toEqual(restoredCanvas);
+  expect((await readVideoWorkspace(id))?.workspace.advanced.annotationEffects).toEqual(
+    restoredLane
+  );
 });
 
 it('refuses to create a session for a replaced file loaded before opening the editor', async () => {
@@ -1340,6 +1348,10 @@ it('rejects an old New command after recreating its parent at the same revision'
 it('publishes text anchors atomically and retains them through conflict, retry, history and reopen', async () => {
   const opened = await openVideoWorkspace(id, source);
   const advanced = createQuickEditAdvancedState();
+  const title = createReviewAnnotationTextClip('title', 'On result time', 5, 11, 0);
+  title.entrance.preset = 'typewriter';
+  const lane = { enabled: true, instances: [], textClips: [title] };
+  advanced.annotationEffects = lane;
   advanced.text = {
     version: 1,
     fragments: [
@@ -1388,13 +1400,15 @@ it('publishes text anchors atomically and retains them through conflict, retry, 
   if (first.status !== 'fulfilled') throw first.reason;
   const committed = first.value;
   const { replayReviewHistory } = await import('../../../features/video/review/document');
-  const text = (workspace: typeof saved.workspace) =>
+  const content = (workspace: typeof saved.workspace) =>
     replayReviewHistory(
       workspace.history,
       workspace.cursor,
       workspace.source,
       reviewAdvancedContentBaseline(workspace.advanced)
-    ).advancedContent.text;
+    ).advancedContent;
+  const text = (workspace: typeof saved.workspace) => content(workspace).text;
+  expect(content(committed.workspace).annotationEffects).toEqual(lane);
   expect(text(committed.workspace)?.fragments[0]).toMatchObject({
     start: 6,
     end: 8,
@@ -1408,12 +1422,72 @@ it('publishes text anchors atomically and retains them through conflict, retry, 
     direction: 'undo',
   });
   expect(text(undone.workspace)).toEqual(advanced.text);
+  expect(content(undone.workspace).annotationEffects).toEqual(lane);
   const redone = await moveVideoWorkspaceHistory({
     ...args,
     expectedRevision: undone.workspace.revision,
     direction: 'redo',
   });
   expect(text(redone.workspace)).toEqual(text(committed.workspace));
+  expect(content(redone.workspace).annotationEffects).toEqual(lane);
+});
+
+it('publishes native text atomically through conflict, retry, history and reopen', async () => {
+  const { workspace } = await openVideoWorkspace(id, source);
+  const before = reviewAdvancedContentBaseline(workspace.advanced);
+  const title = createReviewAnnotationTextClip('title', 'Результат 👩🏽‍💻', 5, 8, 0);
+  title.entrance.preset = 'cascade';
+  title.loop.preset = 'shine';
+  title.exit.preset = 'fade';
+  title.transform.x = 0.25;
+  const lane = { enabled: true, instances: [], textClips: [title] };
+  const args = {
+    aggregateId: id,
+    expectedRevision: workspace.revision,
+    expectedSourceAssetId: workspace.sourceAssetId,
+    operation: {
+      id: 'title-add',
+      at: 1,
+      target: 'advancedContent',
+      before,
+      after: { ...before, annotationEffects: lane },
+    },
+  };
+  harness.failure = true;
+  await expect(commitVideoWorkspace(args)).rejects.toMatchObject({ name: 'QuotaExceededError' });
+  expect((await readVideoWorkspace(id))?.workspace).toEqual(workspace);
+  harness.failure = false;
+  const [accepted, stale] = await Promise.allSettled([
+    commitVideoWorkspace(args),
+    commitVideoWorkspace({
+      ...args,
+      operation: { ...args.operation, id: 'parallel-title' },
+    }),
+  ]);
+  if (accepted.status !== 'fulfilled') throw accepted.reason;
+  expect(stale).toMatchObject({ status: 'rejected', reason: { code: 'conflict' } });
+  const { replayReviewHistory } = await import('../../../features/video/review/document');
+  const authored = (value: typeof workspace) =>
+    replayReviewHistory(
+      value.history,
+      value.cursor,
+      value.source,
+      reviewAdvancedContentBaseline(value.advanced)
+    ).advancedContent.annotationEffects;
+  expect(authored(accepted.value.workspace)).toEqual(lane);
+  const undone = await moveVideoWorkspaceHistory({
+    ...args,
+    expectedRevision: accepted.value.workspace.revision,
+    direction: 'undo',
+  });
+  expect(authored(undone.workspace)).toBeUndefined();
+  const redone = await moveVideoWorkspaceHistory({
+    ...args,
+    expectedRevision: undone.workspace.revision,
+    direction: 'redo',
+  });
+  expect(authored(redone.workspace)).toEqual(lane);
+  expect(authored((await openVideoWorkspace(id, source)).workspace)).toEqual(lane);
 });
 
 // Exercise rollover and refusal with a small budget; actual defaults have browser capacity proof.

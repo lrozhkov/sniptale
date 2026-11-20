@@ -151,6 +151,8 @@ function selectionIntervals(
       return item ? ranges({ start: item.start ?? 0, end: item.end ?? duration }) : [];
     }
     case 'annotation-effect': {
+      const clip = advanced.annotationEffects?.textClips?.find((item) => item.id === selection.id);
+      if (clip) return ranges(clip, 'result');
       const item = advanced.annotationEffects?.instances.find((item) => item.id === selection.id);
       return item?.visualAnchor
         ? projectReviewVisualAnchor(item.visualAnchor, segments).flatMap((part) =>
@@ -298,7 +300,10 @@ export function reviewSelectionExists(
   if (selection.kind === 'canvas-comment')
     return document.canvasComments.some((item) => item.id === selection.id);
   if (selection.kind === 'annotation-effect')
-    return !!advanced.annotationEffects?.instances.some((item) => item.id === selection.id);
+    return (
+      !!advanced.annotationEffects?.instances.some((item) => item.id === selection.id) ||
+      !!advanced.annotationEffects?.textClips?.some((item) => item.id === selection.id)
+    );
   if (selection.kind === 'text')
     return !!advanced.text?.fragments.some((item) => item.id === selection.id);
   if (selection.kind === 'zoom')
@@ -455,10 +460,17 @@ export function reviewSelectionSourceTime(
       const comment = document.canvasComments.find((item) => item.id === selection.id);
       return comment?.visible ? ((comment.start ?? 0) + (comment.end ?? duration)) / 2 : null;
     }
-    case 'annotation-effect':
+    case 'annotation-effect': {
+      const clip = advanced.annotationEffects?.textClips?.find((item) => item.id === selection.id);
+      if (clip) {
+        const projection = createTrackProjection(duration, document.edits);
+        if (clip.start >= projection.resultDuration) return null;
+        return projection.source((clip.start + Math.min(clip.end, projection.resultDuration)) / 2);
+      }
       return midpoint(
         advanced.annotationEffects?.instances.find((item) => item.id === selection.id)
       );
+    }
     case 'text': {
       const fragment = advanced.text?.fragments.find((item) => item.id === selection.id);
       if (!fragment) return null;

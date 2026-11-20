@@ -15,6 +15,9 @@ import {
   verifyReviewAnnotationEffectSnapshot,
 } from './validation';
 import type { ReviewAnnotationEffect } from './types';
+import { createReviewAnnotationTextClip } from './text-animation';
+import { createQuickEditAdvancedContent } from '../advanced/defaults';
+import { loadQuickEditAdvancedContentState } from '../advanced/validation';
 
 const hash = 'a'.repeat(64);
 function source(name: string) {
@@ -345,4 +348,53 @@ describe('immutable byte verification', () => {
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
     expect(read).not.toHaveBeenCalled();
   });
+});
+
+it('admits native text and phases in schema 35 and rejects malformed or downgraded data', () => {
+  const content = createQuickEditAdvancedContent();
+  const text = createReviewAnnotationTextClip('title', 'Результат 👩🏽‍💻', 5, 7, 1);
+  text.entrance.preset = 'cascade';
+  text.loop.preset = 'sway';
+  text.exit.preset = 'fade';
+  const lane = { enabled: true, instances: [instance()], textClips: [text] };
+  expect(loadQuickEditAdvancedContentState({ ...content, annotationEffects: lane })).toEqual({
+    ...content,
+    annotationEffects: lane,
+  });
+  expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion: 34 })).toEqual(content);
+  expect(
+    loadQuickEditAdvancedContentState({ ...content, schemaVersion: 34, annotationEffects: lane })
+  ).toBeNull();
+  for (const clip of [
+    { ...text, id: instance().id },
+    { ...text, order: 0 },
+    { ...text, end: text.start },
+    { ...text, color: 'url(https://example.test)' },
+    { ...text, loop: { ...text.loop, period: 0 } },
+    { ...text, exit: { ...text.exit, preset: 'unknown' } },
+  ]) {
+    expect(parseReviewAnnotationEffects({ ...lane, textClips: [clip] })).toBeNull();
+  }
+});
+
+it('admits long non-overlapping text and rejects excess simultaneous layout work', () => {
+  const text = 'Д'.repeat(4096);
+  const start = createReviewAnnotationTextClip('start', text, 0, 3, 0);
+  const overlap = createReviewAnnotationTextClip('overlap', text, 1, 2, 1);
+  const next = createReviewAnnotationTextClip('next', text, 2, 4, 2);
+  const lane = { enabled: true, instances: [], textClips: [start, overlap, next] };
+  expect(parseReviewAnnotationEffects(lane)).toEqual(lane);
+  expect(
+    parseReviewAnnotationEffects({
+      ...lane,
+      textClips: [start, overlap, { ...next, start: 1.99 }],
+    })
+  ).toBeNull();
+  const shortTitles = Array.from({ length: 129 }, (_, index) =>
+    createReviewAnnotationTextClip(`small-${index}`, 'A', 0, 1, index)
+  );
+  expect(parseReviewAnnotationEffects({ ...lane, textClips: shortTitles })).toBeNull();
+  expect(
+    parseReviewAnnotationEffects({ ...lane, textClips: shortTitles.slice(0, 128) })
+  ).not.toBeNull();
 });

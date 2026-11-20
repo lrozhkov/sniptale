@@ -125,6 +125,8 @@ export function planReviewProjectConversion(args: {
     return blocked({ kind: 'changed-source' });
   const document = parseReviewDocumentBaseline(args.document, args.source.duration);
   if (!document) return blocked({ kind: 'invalid-document' });
+  if (document.advancedContent.annotationEffects?.textClips?.length)
+    return blocked({ kind: 'unmapped-content', field: 'annotationEffects' });
   const advanced = loadQuickEditAdvancedState({ ...document.advancedContent, ui: args.ui });
   if (!advanced) return blocked({ kind: 'invalid-document', field: 'ui' });
   const application = resolveQuickEditEffectiveFeatures(advanced);

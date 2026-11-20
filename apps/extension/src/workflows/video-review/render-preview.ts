@@ -14,6 +14,7 @@ import {
 import type { PreviewGpuCanvasFactory } from './preview-render-resources';
 import {
   reviewGpuPreviewAllocation,
+  supportsReviewGpuAnnotationText,
   reviewPresentedGeometry,
   type ReviewPresentedGeometry,
 } from './gpu-preview-geometry';
@@ -82,6 +83,11 @@ import {
 } from './export-source-sampling';
 import type { ExportEnhancer } from '../../features/video/composition/export-enhancement/enhancer';
 import { selectReviewCutTransitionSource } from './cut-transition-frames';
+import {
+  drawReviewAnnotationText,
+  reviewActiveAnnotationText,
+  reviewViewportAnnotationLayers,
+} from './draw-annotation-text';
 import { drawReviewSceneOverlays } from './render-scene-overlays';
 import { drawReviewWebcam } from './render-webcam';
 import { drawReviewKeys } from './render-key-animation';
@@ -97,6 +103,7 @@ import { prepareReviewCaptions } from './render-captions';
 import { reviewCaptionReservations } from './caption-reservations';
 import {
   createReviewAnnotationRenderer,
+  drawReviewAnnotationFrame,
   reviewAnnotationPreparationBytes,
 } from './annotation-renderer';
 
@@ -537,7 +544,11 @@ async function drawPreparedFrame(
   const scene = await recordingHistoryScene(prepared, frame, signal);
   const { dimensions } = prepared;
   const raw = frame.source.videoFrame?.();
-  if (raw && assets.gpu) {
+  if (
+    raw &&
+    assets.gpu &&
+    supportsReviewGpuAnnotationText(scene, dimensions, assets.maximumInFlight)
+  ) {
     const geometry = reviewPresentedGeometry(
       scene,
       dimensions,
@@ -630,6 +641,22 @@ async function drawPreparedCanvasFrame(
   const { scene, dimensions } = prepared;
   const request = sceneRequest(prepared, frame);
   const { context, canvas } = output;
+  const annotationTextTime = frame.resultTime;
+  const splitScreen = reviewSplitScreenAt(
+    scene.webcam,
+    frame.sourceTime,
+    !!frame.camera,
+    frame.resultTime
+  );
+  const transformMain =
+    frame.transition?.blend.plan.type === 'gl' ||
+    (splitScreen && (splitScreen.width < 1 || splitScreen.height < 1 || splitScreen.clip));
+  const lane = scene.annotationEffects?.lane;
+  const nativeText = lane?.enabled ? lane.textClips : undefined;
+  const finalAnnotationText = transformMain
+    ? reviewActiveAnnotationText(nativeText ?? [], annotationTextTime)
+    : [];
+  const endpointText = finalAnnotationText.length ? undefined : nativeText;
   let geometry: ReviewPresentedGeometry;
   await frame.source.prepare?.(signal);
   await frame.camera?.drawable.prepare?.(signal);
@@ -715,9 +742,18 @@ async function drawPreparedCanvasFrame(
           height: dimensions.backing.height / dimensions.canonical.height,
         },
       };
-      const instances = scene.annotationEffects?.lane.instances;
-      const plans =
-        assets.annotations?.describe(frame.resultTime, density, frame.fps ?? 30, instances) ?? [];
+      const fps = frame.fps ?? 30;
+      const allPlans =
+        assets.annotations?.describe(frame.resultTime, density, fps, lane?.instances) ?? [];
+      const viewportPlans = allPlans.filter((entry) => entry.instance.attachment === 'viewport');
+      const streamViewport =
+        !!nativeText?.length &&
+        viewportPlans.length > 0 &&
+        allPlans.length > EFFECT_RUNTIME_RESOURCE_LIMITS.maxLiveCanvases;
+      const plans = streamViewport
+        ? allPlans.filter((entry) => entry.instance.attachment === 'content')
+        : allPlans;
+      const annotationScope = streamViewport ? assets.annotations?.createFrameScope() : undefined;
       admit(
         frame,
         plans.map(({ plan }) => plan.renderDimensions)
@@ -725,9 +761,10 @@ async function drawPreparedCanvasFrame(
       const annotations = await assets.annotations?.render(
         frame.resultTime,
         density,
-        frame.fps ?? 30,
+        fps,
         signal,
-        instances
+        streamViewport ? plans.map((entry) => entry.instance) : lane?.instances,
+        annotationScope
       );
       let enhanced: ReviewExportSamplingFrame | null = null;
       try {
@@ -796,12 +833,56 @@ async function drawPreparedCanvasFrame(
                   }
                 : {}),
               ...(annotations ? { annotationFrames: annotations.entries } : {}),
+              ...(endpointText && !streamViewport
+                ? {
+                    annotationText: {
+                      clips: endpointText,
+                      plane: dimensions.canonical,
+                      resultTime: annotationTextTime,
+                    },
+                  }
+                : {}),
             }),
         };
         drawReviewSceneFrame(context, sceneArgs);
       } finally {
         enhanced?.dispose();
         annotations?.release();
+      }
+      if (streamViewport && assets.annotations) {
+        const layers = reviewViewportAnnotationLayers(
+          viewportPlans,
+          endpointText ?? [],
+          annotationTextTime
+        );
+        const target = { x: 0, y: 0, width: canvas.width, height: canvas.height };
+        for (const layer of layers) {
+          signal.throwIfAborted();
+          if (layer.kind === 'text') {
+            drawReviewAnnotationText(
+              context,
+              layer.clip,
+              annotationTextTime,
+              dimensions.canonical,
+              canvas
+            );
+            continue;
+          }
+          admit(frame, [layer.frame.plan.renderDimensions]);
+          const bitmap = await assets.annotations.render(
+            frame.resultTime,
+            density,
+            fps,
+            signal,
+            [layer.frame.instance],
+            annotationScope
+          );
+          try {
+            for (const entry of bitmap.entries) drawReviewAnnotationFrame(context, entry, target);
+          } finally {
+            bitmap.release();
+          }
+        }
       }
       return reviewPresentedGeometry(scene, dimensions, frame.resultTime, request.camera);
     };
@@ -851,13 +932,9 @@ async function drawPreparedCanvasFrame(
         await paintReviewCutDissolve(context, transition, blend.incoming, drawEndpoint, canvas);
     } else geometry = await draw(context, canvas, frame, sample);
     signal.throwIfAborted();
-    const splitScreen = reviewSplitScreenAt(
-      scene.webcam,
-      frame.sourceTime,
-      !!frame.camera,
-      frame.resultTime
-    );
     paintReviewCameraSplitScreen(context, canvas, dimensions.backing, splitScreen, resources);
+    for (const clip of finalAnnotationText)
+      drawReviewAnnotationText(context, clip, annotationTextTime, dimensions.canonical, canvas);
     if (frame.camera && scene.webcam)
       drawReviewWebcam(
         context,

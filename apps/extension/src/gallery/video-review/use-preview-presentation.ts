@@ -80,7 +80,10 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
       (input.scene.webcam.split || input.scene.webcam.positions.some((position) => position.split))
     ) ||
     (!!input.scene.annotationEffects?.lane.enabled &&
-      input.scene.annotationEffects.lane.instances.some((instance) => instance.enabled)) ||
+      (input.scene.annotationEffects.lane.instances.some((instance) => instance.enabled) ||
+        !!input.scene.annotationEffects.lane.textClips?.some(
+          (clip) => clip.enabled && clip.text.trim()
+        ))) ||
     !!input.scene.cursorMotions?.some((m) => m.enabled) ||
     !!input.scene.captions?.settings?.enabled ||
     !!input.cut?.edits.some((edit) => edit.kind === 'freeze') ||

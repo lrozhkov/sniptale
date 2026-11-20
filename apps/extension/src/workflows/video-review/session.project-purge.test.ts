@@ -1,3 +1,4 @@
+import { createReviewAnnotationTextClip } from '../../features/video/review/annotation-effects/text-animation';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createReviewWorkspaceStoreFixture } from '../../composition/persistence/review-workspaces/store.test-support';
 import { acquireAssetResourceSession } from '../../composition/persistence/assets/resource-sessions';
@@ -32,7 +33,14 @@ vi.mock('../../composition/persistence/assets/opfs-store', async (original) => (
 }));
 afterEach(() => vi.unstubAllGlobals());
 
-it.each(['text', 'crop', 'workspace color', 'track controls', 'initial mode'] as const)(
+it.each([
+  'text',
+  'native title',
+  'crop',
+  'workspace color',
+  'track controls',
+  'initial mode',
+] as const)(
   'no deleted %s returns: delayed editor write, purge retry, and same-identity recreation',
   async (kind) => {
     vi.stubGlobal('chrome', undefined);
@@ -104,24 +112,45 @@ it.each(['text', 'crop', 'workspace color', 'track controls', 'initial mode'] as
         canvas: { width: 360, height: 360, crop: { x: 0.2, y: 0, width: 0.5625, height: 1 } },
       },
     };
+    const titleOperation = {
+      id: 'title',
+      at: 1,
+      target: 'advancedContent' as const,
+      before,
+      after: {
+        ...before,
+        annotationEffects: {
+          enabled: true,
+          instances: [],
+          textClips: [
+            createReviewAnnotationTextClip('old-title', 'Deleted project title', 2, 4, 0),
+          ],
+        },
+      },
+    };
     const write = () =>
-      kind === 'text'
-        ? oldEditor.saveDraft(annotation, null)
-        : kind === 'crop'
-          ? oldEditor.commit(cropOperation)
-          : kind === 'track controls'
-            ? oldEditor.setTrackControl('zoom', { enabled: false })
-            : oldEditor.saveAdvanced({
-                ...initial.workspace.advanced,
-                ui:
-                  kind === 'initial mode'
-                    ? {
-                        ...initial.workspace.advanced.ui,
-                        mode: 'advanced',
-                        modeSelectionPending: false,
-                      }
-                    : { ...initial.workspace.advanced.ui, workspaceColors: { dark: '#123456ff' } },
-              });
+      kind === 'native title'
+        ? oldEditor.commit(titleOperation)
+        : kind === 'text'
+          ? oldEditor.saveDraft(annotation, null)
+          : kind === 'crop'
+            ? oldEditor.commit(cropOperation)
+            : kind === 'track controls'
+              ? oldEditor.setTrackControl('zoom', { enabled: false })
+              : oldEditor.saveAdvanced({
+                  ...initial.workspace.advanced,
+                  ui:
+                    kind === 'initial mode'
+                      ? {
+                          ...initial.workspace.advanced.ui,
+                          mode: 'advanced',
+                          modeSelectionPending: false,
+                        }
+                      : {
+                          ...initial.workspace.advanced.ui,
+                          workspaceColors: { dark: '#123456ff' },
+                        },
+                });
     await write();
     const delayedWrite = oldEditor.flush();
     await started;
@@ -155,6 +184,7 @@ it.each(['text', 'crop', 'workspace color', 'track controls', 'initial mode'] as
       expect(purgedWhileLive).toBe(false);
       expect(recreated.workspace.history).toEqual([]);
       expect(recreated.workspace.advanced.canvas).toBeUndefined();
+      expect(recreated.workspace.advanced.annotationEffects).toBeUndefined();
       expect(recreated.workspace.advanced.ui.workspaceColors).toBeUndefined();
       expect(recreated.workspace.advanced.ui.lockedTracks).toBeUndefined();
       expect(recreated.workspace.advanced.ui.modeSelectionPending).toBe(true);

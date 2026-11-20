@@ -119,7 +119,7 @@ function retainOutputBitmap(
     resourceScope.retainBitmap(bitmap);
   } catch {
     bitmap.close();
-    throw new Error('EFFECT_RUNTIME_OUTPUT_RESOURCE_LIMIT');
+    throw new EffectRuntimeFrameError('resourceLimit');
   }
 }
 
