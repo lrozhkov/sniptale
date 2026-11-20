@@ -3,6 +3,7 @@ import './playback-focus.css';
 import { focusReviewRegion, reviewKeyboardTarget, reviewOwnsNavigation } from './keyboard-context';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { translate } from '../../platform/i18n';
+import { NativeHints } from '../../ui/native-hints';
 
 /** Modal lifecycle and keyboard modality belong to the editor surface. */
 export function ReviewDialog({ children }: { children: ReactNode }) {
@@ -90,6 +91,7 @@ export function ReviewDialog({ children }: { children: ReactNode }) {
         border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]
         p-0 text-[var(--sniptale-color-text-primary)] backdrop:bg-black/60"
       >
+        <NativeHints excludeSelector={'[data-ui="gallery.videoReview.timeline"]'} />
         {children}
       </dialog>
     </CommandPressScope.Provider>

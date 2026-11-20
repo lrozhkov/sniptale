@@ -152,6 +152,7 @@ function stubReviewDom(inspectorWidth: number) {
     'ResizeObserver',
     class {
       observe() {}
+      unobserve() {}
       disconnect() {}
     }
   );

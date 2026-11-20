@@ -45,7 +45,9 @@ export function ReviewTrackWorkspaceHeading({ id, track }: { id: string; track: 
         className="shrink-0 text-[var(--sniptale-color-text-secondary)]"
         aria-hidden="true"
       />
-      <span className="truncate">{title}</span>
+      <span className="truncate" title={title}>
+        {title}
+      </span>
     </h2>
   );
 }

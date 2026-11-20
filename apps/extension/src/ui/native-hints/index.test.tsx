@@ -32,11 +32,11 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function mountHints() {
+function mountHints(excludeSelector?: string) {
   const container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
-  act(() => root?.render(<NativeHints />));
+  act(() => root?.render(<NativeHints excludeSelector={excludeSelector} />));
 }
 
 function hover(element: Element) {
@@ -120,6 +120,19 @@ it('does not repeat a fully visible label', () => {
   expect(element.hasAttribute('title')).toBe(false);
 });
 
+it('leaves a surface with its own hint owner alone', () => {
+  mountHints('[data-own-hints]');
+  const field = button('Resolution');
+  const timelineControl = button('Start');
+  timelineControl.setAttribute('data-own-hints', '');
+  timelineControl.title = 'Start';
+  hover(field);
+  expect(field.hasAttribute('title')).toBe(false);
+  hover(timelineControl);
+  act(() => timelineControl.focus());
+  expect(timelineControl.title).toBe('Start');
+});
+
 it('exposes the full label only while it is clipped', () => {
   const element = button('A long microphone name');
   Object.defineProperties(element, {
@@ -127,8 +140,17 @@ it('exposes the full label only while it is clipped', () => {
     clientWidth: { value: 100, configurable: true },
   });
   expect(resolveNativeHint(element)).toBe('A long microphone name');
+  Object.defineProperty(element, 'clientWidth', { value: 239 });
+  expect(resolveNativeHint(element)).toBe('A long microphone name');
   Object.defineProperty(element, 'clientWidth', { value: 240 });
   expect(resolveNativeHint(element)).toBeNull();
+});
+
+it('preserves a clipped label consisting only of punctuation', () => {
+  const label = '•'.repeat(60);
+  const element = button(label);
+  Object.defineProperties(element, { scrollWidth: { value: 240 }, clientWidth: { value: 100 } });
+  expect(resolveNativeHint(element)).toBe(label);
 });
 
 it('detects clipped descendants and multiline clamping', () => {
@@ -140,6 +162,21 @@ it('detects clipped descendants and multiline clamping', () => {
   Object.defineProperties(label, { scrollHeight: { value: 48 }, clientHeight: { value: 32 } });
   element.append(label);
   expect(resolveNativeHint(element)).toBe('A long project name');
+});
+
+it('does not show a visible option label when only its description is clipped', () => {
+  const element = button('Current');
+  const description = document.createElement('span');
+  description.textContent = 'Uses the current project dimensions';
+  description.title = description.textContent;
+  description.style.overflowX = 'hidden';
+  Object.defineProperties(description, {
+    scrollWidth: { value: 240 },
+    clientWidth: { value: 100 },
+  });
+  element.append(description);
+  expect(resolveNativeHint(element)).toBeNull();
+  expect(resolveNativeHint(description)).toBe(description.textContent);
 });
 
 it('keeps an explanation available without label clipping', () => {

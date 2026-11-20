@@ -138,6 +138,7 @@ export function ReviewProjectTitle({
         ref={title}
         type="button"
         className="review-project-title w-full truncate text-left"
+        title={name}
         disabled={busy}
         onClick={() => {
           setDraft(name);

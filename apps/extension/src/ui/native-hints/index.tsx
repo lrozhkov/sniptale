@@ -5,8 +5,8 @@ const FOCUSABLE_SELECTOR = 'button, a[href], input, select, textarea, [tabindex]
 function clipped(element: HTMLElement): boolean {
   const style = getComputedStyle(element);
   return (
-    (style.overflowX !== 'visible' && element.scrollWidth > element.clientWidth + 1) ||
-    (style.overflowY !== 'visible' && element.scrollHeight > element.clientHeight + 1)
+    (style.overflowX !== 'visible' && element.scrollWidth > element.clientWidth) ||
+    (style.overflowY !== 'visible' && element.scrollHeight > element.clientHeight)
   );
 }
 
@@ -32,7 +32,7 @@ function visibleText(element: HTMLElement): string {
 }
 
 function normalize(text: string): string {
-  return text.replace(/[\s.•]+/gu, ' ').trim();
+  return text.replace(/[\s.•]+/gu, ' ').trim() || text.trim();
 }
 
 export function resolveNativeHint(
@@ -41,19 +41,24 @@ export function resolveNativeHint(
 ): string | null {
   const hint = (element.dataset['popupHint'] ?? nativeTitle)?.trim();
   if (!hint) return null;
-  if (!normalize(visibleText(element)).includes(normalize(hint))) return hint;
-  return [element, ...element.querySelectorAll<HTMLElement>('*')].some(
-    (candidate) => candidate.textContent?.trim() && clipped(candidate)
-  )
+  const hintText = normalize(hint);
+  if (!normalize(visibleText(element)).includes(hintText)) return hint;
+  return [element, ...element.querySelectorAll<HTMLElement>('*')].some((candidate) => {
+    if (!candidate.textContent?.trim() || !clipped(candidate)) return false;
+    const candidateText = normalize(visibleText(candidate));
+    return candidateText && (candidateText.includes(hintText) || hintText.includes(candidateText));
+  })
     ? hint
     : null;
 }
 
 function findNativeHintTarget(
   target: EventTarget | null,
-  known: Map<HTMLElement, { title: string | null; applied: string | null }>
+  known: Map<HTMLElement, { title: string | null; applied: string | null }>,
+  excludeSelector: string | undefined
 ) {
   if (!(target instanceof Element)) return null;
+  if (excludeSelector && target.closest(excludeSelector)) return null;
   let ancestor: Element | null = target;
   while (ancestor) {
     if (ancestor instanceof HTMLElement && (known.has(ancestor) || ancestor.matches(HINT_SELECTOR)))
@@ -67,7 +72,7 @@ function findNativeHintTarget(
   );
 }
 
-function bindNativeHints() {
+function bindNativeHints(excludeSelector?: string) {
   const originals = new Map<HTMLElement, { title: string | null; applied: string | null }>();
   const observed = new Set<HTMLElement>();
   let hovered: HTMLElement | null = null;
@@ -79,7 +84,7 @@ function bindNativeHints() {
       original.title = element.getAttribute('title');
     if (original.title === null) element.removeAttribute('title');
     else element.setAttribute('title', original.title);
-    resize.unobserve(element);
+    resize?.unobserve(element);
     observed.delete(element);
     originals.delete(element);
   };
@@ -108,27 +113,31 @@ function bindNativeHints() {
       original.applied = title;
       if (!observed.has(element)) {
         observed.add(element);
-        resize.observe(element);
+        resize?.observe(element);
       }
     }
   };
   const enter = (event: Event) => {
-    hovered = findNativeHintTarget(event.target, originals);
+    hovered = findNativeHintTarget(event.target, originals, excludeSelector);
     update();
   };
   const focus = (event: Event) => {
-    focused = findNativeHintTarget(event.target, originals);
+    focused = findNativeHintTarget(event.target, originals, excludeSelector);
     update();
   };
   const leave = (event: Event) => {
     const next =
       event instanceof MouseEvent || event instanceof FocusEvent ? event.relatedTarget : null;
-    if (event.type === 'focusout') focused = findNativeHintTarget(next, originals);
-    else hovered = findNativeHintTarget(next, originals);
+    if (event.type === 'focusout') focused = findNativeHintTarget(next, originals, excludeSelector);
+    else hovered = findNativeHintTarget(next, originals, excludeSelector);
     update();
   };
-  const resize = new ResizeObserver(update);
-  const mutations = new MutationObserver(update);
+  const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+  const mutations = new MutationObserver((records) => {
+    const affected = (element: HTMLElement | null) =>
+      element && (!element.isConnected || records.some(({ target }) => element.contains(target)));
+    if (affected(hovered) || affected(focused)) update();
+  });
   mutations.observe(document.body, {
     childList: true,
     subtree: true,
@@ -147,13 +156,14 @@ function bindNativeHints() {
     document.removeEventListener('focusin', focus);
     document.removeEventListener('focusout', leave);
     window.removeEventListener('resize', update);
-    resize.disconnect();
+    resize?.disconnect();
     mutations.disconnect();
     for (const element of originals.keys()) restore(element);
   };
 }
 
-export function NativeHints() {
-  useEffect(bindNativeHints, []);
+/** Applies browser hints to the page, outside surfaces that own their own hints. */
+export function NativeHints({ excludeSelector }: { excludeSelector?: string | undefined }) {
+  useEffect(() => bindNativeHints(excludeSelector), [excludeSelector]);
   return null;
 }

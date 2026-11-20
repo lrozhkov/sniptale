@@ -227,7 +227,9 @@ function RecognitionRelatedText(props: {
           disabled={props.disabled}
           onClick={() => props.onSelect(fragment.id)}
         >
-          <span className="block truncate">{fragment.text}</span>
+          <span className="block truncate" title={fragment.text}>
+            {fragment.text}
+          </span>
         </ReviewButton>
       ))}
       {props.fragments.length > limit && (

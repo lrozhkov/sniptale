@@ -189,7 +189,11 @@ export function ReviewTrackItemsInspector(props: {
                 {reviewTimeLabel(row.start)}
                 {row.end > row.start ? ` – ${reviewTimeLabel(row.end)}` : ''}
               </span>
-              {row.detail ? <span className="truncate">{row.detail}</span> : null}
+              {row.detail ? (
+                <span className="truncate" title={row.detail}>
+                  {row.detail}
+                </span>
+              ) : null}
             </span>
             {row.inactive ? (
               <span className="text-xs text-[var(--sniptale-color-text-secondary)]">
