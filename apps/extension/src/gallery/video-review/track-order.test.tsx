@@ -81,6 +81,33 @@ it('moves tracks to the group boundary on pin and unpin', async () => {
   expect(order().slice(0, 3)).toEqual(['music', 'source', 'keyboard']);
 });
 
+it('keeps the target when the pointer hovers near a boundary between unequal rows', async () => {
+  const height = (node: Element) =>
+    node.getAttribute('data-review-header-track') === 'keyboard'
+      ? 24
+      : node.getAttribute('data-review-header-track') === 'mouse'
+        ? 56
+        : 32;
+  vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(function (
+    this: HTMLElement
+  ) {
+    const siblings = [...(this.parentElement?.children ?? [])];
+    const y = siblings.slice(0, siblings.indexOf(this)).reduce((top, row) => top + height(row), 0);
+    return new DOMRect(0, y, 120, height(this));
+  });
+  const handle = host.querySelector<HTMLButtonElement>(
+    '[data-review-header-track="keyboard"] button'
+  )!;
+  await act(async () => pointer(handle, 'pointerdown', 44));
+  await act(async () => pointer(handle, 'pointermove', 68));
+  expect(order().slice(0, 3)).toEqual(['source', 'mouse', 'keyboard']);
+  await act(async () => pointer(handle, 'pointermove', 63));
+  expect(order().slice(0, 3)).toEqual(['source', 'mouse', 'keyboard']);
+  await act(async () => pointer(handle, 'pointermove', 55));
+  expect(order().slice(0, 3)).toEqual(['source', 'keyboard', 'mouse']);
+  await act(async () => pointer(handle, 'pointerup', 55));
+});
+
 it('reorders with pointer and keyboard without crossing the pin boundary', async () => {
   await act(async () => host.querySelector<HTMLButtonElement>('[data-pin="mouse"]')!.click());
   const handle = (track: string) =>

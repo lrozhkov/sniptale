@@ -35,6 +35,7 @@ export function ReviewTimelinePanes(props: {
 }) {
   const shell = useRef<HTMLDivElement>(null);
   const controls = useRef<HTMLDivElement>(null);
+  const pinnedHeaders = useRef<HTMLDivElement>(null);
   const labels = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const rows = useRef(new Set<Row>());
@@ -80,11 +81,12 @@ export function ReviewTimelinePanes(props: {
     const right = props.viewport.current;
     const list = content.current;
     const fixed = controls.current;
-    if (!root || !left || !right || !list || !fixed) return;
+    const pinned = pinnedHeaders.current;
+    if (!root || !left || !right || !list || !fixed || !pinned) return;
     const plane = right.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]');
     if (!plane) return;
     const observation = observeReviewPaneLayout(
-      { root, left, right, list, fixed, plane },
+      { root, left, right, list, fixed, pinned, plane },
       rows.current,
       (value) => {
         mirrored.current = value;
@@ -129,12 +131,43 @@ export function ReviewTimelinePanes(props: {
               ref={controls}
               className="sticky top-0 z-40 overflow-hidden bg-[var(--sniptale-color-surface-panel)]"
             />
-            <div ref={content} className="relative" />
+            <div
+              ref={pinnedHeaders}
+              data-review-track-group="pinned"
+              className="sticky z-30 bg-[var(--sniptale-color-surface-panel)]"
+            />
+            <div ref={content} data-review-track-group="scrolling" className="relative isolate" />
           </div>
         </div>
         {props.children}
       </div>
     </PaneContext.Provider>
+  );
+}
+
+function readPinnedOffsets(rows: readonly Row[]) {
+  const offsets = new Map<Row, { top: number; gap: number }>();
+  let height = 0;
+  for (const row of rows) {
+    if (!row.body.hasAttribute('data-review-track-pinned')) continue;
+    const gap = Number.parseFloat(getComputedStyle(row.body).marginTop) || 0;
+    offsets.set(row, { top: height + gap, gap });
+    height += gap + row.body.getBoundingClientRect().height;
+  }
+  return { offsets, height };
+}
+
+function measureHeaderWidth(header: HTMLElement) {
+  const label = header.querySelector<HTMLElement>('[data-track-label]');
+  const actions = header.querySelector<HTMLElement>('[data-track-controls]');
+  const settings = header.querySelectorAll<HTMLElement>(
+    '[role="switch"], .review-track-reorder, .review-track-pin'
+  );
+  return (
+    (label?.scrollWidth ?? 0) +
+    (actions?.scrollWidth ?? 0) +
+    [...settings].reduce((width, control) => width + control.offsetWidth + 4, 0) +
+    44
   );
 }
 
@@ -146,8 +179,9 @@ function observeReviewPaneLayout(
     right,
     list,
     fixed,
+    pinned,
     plane,
-  }: Record<'root' | 'left' | 'right' | 'list' | 'fixed' | 'plane', HTMLElement>,
+  }: Record<'root' | 'left' | 'right' | 'list' | 'fixed' | 'pinned' | 'plane', HTMLElement>,
   rows: Set<Row>,
   onClamp: (value: { labels: number; time: number }) => void
 ) {
@@ -158,31 +192,32 @@ function observeReviewPaneLayout(
     );
     const rulerHeight = ordered.find((row) => row.ruler)?.body.getBoundingClientRect().height ?? 0;
     const planeRect = plane.getBoundingClientRect();
-    let index = 0;
+    const stack = readPinnedOffsets(ordered);
+    const firstScrolling = ordered.find((row) => !row.ruler && !stack.offsets.has(row));
+    const available = Math.max(0, right.clientHeight - rulerHeight);
+    const reserve = Math.min(
+      available / 2,
+      firstScrolling?.body.getBoundingClientRect().height ?? 0
+    );
+    // A tall stack can scroll up under the ruler, leaving room to reach the unpinned lanes.
+    const stickyTop = Math.min(rulerHeight, right.clientHeight - reserve - stack.height);
+    const positions = new Map<HTMLElement, number>();
     let natural = 120;
     const placements = ordered.map((row) => {
-      const parent = row.ruler ? fixed : list;
-      const position = row.ruler ? 0 : index++;
+      const offset = stack.offsets.get(row);
+      const parent = row.ruler ? fixed : offset ? pinned : list;
+      const position = positions.get(parent) ?? 0;
+      positions.set(parent, position + 1);
       // Source comments occupy leading clearance above the visible video strip.
       const visibleLane = row.body.querySelector<HTMLElement>(
         '[data-ui="gallery.videoReview.sourceLane"]'
       );
       const rect = (visibleLane ?? row.body).getBoundingClientRect();
-      const label = row.header.querySelector<HTMLElement>('[data-track-label]');
-      const actions = row.header.querySelector<HTMLElement>('[data-track-controls]');
-      const toggle = row.header.querySelector<HTMLElement>('[role="switch"]');
-      const reorder = row.header.querySelector<HTMLElement>('.review-track-reorder');
-      const pin = row.header.querySelector<HTMLElement>('.review-track-pin');
-      natural = Math.max(
-        natural,
-        (label?.scrollWidth ?? 0) +
-          (actions?.scrollWidth ?? 0) +
-          (toggle ? toggle.offsetWidth + 4 : 0) +
-          (reorder ? reorder.offsetWidth + 4 : 0) +
-          (pin ? pin.offsetWidth + 4 : 0) +
-          44
-      );
-      return { row, parent, position, rect };
+      const top = offset
+        ? offset.top + rect.top - row.body.getBoundingClientRect().top
+        : rect.top - planeRect.top - rulerHeight - stack.height;
+      natural = Math.max(natural, measureHeaderWidth(row.header));
+      return { row, parent, position, top: row.ruler ? 0 : top, height: rect.height, offset };
     });
     const scrollbarHeight = Math.max(0, right.offsetHeight - right.clientHeight);
     const scrollbar = Math.max(0, left.offsetWidth - left.clientWidth);
@@ -192,22 +227,28 @@ function observeReviewPaneLayout(
     );
     // Read all row geometry before changing any row or pane layout.
     fixed.style.height = `${rulerHeight}px`;
-    left.style.scrollPaddingBlockStart = `${rulerHeight}px`;
-    list.style.height = `${Math.max(0, planeRect.height - rulerHeight)}px`;
+    pinned.style.height = `${stack.height}px`;
+    pinned.style.top = `${stickyTop}px`;
+    left.style.scrollPaddingBlockStart = `${Math.max(rulerHeight, stickyTop + stack.height)}px`;
+    list.style.height = `${Math.max(0, planeRect.height - rulerHeight - stack.height)}px`;
     root.style.setProperty('--review-scrollbar-height', `${scrollbarHeight}px`);
     const focused = document.activeElement;
-    for (const { row, parent, position, rect } of placements) {
+    for (const { row, parent, position, top, height, offset } of placements) {
       if (parent.children[position] !== row.header)
         parent.insertBefore(row.header, parent.children[position] ?? null);
       row.header.style.position = 'absolute';
       row.header.style.insetInline = '0';
-      row.header.style.top = `${row.ruler ? 0 : rect.top - planeRect.top - rulerHeight}px`;
-      row.header.style.height = `${rect.height}px`;
+      row.header.style.top = `${top}px`;
+      row.header.style.height = `${height}px`;
+      if (offset) {
+        row.body.style.setProperty('--review-pinned-track-top', `${stickyTop + offset.top}px`);
+        row.body.style.setProperty('--review-pinned-track-gap', `${offset.gap}px`);
+      }
     }
     if (
       document.activeElement === document.body &&
       focused instanceof HTMLElement &&
-      list.contains(focused)
+      left.contains(focused)
     )
       focused.focus({ preventScroll: true });
     labelWidth = width;
@@ -235,13 +276,7 @@ function observeReviewPaneLayout(
   };
   const mutation = new MutationObserver((records) => {
     const geometryChanged = records.some((record) => {
-      if (
-        record.target === fixed ||
-        record.target === list ||
-        fixed.contains(record.target) ||
-        list.contains(record.target)
-      )
-        return true;
+      if (record.type === 'attributes' || left.contains(record.target)) return true;
       return [...record.addedNodes, ...record.removedNodes].some(
         (node) =>
           node instanceof Element &&
@@ -251,9 +286,13 @@ function observeReviewPaneLayout(
     // Lane size changes are covered by ResizeObserver; playback text does not move headers.
     if (geometryChanged) observe();
   });
-  for (const node of [fixed, list])
+  for (const node of [fixed, pinned, list])
     mutation.observe(node, { childList: true, subtree: true, characterData: true });
-  mutation.observe(plane, { childList: true, subtree: true });
+  mutation.observe(plane, {
+    childList: true,
+    subtree: true,
+    attributeFilter: ['data-review-track-pinned'],
+  });
   observe();
   return {
     refresh: observe,

@@ -189,6 +189,7 @@ export function ReviewTrackVisibilityButton({ track, onToggle, ...props }: Track
   return (
     <ReviewTrackVisibilityPresentation
       {...props}
+      track={track}
       disabled={props.disabled || !!unavailable}
       onToggle={toggle}
     />
@@ -197,17 +198,48 @@ export function ReviewTrackVisibilityButton({ track, onToggle, ...props }: Track
 
 /** Visual flags and the current glyph change independently from command closures. */
 const ReviewTrackVisibilityPresentation = memo(function ReviewTrackVisibilityPresentation({
+  track,
+  label,
   enabled,
   icon: Icon,
   onToggle,
   ...props
-}: Omit<TrackVisibilityProps, 'track'>) {
+}: TrackVisibilityProps) {
+  useAppLocale();
   return (
-    <ReviewButton {...props} aria-pressed={enabled} onClick={onToggle}>
+    <ReviewButton
+      {...props}
+      label={label}
+      title={track === 'originalAudio' ? label : undefined}
+      data-review-hint={trackOutputHint(track, enabled, label)}
+      aria-pressed={enabled}
+      onClick={onToggle}
+    >
       <Icon size={14} aria-hidden="true" />
     </ReviewButton>
   );
 });
+
+function trackOutputHint(track: QuickEditTrack, enabled: boolean, label: string) {
+  if (track === 'originalAudio') return label;
+  if (track === 'music' || track === 'voiceover')
+    return translate(enabled ? 'gallery.videoReview.muteTrack' : 'gallery.videoReview.unmuteTrack');
+  if (track === 'text')
+    return translate(
+      enabled ? 'gallery.videoReview.hideVideoCaptions' : 'gallery.videoReview.showVideoCaptions'
+    );
+  return translate(
+    enabled ? 'gallery.videoReview.hideFromVideo' : 'gallery.videoReview.showInVideo'
+  );
+}
+
+function trackStatusHint(track: QuickEditTrack, unavailable: boolean, enabled: boolean) {
+  if (track === 'source') return translate('gallery.videoReview.sourceTrackAlwaysEnabled');
+  if (unavailable) return translate('gallery.videoReview.trackUnavailable');
+  return translate(
+    enabled ? 'gallery.videoReview.disableTrack' : 'gallery.videoReview.enableTrack'
+  );
+}
 
 type TrackRowProps = {
   label: string;
@@ -256,6 +288,7 @@ export function ReviewTrackRow(props: TrackRowProps) {
     <div
       ref={placement.body}
       data-review-track={track}
+      data-review-track-pinned={controls?.pinned ? '' : undefined}
       data-review-track-selected={!!track && controls?.selectedTrack === track ? 'true' : 'false'}
       data-review-track-muted={muted ? 'true' : 'false'}
       className={[
@@ -400,7 +433,7 @@ const ReviewTrackHeaderIdentity = memo(function ReviewTrackHeaderIdentity({
           on={enabled}
           disabled={track === 'source' || unavailable || controls.busy}
           aria-label={`${translate('gallery.videoReview.trackEnabled')}: ${props.label}`}
-          title={unavailable ? translate('gallery.videoReview.trackUnavailable') : undefined}
+          data-review-hint={trackStatusHint(track, unavailable, enabled)}
           onClick={() => {
             if (track !== 'source') controls.setEnabled(track, !enabled);
           }}
@@ -409,6 +442,10 @@ const ReviewTrackHeaderIdentity = memo(function ReviewTrackHeaderIdentity({
       {track && controls?.configuring && controls.order ? (
         <ReviewButton
           label={`${translate('gallery.videoReview.trackPinned')}: ${props.label}`}
+          title={undefined}
+          data-review-hint={translate(
+            controls.pinned ? 'gallery.videoReview.unpinTrack' : 'gallery.videoReview.pinTrack'
+          )}
           aria-pressed={controls.pinned}
           disabled={controls.busy}
           className={`${reviewCompactTrackButtonClassName} review-track-pin !h-6 !min-h-6 !w-6 !px-1`}

@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { ReviewTimelineHints, reviewTimelineHint } from './timeline-hints';
 
-it('delays complete multiline hints, dismisses gestures and restores native descriptions', () => {
+it('updates open hints, dismisses gestures and restores native descriptions', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('PointerEvent', MouseEvent);
   vi.useFakeTimers();
@@ -38,6 +38,13 @@ it('delays complete multiline hints, dismisses gestures and restores native desc
     expect(tooltip.closest('dialog')).not.toBeNull();
     expect(button.getAttribute('aria-describedby')).toContain(tooltip.id);
     expect(button.hasAttribute('title')).toBe(false);
+    await act(async () => {
+      button.dataset['reviewHint'] = 'Updated action';
+    });
+    expect(tooltip.textContent).toBe('Updated action');
+    await act(async () => {
+      button.dataset['reviewHint'] = hint;
+    });
     act(() => button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
     expect(host.querySelector('[role="tooltip"]')).toBeNull();
     expect(button.getAttribute('title')).toBe('Native');
@@ -54,6 +61,21 @@ it('delays complete multiline hints, dismisses gestures and restores native desc
     expect(host.querySelector('[role="tooltip"]')?.textContent).toBe(hint);
     act(() => document.dispatchEvent(new Event('scroll')));
     expect(host.querySelector('[role="tooltip"]')).toBeNull();
+    over();
+    await act(async () => {
+      button.dataset['reviewHint'] = 'Changed before the delay';
+    });
+    expect(host.querySelector('[role="tooltip"]')).toBeNull();
+    act(() => vi.advanceTimersByTime(500));
+    expect(host.querySelector('[role="tooltip"]')?.textContent).toBe('Changed before the delay');
+    await act(async () => {
+      button.removeAttribute('data-review-hint');
+    });
+    expect(host.querySelector('[role="tooltip"]')).toBeNull();
+    expect(button.getAttribute('aria-describedby')).toBe('existing');
+    over();
+    act(() => vi.advanceTimersByTime(500));
+    expect(host.querySelector('[role="tooltip"]')?.textContent).toBe('Native');
   } finally {
     act(() => root.unmount());
     host.remove();

@@ -50,6 +50,9 @@ it('keeps a checked unavailable source switch in the settings grid and removes l
     expect(toggle).not.toBeNull();
     expect(toggle?.disabled).toBe(true);
     expect(toggle?.getAttribute('aria-checked')).toBe('true');
+    expect(toggle?.dataset['reviewHint']).toBe(
+      i18n.translate('gallery.videoReview.sourceTrackAlwaysEnabled')
+    );
     expect(host.querySelector('[data-review-track-locked="true"]')).toBeNull();
     expect(
       host.querySelectorAll('[aria-label*="trackLock"],[aria-label*="trackUnlock"]')
@@ -470,7 +473,7 @@ it('retains header identity during fresh lane and action updates while commands 
     unavailable = true;
     await render();
     expect(host.querySelector('[role="switch"]')?.getAttribute('aria-checked')).toBe('false');
-    expect(host.querySelector('[role="switch"]')?.getAttribute('title')).toBe(
+    expect(host.querySelector('[role="switch"]')?.getAttribute('data-review-hint')).toBe(
       i18n.translate('gallery.videoReview.trackUnavailable')
     );
     unavailable = false;
@@ -519,17 +522,17 @@ it('refreshes configuration labels and tooltips on locale change with an unchang
     );
     const toggle = host.querySelector('[role="switch"]')!;
     const label = toggle.getAttribute('aria-label');
-    const title = toggle.getAttribute('title');
+    const hint = toggle.getAttribute('data-review-hint');
     await act(async () => i18n.setLocalePreference(original === 'en' ? 'ru' : 'en'));
     expect(host.querySelector('[data-track-label]')?.textContent).toBe('3D');
     expect(toggle.getAttribute('aria-label')).toBe(
       `${i18n.translate('gallery.videoReview.trackEnabled')}: 3D`
     );
     expect(toggle.getAttribute('aria-label')).not.toBe(label);
-    expect(toggle.getAttribute('title')).toBe(
+    expect(toggle.getAttribute('data-review-hint')).toBe(
       i18n.translate('gallery.videoReview.trackUnavailable')
     );
-    expect(toggle.getAttribute('title')).not.toBe(title);
+    expect(toggle.getAttribute('data-review-hint')).not.toBe(hint);
   } finally {
     await act(async () => root.unmount());
     await i18n.setLocalePreference(original);
@@ -714,6 +717,7 @@ it('updates visibility glyphs, flags and labels without bypassing lane master av
     await render();
     const button = host.querySelector<HTMLButtonElement>('button')!;
     expect(button.getAttribute('aria-pressed')).toBe('true');
+    expect(button.dataset['reviewHint']).toBe(i18n.translate('gallery.videoReview.hideFromVideo'));
     expect(button.querySelector('.lucide-eye')).not.toBeNull();
     enabled = false;
     icon = EyeOff;
@@ -728,7 +732,7 @@ it('updates visibility glyphs, flags and labels without bypassing lane master av
     expect(button.disabled).toBe(true);
     expect(button.querySelector('.lucide-volume-2')).not.toBeNull();
     expect(button.getAttribute('aria-label')).toBe(label);
-    expect(button.title).toBe(label);
+    expect(button.dataset['reviewHint']).toBe(i18n.translate('gallery.videoReview.showInVideo'));
     expect(button.classList.contains(className)).toBe(true);
     await act(async () => button.click());
     expect(toggle).not.toHaveBeenCalled();
@@ -779,7 +783,7 @@ it('receives changed authored visibility labels through the real caller locale s
     expect(button.getAttribute('aria-label')).toBe(
       i18n.translate('gallery.videoReview.zoomEnabled')
     );
-    expect(button.title).toBe(i18n.translate('gallery.videoReview.zoomEnabled'));
+    expect(button.dataset['reviewHint']).toBe(i18n.translate('gallery.videoReview.hideFromVideo'));
   } finally {
     await act(async () => root.unmount());
     await i18n.setLocalePreference(original);

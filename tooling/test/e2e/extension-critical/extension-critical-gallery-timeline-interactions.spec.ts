@@ -249,12 +249,45 @@ async function inspectPinnedTracks(
     exact: true,
   });
   const textPin = text.locator('.review-track-pin');
+  const tooltip = dialog.getByRole('tooltip');
   await expect(sourcePin).toHaveAttribute('aria-pressed', 'true');
+  await expect(sourcePin).toHaveAttribute(
+    'data-review-hint',
+    label('gallery.videoReview.unpinTrack')
+  );
+  await expect(textPin).toHaveAttribute('data-review-hint', label('gallery.videoReview.pinTrack'));
+  await source.getByRole('switch').hover();
+  await expect(tooltip).toHaveText(label('gallery.videoReview.sourceTrackAlwaysEnabled'));
+  await expect(text.getByRole('switch')).toHaveAttribute(
+    'data-review-hint',
+    label('gallery.videoReview.disableTrack')
+  );
   await expect(rows.first()).toHaveAttribute('data-review-header-track', 'source');
   await textPin.press('Enter');
   await expect(textPin).toHaveAttribute('aria-pressed', 'true');
+  await expect(textPin).toHaveAttribute(
+    'data-review-hint',
+    label('gallery.videoReview.unpinTrack')
+  );
   await expect(textPin).toBeFocused();
   await expect.poll(first).toEqual(['source', 'text']);
+  const labels = dialog.locator('[data-ui="gallery.videoReview.trackListViewport"]');
+  const time = dialog.locator('[data-ui="gallery.videoReview.timelineViewport"]');
+  await labels.evaluate((node) => {
+    node.scrollTop = 0;
+  });
+  await expect.poll(() => time.evaluate((node) => node.scrollTop)).toBe(0);
+  await page.mouse.move(0, 0);
+  await textPin.hover();
+  await expect(tooltip).toHaveText(label('gallery.videoReview.unpinTrack'));
+  const captions = text.getByRole('button', { name: label('gallery.videoReview.captionsEnabled') });
+  const captionsOn = (await captions.getAttribute('aria-pressed')) === 'true';
+  await captions.hover();
+  await expect(tooltip).toHaveText(
+    label(
+      captionsOn ? 'gallery.videoReview.hideVideoCaptions' : 'gallery.videoReview.showVideoCaptions'
+    )
+  );
   const textReorder = text.locator('.review-track-reorder');
   await textReorder.press('Home');
   await expect.poll(first).toEqual(['text', 'source']);
@@ -265,7 +298,12 @@ async function inspectPinnedTracks(
   await expect.poll(first).toEqual(['source', 'text']);
   await inspectTimelinePanes(dialog);
   await page.screenshot({ path: screenshotPath, fullPage: false, animations: 'disabled' });
+  const settings = command('gallery.videoReview.trackSettings');
+  await settings.click();
+  await inspectPinnedScroll(page, dialog, screenshotPath.replace('.png', '-scrolled.png'));
+  await inspectOverflowingPins(dialog);
 
+  await settings.click();
   await command('gallery.videoReview.collapseTracks').click();
   const expand = command('gallery.videoReview.expandTracks');
   await expect(expand).toHaveAttribute('aria-expanded', 'false');
@@ -286,6 +324,91 @@ async function inspectPinnedTracks(
   await textPin.click();
   await expect(textPin).toHaveAttribute('aria-pressed', 'false');
   await expect(rows.first()).toHaveAttribute('data-review-header-track', 'source');
+}
+
+async function inspectPinnedScroll(page: Page, dialog: Locator, screenshotPath: string) {
+  const time = dialog.locator('[data-ui="gallery.videoReview.timelineViewport"]');
+  const labels = dialog.locator('[data-ui="gallery.videoReview.trackListViewport"]');
+  const resize = dialog.locator('[data-review-panel-resize="timeline"]');
+  const scrollRange = () => time.evaluate((node) => node.scrollHeight - node.clientHeight);
+  for (let index = 0; index < 8 && (await scrollRange()) < 40; index++)
+    await resize.press('ArrowDown');
+  expect(await scrollRange()).toBeGreaterThanOrEqual(40);
+  await time.evaluate((node) => {
+    node.scrollTop = 0;
+  });
+  await expect.poll(() => labels.evaluate((node) => node.scrollTop)).toBe(0);
+  const position = () =>
+    dialog
+      .locator('[data-review-header-track],[data-review-track]')
+      .evaluateAll((nodes) =>
+        nodes
+          .filter((node) =>
+            ['source', 'text', 'keyboard'].includes(
+              node.getAttribute('data-review-header-track') ??
+                node.getAttribute('data-review-track') ??
+                ''
+            )
+          )
+          .map((node) => node.getBoundingClientRect().top)
+      );
+  const before = await position();
+  expect(before).toHaveLength(6);
+  for (const [surface, other, top] of [
+    [labels, time, 32],
+    [time, labels, 16],
+  ] as const) {
+    await surface.evaluate((node, value) => {
+      node.scrollTop = value;
+    }, top);
+    await expect.poll(() => other.evaluate((node) => node.scrollTop)).toBe(top);
+    const after = await position();
+    for (const [index, y] of after.entries()) {
+      const expected = before[index]! - (index % 3 === 2 ? top : 0);
+      expect(Math.abs(y - expected)).toBeLessThanOrEqual(1);
+    }
+    const hitTrack = await labels.locator('[data-review-header-track="text"]').evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      return document
+        .elementFromPoint(rect.left + rect.width / 2, rect.bottom - 2)
+        ?.closest('[data-review-header-track]')
+        ?.getAttribute('data-review-header-track');
+    });
+    expect(hitTrack).toBe('text');
+  }
+  await page.screenshot({ path: screenshotPath, fullPage: false, animations: 'disabled' });
+  await time.evaluate((node) => {
+    node.scrollTop = 0;
+  });
+}
+
+async function inspectOverflowingPins(dialog: Locator) {
+  const resize = dialog.locator('[data-review-panel-resize="timeline"]');
+  const labels = dialog.locator('[data-ui="gallery.videoReview.trackListViewport"]');
+  const time = dialog.locator('[data-ui="gallery.videoReview.timelineViewport"]');
+  await resize.press('Home');
+  await labels.evaluate((node) => {
+    node.scrollTop = node.scrollHeight;
+  });
+  const visibleTail = () =>
+    labels.evaluate((node) => {
+      const stack = node
+        .querySelector('[data-review-track-group="pinned"]')!
+        .getBoundingClientRect();
+      const tail = node
+        .querySelector('[data-review-header-track="music"]')!
+        .getBoundingClientRect();
+      return (
+        Math.min(node.getBoundingClientRect().bottom, tail.bottom) -
+        Math.max(tail.top, stack.bottom)
+      );
+    });
+  await expect.poll(visibleTail).toBeGreaterThan(0);
+  await inspectTimelinePanes(dialog);
+  await resize.press('End');
+  await time.evaluate((node) => {
+    node.scrollTop = 0;
+  });
 }
 
 for (const variant of [

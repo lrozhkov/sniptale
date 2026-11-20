@@ -37,9 +37,11 @@ export function ReviewTimelineHints() {
     const hide = () => {
       clearTimeout(timer);
       clearTimeout(leaveTimer.current);
+      watchHint.disconnect();
       if (active) {
         active.removeAttribute('data-review-native-hint');
-        if (nativeTitle !== null) active.setAttribute('title', nativeTitle);
+        if (nativeTitle !== null && !active.hasAttribute('title'))
+          active.setAttribute('title', nativeTitle);
         if (describedBy === null) active.removeAttribute('aria-describedby');
         else active.setAttribute('aria-describedby', describedBy);
       }
@@ -50,6 +52,14 @@ export function ReviewTimelineHints() {
       describedBy = null;
       setHint(null);
     };
+    const watchHint = new MutationObserver(() => {
+      const target = active;
+      const text = target?.dataset['reviewHint'];
+      if (!target || !text?.trim()) return hide();
+      setHint((current) =>
+        current?.target === target && current.text !== text ? { ...current, text } : current
+      );
+    });
     dismiss.current = hide;
     const show = (event: Event) => {
       clearTimeout(leaveTimer.current);
@@ -74,6 +84,8 @@ export function ReviewTimelineHints() {
         target.getAttribute('aria-label');
       if (!text?.trim()) return;
       active = target;
+      if (target.hasAttribute('data-review-hint'))
+        watchHint.observe(target, { attributeFilter: ['data-review-hint'] });
       nativeTitle = target.getAttribute('title');
       describedBy = target.getAttribute('aria-describedby');
       target.setAttribute('data-review-native-hint', text);
@@ -92,7 +104,11 @@ export function ReviewTimelineHints() {
       timer = setTimeout(() => {
         if (!target.isConnected) return hide();
         target.setAttribute('aria-describedby', [describedBy, id].filter(Boolean).join(' '));
-        setHint({ text, target, host: surface.closest('dialog') ?? document.body });
+        setHint({
+          text: target.dataset['reviewHint'] ?? text,
+          target,
+          host: surface.closest('dialog') ?? document.body,
+        });
       }, 500);
     };
     const leave = (event: Event) => {

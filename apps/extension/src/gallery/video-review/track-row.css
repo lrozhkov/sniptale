@@ -288,3 +288,25 @@
   );
   background: var(--review-interaction-item-background);
 }
+
+/* Lane paint stays below the pinned rows and the timeline-wide overlays. */
+[data-review-track] {
+  isolation: isolate;
+}
+
+[data-review-track-pinned] {
+  position: sticky;
+  top: var(--review-pinned-track-top, auto);
+  z-index: 15;
+  background: var(--sniptale-color-surface-panel);
+}
+
+[data-review-track-pinned]::before {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 100%;
+  height: var(--review-pinned-track-gap, 0px);
+  background: inherit;
+  content: '';
+  pointer-events: none;
+}
