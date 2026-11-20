@@ -301,9 +301,7 @@ it('preserves an inside playhead when opening properties and seeks to the start 
       );
       expect(video.currentTime).toBe(expected);
       expect(
-        fixture.host.querySelector(
-          'aside [role="group"][aria-label="gallery.videoReview.speedRate"]'
-        )
+        fixture.host.querySelector('aside button[aria-label="gallery.videoReview.speedRate"]')
       ).not.toBeNull();
     }
     await seek(2);
@@ -454,10 +452,10 @@ it('preserves a selected speed range when toolbar preferences and tools change',
     await fixture.selectRulerRange(1, 2);
     await fixture.click('speedMode');
     const speedOptions = fixture.host.querySelector<HTMLElement>(
-      'aside [role="group"][aria-label="gallery.videoReview.speedRate"]'
+      'aside button[aria-label="gallery.videoReview.speedRate"]'
     )!;
     expect(speedOptions).not.toBeNull();
-    const selectedRate = speedOptions.querySelector('[aria-pressed="true"]')?.textContent;
+    const selectedRate = speedOptions.textContent;
     expect(selectedRate).toBe('2×');
     const historyLength = fixture.snapshot.workspace.history.length;
     expect(
@@ -477,7 +475,7 @@ it('preserves a selected speed range when toolbar preferences and tools change',
     await act(async () => liveSeek.click());
     expect(fixture.snapshot.workspace.history).toHaveLength(historyLength);
     expect(speedOptions.isConnected).toBe(true);
-    expect(speedOptions.querySelector('[aria-pressed="true"]')?.textContent).toBe(selectedRate);
+    expect(speedOptions.textContent).toBe(selectedRate);
     await fixture.addFocus(2, 3);
     expect(fixture.snapshot.workspace.history).toHaveLength(historyLength + 1);
     expect(fixture.snapshot.workspace.history[historyLength - 1]).toEqual(speed);
@@ -506,10 +504,10 @@ it('resizes a selected speed range on the timeline through the same reversible h
     await fixture.selectRulerRange(1, 2);
     await fixture.click('speedMode');
     const speedOptions = fixture.host.querySelector<HTMLElement>(
-      'aside [role="group"][aria-label="gallery.videoReview.speedRate"]'
+      'aside button[aria-label="gallery.videoReview.speedRate"]'
     )!;
     expect(speedOptions).not.toBeNull();
-    const selectedRate = speedOptions.querySelector('[aria-pressed="true"]')?.textContent;
+    const selectedRate = speedOptions.textContent;
     expect(selectedRate).toBe('2×');
     const historyLength = fixture.snapshot.workspace.history.length;
     const block = fixture.host.querySelector<HTMLElement>(
@@ -562,7 +560,7 @@ it('resizes a selected speed range on the timeline through the same reversible h
       after: null,
     });
     expect(
-      fixture.host.querySelector('aside [role="group"][aria-label="gallery.videoReview.speedRate"]')
+      fixture.host.querySelector('aside button[aria-label="gallery.videoReview.speedRate"]')
     ).toBeNull();
     expect(fixture.host.querySelectorAll('[data-ui="gallery.videoReview.editBlock"]')).toHaveLength(
       0
@@ -772,7 +770,7 @@ it('creates edits from recorded actions, selects their properties and recalculat
       after: { kind: 'speed', start: 2, end: 3 },
     });
     expect(
-      fixture.host.querySelector('aside [role="group"][aria-label="gallery.videoReview.speedRate"]')
+      fixture.host.querySelector('aside button[aria-label="gallery.videoReview.speedRate"]')
     ).not.toBeNull();
     await selectAction();
     expect(fixture.button('actionSpeed').disabled).toBe(true);
@@ -891,8 +889,11 @@ it('copies, mutes and deletes a multi-selection through the existing command his
           new MouseEvent('pointerdown', { bubbles: true, button: 0, ctrlKey: true })
         )
       );
+    const batch = fixture.host.querySelector(
+      '[data-ui="gallery.videoReview.timelineBatchInspector"]'
+    );
     expect(
-      fixture.host.querySelector('[data-ui="gallery.videoReview.timelineBatchInspector"]')
+      batch?.querySelector('button[aria-label="gallery.videoReview.timelineSelectionClear"]')
     ).not.toBeNull();
     await fixture.click('timelineSelectionClone');
     expect(music()).toHaveLength(4);

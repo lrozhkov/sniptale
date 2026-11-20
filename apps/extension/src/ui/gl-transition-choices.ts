@@ -4,6 +4,7 @@ import {
   type GlTransitionSelection,
 } from '../features/video/project/transition/gl-catalog';
 import { glTransitionLabel } from './gl-transition-labels';
+import { translate } from '../platform/i18n';
 
 /** Checked catalogue data is supplied by composition; this projection has no storage authority. */
 export type GlTransitionChoiceCatalog = {
@@ -64,6 +65,27 @@ export function glTransitionChoices(
   }
   return options;
 }
+
+/** Keep simple joins and GL choices distinct when their localized labels match. */
+export function sceneJoinTransitionChoices(
+  catalog?: GlTransitionChoiceCatalog,
+  current?: GlTransitionSelection
+) {
+  const simple = [
+    { value: 'none', label: translate('gallery.videoReview.transitionNone') },
+    { value: 'dissolve', label: translate('gallery.videoReview.cutDissolve') },
+    { value: 'fade-black', label: translate('gallery.videoReview.cutFadeColor') },
+  ];
+  return [
+    ...simple,
+    ...glTransitionChoices(catalog, current).map((option) =>
+      simple.some(({ label }) => label === option.label)
+        ? { ...option, label: `${option.label} (GL)` }
+        : option
+    ),
+  ];
+}
+
 export function resolveGlTransitionChoice(
   catalog: GlTransitionChoiceCatalog | undefined,
   value: string

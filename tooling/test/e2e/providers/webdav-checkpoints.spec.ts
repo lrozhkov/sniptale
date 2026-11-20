@@ -548,7 +548,7 @@ function reviewEdits(page: Page): Edit[] {
         const owner = dialog.locator('[data-ui="gallery.videoReview.cutTransition"]');
         await owner
           .getByRole('button', {
-            name: label('gallery.videoReview.zoomTransitionType'),
+            name: label('gallery.videoReview.cutTransition'),
             exact: true,
           })
           .click();

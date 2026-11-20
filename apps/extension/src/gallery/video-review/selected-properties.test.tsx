@@ -868,7 +868,7 @@ it.each([true, false])(
     const view = mount(initial);
     if (!accepted) view.change.mockResolvedValue(false);
     const select = view.host.querySelector<HTMLSelectElement>(
-      'select[aria-label="gallery.videoReview.zoomTransitionType"]'
+      'select[aria-label="gallery.videoReview.cutTransition"]'
     )!;
     expect(view.host.querySelector('[role="tab"]')).toBeNull();
     expect(view.host.querySelector('[data-section="timing"]')).toBeNull();

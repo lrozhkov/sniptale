@@ -1,6 +1,9 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { GL_TRANSITIONS } from '../features/video/project/transition/gl-catalog';
-import { getCatalogFixture } from '../platform/i18n/catalog-fixture.test-support';
+import {
+  getCatalogFixture,
+  translateCatalogFixture,
+} from '../platform/i18n/catalog-fixture.test-support';
 import { glTransitionParameterLabel } from './gl-transition-labels';
 const state = vi.hoisted(() => ({ locale: 'en' as 'en' | 'ru' }));
 vi.mock('../platform/i18n', async (original) => {
@@ -21,6 +24,7 @@ import {
   glTransitionChoices,
   glTransitionChoiceValue,
   resolveGlTransitionChoice,
+  sceneJoinTransitionChoices,
   type GlTransitionChoiceCatalog,
 } from './gl-transition-choices';
 const original = createGlTransitionSelection('CrossZoom');
@@ -100,6 +104,24 @@ it('retains standalone pure-field builtin choices when no catalogue dependency i
   expect(glTransitionChoices()).toHaveLength(214);
   expect(resolveGlTransitionChoice(undefined, 'CrossZoom')).toEqual(original);
 });
+
+it.each(['en', 'ru'] as const)(
+  'distinguishes a GL preset from a simple join with the same label in %s',
+  (locale) => {
+    state.locale = locale;
+    const label = translateCatalogFixture('gallery.videoReview.cutFadeColor', locale);
+    const choices = sceneJoinTransitionChoices({
+      ...catalog,
+      items: catalog.items.map((item) =>
+        item.id === 'gl.custom' ? { ...item, name: label } : item
+      ),
+    });
+    expect(choices.filter((option) => option.label === label)).toEqual([
+      { value: 'fade-black', label },
+    ]);
+    expect(choices).toContainEqual({ value: 'gl.custom', label: `${label} (GL)` });
+  }
+);
 
 it.each(['en', 'ru'] as const)(
   'covers every pinned built-in name and parameter in %s',

@@ -3698,7 +3698,7 @@ for (const variant of [
         .click();
       const settings = dialog.locator('[data-ui="gallery.videoReview.cutTransition"]');
       const type = settings.getByRole('button', {
-        name: label('gallery.videoReview.zoomTransitionType'),
+        name: label('gallery.videoReview.cutTransition'),
         exact: true,
       });
       await expect(type).toContainText(label('gallery.videoReview.transitionNone'));
@@ -3732,6 +3732,10 @@ for (const variant of [
       await duration.fill('1');
       await duration.press('Tab');
       await expect(duration).toHaveValue('1');
+      await settings
+        .locator('summary')
+        .filter({ hasText: label('gallery.videoReview.presentationJoinTiming') })
+        .click();
       await expect(
         settings.getByRole('textbox', {
           name: label('gallery.videoReview.cutTransitionBefore'),
@@ -3926,7 +3930,7 @@ test('cut transition VFR fragment excludes cut and outside-fragment rasters', as
     const settings = dialog.locator('[data-ui="gallery.videoReview.cutTransition"]');
     await settings
       .getByRole('button', {
-        name: translate('gallery.videoReview.zoomTransitionType', 'en'),
+        name: translate('gallery.videoReview.cutTransition', 'en'),
         exact: true,
       })
       .click();

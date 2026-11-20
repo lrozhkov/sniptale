@@ -13,7 +13,11 @@ import {
 import { canCloneReviewSelection, cloneReviewTimelineSelection } from './timeline-clone';
 import { commitReviewTimelineClonePlan } from './timeline-clone-commit';
 import { reviewSelectionExists } from './use-review-selection';
-import { ReviewInspectorSections, reviewInspectorActions } from './inspector-sections';
+import {
+  ReviewInspectorActionTrayContext,
+  ReviewInspectorSections,
+  reviewInspectorActions,
+} from './inspector-sections';
 import { ReviewButton, reviewDeleteButtonClassName, reviewTextButtonClassName } from './controls';
 
 type MutationCommands = {
@@ -186,80 +190,85 @@ export function ReviewTimelineBatchInspector({
     };
   });
   return (
-    <div data-ui="gallery.videoReview.timelineBatchInspector" className="space-y-3">
-      <p className="text-xs text-[var(--sniptale-color-text-secondary)]" role="status">
+    <div
+      data-ui="gallery.videoReview.timelineBatchInspector"
+      className="review-inspector-section-body"
+    >
+      <p className="sr-only" role="status">
         {translate('gallery.videoReview.timelineSelectionCount').replace(
           '{count}',
           String(group?.keys.length ?? 0)
         )}
       </p>
-      <ReviewInspectorSections
-        sections={[
-          reviewInspectorActions(
-            <>
-              {cloneable ? (
-                <ReviewButton
-                  selectionAction="duplicate"
-                  label={translate('gallery.videoReview.timelineSelectionClone')}
-                  disabled={disabled}
-                  className={`${reviewTextButtonClassName} !w-full justify-start`}
-                  onClick={() => void apply('clone')}
-                >
-                  <Copy size={15} aria-hidden="true" />
-                  <span>{translate('gallery.videoReview.timelineSelectionClone')}</span>
-                </ReviewButton>
-              ) : null}
-              {mutableAudio ? (
-                <ReviewButton
-                  label={translate(
-                    allMuted
-                      ? 'gallery.videoReview.timelineSelectionUnmute'
-                      : 'gallery.videoReview.timelineSelectionMute'
-                  )}
-                  aria-pressed={allMuted}
-                  disabled={disabled}
-                  className={`${reviewTextButtonClassName} !w-full justify-start`}
-                  onClick={() => void apply('mute')}
-                >
-                  {allMuted ? (
-                    <Volume2 size={15} aria-hidden="true" />
-                  ) : (
-                    <VolumeX size={15} aria-hidden="true" />
-                  )}
-                  <span>
-                    {translate(
+      <ReviewInspectorActionTrayContext value={null}>
+        <ReviewInspectorSections
+          sections={[
+            reviewInspectorActions(
+              <>
+                {cloneable ? (
+                  <ReviewButton
+                    selectionAction="duplicate"
+                    label={translate('gallery.videoReview.timelineSelectionClone')}
+                    disabled={disabled}
+                    className={`${reviewTextButtonClassName} !w-full justify-start`}
+                    onClick={() => void apply('clone')}
+                  >
+                    <Copy size={15} aria-hidden="true" />
+                    <span>{translate('gallery.videoReview.timelineSelectionClone')}</span>
+                  </ReviewButton>
+                ) : null}
+                {mutableAudio ? (
+                  <ReviewButton
+                    label={translate(
                       allMuted
                         ? 'gallery.videoReview.timelineSelectionUnmute'
                         : 'gallery.videoReview.timelineSelectionMute'
                     )}
-                  </span>
-                </ReviewButton>
-              ) : null}
-              {removable ? (
+                    aria-pressed={allMuted}
+                    disabled={disabled}
+                    className={`${reviewTextButtonClassName} !w-full justify-start`}
+                    onClick={() => void apply('mute')}
+                  >
+                    {allMuted ? (
+                      <Volume2 size={15} aria-hidden="true" />
+                    ) : (
+                      <VolumeX size={15} aria-hidden="true" />
+                    )}
+                    <span>
+                      {translate(
+                        allMuted
+                          ? 'gallery.videoReview.timelineSelectionUnmute'
+                          : 'gallery.videoReview.timelineSelectionMute'
+                      )}
+                    </span>
+                  </ReviewButton>
+                ) : null}
+                {removable ? (
+                  <ReviewButton
+                    selectionAction="delete"
+                    label={translate('gallery.videoReview.timelineSelectionDelete')}
+                    disabled={disabled}
+                    className={`${reviewDeleteButtonClassName} !w-full justify-start`}
+                    onClick={() => void apply('remove')}
+                  >
+                    <Trash2 size={15} aria-hidden="true" />
+                    <span>{translate('gallery.videoReview.timelineSelectionDelete')}</span>
+                  </ReviewButton>
+                ) : null}
                 <ReviewButton
-                  selectionAction="delete"
-                  label={translate('gallery.videoReview.timelineSelectionDelete')}
+                  label={translate('gallery.videoReview.timelineSelectionClear')}
                   disabled={disabled}
-                  className={`${reviewDeleteButtonClassName} !w-full justify-start`}
-                  onClick={() => void apply('remove')}
+                  className={`${reviewTextButtonClassName} !w-full justify-start`}
+                  onClick={group?.clear}
                 >
-                  <Trash2 size={15} aria-hidden="true" />
-                  <span>{translate('gallery.videoReview.timelineSelectionDelete')}</span>
+                  <X size={15} aria-hidden="true" />
+                  <span>{translate('gallery.videoReview.timelineSelectionClear')}</span>
                 </ReviewButton>
-              ) : null}
-              <ReviewButton
-                label={translate('gallery.videoReview.timelineSelectionClear')}
-                disabled={disabled}
-                className={`${reviewTextButtonClassName} !w-full justify-start`}
-                onClick={group?.clear}
-              >
-                <X size={15} aria-hidden="true" />
-                <span>{translate('gallery.videoReview.timelineSelectionClear')}</span>
-              </ReviewButton>
-            </>
-          ),
-        ]}
-      />
+              </>
+            ),
+          ]}
+        />
+      </ReviewInspectorActionTrayContext>
     </div>
   );
 }

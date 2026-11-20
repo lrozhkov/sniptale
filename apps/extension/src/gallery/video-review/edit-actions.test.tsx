@@ -365,13 +365,19 @@ it('keeps labelled inspector speed and audio choices editable and respects the b
   const props = { layout: 'inspector' as const, rate: 2, audio: 'speed' as const, onRate, onAudio };
   try {
     await act(async () => root.render(<ReviewSpeedOptions {...props} busy={false} />));
-    const rateGroup = host.querySelector(
-      `[role="group"][aria-label="${translate('gallery.videoReview.speedRate')}"]`
-    )!;
+    const rate = () =>
+      host.querySelector<HTMLButtonElement>(
+        `button[aria-label="${translate('gallery.videoReview.speedRate')}"]`
+      )!;
     const audioGroup = host.querySelector(
       `[role="group"][aria-label="${translate('gallery.videoReview.speedAudio')}"]`
     )!;
-    const rateChoices = [...rateGroup.querySelectorAll<HTMLButtonElement>('button')];
+    const choices = () => [
+      ...document.querySelectorAll<HTMLButtonElement>('[role="listbox"] [role="option"]'),
+    ];
+    expect(rate().textContent).toBe('2×');
+    await act(async () => rate().click());
+    const rateChoices = choices();
     expect(rateChoices.map((button) => button.textContent)).toEqual([
       '0.5×',
       '0.75×',
@@ -390,10 +396,10 @@ it('keeps labelled inspector speed and audio choices editable and respects the b
       [...host.querySelectorAll<HTMLButtonElement>('button')].every((button) => button.disabled)
     ).toBe(true);
     await act(async () => root.render(<ReviewSpeedOptions {...props} rate={16} busy={false} />));
-    const custom = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
-      (button) => button.textContent === '16×'
-    )!;
-    expect(custom.getAttribute('aria-pressed')).toBe('true');
+    expect(rate().textContent).toBe('16×');
+    await act(async () => rate().click());
+    const custom = choices().find((button) => button.textContent === '16×')!;
+    expect(custom.getAttribute('aria-selected')).toBe('true');
     await act(async () => custom.click());
     expect(onRate).toHaveBeenLastCalledWith(16);
   } finally {

@@ -1,8 +1,8 @@
 import { useGlTransitionCatalog } from '../../composition/gl-transition-presets/catalog';
 import {
-  glTransitionChoices,
   glTransitionChoiceValue,
   resolveGlTransitionChoice,
+  sceneJoinTransitionChoices,
 } from '../../ui/gl-transition-choices';
 
 import { GlTransitionFields } from '../../ui/gl-transition-fields';
@@ -73,6 +73,7 @@ import {
 } from 'lucide-react';
 import {
   ReviewButton,
+  ReviewDetails,
   ReviewInterval,
   reviewDeleteButtonClassName,
   reviewEventLabel,
@@ -595,6 +596,27 @@ function CutTransitionFields(props: {
         : { ...draft, [field]: value };
     return next;
   };
+  const timingField = (current: CompositionJoinSettings, field: 'total' | 'before' | 'after') => (
+    <NumericRow
+      appearance="plain"
+      className="w-full"
+      label={translate(
+        field === 'total'
+          ? 'gallery.videoReview.zoomTransitionDuration'
+          : field === 'before'
+            ? 'gallery.videoReview.cutTransitionBefore'
+            : 'gallery.videoReview.cutTransitionAfter'
+      )}
+      value={field === 'total' ? total : current[field]}
+      min={0}
+      max={field === 'total' ? 60 : 60 - current[field === 'before' ? 'after' : 'before']}
+      unit="s"
+      step={0.05}
+      precision={3}
+      onPreviewValue={(value) => setDraft(change(field, value))}
+      onCommitValue={(value) => void commit(change(field, value))}
+    />
+  );
   return (
     <fieldset
       disabled={saving}
@@ -603,18 +625,16 @@ function CutTransitionFields(props: {
     >
       <SelectField<string>
         className={reviewSelectFieldClassName}
-        label={translate('gallery.videoReview.zoomTransitionType')}
+        label={translate('gallery.videoReview.cutTransition')}
         value={
           draft?.type === 'gl'
             ? glTransitionChoiceValue(glCatalog, draft.selection)
             : (draft?.type ?? 'none')
         }
-        options={[
-          { value: 'none', label: translate('gallery.videoReview.transitionNone') },
-          { value: 'dissolve', label: translate('gallery.videoReview.cutDissolve') },
-          { value: 'fade-black', label: translate('gallery.videoReview.cutFadeColor') },
-          ...glTransitionChoices(glCatalog, draft?.type === 'gl' ? draft.selection : undefined),
-        ]}
+        options={sceneJoinTransitionChoices(
+          glCatalog,
+          draft?.type === 'gl' ? draft.selection : undefined
+        )}
         onChange={(type) => {
           if (type === 'none') {
             void commit(null);
@@ -637,15 +657,6 @@ function CutTransitionFields(props: {
       />
       {draft ? (
         <>
-          {draft.type === 'gl' && (
-            <GlTransitionFields
-              selection={draft.selection}
-              easing={draft.easing}
-              disabled={saving}
-              onChangeSelection={(selection) => void commit({ ...draft, selection })}
-              onChangeEasing={(easing) => void commit({ ...draft, easing })}
-            />
-          )}
           {draft.type === 'fade-black' ? (
             <ColorField
               className={reviewSelectFieldClassName}
@@ -657,28 +668,23 @@ function CutTransitionFields(props: {
               onChange={(color) => void commit({ ...draft, color })}
             />
           ) : null}
-          {(['total', 'before', 'after'] as const).map((field) => (
-            <NumericRow
-              key={field}
-              appearance="plain"
-              className="w-full"
-              label={translate(
-                field === 'total'
-                  ? 'gallery.videoReview.zoomTransitionDuration'
-                  : field === 'before'
-                    ? 'gallery.videoReview.cutTransitionBefore'
-                    : 'gallery.videoReview.cutTransitionAfter'
-              )}
-              value={field === 'total' ? total : draft[field]}
-              min={0}
-              max={field === 'total' ? 60 : 60 - draft[field === 'before' ? 'after' : 'before']}
-              unit="s"
-              step={0.05}
-              precision={3}
-              onPreviewValue={(value) => setDraft(change(field, value))}
-              onCommitValue={(value) => void commit(change(field, value))}
+          {timingField(draft, 'total')}
+          {draft.type === 'gl' && (
+            <GlTransitionFields
+              selection={draft.selection}
+              easing={draft.easing}
+              disabled={saving}
+              onChangeSelection={(selection) => void commit({ ...draft, selection })}
+              onChangeEasing={(easing) => void commit({ ...draft, easing })}
             />
-          ))}
+          )}
+          <ReviewDetails
+            label={translate('gallery.videoReview.presentationJoinTiming')}
+            preferenceId="cut.transition.timing"
+          >
+            {timingField(draft, 'before')}
+            {timingField(draft, 'after')}
+          </ReviewDetails>
         </>
       ) : null}
     </fieldset>

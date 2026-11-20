@@ -1,7 +1,7 @@
 import {
-  glTransitionChoices,
   glTransitionChoiceValue,
   resolveGlTransitionChoice,
+  sceneJoinTransitionChoices,
   type GlTransitionChoiceCatalog,
 } from './gl-transition-choices';
 import { GlTransitionFields } from './gl-transition-fields';
@@ -64,15 +64,10 @@ export function PresentationJoinFields(props: {
             ? glTransitionChoiceValue(props.glCatalog, value.selection)
             : (value?.type ?? 'none')
         }
-        options={[
-          { value: 'none', label: translate('gallery.videoReview.transitionNone') },
-          { value: 'dissolve', label: translate('gallery.videoReview.cutDissolve') },
-          { value: 'fade-black', label: translate('gallery.videoReview.cutFadeColor') },
-          ...glTransitionChoices(
-            props.glCatalog,
-            value?.type === 'gl' ? value.selection : undefined
-          ),
-        ]}
+        options={sceneJoinTransitionChoices(
+          props.glCatalog,
+          value?.type === 'gl' ? value.selection : undefined
+        )}
         onChange={(type) => {
           if (type === 'none') {
             props.onChange(null);

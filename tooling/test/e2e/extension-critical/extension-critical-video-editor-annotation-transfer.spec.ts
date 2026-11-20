@@ -2559,7 +2559,7 @@ for (const {
           await chooseInspectorValue(
             page,
             settings,
-            label('gallery.videoReview.zoomTransitionType'),
+            label('gallery.videoReview.cutTransition'),
             label(
               galleryCut === 'dissolve'
                 ? 'gallery.videoReview.cutDissolve'

@@ -235,10 +235,11 @@ for (const size of [
             nodes.map((node) => node.getAttribute('data-review-header-track'))
           );
         const expected = [
-          'actions',
+          'keyboard',
+          'mouse',
           'source',
-          'webcam',
           'zoom',
+          'cursorMotion',
           'originalAudio',
           'annotationEffects',
           'text',
@@ -278,12 +279,14 @@ for (const size of [
         }
         const sourceHandle = row('source').locator('.review-track-reorder');
         await sourceHandle.press('ArrowDown');
-        await expect.poll(order).toEqual(['actions', 'webcam', 'source', ...expected.slice(3)]);
+        await expect
+          .poll(order)
+          .toEqual(['keyboard', 'mouse', 'zoom', 'source', ...expected.slice(4)]);
         await sourceHandle.press('ArrowUp');
         await expect.poll(order).toEqual(expected);
         await sourceHandle.scrollIntoViewIfNeeded();
         const start = (await sourceHandle.boundingBox())!;
-        const target = (await row('actions').boundingBox())!;
+        const target = (await row('keyboard').boundingBox())!;
         const drag = async () => {
           await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
           await page.mouse.down();
@@ -301,7 +304,8 @@ for (const size of [
           ).toBe('grabbing');
         };
         await drag();
-        await expect.poll(order).toEqual(['source', 'actions', ...expected.slice(2)]);
+        const sourceFirst = ['source', 'keyboard', 'mouse', ...expected.slice(3)];
+        await expect.poll(order).toEqual(sourceFirst);
         const movedBody = review.locator('[data-review-track="source"]');
         await expect
           .poll(async () =>
@@ -315,7 +319,7 @@ for (const size of [
         await drag();
         await page.mouse.up();
         await expect(review).not.toHaveClass(/review-track-reordering/);
-        await expect.poll(order).toEqual(['source', 'actions', ...expected.slice(2)]);
+        await expect.poll(order).toEqual(sourceFirst);
         const bodies = review.locator('[data-review-track]');
         await expect
           .poll(() =>
@@ -323,7 +327,7 @@ for (const size of [
               nodes.map((node) => node.getAttribute('data-review-track'))
             )
           )
-          .toEqual(['source', 'actions', ...expected.slice(2)]);
+          .toEqual(sourceFirst);
         const zoom = row('zoom');
         await zoom.getByRole('switch').click();
         await expect(zoom.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
@@ -333,7 +337,7 @@ for (const size of [
         const zoomHandle = zoom.locator('.review-track-reorder');
         await expect(zoomHandle).toBeEnabled();
         const offStart = (await zoomHandle.boundingBox())!;
-        const offTarget = (await row('webcam').boundingBox())!;
+        const offTarget = (await row('mouse').boundingBox())!;
         await page.mouse.move(offStart.x + offStart.width / 2, offStart.y + offStart.height / 2);
         await page.mouse.down();
         await page.mouse.move(offStart.x + offStart.width / 2, offTarget.y + offTarget.height / 2, {
@@ -342,10 +346,10 @@ for (const size of [
         await page.mouse.up();
         await expect
           .poll(order)
-          .toEqual(['source', 'actions', 'zoom', 'webcam', ...expected.slice(4)]);
+          .toEqual(['source', 'keyboard', 'zoom', 'mouse', ...expected.slice(4)]);
         await expect(zoom.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
         await zoomHandle.press('ArrowDown');
-        await expect.poll(order).toEqual(['source', 'actions', ...expected.slice(2)]);
+        await expect.poll(order).toEqual(sourceFirst);
         await zoom.getByRole('switch').click();
         await expect(
           zoom.getByRole('button', { name: label('gallery.videoReview.zoomEnabled'), exact: true })
@@ -561,7 +565,7 @@ for (const size of [
         const settings = review.locator('[data-ui="gallery.videoReview.cutTransition"]');
         await settings
           .getByRole('button', {
-            name: label('gallery.videoReview.zoomTransitionType'),
+            name: label('gallery.videoReview.cutTransition'),
             exact: true,
           })
           .click();

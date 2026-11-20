@@ -234,7 +234,7 @@ for (const variant of [
           await chooseInspectorValue(
             page,
             fields,
-            label('gallery.videoReview.zoomTransitionType'),
+            label('gallery.videoReview.cutTransition'),
             label(
               variant.type === 'dissolve'
                 ? 'gallery.videoReview.cutDissolve'

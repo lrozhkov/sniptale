@@ -174,13 +174,13 @@ export function ReviewSpeedOptions(props: {
   };
   if (props.layout === 'inspector')
     return (
-      <>
-        <SegmentedRow
-          ariaLabel={translate('gallery.videoReview.speedRate')}
+      <div className="sniptale-parameter-stack">
+        <SelectField
           label={translate('gallery.videoReview.speedRate')}
+          className={reviewSelectFieldClassName}
           value={String(props.rate)}
-          columns={4}
-          options={rateOptions.map((option) => ({ ...option, disabled: props.busy }))}
+          disabled={props.busy}
+          options={rateOptions}
           onChange={changeRate}
         />
         <SegmentedRow
@@ -191,7 +191,7 @@ export function ReviewSpeedOptions(props: {
           options={audioOptions.map((option) => ({ ...option, disabled: props.busy }))}
           onChange={props.onAudio}
         />
-      </>
+      </div>
     );
   return (
     <>
