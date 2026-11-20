@@ -13,6 +13,7 @@ import {
 } from './cursor-motion-editor';
 import { createTrackProjection } from './track-projection';
 import { translate } from '../../platform/i18n';
+import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import { createReviewCommandFixture } from './editor-fixture.test-support';
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
@@ -75,7 +76,9 @@ it('authors cursor intervals and points; edits, copies and toggles without accep
             { id: 'cut', kind: 'cut', start: 5, end: 6, requestedStart: 5, requestedEnd: 6 },
           ])}
         />
-        <ReviewCursorMotionInspector editor={editor} busy={false} />
+        <InspectorLayout>
+          <ReviewCursorMotionInspector editor={editor} busy={false} />
+        </InspectorLayout>
       </>
     );
   }

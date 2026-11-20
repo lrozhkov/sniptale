@@ -639,38 +639,34 @@ export function ReviewCursorMotionInspector({
             icon: Palette,
             content: (
               <div className="sniptale-parameter-stack">
-                <div className="flex flex-wrap gap-1">
-                  {CURSOR_MOTION_SHAPES.map((shape) => (
-                    <button
-                      key={shape}
-                      type="button"
-                      aria-label={translate(reviewCursorMotionShapeTitleKeys[shape])}
-                      aria-pressed={m.shape === shape}
-                      title={translate(reviewCursorMotionShapeTitleKeys[shape])}
-                      onClick={() => update({ shape })}
-                      className={[
-                        'flex h-10 w-10 shrink-0 items-center justify-center rounded border border-transparent !p-0',
-                        m.shape === shape
-                          ? 'bg-[var(--sniptale-color-surface-hover)]'
-                          : 'bg-transparent hover:bg-[var(--sniptale-color-surface-hover)]',
-                      ].join(' ')}
-                    >
+                <SegmentedRow
+                  columns={5}
+                  layout="stacked"
+                  ariaLabel={translate('gallery.videoReview.cursorMotionShape')}
+                  label={translate('gallery.videoReview.cursorMotionShape')}
+                  value={m.shape}
+                  options={CURSOR_MOTION_SHAPES.map((shape) => ({
+                    value: shape,
+                    label: translate(reviewCursorMotionShapeTitleKeys[shape]),
+                    icon: (
                       <img
                         alt=""
-                        className="h-8 w-8 shrink-0 object-contain"
-                        width={32}
-                        height={32}
+                        className="size-6 shrink-0 object-contain"
+                        width={24}
+                        height={24}
                         src={appleCursorDataUrl(shape, m.color, m.outline, false)}
                       />
-                    </button>
-                  ))}
-                </div>
+                    ),
+                  }))}
+                  onChange={(shape) => update({ shape })}
+                />
                 <DraftNumericRow
                   label={translate('gallery.videoReview.cursorMotionSize')}
                   value={m.size}
                   min={12}
                   max={160}
                   step={1}
+                  rangePresentation="field"
                   unit="px"
                   onChange={(size) => update({ size })}
                 />
@@ -688,6 +684,7 @@ export function ReviewCursorMotionInspector({
                 />
                 <ToggleField
                   label={translate('gallery.videoReview.cursorMotionShadow')}
+                  showStatus
                   value={m.shadow}
                   onChange={(shadow) => update({ shadow })}
                 />

@@ -309,7 +309,9 @@ function ClickSettingNumber(props: {
   onChange(patch: Partial<ReviewClickStyle> | null): void;
 }) {
   const { field: key, value, label, factor, unit } = props;
-  const [min, max] = CLICK_BOUNDS[key];
+  const min = CLICK_BOUNDS[key][0] * factor;
+  const max = CLICK_BOUNDS[key][1] * factor;
+  const shadow = key === 'lensShadow' && typeof value === 'number';
   return (
     <>
       <ClickNumberRow
@@ -319,8 +321,8 @@ function ClickSettingNumber(props: {
 
         label={translate(label)}
         value={value === null || value === undefined ? null : value * factor}
-        min={min * factor}
-        max={max * factor}
+        min={min}
+        max={max}
         step={
           key === 'magnification'
             ? 0.1
@@ -334,7 +336,14 @@ function ClickSettingNumber(props: {
           key === 'magnification' || key === 'stroke' || key === 'x' || key === 'y' ? 1 : 0
         }
         unit={unit}
-        scrub={key === 'magnification' ? { min: 1, max: 2.5, step: 0.1 } : undefined}
+        scrub={
+          key === 'magnification'
+            ? { min: 1, max: 2.5, step: 0.1 }
+            : shadow
+              ? { min, max, step: 1 }
+              : undefined
+        }
+        rangePresentation={shadow ? 'field' : undefined}
         onCommitValue={(next) => props.onChange({ [key]: next / factor })}
       />
       {value === null || value === undefined ? (

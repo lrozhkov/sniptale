@@ -8164,6 +8164,7 @@
       "cursorMotionAdd": "Движение курсора",
       "cursorMotionNoSpace": "Для движения курсора нужен свободный интервал.",
       "cursorMotionPoint": "Точка {number}",
+      "cursorMotionShape": "Форма курсора",
       "cursorMotionSize": "Размер курсора",
       "cursorMotionColor": "Цвет курсора",
       "cursorMotionOutline": "Обводка",

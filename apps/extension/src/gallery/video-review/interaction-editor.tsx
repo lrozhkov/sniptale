@@ -347,6 +347,7 @@ export function ReviewInteractionProperties({
   part?: 'all' | 'fields' | 'actions';
 }) {
   const p = editor.presses.find((p) => p.id === marker.ref.id);
+  if (!p && part === 'fields') return null;
   const row = (key: 'x' | 'y', label: string) =>
     p ? (
       <DraftNumericRow
@@ -390,7 +391,13 @@ export function ReviewInteractionProperties({
   ) : null;
   return (
     <div
-      className={part === 'actions' ? 'contents' : 'space-y-2'}
+      className={
+        part === 'actions'
+          ? 'contents'
+          : part === 'fields'
+            ? 'sniptale-parameter-stack border-b border-[var(--sniptale-color-border-soft)] pb-2'
+            : 'sniptale-parameter-stack'
+      }
       data-ui="gallery.videoReview.interactionProperties"
     >
       {part !== 'actions' ? fields : null}

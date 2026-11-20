@@ -8164,6 +8164,7 @@
       "cursorMotionAdd": "Cursor motion",
       "cursorMotionNoSpace": "Cursor motion needs a free interval.",
       "cursorMotionPoint": "Point {number}",
+      "cursorMotionShape": "Cursor shape",
       "cursorMotionSize": "Cursor size",
       "cursorMotionColor": "Cursor color",
       "cursorMotionOutline": "Outline",

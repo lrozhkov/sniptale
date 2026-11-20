@@ -145,6 +145,12 @@ it('shows a narrow default rim only for optical lenses and preserves the authore
   render('flat');
   expect(host.querySelector('[aria-label="gallery.videoReview.clickLensEdgeWidth"]')).toBeNull();
   render('optical');
+  const shadow = host.querySelector<HTMLInputElement>(
+    'input[type="range"][aria-label="gallery.videoReview.clickLensShadow"]'
+  );
+  expect(shadow?.value).toBe('20');
+  expect(shadow?.min).toBe('0');
+  expect(shadow?.max).toBe('100');
   expect(
     host.querySelector<HTMLInputElement>(
       'input[aria-label="gallery.videoReview.clickLensEdgeWidth"]'

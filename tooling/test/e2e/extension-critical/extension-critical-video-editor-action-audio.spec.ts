@@ -20,6 +20,7 @@ import {
   checkInspectorPaintedFont,
   checkInspectorParameterRows,
 } from '../support/inspector-utilities';
+import { openNumericControl } from '../support/inspector-numeric';
 import { startHostServer } from '../support/host-server';
 import {
   applyHarnessBootstrap,
@@ -209,10 +210,11 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
           exact: true,
         })
       ).toBeChecked();
-      const volume = owner.getByRole('textbox', {
-        name: label('gallery.videoReview.actionAudioVolume'),
-        exact: true,
-      });
+      const volume = await openNumericControl(
+        owner,
+        label('gallery.videoReview.actionAudioVolume')
+      );
+      await checkInspectorPaintedFont(page, volume, 'numeric');
       await volume.fill('30');
       await volume.press('Enter');
       await expect.poll(async () => (await setting())?.volume).toBe(0.3);
@@ -223,7 +225,6 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await offset.fill('0.1');
       await offset.press('Enter');
       await expect.poll(async () => (await setting())?.offset).toBe(0.1);
-      await checkInspectorPaintedFont(page, volume, 'numeric');
       const listen = owner.getByRole('button', {
         name: label('gallery.videoReview.actionAudioListen'),
         exact: true,

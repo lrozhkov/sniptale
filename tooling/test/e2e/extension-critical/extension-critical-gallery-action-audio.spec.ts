@@ -252,7 +252,10 @@ for (const viewport of [
         ['gallery.videoReview.actionAudioVolume', '0', '100'],
         ['gallery.videoReview.actionAudioOffset', '-2', '2'],
       ] as const) {
-        const number = audio.getByRole('textbox', { name: label(key), exact: true });
+        const number = audio.getByRole(
+          key === 'gallery.videoReview.actionAudioVolume' ? 'slider' : 'textbox',
+          { name: label(key), exact: true }
+        );
         const row = number.locator(
           'xpath=ancestor::*[@data-ui="shared.ui.compact-inspector.numeric-row"][1]'
         );

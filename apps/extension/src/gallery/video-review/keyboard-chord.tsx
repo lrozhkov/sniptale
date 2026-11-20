@@ -67,7 +67,12 @@ function KeyChoice({
         ?.scrollIntoView({ block: 'nearest' });
   }, [open, active, query]);
   return (
-    <div ref={containerRef} className="relative min-w-0 flex-1" data-floating-ui-owner-id={id}>
+    <div
+      ref={containerRef}
+      className="sniptale-text-value"
+      data-framed
+      data-floating-ui-owner-id={id}
+    >
       <ProductInput
         ref={input}
         role="combobox"
@@ -82,7 +87,7 @@ function KeyChoice({
         placeholder={translate(
           adding ? 'gallery.videoReview.addChordKey' : 'gallery.videoReview.searchChordKey'
         )}
-        className="w-full"
+        className="sniptale-input-compact"
         onClick={() => {
           if (!open) {
             setQuery('');
@@ -224,7 +229,7 @@ export function ReviewKeyboardChord({
       <InspectorParameterRow label={translate('gallery.videoReview.keyCombination')} stacked>
         <div className="sniptale-parameter-stack">
           {values.map((value, index) => (
-            <div className="flex min-w-0 items-center gap-1" key={index}>
+            <div className="sniptale-text-compound" key={index}>
               <KeyChoice
                 value={value}
                 excluded={values.filter((_, i) => i !== index)}
@@ -241,18 +246,19 @@ export function ReviewKeyboardChord({
             </div>
           ))}
           {values.length < 8 ? (
-            <div className="flex min-w-0 items-center gap-1">
-              <Plus
-                size={14}
-                aria-hidden="true"
-                className="shrink-0 text-[var(--sniptale-color-text-secondary)]"
-              />
+            <div className="sniptale-text-compound">
               <KeyChoice
                 value=""
                 adding
                 excluded={values}
                 onChange={(value) => change([...values, value])}
               />
+              <span
+                aria-hidden="true"
+                className="flex size-8 items-center justify-center text-[var(--sniptale-color-text-secondary)]"
+              >
+                <Plus size={14} />
+              </span>
             </div>
           ) : null}
         </div>

@@ -182,32 +182,36 @@ function ActionAudioNumber(props: {
 }) {
   const [draft, setDraft] = useState<number>();
   useEffect(() => setDraft(undefined), [props.value]);
-  const factor = props.field !== 'offset' ? 100 : 1;
+  const offset = props.field === 'offset';
+  const factor = offset ? 1 : 100;
+  const min = offset ? -2 : 0;
+  const max = offset ? 2 : 100;
+  const step = offset ? 0.01 : 1;
   return (
     <NumericRow
+      appearance="plain"
+      className="w-full"
       disabled={props.disabled}
       label={translate(
         props.field === 'downGain'
           ? 'gallery.videoReview.actionAudioDownGain'
           : props.field === 'upGain'
             ? 'gallery.videoReview.actionAudioUpGain'
-            : props.field !== 'offset'
-              ? 'gallery.videoReview.actionAudioVolume'
-              : 'gallery.videoReview.actionAudioOffset'
+            : offset
+              ? 'gallery.videoReview.actionAudioOffset'
+              : 'gallery.videoReview.actionAudioVolume'
       )}
       value={draft ?? (props.value === undefined ? null : props.value * factor)}
-      min={props.field !== 'offset' ? 0 : -2}
-      max={props.field !== 'offset' ? 100 : 2}
-      step={props.field !== 'offset' ? 1 : 0.01}
-      precision={props.field !== 'offset' ? 0 : 2}
-      unit={props.field !== 'offset' ? '%' : 's'}
-      scrub={{
-        min: props.field !== 'offset' ? 0 : -2,
-        max: props.field !== 'offset' ? 100 : 2,
-        step: props.field !== 'offset' ? 1 : 0.01,
-      }}
+      min={min}
+      max={max}
+      step={step}
+      precision={offset ? 2 : 0}
+      unit={offset ? 's' : '%'}
+      scrub={{ min, max, step }}
+      rangePresentation={!offset && props.value !== undefined ? 'field' : undefined}
       enterBehavior="blur"
       onPreviewValue={setDraft}
+      onCancelValue={() => setDraft(undefined)}
       onCommitValue={(value) => {
         setDraft(undefined);
         props.onChange(value / factor);
