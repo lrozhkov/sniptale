@@ -9,7 +9,7 @@ configureGpuPreviewProofBrowser();
 
 for (const combinedBorders of [false, true]) {
   test(
-    'native EffectV1 annotations match the offline export compositor in both attachment planes ' +
+    'native sniptale.animation.v1 annotations match the offline export in both attachment planes ' +
       `(borders=${combinedBorders})`,
     async ({ page }, info) => {
       test.setTimeout(120_000);

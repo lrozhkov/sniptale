@@ -324,7 +324,7 @@ it('preserves the disposable text and storage recovery state when the actual roo
   );
 });
 
-it('passes the coherent EffectV1 snapshots into the Gallery presentation preview', async () => {
+it('passes sniptale.animation.v1 snapshots to the Gallery presentation preview', async () => {
   setup();
   vi.mocked(inspectReviewMedia).mockResolvedValue({
     duration: 4,
