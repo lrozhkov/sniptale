@@ -754,7 +754,11 @@ function ReviewStageGeometryLayers({
             geometry={annotationGeometry}
             size={size}
           />
-          <ReviewAnnotationTextOverlay binding={props.annotationEditing} size={size} />
+          <ReviewAnnotationTextOverlay
+            binding={props.annotationEditing}
+            size={size}
+            plane={annotationGeometry.viewport}
+          />
         </>
       )}
       {afterAnnotation}

@@ -3,7 +3,11 @@ import {
   reviewBuiltinTextTemplates,
 } from '../../features/video/review/annotation-effects/text-templates';
 import { expect, it, vi } from 'vitest';
-import { layoutReviewAnnotationText } from './annotation-text-layout';
+import {
+  layoutReviewAnnotationText,
+  prepareReviewAnnotationTextLayout,
+  reviewAnnotationTextSelectionBounds,
+} from './annotation-text-layout';
 import { legacyReviewTextAppearance } from '../../features/video/review/annotation-effects/text-appearance';
 import { createReviewAnnotationTextClip } from '../../features/video/review/annotation-effects/text-animation';
 import { drawReviewAnnotationText, reviewViewportAnnotationLayers } from './draw-annotation-text';
@@ -111,7 +115,7 @@ it.each([0.000001, 16])(
   }
 );
 
-it('keeps marker bounds stable in typewriter and aligns single-line text to the frame', () => {
+it('keeps marker bounds stable in typewriter and centers a single-line block for every alignment', () => {
   const base = createReviewAnnotationTextClip('test', 'Первая строка\nКадр', 0, 3, 0);
   const clip = applyReviewTextTemplate(base, reviewBuiltinTextTemplates.marker);
   clip.entrance = { ...clip.entrance, preset: 'typewriter', duration: 1 };
@@ -144,5 +148,81 @@ it('keeps marker bounds stable in typewriter and aligns single-line text to the 
   clip.appearance!.align = 'right';
   fill.mockClear();
   drawReviewAnnotationText(context, clip, 1.5, size, size);
-  expect(fill.mock.calls[0]?.[1]).toBeGreaterThan(x);
+  expect(fill.mock.calls[0]?.[1]).toBe(x);
+});
+
+it('uses one default alignment for all built-in title templates', () => {
+  expect(
+    Object.values(reviewBuiltinTextTemplates).map(({ appearance }) => appearance.align)
+  ).toEqual(Array(6).fill('center'));
+});
+
+it.each([
+  ['left', -40],
+  ['center', -10],
+  ['right', 20],
+] as const)('aligns short rows %s inside the fitted text block', (align, shortX) => {
+  const base = createReviewAnnotationTextClip('bounds', 'Длинная!\nДа', 0, 3, 0);
+  const clip = applyReviewTextTemplate(base, reviewBuiltinTextTemplates.marker);
+  const appearance = { ...clip.appearance!, align };
+  const measureText = (text: string) => ({
+    width: text.length * 10,
+    actualBoundingBoxLeft: 0,
+    actualBoundingBoxRight: text.length * 10,
+    actualBoundingBoxAscent: 4,
+    actualBoundingBoxDescent: 3,
+  });
+  const fillRect = vi.fn();
+  const context = {
+    measureText,
+    fillRect,
+    fillText: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+    scale: vi.fn(),
+    translate: vi.fn(),
+    rotate: vi.fn(),
+  } as unknown as CanvasRenderingContext2D;
+  const plane = { width: 640, height: 100 };
+  clip.appearance = appearance;
+  clip.fontSize = 0.1;
+  const layout = prepareReviewAnnotationTextLayout(
+    context,
+    clip,
+    clip.transform.width * plane.width,
+    10,
+    appearance
+  );
+  expect(layout.lines.map(({ x }) => x)).toEqual([-40, shortX]);
+  const bounds = reviewAnnotationTextSelectionBounds(layout, appearance, 10)!;
+  expect(bounds.x).toBeCloseTo(-41.7, 5);
+  expect(bounds.width).toBeCloseTo(83.4, 5);
+  drawReviewAnnotationText(context, clip, 1.5, plane, plane);
+  const rows = fillRect.mock.calls as [number, number, number, number][];
+  expect(rows).toHaveLength(2);
+  expect(rows[0]?.[0]).toBeCloseTo(bounds.x, 5);
+  expect(rows[0]?.[1]).toBeCloseTo(bounds.y, 5);
+  expect(rows[1]?.[0]).toBeCloseTo(shortX - 1.7, 5);
+  expect(rows[1]![1] + rows[1]![3]).toBeCloseTo(bounds.y + bounds.height, 5);
+});
+
+it('fits glyph overhang and outline when there is no background', () => {
+  const clip = createReviewAnnotationTextClip('bounds', 'А', 0, 3, 0);
+  const context = {
+    measureText: () => ({
+      width: 10,
+      actualBoundingBoxLeft: 2,
+      actualBoundingBoxRight: 11,
+      actualBoundingBoxAscent: 4,
+      actualBoundingBoxDescent: 3,
+    }),
+  } as unknown as CanvasRenderingContext2D;
+  const appearance = legacyReviewTextAppearance;
+  const layout = prepareReviewAnnotationTextLayout(context, clip, 200, 10, appearance);
+  expect(reviewAnnotationTextSelectionBounds(layout, appearance, 10)).toEqual({
+    x: -7.3,
+    y: -4.3,
+    width: 13.6,
+    height: 7.6,
+  });
 });

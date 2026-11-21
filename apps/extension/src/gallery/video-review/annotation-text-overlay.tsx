@@ -1,6 +1,15 @@
-import { useEffect, useRef, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { translate } from '../../platform/i18n';
+import { legacyReviewTextAppearance } from '../../features/video/review/annotation-effects/text-appearance';
 import type { ReviewAnnotationEffectTransform } from '../../features/video/review/annotation-effects/types';
+import {
+  prepareReviewAnnotationTextFonts,
+  reviewAnnotationTextFont,
+} from '../../workflows/video-review/annotation-text-fonts';
+import {
+  prepareReviewAnnotationTextLayout,
+  reviewAnnotationTextSelectionBounds,
+} from '../../workflows/video-review/annotation-text-layout';
 import type { ReviewAnnotationEditing } from './annotation-effects-overlay';
 import { deferReviewGesture } from './note-transitions';
 
@@ -16,6 +25,7 @@ type Drag = {
   moved: boolean;
   admission?: ReturnType<typeof deferReviewGesture>;
 };
+type Size = { width: number; height: number };
 
 function move(transform: ReviewAnnotationEffectTransform, x: number, y: number) {
   return {
@@ -29,16 +39,36 @@ function move(transform: ReviewAnnotationEffectTransform, x: number, y: number) 
 export function ReviewAnnotationTextOverlay({
   binding,
   size,
+  plane = size,
 }: {
   binding: ReviewAnnotationEditing;
-  size: { width: number; height: number };
+  size: Size;
+  plane?: Size;
 }) {
   const drag = useRef<Drag | null>(null);
+  const measurement = useRef<CanvasRenderingContext2D | null | undefined>(undefined);
   const editorRef = useRef(binding.editor);
   editorRef.current = binding.editor;
   const clip = binding.editor.previewLane?.textClips?.find(
     (item) => item.id === binding.selectedId
   );
+  const enabled = clip?.enabled ?? false;
+  const text = clip?.text ?? '';
+  const appearance = clip?.appearance ?? legacyReviewTextAppearance;
+  const measuredFont = reviewAnnotationTextFont(appearance, 1);
+  const [, setFontVersion] = useState(0);
+  useEffect(() => {
+    if (!enabled || !text.trim() || appearance.family === 'legacy') return;
+    const controller = new AbortController();
+    void prepareReviewAnnotationTextFonts([{ enabled, text, appearance }], controller.signal).then(
+      () => {
+        if (!controller.signal.aborted && reviewAnnotationTextFont(appearance, 1) !== measuredFont)
+          setFontVersion((version) => version + 1);
+      },
+      () => undefined
+    );
+    return () => controller.abort();
+  }, [appearance, enabled, measuredFont, text]);
   const clipId = clip?.id;
   useEffect(() => {
     if (!clipId) return;
@@ -67,10 +97,24 @@ export function ReviewAnnotationTextOverlay({
   }, [clipId]);
   if (!clip?.enabled || binding.time < clip.start || binding.time >= clip.end) return null;
   const { transform } = clip;
-  const x = transform.x * size.width;
-  const y = transform.y * size.height;
-  const width = transform.width * size.width;
-  const height = transform.height * size.height;
+  const centerX = (transform.x + transform.width / 2) * plane.width;
+  const centerY = (transform.y + transform.height / 2) * plane.height;
+  const fontSize = clip.fontSize * plane.height;
+  if (text.trim() && measurement.current === undefined)
+    measurement.current = document.createElement('canvas').getContext('2d');
+  const context = measurement.current;
+  const bounds = (context &&
+    reviewAnnotationTextSelectionBounds(
+      prepareReviewAnnotationTextLayout(
+        context,
+        clip,
+        transform.width * plane.width,
+        fontSize,
+        appearance
+      ),
+      appearance,
+      fontSize
+    )) ?? { x: -fontSize / 2, y: -fontSize / 2, width: fontSize, height: fontSize };
   const preview = (current: Drag) => {
     if (!current.ready || !current.moved) return;
     editorRef.current.previewGesture({
@@ -110,15 +154,16 @@ export function ReviewAnnotationTextOverlay({
   return (
     <svg
       className="pointer-events-none absolute inset-0 h-full w-full"
-      viewBox={`0 0 ${size.width} ${size.height}`}
+      viewBox={`0 0 ${plane.width} ${plane.height}`}
+      preserveAspectRatio="none"
       data-ui="gallery.videoReview.annotationTextOverlay"
     >
       <rect
-        x={x}
-        y={y}
-        width={width}
-        height={height}
-        transform={`rotate(${(transform.rotation * 180) / Math.PI} ${x + width / 2} ${y + height / 2})`}
+        x={centerX + bounds.x}
+        y={centerY + bounds.y}
+        width={bounds.width}
+        height={bounds.height}
+        transform={`rotate(${(transform.rotation * 180) / Math.PI} ${centerX} ${centerY})`}
         fill="transparent"
         stroke="var(--sniptale-color-accent)"
         vectorEffect="non-scaling-stroke"

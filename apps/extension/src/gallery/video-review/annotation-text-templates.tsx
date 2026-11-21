@@ -23,7 +23,7 @@ import './annotation-text-fonts.css';
 
 type Editor = { id: string; name: string } & (
   | { type: 'create'; afterDeletion: string | null }
-  | { type: 'update'; previous: string }
+  | { type: 'update'; previous: string; targetName: string }
 );
 function TemplateSample({ template }: { template: ReviewTextTemplate }) {
   const { appearance, color } = template;
@@ -140,7 +140,7 @@ export function useReviewAnnotationTextTemplates(
   clip: ReviewAnnotationTextClip,
   disabled: boolean,
   apply: (template: ReviewTextTemplate) => void
-): { picker: ReactNode; form: ReactNode; save: ReactNode } {
+): ReactNode {
   const catalog = useReviewTextTemplateCatalog();
   const [chosen, setChosen] = useState<string>();
   const [editor, setEditor] = useState<Editor>();
@@ -148,10 +148,23 @@ export function useReviewAnnotationTextTemplates(
   const [failure, setFailure] = useState<TemplateFailure>();
   const input = useRef<HTMLInputElement>(null);
   const editorId = editor?.id;
+  const opener = useRef<HTMLButtonElement>(null);
+  const personalGroup = useRef<HTMLFieldSetElement>(null);
   useEffect(() => {
-    if (!editorId) return;
-    // The command menu restores its trigger's focus at the end of the activation.
-    const frame = requestAnimationFrame(() => input.current?.focus());
+    const frame = requestAnimationFrame(() => {
+      if (editorId) {
+        input.current?.focus({ preventScroll: true });
+        input.current?.form?.scrollIntoView?.({ block: 'nearest' });
+      } else if (opener.current) {
+        const original = opener.current;
+        if (original.isConnected && !original.disabled) original.focus();
+        else {
+          const group = personalGroup.current;
+          (group?.querySelector<HTMLButtonElement>('button:enabled') ?? group)?.focus();
+        }
+        opener.current = null;
+      }
+    });
     return () => cancelAnimationFrame(frame);
   }, [editorId]);
 
@@ -222,6 +235,9 @@ export function useReviewAnnotationTextTemplates(
       const fresh = newDraft(draft.name);
       setEditor(fresh);
       void mutate({ ...fresh, template });
+    } else if (draft.type === 'update') {
+      const { id, name, previous } = draft;
+      void mutate({ type: 'update', id, name, previous, template });
     } else void mutate({ ...draft, template });
   };
   const renderOption = (option: (typeof options)[number]) => (
@@ -241,6 +257,23 @@ export function useReviewAnnotationTextTemplates(
   const title = translate('gallery.videoReview.annotationTextTemplates');
   const save = translate('gallery.videoReview.annotationTextTemplateSave');
   const personal = translate('gallery.videoReview.annotationTextTemplatesPersonal');
+  const update = translate('gallery.videoReview.annotationTextTemplateUpdate');
+  const updateTarget =
+    editor?.type === 'update'
+      ? translate('gallery.videoReview.annotationTextTemplateUpdateTarget').replace(
+          '{name}',
+          () => currentRecord?.name ?? editor.targetName
+        )
+      : undefined;
+  const confirm = translate(
+    editor?.type === 'update'
+      ? 'gallery.videoReview.annotationTextTemplateConfirmUpdate'
+      : 'gallery.videoReview.annotationTextTemplateConfirm'
+  );
+  const closeEditor = () => {
+    setEditor(undefined);
+    setFailure(undefined);
+  };
   const reload = catalog.status === 'unavailable' && (
     <ReviewButton
       label={translate('gallery.videoReview.annotationTextTemplatesReloadList')}
@@ -249,161 +282,179 @@ export function useReviewAnnotationTextTemplates(
       onClick={() => void catalog.reload()}
     />
   );
-  return {
-    picker: (
-      <ReviewDetails label={title} preferenceId="text-templates" initiallyOpen>
-        <div className="review-text-template-picker">
-          <fieldset className="review-text-template-group">
-            <legend>{translate('gallery.videoReview.annotationTextTemplatesBuiltin')}</legend>
-            <div className="review-text-template-options">{builtin.map(renderOption)}</div>
-          </fieldset>
-          <fieldset className="review-text-template-group">
-            <legend>{personal}</legend>
-            {options.length > 0 ? (
-              <div className="review-text-template-options">{options.map(renderOption)}</div>
-            ) : catalog.status === 'ready' ? (
-              <span className="review-text-template-status">
-                {translate('gallery.videoReview.annotationTextTemplatesEmpty')}
-              </span>
-            ) : null}
-            {selected && (
-              <div className="review-text-template-actions" role="group" aria-label={selected.name}>
-                {!active && (
-                  <span className="review-text-template-label" title={selected.name}>
-                    {selected.name}
-                  </span>
-                )}
+  const form = (
+    <>
+      {deletion ? (
+        <TemplateDeleteRecovery
+          target={deletion}
+          current={catalog.records.find((record) => record.id === deletion.id)}
+          ready={!unavailable}
+          disabled={disabled || pending}
+          reload={reload}
+          dismiss={() => setFailure(undefined)}
+          remove={remove}
+        />
+      ) : !conflict && (failure || catalog.status === 'unavailable') ? (
+        <div className="review-inspector-notice" role="alert">
+          {translate('gallery.videoReview.annotationTextTemplateFailed')}
+          {reload}
+        </div>
+      ) : null}
+      {editor && (
+        <form
+          aria-label={updateTarget ?? save}
+          className="review-inspector-section-body"
+          onKeyDown={(event) => {
+            if (event.key !== 'Escape') return;
+            event.stopPropagation();
+            if (event.nativeEvent.isComposing) return;
+            event.preventDefault();
+            if (!pending) closeEditor();
+          }}
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit(editor);
+          }}
+        >
+          {updateTarget && (
+            <div className="review-text-template-status [overflow-wrap:anywhere]">
+              {updateTarget}
+            </div>
+          )}
+          <TextField
+            ref={input}
+            label={translate('gallery.videoReview.annotationTextTemplateName')}
+            value={editor.name}
+            maxLength={80}
+            disabled={pending}
+            onChange={(event) => setEditor({ ...editor, name: event.currentTarget.value })}
+          />
+          {conflict && (
+            <div className="review-inspector-notice" role="alert">
+              {translate('gallery.videoReview.annotationTextTemplateChanged')}
+              <div className="review-text-template-actions">
                 <ReviewButton
-                  label={translate('gallery.videoReview.annotationTextTemplateUpdate')}
+                  label={translate(
+                    currentRecord
+                      ? 'gallery.videoReview.annotationTextTemplateReload'
+                      : 'gallery.videoReview.annotationTextTemplateSaveNew'
+                  )}
                   className={reviewTextButtonClassName}
                   disabled={disabled || pending}
-                  onClick={() =>
-                    setEditor({
-                      type: 'update',
-                      id: selected.id,
-                      name: selected.name,
-                      previous: selected.revision,
-                    })
-                  }
-                >
-                  {translate('gallery.videoReview.annotationTextTemplateUpdate')}
-                </ReviewButton>
-                <ReviewButton
-                  label={translate('gallery.videoReview.annotationTextTemplateDelete')}
-                  className={reviewTextButtonClassName}
-                  disabled={disabled || pending || deletion !== undefined}
-                  onClick={() => remove(selected)}
-                >
-                  {translate('gallery.videoReview.annotationTextTemplateDelete')}
-                </ReviewButton>
-              </div>
-            )}
-          </fieldset>
-        </div>
-      </ReviewDetails>
-    ),
-    form: (
-      <>
-        {deletion ? (
-          <TemplateDeleteRecovery
-            target={deletion}
-            current={catalog.records.find((record) => record.id === deletion.id)}
-            ready={!unavailable}
-            disabled={disabled || pending}
-            reload={reload}
-            dismiss={() => setFailure(undefined)}
-            remove={remove}
-          />
-        ) : !conflict && (failure || catalog.status === 'unavailable') ? (
-          <div className="review-inspector-notice" role="alert">
-            {translate('gallery.videoReview.annotationTextTemplateFailed')}
-            {reload}
-          </div>
-        ) : null}
-        {editor && (
-          <form
-            className="review-inspector-section-body"
-            onSubmit={(event) => {
-              event.preventDefault();
-              submit(editor);
-            }}
-          >
-            <TextField
-              ref={input}
-              label={translate('gallery.videoReview.annotationTextTemplateName')}
-              value={editor.name}
-              maxLength={80}
-              disabled={pending}
-              onChange={(event) => setEditor({ ...editor, name: event.currentTarget.value })}
-            />
-            {conflict && (
-              <div className="review-inspector-notice" role="alert">
-                {translate('gallery.videoReview.annotationTextTemplateChanged')}
-                <div className="review-text-template-actions">
-                  <ReviewButton
-                    label={translate(
+                  onClick={() => {
+                    setFailure(undefined);
+                    setEditor(
                       currentRecord
-                        ? 'gallery.videoReview.annotationTextTemplateReload'
-                        : 'gallery.videoReview.annotationTextTemplateSaveNew'
-                    )}
-                    className={reviewTextButtonClassName}
-                    disabled={disabled || pending}
-                    onClick={() => {
-                      setFailure(undefined);
-                      setEditor(
-                        currentRecord
-                          ? {
-                              type: 'update',
-                              id: currentRecord.id,
-                              name: editor.name,
-                              previous: currentRecord.revision,
-                            }
-                          : newDraft(editor.name)
-                      );
-                      input.current?.focus();
-                    }}
-                  />
-                </div>
+                        ? {
+                            type: 'update',
+                            id: currentRecord.id,
+                            name: editor.name,
+                            targetName: currentRecord.name,
+                            previous: currentRecord.revision,
+                          }
+                        : newDraft(editor.name)
+                    );
+                    input.current?.focus();
+                  }}
+                />
               </div>
-            )}
-            <div className="review-text-template-actions">
+            </div>
+          )}
+          <div className="review-text-template-actions">
+            <ReviewButton
+              label={confirm}
+              type="submit"
+              primary
+              disabled={disabled || pending || conflict || !editor.name.trim()}
+            >
+              {confirm}
+            </ReviewButton>
+            <ReviewButton
+              label={translate('gallery.videoReview.annotationTextTemplateCancel')}
+              className={reviewTextButtonClassName}
+              disabled={pending}
+              onClick={closeEditor}
+            >
+              {translate('gallery.videoReview.annotationTextTemplateCancel')}
+            </ReviewButton>
+          </div>
+        </form>
+      )}
+    </>
+  );
+  return (
+    <ReviewDetails label={title} preferenceId="text-templates" initiallyOpen>
+      <div className="review-text-template-picker">
+        <fieldset className="review-text-template-group">
+          <legend>{translate('gallery.videoReview.annotationTextTemplatesBuiltin')}</legend>
+          <div className="review-text-template-options">{builtin.map(renderOption)}</div>
+        </fieldset>
+        <fieldset ref={personalGroup} tabIndex={-1} className="review-text-template-group">
+          <legend>{personal}</legend>
+          <div className="review-text-template-actions">
+            <ReviewButton
+              label={save}
+              className={reviewTextButtonClassName}
+              disabled={disabled || unavailable || pending || !!editor}
+              onClick={(event) => {
+                opener.current = event.currentTarget;
+                setFailure(undefined);
+                setEditor(newDraft(''));
+              }}
+            >
+              <Save size={16} aria-hidden />
+              <span>{save}</span>
+            </ReviewButton>
+          </div>
+          {form}
+          {options.length > 0 ? (
+            <div className="review-text-template-options">{options.map(renderOption)}</div>
+          ) : catalog.status === 'ready' ? (
+            <span className="review-text-template-status">
+              {translate('gallery.videoReview.annotationTextTemplatesEmpty')}
+            </span>
+          ) : null}
+          {selected && (
+            <div
+              key={selected.id}
+              className="review-text-template-actions"
+              role="group"
+              aria-label={selected.name}
+            >
+              {!active && (
+                <span className="review-text-template-label" title={selected.name}>
+                  {selected.name}
+                </span>
+              )}
               <ReviewButton
-                label={translate('gallery.videoReview.annotationTextTemplateConfirm')}
-                type="submit"
+                label={update}
                 className={reviewTextButtonClassName}
-                disabled={disabled || pending || conflict || !editor.name.trim()}
-              >
-                {translate('gallery.videoReview.annotationTextTemplateConfirm')}
-              </ReviewButton>
-              <ReviewButton
-                label={translate('gallery.videoReview.annotationTextTemplateCancel')}
-                className={reviewTextButtonClassName}
-                disabled={pending}
-                onClick={() => {
-                  setEditor(undefined);
-                  setFailure(undefined);
+                disabled={disabled || pending || !!editor}
+                onClick={(event) => {
+                  opener.current = event.currentTarget;
+                  setEditor({
+                    type: 'update',
+                    id: selected.id,
+                    name: selected.name,
+                    targetName: selected.name,
+                    previous: selected.revision,
+                  });
                 }}
               >
-                {translate('gallery.videoReview.annotationTextTemplateCancel')}
+                {update}
+              </ReviewButton>
+              <ReviewButton
+                label={translate('gallery.videoReview.annotationTextTemplateDelete')}
+                className={reviewTextButtonClassName}
+                disabled={disabled || pending || deletion !== undefined}
+                onClick={() => remove(selected)}
+              >
+                {translate('gallery.videoReview.annotationTextTemplateDelete')}
               </ReviewButton>
             </div>
-          </form>
-        )}
-      </>
-    ),
-    save: (
-      <ReviewButton
-        label={save}
-        className={reviewTextButtonClassName}
-        disabled={disabled || unavailable || pending}
-        onClick={() => {
-          setFailure(undefined);
-          setEditor(newDraft(''));
-        }}
-      >
-        <Save size={16} aria-hidden />
-        <span>{save}</span>
-      </ReviewButton>
-    ),
-  };
+          )}
+        </fieldset>
+      </div>
+    </ReviewDetails>
+  );
 }

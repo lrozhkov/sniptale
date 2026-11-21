@@ -724,7 +724,11 @@ async function styledPreviewMarkerRows(
 }
 
 /** Actual frame exporter, probed codecs, muxed files and decoded witnesses for full and fragment clocks. */
-export async function exportProbe(converted = false, nativeText: boolean | 'styles' = false) {
+export async function exportProbe(
+  format: 'mp4' | 'webm',
+  converted: boolean,
+  nativeText: boolean | 'styles'
+) {
   const defs = nativeText ? [] : await definitions();
   const inputSize = { width: 160, height: 90 };
   const file = await encodedSource({ size: inputSize });
@@ -777,233 +781,225 @@ export async function exportProbe(converted = false, nativeText: boolean | 'styl
   ];
   if (nativeText === 'styles') prepareStyledTextWitness(2);
   const results = [];
-  const formats = nativeText === 'styles' ? (['mp4'] as const) : (['mp4', 'webm'] as const);
   const variants =
     nativeText === 'styles'
       ? (['full', 'fragment'] as const)
       : (['full', 'fragment', 'presentation'] as const);
   const frameRate = 30;
   const styledTimes = { cascade: 42 / frameRate, hold: 49 / frameRate };
-  for (const format of formats) {
-    const codec = index.outputCodecs?.[format][0];
-    if (!codec) throw new Error(`Required native ${format} encoder unavailable`);
-    for (const variant of variants) {
-      const fragment = variant === 'fragment';
-      const presentation = variant === 'presentation';
-      const { scene, advanced } = annotationExportScene(defs, size, converted);
-      if (nativeText === 'styles') {
-        scene.annotationEffects!.lane.textClips = REVIEW_TEXT_TEMPLATE_IDS.map((style, order) => {
-          const clip = applyReviewTextTemplate(
-            createReviewAnnotationTextClip(
-              style,
-              style === 'marker' ? 'Новый кадр\nТитр' : 'Новый кадр\nSniptale',
-              style === 'marker' ? 1.2 : 0.4,
-              1.95,
-              order
-            ),
-            reviewBuiltinTextTemplates[style]
-          );
-          const column = order % 3;
-          const row = Math.floor(order / 3);
-          clip.transform = {
-            x: column / 3 + 0.035,
-            y: row * 0.45 + 0.08,
-            width: 0.262,
-            height: 0.36,
-            rotation: (order - 2) * 0.04,
-          };
-          clip.fontSize *= 0.7;
-          if (style === 'marker' && clip.appearance) {
-            clip.appearance.weight = 800;
-            clip.appearance.outline = { enabled: true, color: '#fffafa', opacity: 1, width: 0.07 };
-          }
-          return clip;
-        });
-      } else if (nativeText) {
-        const title = createReviewAnnotationTextClip('text', 'Новый титр 👩🏽‍💻', 0.95, 1.8, 0);
-        title.entrance = { ...title.entrance, preset: 'cascade', duration: 0.4 };
-        title.loop.preset = 'shine';
-        title.exit = { ...title.exit, preset: 'fade', duration: 0.3 };
-        scene.annotationEffects!.lane.textClips = [title];
-      }
-      let bookend: Blob | null = null;
-      if (presentation) {
-        const card = surface(size);
-        card.getContext('2d')!.fillStyle = '#4261a3';
-        card.getContext('2d')!.fillRect(0, 0, size.width, size.height);
-        bookend = await new Promise<Blob>((resolve, reject) =>
-          card.toBlob(
-            (blob) => (blob ? resolve(blob) : reject(new Error('Bookend PNG unavailable'))),
-            'image/png'
-          )
+  const codec = index.outputCodecs?.[format][0];
+  if (!codec) throw new Error(`Required native ${format} encoder unavailable`);
+  for (const variant of variants) {
+    const fragment = variant === 'fragment';
+    const presentation = variant === 'presentation';
+    const { scene, advanced } = annotationExportScene(defs, size, converted);
+    if (nativeText === 'styles') {
+      scene.annotationEffects!.lane.textClips = REVIEW_TEXT_TEMPLATE_IDS.map((style, order) => {
+        const clip = applyReviewTextTemplate(
+          createReviewAnnotationTextClip(
+            style,
+            style === 'marker' ? 'Новый кадр\nТитр' : 'Новый кадр\nSniptale',
+            style === 'marker' ? 1.2 : 0.4,
+            1.95,
+            order
+          ),
+          reviewBuiltinTextTemplates[style]
         );
-        const settings = createNeutralPresentationSettings();
-        const image = {
-          assetId: 'native-bookend',
-          width: size.width,
-          height: size.height,
-          duration: 0.5,
-          fit: 'contain' as const,
-          fillColor: '#000000ff',
-          crop: { panX: 0, panY: 0 },
+        const column = order % 3;
+        const row = Math.floor(order / 3);
+        clip.transform = {
+          x: column / 3 + 0.035,
+          y: row * 0.45 + 0.08,
+          width: 0.262,
+          height: 0.36,
+          rotation: (order - 2) * 0.04,
         };
-        settings.intro = { mode: 'image', image };
-        settings.outro = { mode: 'image', image };
-        advanced.presentation = settings;
-      }
-      const args = {
-        file,
-        index,
-        advanced,
-        edits: fragment ? fragments : fullEdits,
-        captionTimeMap: buildReviewTimeMap(4, fullEdits),
-        fragmentOffset: fragment ? fragmentStart / 2 : 0,
-        effectSnapshots: scene.annotationEffects!.snapshots,
-        readProjectAsset: async (id: string) => (id === 'native-bookend' ? bookend : null),
-        renderSettings: { format, codec, frameRate, quality: 'HIGH' as const },
-        signal,
-      };
-      const holdTime = fragment ? 0.2 : presentation ? 1.7 : 1.2;
-      const hold = createExportWitness(
-        size,
-        nativeText === 'styles' ? styledTimes.hold - args.fragmentOffset : holdTime
-      );
-      const cascade =
-        nativeText === 'styles'
-          ? createExportWitness(size, styledTimes.cascade - args.fragmentOffset)
-          : undefined;
-      const witnesses = cascade ? [cascade, hold] : [hold];
-      const previews = cascade
-        ? await styledPreviewMarkerRows(
-            scene,
-            { file, size: inputSize },
-            fullEdits,
-            [styledTimes.cascade, styledTimes.hold],
-            frameRate,
-            signal
-          )
-        : undefined;
-      const forbidWrite = {
-        writeAt: async () => {
-          throw new Error('Frame probe must not mux');
-        },
-      };
-      await writeReviewFrames({
-        ...args,
-        writer: forbidWrite,
-        frameProbe: {
-          add: async (sample) => {
-            for (const witness of witnesses) {
-              if (
-                witness.capturedTime !== undefined ||
-                sample.timestamp < witness.targetTime - 1e-8
-              )
-                continue;
-              sample.draw(witness.expected.getContext('2d')!, 0, 0, size.width, size.height);
-              witness.capturedTime = sample.timestamp;
-            }
-          },
-        },
+        clip.fontSize *= 0.7;
+        if (style === 'marker' && clip.appearance) {
+          clip.appearance.weight = 800;
+          clip.appearance.outline = { enabled: true, color: '#fffafa', opacity: 1, width: 0.07 };
+        }
+        return clip;
       });
-      if (witnesses.some((witness) => witness.capturedTime === undefined))
-        throw new Error('Export witness frame absent');
-      let bytes = new Uint8Array(0);
-      const writer = {
-        writeAt: async (position: number, chunk: Blob) => {
-          const part = new Uint8Array(await chunk.arrayBuffer());
-          if (position + part.length > bytes.length) {
-            const next = new Uint8Array(position + part.length);
-            next.set(bytes);
-            bytes = next;
-          }
-          bytes.set(part, position);
-        },
+    } else if (nativeText) {
+      const title = createReviewAnnotationTextClip('text', 'Новый титр 👩🏽‍💻', 0.95, 1.8, 0);
+      title.entrance = { ...title.entrance, preset: 'cascade', duration: 0.4 };
+      title.loop.preset = 'shine';
+      title.exit = { ...title.exit, preset: 'fade', duration: 0.3 };
+      scene.annotationEffects!.lane.textClips = [title];
+    }
+    let bookend: Blob | null = null;
+    if (presentation) {
+      const card = surface(size);
+      card.getContext('2d')!.fillStyle = '#4261a3';
+      card.getContext('2d')!.fillRect(0, 0, size.width, size.height);
+      bookend = await new Promise<Blob>((resolve, reject) =>
+        card.toBlob(
+          (blob) => (blob ? resolve(blob) : reject(new Error('Bookend PNG unavailable'))),
+          'image/png'
+        )
+      );
+      const settings = createNeutralPresentationSettings();
+      const image = {
+        assetId: 'native-bookend',
+        width: size.width,
+        height: size.height,
+        duration: 0.5,
+        fit: 'contain' as const,
+        fillColor: '#000000ff',
+        crop: { panX: 0, panY: 0 },
       };
-      await writeReviewFrames({ ...args, writer });
-      const input = new Input({ source: new BlobSource(new Blob([bytes])), formats: ALL_FORMATS });
-      try {
-        const track = await input.getPrimaryVideoTrack();
-        if (!track) throw new Error('Encoded annotation video absent');
-        let decodedFrames = 0,
-          lastDecodedTime = 0;
-        for await (const sample of new VideoSampleSink(track).samples()) {
-          try {
-            decodedFrames++;
-            lastDecodedTime = sample.timestamp;
-            for (const witness of witnesses) {
-              if (
-                witness.decodedTime !== undefined ||
-                sample.timestamp < witness.capturedTime! - 1e-5
-              )
-                continue;
-              sample.draw(witness.actual.getContext('2d')!, 0, 0, size.width, size.height);
-              witness.decodedTime = sample.timestamp;
-            }
-          } finally {
-            sample.close();
-          }
-        }
-        if (witnesses.some((witness) => witness.decodedTime === undefined))
-          throw new Error('Encoded witness timestamp absent');
-        const { expected, actual, capturedTime, decodedTime } = hold;
-        const reference = expected
-          .getContext('2d')!
-          .getImageData(0, 0, size.width, size.height).data;
-        const decoded = actual.getContext('2d')!.getImageData(0, 0, size.width, size.height).data;
-        let absoluteDifference = 0,
-          witnessPixels = 0;
-        for (let p = 0; p < reference.length; p += 4) {
-          for (let c = 0; c < 3; c++)
-            absoluteDifference += Math.abs(reference[p + c]! - decoded[p + c]!);
-          if (
-            Math.abs(reference[p]! - 18) +
-              Math.abs(reference[p + 1]! - 57) +
-              Math.abs(reference[p + 2]! - 74) >
-            40
-          )
-            witnessPixels++;
-        }
-        if (nativeText === 'styles')
-          appendStyledTextWitness(
-            actual,
-            `${format.toUpperCase()} · ${variant} · ${decodedTime!.toFixed(2)} s`
-          );
-        results.push({
-          format,
-          codec,
+      settings.intro = { mode: 'image', image };
+      settings.outro = { mode: 'image', image };
+      advanced.presentation = settings;
+    }
+    const args = {
+      file,
+      index,
+      advanced,
+      edits: fragment ? fragments : fullEdits,
+      captionTimeMap: buildReviewTimeMap(4, fullEdits),
+      fragmentOffset: fragment ? fragmentStart / 2 : 0,
+      effectSnapshots: scene.annotationEffects!.snapshots,
+      readProjectAsset: async (id: string) => (id === 'native-bookend' ? bookend : null),
+      renderSettings: { format, codec, frameRate, quality: 'HIGH' as const },
+      signal,
+    };
+    const holdTime = fragment ? 0.2 : presentation ? 1.7 : 1.2;
+    const hold = createExportWitness(
+      size,
+      nativeText === 'styles' ? styledTimes.hold - args.fragmentOffset : holdTime
+    );
+    const cascade =
+      nativeText === 'styles'
+        ? createExportWitness(size, styledTimes.cascade - args.fragmentOffset)
+        : undefined;
+    const witnesses = cascade ? [cascade, hold] : [hold];
+    const previews = cascade
+      ? await styledPreviewMarkerRows(
+          scene,
+          { file, size: inputSize },
+          fullEdits,
+          [styledTimes.cascade, styledTimes.hold],
           frameRate,
-          fragment,
-          presentation,
-          bytes: bytes.byteLength,
-          capturedTime: capturedTime!,
-          decodedTime: decodedTime!,
-          meanRgbDifference: absoluteDifference / (size.width * size.height * 3),
-          witnessPixels,
-          visibleStyles: nativeText === 'styles' ? styledExportCells(actual) : undefined,
-          marker: cascade
-            ? {
-                rendered: styledMarkerRows(expected),
-                decoded: styledMarkerRows(actual),
-                resultTime: capturedTime! + args.fragmentOffset,
-                preview: previews![1]!,
-                cascade: {
-                  rendered: styledMarkerRows(cascade.expected),
-                  decoded: styledMarkerRows(cascade.actual),
-                  capturedTime: cascade.capturedTime!,
-                  decodedTime: cascade.decodedTime!,
-                  resultTime: cascade.capturedTime! + args.fragmentOffset,
-                  preview: previews![0]!,
-                },
-              }
-            : undefined,
-          duration: await input.computeDuration(),
-          metadataDuration: await input.getDurationFromMetadata(),
-          decodedFrames,
-          lastDecodedTime,
-        });
-      } finally {
-        input.dispose();
+          signal
+        )
+      : undefined;
+    const forbidWrite = {
+      writeAt: async () => {
+        throw new Error('Frame probe must not mux');
+      },
+    };
+    await writeReviewFrames({
+      ...args,
+      writer: forbidWrite,
+      frameProbe: {
+        add: async (sample) => {
+          for (const witness of witnesses) {
+            if (witness.capturedTime !== undefined || sample.timestamp < witness.targetTime - 1e-8)
+              continue;
+            sample.draw(witness.expected.getContext('2d')!, 0, 0, size.width, size.height);
+            witness.capturedTime = sample.timestamp;
+          }
+        },
+      },
+    });
+    if (witnesses.some((witness) => witness.capturedTime === undefined))
+      throw new Error('Export witness frame absent');
+    let bytes = new Uint8Array(0);
+    const writer = {
+      writeAt: async (position: number, chunk: Blob) => {
+        const part = new Uint8Array(await chunk.arrayBuffer());
+        if (position + part.length > bytes.length) {
+          const next = new Uint8Array(position + part.length);
+          next.set(bytes);
+          bytes = next;
+        }
+        bytes.set(part, position);
+      },
+    };
+    await writeReviewFrames({ ...args, writer });
+    const input = new Input({ source: new BlobSource(new Blob([bytes])), formats: ALL_FORMATS });
+    try {
+      const track = await input.getPrimaryVideoTrack();
+      if (!track) throw new Error('Encoded annotation video absent');
+      let decodedFrames = 0,
+        lastDecodedTime = 0;
+      for await (const sample of new VideoSampleSink(track).samples()) {
+        try {
+          decodedFrames++;
+          lastDecodedTime = sample.timestamp;
+          for (const witness of witnesses) {
+            if (
+              witness.decodedTime !== undefined ||
+              sample.timestamp < witness.capturedTime! - 1e-5
+            )
+              continue;
+            sample.draw(witness.actual.getContext('2d')!, 0, 0, size.width, size.height);
+            witness.decodedTime = sample.timestamp;
+          }
+        } finally {
+          sample.close();
+        }
       }
+      if (witnesses.some((witness) => witness.decodedTime === undefined))
+        throw new Error('Encoded witness timestamp absent');
+      const { expected, actual, capturedTime, decodedTime } = hold;
+      const reference = expected.getContext('2d')!.getImageData(0, 0, size.width, size.height).data;
+      const decoded = actual.getContext('2d')!.getImageData(0, 0, size.width, size.height).data;
+      let absoluteDifference = 0,
+        witnessPixels = 0;
+      for (let p = 0; p < reference.length; p += 4) {
+        for (let c = 0; c < 3; c++)
+          absoluteDifference += Math.abs(reference[p + c]! - decoded[p + c]!);
+        if (
+          Math.abs(reference[p]! - 18) +
+            Math.abs(reference[p + 1]! - 57) +
+            Math.abs(reference[p + 2]! - 74) >
+          40
+        )
+          witnessPixels++;
+      }
+      if (nativeText === 'styles')
+        appendStyledTextWitness(
+          actual,
+          `${format.toUpperCase()} · ${variant} · ${decodedTime!.toFixed(2)} s`
+        );
+      results.push({
+        format,
+        codec,
+        frameRate,
+        fragment,
+        presentation,
+        bytes: bytes.byteLength,
+        capturedTime: capturedTime!,
+        decodedTime: decodedTime!,
+        meanRgbDifference: absoluteDifference / (size.width * size.height * 3),
+        witnessPixels,
+        visibleStyles: nativeText === 'styles' ? styledExportCells(actual) : undefined,
+        marker: cascade
+          ? {
+              rendered: styledMarkerRows(expected),
+              decoded: styledMarkerRows(actual),
+              resultTime: capturedTime! + args.fragmentOffset,
+              preview: previews![1]!,
+              cascade: {
+                rendered: styledMarkerRows(cascade.expected),
+                decoded: styledMarkerRows(cascade.actual),
+                capturedTime: cascade.capturedTime!,
+                decodedTime: cascade.decodedTime!,
+                resultTime: cascade.capturedTime! + args.fragmentOffset,
+                preview: previews![0]!,
+              },
+            }
+          : undefined,
+        duration: await input.computeDuration(),
+        metadataDuration: await input.getDurationFromMetadata(),
+        decodedFrames,
+        lastDecodedTime,
+      });
+    } finally {
+      input.dispose();
     }
   }
   return results;

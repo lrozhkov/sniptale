@@ -47,7 +47,7 @@ export function ReviewAnnotationTextInspector({ editor, clip, busy }: Props) {
       icon: Type,
       content: (
         <>
-          {templates.picker}
+          {templates}
           <TextareaField
             clearable={false}
             label={translate('gallery.videoReview.annotationText')}
@@ -105,7 +105,6 @@ export function ReviewAnnotationTextInspector({ editor, clip, busy }: Props) {
     },
     reviewInspectorActions(
       <>
-        {templates.save}
         <ReviewButton
           label={translate('gallery.videoReview.annotationDuplicate')}
           className={reviewTextButtonClassName}
@@ -141,7 +140,6 @@ export function ReviewAnnotationTextInspector({ editor, clip, busy }: Props) {
           />
         </div>
       )}
-      {templates.form}
       <ReviewInspectorSections sections={sections} rememberSection={false} />
     </div>
   );

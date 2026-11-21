@@ -91,7 +91,6 @@ const marker: ReviewTextTemplate = {
   appearance: {
     ...block.appearance,
     weight: 700,
-    align: 'left',
     background: {
       ...block.appearance.background,
       mode: 'marker',
@@ -127,7 +126,6 @@ const terminal: ReviewTextTemplate = {
     family: 'jetbrains-mono',
     weight: 500,
     lineHeight: 1.22,
-    align: 'left',
     background: {
       ...block.appearance.background,
       color: '#111c19',

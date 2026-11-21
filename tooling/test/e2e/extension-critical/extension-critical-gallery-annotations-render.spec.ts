@@ -61,17 +61,22 @@ for (const combinedBorders of [false, true]) {
   );
 }
 
-for (const { converted, nativeText } of [
+const nativeExportCases = [
   { converted: false, nativeText: false },
   { converted: true, nativeText: false },
   { converted: false, nativeText: true },
-  { converted: false, nativeText: 'styles' as const },
+].flatMap((options) => (['mp4', 'webm'] as const).map((format) => ({ ...options, format })));
+
+// Each container has its own deadline. Both the reference render and the encoded file are checked.
+for (const { format, converted, nativeText } of [
+  ...nativeExportCases,
+  { format: 'mp4', converted: false, nativeText: 'styles' } as const,
 ]) {
   test(
     nativeText === 'styles'
       ? 'six title styles survive full and fragment MP4 exports (nativeText=styles)'
-      : `native MP4/WebM exports retain annotations through full, fragment and presentation clocks ` +
-          `(converted=${converted}, nativeText=${nativeText})`,
+      : `native exports retain annotations through full, fragment and presentation clocks ` +
+          `(format=${format}, converted=${converted}, nativeText=${nativeText})`,
     async ({ page }, info) => {
       test.setTimeout(120_000);
       const host = await startHostServer();
@@ -81,12 +86,12 @@ for (const { converted, nativeText } of [
         await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
         await page.locator('[data-ui="gallery.page.root"]').waitFor();
         const results = await page.evaluate(
-          async ({ text, converted, nativeText }) => {
+          async ({ text, format, converted, nativeText }) => {
             const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
             try {
               const module: typeof import('../support/quick-review-annotation-render-probe') =
                 await import(url);
-              return await module.exportProbe(converted, nativeText);
+              return await module.exportProbe(format, converted, nativeText);
             } catch (error) {
               if (error instanceof Error && 'failures' in error)
                 throw new Error(`${error.message}: ${JSON.stringify(error.failures)}`, {
@@ -97,13 +102,13 @@ for (const { converted, nativeText } of [
               URL.revokeObjectURL(url);
             }
           },
-          { text: bundle.outputFiles[0]!.text, converted, nativeText }
+          { text: bundle.outputFiles[0]!.text, format, converted, nativeText }
         );
         await writeFile(
           info.outputPath('annotation-native-exports.json'),
           JSON.stringify(results, null, 2)
         );
-        expect(results).toHaveLength(nativeText === 'styles' ? 2 : 6);
+        expect(results).toHaveLength(nativeText === 'styles' ? 2 : 3);
         if (nativeText === 'styles') {
           await page.screenshot({
             path: info.outputPath('styled-text-decoded-exports.png'),
@@ -111,6 +116,7 @@ for (const { converted, nativeText } of [
           });
         }
         for (const result of results) {
+          expect(result.format).toBe(format);
           if (nativeText === 'styles') {
             expect(result.visibleStyles).toHaveLength(6);
             for (const count of result.visibleStyles!)

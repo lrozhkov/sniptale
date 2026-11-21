@@ -886,6 +886,15 @@ for (const locale of ['en', 'ru'] as const) {
       await dialog.locator('.review-inspector-scroll').evaluate((panel) => {
         panel.scrollTop = 0;
       });
+      const personal = inspector.getByRole('group', {
+        name: label('gallery.videoReview.annotationTextTemplatesPersonal'),
+        exact: true,
+      });
+      const saveAs = personal.getByRole('button', {
+        name: label('gallery.videoReview.annotationTextTemplateSave'),
+        exact: true,
+      });
+      await expect(saveAs).toBeInViewport({ ratio: 1 });
       await page.screenshot({ path: info.outputPath('text-template-picker.png'), fullPage: false });
 
       const move = dialog.getByRole('button', {
@@ -894,6 +903,24 @@ for (const locale of ['en', 'ru'] as const) {
       await move.scrollIntoViewIfNeeded();
       const body = await move.boundingBox();
       if (!body) throw new Error('Missing selected text geometry');
+      const stage = await dialog.locator('[data-ui="gallery.videoReview.stage"]').boundingBox();
+      expect(body.width).toBeLessThan(stage!.width * 0.45);
+      const appearanceTab = inspector.getByRole('tab', {
+        name: label('gallery.videoReview.annotationTextAppearance'),
+        exact: true,
+      });
+      await appearanceTab.click();
+      const alignment = inspector.getByRole('button', {
+        name: label('gallery.videoReview.annotationTextAlign'),
+        exact: true,
+      });
+      await selectCatalogOption(alignment, label('gallery.videoReview.annotationTextAlignLeft'));
+      await expect.poll(async () => (await clip())?.appearance?.align).toBe('left');
+      const leftAligned = (await move.boundingBox())!;
+      expect(Math.abs(leftAligned.x - body.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(leftAligned.width - body.width)).toBeLessThanOrEqual(1);
+      await selectCatalogOption(alignment, label('gallery.videoReview.annotationTextAlignCenter'));
+      await expect.poll(async () => (await clip())?.appearance?.align).toBe('center');
       const x = body.x + body.width / 2;
       const y = body.y + body.height / 2;
       await page.mouse.move(x, y);
@@ -901,6 +928,10 @@ for (const locale of ['en', 'ru'] as const) {
       await page.mouse.move(x + 18, y + 10, { steps: 4 });
       await page.mouse.up();
       await expect.poll(async () => (await clip())?.transform.x ?? 0).toBeGreaterThan(0.15);
+      const moved = (await move.boundingBox())!;
+      expect(Math.abs(moved.x - body.x - 18)).toBeLessThanOrEqual(2);
+      expect(Math.abs(moved.y - body.y - 10)).toBeLessThanOrEqual(2);
+      expect(Math.abs(moved.width - body.width)).toBeLessThanOrEqual(1);
 
       const before = (await clip())!;
       await plates.first().press('ArrowRight');
@@ -1029,10 +1060,6 @@ for (const locale of ['en', 'ru'] as const) {
       await expect(inspector).toBeVisible();
       await expect.poll(clip).toEqual(saved);
 
-      const appearanceTab = inspector.getByRole('tab', {
-        name: label('gallery.videoReview.annotationTextAppearance'),
-        exact: true,
-      });
       if (await appearanceTab.isVisible()) await appearanceTab.click();
       await selectCatalogOption(
         inspector.getByRole('button', {
@@ -1044,24 +1071,27 @@ for (const locale of ['en', 'ru'] as const) {
       await expect.poll(async () => (await clip())?.appearance?.weight).toBe(800);
       const custom = (await clip())!;
       await page.screenshot({ path: info.outputPath('text-style-controls.png'), fullPage: false });
-      const actionMenu = dialog.locator(
-        '[data-ui="gallery.videoReview.inspectorActionMenuTrigger"]'
-      );
-      await actionMenu.click();
-      const saveAs = label('gallery.videoReview.annotationTextTemplateSave');
-      await dialog.getByRole('menuitem', { name: saveAs, exact: true }).click();
-      const name = inspector.getByRole('textbox', {
+      await inspector
+        .getByRole('tab', { name: label('gallery.videoReview.annotationText') })
+        .click();
+      await saveAs.click();
+      const name = personal.getByRole('textbox', {
         name: label('gallery.videoReview.annotationTextTemplateName'),
         exact: true,
       });
       await expect(name).toBeFocused();
+      await name.press('Escape');
+      await expect(name).toHaveCount(0);
+      await expect(saveAs).toBeFocused();
+      await saveAs.click();
       await name.fill('Мой титр');
-      await inspector
-        .getByRole('button', {
-          name: label('gallery.videoReview.annotationTextTemplateConfirm'),
-          exact: true,
-        })
-        .click();
+      const confirmSave = personal.getByRole('button', {
+        name: label('gallery.videoReview.annotationTextTemplateConfirm'),
+        exact: true,
+      });
+      await expect(confirmSave).toBeInViewport({ ratio: 1 });
+      await page.screenshot({ path: info.outputPath('text-template-save.png'), fullPage: false });
+      await confirmSave.click();
       await expect(name).toHaveCount(0);
       await page.evaluate(() => {
         const profile = window.__sniptaleHarness?.getStorageState();
@@ -1101,13 +1131,36 @@ for (const locale of ['en', 'ru'] as const) {
         loop: custom.loop,
         exit: custom.exit,
       });
+      const reused = await clip();
+      const update = personal.getByRole('button', {
+        name: label('gallery.videoReview.annotationTextTemplateUpdate'),
+        exact: true,
+      });
+      await update.click();
+      const target = label('gallery.videoReview.annotationTextTemplateUpdateTarget').replace(
+        '{name}',
+        'Мой титр'
+      );
+      await expect(personal.getByRole('form', { name: target, exact: true })).toBeVisible();
+      await expect(name).toHaveValue('Мой титр');
+      await name.fill('Мой титр 2');
+      await personal
+        .getByRole('button', {
+          name: label('gallery.videoReview.annotationTextTemplateConfirmUpdate'),
+          exact: true,
+        })
+        .click();
+      const updated = personal.getByRole('button', { name: 'Мой титр 2', exact: true });
+      await expect(updated).toBeVisible();
+      await expect(mine).toHaveCount(0);
+      await expect.poll(clip).toEqual(reused);
       await inspector
         .getByRole('button', {
           name: label('gallery.videoReview.annotationTextTemplateDelete'),
           exact: true,
         })
         .click();
-      await expect(mine).toHaveCount(0);
+      await expect(updated).toHaveCount(0);
       const newSaved = await clip();
       await page.evaluate(() => {
         const profile = window.__sniptaleHarness?.getStorageState();
@@ -1119,7 +1172,7 @@ for (const locale of ['en', 'ru'] as const) {
       await page.reload();
       await expect(dialog).toBeVisible();
       await plates.filter({ hasText: 'Новый проект' }).click();
-      await expect(mine).toHaveCount(0);
+      await expect(updated).toHaveCount(0);
       await expect.poll(clip).toEqual(newSaved);
     } finally {
       await new Promise<void>((resolve, reject) =>

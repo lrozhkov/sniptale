@@ -27,7 +27,7 @@ export function reviewTextPreferredFont(family: Family) {
 
 /** Starts any missing faces once per document and settles their fallback before painting. */
 export async function prepareReviewAnnotationTextFonts(
-  clips: readonly ReviewAnnotationTextClip[] | undefined,
+  clips: readonly Pick<ReviewAnnotationTextClip, 'enabled' | 'text' | 'appearance'>[] | undefined,
   signal: AbortSignal
 ) {
   const fonts = fontSet();

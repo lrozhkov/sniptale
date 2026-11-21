@@ -298,7 +298,9 @@ function templateProfile() {
     request: async (_name, _options, task) => task({}),
   });
   return {
-    listen: (area: string) => changes.addListener.mock.lastCall?.[0](storage, area),
+    listen: (area: string) => {
+      for (const [listener] of changes.addListener.mock.calls) listener(storage, area);
+    },
     fail: (value: boolean) => {
       refuse = value;
     },
@@ -322,9 +324,24 @@ it('saves, updates and removes profile templates without altering the current cl
   const save = () => button(labels('gallery.videoReview.annotationTextTemplateSave'));
   const submit = () => button(labels('gallery.videoReview.annotationTextTemplateConfirm'));
   const name = () => field('gallery.videoReview.annotationTextTemplateName');
+  const personal = save().closest('fieldset');
+  expect(personal?.querySelector('legend')?.textContent).toBe(
+    labels('gallery.videoReview.annotationTextTemplatesPersonal')
+  );
   act(() => save().click());
+  expect(personal?.contains(name())).toBe(true);
   expect(submit().disabled).toBe(true);
   act(() => input(name(), 'Мой стиль'));
+  act(() => {
+    name().dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        isComposing: true,
+      })
+    );
+  });
+  expect(name().value).toBe('Мой стиль');
   profile.fail(true);
   await act(async () => submit().click());
   expect(host.querySelector('[role="alert"]')?.textContent).toContain(
@@ -333,17 +350,27 @@ it('saves, updates and removes profile templates without altering the current cl
   profile.fail(false);
   await act(async () => submit().click());
   expect(profile.read()).toMatchObject({ version: 1, records: [{ name: 'Мой стиль' }] });
+  expect(mounted.read()).toBe(clip);
   expect(button('Мой стиль').getAttribute('aria-pressed')).toBe('true');
+  const storage = createBrowserReviewTextTemplateStorage();
+  const first = (await storage.load()).records[0]!;
+  setValue('gallery.videoReview.annotationTextFontSize', '12');
+  const editedClip = mounted.read();
   act(() => button(labels('gallery.videoReview.annotationTextTemplateUpdate')).click());
+  expect(name().value).toBe(first.name);
   act(() => input(name(), 'Заголовок'));
-  await act(async () => submit().click());
-  expect(profile.read()).toMatchObject({ records: [{ name: 'Заголовок' }] });
+  await act(async () =>
+    button(labels('gallery.videoReview.annotationTextTemplateConfirmUpdate')).click()
+  );
+  expect(profile.read()).toMatchObject({
+    records: [{ id: first.id, name: 'Заголовок', template: { fontSize: editedClip.fontSize } }],
+  });
   act(() => save().click());
   act(() => button(labels('gallery.videoReview.annotationTextTemplateCancel')).click());
   expect(host.querySelector('form')).toBeNull();
   await act(async () => button(labels('gallery.videoReview.annotationTextTemplateDelete')).click());
   expect(profile.read()).toMatchObject({ records: [] });
-  expect(mounted.read()).toBe(clip);
+  expect(mounted.read()).toBe(editedClip);
 });
 
 it('deletes the personal template marked active after Undo restores a different title style', async () => {
@@ -421,7 +448,7 @@ it('requires explicit confirmation of the refreshed target after a concurrent up
     previous: previous.revision,
     name: 'Версия 2',
   });
-  const confirm = () => button(labels('gallery.videoReview.annotationTextTemplateConfirm'));
+  const confirm = () => button(labels('gallery.videoReview.annotationTextTemplateConfirmUpdate'));
   await act(async () => confirm().click());
   expect(profile.read()).toMatchObject({ records: [{ name: 'Версия 2' }] });
   expect(name.value).toBe('Моя версия');
@@ -441,10 +468,64 @@ it('requires explicit confirmation of the refreshed target after a concurrent up
   act(() => button(labels('gallery.videoReview.annotationTextTemplateSaveNew')).click());
   expect(profile.read()).toMatchObject({ records: [] });
   expect(field('gallery.videoReview.annotationTextTemplateName').value).toBe('Отдельная версия');
-  await act(async () => confirm().click());
+  await act(async () =>
+    button(labels('gallery.videoReview.annotationTextTemplateConfirm')).click()
+  );
   const replacement = (await external.load()).records[0]!;
   expect(replacement.name).toBe('Отдельная версия');
   expect(replacement.id).not.toBe(updated.id);
+});
+
+it('names the original update target and restores focus when its action is replaced', async () => {
+  const profile = templateProfile();
+  const external = createBrowserReviewTextTemplateStorage();
+  const first = {
+    id: crypto.randomUUID(),
+    name: 'Первый стиль',
+    template: { ...reviewBuiltinTextTemplates.marker, fontSize: 0.11 },
+  };
+  const second = {
+    id: crypto.randomUUID(),
+    name: 'Второй стиль',
+    template: { ...reviewBuiltinTextTemplates.marker, fontSize: 0.15 },
+  };
+  await external.change({ ...first, type: 'create', afterDeletion: null });
+  await external.change({ ...second, type: 'create', afterDeletion: null });
+  const mounted = mountEditableTitle();
+  await mounted.render();
+  await act(async () => button(first.name).click());
+  act(() => button(labels('gallery.videoReview.annotationTextTemplateUpdate')).click());
+  act(() => input(field('gallery.videoReview.annotationTextTemplateName'), 'Черновик'));
+  await act(async () => button(second.name).click());
+  expect(host.querySelector('form')?.textContent).toContain(first.name);
+  expect(field('gallery.videoReview.annotationTextTemplateName').value).toBe('Черновик');
+  act(() => key(field('gallery.videoReview.annotationTextTemplateName'), 'Escape'));
+  await act(async () => {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  });
+  expect(document.activeElement).toBe(
+    button(labels('gallery.videoReview.annotationTextTemplateSave'))
+  );
+  expect((await external.load()).records.map(({ name }) => name)).toEqual([
+    first.name,
+    second.name,
+  ]);
+
+  await act(async () => button(first.name).click());
+  const removedOpener = button(labels('gallery.videoReview.annotationTextTemplateUpdate'));
+  act(() => removedOpener.click());
+  const { revision } = (await external.load()).records[0]!;
+  await external.change({ type: 'delete', id: first.id, previous: revision });
+  await act(async () => profile.listen('local'));
+  expect(removedOpener.isConnected).toBe(false);
+  expect(host.querySelector('form')?.textContent).toContain(first.name);
+  act(() => key(field('gallery.videoReview.annotationTextTemplateName'), 'Escape'));
+  await act(async () => {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  });
+  expect(document.activeElement).toBe(
+    button(labels('gallery.videoReview.annotationTextTemplateSave'))
+  );
 });
 
 it('retries deletion only against its original identity after the selected style changes', async () => {
@@ -613,8 +694,10 @@ it('cancels or confirms a text draft and routes retry through the editor', () =>
   expect(editor.retry).toHaveBeenCalledOnce();
 });
 
-function renderOverlay(binding: ReviewAnnotationEditing) {
-  act(() => root.render(<ReviewAnnotationTextOverlay binding={binding} size={size} />));
+function renderOverlay(binding: ReviewAnnotationEditing, plane = size) {
+  act(() =>
+    root.render(<ReviewAnnotationTextOverlay binding={binding} size={size} plane={plane} />)
+  );
   const view = host.querySelector('svg');
   const target = view?.querySelector('rect');
   if (!view || !target) return null;
@@ -631,6 +714,48 @@ function pointer(node: SVGRectElement, type: string, x: number, y: number, id = 
   Object.defineProperty(event, 'pointerId', { value: id });
   act(() => node.dispatchEvent(event));
 }
+
+it('moves a tight rotated text frame around the authored pivot in the canonical plane', () => {
+  const measured = {
+    measureText: (text: string) => ({
+      width: text.length * 10,
+      actualBoundingBoxLeft: 0,
+      actualBoundingBoxRight: text.length * 10,
+      actualBoundingBoxAscent: 4,
+      actualBoundingBoxDescent: 3,
+    }),
+  } as CanvasRenderingContext2D;
+  const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(measured);
+  const { binding, editor } = fixture();
+  const clip = {
+    ...title,
+    appearance: reviewBuiltinTextTemplates.marker.appearance,
+    transform: { ...title.transform, rotation: Math.PI / 6 },
+  };
+  const lane = { ...editor.lane, textClips: [clip] };
+  const plane = { width: 1280, height: 720 };
+  try {
+    const rect = renderOverlay({ ...binding, editor: { ...editor, previewLane: lane } }, plane)!;
+    expect(rect.ownerSVGElement?.getAttribute('viewBox')).toBe('0 0 1280 720');
+    const [, angle, cx, cy] = rect
+      .getAttribute('transform')!
+      .match(/^rotate\(([^ ]+) ([^ ]+) ([^)]+)\)$/)!;
+    expect(Number(angle)).toBeCloseTo(30);
+    expect(Number(cx)).toBeCloseTo((clip.transform.x + clip.transform.width / 2) * plane.width);
+    expect(Number(cy)).toBeCloseTo((clip.transform.y + clip.transform.height / 2) * plane.height);
+    const markerWidth = 50 + 2 * clip.appearance.background.paddingX * clip.fontSize * plane.height;
+    expect(Number(rect.getAttribute('width'))).toBeCloseTo(markerWidth);
+    expect(Number(rect.getAttribute('x'))).toBeCloseTo(Number(cx) - markerWidth / 2);
+    pointer(rect, 'pointerdown', 320, 170);
+    pointer(rect, 'pointerup', 384, 206);
+    expect(editor.previewGesture).toHaveBeenLastCalledWith({
+      transform: { ...clip.transform, x: 0.25, y: 0.48 },
+    });
+    expect(editor.commitGesture).toHaveBeenCalledOnce();
+  } finally {
+    context.mockRestore();
+  }
+});
 
 it('commits one viewport move per drag and cancels click, escape or lost capture', () => {
   const { binding, editor } = fixture();

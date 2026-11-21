@@ -3,8 +3,10 @@ import {
   reviewTextCssColor,
   type ReviewTextAppearance,
 } from '../../features/video/review/annotation-effects/text-appearance';
-import { reviewAnnotationTextFont } from './annotation-text-fonts';
-import { layoutReviewAnnotationText } from './annotation-text-layout';
+import {
+  prepareReviewAnnotationTextLayout,
+  reviewAnnotationTextBackgroundRect,
+} from './annotation-text-layout';
 import {
   reviewTextRevealUnit,
   sampleReviewAnnotationText,
@@ -74,20 +76,15 @@ export function drawReviewAnnotationText(
     context.translate(x, y);
     context.rotate(angle);
     context.scale(motion.scaleX, motion.scaleY);
-    const font = reviewAnnotationTextFont(appearance, fontSize);
-    context.font = font;
-    context.textAlign = 'left';
-    context.textBaseline = 'middle';
     context.lineJoin = 'round';
     context.shadowColor = 'transparent';
-    context.letterSpacing = `${appearance.letterSpacing * fontSize}px`;
     const { outline, background } = appearance;
     const stroke = outline.enabled && outline.width > 0 && outline.opacity > 0;
     if (stroke) {
       context.lineWidth = fontSize * outline.width;
       context.strokeStyle = reviewTextCssColor(outline.color, outline.opacity);
     }
-    const layout = layoutReviewAnnotationText(context, clip, width, fontSize, appearance, font);
+    const layout = prepareReviewAnnotationTextLayout(context, clip, width, fontSize, appearance);
     const { lines, lineHeight } = layout;
     const firstLine = -((lines.length - 1) * lineHeight) / 2;
     const unit = reveal ? reviewTextRevealUnit(reveal.transition) : null;
@@ -208,46 +205,45 @@ export function drawReviewAnnotationText(
 function paintTextBackground(
   context: CanvasRenderingContext2D,
   { background }: ReviewTextAppearance,
-  { lines, width, x, lineHeight }: ReturnType<typeof layoutReviewAnnotationText>,
+  layout: ReturnType<typeof prepareReviewAnnotationTextLayout>,
   fontSize: number,
   opacity: number,
   visibleRows: ReadonlyMap<number, number> | null,
   viewport: ReturnType<typeof localViewport>
 ) {
-  if (width <= 0 || opacity <= 0) return;
-  const paddingX = background.paddingX * fontSize;
-  const paddingY = background.paddingY * fontSize;
+  if (layout.width <= 0 || opacity <= 0) return;
   context.fillStyle = background.color;
   context.filter = 'none';
   if (background.mode === 'block') {
     context.globalAlpha = opacity * background.opacity;
-    const height = lines.length * lineHeight + paddingY * 2;
+    const { x, y, width, height } = reviewAnnotationTextBackgroundRect(
+      layout,
+      background,
+      fontSize
+    );
     context.beginPath();
     context.roundRect(
-      x - paddingX,
-      -height / 2,
-      width + paddingX * 2,
+      x,
+      y,
+      width,
       height,
-      Math.min(background.radius * fontSize, height / 2, width / 2 + paddingX)
+      Math.min(background.radius * fontSize, height / 2, width / 2)
     );
     context.fill();
     return;
   }
-  const lineBox = Math.min(lineHeight, fontSize);
-  const markerHeight = lineBox + 2 * paddingY;
-  const first = -((lines.length - 1) * lineHeight + markerHeight) / 2;
-  for (const [row, line] of lines.entries()) {
+  for (const [row, line] of layout.lines.entries()) {
     const rowOpacity = visibleRows ? (visibleRows.get(row) ?? 0) : 1;
-    const y = first + row * lineHeight;
-    if (
-      rowOpacity <= 0 ||
-      line.width <= 0 ||
-      y > viewport.bottom ||
-      y + markerHeight < viewport.top
-    )
-      continue;
+    if (rowOpacity <= 0 || line.width <= 0) continue;
+    const { x, y, width, height } = reviewAnnotationTextBackgroundRect(
+      layout,
+      background,
+      fontSize,
+      row
+    );
+    if (y > viewport.bottom || y + height < viewport.top) continue;
     context.globalAlpha = opacity * rowOpacity * background.opacity;
-    context.fillRect(line.x - paddingX, y, line.width + paddingX * 2, markerHeight);
+    context.fillRect(x, y, width, height);
   }
 }
 
