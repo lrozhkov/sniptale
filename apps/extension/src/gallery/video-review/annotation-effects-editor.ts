@@ -2,6 +2,10 @@ import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { transformReviewAnnotationAnchors } from '../../features/video/review/annotation-effects/layout';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EffectBundleCatalogEntry } from '../../features/video/project/effect-bundle/catalog';
+import {
+  applyReviewTextTemplate,
+  reviewBuiltinTextTemplates,
+} from '../../features/video/review/annotation-effects/text-templates';
 import { createReviewAnnotationTextClip } from '../../features/video/review/annotation-effects/text-animation';
 import { prepareReviewAnnotationAppend } from '../../features/video/review/annotation-effects/types';
 import type {
@@ -535,7 +539,10 @@ export function useReviewAnnotationEffects(
       async (owner, controller) => {
         const { lane, order } = prepareReviewAnnotationAppend(currentLane());
         const id = crypto.randomUUID();
-        const clip = createReviewAnnotationTextClip(id, text, range.start, range.end, order);
+        const clip = applyReviewTextTemplate(
+          createReviewAnnotationTextClip(id, text, range.start, range.end, order),
+          reviewBuiltinTextTemplates.clean
+        );
         const next = { ...lane, textClips: [...(lane.textClips ?? []), clip] };
         if (!valid(next)) {
           setFailure('invalid');

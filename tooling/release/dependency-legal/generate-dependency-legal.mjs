@@ -57,6 +57,7 @@ export async function generateRepositoryDependencyLegal(repoRoot = process.cwd()
     manifestPath: policy.dependencyLegal.manifestPath,
     interfaceFont: interfaceFontMetadata(policy),
     documentFont: policy.bundledAssets.find((asset) => asset.id === 'golos-text'),
+    galleryFonts: policy.bundledAssets.filter((asset) => asset.sourceArchive !== undefined),
     bundledAssets,
     outputRoot: repoRoot,
   });

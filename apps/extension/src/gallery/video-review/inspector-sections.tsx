@@ -140,8 +140,10 @@ export function ReviewInspectorActionTray({ children }: { children: ReactNode })
 /** The same row navigates all item parameters; a single group needs no grouping chrome. */
 export function ReviewInspectorSections({
   sections: suppliedSections,
+  rememberSection = true,
 }: {
   sections: readonly ReviewInspectorSection[];
+  rememberSection?: boolean;
 }) {
   const actionTarget = useContext(ReviewSelectionActionsContext);
   const selectionCount = useContext(ReviewTimelineMultiSelectionContext)?.keys.length ?? 0;
@@ -184,8 +186,8 @@ export function ReviewInspectorSections({
   }, [registerSectionCount, sections.length]);
   const [local, setLocal] = useState<string>();
   const id = useId();
-  const remembered = context.remembered ?? local;
-  const remember = context.remember ?? setLocal;
+  const remembered = rememberSection ? (context.remembered ?? local) : local;
+  const remember = (rememberSection ? context.remember : undefined) ?? setLocal;
   const current = sections.find((section) => section.id === remembered) ?? sections[0];
   return (
     <>

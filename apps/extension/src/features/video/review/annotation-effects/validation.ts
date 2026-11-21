@@ -12,6 +12,7 @@ import {
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { EFFECT_BUNDLE_LIMITS } from '../../project/effect-bundle/limits';
 import { REVIEW_TEXT_DIRECTIONS, REVIEW_TEXT_LOOPS, REVIEW_TEXT_TRANSITIONS } from './types';
+import { parseReviewTextAppearance } from './text-appearance';
 import type {
   ReviewAnnotationEffect,
   ReviewAnnotationTextClip,
@@ -137,7 +138,8 @@ function parseInstance(raw: unknown): ReviewAnnotationEffect | null {
   };
 }
 
-function parseTextTransition(raw: unknown): ReviewTextTransition | null {
+/** Reads one authored entrance or exit phase from a project or template. */
+export function parseTextTransition(raw: unknown): ReviewTextTransition | null {
   if (!isRecord(raw)) return null;
   const preset = REVIEW_TEXT_TRANSITIONS.find((item) => item === raw['preset']);
   const direction = REVIEW_TEXT_DIRECTIONS.find((item) => item === raw['direction']);
@@ -158,7 +160,8 @@ function parseTextTransition(raw: unknown): ReviewTextTransition | null {
   };
 }
 
-function parseTextLoop(raw: unknown): ReviewTextLoop | null {
+/** Reads one authored holding motion from a project or template. */
+export function parseTextLoop(raw: unknown): ReviewTextLoop | null {
   if (!isRecord(raw)) return null;
   const preset = REVIEW_TEXT_LOOPS.find((item) => item === raw['preset']);
   if (!preset || !finite(raw['period'], 0.1, 30) || !finite(raw['amount'], 0, 1)) return null;
@@ -186,7 +189,9 @@ function parseTextClip(raw: unknown): ReviewAnnotationTextClip | null {
   const entrance = parseTextTransition(raw['entrance']);
   const exit = parseTextTransition(raw['exit']);
   const loop = parseTextLoop(raw['loop']);
-  if (!transform || !entrance || !exit || !loop) return null;
+  const appearance =
+    raw['appearance'] === undefined ? undefined : parseReviewTextAppearance(raw['appearance']);
+  if (!transform || !entrance || !exit || !loop || appearance === null) return null;
   return {
     id: raw['id'],
     enabled: raw['enabled'],
@@ -196,6 +201,7 @@ function parseTextClip(raw: unknown): ReviewAnnotationTextClip | null {
     transform,
     color: raw['color'],
     fontSize: raw['fontSize'],
+    ...(appearance ? { appearance } : {}),
     order: raw['order'],
     entrance,
     loop,

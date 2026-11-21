@@ -364,6 +364,7 @@ export type PersistenceMutationDomain =
   | 'callout-presets'
   | 'drawing-palette'
   | 'drawing-tool-preferences'
+  | 'gallery-text-templates'
   | 'gradient-presets'
   | 'background-presets'
   | 'highlighter-settings'
@@ -379,6 +380,16 @@ export function runWithPersistenceDomainMutationLock<T>(
   operation: (permit: PersistenceMutationPermit) => T | Promise<T>
 ): Promise<T> {
   return runWithPersistenceDomainMutationLocks([domain], operation);
+}
+
+/** Refuses erasure overlap before waiting for other writers in the same domain. */
+export function tryRunWithPersistenceDomainMutationLock<T>(
+  domain: PersistenceMutationDomain,
+  operation: (permit: PersistenceMutationPermit) => T | Promise<T>
+): Promise<T | null> {
+  return tryRunWithPersistenceMutationPermit((permit) =>
+    acquireDomainLocks([domain], 0, () => operation(permit))
+  );
 }
 
 export function runWithPersistenceDomainMutationLocks<T>(

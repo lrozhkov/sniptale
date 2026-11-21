@@ -1,4 +1,10 @@
-import { wrapReviewCaptionText } from '../../features/video/review/caption-lines';
+import {
+  legacyReviewTextAppearance,
+  reviewTextCssColor,
+  type ReviewTextAppearance,
+} from '../../features/video/review/annotation-effects/text-appearance';
+import { reviewAnnotationTextFont } from './annotation-text-fonts';
+import { layoutReviewAnnotationText } from './annotation-text-layout';
 import {
   reviewTextRevealUnit,
   sampleReviewAnnotationText,
@@ -6,62 +12,7 @@ import {
 } from '../../features/video/review/annotation-effects/text-animation';
 import type { ReviewAnnotationTextClip } from '../../features/video/review/annotation-effects/types';
 
-const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
-
 type Size = { width: number; height: number };
-
-type TextUnit = { text: string; row: number; x: number; width: number };
-type TextLayout = {
-  text: string;
-  width: number;
-  fontSize: number;
-  lines: string[];
-  widths: number[];
-  word?: TextUnit[];
-  grapheme?: TextUnit[];
-};
-const layouts = new WeakMap<ReviewAnnotationTextClip, TextLayout>();
-
-export function layoutReviewAnnotationTextUnits(
-  lines: readonly string[],
-  unit: 'word' | 'grapheme',
-  measure: (text: string) => number
-): TextUnit[] {
-  const units: TextUnit[] = [];
-  for (const [row, line] of lines.entries()) {
-    const pieces =
-      unit === 'word'
-        ? line.split(/(\s+)/u).filter(Boolean)
-        : Array.from(graphemes.segment(line), ({ segment }) => segment);
-    let previous = '';
-    let previousWidth = 0;
-    let x = -measure(line) / 2;
-    for (const text of pieces) {
-      const width = measure(text);
-      if (previous) x += measure(previous + text) - previousWidth - width;
-      if (text.trim()) units.push({ text, row, x, width });
-      x += width;
-      previous = text;
-      previousWidth = width;
-    }
-  }
-  return units;
-}
-
-function textLayout(
-  clip: ReviewAnnotationTextClip,
-  width: number,
-  fontSize: number,
-  measure: (text: string) => number
-): TextLayout {
-  const existing = layouts.get(clip);
-  if (existing?.width === width && existing.fontSize === fontSize && existing.text === clip.text)
-    return existing;
-  const lines = wrapReviewCaptionText(clip.text, width, measure);
-  const layout = { text: clip.text, width, fontSize, lines, widths: lines.map(measure) };
-  layouts.set(clip, layout);
-  return layout;
-}
 
 /** Conservative bounds for visible glyphs in the rotated text box's own coordinates. */
 function localViewport(
@@ -112,7 +63,7 @@ export function drawReviewAnnotationText(
   const width = transform.width * plane.width;
   const height = transform.height * plane.height;
   const fontSize = clip.fontSize * plane.height;
-  const lineHeight = fontSize * 1.2;
+  const appearance = clip.appearance ?? legacyReviewTextAppearance;
   const x = (transform.x + transform.width / 2) * plane.width + motion.x * width;
   const y = (transform.y + transform.height / 2) * plane.height + motion.y * height;
   const angle = transform.rotation + motion.rotation;
@@ -123,21 +74,36 @@ export function drawReviewAnnotationText(
     context.translate(x, y);
     context.rotate(angle);
     context.scale(motion.scaleX, motion.scaleY);
-    context.font = `600 ${fontSize}px Arial, sans-serif`;
+    const font = reviewAnnotationTextFont(appearance, fontSize);
+    context.font = font;
     context.textAlign = 'left';
     context.textBaseline = 'middle';
     context.lineJoin = 'round';
-    context.lineWidth = fontSize * 0.06;
-    context.strokeStyle = 'rgba(0, 0, 0, 0.65)';
-    context.letterSpacing = '0px';
-    const measure = (text: string) => context.measureText(text).width;
-    const layout = textLayout(clip, width, fontSize, measure);
-    const { lines } = layout;
+    context.shadowColor = 'transparent';
+    context.letterSpacing = `${appearance.letterSpacing * fontSize}px`;
+    const { outline, background } = appearance;
+    const stroke = outline.enabled && outline.width > 0 && outline.opacity > 0;
+    if (stroke) {
+      context.lineWidth = fontSize * outline.width;
+      context.strokeStyle = reviewTextCssColor(outline.color, outline.opacity);
+    }
+    const layout = layoutReviewAnnotationText(context, clip, width, fontSize, appearance, font);
+    const { lines, lineHeight } = layout;
     const firstLine = -((lines.length - 1) * lineHeight) / 2;
+    const unit = reveal ? reviewTextRevealUnit(reveal.transition) : null;
+    const parts =
+      unit && reveal
+        ? layout.units(unit, context).map((part, index, units) => ({
+            ...part,
+            state: sampleReviewTextReveal(reveal, index, units.length),
+          }))
+        : null;
     if (motion.wipe < 1) {
       const vertical = reveal?.transition.preset === 'rise';
-      const maskHeight = Math.max(height, lines.length * lineHeight);
-      const maskWidth = width + fontSize * 0.12;
+      const extentX = clip.appearance ? background.paddingX * fontSize : 0;
+      const extentY = clip.appearance ? background.paddingY * fontSize : 0;
+      const maskHeight = Math.max(height, lines.length * lineHeight + extentY * 2);
+      const maskWidth = width + fontSize * 0.12 + extentX * 2;
       context.beginPath();
       context.rect(
         -maskWidth / 2,
@@ -146,6 +112,13 @@ export function drawReviewAnnotationText(
         maskHeight * (vertical ? motion.wipe : 1)
       );
       context.clip();
+    }
+    if (background.mode !== 'none' && background.opacity > 0) {
+      const rows = parts ? new Map<number, number>() : null;
+      for (const part of parts ?? []) {
+        rows?.set(part.row, Math.max(rows.get(part.row) ?? 0, part.state.opacity));
+      }
+      paintTextBackground(context, appearance, layout, fontSize, motion.opacity, rows, viewport);
     }
     context.fillStyle = clip.color;
     if (motion.shine > 0) {
@@ -157,6 +130,26 @@ export function drawReviewAnnotationText(
       shine.addColorStop(1, clip.color);
       context.fillStyle = shine;
     }
+    const { shadow } = appearance;
+    const shadowColor =
+      shadow.enabled && shadow.opacity > 0
+        ? reviewTextCssColor(shadow.color, shadow.opacity)
+        : 'transparent';
+    const shadowExtent =
+      shadowColor === 'transparent'
+        ? 0
+        : Math.max(Math.abs(shadow.x), Math.abs(shadow.y)) + shadow.blur * 4;
+    if (shadowExtent > 0) {
+      const dx = shadow.x * fontSize * motion.scaleX;
+      const dy = shadow.y * fontSize * motion.scaleY;
+      const scaleX = output.width / plane.width;
+      const scaleY = output.height / plane.height;
+      // Canvas shadows operate in destination pixels and do not follow the current transform.
+      context.shadowOffsetX = (dx * Math.cos(angle) - dy * Math.sin(angle)) * scaleX;
+      context.shadowOffsetY = (dx * Math.sin(angle) + dy * Math.cos(angle)) * scaleY;
+      context.shadowBlur =
+        shadow.blur * fontSize * (motion.scaleX * scaleX + motion.scaleY * scaleY);
+    }
     const paint = (
       text: string,
       x: number,
@@ -165,7 +158,8 @@ export function drawReviewAnnotationText(
       opacity: number,
       blur: number
     ) => {
-      const padding = fontSize * (2 + (4 * blur) / Math.min(motion.scaleX, motion.scaleY));
+      const padding =
+        fontSize * (2 + shadowExtent + (4 * blur) / Math.min(motion.scaleX, motion.scaleY));
       if (
         opacity <= 0 ||
         y + padding < viewport.top ||
@@ -177,39 +171,83 @@ export function drawReviewAnnotationText(
       context.globalAlpha = opacity;
       context.filter =
         blur > 0 ? `blur(${blur * fontSize * (output.height / plane.height)}px)` : 'none';
-      context.strokeText(text, x, y);
+      if (stroke) {
+        context.shadowColor = 'transparent';
+        context.strokeText(text, x, y);
+      }
+      context.shadowColor = shadowColor;
       context.fillText(text, x, y);
     };
-    const unit = reveal ? reviewTextRevealUnit(reveal.transition) : null;
-    if (unit && reveal) {
-      const units = (layout[unit] ??= layoutReviewAnnotationTextUnits(lines, unit, measure));
-      for (const [index, part] of units.entries()) {
-        const state = sampleReviewTextReveal(reveal, index, units.length);
+    if (parts) {
+      for (const { text, row, x, width, state } of parts) {
         paint(
-          part.text,
-          part.x,
-          firstLine + part.row * lineHeight + state.y * fontSize,
-          part.width,
+          text,
+          x,
+          firstLine + row * lineHeight + state.y * fontSize,
+          width,
           motion.opacity * state.opacity,
           motion.blur + state.blur
         );
       }
       return;
     }
-    context.letterSpacing = `${motion.tracking * fontSize}px`;
+    context.letterSpacing = `${(appearance.letterSpacing + motion.tracking) * fontSize}px`;
     for (const [index, line] of lines.entries()) {
-      const advance = motion.tracking ? measure(line) : (layout.widths[index] ?? 0);
-      paint(
-        line,
-        -advance / 2,
-        firstLine + index * lineHeight,
-        advance,
-        motion.opacity,
-        motion.blur
-      );
+      const advance = motion.tracking ? context.measureText(line.text).width : line.width;
+      const x =
+        line.x +
+        (line.width - advance) *
+          (appearance.align === 'center' ? 0.5 : Number(appearance.align === 'right'));
+      paint(line.text, x, firstLine + index * lineHeight, advance, motion.opacity, motion.blur);
     }
   } finally {
     context.restore();
+  }
+}
+
+function paintTextBackground(
+  context: CanvasRenderingContext2D,
+  { background }: ReviewTextAppearance,
+  { lines, width, x, lineHeight }: ReturnType<typeof layoutReviewAnnotationText>,
+  fontSize: number,
+  opacity: number,
+  visibleRows: ReadonlyMap<number, number> | null,
+  viewport: ReturnType<typeof localViewport>
+) {
+  if (width <= 0 || opacity <= 0) return;
+  const paddingX = background.paddingX * fontSize;
+  const paddingY = background.paddingY * fontSize;
+  context.fillStyle = background.color;
+  context.filter = 'none';
+  if (background.mode === 'block') {
+    context.globalAlpha = opacity * background.opacity;
+    const height = lines.length * lineHeight + paddingY * 2;
+    context.beginPath();
+    context.roundRect(
+      x - paddingX,
+      -height / 2,
+      width + paddingX * 2,
+      height,
+      Math.min(background.radius * fontSize, height / 2, width / 2 + paddingX)
+    );
+    context.fill();
+    return;
+  }
+  const lineBox = Math.min(lineHeight, fontSize);
+  const markerHeight = lineBox + 2 * paddingY;
+  const first = -((lines.length - 1) * lineHeight + markerHeight) / 2;
+  for (const [row, line] of lines.entries()) {
+    const rowOpacity = visibleRows ? (visibleRows.get(row) ?? 0) : 1;
+    const y = first + row * lineHeight;
+    if (
+      rowOpacity <= 0 ||
+      line.width <= 0 ||
+      y > viewport.bottom ||
+      y + markerHeight < viewport.top
+    )
+      continue;
+    context.globalAlpha = opacity * rowOpacity * background.opacity;
+    context.fillRect(line.x - paddingX, y, line.width + paddingX * 2, markerHeight);
   }
 }
 

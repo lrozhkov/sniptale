@@ -1,3 +1,13 @@
+import { drawReviewAnnotationText } from '../../../../apps/extension/src/workflows/video-review/draw-annotation-text';
+import {
+  prepareReviewAnnotationTextFonts,
+  reviewAnnotationTextFont,
+} from '../../../../apps/extension/src/workflows/video-review/annotation-text-fonts';
+import {
+  applyReviewTextTemplate,
+  REVIEW_TEXT_TEMPLATE_IDS,
+  reviewBuiltinTextTemplates,
+} from '../../../../apps/extension/src/features/video/review/annotation-effects/text-templates';
 import { createReviewAnnotationTextClip } from '../../../../apps/extension/src/features/video/review/annotation-effects/text-animation';
 import { createReviewPresentationMain } from '../../../../apps/extension/src/workflows/video-review/presentation-main';
 import { reviewCutTransitionAt } from '../../../../apps/extension/src/features/video/review/cuts';
@@ -61,7 +71,10 @@ import { inspectReviewMedia } from '../../../../apps/extension/src/workflows/vid
 import { writeReviewFrames } from '../../../../apps/extension/src/workflows/video-review/render-export';
 import { createNeutralPresentationSettings } from '../../../../apps/extension/src/features/video/review/advanced/presentation';
 import { createQuickEditAdvancedState } from '../../../../apps/extension/src/features/video/review/advanced/defaults';
-import { buildReviewTimeMap } from '../../../../apps/extension/src/features/video/review/timeline';
+import {
+  buildReviewTimeMap,
+  createReviewTimeMap,
+} from '../../../../apps/extension/src/features/video/review/timeline';
 import type { ReviewEdit } from '../../../../apps/extension/src/features/video/review/types';
 
 type Size = { width: number; height: number };
@@ -610,10 +623,111 @@ function annotationExportScene(
   return { scene, advanced };
 }
 
+function createExportWitness(size: Size, targetTime: number) {
+  return {
+    targetTime,
+    expected: surface(size),
+    actual: surface(size),
+    capturedTime: undefined as number | undefined,
+    decodedTime: undefined as number | undefined,
+  };
+}
+
+async function styledPreviewMarkerRows(
+  scene: Scene,
+  source: { file: Blob; size: Size },
+  edits: readonly ReviewEdit[],
+  times: readonly number[],
+  fps: number,
+  signal: AbortSignal
+) {
+  const clock = createReviewTimeMap(4, edits);
+  const size = scene.canvas;
+  const preview = {
+    ...scene,
+    source: source.size,
+    annotationEffects: {
+      ...scene.annotationEffects!,
+      segments: clock.getSegments(),
+    },
+  };
+  const owner = managed(preview, size);
+  const renderer = createReviewPreviewRenderer({
+    resources: owner.resources,
+    allocation: owner.allocation,
+    renderer: 'gpu',
+  });
+  const input = new Input({ source: new BlobSource(source.file), formats: ALL_FORMATS });
+  try {
+    const track = await input.getPrimaryVideoTrack();
+    if (!track) throw new Error('Styled preview source video unavailable');
+    const sink = new VideoSampleSink(track);
+    const prepared = await renderer.prepare(preview, { canonical: size, backing: size }, signal);
+    owner.admit(prepared);
+    const frames = [];
+    for (const [index, resultTime] of times.entries()) {
+      const sourceTime = clock.timelineToSource(resultTime);
+      const sample = sourceTime === null ? null : await sink.getSample(sourceTime);
+      if (!sample || sourceTime === null)
+        throw new Error('Styled preview source frame unavailable');
+      try {
+        const paint = {
+          timestamp: sample.timestamp,
+          backing: source.size,
+          draw: sample.draw.bind(sample),
+        };
+        const request = { generation: index * 2, fps, sourceTime, resultTime };
+        const canvas = await renderer.render(prepared, { ...request, source: paint }, signal);
+        let canvasRows;
+        try {
+          canvasRows = styledMarkerRows(canvas.canvas);
+        } finally {
+          canvas.release();
+        }
+
+        const raw = sample.toVideoFrame();
+        try {
+          const gpu = await renderer.render(
+            prepared,
+            {
+              ...request,
+              generation: request.generation + 1,
+              source: { ...paint, videoFrame: () => raw },
+            },
+            signal
+          );
+          try {
+            const copy = surface(size);
+            copy.getContext('2d')!.drawImage(gpu.canvas, 0, 0);
+            frames.push({
+              resultTime,
+              backend: gpu.renderer.backend,
+              canvas: canvasRows,
+              gpu: styledMarkerRows(copy),
+            });
+          } finally {
+            gpu.release();
+          }
+        } finally {
+          raw.close();
+        }
+      } finally {
+        sample.close();
+      }
+    }
+    return frames;
+  } finally {
+    renderer.dispose();
+    owner.resources.dispose();
+    input.dispose();
+  }
+}
+
 /** Actual frame exporter, probed codecs, muxed files and decoded witnesses for full and fragment clocks. */
-export async function exportProbe(converted = false, nativeText = false) {
+export async function exportProbe(converted = false, nativeText: boolean | 'styles' = false) {
   const defs = nativeText ? [] : await definitions();
-  const file = await encodedSource();
+  const inputSize = { width: 160, height: 90 };
+  const file = await encodedSource({ size: inputSize });
   const signal = new AbortController().signal;
   const index = await inspectReviewMedia(file, signal);
   const size = { width: 640, height: 360 };
@@ -630,29 +744,82 @@ export async function exportProbe(converted = false, nativeText = false) {
       audio: 'mute',
     },
   ];
+  // The styles fragment starts on the same 30 fps grid as the full export.
+  const fragmentStart = nativeText === 'styles' ? 2.4 : 2.5;
+  const fragmentEnd = fragmentStart + 1;
   const fragments: ReviewEdit[] = [
-    { id: 'before', kind: 'cut', start: 0, end: 2.5, requestedStart: 0, requestedEnd: 2.5 },
+    {
+      id: 'before',
+      kind: 'cut',
+      start: 0,
+      end: fragmentStart,
+      requestedStart: 0,
+      requestedEnd: fragmentStart,
+    },
     {
       id: 'speed',
       kind: 'speed',
-      start: 2.5,
-      end: 3.5,
-      requestedStart: 2.5,
-      requestedEnd: 3.5,
+      start: fragmentStart,
+      end: fragmentEnd,
+      requestedStart: fragmentStart,
+      requestedEnd: fragmentEnd,
       rate: 2,
       audio: 'mute',
     },
-    { id: 'after', kind: 'cut', start: 3.5, end: 4, requestedStart: 3.5, requestedEnd: 4 },
+    {
+      id: 'after',
+      kind: 'cut',
+      start: fragmentEnd,
+      end: 4,
+      requestedStart: fragmentEnd,
+      requestedEnd: 4,
+    },
   ];
+  if (nativeText === 'styles') prepareStyledTextWitness(2);
   const results = [];
-  for (const format of ['mp4', 'webm'] as const) {
+  const formats = nativeText === 'styles' ? (['mp4'] as const) : (['mp4', 'webm'] as const);
+  const variants =
+    nativeText === 'styles'
+      ? (['full', 'fragment'] as const)
+      : (['full', 'fragment', 'presentation'] as const);
+  const frameRate = 30;
+  const styledTimes = { cascade: 42 / frameRate, hold: 49 / frameRate };
+  for (const format of formats) {
     const codec = index.outputCodecs?.[format][0];
     if (!codec) throw new Error(`Required native ${format} encoder unavailable`);
-    for (const variant of ['full', 'fragment', 'presentation'] as const) {
+    for (const variant of variants) {
       const fragment = variant === 'fragment';
       const presentation = variant === 'presentation';
       const { scene, advanced } = annotationExportScene(defs, size, converted);
-      if (nativeText) {
+      if (nativeText === 'styles') {
+        scene.annotationEffects!.lane.textClips = REVIEW_TEXT_TEMPLATE_IDS.map((style, order) => {
+          const clip = applyReviewTextTemplate(
+            createReviewAnnotationTextClip(
+              style,
+              style === 'marker' ? 'Новый кадр\nТитр' : 'Новый кадр\nSniptale',
+              style === 'marker' ? 1.2 : 0.4,
+              1.95,
+              order
+            ),
+            reviewBuiltinTextTemplates[style]
+          );
+          const column = order % 3;
+          const row = Math.floor(order / 3);
+          clip.transform = {
+            x: column / 3 + 0.035,
+            y: row * 0.45 + 0.08,
+            width: 0.262,
+            height: 0.36,
+            rotation: (order - 2) * 0.04,
+          };
+          clip.fontSize *= 0.7;
+          if (style === 'marker' && clip.appearance) {
+            clip.appearance.weight = 800;
+            clip.appearance.outline = { enabled: true, color: '#fffafa', opacity: 1, width: 0.07 };
+          }
+          return clip;
+        });
+      } else if (nativeText) {
         const title = createReviewAnnotationTextClip('text', 'Новый титр 👩🏽‍💻', 0.95, 1.8, 0);
         title.entrance = { ...title.entrance, preset: 'cascade', duration: 0.4 };
         title.loop.preset = 'shine';
@@ -690,15 +857,32 @@ export async function exportProbe(converted = false, nativeText = false) {
         advanced,
         edits: fragment ? fragments : fullEdits,
         captionTimeMap: buildReviewTimeMap(4, fullEdits),
-        fragmentOffset: fragment ? 1.25 : 0,
+        fragmentOffset: fragment ? fragmentStart / 2 : 0,
         effectSnapshots: scene.annotationEffects!.snapshots,
         readProjectAsset: async (id: string) => (id === 'native-bookend' ? bookend : null),
-        renderSettings: { format, codec, frameRate: 30 as const, quality: 'HIGH' as const },
+        renderSettings: { format, codec, frameRate, quality: 'HIGH' as const },
         signal,
       };
-      const expected = surface(size);
-      let capturedTime: number | undefined;
-      const targetTime = fragment ? 0.2 : presentation ? 1.7 : 1.2;
+      const holdTime = fragment ? 0.2 : presentation ? 1.7 : 1.2;
+      const hold = createExportWitness(
+        size,
+        nativeText === 'styles' ? styledTimes.hold - args.fragmentOffset : holdTime
+      );
+      const cascade =
+        nativeText === 'styles'
+          ? createExportWitness(size, styledTimes.cascade - args.fragmentOffset)
+          : undefined;
+      const witnesses = cascade ? [cascade, hold] : [hold];
+      const previews = cascade
+        ? await styledPreviewMarkerRows(
+            scene,
+            { file, size: inputSize },
+            fullEdits,
+            [styledTimes.cascade, styledTimes.hold],
+            frameRate,
+            signal
+          )
+        : undefined;
       const forbidWrite = {
         writeAt: async () => {
           throw new Error('Frame probe must not mux');
@@ -709,14 +893,20 @@ export async function exportProbe(converted = false, nativeText = false) {
         writer: forbidWrite,
         frameProbe: {
           add: async (sample) => {
-            if (capturedTime === undefined && sample.timestamp >= targetTime - 1e-8) {
-              sample.draw(expected.getContext('2d')!, 0, 0, size.width, size.height);
-              capturedTime = sample.timestamp;
+            for (const witness of witnesses) {
+              if (
+                witness.capturedTime !== undefined ||
+                sample.timestamp < witness.targetTime - 1e-8
+              )
+                continue;
+              sample.draw(witness.expected.getContext('2d')!, 0, 0, size.width, size.height);
+              witness.capturedTime = sample.timestamp;
             }
           },
         },
       });
-      if (capturedTime === undefined) throw new Error('Export witness frame absent');
+      if (witnesses.some((witness) => witness.capturedTime === undefined))
+        throw new Error('Export witness frame absent');
       let bytes = new Uint8Array(0);
       const writer = {
         writeAt: async (position: number, chunk: Blob) => {
@@ -734,23 +924,28 @@ export async function exportProbe(converted = false, nativeText = false) {
       try {
         const track = await input.getPrimaryVideoTrack();
         if (!track) throw new Error('Encoded annotation video absent');
-        const actual = surface(size);
-        let decodedTime: number | undefined;
         let decodedFrames = 0,
           lastDecodedTime = 0;
         for await (const sample of new VideoSampleSink(track).samples()) {
           try {
             decodedFrames++;
             lastDecodedTime = sample.timestamp;
-            if (decodedTime === undefined && sample.timestamp >= capturedTime - 1e-5) {
-              decodedTime = sample.timestamp;
-              sample.draw(actual.getContext('2d')!, 0, 0, size.width, size.height);
+            for (const witness of witnesses) {
+              if (
+                witness.decodedTime !== undefined ||
+                sample.timestamp < witness.capturedTime! - 1e-5
+              )
+                continue;
+              sample.draw(witness.actual.getContext('2d')!, 0, 0, size.width, size.height);
+              witness.decodedTime = sample.timestamp;
             }
           } finally {
             sample.close();
           }
         }
-        if (decodedTime === undefined) throw new Error('Encoded witness timestamp absent');
+        if (witnesses.some((witness) => witness.decodedTime === undefined))
+          throw new Error('Encoded witness timestamp absent');
+        const { expected, actual, capturedTime, decodedTime } = hold;
         const reference = expected
           .getContext('2d')!
           .getImageData(0, 0, size.width, size.height).data;
@@ -768,16 +963,39 @@ export async function exportProbe(converted = false, nativeText = false) {
           )
             witnessPixels++;
         }
+        if (nativeText === 'styles')
+          appendStyledTextWitness(
+            actual,
+            `${format.toUpperCase()} · ${variant} · ${decodedTime!.toFixed(2)} s`
+          );
         results.push({
           format,
           codec,
+          frameRate,
           fragment,
           presentation,
           bytes: bytes.byteLength,
-          capturedTime,
-          decodedTime,
+          capturedTime: capturedTime!,
+          decodedTime: decodedTime!,
           meanRgbDifference: absoluteDifference / (size.width * size.height * 3),
           witnessPixels,
+          visibleStyles: nativeText === 'styles' ? styledExportCells(actual) : undefined,
+          marker: cascade
+            ? {
+                rendered: styledMarkerRows(expected),
+                decoded: styledMarkerRows(actual),
+                resultTime: capturedTime! + args.fragmentOffset,
+                preview: previews![1]!,
+                cascade: {
+                  rendered: styledMarkerRows(cascade.expected),
+                  decoded: styledMarkerRows(cascade.actual),
+                  capturedTime: cascade.capturedTime!,
+                  decodedTime: cascade.decodedTime!,
+                  resultTime: cascade.capturedTime! + args.fragmentOffset,
+                  preview: previews![0]!,
+                },
+              }
+            : undefined,
           duration: await input.computeDuration(),
           metadataDuration: await input.getDurationFromMetadata(),
           decodedFrames,
@@ -1044,8 +1262,115 @@ export async function textCutClockProbe() {
   return results;
 }
 
+function markerRows(
+  canvas: HTMLCanvasElement,
+  bounds = { left: 0, top: 0, right: canvas.width, bottom: canvas.height }
+) {
+  const { width, height } = canvas;
+  const pixels = canvas.getContext('2d')!.getImageData(0, 0, width, height).data;
+  const bands: { left: number; right: number; top: number; bottom: number }[] = [];
+  for (let y = bounds.top; y < bounds.bottom; y++) {
+    let left = width;
+    let right = -1;
+    for (let x = bounds.left; x < bounds.right; x++) {
+      const index = (y * width + x) * 4;
+      if (pixels[index]! < 205 || pixels[index + 1]! < 172 || pixels[index + 2]! > 155) continue;
+      left = Math.min(left, x);
+      right = x;
+    }
+    if (right - left < 5) continue;
+    const last = bands.at(-1);
+    if (last && y === last.bottom + 1) {
+      last.left = Math.min(last.left, left);
+      last.right = Math.max(last.right, right);
+      last.bottom = y;
+    } else bands.push({ left, right, top: y, bottom: y });
+  }
+  return bands;
+}
+
+function styledMarkerRows(canvas: HTMLCanvasElement) {
+  // The marker occupies the upper-right cell. Keep the other titles out of its color mask.
+  return markerRows(canvas, {
+    left: Math.floor((canvas.width * 2) / 3),
+    top: 0,
+    right: canvas.width,
+    bottom: Math.floor(canvas.height / 2),
+  });
+}
+
+function styledExportCells(canvas: HTMLCanvasElement) {
+  const context = canvas.getContext('2d')!;
+  return REVIEW_TEXT_TEMPLATE_IDS.map((_, index) => {
+    const left = Math.floor(((index % 3) * canvas.width) / 3);
+    const top = Math.floor((Math.floor(index / 3) * canvas.height) / 2);
+    const data = context.getImageData(
+      left,
+      top,
+      Math.floor(canvas.width / 3),
+      canvas.height / 2
+    ).data;
+    let count = 0;
+    for (let offset = 0; offset < data.length; offset += 4) {
+      const difference =
+        Math.abs(data[offset]! - 18) +
+        Math.abs(data[offset + 1]! - 57) +
+        Math.abs(data[offset + 2]! - 74);
+      if (difference > 180) count++;
+    }
+    return count;
+  });
+}
+
+function prepareStyledTextWitness(columns: number) {
+  const witness = document.createElement('section');
+  witness.dataset['styledTitleWitness'] = '';
+  witness.style.cssText = `position:fixed; inset:0; z-index:10000; padding:16px; background:#191b20; color:white; display:grid; grid-template-columns:repeat(${columns},minmax(0,1fr)); align-content:start; gap:12px`;
+  document.body.append(witness);
+}
+
+function appendStyledTextWitness(scene: HTMLCanvasElement, title: string) {
+  const figure = document.createElement('figure');
+  const caption = document.createElement('figcaption');
+  caption.textContent = title;
+  scene.style.width = '100%';
+  figure.style.margin = '0';
+  figure.append(scene, caption);
+  document.querySelector('[data-styled-title-witness]')?.append(figure);
+}
+
+/** The same typography and composition with all built-ins over three kinds of footage. */
+export async function textStyleContactSheet() {
+  const size = { width: 640, height: 360 };
+  const clips = REVIEW_TEXT_TEMPLATE_IDS.map((style, order) =>
+    applyReviewTextTemplate(
+      createReviewAnnotationTextClip(style, 'Новый кадр\nСделано в Gallery', 0, 3, order),
+      reviewBuiltinTextTemplates[style]
+    )
+  );
+  const signal = new AbortController().signal;
+  await prepareReviewAnnotationTextFonts(clips, signal);
+  prepareStyledTextWitness(6);
+  const backgrounds = ['#f4ecdf', '#12394a', 'pattern'];
+  for (const background of backgrounds) {
+    for (const clip of clips) {
+      const canvas = surface(size);
+      const context = canvas.getContext('2d')!;
+      if (background === 'pattern') source().draw(context, 0, 0, size.width, size.height);
+      else {
+        context.fillStyle = background;
+        context.fillRect(0, 0, size.width, size.height);
+      }
+      drawReviewAnnotationText(context, clip, 1.25, size, size);
+      appendStyledTextWitness(canvas, clip.id);
+    }
+  }
+  return clips.map((clip) => reviewAnnotationTextFont(clip.appearance!, 24));
+}
+
 /** Sample reveal, hold and exit in actual Canvas, WebGPU and both export clocks. */
-export async function textClockProbe() {
+export async function textClockProbe(styled = false) {
+  if (styled) prepareStyledTextWitness(3);
   const size = { width: 640, height: 360 };
   const inputSize = { width: 160, height: 90 };
   const signal = new AbortController().signal;
@@ -1058,10 +1383,22 @@ export async function textClockProbe() {
     { id: 'head', kind: 'cut', start: 0, end: 0.75, requestedStart: 0, requestedEnd: 0.75 },
   ];
   const segments = buildReviewTimeMap(4, fullEdits);
-  const title = createReviewAnnotationTextClip('text', 'А Новый титр 👩🏽‍💻', 0.25, 1.9, 0);
+  const base = createReviewAnnotationTextClip(
+    'text',
+    styled ? 'Проверяем стиль\nКадр' : 'А Новый титр 👩🏽‍💻',
+    0.25,
+    1.9,
+    0
+  );
+  const title = styled ? applyReviewTextTemplate(base, reviewBuiltinTextTemplates.marker) : base;
   title.entrance = { ...title.entrance, duration: 0.45, preset: 'cascade' };
-  title.loop = { ...title.loop, preset: 'shine', period: 1.2 };
+  title.loop = { ...title.loop, preset: styled ? 'none' : 'shine', period: 1.2 };
   title.exit = { ...title.exit, duration: 0.45, preset: 'fade' };
+  if (title.appearance) {
+    title.appearance.weight = 800;
+    title.appearance.outline = { enabled: true, color: '#fffafa', opacity: 1, width: 0.07 };
+    title.fontSize = 0.105;
+  }
   const scene: Scene = {
     ...fixture([], 0, size, 'viewport'),
     source: inputSize,
@@ -1109,7 +1446,7 @@ export async function textClockProbe() {
     const prepared = await renderer.prepare(scene, settings.dimensions, signal);
     owner.admit(prepared);
     const results = [];
-    for (const [generation, time] of [0.54, 1.3, 1.59].entries()) {
+    for (const [generation, time] of (styled ? [0.44, 1.3, 1.59] : [0.54, 1.3, 1.59]).entries()) {
       const sourceTime = time + 0.5;
       const sample = await sink.getSample(sourceTime);
       if (!sample) throw new Error('Text proof frame is unavailable');
@@ -1140,9 +1477,22 @@ export async function textClockProbe() {
           const fullFrame = await full.renderAtTime(time);
           const fragmentFrame = await fragment.renderAtTime(time - 0.25);
           try {
+            if (styled && generation < 2) {
+              const exported = surface(size);
+              exported.getContext('2d')!.drawImage(fragmentFrame.canvas, 0, 0);
+              appendStyledTextWitness(expected, `Canvas · ${time.toFixed(2)} s`);
+              appendStyledTextWitness(gpuCopy, `WebGPU · ${time.toFixed(2)} s`);
+              appendStyledTextWitness(exported, `Fragment output · ${time.toFixed(2)} s`);
+            }
             results.push({
               time,
               backend: gpu.renderer.backend,
+              marker: styled
+                ? {
+                    canvas: markerRows(expected),
+                    gpu: markerRows(gpuCopy),
+                  }
+                : undefined,
               canvas: brightTextBounds(expected),
               gpu: brightTextBounds(gpuCopy),
               full: compare(expected, fullFrame.canvas),

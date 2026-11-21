@@ -100,6 +100,7 @@ import {
 } from './cut-transition-frames';
 import { QuickEditExportUnavailable } from './export-unavailable';
 import { prepareReviewCaptions } from './render-captions';
+import { prepareReviewAnnotationTextFonts } from './annotation-text-fonts';
 import { reviewCaptionReservations } from './caption-reservations';
 import {
   createReviewAnnotationRenderer,
@@ -389,6 +390,7 @@ async function prepareAssets(
   admit(false);
   assets.watermark = await watermark.paint(reviewWatermarkAssets(readAsset));
   signal.throwIfAborted();
+  await prepareReviewAnnotationTextFonts(scene.annotationEffects?.lane.textClips, signal);
   if (document.fonts) await document.fonts.ready;
   signal.throwIfAborted();
   if (scene.captions) {
@@ -1419,7 +1421,13 @@ export function createReviewPreviewRenderer(args: {
             args.allocation,
             controller.signal
           );
-          const captions = refresh ? await refresh : captured.assets.captions;
+          const [captions] = await Promise.all([
+            refresh ?? captured.assets.captions,
+            prepareReviewAnnotationTextFonts(
+              scene.annotationEffects?.lane.textClips,
+              controller.signal
+            ),
+          ]);
           controller.signal.throwIfAborted();
           if (disposed || current !== captured) throw new Error('Preview scene is stale.');
           if (refresh)

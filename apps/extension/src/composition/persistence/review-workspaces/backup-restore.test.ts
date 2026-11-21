@@ -1,3 +1,7 @@
+import {
+  applyReviewTextTemplate,
+  reviewBuiltinTextTemplates,
+} from '../../../features/video/review/annotation-effects/text-templates';
 import { createReviewAnnotationTextClip } from '../../../features/video/review/annotation-effects/text-animation';
 import type { CursorFocusPath } from '../../../features/video/project/cursor-focus-path/types';
 import { createQuickEditSpotlight } from '../../../features/video/project/scene/focus-appearance';
@@ -751,7 +755,10 @@ it('preserves recording-bound focus history across archived-source aliases and r
 });
 
 it('restores native annotation text, geometry and phase settings from the portable workspace', async () => {
-  const title = createReviewAnnotationTextClip('title', 'Восстановлено', 2, 5, 0);
+  const title = applyReviewTextTemplate(
+    createReviewAnnotationTextClip('title', 'Восстановлено', 2, 5, 0),
+    reviewBuiltinTextTemplates.marker
+  );
   title.entrance.preset = 'words';
   title.loop = { preset: 'sway', amount: 0.5, period: 2.2 };
   title.exit.preset = 'blur';

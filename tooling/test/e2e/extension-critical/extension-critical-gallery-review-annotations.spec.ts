@@ -807,18 +807,24 @@ for (const locale of ['en', 'ru'] as const) {
       await page.getByRole('option', { name, exact: true }).click();
     };
     try {
-      await applyHarnessBootstrap(page, {
-        preserveMediaLibrary: true,
-        storage: {
-          'sniptale-locale-preference': locale,
-          sniptale_quick_preview_preferences: {
-            rasterPreset: locale === 'ru' ? 'current' : '360p',
-            frameRate: locale === 'ru' ? 'current' : '30',
-            pausedQuality: 'same',
-            showFrameRate: false,
+      await page.addInitScript((locale) => {
+        // The HTTP harness resets its chrome.storage mock on navigation. Replay the value that
+        // the app actually wrote, as a persistent browser profile does on a new page.
+        const saved = sessionStorage.getItem('gallery-template-proof');
+        window.__sniptaleHarnessBootstrap = {
+          preserveMediaLibrary: true,
+          storage: {
+            'sniptale-locale-preference': locale,
+            sniptale_quick_preview_preferences: {
+              rasterPreset: locale === 'ru' ? 'current' : '360p',
+              frameRate: locale === 'ru' ? 'current' : '30',
+              pausedQuality: 'same',
+              showFrameRate: false,
+            },
+            ...(saved ? { sniptale_gallery_annotation_text_templates: JSON.parse(saved) } : {}),
           },
-        },
-      });
+        };
+      }, locale);
       await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
@@ -840,6 +846,47 @@ for (const locale of ['en', 'ru'] as const) {
       await text.fill('Заголовок 👩🏽‍💻');
       await text.press('Tab');
       await expect.poll(async () => (await clip())?.text).toBe('Заголовок 👩🏽‍💻');
+
+      const video = dialog.locator('[data-ui="gallery.videoReview.stage"] video').first();
+      await video.evaluate((node: HTMLVideoElement) => {
+        node.currentTime = 0.8;
+      });
+      await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.seeking)).toBe(false);
+      const template = (name: 'clean' | 'block' | 'marker') =>
+        inspector.getByRole('button', {
+          name: label(`gallery.videoReview.annotationTextTemplate_${name}`),
+          exact: true,
+        });
+      const original = (await clip())!;
+      await template('block').click();
+      await expect.poll(clip).toMatchObject({
+        text: original.text,
+        transform: original.transform,
+        start: original.start,
+        end: original.end,
+        appearance: { background: { mode: 'block' } },
+        entrance: { preset: 'fade' },
+      });
+      await template('marker').click();
+      await expect.poll(clip).toMatchObject({
+        text: original.text,
+        transform: original.transform,
+        start: original.start,
+        end: original.end,
+        appearance: { background: { mode: 'marker' } },
+        entrance: { preset: 'cascade' },
+      });
+      await button('gallery.videoReview.undo').click();
+      await expect.poll(async () => (await clip())?.appearance?.background.mode).toBe('block');
+      await button('gallery.videoReview.redo').click();
+      await expect.poll(async () => (await clip())?.appearance?.background.mode).toBe('marker');
+      await template('clean').click();
+      await expect.poll(clip).toEqual(original);
+      await expect(template('clean')).toHaveAttribute('aria-pressed', 'true');
+      await dialog.locator('.review-inspector-scroll').evaluate((panel) => {
+        panel.scrollTop = 0;
+      });
+      await page.screenshot({ path: info.outputPath('text-template-picker.png'), fullPage: false });
 
       const move = dialog.getByRole('button', {
         name: label('gallery.videoReview.annotationTextMove'),
@@ -898,12 +945,34 @@ for (const locale of ['en', 'ru'] as const) {
         }),
         label('gallery.videoReview.annotationTextPreset_blur')
       );
+      const duration = (phase: 'Entrance' | 'Exit') =>
+        inspector
+          .getByRole('group', {
+            name: label(`gallery.videoReview.annotationText${phase}`),
+            exact: true,
+          })
+          .getByRole('textbox', {
+            name: label('gallery.videoReview.annotationTextPhaseTime'),
+            exact: true,
+          });
+      const changeNumber = async (field: Locator, en: string) => {
+        await field.fill(en);
+        await field.press('Tab');
+      };
+      await changeNumber(duration('Entrance'), '0.62');
+      await changeNumber(
+        inspector.getByRole('textbox', {
+          name: label('gallery.videoReview.annotationTextPeriod'),
+          exact: true,
+        }),
+        '2.25'
+      );
+      await changeNumber(duration('Exit'), '0.48');
       await expect.poll(clip).toMatchObject({
-        entrance: { preset: 'cascade' },
-        loop: { preset: 'shine' },
-        exit: { preset: 'blur' },
+        entrance: { preset: 'cascade', duration: 0.62 },
+        loop: { preset: 'shine', period: 2.25 },
+        exit: { preset: 'blur', duration: 0.48 },
       });
-      const video = dialog.locator('[data-ui="gallery.videoReview.stage"] video').first();
       await video.evaluate((node: HTMLVideoElement) => {
         node.currentTime = 1.2;
       });
@@ -936,9 +1005,9 @@ for (const locale of ['en', 'ru'] as const) {
         fullPage: false,
       });
       await button('gallery.videoReview.undo').click();
-      await expect.poll(async () => (await clip())?.exit.preset).toBe('none');
+      await expect.poll(async () => (await clip())?.exit.duration).toBe(0.35);
       await button('gallery.videoReview.redo').click();
-      await expect.poll(async () => (await clip())?.exit.preset).toBe('blur');
+      await expect.poll(async () => (await clip())?.exit.duration).toBe(0.48);
 
       await selectCatalogOption(
         button('gallery.videoReview.annotationEffectsAdd'),
@@ -959,6 +1028,99 @@ for (const locale of ['en', 'ru'] as const) {
       await plates.filter({ hasText: 'Заголовок' }).click();
       await expect(inspector).toBeVisible();
       await expect.poll(clip).toEqual(saved);
+
+      const appearanceTab = inspector.getByRole('tab', {
+        name: label('gallery.videoReview.annotationTextAppearance'),
+        exact: true,
+      });
+      if (await appearanceTab.isVisible()) await appearanceTab.click();
+      await selectCatalogOption(
+        inspector.getByRole('button', {
+          name: label('gallery.videoReview.annotationTextWeight'),
+          exact: true,
+        }),
+        '800'
+      );
+      await expect.poll(async () => (await clip())?.appearance?.weight).toBe(800);
+      const custom = (await clip())!;
+      await page.screenshot({ path: info.outputPath('text-style-controls.png'), fullPage: false });
+      const actionMenu = dialog.locator(
+        '[data-ui="gallery.videoReview.inspectorActionMenuTrigger"]'
+      );
+      await actionMenu.click();
+      const saveAs = label('gallery.videoReview.annotationTextTemplateSave');
+      await dialog.getByRole('menuitem', { name: saveAs, exact: true }).click();
+      const name = inspector.getByRole('textbox', {
+        name: label('gallery.videoReview.annotationTextTemplateName'),
+        exact: true,
+      });
+      await expect(name).toBeFocused();
+      await name.fill('Мой титр');
+      await inspector
+        .getByRole('button', {
+          name: label('gallery.videoReview.annotationTextTemplateConfirm'),
+          exact: true,
+        })
+        .click();
+      await expect(name).toHaveCount(0);
+      await page.evaluate(() => {
+        const profile = window.__sniptaleHarness?.getStorageState();
+        const saved = profile?.['sniptale_gallery_annotation_text_templates'];
+        if (!saved) throw new Error('Missing profile template write');
+        sessionStorage.setItem('gallery-template-proof', JSON.stringify(saved));
+      });
+      await page.goto(
+        `${host.origin}${GALLERY_HARNESS_PATH}?mediaId=${encodeURIComponent(savedProject!)}&mode=edit`
+      );
+      await expect(dialog).toBeVisible();
+      await button('gallery.videoReview.moreActions').click();
+      await page
+        .getByRole('menuitem', {
+          name: label('videoEditor.app.newProjectAction'),
+          exact: true,
+        })
+        .click();
+      const advanced = button('gallery.videoReview.advancedEditing');
+      await advanced.click();
+      await dialog
+        .locator('[data-review-header-track="annotationEffects"] [data-review-track-select]')
+        .click();
+      await button('gallery.videoReview.annotationTextAdd').click();
+      const mine = inspector.getByRole('button', { name: 'Мой титр', exact: true });
+      await expect(mine).toBeVisible();
+      await mine.click();
+      await text.fill('Новый проект');
+      await text.press('Tab');
+      await expect.poll(projectId).not.toBe(savedProject);
+      await expect.poll(clip).toMatchObject({
+        text: 'Новый проект',
+        color: custom.color,
+        fontSize: custom.fontSize,
+        appearance: custom.appearance,
+        entrance: custom.entrance,
+        loop: custom.loop,
+        exit: custom.exit,
+      });
+      await inspector
+        .getByRole('button', {
+          name: label('gallery.videoReview.annotationTextTemplateDelete'),
+          exact: true,
+        })
+        .click();
+      await expect(mine).toHaveCount(0);
+      const newSaved = await clip();
+      await page.evaluate(() => {
+        const profile = window.__sniptaleHarness?.getStorageState();
+        sessionStorage.setItem(
+          'gallery-template-proof',
+          JSON.stringify(profile?.['sniptale_gallery_annotation_text_templates'])
+        );
+      });
+      await page.reload();
+      await expect(dialog).toBeVisible();
+      await plates.filter({ hasText: 'Новый проект' }).click();
+      await expect(mine).toHaveCount(0);
+      await expect.poll(clip).toEqual(newSaved);
     } finally {
       await new Promise<void>((resolve, reject) =>
         host.server.close((error) => (error ? reject(error) : resolve()))

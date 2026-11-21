@@ -34,7 +34,11 @@ export function seedInterfaceFontConsumers(root: string) {
     'apps/extension/manifest.json',
     JSON.stringify({ web_accessible_resources: [{ resources: [fontPath] }] })
   );
-  write(root, 'apps/extension/build/layout.data.json', JSON.stringify({ required: [fontPath] }));
+  write(
+    root,
+    'apps/extension/build/layout.data.json',
+    JSON.stringify({ requiredReleaseArtifacts: [fontPath] })
+  );
   write(root, 'apps/extension/vite.config.ts', `${fontPath}\n`);
   write(root, 'packages/ui/src/styles/fonts.css', `${fontPath}\n`);
 }
@@ -56,7 +60,9 @@ export function seedDocumentFont(root: string) {
   write(
     root,
     'apps/extension/build/layout.data.json',
-    JSON.stringify({ required: ['assets/golos-ui-vf.woff2', 'assets/golos-text-vf.woff2'] })
+    JSON.stringify({
+      requiredReleaseArtifacts: ['assets/golos-ui-vf.woff2', 'assets/golos-text-vf.woff2'],
+    })
   );
   return asset;
 }

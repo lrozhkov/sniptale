@@ -7,13 +7,10 @@ import {
   type ReviewAnnotationTextClip,
 } from '../../features/video/review/annotation-effects/types';
 import { translate } from '../../platform/i18n';
-import {
-  ColorField,
-  NumericRow,
-  SelectField,
-  TextareaField,
-  ToggleField,
-} from '../../ui/compact-inspector-controls';
+import { NumericRow, SelectField, TextareaField } from '../../ui/compact-inspector-controls';
+import { applyReviewTextTemplate } from '../../features/video/review/annotation-effects/text-templates';
+import { ReviewAnnotationTextAppearance } from './annotation-text-appearance';
+import { useReviewAnnotationTextTemplates } from './annotation-text-templates';
 import type { useReviewAnnotationEffects } from './annotation-effects-editor';
 import {
   ReviewButton,
@@ -35,6 +32,9 @@ export function ReviewAnnotationTextInspector({ editor, clip, busy }: Props) {
   const cancelling = useRef(false);
   const change = (edit: (current: ReviewAnnotationTextClip) => ReviewAnnotationTextClip) =>
     editor.changeText(clip.id, edit);
+  const templates = useReviewAnnotationTextTemplates(clip, disabled, (template) =>
+    change((item) => applyReviewTextTemplate(item, template))
+  );
   const phases = [
     { id: 'entrance', label: translate('gallery.videoReview.annotationTextEntrance') },
     { id: 'hold', label: translate('gallery.videoReview.annotationTextHold') },
@@ -46,30 +46,39 @@ export function ReviewAnnotationTextInspector({ editor, clip, busy }: Props) {
       label: translate('gallery.videoReview.annotationText'),
       icon: Type,
       content: (
-        <TextareaField
-          clearable={false}
-          label={translate('gallery.videoReview.annotationText')}
-          disabled={disabled}
-          value={visible.text}
-          onChange={(text) => {
-            if (editor.gestureId === clip.id || editor.beginGesture(clip.id, 'field'))
-              editor.previewGesture({ text: text.slice(0, 4096) });
-          }}
-          onBlur={() => {
-            if (!cancelling.current) void editor.commitGesture();
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              event.preventDefault();
-              event.stopPropagation();
-              cancelling.current = true;
-              editor.cancelGesture();
-              event.currentTarget.blur();
-              cancelling.current = false;
-            }
-          }}
-        />
+        <>
+          {templates.picker}
+          <TextareaField
+            clearable={false}
+            label={translate('gallery.videoReview.annotationText')}
+            disabled={disabled}
+            value={visible.text}
+            onChange={(text) => {
+              if (editor.gestureId === clip.id || editor.beginGesture(clip.id, 'field'))
+                editor.previewGesture({ text: text.slice(0, 4096) });
+            }}
+            onBlur={() => {
+              if (!cancelling.current) void editor.commitGesture();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                cancelling.current = true;
+                editor.cancelGesture();
+                event.currentTarget.blur();
+                cancelling.current = false;
+              }
+            }}
+          />
+        </>
       ),
+    },
+    {
+      id: 'appearance',
+      label: translate('gallery.videoReview.annotationTextAppearance'),
+      icon: Paintbrush,
+      content: <ReviewAnnotationTextAppearance clip={clip} disabled={disabled} change={change} />,
     },
     {
       id: 'animation',
@@ -94,45 +103,9 @@ export function ReviewAnnotationTextInspector({ editor, clip, busy }: Props) {
         </fieldset>
       )),
     },
-    {
-      id: 'appearance',
-      label: translate('videoEditor.effectsLibrary.objectAppearance'),
-      icon: Paintbrush,
-      content: (
-        <>
-          <ToggleField
-            label={translate('gallery.videoReview.annotationEnabled')}
-            value={clip.enabled}
-            disabled={disabled}
-            onChange={(enabled) => change((item) => ({ ...item, enabled }))}
-          />
-          <ColorField
-            title={translate('gallery.videoReview.annotationTextColor')}
-            allowAlpha={false}
-            allowTransparent={false}
-            label={translate('gallery.videoReview.annotationTextColor')}
-            value={clip.color}
-            disabled={disabled}
-            onChange={(color) => change((item) => ({ ...item, color: color.slice(0, 7) }))}
-          />
-          <NumericRow
-            appearance="plain"
-            label={translate('gallery.videoReview.annotationTextFontSize')}
-            value={clip.fontSize * 100}
-            disabled={disabled}
-            unit="%"
-            min={0.5}
-            max={50}
-            precision={1}
-            step={0.5}
-            onPreviewValue={() => undefined}
-            onCommitValue={(size) => change((item) => ({ ...item, fontSize: size / 100 }))}
-          />
-        </>
-      ),
-    },
     reviewInspectorActions(
       <>
+        {templates.save}
         <ReviewButton
           label={translate('gallery.videoReview.annotationDuplicate')}
           className={reviewTextButtonClassName}
@@ -168,7 +141,8 @@ export function ReviewAnnotationTextInspector({ editor, clip, busy }: Props) {
           />
         </div>
       )}
-      <ReviewInspectorSections sections={sections} />
+      {templates.form}
+      <ReviewInspectorSections sections={sections} rememberSection={false} />
     </div>
   );
 }

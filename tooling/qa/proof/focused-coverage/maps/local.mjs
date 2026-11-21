@@ -498,6 +498,72 @@ purged-root refusal and recovery validation.`,
   },
 
   {
+    owner: 'gallery-annotation-text-inspector',
+    productionFile: 'apps/extension/src/gallery/video-review/annotation-text-appearance.tsx',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'The mounted title inspector uses the project command and profile catalog for distinct writes.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/annotation-text-interactions.test.tsx',
+      'apps/extension/src/gallery/video-review/annotation-effects-editor.test.tsx',
+      'apps/extension/src/composition/persistence/annotation-text-templates/storage.test.ts',
+    ],
+  },
+  {
+    owner: 'gallery-annotation-text-inspector',
+    productionFile: 'apps/extension/src/gallery/video-review/annotation-text-inspector.tsx',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'The mounted title inspector uses the project command and profile catalog for distinct writes.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/annotation-text-interactions.test.tsx',
+      'apps/extension/src/gallery/video-review/annotation-effects-editor.test.tsx',
+      'apps/extension/src/composition/persistence/annotation-text-templates/storage.test.ts',
+    ],
+  },
+  {
+    owner: 'gallery-annotation-text-inspector',
+    productionFile: 'apps/extension/src/gallery/video-review/annotation-text-templates.tsx',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'The mounted title inspector uses the project command and profile catalog for distinct writes.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/annotation-text-interactions.test.tsx',
+      'apps/extension/src/gallery/video-review/annotation-effects-editor.test.tsx',
+      'apps/extension/src/composition/persistence/annotation-text-templates/storage.test.ts',
+    ],
+  },
+  {
+    owner: 'gallery-annotation-text-inspector',
+    productionFile:
+      'apps/extension/src/gallery/video-review/use-annotation-text-template-catalog.ts',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'The mounted title inspector uses the project command and profile catalog for distinct writes.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/annotation-text-interactions.test.tsx',
+      'apps/extension/src/gallery/video-review/annotation-effects-editor.test.tsx',
+      'apps/extension/src/composition/persistence/annotation-text-templates/storage.test.ts',
+    ],
+  },
+  {
+    owner: 'gallery-annotation-text-layout',
+    productionFile: 'apps/extension/src/workflows/video-review/annotation-text-layout.ts',
+    exclusive: true,
+    reason: 'The shared frame renderer retains geometry through reveal, hold, preview and export.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/draw-annotation-text.test.ts',
+      'apps/extension/src/workflows/video-review/annotation-text-fonts.test.ts',
+      'apps/extension/src/workflows/video-review/render-preview.test.ts',
+      'apps/extension/src/workflows/video-review/gpu-preview-geometry.test.ts',
+      'apps/extension/src/workflows/video-review/export-lifecycle.test.ts',
+    ],
+  },
+  {
     owner: 'review-inspector-section-consumers',
     productionFile: 'apps/extension/src/gallery/video-review/inspector-sections.tsx',
     reason:

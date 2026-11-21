@@ -1,3 +1,4 @@
+import type { ReviewTextAppearance } from './text-appearance';
 import type { ReviewVisualPlacement } from '../visual-anchor';
 /** Canonical plane fractions; rotation is clockwise radians around the body centre. */
 export interface ReviewAnnotationEffectTransform {
@@ -84,6 +85,7 @@ export interface ReviewAnnotationTextClip {
   transform: ReviewAnnotationEffectTransform;
   color: string;
   fontSize: number;
+  appearance?: ReviewTextAppearance;
   order: number;
   entrance: ReviewTextTransition;
   loop: ReviewTextLoop;

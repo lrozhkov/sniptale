@@ -38,15 +38,16 @@ export function validatePackages(root, policy, inventory) {
 
 function validateBundledFontConsumers(root, artifacts, releaseConsumers) {
   const errors = [];
-  const fileNames = artifacts.map((entry) => path.basename(entry.path)).sort();
   const publicFileNames = artifacts
     .filter((entry) => entry.path.startsWith('apps/extension/public/fonts/'))
     .map((entry) => path.basename(entry.path));
   const manifest = JSON.parse(
     readFileSync(path.resolve(root, 'apps/extension/manifest.json'), 'utf8')
   );
-  const manifestFonts = (manifest.web_accessible_resources ?? [])
-    .flatMap((entry) => entry.resources ?? [])
+  const exposed = (manifest.web_accessible_resources ?? []).flatMap(
+    (entry) => entry.resources ?? []
+  );
+  const manifestFonts = exposed
     .filter((entry) => entry.startsWith('fonts/'))
     .map((entry) => entry.slice('fonts/'.length));
   if (!sameStringSet(publicFileNames, manifestFonts))
@@ -54,17 +55,20 @@ function validateBundledFontConsumers(root, artifacts, releaseConsumers) {
   const layout = JSON.parse(
     readFileSync(path.resolve(root, 'apps/extension/build/layout.data.json'), 'utf8')
   );
-  const layoutText = JSON.stringify(layout);
+  const required = Array.isArray(layout.requiredReleaseArtifacts)
+    ? layout.requiredReleaseArtifacts
+    : [];
+  if (exposed.some((entry) => entry.startsWith('gallery-fonts/')))
+    errors.push('Gallery fonts must remain private to extension pages');
   const styleConsumers = releaseConsumers
     .filter((entry) => entry.category === 'bundled-font' && entry.path.endsWith('.css'))
     .map((entry) => readFileSync(path.resolve(root, entry.path), 'utf8'));
-  for (const fileName of fileNames) {
-    if (
-      !layoutText.includes(
-        `${['golos-ui-vf.woff2', 'golos-text-vf.woff2'].includes(fileName) ? 'assets' : 'fonts'}/${fileName}`
-      ) ||
-      !styleConsumers.some((styles) => styles.includes(fileName))
-    ) {
+  for (const artifact of artifacts) {
+    const fileName = path.basename(artifact.path);
+    const output = artifact.path.startsWith('apps/extension/public/')
+      ? artifact.path.slice('apps/extension/public/'.length)
+      : `assets/${fileName}`;
+    if (!required.includes(output) || !styleConsumers.some((styles) => styles.includes(fileName))) {
       errors.push(`bundled font consumer drift: ${fileName}`);
     }
   }
@@ -73,6 +77,34 @@ function validateBundledFontConsumers(root, artifacts, releaseConsumers) {
 
 function validateBundledAssetSourceParity(root, asset) {
   const errors = [];
+  if (
+    asset.artifacts.some((artifact) =>
+      artifact.path.startsWith('apps/extension/public/gallery-fonts/')
+    )
+  ) {
+    const expectedArtifacts = ['cyrillic', 'latin'].map(
+      (subset) => `apps/extension/public/gallery-fonts/${asset.id}-${subset}-wght-normal.woff2`
+    );
+    const archive = `https://registry.npmjs.org/@fontsource-variable/${asset.id}/-/${asset.id}-${asset.version}.tgz`;
+    if (
+      !/^[a-z-]+$/u.test(asset.id) ||
+      !/^\d+\.\d+\.\d+$/u.test(asset.version) ||
+      asset.sourcePackage !== `@fontsource-variable/${asset.id}` ||
+      asset.license !== 'OFL-1.1' ||
+      asset.licensePath !== `LICENSES/fonts/${asset.id}.txt` ||
+      asset.sourceArchive !== archive ||
+      !/^[a-f0-9]{64}$/u.test(asset.sourceArchiveSha256) ||
+      !sameStringSet(
+        asset.artifacts.map(({ path }) => path),
+        expectedArtifacts
+      ) ||
+      asset.artifacts.some(
+        (artifact) => artifact.sourcePath !== `package/files/${path.basename(artifact.path)}`
+      )
+    )
+      errors.push(`Gallery font provenance drift: ${asset.id}`);
+    return errors;
+  }
   for (const artifact of asset?.artifacts ?? []) {
     const expectedSourcePath =
       asset.id === 'golos-ui'

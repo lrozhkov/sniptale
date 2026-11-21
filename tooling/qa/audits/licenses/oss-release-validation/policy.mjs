@@ -3,7 +3,6 @@ import path from 'node:path';
 
 import {
   CANONICAL_LICENSE_DIGESTS,
-  DOCUMENT_FONT_LICENSE_PATH,
   REQUIRED_RELEASE_LEGAL_PATHS,
   releaseLegalArchivePath,
   sha256,
@@ -101,9 +100,9 @@ export function validateLegalFiles(root, policy) {
   }
   const expectedLegalPaths = new Set([
     ...REQUIRED_RELEASE_LEGAL_PATHS.map(releaseLegalArchivePath),
-    ...(policy.bundledAssets.some((asset) => asset.id === 'golos-text')
-      ? [releaseLegalArchivePath(DOCUMENT_FONT_LICENSE_PATH)]
-      : []),
+    ...policy.bundledAssets.flatMap((asset) =>
+      asset.licensePath ? [releaseLegalArchivePath(asset.licensePath)] : []
+    ),
     policy.dependencyLegal.manifestPath,
     ...dependencyArchivePaths,
     ...bundledLegalPaths,

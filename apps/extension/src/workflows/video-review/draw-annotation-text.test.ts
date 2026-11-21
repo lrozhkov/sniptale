@@ -1,16 +1,32 @@
-import { expect, it, vi } from 'vitest';
-import { createReviewAnnotationTextClip } from '../../features/video/review/annotation-effects/text-animation';
 import {
-  drawReviewAnnotationText,
-  layoutReviewAnnotationTextUnits,
-  reviewViewportAnnotationLayers,
-} from './draw-annotation-text';
+  applyReviewTextTemplate,
+  reviewBuiltinTextTemplates,
+} from '../../features/video/review/annotation-effects/text-templates';
+import { expect, it, vi } from 'vitest';
+import { layoutReviewAnnotationText } from './annotation-text-layout';
+import { legacyReviewTextAppearance } from '../../features/video/review/annotation-effects/text-appearance';
+import { createReviewAnnotationTextClip } from '../../features/video/review/annotation-effects/text-animation';
+import { drawReviewAnnotationText, reviewViewportAnnotationLayers } from './draw-annotation-text';
 
 it('keeps combined accents and joined emoji intact and measures against the full line', () => {
   const measure = (text: string) => Array.from(text).length * 10;
   const accent = 'е\u0301';
   const emoji = '👩🏽‍💻';
-  expect(layoutReviewAnnotationTextUnits([`А ${accent}${emoji}`], 'grapheme', measure)).toEqual([
+  const context = {
+    measureText: (text: string) => ({ width: measure(text) }),
+    save: vi.fn(),
+    restore: vi.fn(),
+  } as unknown as CanvasRenderingContext2D;
+  const clip = createReviewAnnotationTextClip('title', `А ${accent}${emoji}`, 0, 1, 0);
+  const layout = layoutReviewAnnotationText(
+    context,
+    clip,
+    100,
+    10,
+    legacyReviewTextAppearance,
+    '600 10px Arial'
+  );
+  expect(layout.units('grapheme', context)).toEqual([
     { text: 'А', row: 0, x: -40, width: 10 },
     { text: accent, row: 0, x: -20, width: 20 },
     { text: emoji, row: 0, x: 0, width: 40 },
@@ -94,3 +110,39 @@ it.each([0.000001, 16])(
     expect(measured).toBeGreaterThan(0);
   }
 );
+
+it('keeps marker bounds stable in typewriter and aligns single-line text to the frame', () => {
+  const base = createReviewAnnotationTextClip('test', 'Первая строка\nКадр', 0, 3, 0);
+  const clip = applyReviewTextTemplate(base, reviewBuiltinTextTemplates.marker);
+  clip.entrance = { ...clip.entrance, preset: 'typewriter', duration: 1 };
+  const rectangle = vi.fn();
+  const fill = vi.fn();
+  const context = {
+    fillRect: rectangle,
+    fillText: fill,
+    save: vi.fn(),
+    restore: vi.fn(),
+    translate: vi.fn(),
+    rotate: vi.fn(),
+    scale: vi.fn(),
+    measureText: (text: string) => ({ width: text.length * 10 }),
+  } as unknown as CanvasRenderingContext2D;
+  const size = { width: 640, height: 360 };
+  drawReviewAnnotationText(context, clip, 0.3, size, size);
+  expect(rectangle.mock.calls).toHaveLength(1);
+  const first = rectangle.mock.calls[0];
+  rectangle.mockClear();
+  drawReviewAnnotationText(context, clip, 1.5, size, size);
+  expect(rectangle.mock.calls).toHaveLength(2);
+  expect(rectangle.mock.calls[0]).toEqual(first);
+  expect(rectangle.mock.calls[1]?.[2]).toBeLessThan(first?.[2] ?? 0);
+
+  clip.text = 'Кадр';
+  fill.mockClear();
+  drawReviewAnnotationText(context, clip, 1.5, size, size);
+  const x = fill.mock.calls[0]?.[1];
+  clip.appearance!.align = 'right';
+  fill.mockClear();
+  drawReviewAnnotationText(context, clip, 1.5, size, size);
+  expect(fill.mock.calls[0]?.[1]).toBeGreaterThan(x);
+});

@@ -54,6 +54,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/persistence/aggregate-presentations`
 - `apps/extension/src/composition/persistence/ai-settings`
 - `apps/extension/src/composition/persistence/annotation-template-tags`
+- `apps/extension/src/composition/persistence/annotation-text-templates`
 - `apps/extension/src/composition/persistence/asset-publication-recovery`
 - `apps/extension/src/composition/persistence/assets`
 - `apps/extension/src/composition/persistence/audio-presets`

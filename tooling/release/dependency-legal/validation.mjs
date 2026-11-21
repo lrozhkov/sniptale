@@ -156,6 +156,7 @@ export async function validateDependencyLegalClosure(root = process.cwd()) {
     entries: closure.entries,
     interfaceFont: interfaceFontMetadata(policy),
     documentFont: policy.bundledAssets.find((asset) => asset.id === 'golos-text'),
+    galleryFonts: policy.bundledAssets.filter((asset) => asset.sourceArchive !== undefined),
     bundledAssets: assets,
   });
   let notices;

@@ -815,3 +815,82 @@
     background: var(--sniptale-color-surface-hover) !important;
   }
 }
+
+.review-text-template-picker,
+.review-text-template-group {
+  display: grid;
+  gap: 6px;
+  min-inline-size: 0;
+}
+.review-text-template-picker {
+  gap: 10px;
+}
+.review-text-template-group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.review-text-template-group legend,
+.review-text-template-status {
+  color: var(--sniptale-color-text-secondary);
+  font-size: var(--sniptale-compact-font-size, 12px);
+}
+.review-text-template-group legend {
+  margin-block-end: 5px;
+}
+.review-text-template-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 78px), 1fr));
+  gap: 5px;
+}
+button.review-text-template-option {
+  min-inline-size: 0;
+  padding: 4px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: var(--sniptale-radius-sm);
+  color: var(--sniptale-color-text-primary);
+  font-size: var(--sniptale-compact-font-size, 12px);
+}
+.review-text-template-option:enabled:hover {
+  background: var(--sniptale-color-surface-hover);
+}
+.review-text-template-option:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 1px;
+}
+.review-text-template-option:disabled {
+  opacity: 0.55;
+}
+button.review-text-template-option[data-command-press] > .sniptale-command-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  inline-size: 100%;
+  gap: 4px;
+}
+.review-text-template-option[aria-pressed='true'] {
+  border-color: var(--sniptale-color-accent);
+}
+.review-text-template-sample {
+  display: grid;
+  place-items: center;
+  min-block-size: 26px;
+  overflow: hidden;
+  border-radius: var(--sniptale-radius-xs, 3px);
+  background-color: #35363c;
+  font-size: 16px;
+  line-height: 1.2;
+  paint-order: stroke fill;
+}
+.review-text-template-label {
+  font-size: 11px;
+  line-height: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.review-text-template-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
